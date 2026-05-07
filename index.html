@@ -7,6 +7,32 @@
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  /* ============================================================
+     SUPABASE CONFIG — Sprint 3
+     ============================================================ */
+  window.SUPABASE_CONFIG = {
+    url: 'https://mqsgptraslgpyzbpndlg.supabase.co',
+    anonKey: 'sb_publishable_hSoyaWrYCrNRf1NV3LRFkQ_bPGgXkJb',
+    enabled: true,  // ตั้ง false เพื่อปิด Supabase (กลับไปใช้ LocalStorage อย่างเดียว)
+  };
+  // Initialize Supabase client (after DOM ready)
+  window.addEventListener('DOMContentLoaded', () => {
+    if (window.SUPABASE_CONFIG.enabled && window.supabase) {
+      try {
+        window.sb = window.supabase.createClient(
+          window.SUPABASE_CONFIG.url,
+          window.SUPABASE_CONFIG.anonKey,
+          { auth: { persistSession: true, autoRefreshToken: true } }
+        );
+        console.log('✅ Supabase client initialized');
+      } catch(e) {
+        console.error('❌ Supabase init failed:', e);
+      }
+    }
+  });
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Sarabun', sans-serif; }
@@ -3343,11 +3369,72 @@ const app = createApp({
     }
     window._showToast = showToast;
 
-    function login() {
+    /* ============================================================
+       Supabase Auth Helpers — Sprint 3 Phase A
+       ============================================================ */
+    async function loginWithSupabase(emailOrUsername, password) {
+      if (!window.sb) throw new Error('Supabase ยังไม่พร้อม — refresh หน้า');
+      // Allow login by email OR by username (lookup email from user_profiles)
+      let email = emailOrUsername;
+      if (!email.includes('@')) {
+        // username → lookup email from user_profiles
+        const { data: profile, error: pErr } = await window.sb
+          .from('user_profiles').select('email').eq('username', emailOrUsername).maybeSingle();
+        if (pErr) throw new Error('lookup error: '+pErr.message);
+        if (!profile?.email) throw new Error('ไม่พบ user "'+emailOrUsername+'" ใน Supabase');
+        email = profile.email;
+      }
+      const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(error.message);
+      // Fetch user_profile
+      const { data: profile, error: pErr } = await window.sb
+        .from('user_profiles').select('*').eq('user_id', data.user.id).maybeSingle();
+      if (pErr) throw new Error('profile error: '+pErr.message);
+      if (!profile) throw new Error('User ใน Supabase ไม่มี profile — แจ้ง admin');
+      return { authUser: data.user, session: data.session, profile };
+    }
+
+    async function logoutSupabase() {
+      if (window.sb) {
+        try { await window.sb.auth.signOut(); } catch(e) { console.warn('signOut error:', e); }
+      }
+    }
+
+    async function login() {
       loginError.value = '';
-      if (!loginForm.username) { loginError.value = 'กรุณาใส่ Username'; return; }
+      if (!loginForm.username) { loginError.value = 'กรุณาใส่ Username/Email'; return; }
       if (!loginForm.password) { loginError.value = 'กรุณาใส่ Password'; return; }
-      // Lookup user in db.users by username
+
+      /* Try Supabase Auth first (if enabled) */
+      const useSupabase = window.SUPABASE_CONFIG?.enabled && window.sb;
+      if (useSupabase) {
+        try {
+          const { authUser, profile } = await loginWithSupabase(loginForm.username, loginForm.password);
+          currentUser.value = {
+            username: profile.username || loginForm.username,
+            role: profile.role || 'User',
+            roleId: 'R-'+(profile.role||'USER').toUpperCase(),
+            userId: profile.user_id,
+            authId: authUser.id,
+            email: profile.email || authUser.email,
+            branchId: (profile.branch_ids && profile.branch_ids[0]) || '',
+            branchIds: profile.branch_ids || [],
+            mustChangePwd: false,
+            loginAt: new Date().toISOString(),
+            authSource: 'supabase',
+          };
+          loginForm.password = '';
+          window.$erp.logActivity('LOGIN', '-', currentUser.value.username, 'role='+currentUser.value.role+' (Supabase)');
+          showToast('เข้าสู่ระบบสำเร็จ ☁️ (Supabase)','success');
+          return;
+        } catch(e) {
+          // Fallback: try local login below
+          console.warn('Supabase login failed, trying local:', e.message);
+          loginError.value = '⚠ Supabase: '+e.message+' — ลอง local fallback...';
+        }
+      }
+
+      /* Fallback — Local LocalStorage login */
       const userRec = (db.users||[]).find(u => u && u.username === loginForm.username && u.active !== false);
       if (!userRec) {
         loginError.value = '❌ ไม่พบ user "'+loginForm.username+'" หรือถูกระงับการใช้งาน';
@@ -27505,10 +27592,180 @@ app.component('view-backup', {
     /* Run auto-backup on mount if enabled */
     if (autoBackupEnabled.value) runAutoBackup();
 
+    /* ============================================================
+       SUPABASE MIGRATION — Sprint 3 Phase B
+       ============================================================ */
+    const migrating = ref(false);
+    const migrateLog = ref([]);
+    const migrateProgress = ref({ current: 0, total: 0, table: '' });
+
+    function _camelToSnake(s) {
+      return s.replace(/[A-Z]/g, m => '_'+m.toLowerCase());
+    }
+    function _mapKeys(obj, customMap = {}) {
+      // Convert camelCase keys to snake_case (with custom overrides)
+      const out = {};
+      for (const [k, v] of Object.entries(obj || {})) {
+        if (v === undefined) continue;
+        const sk = customMap[k] || _camelToSnake(k);
+        out[sk] = v;
+      }
+      return out;
+    }
+
+    /* Map LocalStorage record → Supabase row (per table) */
+    const _MIGRATION_MAP = {
+      branches: { source:'branches', target:'branches' },
+      warehouses: { source:'warehouses', target:'warehouses' },
+      suppliers: { source:'suppliers', target:'suppliers',
+        keyMap: { creditTerm:'credit_term', salesRep:'sales_rep', taxId:'tax_id', bankName:'bank_name', bankAccount:'bank_account', bankAccountName:'bank_account_name', branchId:'branch_id' } },
+      customers: { source:'customers', target:'customers',
+        keyMap: { creditTerm:'credit_term', taxId:'tax_id', bankName:'bank_name', bankAccount:'bank_account', branchId:'branch_id' } },
+      products: { source:'products', target:'products',
+        keyMap: { metalGroup:'metal_group', itemStatus:'item_status', stdPrice:'std_price', stdCost:'std_cost' } },
+      accounts: { source:'accounts', target:'accounts',
+        keyMap: { openingBalance:'opening_balance', odLimit:'od_limit', accountNo:'account_no', bankName:'bank_name', branchId:'branch_id' } },
+      purchaseChannels: { source:'purchaseChannels', target:'purchase_channels' },
+      salesChannels: { source:'salesChannels', target:'sales_channels' },
+      expenseCategories: { source:'expenseCategories', target:'expense_categories', keyMap:{ parentId:'parent_id' } },
+      currencies: { source:'currencies', target:'currencies', keyMap:{ rateToTHB:'rate_to_thb' } },
+      overseasRecipients: { source:'overseasRecipients', target:'overseas_recipients', keyMap:{ accountNo:'account_no', bankName:'bank_name' } },
+      purchaseBills: { source:'purchaseBills', target:'purchase_bills',
+        keyMap: { docNo:'doc_no', refNo:'ref_no', taxInvoiceNo:'tax_invoice_no', supplierId:'supplier_id', branchId:'branch_id', channelId:'channel_id', warehouseId:'warehouse_id', transactionMode:'transaction_mode', vatType:'vat_type', vatAmount:'vat_amount', totalAmount:'total_amount', paidAmount:'paid_amount', payableBalance:'payable_balance', createdBy:'created_by', createdAt:'created_at', updatedAt:'updated_at' } },
+      salesBills: { source:'salesBills', target:'sales_bills',
+        keyMap: { docNo:'doc_no', refNo:'ref_no', customerId:'customer_id', branchId:'branch_id', channelId:'channel_id', warehouseId:'warehouse_id', transactionMode:'transaction_mode', vatType:'vat_type', creditTerm:'credit_term', vatAmount:'vat_amount', totalAmount:'total_amount', receivedAmount:'received_amount', receivableBalance:'receivable_balance', cogsAmount:'cogs_amount', grossProfit:'gross_profit', createdBy:'created_by', createdAt:'created_at', updatedAt:'updated_at' } },
+      payments: { source:'payments', target:'payments',
+        keyMap: { docNo:'doc_no', billId:'bill_id', supplierId:'supplier_id', accountId:'account_id', withholdingTax:'withholding_tax', netAmount:'net_amount', branchId:'branch_id', vatType:'vat_type', createdBy:'created_by', createdAt:'created_at' } },
+      receipts: { source:'receipts', target:'receipts',
+        keyMap: { docNo:'doc_no', billId:'bill_id', customerId:'customer_id', accountId:'account_id', withholdingTax:'withholding_tax', netAmount:'net_amount', branchId:'branch_id', vatType:'vat_type', createdBy:'created_by', createdAt:'created_at' } },
+      transfers: { source:'transfers', target:'transfers',
+        keyMap: { docNo:'doc_no', fromAccountId:'from_account_id', toAccountId:'to_account_id', createdBy:'created_by', createdAt:'created_at' } },
+      expenses: { source:'expenses', target:'expenses',
+        keyMap: { docNo:'doc_no', categoryId:'category_id', netAmount:'net_amount', accountId:'account_id', branchId:'branch_id', taxInvoiceNo:'tax_invoice_no', approvedBy:'approved_by', approvedAt:'approved_at', paidAt:'paid_at', createdBy:'created_by', createdAt:'created_at', cat:'category_id' } },
+      stockLedger: { source:'stockLedger', target:'stock_ledger',
+        keyMap: { productId:'product_id', warehouseId:'warehouse_id', branchId:'branch_id', movementType:'movement_type', refId:'ref_id', refNo:'ref_no', qtyIn:'qty_in', qtyOut:'qty_out', valueIn:'value_in', valueOut:'value_out', unitCost:'unit_cost', createdAt:'created_at' } },
+      bankStatement: { source:'bankStatement', target:'bank_statement',
+        keyMap: { accountId:'account_id', refType:'ref_type', refId:'ref_id', refNo:'ref_no', amountIn:'amount_in', amountOut:'amount_out', cashFlowCategory:'cash_flow_category', createdAt:'created_at', in:'amount_in', out:'amount_out' } },
+      stockIssues: { source:'stockIssues', target:'stock_issues',
+        keyMap: { docNo:'doc_no', customerId:'customer_id', branchId:'branch_id', warehouseId:'warehouse_id', totalCost:'total_cost', totalEstAmount:'total_est_amount', convertedToBillId:'converted_to_bill_id', createdBy:'created_by', createdAt:'created_at' } },
+      gradeAdjustments: { source:'gradeAdjustments', target:'grade_adjustments',
+        keyMap: { docNo:'doc_no', productId:'product_id', warehouseId:'warehouse_id', qtyDiff:'qty_diff', valueDiff:'value_diff', approvedBy:'approved_by', createdAt:'created_at' } },
+      productionOrders: { source:'productionOrders', target:'production_orders',
+        keyMap: { docNo:'doc_no', productId:'product_id', qtyPlanned:'qty_planned', branchId:'branch_id', warehouseId:'warehouse_id', totalInputCost:'total_input_cost', totalOutputValue:'total_output_value', closedAt:'closed_at', closedBy:'closed_by', createdAt:'created_at' } },
+      productionInputs: { source:'productionInputs', target:'production_inputs',
+        keyMap: { orderId:'order_id', productId:'product_id', unitCost:'unit_cost', totalCost:'total_cost', createdAt:'created_at' } },
+      productionOutputs: { source:'productionOutputs', target:'production_outputs',
+        keyMap: { orderId:'order_id', productId:'product_id', unitCost:'unit_cost', totalCost:'total_cost', outputType:'output_type', createdAt:'created_at' } },
+      poBuyOrders: { source:'poBuyOrders', target:'po_buys',
+        keyMap: { docNo:'doc_no', supplierId:'supplier_id', expectedDelivery:'expected_delivery', totalAmount:'total_amount', cutAmount:'cut_amount', remainingAmount:'remaining_amount', createdAt:'created_at' } },
+      poSellOrders: { source:'poSellOrders', target:'po_sells',
+        keyMap: { docNo:'doc_no', customerId:'customer_id', expectedDelivery:'expected_delivery', totalAmount:'total_amount', cutAmount:'cut_amount', remainingAmount:'remaining_amount', createdAt:'created_at' } },
+      assets: { source:'assets', target:'assets',
+        keyMap: { branchId:'branch_id', responsiblePerson:'responsible_person', purchaseDate:'purchase_date', acquisitionType:'acquisition_type', supplierId:'supplier_id', purchaseBillId:'purchase_bill_id', originalCost:'original_cost', vatAmount:'vat_amount', netAssetCost:'net_asset_cost', salvageValue:'salvage_value', usefulLifeMonths:'useful_life_months', depreciationMethod:'depreciation_method', assetStatus:'asset_status', serialNo:'serial_no', licensePlate:'license_plate', chassisNo:'chassis_no', engineNo:'engine_no', insurancePolicyNo:'insurance_policy_no', warrantyExpireDate:'warranty_expire_date', createdBy:'created_by', createdAt:'created_at' } },
+      depreciations: { source:'depreciations', target:'depreciations',
+        keyMap: { assetId:'asset_id', createdAt:'created_at' } },
+      loans: { source:'loans', target:'loans',
+        keyMap: { contractNo:'contract_no', loanType:'loan_type', lenderName:'lender_name', startDate:'start_date', endDate:'end_date', principalAmount:'principal_amount', interestRate:'interest_rate', termMonths:'term_months', installmentAmount:'installment_amount', createdAt:'created_at' } },
+      loanSchedules: { source:'loanSchedules', target:'loan_schedules',
+        keyMap: { loanId:'loan_id', installmentNo:'installment_no', dueDate:'due_date', principalAmount:'principal_amount', interestAmount:'interest_amount', totalDueAmount:'total_due_amount', paidAmount:'paid_amount', paymentStatus:'payment_status', paidDate:'paid_date' } },
+      loanPayments: { source:'loanPayments', target:'loan_payments',
+        keyMap: { docNo:'doc_no', loanId:'loan_id', scheduleId:'schedule_id', principalAmount:'principal_amount', interestAmount:'interest_amount', totalAmount:'total_amount', accountId:'account_id', createdAt:'created_at' } },
+      tradingDeals: { source:'tradingDeals', target:'trading_deals',
+        keyMap: { dealNo:'deal_no', purchaseBillId:'purchase_bill_id', purchaseBillNo:'purchase_bill_no', salesBillId:'sales_bill_id', salesBillNo:'sales_bill_no', productId:'product_id', supplierId:'supplier_id', customerId:'customer_id', matchedQty:'matched_qty', matchedPurchaseAmount:'matched_purchase_amount', matchedSalesAmount:'matched_sales_amount', exVat:'ex_vat', createdBy:'created_by', cancelledAt:'cancelled_at', createdAt:'created_at' } },
+      fxGainLoss: { source:'fxGainLoss', target:'fx_gain_loss',
+        keyMap: { refType:'ref_type', refId:'ref_id', amountFc:'amount_fc', rateBook:'rate_book', rateSettlement:'rate_settlement', gainLoss:'gain_loss', createdAt:'created_at' } },
+    };
+
+    /* Migration order — parents first (FK constraints) */
+    const _MIGRATION_ORDER = [
+      'branches','warehouses','suppliers','customers','products','accounts',
+      'purchaseChannels','salesChannels','expenseCategories','currencies','overseasRecipients',
+      'purchaseBills','salesBills','payments','receipts','transfers','expenses',
+      'stockLedger','bankStatement','stockIssues','gradeAdjustments',
+      'productionOrders','productionInputs','productionOutputs',
+      'poBuyOrders','poSellOrders',
+      'assets','depreciations','loans','loanSchedules','loanPayments',
+      'tradingDeals','fxGainLoss'
+    ];
+
+    function _logMig(msg, type='info') {
+      migrateLog.value.unshift({ at: new Date().toISOString().slice(11,19), msg, type });
+      if (migrateLog.value.length > 200) migrateLog.value.length = 200;
+    }
+
+    async function _uploadBatch(table, rows, batchSize = 100) {
+      let inserted = 0, failed = 0;
+      for (let i = 0; i < rows.length; i += batchSize) {
+        const chunk = rows.slice(i, i + batchSize);
+        const { error } = await window.sb.from(table).upsert(chunk, { onConflict: 'id' });
+        if (error) {
+          failed += chunk.length;
+          _logMig(`  ❌ batch ${i}-${i+chunk.length}: ${error.message}`, 'error');
+        } else {
+          inserted += chunk.length;
+          migrateProgress.value = { ...migrateProgress.value, current: migrateProgress.value.current + chunk.length };
+        }
+      }
+      return { inserted, failed };
+    }
+
+    async function migrateToSupabase() {
+      if (!window.sb) { erp.showToast('Supabase ยังไม่พร้อม','error'); return; }
+      if (!confirm('🌐 Migrate ข้อมูลทั้งหมดไป Supabase?\n\n• ใช้เวลา 1-3 นาที\n• ข้อมูลใน Supabase จะถูกเขียนทับ (upsert)\n• Local data ยังอยู่เหมือนเดิม\n\nดำเนินการต่อ?')) return;
+
+      migrating.value = true;
+      migrateLog.value = [];
+      migrateProgress.value = { current: 0, total: 0, table: '' };
+      _logMig('🚀 เริ่ม Migration ไป Supabase...', 'info');
+
+      // Calculate total
+      let total = 0;
+      _MIGRATION_ORDER.forEach(k => { total += (_trkSafe(db[k])||[]).length; });
+      migrateProgress.value.total = total;
+      _logMig(`📊 รวม ${total} records จาก ${_MIGRATION_ORDER.length} tables`);
+
+      let totalOK = 0, totalFail = 0;
+
+      for (const localKey of _MIGRATION_ORDER) {
+        const cfg = _MIGRATION_MAP[localKey];
+        if (!cfg) continue;
+        const rows = _trkSafe(db[localKey]||[]);
+        if (!rows.length) { _logMig(`  ⏭ ${localKey}: ว่าง — ข้าม`); continue; }
+
+        migrateProgress.value.table = `${localKey} → ${cfg.target}`;
+        _logMig(`📤 ${localKey} (${rows.length} rows) → ${cfg.target}`);
+
+        // Map rows
+        const mapped = rows.map(r => {
+          const out = _mapKeys(r, cfg.keyMap || {});
+          // Drop fields that don't exist in Supabase schema
+          delete out._normalized; delete out._migrated; delete out._dirty;
+          return out;
+        });
+
+        try {
+          const { inserted, failed } = await _uploadBatch(cfg.target, mapped);
+          totalOK += inserted; totalFail += failed;
+          _logMig(`  ✓ ${cfg.target}: ${inserted} OK, ${failed} fail`, failed?'warn':'ok');
+        } catch(e) {
+          totalFail += rows.length;
+          _logMig(`  ❌ ${cfg.target} ล้มเหลว: ${e.message}`, 'error');
+        }
+        // Small pause to avoid rate limit
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      migrateProgress.value.table = '';
+      _logMig(`✅ เสร็จ! สำเร็จ ${totalOK} · ผิดพลาด ${totalFail}`, totalFail?'warn':'ok');
+      migrating.value = false;
+      erp.showToast(`Migration เสร็จ — ${totalOK} OK, ${totalFail} fail`, totalFail?'warning':'success');
+    }
+
     return { erp, db, fmt, storageInfo, stats, lastBackupAt, autoBackupEnabled, autoBackupHistory,
       localSnapshots, importPreview, importError,
       exportFull, previewImport, applyImport, resetAll, toggleAutoBackup,
-      restoreLocalSnapshot, deleteLocalSnapshot };
+      restoreLocalSnapshot, deleteLocalSnapshot,
+      migrating, migrateLog, migrateProgress, migrateToSupabase };
   },
   template: `
   <div class="space-y-3">
@@ -27608,6 +27865,57 @@ app.component('view-backup', {
           <tr v-if="!localSnapshots.length"><td colspan="3" class="text-center py-6 text-slate-400">ยังไม่มี snapshot — เปิด Auto-backup ก่อน</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- ☁️ Supabase Cloud Migration — Sprint 3 -->
+    <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border-2 border-cyan-400 rounded-xl p-4">
+      <h2 class="font-bold text-cyan-700 mb-2 flex items-center gap-2">☁️ Migrate ไป Supabase Cloud (Sprint 3)</h2>
+      <p class="text-sm text-slate-700 mb-3">Upload ข้อมูลทั้งหมดจาก LocalStorage → Supabase Cloud — ทำครั้งแรกเพื่อย้ายข้อมูลขึ้น cloud</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs mb-3">
+        <div class="bg-white rounded p-2 border-l-4 border-emerald-500">
+          <div class="text-slate-500">📊 Records ทั้งหมด</div>
+          <div class="font-bold text-lg text-emerald-700">{{Object.values(stats).reduce((s,n)=>s+(n||0),0).toLocaleString()}}</div>
+        </div>
+        <div class="bg-white rounded p-2 border-l-4 border-blue-500">
+          <div class="text-slate-500">🌐 Supabase Status</div>
+          <div class="font-bold text-sm" :class="window.sb?'text-emerald-700':'text-red-600'">{{window.sb?'✓ พร้อม':'✗ ไม่พร้อม'}}</div>
+        </div>
+        <div class="bg-white rounded p-2 border-l-4 border-amber-500">
+          <div class="text-slate-500">⏱ เวลาประมาณการ</div>
+          <div class="font-bold text-sm text-amber-700">~1-3 นาที</div>
+        </div>
+      </div>
+
+      <button @click="migrateToSupabase" :disabled="migrating || !window.sb"
+        class="bg-cyan-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed">
+        {{migrating ? '⏳ กำลัง Migrate...' : '☁️ Migrate ทั้งหมดไป Supabase'}}
+      </button>
+
+      <!-- Progress Bar -->
+      <div v-if="migrating || migrateLog.length" class="mt-3 space-y-2">
+        <div v-if="migrateProgress.total > 0" class="bg-white rounded p-2 border">
+          <div class="flex justify-between text-xs mb-1">
+            <span>{{migrateProgress.table || 'เสร็จสิ้น'}}</span>
+            <span class="font-bold">{{migrateProgress.current}} / {{migrateProgress.total}}</span>
+          </div>
+          <div class="bg-slate-200 rounded-full h-2">
+            <div class="bg-cyan-500 h-2 rounded-full transition-all" :style="{width: ((migrateProgress.current/migrateProgress.total)*100)+'%'}"></div>
+          </div>
+        </div>
+
+        <div v-if="migrateLog.length" class="bg-slate-900 text-slate-100 rounded p-3 font-mono text-xs max-h-72 overflow-y-auto">
+          <div v-for="(l,i) in migrateLog" :key="i" :class="l.type==='error'?'text-red-300':l.type==='warn'?'text-amber-300':l.type==='ok'?'text-emerald-300':'text-slate-200'">
+            <span class="text-slate-500">[{{l.at}}]</span> {{l.msg}}
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 text-xs text-slate-600 space-y-1">
+        <div>📌 ใช้ <b>upsert</b> — ถ้ามี id ซ้ำ จะ overwrite ใน Supabase (ปลอดภัย)</div>
+        <div>📌 LocalStorage <b>ไม่ถูกแตะต้อง</b> — เป็นแค่การ copy ขึ้น cloud</div>
+        <div>📌 ทำซ้ำได้บ่อยๆ — ทุกครั้งจะ sync ของใหม่ขึ้นไป</div>
+      </div>
     </div>
 
     <!-- Danger Zone -->
