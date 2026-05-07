@@ -27709,10 +27709,32 @@ app.component('view-backup', {
       if (migrateLog.value.length > 200) migrateLog.value.length = 200;
     }
 
+    /* Per-table conflict column (default: 'id') */
+    const _CONFLICT_COL = {
+      'currencies': 'code',  // currencies use 'code' as PK, not 'id'
+    };
+
+    /* Deduplicate rows by primary key (keep last occurrence) */
+    function _dedupe(rows, conflictCol) {
+      const seen = new Map();
+      rows.forEach(r => {
+        const key = r[conflictCol];
+        if (key !== undefined && key !== null) seen.set(key, r);
+      });
+      return Array.from(seen.values());
+    }
+
     async function _uploadBatch(table, rows, batchSize = 100) {
-      let inserted = 0, failed = 0;
-      // Cache of columns to drop for this table (discovered via errors)
+      let inserted = 0, failed = 0, skipped = 0;
       const dropCols = new Set();
+      const conflictCol = _CONFLICT_COL[table] || 'id';
+
+      // Dedupe by conflict key first
+      const beforeCount = rows.length;
+      rows = _dedupe(rows, conflictCol);
+      if (rows.length < beforeCount) {
+        _logMig(`  🔁 dedupe: ${beforeCount} → ${rows.length} rows (เอาตัวซ้ำออก)`, 'info');
+      }
 
       function _stripUnknown(rs) {
         if (dropCols.size === 0) return rs;
@@ -27727,23 +27749,54 @@ app.component('view-backup', {
         let chunk = rows.slice(i, i + batchSize);
         let attempts = 0;
         let success = false;
-        while (attempts < 8 && !success) {
+        while (attempts < 12 && !success) {
           attempts++;
           chunk = _stripUnknown(chunk);
-          const { error } = await window.sb.from(table).upsert(chunk, { onConflict: 'id' });
+          const { error } = await window.sb.from(table).upsert(chunk, { onConflict: conflictCol });
           if (!error) {
             success = true;
             inserted += chunk.length;
             migrateProgress.value = { ...migrateProgress.value, current: migrateProgress.value.current + chunk.length };
             break;
           }
-          // Try to extract column name from error
-          const m = error.message.match(/column ['"]?([a-zA-Z0-9_]+)['"]?|'([a-zA-Z0-9_]+)' column/);
-          const badCol = m ? (m[1] || m[2]) : null;
+          // Try to extract column name from error (multiple regex patterns)
+          let badCol = null;
+          const patterns = [
+            /Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column/,
+            /column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/,
+            /column ['"]?([a-zA-Z0-9_]+)['"]? of relation/,
+          ];
+          for (const p of patterns) {
+            const m = error.message.match(p);
+            if (m) { badCol = m[1]; break; }
+          }
           if (badCol && !dropCols.has(badCol)) {
             dropCols.add(badCol);
             _logMig(`  🔧 drop column "${badCol}" และลองใหม่...`, 'warn');
             continue; // retry
+          }
+          // FK constraint violation → set the bad FK to null and retry
+          const fkMatch = error.message.match(/foreign key constraint ['"]?([a-zA-Z0-9_]+)_([a-zA-Z0-9_]+)_fkey/);
+          if (fkMatch) {
+            const fkCol = fkMatch[2];   // e.g. "branch_id"
+            // Strip rows where this FK doesn't have a valid value (set to null)
+            chunk = chunk.map(r => ({ ...r, [fkCol]: null }));
+            _logMig(`  🔧 FK violation: set "${fkCol}"=null และลองใหม่...`, 'warn');
+            continue;
+          }
+          // Duplicate ID error in batch → split into smaller batches
+          if (error.message.includes('cannot affect row a second time') && batchSize > 1) {
+            // Try one-by-one
+            let okCount = 0, failCount = 0;
+            for (const single of chunk) {
+              const { error: e2 } = await window.sb.from(table).upsert([single], { onConflict: conflictCol });
+              if (e2) failCount++; else okCount++;
+            }
+            inserted += okCount; failed += failCount;
+            migrateProgress.value = { ...migrateProgress.value, current: migrateProgress.value.current + okCount };
+            _logMig(`  🔧 split batch (dupes): ${okCount} OK / ${failCount} fail`, 'warn');
+            success = true;
+            break;
           }
           // Can't recover
           failed += chunk.length;
