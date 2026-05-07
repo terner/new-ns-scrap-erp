@@ -27896,6 +27896,109 @@ app.component('view-backup', {
     setInterval(() => { supabaseReady.value = !!window.sb; }, 2000);
 
     /* ============================================================
+       MIGRATE LOCAL USERS → Supabase Auth (Sprint 4)
+       ============================================================ */
+    const migratingUsers = ref(false);
+    const userMigLog = ref([]);
+    const userMigProgress = ref({ current: 0, total: 0, name: '' });
+
+    function _logUMig(msg, type='info') {
+      userMigLog.value.unshift({ at: new Date().toISOString().slice(11,19), msg, type });
+      if (userMigLog.value.length > 100) userMigLog.value.length = 100;
+    }
+
+    async function migrateUsersToSupabase() {
+      if (!window.sb) { erp.showToast('Supabase ยังไม่พร้อม','error'); return; }
+      const localUsers = (db.users||[]).filter(u => u && u.active !== false);
+      if (!localUsers.length) { erp.showToast('ไม่พบ user ใน local','warning'); return; }
+
+      // Need admin email/password to re-login after creating users
+      const adminEmail = prompt('🔐 ใส่ email Admin Supabase (เพื่อ login กลับหลังสร้าง users)');
+      if (!adminEmail) return;
+      const adminPwd = prompt('🔐 ใส่ password Admin');
+      if (!adminPwd) return;
+
+      const emailDomain = prompt('📧 Domain email สำหรับ user ใหม่ (เช่น @nsscrap.com)', '@nsscrap.com');
+      if (!emailDomain) return;
+      const defaultPwd = prompt('🔑 Password เริ่มต้นสำหรับทุก user (อย่างน้อย 6 ตัว)', 'NSScrap2026');
+      if (!defaultPwd || defaultPwd.length < 6) { erp.showToast('Password ต้องอย่างน้อย 6 ตัว','error'); return; }
+
+      if (!confirm(`สร้าง ${localUsers.length} users ใน Supabase Auth?\n\n• Email: username + ${emailDomain}\n• Password: ${defaultPwd}\n• แนะนำพนักงานเปลี่ยน password หลัง login\n\nดำเนินการต่อ?`)) return;
+
+      migratingUsers.value = true;
+      userMigLog.value = [];
+      userMigProgress.value = { current: 0, total: localUsers.length, name: '' };
+      _logUMig(`🚀 เริ่ม migrate ${localUsers.length} users...`);
+
+      let okCount = 0, skipCount = 0, failCount = 0;
+
+      for (let i = 0; i < localUsers.length; i++) {
+        const u = localUsers[i];
+        const email = (u.email && u.email.includes('@')) ? u.email : (u.username.toLowerCase() + emailDomain);
+        userMigProgress.value = { current: i+1, total: localUsers.length, name: u.username };
+        _logUMig(`📤 ${u.username} → ${email}`);
+
+        try {
+          // 1. Create Auth user (signUp will auto-login this user)
+          const { data: signUpData, error: signUpErr } = await window.sb.auth.signUp({
+            email,
+            password: defaultPwd,
+            options: { data: { username: u.username, role: u.role||'User' } }
+          });
+          if (signUpErr) {
+            if (signUpErr.message.includes('already registered') || signUpErr.message.includes('already been')) {
+              _logUMig(`  ⚠ ${email} มีอยู่แล้ว — ข้าม (อาจต้อง update profile)`, 'warn');
+              skipCount++;
+              continue;
+            }
+            throw signUpErr;
+          }
+          const authId = signUpData?.user?.id;
+          if (!authId) throw new Error('ไม่ได้ user.id');
+
+          // 2. Insert/upsert user_profile
+          const role = (db.roles||[]).find(r => r && r.id === u.roleId)?.name || u.role || 'User';
+          const { error: profErr } = await window.sb.from('user_profiles').upsert({
+            user_id: authId,
+            username: u.username,
+            display_name: u.name || u.username,
+            email,
+            role,
+            branch_ids: u.branchId ? [u.branchId] : null,
+            active: true,
+          }, { onConflict: 'user_id' });
+          if (profErr) {
+            _logUMig(`  ⚠ profile ${u.username}: ${profErr.message}`, 'warn');
+          }
+          _logUMig(`  ✓ ${u.username} OK`, 'ok');
+          okCount++;
+        } catch(e) {
+          _logUMig(`  ❌ ${u.username}: ${e.message}`, 'error');
+          failCount++;
+        }
+        await new Promise(r => setTimeout(r, 200)); // rate limit
+      }
+
+      // Re-login as admin (because signUp swapped the session)
+      _logUMig(`🔐 Login กลับเป็น admin...`);
+      try {
+        await window.sb.auth.signOut();
+        const { error: loginErr } = await window.sb.auth.signInWithPassword({ email: adminEmail, password: adminPwd });
+        if (loginErr) {
+          _logUMig(`  ⚠ Login กลับล้มเหลว: ${loginErr.message} — กรุณา logout/login เอง`, 'warn');
+        } else {
+          _logUMig(`  ✓ Login กลับสำเร็จ`, 'ok');
+        }
+      } catch(e) {
+        _logUMig(`  ⚠ ${e.message}`, 'warn');
+      }
+
+      _logUMig(`✅ เสร็จ — สร้าง ${okCount}, ข้าม ${skipCount}, ผิดพลาด ${failCount}`, 'ok');
+      migratingUsers.value = false;
+      erp.showToast(`Migrate Users เสร็จ — ${okCount} OK · ${skipCount} skip · ${failCount} fail`, failCount?'warning':'success');
+    }
+
+    /* ============================================================
        SYNC DOWN — Pull from Supabase → LocalStorage (Phase C)
        ============================================================ */
     const pulling = ref(false);
@@ -27991,6 +28094,7 @@ app.component('view-backup', {
       restoreLocalSnapshot, deleteLocalSnapshot,
       migrating, migrateLog, migrateProgress, migrateToSupabase,
       pulling, pullLog, pullProgress, pullFromSupabase,
+      migratingUsers, userMigLog, userMigProgress, migrateUsersToSupabase,
       supabaseReady, supabaseUrl };
   },
   template: `
@@ -28114,14 +28218,36 @@ app.component('view-backup', {
       </div>
 
       <div class="flex flex-wrap gap-2">
-        <button @click="migrateToSupabase" :disabled="migrating || pulling || !supabaseReady"
+        <button @click="migrateToSupabase" :disabled="migrating || pulling || migratingUsers || !supabaseReady"
           class="bg-cyan-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed">
           {{migrating ? '⏳ กำลัง Push...' : '☁️ ⬆ Push (LocalStorage → Cloud)'}}
         </button>
-        <button @click="pullFromSupabase" :disabled="migrating || pulling || !supabaseReady"
+        <button @click="pullFromSupabase" :disabled="migrating || pulling || migratingUsers || !supabaseReady"
           class="bg-emerald-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
           {{pulling ? '⏳ กำลัง Pull...' : '☁️ ⬇ Pull (Cloud → LocalStorage)'}}
         </button>
+        <button @click="migrateUsersToSupabase" :disabled="migrating || pulling || migratingUsers || !supabaseReady"
+          class="bg-violet-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          {{migratingUsers ? '⏳ กำลัง Migrate Users...' : '👥 Migrate Users (Local → Supabase Auth)'}}
+        </button>
+      </div>
+
+      <!-- User Migration Progress -->
+      <div v-if="migratingUsers || userMigLog.length" class="mt-3 space-y-2">
+        <div v-if="userMigProgress.total > 0" class="bg-white rounded p-2 border">
+          <div class="flex justify-between text-xs mb-1">
+            <span>👥 Migrating: {{userMigProgress.name || 'เสร็จสิ้น'}}</span>
+            <span class="font-bold">{{userMigProgress.current}} / {{userMigProgress.total}}</span>
+          </div>
+          <div class="bg-slate-200 rounded-full h-2">
+            <div class="bg-violet-500 h-2 rounded-full transition-all" :style="{width: ((userMigProgress.current/userMigProgress.total)*100)+'%'}"></div>
+          </div>
+        </div>
+        <div v-if="userMigLog.length" class="bg-slate-900 text-slate-100 rounded p-3 font-mono text-xs max-h-72 overflow-y-auto">
+          <div v-for="(l,i) in userMigLog" :key="i" :class="l.type==='error'?'text-red-300':l.type==='warn'?'text-amber-300':l.type==='ok'?'text-emerald-300':'text-slate-200'">
+            <span class="text-slate-500">[{{l.at}}]</span> {{l.msg}}
+          </div>
+        </div>
       </div>
 
       <!-- Push Progress Bar -->
