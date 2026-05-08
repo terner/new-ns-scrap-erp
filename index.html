@@ -2421,22 +2421,22 @@ function seedData() {
         branchScope:'all' },
       /* === Custom Roles ที่ใช้จริงในบริษัท (แก้/ลบได้) === */
       { id:'R-ACCOUNTANT', name:'บัญชี', desc:'บัญชี — งบการเงิน, AR/AP, ภาษี + บิลซื้อ/ขาย', isSystem:false,
-        menus:['changePassword','purchase','sales','stockIssue','payment','receipt','transfer','expense','paymentApproval','billSwapHistory','stockBalance','stockLedger','tradingDashboard','tradingMatching','poBuy','poSell','poOutstanding','reports','audit','salesPlan','pendingSales','ar','ap','bank','cashPosition','plStatement','balanceSheet','cashFlowStatement','cashFlowAnalysis','workingCapital','taxVAT','mdCustomer','mdSupplier','mdProduct','mdAccount','mdExpense','mdImport','equityMaint'],
+        menus:['changePassword','purchase','sales','stockIssue','payment','receipt','transfer','expense','paymentApproval','billSwapHistory','stockBalance','stockLedger','tradingDashboard','tradingMatching','poBuy','poSell','poOutstanding','reports','audit','salesPlan','pendingSales','ar','ap','bank','cashPosition','plStatement','balanceSheet','cashFlowStatement','cashFlowAnalysis','workingCapital','taxVAT','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdAccount','mdExpense','mdImport','equityMaint','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:false,
         branchScope:'all' },
       { id:'R-COORDINATOR', name:'ประสานงาน', desc:'ประสานงาน — กรอกบิลซื้อ/ขาย, Stock, Trading, PO', isSystem:false,
-        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','stockBalance','stockLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports'],
+        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','stockBalance','stockLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:false, seeCash:false, seeFinancials:false, seeOpening:false,
         branchScope:'all' },
       { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan', isSystem:false,
-        menus:['dashboard','changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','expense','ar','ap','bank','cashPosition','stockBalance','stockLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','plStatement','balanceSheet','cashFlowStatement','production','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','audit'],
+        menus:['dashboard','changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','expense','ar','ap','bank','cashPosition','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','plStatement','balanceSheet','cashFlowStatement','production','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','audit','anomalyDetector','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:true,
         branchScope:'all' },
       { id:'R-WAREHOUSE', name:'คลัง', desc:'คลังสินค้า — Stock, Production, Transfer (เฉพาะสาขาตัวเอง)', isSystem:false,
-        menus:['changePassword','stockBalance','stockLedger','stockTransfer','pendingSales','production','productionReport','wipReport','machineUtil','mdProduct','mdBranch','gradeAdjustment','statusConvert','customerReturn'],
+        menus:['changePassword','stockBalance','stockLedger','stockTransfer','pendingSales','production','productionReport','wipReport','machineUtil','mdProduct','mdBranch','gradeAdjustment','statusConvert','customerReturn','backup','companyProfile'],
         actions:{'stockTransfer':['view','create','edit','post','export'],'production':['view','create','edit','post','export'],'gradeAdjustment':['view','create','edit','export'],'*':['view','export']},
         seeCost:false, seeProfit:false, seeCash:false, seeFinancials:false, seeOpening:false,
         branchScope:'own' },
@@ -30890,6 +30890,392 @@ app.component('view-anomalyDetector', {
         }
       }
 
+      /* ====== 🆕 BILL MATH INTEGRITY (16-22) ====== */
+      // 16. บิลซื้อ: subtotal + vat ≠ totalAmount (math mismatch)
+      _safeArr(db.purchaseBills).filter(b => b && b.status !== 'cancelled').forEach(b => {
+        const itemSum = (b.items||[]).reduce((s,it) => s + Number(it.netAmount||0), 0);
+        const sub = Number(b.subtotal != null ? b.subtotal : itemSum);
+        const disc = Number(b.discountTotal||0);
+        const expectedAfterDisc = sub - disc;
+        const expectedVat = b.hasVat ? expectedAfterDisc * 0.07 : 0;
+        const expectedTotal = expectedAfterDisc + expectedVat;
+        const diff = Math.abs(Number(b.totalAmount||0) - expectedTotal);
+        if (diff > 1) {
+          out.push({
+            id:'pb-math-'+b.id, severity:'critical', category:'BillMath', icon:'❗',
+            title: `บิลซื้อ ${b.docNo} ตัวเลขไม่ตรง (${fmt(diff)} บาท)`,
+            detail: `Items=${fmt(itemSum)} − Disc=${fmt(disc)} + VAT=${fmt(expectedVat)} = ${fmt(expectedTotal)} แต่ totalAmount=${fmt(b.totalAmount)}`,
+            action: 'เปิดบิล → save ใหม่ ระบบจะคำนวณใหม่อัตโนมัติ',
+          });
+        }
+      });
+      // 17. บิลขาย: subtotal + vat ≠ totalAmount
+      _safeArr(db.salesBills).filter(b => b && b.status !== 'cancelled').forEach(b => {
+        const itemSum = (b.items||[]).reduce((s,it) => s + Number(it.netAmount||0), 0);
+        const sub = Number(b.subtotal != null ? b.subtotal : itemSum);
+        const disc = Number(b.discountTotal||0);
+        const expectedAfterDisc = sub - disc;
+        const expectedVat = b.hasVat ? expectedAfterDisc * 0.07 : 0;
+        const expectedTotal = expectedAfterDisc + expectedVat;
+        const diff = Math.abs(Number(b.totalAmount||0) - expectedTotal);
+        if (diff > 1) {
+          out.push({
+            id:'sb-math-'+b.id, severity:'critical', category:'BillMath', icon:'❗',
+            title: `บิลขาย ${b.docNo} ตัวเลขไม่ตรง (${fmt(diff)} บาท)`,
+            detail: `Items=${fmt(itemSum)} − Disc=${fmt(disc)} + VAT=${fmt(expectedVat)} = ${fmt(expectedTotal)} แต่ totalAmount=${fmt(b.totalAmount)}`,
+            action: 'เปิดบิล → save ใหม่',
+          });
+        }
+      });
+      // 18. AP balance out-of-sync (paidAmount + payableBalance ≠ totalAmount)
+      _safeArr(db.purchaseBills).filter(b => b && b.status !== 'cancelled').forEach(b => {
+        const expected = Number(b.totalAmount||0) - Number(b.paidAmount||0);
+        const actual = Number(b.payableBalance||0);
+        if (Math.abs(expected - actual) > 1) {
+          out.push({
+            id:'ap-sync-'+b.id, severity:'critical', category:'BillMath', icon:'❗',
+            title: `AP ไม่ sync บิล ${b.docNo}`,
+            detail: `payableBalance=${fmt(actual)} ควรเป็น ${fmt(expected)} (totalAmount ${fmt(b.totalAmount)} − paidAmount ${fmt(b.paidAmount)})`,
+            action: 'รีบคำนวณใหม่ — ลบ Payment Voucher แล้วบันทึกใหม่',
+          });
+        }
+      });
+      // 19. AR balance out-of-sync
+      _safeArr(db.salesBills).filter(b => b && b.status !== 'cancelled').forEach(b => {
+        const expected = Number(b.totalAmount||0) - Number(b.receivedAmount||0);
+        const actual = Number(b.receivableBalance||0);
+        if (Math.abs(expected - actual) > 1) {
+          out.push({
+            id:'ar-sync-'+b.id, severity:'critical', category:'BillMath', icon:'❗',
+            title: `AR ไม่ sync บิล ${b.docNo}`,
+            detail: `receivableBalance=${fmt(actual)} ควรเป็น ${fmt(expected)} (totalAmount ${fmt(b.totalAmount)} − receivedAmount ${fmt(b.receivedAmount)})`,
+            action: 'ลบ Receipt Voucher แล้วบันทึกใหม่',
+          });
+        }
+      });
+      // 20. Overpaid: paidAmount > totalAmount
+      _safeArr(db.purchaseBills).filter(b => b && b.status !== 'cancelled' && Number(b.paidAmount||0) > Number(b.totalAmount||0) + 1).forEach(b => {
+        out.push({
+          id:'pb-overpaid-'+b.id, severity:'critical', category:'BillMath', icon:'🚨',
+          title: `บิลซื้อ ${b.docNo} จ่ายเกิน`,
+          detail: `จ่าย ${fmt(b.paidAmount)} > ยอดบิล ${fmt(b.totalAmount)} (เกิน ${fmt(b.paidAmount-b.totalAmount)})`,
+          action: 'ตรวจสอบ Payment Voucher ที่ผูกบิลนี้ — อาจซ้ำ',
+        });
+      });
+      // 21. Status mismatch: bill='paid' แต่ payableBalance > 0
+      _safeArr(db.purchaseBills).filter(b => b && b.status === 'paid' && Number(b.payableBalance||0) > 1).forEach(b => {
+        out.push({
+          id:'pb-status-paid-'+b.id, severity:'warn', category:'BillMath', icon:'⚠',
+          title: `บิลซื้อ ${b.docNo} สถานะ "paid" แต่ยังค้าง ${fmt(b.payableBalance)}`,
+          detail: `paidAmount=${fmt(b.paidAmount)} / totalAmount=${fmt(b.totalAmount)}`,
+          action: 'แก้ status → partial',
+        });
+      });
+      // 22. Status mismatch: bill='unpaid' แต่ paidAmount > 0
+      _safeArr(db.purchaseBills).filter(b => b && b.status === 'unpaid' && Number(b.paidAmount||0) > 1).forEach(b => {
+        out.push({
+          id:'pb-status-unpaid-'+b.id, severity:'warn', category:'BillMath', icon:'⚠',
+          title: `บิลซื้อ ${b.docNo} สถานะ "unpaid" แต่จ่ายแล้ว ${fmt(b.paidAmount)}`,
+          detail: `payableBalance=${fmt(b.payableBalance)}`,
+          action: 'รีเฟรช status — ดูที่หน้า Payment Voucher',
+        });
+      });
+
+      /* ====== 🆕 DUPLICATE / DATE ANOMALIES (23-26) ====== */
+      // 23. duplicate docNo (same prefix+number)
+      const docNoMap = new Map();
+      _safeArr(db.purchaseBills).filter(b => b && b.status!=='cancelled' && b.docNo).forEach(b => {
+        if (!docNoMap.has(b.docNo)) docNoMap.set(b.docNo, []);
+        docNoMap.get(b.docNo).push(b);
+      });
+      docNoMap.forEach((bills, dn) => {
+        if (bills.length > 1) {
+          out.push({
+            id:'pb-dup-'+dn, severity:'critical', category:'Duplicate', icon:'🚨',
+            title: `บิลซื้อเลข ${dn} ซ้ำ (${bills.length} ใบ)`,
+            detail: bills.map(b => '['+b.id.slice(-6)+'] '+erp.supplierName(b.supplierId)+' '+fmt(b.totalAmount)).join(' · '),
+            action: 'เปลี่ยนเลขบิลให้ไม่ซ้ำ — เปิดบิล → แก้ docNo',
+          });
+        }
+      });
+      const sbDocMap = new Map();
+      _safeArr(db.salesBills).filter(b => b && b.status!=='cancelled' && b.docNo).forEach(b => {
+        if (!sbDocMap.has(b.docNo)) sbDocMap.set(b.docNo, []);
+        sbDocMap.get(b.docNo).push(b);
+      });
+      sbDocMap.forEach((bills, dn) => {
+        if (bills.length > 1) {
+          out.push({
+            id:'sb-dup-'+dn, severity:'critical', category:'Duplicate', icon:'🚨',
+            title: `บิลขายเลข ${dn} ซ้ำ (${bills.length} ใบ)`,
+            detail: bills.map(b => '['+b.id.slice(-6)+'] '+erp.customerName(b.customerId)+' '+fmt(b.totalAmount)).join(' · '),
+            action: 'เปลี่ยนเลขบิลให้ไม่ซ้ำ',
+          });
+        }
+      });
+      // 24. Bill date in the future
+      _safeArr(db.purchaseBills).concat(_safeArr(db.salesBills)).filter(b => b && b.status!=='cancelled' && b.date > today).forEach(b => {
+        const isPB = (db.purchaseBills||[]).includes(b);
+        out.push({
+          id: (isPB?'pb':'sb')+'-future-'+b.id, severity:'warn', category:'DateAnomaly', icon:'⚠',
+          title: `${isPB?'บิลซื้อ':'บิลขาย'} ${b.docNo} วันที่อยู่ในอนาคต (${b.date})`,
+          detail: `วันนี้ ${today} แต่บิลลงวันที่ ${b.date}`,
+          action: 'ตรวจสอบว่าใส่วันที่ผิดหรือเป็น forward booking',
+        });
+      });
+      // 25. Bill backdated > 30 วัน (ตอนสร้าง)
+      _safeArr(db.purchaseBills).concat(_safeArr(db.salesBills)).filter(b => b && b.status!=='cancelled' && b.createdAt && b.date).forEach(b => {
+        const isPB = (db.purchaseBills||[]).includes(b);
+        const createDate = (b.createdAt||'').slice(0,10);
+        if (createDate && createDate !== b.date) {
+          const diff = Math.floor((new Date(createDate) - new Date(b.date)) / 86400000);
+          if (diff > 30) {
+            out.push({
+              id: (isPB?'pb':'sb')+'-back-'+b.id, severity:'warn', category:'DateAnomaly', icon:'⚠',
+              title: `${isPB?'บิลซื้อ':'บิลขาย'} ${b.docNo} ลงวันที่ย้อน ${diff} วัน`,
+              detail: `วันที่บิล ${b.date} · บันทึกระบบ ${createDate}`,
+              action: 'ตรวจสอบว่าตั้งใจหรือพิมพ์วันที่ผิด',
+            });
+          }
+        }
+      });
+      // 26. Bill ที่ซ้ำกันสนิท (same supplier/customer + same date + same totalAmount)
+      const pbSig = new Map();
+      _safeArr(db.purchaseBills).filter(b => b && b.status!=='cancelled').forEach(b => {
+        const sig = (b.supplierId||'')+'|'+(b.date||'')+'|'+Number(b.totalAmount||0).toFixed(2);
+        if (!pbSig.has(sig)) pbSig.set(sig, []);
+        pbSig.get(sig).push(b);
+      });
+      pbSig.forEach((bills, sig) => {
+        if (bills.length > 1) {
+          out.push({
+            id:'pb-twin-'+bills[0].id, severity:'warn', category:'Duplicate', icon:'⚠',
+            title: `บิลซื้อ${bills.length}ใบเหมือนกันมาก: ${erp.supplierName(bills[0].supplierId)}`,
+            detail: bills.map(b => b.docNo+' (วันที่ '+b.date+', '+fmt(b.totalAmount)+')').join(' / '),
+            action: 'ตรวจสอบว่าเป็นบิลคนละใบจริงๆ หรือบันทึกซ้ำ',
+          });
+        }
+      });
+
+      /* ====== 🆕 TRADING ANOMALIES (27-29) ====== */
+      // 27. Trading purchase ค้าง match > 30 วัน
+      _safeArr(db.purchaseBills).filter(b => b && b.transactionMode === 'TRADING' && b.status !== 'cancelled').forEach(b => {
+        const matched = erp.tradingMatchedSales ? erp.tradingMatchedSales(b.id) : 0;
+        const total = Number(b.subtotal||b.totalAmount||0);
+        const remain = total - matched;
+        if (remain > 1) {
+          const days = Math.floor((new Date(today) - new Date(b.date)) / 86400000);
+          if (days > 30) {
+            out.push({
+              id:'trade-stuck-'+b.id, severity: days>60?'critical':'warn', category:'Trading', icon: days>60?'🚨':'⚠',
+              title: `บิลซื้อ Trading ${b.docNo} ค้าง match ${days} วัน`,
+              detail: `เหลือต้องจับคู่ ${fmt(remain)} บาท · supplier ${erp.supplierName(b.supplierId)}`,
+              action: 'รีบจับคู่ขาย Trading หรือพิจารณาเปลี่ยนเป็น Stock',
+            });
+          }
+        }
+      });
+      // 28. Trading deal GP < 0
+      _safeArr(db.tradingDeals).filter(d => d && d.status !== 'Cancelled').forEach(d => {
+        const gp = Number(d.matchedSalesAmount||0) - Number(d.matchedPurchaseAmount||0);
+        if (gp < -10) {
+          out.push({
+            id:'trade-loss-'+d.id, severity:'critical', category:'Trading', icon:'🚨',
+            title: `Trading ขาดทุน: ${d.dealNo}`,
+            detail: `ต้นทุน ${fmt(d.matchedPurchaseAmount)} > ขาย ${fmt(d.matchedSalesAmount)} = ขาดทุน ${fmt(-gp)}`,
+            action: 'ตรวจสอบราคาขาย/จับคู่ผิด',
+          });
+        }
+      });
+      // 29. Sales bill ที่ totalCost = 0 (no WAC at sale time)
+      _safeArr(db.salesBills).filter(b => b && b.status!=='cancelled' && b.transactionMode!=='TRADING' && Number(b.totalAmount||0) > 0 && Number(b.totalCost||0) === 0).forEach(b => {
+        out.push({
+          id:'sb-no-cost-'+b.id, severity:'warn', category:'CostMissing', icon:'⚠',
+          title: `บิลขาย ${b.docNo} ไม่มีต้นทุน (cost=0)`,
+          detail: `ขาย ${fmt(b.totalAmount)} แต่ COGS=0 → กำไรเทียม`,
+          action: 'ตรวจสอบบิลซื้อก่อนหน้าของสินค้านี้',
+        });
+      });
+
+      /* ====== 🆕 PRODUCTION ADVANCED (30-31) ====== */
+      // 30. Production input > output (still has WIP)
+      _safeArr(db.productionOrders).filter(p => p && p.status === 'Closed').forEach(p => {
+        const totalIn = (db.productionInputs||[]).filter(i => i && i.productionOrderId===p.id && i.status!=='reversed').reduce((s,i)=>s+Number(i.totalCost||0),0);
+        const totalOut = (db.productionOutputs||[]).filter(o => o && o.productionOrderId===p.id && o.status!=='reversed').reduce((s,o)=>s+Number(o.allocatedCost||o.totalCost||0),0);
+        if (totalIn > 0) {
+          const diff = totalIn - totalOut;
+          if (Math.abs(diff) > totalIn * 0.05 && Math.abs(diff) > 100) {
+            out.push({
+              id:'prod-imbalance-'+p.id, severity:'warn', category:'Production', icon:'⚠',
+              title: `Production ${p.docNo} input/output ไม่สมดุล`,
+              detail: `Input ${fmt(totalIn)} − Output ${fmt(totalOut)} = ${fmt(diff)} (${(Math.abs(diff)/totalIn*100).toFixed(1)}%)`,
+              action: 'ตรวจสอบ Output ว่ารับครบหรือมี Loss/Waste ที่ลืมบันทึก',
+            });
+          }
+        }
+      });
+      // 31. WIP ค้าง > 30 วัน (มี input แต่ไม่มี output)
+      _safeArr(db.productionOrders).filter(p => p && ['In Production','Partially Completed'].includes(p.status)).forEach(p => {
+        const totalIn = (db.productionInputs||[]).filter(i => i && i.productionOrderId===p.id && i.status!=='reversed').reduce((s,i)=>s+Number(i.qtyNet||0),0);
+        const totalOut = (db.productionOutputs||[]).filter(o => o && o.productionOrderId===p.id && o.status!=='reversed').reduce((s,o)=>s+Number(o.qtyNet||0),0);
+        if (totalIn > 0 && totalOut === 0) {
+          const days = Math.floor((new Date(today) - new Date(p.date)) / 86400000);
+          if (days > 30) {
+            out.push({
+              id:'wip-stuck-'+p.id, severity:'critical', category:'Production', icon:'🚨',
+              title: `WIP ค้างไม่มี output: ${p.docNo} (${days} วัน)`,
+              detail: `Input ${fmt(totalIn)} กก. แต่ยังไม่มี output เลย`,
+              action: 'รีบบันทึก Output / Loss / Waste',
+            });
+          }
+        }
+      });
+
+      /* ====== 🆕 BILL CONTENT VALIDATION (32-34) ====== */
+      // 32. บิลที่ items ว่างเปล่า (ไม่มีรายการสินค้า)
+      _safeArr(db.purchaseBills).concat(_safeArr(db.salesBills)).filter(b => b && b.status!=='cancelled' && (!b.items || b.items.length === 0)).forEach(b => {
+        const isPB = (db.purchaseBills||[]).includes(b);
+        out.push({
+          id:(isPB?'pb':'sb')+'-empty-'+b.id, severity:'warn', category:'BillContent', icon:'⚠',
+          title: `${isPB?'บิลซื้อ':'บิลขาย'} ${b.docNo} ไม่มีรายการสินค้า`,
+          detail: `แต่ totalAmount=${fmt(b.totalAmount||0)}`,
+          action: 'ตรวจสอบ → เพิ่มรายการ หรือยกเลิกบิล',
+        });
+      });
+      // 33. บิลที่ price = 0 ในรายการ
+      _safeArr(db.purchaseBills).filter(b => b && b.status!=='cancelled' && (b.items||[]).some(it => Number(it.netWeight||0)>0 && Number(it.price||0) === 0)).forEach(b => {
+        const zeroLines = (b.items||[]).filter(it => Number(it.netWeight||0)>0 && Number(it.price||0)===0).length;
+        out.push({
+          id:'pb-zeroprice-'+b.id, severity:'warn', category:'BillContent', icon:'⚠',
+          title: `บิลซื้อ ${b.docNo} มี ${zeroLines} รายการที่ราคา=0`,
+          detail: 'รายการที่ราคา 0 จะทำให้ต้นทุน WAC เพี้ยน',
+          action: 'แก้ราคา / ลบรายการนั้น',
+        });
+      });
+      // 34. ราคาผิดปกติ — เกิน 3 standard deviation จากค่าเฉลี่ย product (last 30 days)
+      const priceStats = new Map();  // productId → { prices:[], avg, std }
+      const cutoffDate = new Date(today); cutoffDate.setDate(cutoffDate.getDate() - 30);
+      _safeArr(db.purchaseBills).filter(b => b && b.status!=='cancelled' && b.date >= cutoffDate.toISOString().slice(0,10)).forEach(b => {
+        (b.items||[]).forEach(it => {
+          if (!it.productId || Number(it.price||0) <= 0) return;
+          if (!priceStats.has(it.productId)) priceStats.set(it.productId, []);
+          priceStats.get(it.productId).push({ price: Number(it.price), bill: b, item: it });
+        });
+      });
+      priceStats.forEach((prices, pid) => {
+        if (prices.length < 5) return;  // ต้องมีข้อมูลพอ
+        const vals = prices.map(p => p.price);
+        const avg = vals.reduce((s,v)=>s+v,0) / vals.length;
+        const std = Math.sqrt(vals.reduce((s,v)=>s+Math.pow(v-avg,2),0) / vals.length);
+        if (std < 0.01) return;
+        prices.forEach(p => {
+          const z = Math.abs(p.price - avg) / std;
+          if (z > 3) {
+            const direction = p.price > avg ? 'สูง' : 'ต่ำ';
+            out.push({
+              id:'price-outlier-'+p.bill.id+'-'+p.item.id, severity:'warn', category:'PriceAnomaly', icon:'⚠',
+              title: `ราคา${direction}ผิดปกติ: ${erp.productName(pid)}`,
+              detail: `บิล ${p.bill.docNo} · ราคา ${fmt(p.price)} (เฉลี่ย ${fmt(avg)} ± ${fmt(std)}) · z-score=${z.toFixed(1)}`,
+              action: 'ตรวจสอบว่าใส่ราคาผิด หรือเป็นกรณีพิเศษ',
+            });
+          }
+        });
+      });
+
+      /* ====== 🆕 CASH/BANK CONSISTENCY (35-37) ====== */
+      // 35. Account balance != opening + bank statement entries
+      (db.accounts||[]).filter(a => a && a.active).forEach(a => {
+        const opening = Number(a.openingBalance||0);
+        const inflow = (db.bankStatement||[]).filter(s => s && s.accountId === a.id).reduce((sum,s) => sum + Number(s.in||0), 0);
+        const outflow = (db.bankStatement||[]).filter(s => s && s.accountId === a.id).reduce((sum,s) => sum + Number(s.out||0), 0);
+        const expected = opening + inflow - outflow;
+        const actual = erp.accountBalance(a.id);
+        if (Math.abs(expected - actual) > 1) {
+          out.push({
+            id:'acc-mismatch-'+a.id, severity:'critical', category:'CashSync', icon:'❗',
+            title: `บัญชี ${a.name} ยอดไม่ตรง opening+bankStatement`,
+            detail: `expected ${fmt(expected)} แต่ accountBalance() = ${fmt(actual)} (ต่าง ${fmt(actual-expected)})`,
+            action: 'ตรวจสอบ Bank Statement Ledger',
+          });
+        }
+      });
+      // 36. Bank statement entry ที่ไม่มี ref (orphan)
+      _safeArr(db.bankStatement).filter(s => s && !s.refId && !s.refType).forEach(s => {
+        out.push({
+          id:'bs-orphan-'+s.id, severity:'info', category:'CashSync', icon:'ℹ',
+          title: `Bank statement ไม่มี ref: ${s.desc||s.id}`,
+          detail: `${s.date} · ${a => erp.accountName(s.accountId)} · เข้า ${fmt(s.in)} ออก ${fmt(s.out)}`,
+          action: 'อาจเป็น manual entry — ตรวจสอบที่ Bank Statement',
+        });
+      });
+      // 37. Sum of receipts > sum of bill totals (overcollected per customer)
+      const arPerCust = new Map();
+      _safeArr(db.salesBills).filter(b => b && b.status!=='cancelled').forEach(b => {
+        if (!arPerCust.has(b.customerId)) arPerCust.set(b.customerId, { total:0, received:0 });
+        arPerCust.get(b.customerId).total += Number(b.totalAmount||0);
+        arPerCust.get(b.customerId).received += Number(b.receivedAmount||0);
+      });
+      arPerCust.forEach((v, cid) => {
+        if (v.received > v.total + 100) {
+          out.push({
+            id:'cust-overpaid-'+cid, severity:'warn', category:'CashSync', icon:'⚠',
+            title: `ลูกค้า ${erp.customerName(cid)} จ่ายเกิน`,
+            detail: `รับเงิน ${fmt(v.received)} > ยอดบิล ${fmt(v.total)} (เกิน ${fmt(v.received-v.total)})`,
+            action: 'ตรวจสอบ Receipt Voucher อาจซ้ำ หรือถือเป็น Customer Advance',
+          });
+        }
+      });
+
+      /* ====== 🆕 MASTER DATA INTEGRITY (38-40) ====== */
+      // 38. Duplicate suppliers (ชื่อเหมือนกัน)
+      const supByName = new Map();
+      _safeArr(db.suppliers).filter(s => s && s.active).forEach(s => {
+        const n = (s.name||'').trim().toLowerCase();
+        if (!n) return;
+        if (!supByName.has(n)) supByName.set(n, []);
+        supByName.get(n).push(s);
+      });
+      supByName.forEach((sups, name) => {
+        if (sups.length > 1) {
+          out.push({
+            id:'sup-dup-'+sups[0].id, severity:'warn', category:'MasterData', icon:'⚠',
+            title: `Supplier ชื่อซ้ำ "${sups[0].name}" (${sups.length} records)`,
+            detail: sups.map(s => s.code+' ['+s.id+']').join(' · '),
+            action: 'รวมหรือ inactive ตัวที่ซ้ำ',
+          });
+        }
+      });
+      // 39. Duplicate customers
+      const custByName = new Map();
+      _safeArr(db.customers).filter(c => c && c.active).forEach(c => {
+        const n = (c.name||'').trim().toLowerCase();
+        if (!n) return;
+        if (!custByName.has(n)) custByName.set(n, []);
+        custByName.get(n).push(c);
+      });
+      custByName.forEach((custs, name) => {
+        if (custs.length > 1) {
+          out.push({
+            id:'cust-dup-'+custs[0].id, severity:'warn', category:'MasterData', icon:'⚠',
+            title: `ลูกค้าชื่อซ้ำ "${custs[0].name}" (${custs.length} records)`,
+            detail: custs.map(c => c.code+' ['+c.id+']').join(' · '),
+            action: 'รวมหรือ inactive ตัวที่ซ้ำ',
+          });
+        }
+      });
+      // 40. Inactive product แต่ยังมี stock
+      _safeArr(db.products).filter(p => p && p.active === false).forEach(p => {
+        const qty = erp.stockOnHand(p.id);
+        if (qty > 0.01) {
+          out.push({
+            id:'inactive-stock-'+p.id, severity:'warn', category:'MasterData', icon:'⚠',
+            title: `สินค้า inactive แต่ยังมี stock: ${p.name}`,
+            detail: `คงเหลือ ${fmt(qty)} กก. — ขายต่อไม่ได้`,
+            action: 'ขายล้างสต๊อกก่อน หรือ activate กลับ',
+          });
+        }
+      });
+
       // Sort by severity
       const order = {critical:0, warn:1, info:2};
       return out.sort((a,b) => (order[a.severity]||3) - (order[b.severity]||3));
@@ -30936,6 +31322,43 @@ app.component('view-anomalyDetector', {
         'cr-stuck':'⚠ ของคืนค้างนาน',
         'cust-no-contact':'ℹ ลูกค้าไม่มีข้อมูลติดต่อ',
         'no-bill-today':'ℹ วันนี้ยังไม่มีบิล',
+        // 🆕 Bill Math
+        'pb-math':'❗ บิลซื้อตัวเลขไม่ตรง',
+        'sb-math':'❗ บิลขายตัวเลขไม่ตรง',
+        'ap-sync':'❗ AP balance ไม่ sync',
+        'ar-sync':'❗ AR balance ไม่ sync',
+        'pb-overpaid':'🚨 บิลซื้อจ่ายเกิน',
+        'pb-status-paid':'⚠ Status paid แต่ค้าง',
+        'pb-status-unpaid':'⚠ Status unpaid แต่จ่ายแล้ว',
+        // 🆕 Duplicate
+        'pb-dup':'🚨 บิลซื้อเลขซ้ำ',
+        'sb-dup':'🚨 บิลขายเลขซ้ำ',
+        'pb-twin':'⚠ บิลซื้อเหมือนกันมาก',
+        // 🆕 Date
+        'pb-future':'⚠ บิลซื้อวันที่อนาคต',
+        'sb-future':'⚠ บิลขายวันที่อนาคต',
+        'pb-back':'⚠ บิลซื้อย้อนหลัง',
+        'sb-back':'⚠ บิลขายย้อนหลัง',
+        // 🆕 Trading
+        'trade-stuck':'⚠ Trading ค้าง match นาน',
+        'trade-loss':'🚨 Trading ขาดทุน',
+        'sb-no-cost':'⚠ บิลขายไม่มีต้นทุน',
+        // 🆕 Production
+        'prod-imbalance':'⚠ Production input/output ไม่สมดุล',
+        'wip-stuck':'🚨 WIP ค้างไม่มี output',
+        // 🆕 Bill content
+        'pb-empty':'⚠ บิลซื้อไม่มีรายการ',
+        'sb-empty':'⚠ บิลขายไม่มีรายการ',
+        'pb-zeroprice':'⚠ บิลซื้อราคา = 0',
+        'price-outlier':'⚠ ราคาผิดปกติ (outlier)',
+        // 🆕 Cash sync
+        'acc-mismatch':'❗ ยอดบัญชีไม่ sync',
+        'bs-orphan':'ℹ Bank entry ไม่มี ref',
+        'cust-overpaid':'⚠ ลูกค้าจ่ายเกิน',
+        // 🆕 Master data
+        'sup-dup':'⚠ Supplier ชื่อซ้ำ',
+        'cust-dup':'⚠ ลูกค้าชื่อซ้ำ',
+        'inactive-stock':'⚠ สินค้า inactive มี stock',
       };
       return m[key] || key;
     }
@@ -31049,19 +31472,32 @@ app.component('view-anomalyDetector', {
 
     <!-- 💡 Hints -->
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600">
-      <h3 class="font-bold mb-2">📋 ระบบตรวจจับความผิดปกติ — รายการที่ตรวจ:</h3>
-      <ul class="list-disc ml-5 space-y-0.5">
-        <li>📦 <b>Stock:</b> ติดลบ / มูลค่ากำพร้า / สินค้าไม่มีต้นทุน</li>
-        <li>📥 <b>AR:</b> ลูกหนี้เกินกำหนด > 30 / 60 / 90 วัน</li>
-        <li>📤 <b>AP:</b> เจ้าหนี้ค้างจ่ายเกินกำหนด > 30 / 60 วัน</li>
-        <li>💵 <b>Cash:</b> เงินสดต่ำ < 100K / ติดลบ / OD ใช้เกิน 80%</li>
-        <li>🧾 <b>VAT:</b> บิลซื้อ VAT ที่ยังไม่ได้ใบกำกับเกิน 60 วัน</li>
-        <li>📤 <b>Sales:</b> บิลที่ขาดทุน หรือ Margin ติดลบ < 1%</li>
-        <li>🏭 <b>Production:</b> ใบสั่งผลิตค้าง > 14 วัน / Loss เกินมาตรฐาน 1.5×</li>
-        <li>↩️ <b>Customer Return:</b> ของคืนค้างเกิน 30 วัน</li>
-        <li>👥 <b>Master:</b> ลูกค้าไม่มีข้อมูลติดต่อ</li>
-        <li>📅 <b>Daily:</b> วันทำงานยังไม่มีบิลซื้อ-ขาย</li>
-      </ul>
+      <h3 class="font-bold mb-2">📋 ระบบตรวจจับความผิดปกติ — สแกน <b class="text-red-600">40 จุด</b> ใน 11 หมวด:</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <ul class="list-disc ml-5 space-y-0.5">
+          <li>📦 <b>Stock:</b> ติดลบ / มูลค่ากำพร้า / ไม่มีต้นทุน / inactive ที่ยังมี stock</li>
+          <li>📥 <b>AR:</b> ลูกหนี้เกินกำหนด > 30/60/90 วัน · ลูกค้าจ่ายเกิน</li>
+          <li>📤 <b>AP:</b> เจ้าหนี้ค้างจ่าย > 30/60 วัน · บิลซื้อจ่ายเกิน</li>
+          <li>💵 <b>Cash:</b> เงินสด < 100K / ติดลบ · OD ใช้เกิน 80% · ยอดบัญชีไม่ sync กับ Bank Statement</li>
+          <li>🧾 <b>VAT:</b> บิลซื้อ VAT ที่ยังไม่ได้ใบกำกับเกิน 60 วัน</li>
+          <li>📤 <b>Sales/Profit:</b> บิลขาดทุน · Margin ติดลบ &lt; 1% · บิลขายไม่มีต้นทุน</li>
+        </ul>
+        <ul class="list-disc ml-5 space-y-0.5">
+          <li>🧮 <b>Bill Math:</b> subtotal+VAT≠totalAmount · AR/AP balance ไม่ sync · status ไม่ตรงกับยอดจริง</li>
+          <li>🚨 <b>Duplicate:</b> เลขบิลซ้ำ · บิลซ้ำกันสนิท (supplier+date+amount)</li>
+          <li>📅 <b>Date:</b> บิลวันที่อนาคต · ลงวันที่ย้อนหลัง > 30 วัน</li>
+          <li>🔄 <b>Trading:</b> ค้าง match > 30 วัน · Trading deal ขาดทุน</li>
+          <li>🏭 <b>Production:</b> ค้าง > 14 วัน · Loss เกินมาตรฐาน 1.5× · Input/Output ไม่สมดุล · WIP ค้างไม่มี output</li>
+          <li>📝 <b>Bill Content:</b> บิลไม่มีรายการ · ราคา = 0 · ราคา outlier (z-score &gt; 3)</li>
+          <li>👥 <b>Master Data:</b> Supplier/Customer ชื่อซ้ำ · ลูกค้าไม่มีข้อมูลติดต่อ</li>
+          <li>↩️ <b>Customer Return:</b> ของคืนค้างเกิน 30 วัน</li>
+          <li>📅 <b>Daily:</b> วันทำงานยังไม่มีบิลซื้อ-ขาย · Bank entry ไม่มี ref</li>
+        </ul>
+      </div>
+      <div class="mt-3 pt-3 border-t border-slate-300 text-[11px] text-slate-500">
+        💡 <b>Tip:</b> รันทุกครั้งหลัง Pull จาก Cloud — ถ้าเห็น <span class="text-red-600 font-bold">วิกฤต (critical)</span> ต้องแก้ก่อน Push กลับ
+        เพราะอาจ overwrite ข้อมูลคนอื่น
+      </div>
     </div>
   </div>`
 });
