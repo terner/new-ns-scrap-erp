@@ -3785,21 +3785,13 @@ window.$erp = {
             if (fkColDirect) fkCol = fkColDirect[1];
           }
           if (fkCol) {
-            if (NEVER_DROP.has(fkCol)) {
-              _logErr(cfg.target, 'FK on "'+fkCol+'" — ห้ามตั้ง null');
-              fail += chunk.length;
-              break;
-            }
-            // ตรวจว่า column มีอยู่จริงใน chunk — กัน loop ไม่จบเพราะ set non-existent column
-            const colExistsInChunk = chunk.some(r => Object.prototype.hasOwnProperty.call(r, fkCol));
-            if (!colExistsInChunk) {
-              _logErr(cfg.target, 'FK "'+fkCol+'" not in row — drop unrecoverable');
-              fail += chunk.length;
-              break;
-            }
-            chunk = chunk.map(r => ({ ...r, [fkCol]: null }));
-            console.warn('[autoSync] '+cfg.target+': FK violation '+fkCol+' → set null');
-            continue;
+            // 🔧 BUG FIX: เลิก set FK = null โดยอัตโนมัติ — มันทำลายข้อมูล (สูญ supplier_id, warehouse_id ฯลฯ)
+            //   สาเหตุ FK violation มักเกิดจาก master data ยังไม่ขึ้น cloud → push master ก่อน
+            //   หรือ master id ต่างเครื่อง → ต้อง harmonize ก่อน
+            //   วิธีใหม่: skip batch + log → user จะเห็นใน error modal ว่าตารางไหนที่ master หาย
+            _logErr(cfg.target, '⚠ FK violation "'+fkCol+'" — master data หายในคลาวด์ (อย่ารัน pushAll จนกว่าจะ sync master ครบ)');
+            fail += chunk.length;
+            break;
           }
 
           // 4. Duplicate ID in batch → split ทีละ row
