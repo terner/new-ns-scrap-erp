@@ -2797,10 +2797,49 @@ window.$erp = {
   },
   nextDocNo: (prefix) => {
     if (!_GLOBAL_DB.docCounters) _GLOBAL_DB.docCounters = {};
-    const n = _GLOBAL_DB.docCounters[prefix] || 1;
-    _GLOBAL_DB.docCounters[prefix] = n + 1;
     const yymm = new Date().toISOString().slice(2,7).replace('-','');
-    return prefix + yymm + '-' + String(n).padStart(4,'0');
+    const docPrefix = prefix + yymm + '-';
+    // 🔧 Anti-collision: scan ALL relevant tables for max existing docNo
+    const tableMap = {
+      'PB': 'purchaseBills', 'SB': 'salesBills', 'PMT': 'payments', 'RCP': 'receipts',
+      'TRF': 'transfers', 'EXP': 'expenses', 'ST': 'transfers',
+      'POB': 'poBuys', 'POS': 'poSells', 'PO': 'productionOrders', 'PI': 'productionInputs',
+      'PO2': 'productionOutputs', 'ITF': 'fxGainLoss', 'ORC': 'overseasRecipients',
+      'SADV': 'supplierAdvances', 'CADV': 'customerAdvances'
+    };
+    let scannedMax = 0;
+    const tableName = tableMap[prefix];
+    if (tableName && Array.isArray(_GLOBAL_DB[tableName])) {
+      _GLOBAL_DB[tableName].forEach(r => {
+        if (r && typeof r.docNo === 'string' && r.docNo.startsWith(docPrefix)) {
+          const seq = parseInt(r.docNo.slice(docPrefix.length), 10);
+          if (!isNaN(seq) && seq > scannedMax) scannedMax = seq;
+        }
+      });
+    }
+    const counterN = Number(_GLOBAL_DB.docCounters[prefix] || 1);
+    // Use max(counter, scannedMax+1) → always pick higher
+    const n = Math.max(counterN, scannedMax + 1);
+    _GLOBAL_DB.docCounters[prefix] = n + 1;
+    return docPrefix + String(n).padStart(4,'0');
+  },
+  /* 🆕 Pre-save uniqueness check — call before save() to avoid collision */
+  ensureUniqueDocNo: (docNo, prefix, currentBillId) => {
+    const tableMap = {
+      'PB': 'purchaseBills', 'SB': 'salesBills', 'PMT': 'payments', 'RCP': 'receipts',
+      'TRF': 'transfers', 'EXP': 'expenses', 'POB': 'poBuys', 'POS': 'poSells'
+    };
+    const tableName = tableMap[prefix];
+    if (!tableName || !Array.isArray(_GLOBAL_DB[tableName])) return docNo;
+    // Check collision (same docNo, different id)
+    const collision = _GLOBAL_DB[tableName].some(r =>
+      r && r.docNo === docNo && r.id !== currentBillId
+    );
+    if (!collision) return docNo;
+    // Re-generate
+    const newDocNo = window.$erp.nextDocNo(prefix);
+    console.warn('[docNo-collision] '+docNo+' → '+newDocNo+' (table='+tableName+')');
+    return newDocNo;
   },
   logAudit: (action, entity, before, after) => {
     try {
@@ -3406,6 +3445,252 @@ window.$erp = {
   },
 };
 
+/* ================================================================
+   🔄 HYBRID AUTO-SYNC — Phase 1
+   - Auto-pull every 30s (silent, in-place merge)
+   - Auto-push debounced 5s after any local change (changed tables only)
+   - Last-write-wins (no conflict UI)
+   ================================================================ */
+(function setupAutoSync() {
+  // Slim camelCase ↔ snake_case helpers (duplicate of view-backup logic)
+  function _camelToSnake(s) { return String(s||'').replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, ''); }
+  function _snakeToCamel(s) { return String(s||'').replace(/_([a-z])/g, (_,c)=>c.toUpperCase()); }
+
+  // Mapping table: localKey → { target, keyMap }
+  const AS_MAP = {
+    branches: { target:'branches' },
+    warehouses: { target:'warehouses' },
+    suppliers: { target:'suppliers', keyMap:{ creditTerm:'credit_term', salesRep:'sales_rep', taxId:'tax_id', bankName:'bank_name', bankAccount:'bank_account', bankAccountName:'bank_account_name', branchId:'branch_id' } },
+    customers: { target:'customers', keyMap:{ creditTerm:'credit_term', taxId:'tax_id', bankName:'bank_name', bankAccount:'bank_account', branchId:'branch_id' } },
+    products: { target:'products', keyMap:{ metalGroup:'metal_group', itemStatus:'item_status', stdPrice:'std_price', stdCost:'std_cost' } },
+    salespersons: { target:'salespersons', keyMap:{ commissionPct:'commission_pct', baseSalary:'base_salary' } },
+    accounts: { target:'accounts', keyMap:{ openingBalance:'opening_balance', odLimit:'od_limit', accountNo:'account_no', bankName:'bank_name', branchId:'branch_id' } },
+    purchaseChannels: { target:'purchase_channels' },
+    salesChannels: { target:'sales_channels' },
+    expenseCategories: { target:'expense_categories', keyMap:{ parentId:'parent_id' } },
+    purchaseBills: { target:'purchase_bills', keyMap:{ docNo:'doc_no', refNo:'ref_no', supplierId:'supplier_id', branchId:'branch_id', channelId:'channel_id', warehouseId:'warehouse_id', transactionMode:'transaction_mode', vatType:'vat_type', vatAmount:'vat_amount', totalAmount:'total_amount', paidAmount:'paid_amount', payableBalance:'payable_balance', salesId:'sales_id', poBuyId:'po_buy_id', purchaseSource:'purchase_source', licensePlate:'license_plate', contactPhone:'contact_phone', contactName:'contact_name', taxInvoiceNo:'tax_invoice_no', vatInvoiceReceived:'vat_invoice_received', vatInvoiceNo:'vat_invoice_no', vatInvoiceDate:'vat_invoice_date', createdBy:'created_by', createdAt:'created_at', updatedAt:'updated_at' } },
+    salesBills: { target:'sales_bills', keyMap:{ docNo:'doc_no', refNo:'ref_no', customerId:'customer_id', branchId:'branch_id', channelId:'channel_id', warehouseId:'warehouse_id', transactionMode:'transaction_mode', vatType:'vat_type', creditTerm:'credit_term', vatAmount:'vat_amount', totalAmount:'total_amount', receivedAmount:'received_amount', receivableBalance:'receivable_balance', cogsAmount:'cogs_amount', grossProfit:'gross_profit', tradingFromPurchaseId:'trading_from_purchase_id', tradingFromPurchaseIds:'trading_from_purchase_ids', licensePlate:'license_plate', contactPhone:'contact_phone', contactName:'contact_name', createdBy:'created_by', createdAt:'created_at', updatedAt:'updated_at' } },
+    payments: { target:'payments', keyMap:{ docNo:'doc_no', billId:'bill_id', supplierId:'supplier_id', accountId:'account_id', withholdingTax:'withholding_tax', netAmount:'net_amount', branchId:'branch_id', voucherId:'voucher_id', createdBy:'created_by', createdAt:'created_at' } },
+    receipts: { target:'receipts', keyMap:{ docNo:'doc_no', billId:'bill_id', customerId:'customer_id', accountId:'account_id', withholdingTax:'withholding_tax', netAmount:'net_amount', branchId:'branch_id', voucherId:'voucher_id', createdBy:'created_by', createdAt:'created_at' } },
+    transfers: { target:'transfers', keyMap:{ docNo:'doc_no', fromAccountId:'from_account_id', toAccountId:'to_account_id', createdBy:'created_by', createdAt:'created_at' } },
+    expenses: { target:'expenses', keyMap:{ docNo:'doc_no', categoryId:'category_id', netAmount:'net_amount', accountId:'account_id', branchId:'branch_id', taxInvoiceNo:'tax_invoice_no', approvedBy:'approved_by', approvedAt:'approved_at', paidAt:'paid_at', createdBy:'created_by', createdAt:'created_at' } },
+    stockLedger: { target:'stock_ledger', keyMap:{ productId:'product_id', warehouseId:'warehouse_id', branchId:'branch_id', movementType:'movement_type', refType:'ref_type', refId:'ref_id', refNo:'ref_no', qtyIn:'qty_in', qtyOut:'qty_out', valueIn:'value_in', valueOut:'value_out', unitCost:'unit_cost', purchaseChannelId:'purchase_channel_id', salesChannelId:'sales_channel_id', createdBy:'created_by', createdAt:'created_at' } },
+    bankStatement: { target:'bank_statement', keyMap:{ accountId:'account_id', refType:'ref_type', refId:'ref_id', refNo:'ref_no', cashFlowCategory:'cash_flow_category', createdBy:'created_by', createdAt:'created_at', in:'amount_in', out:'amount_out' } },
+    poBuys: { target:'po_buys', keyMap:{ docNo:'doc_no', supplierId:'supplier_id', productId:'product_id', branchId:'branch_id', channelId:'channel_id', expectedDelivery:'expected_delivery', unitPrice:'unit_price', totalAmount:'total_amount', remainingQty:'remaining_qty', createdAt:'created_at' } },
+    poSells: { target:'po_sells', keyMap:{ docNo:'doc_no', customerId:'customer_id', productId:'product_id', branchId:'branch_id', channelId:'channel_id', expectedDelivery:'expected_delivery', unitPrice:'unit_price', totalAmount:'total_amount', remainingQty:'remaining_qty', createdAt:'created_at' } },
+    tradingDeals: { target:'trading_deals', keyMap:{ dealNo:'deal_no', purchaseBillId:'purchase_bill_id', purchaseBillNo:'purchase_bill_no', salesBillId:'sales_bill_id', salesBillNo:'sales_bill_no', productId:'product_id', supplierId:'supplier_id', customerId:'customer_id', matchedQty:'matched_qty', matchedPurchaseAmount:'matched_purchase_amount', matchedSalesAmount:'matched_sales_amount', exVat:'ex_vat', createdBy:'created_by', cancelledAt:'cancelled_at', createdAt:'created_at' } },
+  };
+  const AS_CONFLICT_COL = { 'currencies': 'code' };
+  // Tables to auto-sync (must exist in Supabase). Reduce for safety.
+  const AS_TABLES = ['branches','warehouses','suppliers','customers','products','salespersons','accounts',
+    'purchaseChannels','salesChannels','expenseCategories',
+    'purchaseBills','salesBills','payments','receipts','transfers','expenses',
+    'stockLedger','bankStatement','poBuys','poSells','tradingDeals'];
+
+  function _mapKeysS(obj, customMap = {}) {
+    const out = {};
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (v === undefined) continue;
+      const sk = customMap[k] || _camelToSnake(k);
+      out[sk] = v;
+    }
+    return out;
+  }
+  function _mapKeysReverseS(obj, customMap = {}) {
+    const reverseMap = {};
+    Object.entries(customMap).forEach(([camel, snake]) => { reverseMap[snake] = camel; });
+    const out = {};
+    for (const [k, v] of Object.entries(obj || {})) {
+      const ck = reverseMap[k] || _snakeToCamel(k);
+      out[ck] = v;
+    }
+    return out;
+  }
+  function _dedupeS(rows, conflictCol) {
+    const seen = new Map();
+    rows.forEach(r => {
+      const key = r[conflictCol];
+      if (key !== undefined && key !== null) seen.set(key, r);
+    });
+    return Array.from(seen.values());
+  }
+
+  /* State */
+  const dirtyTables = new Set();        // tables modified locally → push pending
+  let pushTimer = null;                  // debounce timer
+  let pullTimer = null;                  // 30s interval
+  let isPushing = false;
+  let isPulling = false;
+  let lastSyncMsg = '';
+  let userInactiveSince = Date.now();    // for "skip pull while editing" heuristic
+  let enabled = false;
+
+  function _updateStatus(state, label, tooltip) {
+    const ss = window.$erp?.syncStatus;
+    if (!ss) return;
+    ss.enabled = true;       // 🆕 ensure indicator shows
+    ss.state = state; ss.label = label;
+    if (tooltip) ss.tooltip = tooltip;
+    if (state === 'ok') ss.lastSyncAt = new Date().toISOString();
+  }
+
+  /* Push 1 table (silent) */
+  async function _pushTable(localKey) {
+    const cfg = AS_MAP[localKey]; if (!cfg) return { ok:0, fail:0 };
+    const rows = (_GLOBAL_DB[localKey] || []).filter(r => r && r.id);
+    if (!rows.length) return { ok:0, fail:0 };
+    const conflictCol = AS_CONFLICT_COL[cfg.target] || 'id';
+    const mapped = _dedupeS(rows.map(r => {
+      const out = _mapKeysS(r, cfg.keyMap || {});
+      delete out._normalized; delete out._migrated; delete out._dirty;
+      return out;
+    }), conflictCol);
+    let ok = 0, fail = 0;
+    const batchSize = 100;
+    for (let i = 0; i < mapped.length; i += batchSize) {
+      const chunk = mapped.slice(i, i + batchSize);
+      try {
+        const { error } = await window.sb.from(cfg.target).upsert(chunk, { onConflict: conflictCol });
+        if (error) {
+          fail += chunk.length;
+          console.warn('[autoSync] push '+cfg.target+' batch error:', error.message);
+        } else {
+          ok += chunk.length;
+        }
+      } catch(e) {
+        fail += chunk.length;
+        console.warn('[autoSync] push '+cfg.target+' exception:', e.message);
+      }
+    }
+    return { ok, fail };
+  }
+
+  /* Push all dirty tables */
+  async function pushDirty() {
+    if (isPushing || !window.sb || !enabled) return;
+    if (dirtyTables.size === 0) return;
+    isPushing = true;
+    _updateStatus('syncing', '⬆ Pushing...', 'Auto-Push: '+Array.from(dirtyTables).join(', '));
+    let totalOk = 0, totalFail = 0;
+    const toPush = Array.from(dirtyTables);
+    dirtyTables.clear();
+    for (const t of toPush) {
+      const { ok, fail } = await _pushTable(t);
+      totalOk += ok; totalFail += fail;
+    }
+    isPushing = false;
+    if (totalFail > 0) {
+      _updateStatus('error', '⚠ Push '+totalFail+' fail', 'บางตารางพุชไม่สำเร็จ — ลองอีกครั้งใน 30 วิ');
+      // Re-mark for retry next cycle
+      toPush.forEach(t => dirtyTables.add(t));
+    } else {
+      _updateStatus('ok', '☁️✓ Synced', 'Push สำเร็จ ('+totalOk+' rows · '+toPush.length+' tables)');
+      lastSyncMsg = 'pushed '+totalOk+' rows';
+    }
+  }
+
+  /* Pull all tables (silent in-place merge) */
+  async function pullAll() {
+    if (isPulling || isPushing || !window.sb || !enabled) return;
+    // Skip pull if user has been very recently active (<5s) — likely typing
+    if (Date.now() - userInactiveSince < 5000) return;
+    // Skip pull if there are pending pushes — push first
+    if (dirtyTables.size > 0) return;
+    isPulling = true;
+    _updateStatus('syncing', '⬇ Pulling...', 'Auto-Pull กำลังตรวจ Cloud');
+    let totalRows = 0, errors = 0;
+    for (const localKey of AS_TABLES) {
+      const cfg = AS_MAP[localKey]; if (!cfg) continue;
+      try {
+        let allRows = [];
+        let from = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await window.sb.from(cfg.target).select('*').range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          allRows = allRows.concat(data);
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        const localRows = allRows.map(r => _mapKeysReverseS(r, cfg.keyMap || {}));
+        // SMART: skip if cloud is empty but local has data (don't wipe local)
+        if (allRows.length === 0 && (_GLOBAL_DB[localKey] || []).length > 0) continue;
+        // Replace IN PLACE for Vue reactivity (don't break existing array reference)
+        const arr = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
+        arr.length = 0;
+        localRows.forEach(r => arr.push(r));
+        totalRows += localRows.length;
+      } catch(e) {
+        errors++;
+        console.warn('[autoSync] pull '+cfg.target+' error:', e.message);
+      }
+    }
+    isPulling = false;
+    if (errors > 0) {
+      _updateStatus('error', '⚠ Pull '+errors+' errors', 'บางตาราง pull ไม่ได้');
+    } else {
+      _updateStatus('ok', '☁️✓ Synced', 'Pull สำเร็จ ('+totalRows+' rows)');
+      lastSyncMsg = 'pulled '+totalRows+' rows';
+    }
+  }
+
+  /* Track local activity for editing heuristic */
+  ['mousemove','keydown','click','input','focus'].forEach(ev => {
+    window.addEventListener(ev, () => { userInactiveSince = Date.now(); }, { passive:true, capture:true });
+  });
+
+  /* Watch _GLOBAL_DB for changes — debounced push */
+  // Watch each table separately to know which one changed
+  AS_TABLES.forEach(t => {
+    watch(() => _GLOBAL_DB[t], () => {
+      dirtyTables.add(t);
+      // Debounce 5s
+      if (pushTimer) clearTimeout(pushTimer);
+      pushTimer = setTimeout(() => { pushDirty(); }, 5000);
+    }, { deep: true });
+  });
+
+  /* Boot when Supabase ready + user logged in */
+  function boot() {
+    if (enabled) return;
+    if (!window.sb) return;
+    if (!window.$erp?.currentUser?.value) return;
+    enabled = true;
+    console.log('[autoSync] enabled — pull every 30s, push debounced 5s');
+    _updateStatus('ok', '☁️ Auto-Sync ON', 'Auto-Pull ทุก 30 วิ + Auto-Push เมื่อมีการเปลี่ยนแปลง');
+    // Initial pull on boot (delay 3s so login finishes)
+    setTimeout(() => pullAll(), 3000);
+    // Recurring pull every 30s
+    pullTimer = setInterval(() => pullAll(), 30000);
+  }
+  function shutdown() {
+    if (!enabled) return;
+    enabled = false;
+    if (pullTimer) { clearInterval(pullTimer); pullTimer = null; }
+    if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+    _updateStatus('idle', '☁️ Off', 'Auto-Sync ปิด');
+  }
+
+  // Poll for Supabase + login readiness every 2 sec
+  const bootInterval = setInterval(() => {
+    if (window.sb && window.$erp?.currentUser?.value) {
+      clearInterval(bootInterval);
+      boot();
+    }
+  }, 2000);
+
+  // Expose API
+  window.$autoSync = {
+    boot, shutdown,
+    pushNow: () => { if (pushTimer) clearTimeout(pushTimer); return pushDirty(); },
+    pullNow: () => pullAll(),
+    isEnabled: () => enabled,
+    dirtyTables: () => Array.from(dirtyTables),
+    status: () => ({ enabled, isPushing, isPulling, lastSyncMsg, dirty:Array.from(dirtyTables) }),
+  };
+})();
+
 const app = createApp({
   setup() {
     /* Use the GLOBAL db (already loaded above) — don't create another */
@@ -3426,6 +3711,8 @@ const app = createApp({
       tooltip: 'ระบบ Cloud Sync',
       lastSyncAt: '',
     });
+    /* 🆕 expose to global so auto-sync controller can update */
+    window.$erp.syncStatus = syncStatus;
     let _dbDirty = true;     // dirty flag — set true เมื่อข้อมูลเปลี่ยน
 
     /* persist */
@@ -6898,6 +7185,14 @@ app.component('view-purchase', {
         if (!isTrading && !f.channelId) { alert('เลือกช่องทางรับซื้อ'); return; }
         // 🆕 Trading mode: ล้าง branch + warehouse + channel (Trading เป็นของมันเอง — ยอด/กำไรไปฝั่ง Trading)
         if (isTrading) { f.branchId = ''; f.warehouseId = ''; f.channelId = ''; }
+        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำกับบิลคนอื่น (สำคัญตอนหลายเครื่องเปิดบิลพร้อมกัน)
+        if (!editingId.value) {
+          const oldDocNo = f.docNo;
+          f.docNo = erp.ensureUniqueDocNo(f.docNo, 'PB', null);
+          if (f.docNo !== oldDocNo) {
+            erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' — เปลี่ยนเป็น '+f.docNo+' อัตโนมัติ', 'warning');
+          }
+        }
         const items = safeArr(f.items);
         if (!items.length) { alert('เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'); return; }
         // Recalc + validate each line
@@ -7342,8 +7637,49 @@ app.component('view-purchase', {
       erp.logAudit('UPDATE_BANK_ACCOUNT','suppliers',{id:supId, name:s.name},{bankAccount:newVal});
       erp.showToast('✓ เซฟเลขบัญชีเข้า Master Data Supplier แล้ว');
     }
+    /* 🆕 Sales rep helpers — link with supplier master */
+    function getSupplierSalesId(supId) {
+      const s = (db.suppliers||[]).find(x => x && x.id === supId);
+      return s?.salesId || '';
+    }
+    function updateSupplierPhone(supId, val) {
+      const s = (db.suppliers||[]).find(x => x && x.id === supId);
+      if (!s) return;
+      const newVal = String(val||'').trim();
+      if ((s.phone||'') === newVal) return;
+      s.phone = newVal;
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      erp.logAudit('UPDATE_SUPPLIER_PHONE','suppliers',{id:supId, name:s.name},{phone:newVal});
+      erp.showToast('✓ บันทึกเบอร์โทรเข้า Master Data Supplier แล้ว');
+    }
+    function updateSupplierSalesId(supId, val) {
+      const s = (db.suppliers||[]).find(x => x && x.id === supId);
+      if (!s) return;
+      const newVal = String(val||'').trim();
+      if ((s.salesId||'') === newVal) return;
+      s.salesId = newVal;
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      const sp = (db.salespersons||[]).find(x => x && x.id === newVal);
+      erp.logAudit('UPDATE_SUPPLIER_SALES','suppliers',{id:supId, name:s.name},{salesId:newVal, salesName: sp?.name||'-'});
+      erp.showToast('✓ บันทึกเซลที่ดูแลเข้า Master Data Supplier แล้ว');
+    }
 
-    /* 🆕 Quick-add sales person — เพิ่มเข้าฐานข้อมูลทันที + auto-select ในบิล */
+    /* 🆕 Auto-prefill phone + salesId เมื่อเลือก Supplier (เฉพาะตอนค่ายังว่าง) */
+    watch(() => form.value.supplierId, (newId, oldId) => {
+      if (!newId || newId === oldId) return;
+      const s = (db.suppliers||[]).find(x => x && x.id === newId);
+      if (!s) return;
+      // Prefill phone — เฉพาะกรณีฟอร์มยังว่าง (กัน overwrite ของที่ user พิมพ์ไป)
+      if (!form.value.contactPhone && s.phone) {
+        form.value.contactPhone = s.phone;
+      }
+      // Prefill salesId — เฉพาะกรณีฟอร์มยังว่าง
+      if (!form.value.salesId && s.salesId) {
+        form.value.salesId = s.salesId;
+      }
+    });
+
+    /* 🆕 Quick-add sales person — เพิ่มเข้าฐานข้อมูลทันที + auto-select + sync เข้า supplier master */
     function quickAddSales() {
       const name = (prompt('ชื่อเซลที่ดูแล:') || '').trim();
       if (!name) return;
@@ -7351,7 +7687,8 @@ app.component('view-purchase', {
       const existing = (db.salespersons||[]).find(s => s && (s.name||'').trim().toLowerCase() === name.toLowerCase());
       if (existing) {
         form.value.salesId = existing.id;
-        erp.showToast('✓ มีเซล "'+name+'" ในระบบแล้ว — เลือกให้อัตโนมัติ');
+        if (form.value.supplierId) updateSupplierSalesId(form.value.supplierId, existing.id);
+        else erp.showToast('✓ มีเซล "'+name+'" ในระบบแล้ว — เลือกให้อัตโนมัติ');
         return;
       }
       // เพิ่มใหม่
@@ -7361,6 +7698,10 @@ app.component('view-purchase', {
       const newSales = { id, code, name, phone:'', email:'', commissionPct:0, baseSalary:0, active:true, note:'เพิ่มจากบิลซื้อ' };
       db.salespersons.push(newSales);
       form.value.salesId = id;
+      // 🆕 ถ้ามี supplier ในบิล → save salesId เข้า supplier master ด้วย
+      if (form.value.supplierId) {
+        updateSupplierSalesId(form.value.supplierId, id);
+      }
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       erp.logAudit('QUICK_ADD_SALES','salespersons',null,newSales);
       erp.showToast('✓ เพิ่มเซล "'+name+'" เข้าฐานข้อมูลแล้ว — auto-select ในบิล');
@@ -7377,6 +7718,8 @@ app.component('view-purchase', {
       showSwapModal, swapTarget, swapForm, swapTotals, openSwapSupplier, recalcSwapLine, saveSupplierSwap,
       // Bank account
       getSupplierBank, updateSupplierBank, getSupplierPhone,
+      // 🆕 Sales rep + bidirectional sync with supplier master
+      getSupplierSalesId, updateSupplierPhone, updateSupplierSalesId,
       // 🆕 Quick-add sales
       quickAddSales,
     };
@@ -7581,19 +7924,27 @@ app.component('view-purchase', {
                 <input v-model="form.licensePlate" placeholder="เช่น 1กข-1234 / 70-1234" class="w-full px-3 py-2 border rounded-lg uppercase">
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">📞 เบอร์โทรลูกค้า</label>
-                <input v-model="form.contactPhone" :placeholder="form.supplierId ? (getSupplierPhone(form.supplierId) || 'เบอร์โทร') : 'เลือก Supplier ก่อน'" class="w-full px-3 py-2 border rounded-lg">
+                <label class="block text-xs font-medium text-slate-600 mb-1">
+                  📞 เบอร์โทรลูกค้า
+                  <span v-if="form.supplierId && getSupplierPhone(form.supplierId)" class="text-emerald-600 font-normal text-[10px]">✓ ดึงจาก Master</span>
+                </label>
+                <input v-model="form.contactPhone" @change="form.supplierId && updateSupplierPhone(form.supplierId, form.contactPhone)" :placeholder="form.supplierId ? (getSupplierPhone(form.supplierId) || 'พิมพ์เบอร์ใหม่ — จะบันทึกเข้า Master อัตโนมัติ') : 'เลือก Supplier ก่อน'" class="w-full px-3 py-2 border rounded-lg">
+                <div v-if="form.supplierId && form.contactPhone && form.contactPhone !== getSupplierPhone(form.supplierId)" class="text-[10px] text-amber-600 mt-0.5">⚠ ต่างจาก Master — บันทึกแล้วจะอัปเดต Master</div>
               </div>
-              <!-- 🆕 เซลที่ดูแล (dropdown จาก salespersons + quick-add) -->
+              <!-- 🆕 เซลที่ดูแล (dropdown จาก salespersons + quick-add + bidirectional master sync) -->
               <div class="md:col-span-2">
-                <label class="block text-xs font-medium text-slate-600 mb-1">👤 เซลที่ดูแล <span class="text-slate-400 font-normal">(เว้นว่าง = ลูกค้าบริษัท)</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">
+                  👤 เซลที่ดูแล <span class="text-slate-400 font-normal">(เว้นว่าง = ลูกค้าบริษัท)</span>
+                  <span v-if="form.supplierId && getSupplierSalesId(form.supplierId)" class="text-emerald-600 font-normal text-[10px]">✓ ดึงจาก Master</span>
+                </label>
                 <div class="flex gap-2">
-                  <select v-model="form.salesId" class="flex-1 px-3 py-2 border rounded-lg">
+                  <select v-model="form.salesId" @change="form.supplierId && updateSupplierSalesId(form.supplierId, form.salesId)" class="flex-1 px-3 py-2 border rounded-lg">
                     <option value="">— ลูกค้าบริษัท (ไม่มีเซลดูแล) —</option>
                     <option v-for="s in (db.salespersons||[]).filter(x=>x && x.active!==false)" :key="s.id" :value="s.id">{{ s.name }} ({{s.code||'-'}})</option>
                   </select>
                   <button type="button" @click="quickAddSales" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs whitespace-nowrap" title="เพิ่มเซลใหม่เข้าฐานข้อมูล">+ เพิ่มเซล</button>
                 </div>
+                <div v-if="form.supplierId && form.salesId && form.salesId !== getSupplierSalesId(form.supplierId)" class="text-[10px] text-amber-600 mt-0.5">⚠ ต่างจาก Master — เปลี่ยนแล้วจะอัปเดต Master</div>
               </div>
             </div>
           </div>
@@ -7956,6 +8307,12 @@ app.component('view-payment', {
     function save() {
       try {
         const f = form.value;
+        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำ
+        if (!editingVoucherId.value) {
+          const oldDocNo = f.docNo;
+          f.docNo = erp.ensureUniqueDocNo(f.docNo, 'PMT', null);
+          if (f.docNo !== oldDocNo) erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' → '+f.docNo, 'warning');
+        }
         // 🆕 Auto-fill: if only 1 split with accountId but no amount → fill with netCashOut
         if (safeArr(f.splits).length === 1 && f.splits[0].accountId && num(f.splits[0].amount) === 0) {
           f.splits[0].amount = totals.value.netCashOut;
@@ -8561,6 +8918,12 @@ app.component('view-receipt', {
         if (!f.accountId) { alert('เลือกบัญชีรับ'); return; }
         const validLines = safeArr(f.lines).filter(l => l.billId && num(l.receiptAmount)>0);
         if (validLines.length===0) { alert('เลือกบิล + ใส่จำนวนเงินอย่างน้อย 1 รายการ'); return; }
+        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำ
+        if (!editingVoucherId.value) {
+          const oldDocNo = f.docNo;
+          f.docNo = erp.ensureUniqueDocNo(f.docNo, 'RCP', null);
+          if (f.docNo !== oldDocNo) erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' → '+f.docNo, 'warning');
+        }
         const isEdit = !!editingVoucherId.value;
         const voucherId = isEdit ? editingVoucherId.value : newId('RCP');
 
@@ -9938,6 +10301,14 @@ app.component('view-sales', {
         }
       }
       recalcAll();
+      // 🛡️ Anti-collision: ตรวจ docNo ซ้ำกับบิลคนอื่น (สำคัญตอนหลายเครื่องเปิดบิลพร้อมกัน)
+      if (!editing.value) {
+        const oldDocNo = form.docNo;
+        form.docNo = erp.ensureUniqueDocNo(form.docNo, 'SB', null);
+        if (form.docNo !== oldDocNo) {
+          erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' — เปลี่ยนเป็น '+form.docNo+' อัตโนมัติ', 'warning');
+        }
+      }
       const id = editing.value ? editing.value.id : erp.uid('SB');
       const bill = JSON.parse(JSON.stringify({...form, id}));
       bill.receivableBalance = bill.totalAmount - bill.receivedAmount;
