@@ -3949,17 +3949,19 @@ window.$erp = {
           console.warn('[autoSync] pull '+cfg.target+' error:', e.message);
         }
       }
+      // 🆕 Auto-recalc AR/AP balances หลัง pull (กัน sync race ทำให้ paidAmount เพี้ยน)
+      // 🔧 BUG FIX: ย้ายเข้ามาใน try block — ถ้าวางหลัง _applyingCloudUpdate=false
+      //   recalc จะแก้ paidAmount/payableBalance → watch fire → push กลับ cloud → loop
+      try {
+        const r = window.$erp?.recalcBillBalances?.();
+        if (r && (r.fixedPB > 0 || r.fixedSB > 0)) {
+          console.log('[autoSync] Recalc balances: fixed '+r.fixedPB+' PBs, '+r.fixedSB+' SBs');
+        }
+      } catch(e) { console.warn('recalc after pull:', e); }
     } finally {
       _applyingCloudUpdate = false;
     }
     isPulling = false;
-    // 🆕 Auto-recalc AR/AP balances หลัง pull (กัน sync race ทำให้ paidAmount เพี้ยน)
-    try {
-      const r = window.$erp?.recalcBillBalances?.();
-      if (r && (r.fixedPB > 0 || r.fixedSB > 0)) {
-        console.log('[autoSync] Recalc balances: fixed '+r.fixedPB+' PBs, '+r.fixedSB+' SBs');
-      }
-    } catch(e) { console.warn('recalc after pull:', e); }
     if (errors > 0) {
       _updateStatus('error', '⚠ Pull '+errors+' errors', 'บางตาราง pull ไม่ได้ — คลิกดู errors');
     } else {
