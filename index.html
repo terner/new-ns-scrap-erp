@@ -74,15 +74,8 @@
     </div>
     <div class="space-y-4">
       <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">เลือกผู้ใช้</label>
-        <select @change="loginForm.username = $event.target.value" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-          <option value="">— เลือก user —</option>
-          <option v-for="u in (db.users||[]).filter(u=>u && u.active!==false)" :key="u.id" :value="u.username">{{u.username}} · {{u.name}} · {{(db.roles||[]).find(r=>r&&r.id===u.roleId)?.name||'-'}}</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
-        <input v-model="loginForm.username" @keyup.enter="$refs.pwdInput.focus()" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="admin" autocomplete="username">
+        <label class="block text-sm font-medium text-slate-700 mb-1">📧 Email / Username</label>
+        <input v-model="loginForm.username" @keyup.enter="$refs.pwdInput.focus()" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="ns-aom@nsscrap.com" autocomplete="username">
       </div>
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">🔒 Password</label>
@@ -3145,11 +3138,13 @@ window.$erp = {
             <div class="info-box" ${isReceipt ? 'style="margin-bottom:6px"' : ''}>
               <div class="label">${partyLabel}</div>
               <div style="font-weight:bold;font-size:14px">${party.name||'-'}</div>
-              ${isReceipt ? '' : `<div style="font-size:11px;color:#555">
-                ${party.address?party.address+'<br>':''}
-                ${party.phone?'โทร '+party.phone:''}<br>
-                ${party.taxId?'เลขผู้เสียภาษี: '+party.taxId:''}
-              </div>`}
+              <div style="font-size:11px;color:#555;margin-top:4px">
+                ${(bill.contactPhone || party.phone) ? '📞 โทร: <b>'+(bill.contactPhone || party.phone)+'</b>' : ''}
+                ${bill.contactName ? ' · 👤 ผู้ติดต่อ: <b>'+bill.contactName+'</b>' : ''}
+                ${bill.licensePlate ? '<br>🚗 ทะเบียนรถ: <b>'+bill.licensePlate+'</b>' : ''}
+                ${party.salesRep || party.salesPerson ? '<br>🧑‍💼 เซลที่ดูแล: <b>'+(party.salesRep || party.salesPerson)+'</b>' : ''}
+                ${isReceipt ? '' : (party.address?'<br>'+party.address:'') + (party.taxId?'<br>เลขผู้เสียภาษี: '+party.taxId:'')}
+              </div>
             </div>
             ${isReceipt ? '' : `<div class="info-box">
               <div class="label">ผู้ส่ง (บริษัทเรา)</div>
@@ -3157,6 +3152,7 @@ window.$erp = {
               <div style="font-size:11px;color:#555">
                 ${co.address||''}<br>
                 ${co.phone?'โทร '+co.phone:''}
+                ${bill.licensePlate?'<br>🚗 ทะเบียนรถส่งของ: <b>'+bill.licensePlate+'</b>':''}
               </div>
             </div>`}
           </div>
@@ -6625,6 +6621,7 @@ app.component('view-purchase', {
     function blankItem() {
       return { id: newId('LN'), productId:'',
         displayName:'',     // 📝 ชื่อสินค้า custom สำหรับโชว์ในบิล (ถ้าว่าง = ใช้ชื่อ master)
+        poBuyId:'',         // 📋 PO Buy ที่ตัดต่อรายการ (เลือกได้คนละ PO ใน 1 บิล)
         netWeight:0, price:0, netAmount:0 };
     }
     const form = ref({
@@ -6633,6 +6630,9 @@ app.component('view-purchase', {
       transactionMode: 'STOCK',                  // STOCK | TRADING
       purchaseSource: 'SPOT_BUY', poBuyId: '',
       supplierId: '', branchId: '', warehouseId: '', channelId: '',
+      licensePlate: '',                           // 🚗 ทะเบียนรถที่ส่งของ (per bill)
+      contactPhone: '',                           // 📞 เบอร์โทร supplier (override master ถ้ามี)
+      contactName: '',                            // 👤 ชื่อผู้ติดต่อ (override master ถ้ามี)
       items: [blankItem()],
       hasVat: false,                              // checkbox VAT / NO VAT
       discountTotal: 0,                           // ส่วนลดท้ายบิล
@@ -6652,6 +6652,7 @@ app.component('view-purchase', {
           transactionMode: 'STOCK',
           purchaseSource: 'SPOT_BUY', poBuyId: '',
           supplierId: '', branchId: '', warehouseId: '', channelId: '',
+          licensePlate: '', contactPhone: '', contactName: '',
           items: [blankItem()],
           hasVat: false,
           discountTotal: 0,
@@ -6680,6 +6681,7 @@ app.component('view-purchase', {
         const items = (b.items && b.items.length) ? b.items.map(it => ({
           id: it.id || newId('LN'), productId: it.productId,
           displayName: it.displayName || '',     // 📝 preserve custom display name
+          poBuyId: it.poBuyId || '',              // 📋 preserve item-level PO selection
           netWeight: Number(it.netWeight || it.grossWeight || 0),
           price: Number(it.price || 0),
           netAmount: Number(it.netAmount || 0)
@@ -6691,6 +6693,9 @@ app.component('view-purchase', {
           purchaseSource: b.purchaseSource || 'SPOT_BUY', poBuyId: b.poBuyId || '',
           supplierId: b.supplierId, branchId: b.branchId,
           warehouseId: b.warehouseId || '', channelId: b.channelId || '',
+          licensePlate: b.licensePlate || '',
+          contactPhone: b.contactPhone || '',
+          contactName: b.contactName || '',
           items,
           hasVat: !!b.hasVat,
           discountTotal: Number(b.discountTotal||0),
@@ -6776,7 +6781,13 @@ app.component('view-purchase', {
         items.forEach(it => recalcItem(it));
         const invalid = items.findIndex(it => !it.productId || num(it.netWeight) <= 0 || num(it.price) <= 0);
         if (invalid >= 0) { alert(`รายการที่ ${invalid+1}: ต้องเลือกสินค้า + ใส่น้ำหนัก/ราคา > 0`); return; }
-        if (f.purchaseSource === 'PO_RECEIPT' && !f.poBuyId) { alert('เลือก PO Buy ที่จะรับของ'); return; }
+        if (f.purchaseSource === 'PO_RECEIPT') {
+          const itemsWithPo = (f.items||[]).filter(it => it.poBuyId);
+          if (itemsWithPo.length === 0 && !f.poBuyId) {
+            alert('โหมด PO_RECEIPT — กรุณาเลือก PO ในรายการสินค้าอย่างน้อย 1 รายการ');
+            return;
+          }
+        }
 
         const subtotal = items.reduce((s,it)=>s+num(it.netAmount),0);
         const discountTotal = num(f.discountTotal);
@@ -6808,6 +6819,9 @@ app.component('view-purchase', {
           warehouseId: isTrading ? '' : f.warehouseId, channelId: f.channelId,
           purchaseSource: f.purchaseSource || 'SPOT_BUY', poBuyId: f.poBuyId || '',
           purchaseType: 'เงินสด', note: f.note,
+          licensePlate: f.licensePlate || '',
+          contactPhone: f.contactPhone || '',
+          contactName: f.contactName || '',
           vatInvoiceReceived: !!f.vatInvoiceReceived,
           vatInvoiceNo: f.vatInvoiceNo || '',
           vatInvoiceDate: f.vatInvoiceDate || '',
@@ -6869,16 +6883,29 @@ app.component('view-purchase', {
         if (isEdit && !isTrading && affectedProductIds.size > 0) {
           recalcResult = erp.recalcDownstreamCosts(Array.from(affectedProductIds));
         }
-        // Update PO Buy if PO_RECEIPT — ตัด PO ซื้อ (sum across lines)
-        if (bill.purchaseSource === 'PO_RECEIPT' && bill.poBuyId) {
+        // Update PO Buy if PO_RECEIPT — ตัด PO ซื้อ
+        // 🆕 รองรับหลาย PO ใน 1 บิล — แต่ละ item มี poBuyId ของตัวเอง
+        if (bill.purchaseSource === 'PO_RECEIPT') {
           try {
-            const po = safeArr(db.poBuys).find(p => p && p.id === bill.poBuyId);
-            if (po) {
-              const received = bill.items.reduce((s,it)=>s+num(it.netWeight),0);
-              const remaining = Math.max(0, num(po.remainingQty || po.qty) - received);
-              po.remainingQty = remaining;
-              po.status = remaining <= 0 ? 'Received' : 'Partially Received';
-            }
+            // Group items by poBuyId
+            const cutByPo = {};
+            bill.items.forEach(it => {
+              const pid = it.poBuyId || bill.poBuyId;  // fallback to bill-level (legacy)
+              if (!pid) return;
+              if (!cutByPo[pid]) cutByPo[pid] = 0;
+              cutByPo[pid] += num(it.netWeight);
+            });
+            const cutPoIds = [];
+            Object.entries(cutByPo).forEach(([pid, received]) => {
+              const po = safeArr(db.poBuys).find(p => p && p.id === pid);
+              if (po) {
+                const remaining = Math.max(0, num(po.remainingQty != null ? po.remainingQty : po.qty) - received);
+                po.remainingQty = remaining;
+                po.status = remaining <= 0 ? 'Received' : 'Partially Received';
+                cutPoIds.push(po.docNo || po.id);
+              }
+            });
+            bill._cutPoIds = cutPoIds;  // for toast message
           } catch (e) { console.error('PO update:', e); }
         }
         showForm.value = false;
@@ -6887,7 +6914,7 @@ app.component('view-purchase', {
         if (recalcResult && (recalcResult.updatedSales || recalcResult.updatedInputs)) {
           msg += ` · 🔄 Re-calc: บิลขาย ${recalcResult.updatedSales} · Production input ${recalcResult.updatedInputs}`;
         }
-        if (bill.purchaseSource === 'PO_RECEIPT') msg += ' · ตัด PO ซื้อแล้ว';
+        if (bill.purchaseSource === 'PO_RECEIPT' && bill._cutPoIds?.length) msg += ' · ตัด PO ซื้อ: '+bill._cutPoIds.join(', ');
         erp.showToast(msg,'success');
       } catch (e) {
         console.error('save:', e);
@@ -7160,6 +7187,10 @@ app.component('view-purchase', {
       const s = (db.suppliers||[]).find(x => x && x.id === supId);
       return s?.bankAccount || '';
     }
+    function getSupplierPhone(supId) {
+      const s = (db.suppliers||[]).find(x => x && x.id === supId);
+      return s?.phone || '';
+    }
     function updateSupplierBank(supId, val) {
       const s = (db.suppliers||[]).find(x => x && x.id === supId);
       if (!s) return;
@@ -7181,7 +7212,7 @@ app.component('view-purchase', {
       // Swap
       showSwapModal, swapTarget, swapForm, swapTotals, openSwapSupplier, recalcSwapLine, saveSupplierSwap,
       // Bank account
-      getSupplierBank, updateSupplierBank,
+      getSupplierBank, updateSupplierBank, getSupplierPhone,
     };
   },
   template: `
@@ -7308,14 +7339,17 @@ app.component('view-purchase', {
               <button type="button" @click="setSource('SPOT_BUY')" :class="['flex-1 px-4 py-2 rounded-lg text-sm font-medium border-2 transition', form.purchaseSource==='SPOT_BUY' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-300 hover:border-blue-400']">📦 SPOT BUY (ซื้อสด)</button>
               <button type="button" @click="setSource('PO_RECEIPT')" :class="['flex-1 px-4 py-2 rounded-lg text-sm font-medium border-2 transition', form.purchaseSource==='PO_RECEIPT' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-slate-300 hover:border-indigo-400']">📋 PO_RECEIPT (รับจาก PO)</button>
             </div>
-            <div v-if="form.purchaseSource==='PO_RECEIPT'" class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mt-2">
-              <label class="block text-xs text-indigo-700 font-semibold mb-1">เลือก PO Buy ที่จะรับของ *</label>
-              <select v-model="form.poBuyId" @change="loadFromPO" class="w-full px-3 py-2 border rounded text-sm">
-                <option value="">-- เลือก PO Buy --</option>
-                <option v-for="po in availablePOBuys" :key="po.id" :value="po.id">{{ po.label }}</option>
-              </select>
+            <div v-if="form.purchaseSource==='PO_RECEIPT'" class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mt-2 text-xs text-indigo-800">
+              ✅ <b>โหมด PO_RECEIPT</b> — เลือก PO ของแต่ละรายการ ในตารางสินค้าด้านล่าง<br>
+              💡 1 บิล สามารถตัดได้หลาย PO (รายการละ PO ก็ได้)
               <div v-if="availablePOBuys.length === 0" class="text-xs text-amber-700 mt-1">⚠️ ไม่มี PO Buy ที่เปิดอยู่ — สร้างที่เมนู "PO Buy" ก่อน</div>
-              <div v-if="form.poBuyId" class="text-xs text-emerald-700 mt-1">✓ ดึงข้อมูล Supplier/สาขา/สินค้า/น้ำหนัก/ราคา จาก PO มาแล้ว — ปรับตามรับจริงได้</div>
+              <div class="mt-2">
+                <label class="text-xs">📥 Quick Load (เลือก PO หลัก แล้วเติมรายการให้):</label>
+                <select v-model="form.poBuyId" @change="loadFromPO" class="w-full px-2 py-1.5 border rounded text-xs mt-1">
+                  <option value="">-- (ไม่บังคับ) --</option>
+                  <option v-for="po in availablePOBuys" :key="po.id" :value="po.id">{{ po.label }}</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -7369,6 +7403,19 @@ app.component('view-purchase', {
                   <option v-for="c in (db.purchaseChannels || []).filter(x => x && x.active)" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
               </div>
+              <!-- 🚗 ทะเบียนรถ + ผู้ติดต่อ -->
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">🚗 ทะเบียนรถ <span class="text-slate-400 font-normal">(ถ้ามี)</span></label>
+                <input v-model="form.licensePlate" placeholder="เช่น 1กข-1234 / 70-1234" class="w-full px-3 py-2 border rounded-lg uppercase">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">📞 เบอร์โทรลูกค้า</label>
+                <input v-model="form.contactPhone" :placeholder="form.supplierId ? (getSupplierPhone(form.supplierId) || 'เบอร์โทร') : 'เลือก Supplier ก่อน'" class="w-full px-3 py-2 border rounded-lg">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">👤 ชื่อผู้ติดต่อ</label>
+                <input v-model="form.contactName" placeholder="ชื่อคนนำของมาส่ง" class="w-full px-3 py-2 border rounded-lg">
+              </div>
             </div>
           </div>
 
@@ -7383,6 +7430,7 @@ app.component('view-purchase', {
                 <thead class="bg-gradient-to-r from-slate-100 to-slate-50">
                   <tr>
                     <th class="p-3 text-left text-slate-700">สินค้า *</th>
+                    <th v-if="form.purchaseSource==='PO_RECEIPT'" class="p-3 text-left w-48 text-indigo-700">📋 PO ที่ตัด</th>
                     <th class="p-3 text-right w-28 text-slate-700">น้ำหนัก (กก.)</th>
                     <th class="p-3 text-right w-28 text-slate-700">ราคา/กก.</th>
                     <th class="p-3 text-right w-32 text-slate-700">ยอดรวม</th>
@@ -7396,6 +7444,13 @@ app.component('view-purchase', {
                       <!-- 📝 Custom display name — โชว์ในบิล (ถ้าว่าง = ใช้ชื่อ master) -->
                       <input type="text" v-model="it.displayName" :placeholder="it.productId ? '📝 ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master: ' + (productName(it.productId)||'') + ')' : 'เลือกสินค้าก่อน...'" class="w-full px-2 py-1 border rounded text-xs mt-1.5 bg-yellow-50">
                       <div v-if="it.productId" class="text-xs mt-1 px-2 py-1 bg-emerald-50 rounded text-emerald-700">📦 คงเหลือ: <b>{{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId))}}</b> → หลังรับ: <b>{{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId) + Number(it.netWeight||0))}}</b> กก.</div>
+                    </td>
+                    <td v-if="form.purchaseSource==='PO_RECEIPT'" class="p-2">
+                      <select v-model="it.poBuyId" class="w-full px-2 py-1.5 border rounded text-xs bg-indigo-50">
+                        <option value="">-- เลือก PO --</option>
+                        <option v-for="po in availablePOBuys" :key="po.id" :value="po.id">{{po.label}}</option>
+                      </select>
+                      <div v-if="!it.poBuyId" class="text-[10px] text-amber-600 mt-1">⚠ ไม่ตัด PO</div>
                     </td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.netWeight" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.price" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
@@ -7565,8 +7620,26 @@ app.component('view-payment', {
         branchId: '',                  // 🔥 filter by branch only
         accountId: '', method: 'โอน',
         notes: '',
-        lines: [emptyLine()]
+        lines: [emptyLine()],
+        splits: [{ id: newId('SP'), accountId: '', amount: 0 }]    // 🆕 รองรับจ่ายหลายบัญชี
       };
+    }
+    function emptySplit() { return { id: newId('SP'), accountId: '', amount: 0 }; }
+    function addSplit() {
+      if (!form.value.splits) form.value.splits = [];
+      form.value.splits.push(emptySplit());
+    }
+    function removeSplit(idx) {
+      if (form.value.splits.length <= 1) return;
+      form.value.splits.splice(idx, 1);
+    }
+    /* Sync first split with primary accountId for backward compat */
+    function _syncSplits() {
+      if (!form.value.splits) form.value.splits = [emptySplit()];
+      if (form.value.splits.length === 1 && !form.value.splits[0].accountId) {
+        form.value.splits[0].accountId = form.value.accountId;
+        form.value.splits[0].amount = totals.value.netCashOut;
+      }
     }
 
     const editingVoucherId = ref(null);
@@ -7588,6 +7661,11 @@ app.component('view-payment', {
         const rows = safeArr(db.payments).filter(p => p && (p.voucherId || p.id) === g.id);
         if (!rows.length) { alert('ไม่พบข้อมูล'); return; }
         const first = rows[0];
+        // 🆕 Load splits from bank statement entries (1 entry per account)
+        const bsRows = safeArr(db.bankStatement).filter(s => s && s.refType === 'PMT' && s.refId === g.id);
+        const loadedSplits = bsRows.length > 0
+          ? bsRows.map(s => ({ id: newId('SP'), accountId: s.accountId || '', amount: num(s.out) }))
+          : [{ id: newId('SP'), accountId: first.accountId || '', amount: 0 }];
         const f = {
           docNo: first.docNo || '-',
           date: first.date || todayStr(),
@@ -7608,7 +7686,8 @@ app.component('view-payment', {
               discount: num(p.discount),
               bankFee: num(p.bankFee)
             };
-          })
+          }),
+          splits: loadedSplits
         };
         form.value = f;
         showForm.value = true;
@@ -7696,9 +7775,30 @@ app.component('view-payment', {
     function save() {
       try {
         const f = form.value;
-        if (!f.accountId) { alert('เลือกบัญชีจ่าย'); return; }
+        // 🆕 Auto-fill: if only 1 split with accountId but no amount → fill with netCashOut
+        if (safeArr(f.splits).length === 1 && f.splits[0].accountId && num(f.splits[0].amount) === 0) {
+          f.splits[0].amount = totals.value.netCashOut;
+        }
+        // Handle splits — if no splits configured, fallback to single accountId
+        const validSplits = safeArr(f.splits).filter(s => s && s.accountId && num(s.amount) > 0);
+        if (validSplits.length === 0) {
+          // fallback to legacy single accountId
+          if (!f.accountId) { alert('เลือกบัญชีจ่าย'); return; }
+        }
+        if (validSplits.length > 1) {
+          // Validate: sum of splits must equal netCashOut
+          const splitSum = validSplits.reduce((s,x) => s + num(x.amount), 0);
+          const expected = totals.value.netCashOut;
+          if (Math.abs(splitSum - expected) > 0.01) {
+            alert('รวมยอดแยกบัญชี ('+splitSum.toFixed(2)+') ≠ ยอดสุทธิ ('+expected.toFixed(2)+')\nโปรดแก้ไขให้ตรงกัน');
+            return;
+          }
+        }
         const validLines = safeArr(f.lines).filter(l => l.billId && num(l.paymentAmount) > 0);
         if (validLines.length === 0) { alert('เลือกบิล + ใส่จำนวนเงินอย่างน้อย 1 รายการ'); return; }
+        // 🆕 Sync f.accountId from first split (so legacy payment.accountId field is populated)
+        if (validSplits.length > 0 && !f.accountId) f.accountId = validSplits[0].accountId;
+        if (validSplits.length > 0) f.accountId = validSplits[0].accountId; // always sync to first split
         const isEdit = !!editingVoucherId.value;
         const voucherId = isEdit ? editingVoucherId.value : newId('PMT');
 
@@ -7742,13 +7842,19 @@ app.component('view-payment', {
           });
         });
         const supplierLabel = Array.from(supplierNames).join(', ').slice(0,80) || 'หลายราย';
-        db.bankStatement.push({
-          id: newId('BS'), date: f.date, accountId: f.accountId,
-          type: 'จ่ายเงินให้ Supplier',
-          desc: f.docNo + ' - ' + supplierLabel,
-          in: 0, out: totals.value.netCashOut,
-          refType: 'PMT', refId: voucherId, refNo: f.docNo,
-          createdBy: erp.currentUser.value?.username || '-'
+        // 🆕 Split-aware bank statement: 1 entry per account
+        const splitsToWrite = validSplits.length > 0
+          ? validSplits
+          : [{ accountId: f.accountId, amount: totals.value.netCashOut }];
+        splitsToWrite.forEach((sp, idx) => {
+          db.bankStatement.push({
+            id: newId('BS'), date: f.date, accountId: sp.accountId,
+            type: 'จ่ายเงินให้ Supplier',
+            desc: f.docNo + ' - ' + supplierLabel + (splitsToWrite.length > 1 ? ' (split '+(idx+1)+'/'+splitsToWrite.length+')' : ''),
+            in: 0, out: num(sp.amount),
+            refType: 'PMT', refId: voucherId, refNo: f.docNo,
+            createdBy: erp.currentUser.value?.username || '-'
+          });
         });
         showForm.value = false;
         editingVoucherId.value = null;
@@ -7867,7 +7973,8 @@ app.component('view-payment', {
     return { db, erp, form, showForm, search, filterDateFrom, filterDateTo, filterAccount, list, totals, num, editingVoucherId,
       open, openEdit, close: close_, save, remove, addLine, removeLine, pickBill, availableBills,
       getBillDisplay, onBillTyped, actualPayable: _actualPayable, fmt: erp.fmt,
-      outstandingBills, apSummary, quickPayBill, showOutstandingPanel };
+      outstandingBills, apSummary, quickPayBill, showOutstandingPanel,
+      addSplit, removeSplit };
   },
   template: `
   <div>
@@ -8030,31 +8137,56 @@ app.component('view-payment', {
                 <option>โอน</option><option>เงินสด</option><option>เช็ค</option><option>PromptPay</option>
               </select>
             </div>
-            <div class="md:col-span-2"><label class="block text-xs mb-1">บัญชีจ่าย *</label>
-              <select v-model="form.accountId" class="w-full px-2 py-1.5 border rounded">
-                <option value="">--</option>
-                <option v-for="a in (db.accounts||[]).filter(x=>x && x.active)" :key="a.id" :value="a.id">{{a.name}} (คงเหลือ {{fmt(erp.accountBalance(a.id))}})</option>
-              </select>
+            <div class="md:col-span-4"><label class="block text-xs mb-1">หมายเหตุ</label><input v-model="form.notes" class="w-full px-2 py-1.5 border rounded"></div>
+          </div>
+
+          <!-- 💰 บัญชีจ่าย — รองรับหลายบัญชี (split payment) -->
+          <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-3">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="font-medium text-blue-900">💳 บัญชีจ่าย * <span class="text-xs text-slate-600 font-normal">(เลือกได้หลายบัญชี กรณีวงเงินเต็ม → split)</span></h4>
+              <button @click="addSplit" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">+ เพิ่มบัญชี</button>
             </div>
-            <!-- 💰 แสดงเงินคงเหลือบัญชี + คาดการณ์หลังจ่าย -->
-            <div v-if="form.accountId" class="md:col-span-2 grid grid-cols-3 gap-2 text-sm">
-              <div class="bg-blue-50 border border-blue-200 rounded p-2">
-                <div class="text-xs text-blue-700">💵 ยอดเงินตอนนี้</div>
-                <div class="font-bold text-blue-700">{{fmt(erp.accountBalance(form.accountId))}}</div>
-              </div>
-              <div class="bg-amber-50 border border-amber-200 rounded p-2">
-                <div class="text-xs text-amber-700">➖ ยอดที่จะจ่าย (Net)</div>
-                <div class="font-bold text-amber-700">{{fmt(totals.netCashOut)}}</div>
-              </div>
-              <div :class="['rounded p-2 border', (erp.accountBalance(form.accountId) - totals.netCashOut) < 0 ? 'bg-red-50 border-red-300' : 'bg-emerald-50 border-emerald-200']">
-                <div class="text-xs" :class="(erp.accountBalance(form.accountId) - totals.netCashOut) < 0 ? 'text-red-700' : 'text-emerald-700'">📊 คงเหลือหลังจ่าย</div>
-                <div class="font-bold" :class="(erp.accountBalance(form.accountId) - totals.netCashOut) < 0 ? 'text-red-700' : 'text-emerald-700'">
-                  {{fmt(erp.accountBalance(form.accountId) - totals.netCashOut)}}
-                  <span v-if="(erp.accountBalance(form.accountId) - totals.netCashOut) < 0" class="text-xs">⚠️ ติดลบ!</span>
+            <div class="space-y-2">
+              <div v-for="(sp, sidx) in (form.splits||[])" :key="sp.id" class="grid grid-cols-12 gap-2 items-center bg-white rounded p-2 border">
+                <div class="col-span-1 text-center text-xs text-slate-500 font-bold">#{{sidx+1}}</div>
+                <div class="col-span-6">
+                  <select v-model="sp.accountId" @change="form.accountId = (form.splits[0]||{}).accountId || ''" class="w-full px-2 py-1.5 border rounded text-sm">
+                    <option value="">-- เลือกบัญชี --</option>
+                    <option v-for="a in (db.accounts||[]).filter(x=>x && x.active)" :key="a.id" :value="a.id">{{a.name}} (คงเหลือ {{fmt(erp.accountBalance(a.id))}})</option>
+                  </select>
+                </div>
+                <div class="col-span-4">
+                  <input type="number" step="0.01" v-model.number="sp.amount" :placeholder="(form.splits||[]).length===1 ? fmt(totals.netCashOut) : 'จำนวนเงิน'" class="w-full px-2 py-1.5 border rounded text-right text-sm">
+                </div>
+                <div class="col-span-1 text-center">
+                  <button v-if="(form.splits||[]).length>1" @click="removeSplit(sidx)" type="button" class="text-red-500 hover:text-red-700 px-1 font-bold">×</button>
+                </div>
+                <!-- balance preview per split row -->
+                <div v-if="sp.accountId" class="col-span-12 grid grid-cols-3 gap-2 text-xs pl-2">
+                  <div class="text-blue-700">💵 คงเหลือ: <b>{{fmt(erp.accountBalance(sp.accountId))}}</b></div>
+                  <div class="text-amber-700">➖ จ่าย: <b>{{fmt(num(sp.amount))}}</b></div>
+                  <div :class="(erp.accountBalance(sp.accountId) - num(sp.amount)) < 0 ? 'text-red-700' : 'text-emerald-700'">
+                    📊 หลังจ่าย: <b>{{fmt(erp.accountBalance(sp.accountId) - num(sp.amount))}}</b>
+                    <span v-if="(erp.accountBalance(sp.accountId) - num(sp.amount)) < 0">⚠️</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="md:col-span-2"><label class="block text-xs mb-1">หมายเหตุ</label><input v-model="form.notes" class="w-full px-2 py-1.5 border rounded"></div>
+            <!-- Sum validation indicator -->
+            <div v-if="(form.splits||[]).length>1" class="mt-2 grid grid-cols-3 gap-2 text-sm border-t pt-2">
+              <div class="bg-slate-100 rounded p-2">
+                <div class="text-xs text-slate-600">💰 รวมแยกบัญชี</div>
+                <div class="font-bold">{{fmt((form.splits||[]).reduce((s,x)=>s+num(x.amount),0))}}</div>
+              </div>
+              <div class="bg-amber-50 rounded p-2">
+                <div class="text-xs text-amber-700">🎯 ยอดสุทธิที่ต้องจ่าย</div>
+                <div class="font-bold text-amber-700">{{fmt(totals.netCashOut)}}</div>
+              </div>
+              <div :class="['rounded p-2', Math.abs((form.splits||[]).reduce((s,x)=>s+num(x.amount),0) - totals.netCashOut) < 0.01 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700']">
+                <div class="text-xs">{{Math.abs((form.splits||[]).reduce((s,x)=>s+num(x.amount),0) - totals.netCashOut) < 0.01 ? '✅ ตรงกัน' : '⚠️ ผลต่าง'}}</div>
+                <div class="font-bold">{{fmt(totals.netCashOut - (form.splits||[]).reduce((s,x)=>s+num(x.amount),0))}}</div>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -9388,6 +9520,8 @@ app.component('view-sales', {
         transactionMode:'STOCK',         // 🔥 STOCK | TRADING
         tradingFromPurchaseId:'',        // 🔥 link to Trading Purchase (auto-match)
         salesman:erp.currentUser.value?.username||'', creditTerm:0, note:'', items:[],
+        licensePlate:'',                 // 🚗 ทะเบียนรถส่งของ
+        contactPhone:'', contactName:'', // 📞 ผู้ติดต่อรับของ
         subtotal:0, discountTotal:0, hasVat:false, vatAmount:0,
         vatInvoiceIssued:false,           // 🔥 ออกใบกำกับภาษีตัวจริงให้ลูกค้าแล้ว
         vatInvoiceNo:'',
@@ -9955,7 +10089,10 @@ app.component('view-sales', {
             <div><label class="block text-xs text-slate-600 mb-1">สาขา *</label><select v-model="form.branchId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="b in db.branches.filter(x=>x.active)" :value="b.id">{{b.name}}</option></select></div>
             <div><label class="block text-xs text-slate-600 mb-1">คลัง *</label><select v-model="form.warehouseId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="w in db.warehouses.filter(x=>x.active && (!form.branchId || x.branchId===form.branchId))" :value="w.id">{{w.name}}</option></select></div>
             <div><label class="block text-xs text-slate-600 mb-1">ช่องทางขาย *</label><select v-model="form.channelId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="c in db.salesChannels.filter(x=>x.active)" :value="c.id">{{c.name}}</option></select></div>
-            <div><label class="block text-xs text-slate-600 mb-1">หมายเหตุ</label><input v-model="form.note" class="w-full px-2 py-1.5 border rounded"></div>
+            <div><label class="block text-xs text-slate-600 mb-1">🚗 ทะเบียนรถส่งของ <span class="text-slate-400 font-normal">(ถ้ามี)</span></label><input v-model="form.licensePlate" placeholder="เช่น 1กข-1234" class="w-full px-2 py-1.5 border rounded uppercase"></div>
+            <div><label class="block text-xs text-slate-600 mb-1">📞 เบอร์โทรลูกค้า</label><input v-model="form.contactPhone" placeholder="เบอร์ติดต่อ" class="w-full px-2 py-1.5 border rounded"></div>
+            <div><label class="block text-xs text-slate-600 mb-1">👤 ผู้รับของ</label><input v-model="form.contactName" placeholder="ชื่อคนรับของ" class="w-full px-2 py-1.5 border rounded"></div>
+            <div class="md:col-span-3"><label class="block text-xs text-slate-600 mb-1">หมายเหตุ</label><input v-model="form.note" class="w-full px-2 py-1.5 border rounded"></div>
           </div>
           <div>
             <div class="flex items-center justify-between mb-2"><h4 class="font-medium">📋 รายการสินค้า ({{(form.items||[]).length}})</h4><button @click="addItem" class="bg-emerald-600 text-white px-3 py-1.5 rounded text-xs">+ เพิ่มรายการ</button></div>
