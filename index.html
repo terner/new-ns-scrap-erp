@@ -3140,9 +3140,17 @@ window.$erp = {
               <div style="font-weight:bold;font-size:14px">${party.name||'-'}</div>
               <div style="font-size:11px;color:#555;margin-top:4px">
                 ${(bill.contactPhone || party.phone) ? '📞 โทร: <b>'+(bill.contactPhone || party.phone)+'</b>' : ''}
-                ${bill.contactName ? ' · 👤 ผู้ติดต่อ: <b>'+bill.contactName+'</b>' : ''}
                 ${bill.licensePlate ? '<br>🚗 ทะเบียนรถ: <b>'+bill.licensePlate+'</b>' : ''}
-                ${party.salesRep || party.salesPerson ? '<br>🧑‍💼 เซลที่ดูแล: <b>'+(party.salesRep || party.salesPerson)+'</b>' : ''}
+                ${(() => {
+                  // 🆕 เซลที่ดูแล: ดูจาก bill.salesId → salespersons (blank = ลูกค้าบริษัท)
+                  if (bill.salesId) {
+                    const sp = (db.salespersons||[]).find(s => s && s.id === bill.salesId);
+                    return sp ? '<br>🧑‍💼 เซลที่ดูแล: <b>'+sp.name+'</b>' : '';
+                  }
+                  // fallback: จาก master data customer/supplier ถ้ามี salesRep field
+                  if (party.salesRep || party.salesPerson) return '<br>🧑‍💼 เซลที่ดูแล: <b>'+(party.salesRep || party.salesPerson)+'</b>';
+                  return '<br>🏢 ลูกค้าบริษัท';
+                })()}
                 ${isReceipt ? '' : (party.address?'<br>'+party.address:'') + (party.taxId?'<br>เลขผู้เสียภาษี: '+party.taxId:'')}
               </div>
             </div>
@@ -6743,8 +6751,8 @@ app.component('view-purchase', {
       purchaseSource: 'SPOT_BUY', poBuyId: '',
       supplierId: '', branchId: '', warehouseId: '', channelId: '',
       licensePlate: '',                           // 🚗 ทะเบียนรถที่ส่งของ (per bill)
-      contactPhone: '',                           // 📞 เบอร์โทร supplier (override master ถ้ามี)
-      contactName: '',                            // 👤 ชื่อผู้ติดต่อ (override master ถ้ามี)
+      contactPhone: '',                           // 📞 เบอร์โทร supplier
+      salesId: '',                                // 🆕 เซลที่ดูแล (FK → salespersons.id, blank = ลูกค้าบริษัท)
       items: [blankItem()],
       hasVat: false,                              // checkbox VAT / NO VAT
       discountTotal: 0,                           // ส่วนลดท้ายบิล
@@ -6764,7 +6772,8 @@ app.component('view-purchase', {
           transactionMode: 'STOCK',
           purchaseSource: 'SPOT_BUY', poBuyId: '',
           supplierId: '', branchId: '', warehouseId: '', channelId: '',
-          licensePlate: '', contactPhone: '', contactName: '',
+          licensePlate: '', contactPhone: '',
+          salesId: '',
           items: [blankItem()],
           hasVat: false,
           discountTotal: 0,
@@ -6807,7 +6816,7 @@ app.component('view-purchase', {
           warehouseId: b.warehouseId || '', channelId: b.channelId || '',
           licensePlate: b.licensePlate || '',
           contactPhone: b.contactPhone || '',
-          contactName: b.contactName || '',
+          salesId: b.salesId || '',                 // 🆕 load saved sales rep
           items,
           hasVat: !!b.hasVat,
           discountTotal: Number(b.discountTotal||0),
@@ -6886,20 +6895,19 @@ app.component('view-purchase', {
         if (!f.supplierId) { alert('เลือก Supplier'); return; }
         if (!f.branchId) { alert('เลือกสาขา'); return; }
         if (!isTrading && !f.warehouseId) { alert('เลือกคลัง'); return; }
-        if (!f.channelId) { alert('เลือกช่องทางรับซื้อ'); return; }
+        if (!isTrading && !f.channelId) { alert('เลือกช่องทางรับซื้อ'); return; }
+        // 🆕 Trading mode: ล้าง warehouse + channel (Trading คือช่องทางในตัว, ไม่เข้า Stock)
+        if (isTrading) { f.warehouseId = ''; f.channelId = ''; }
         const items = safeArr(f.items);
         if (!items.length) { alert('เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'); return; }
         // Recalc + validate each line
         items.forEach(it => recalcItem(it));
         const invalid = items.findIndex(it => !it.productId || num(it.netWeight) <= 0 || num(it.price) <= 0);
         if (invalid >= 0) { alert(`รายการที่ ${invalid+1}: ต้องเลือกสินค้า + ใส่น้ำหนัก/ราคา > 0`); return; }
-        if (f.purchaseSource === 'PO_RECEIPT') {
-          const itemsWithPo = (f.items||[]).filter(it => it.poBuyId);
-          if (itemsWithPo.length === 0 && !f.poBuyId) {
-            alert('โหมด PO_RECEIPT — กรุณาเลือก PO ในรายการสินค้าอย่างน้อย 1 รายการ');
-            return;
-          }
-        }
+        // 🆕 Auto-derive purchaseSource จาก items: ถ้ามี item ใดมี poBuyId → ตัด PO ด้วย
+        const hasAnyPo = (f.items||[]).some(it => it.poBuyId);
+        const allHavePo = (f.items||[]).every(it => it.poBuyId);
+        f.purchaseSource = !hasAnyPo ? 'SPOT_BUY' : (allHavePo ? 'PO_RECEIPT' : 'MIXED');
 
         const subtotal = items.reduce((s,it)=>s+num(it.netAmount),0);
         const discountTotal = num(f.discountTotal);
@@ -6918,6 +6926,18 @@ app.component('view-purchase', {
           const oldBill = safeArr(db.purchaseBills).find(x => x && x.id === id);
           if (oldBill) {
             (oldBill.items||[]).forEach(it => { if (it.productId) affectedProductIds.add(it.productId); });
+            // 🔧 RESTORE PO BUY: คืนยอดที่บิลเก่าตัดไป (ก่อนตัดใหม่)
+            try {
+              (oldBill.items||[]).forEach(it => {
+                const pid = it.poBuyId || oldBill.poBuyId;
+                if (!pid) return;
+                const po = safeArr(db.poBuys).find(p => p && p.id === pid);
+                if (po) {
+                  po.remainingQty = num(po.remainingQty != null ? po.remainingQty : po.qty) + num(it.netWeight);
+                  po.status = po.remainingQty >= num(po.qty) ? 'Open' : 'Partially Received';
+                }
+              });
+            } catch (e) { console.error('PO restore on edit:', e); }
           }
           // Remove old stock ledger entries for this bill
           db.stockLedger = safeArr(db.stockLedger).filter(s => !(s.refType === 'PB' && s.refId === id));
@@ -6933,7 +6953,7 @@ app.component('view-purchase', {
           purchaseType: 'เงินสด', note: f.note,
           licensePlate: f.licensePlate || '',
           contactPhone: f.contactPhone || '',
-          contactName: f.contactName || '',
+          salesId: f.salesId || '',                                    // 🆕 เซลที่ดูแล (blank = ลูกค้าบริษัท)
           vatInvoiceReceived: !!f.vatInvoiceReceived,
           vatInvoiceNo: f.vatInvoiceNo || '',
           vatInvoiceDate: f.vatInvoiceDate || '',
@@ -6941,6 +6961,7 @@ app.component('view-purchase', {
             id: it.id || newId('LN'),
             productId: it.productId,
             displayName: (it.displayName||'').trim(),    // 📝 ชื่อ custom สำหรับโชว์ในบิล
+            poBuyId: it.poBuyId || '',                   // 🔧 BUG FIX: preserve PO selection on edit
             lotNo: '',
             grossWeight: num(it.netWeight),
             deductWeight: 0,
@@ -6995,14 +7016,14 @@ app.component('view-purchase', {
         if (isEdit && !isTrading && affectedProductIds.size > 0) {
           recalcResult = erp.recalcDownstreamCosts(Array.from(affectedProductIds));
         }
-        // Update PO Buy if PO_RECEIPT — ตัด PO ซื้อ
-        // 🆕 รองรับหลาย PO ใน 1 บิล — แต่ละ item มี poBuyId ของตัวเอง
-        if (bill.purchaseSource === 'PO_RECEIPT') {
+        // 🆕 Update PO Buy — ตัด PO ซื้อ (รองรับ MIXED: บางรายการ Spot บางรายการ PO)
+        // ทำเสมอถ้ามี item ใดมี poBuyId — ไม่ต้องรอ purchaseSource = PO_RECEIPT
+        const billHasAnyPO = (bill.items||[]).some(it => it.poBuyId);
+        if (billHasAnyPO) {
           try {
-            // Group items by poBuyId
             const cutByPo = {};
             bill.items.forEach(it => {
-              const pid = it.poBuyId || bill.poBuyId;  // fallback to bill-level (legacy)
+              const pid = it.poBuyId;
               if (!pid) return;
               if (!cutByPo[pid]) cutByPo[pid] = 0;
               cutByPo[pid] += num(it.netWeight);
@@ -7017,7 +7038,7 @@ app.component('view-purchase', {
                 cutPoIds.push(po.docNo || po.id);
               }
             });
-            bill._cutPoIds = cutPoIds;  // for toast message
+            bill._cutPoIds = cutPoIds;
           } catch (e) { console.error('PO update:', e); }
         }
         showForm.value = false;
@@ -7026,7 +7047,15 @@ app.component('view-purchase', {
         if (recalcResult && (recalcResult.updatedSales || recalcResult.updatedInputs)) {
           msg += ` · 🔄 Re-calc: บิลขาย ${recalcResult.updatedSales} · Production input ${recalcResult.updatedInputs}`;
         }
-        if (bill.purchaseSource === 'PO_RECEIPT' && bill._cutPoIds?.length) msg += ' · ตัด PO ซื้อ: '+bill._cutPoIds.join(', ');
+        if (bill._cutPoIds?.length) {
+          const spotCount = (bill.items||[]).filter(it => !it.poBuyId).length;
+          const poCount = (bill.items||[]).filter(it => it.poBuyId).length;
+          if (bill.purchaseSource === 'MIXED') {
+            msg += ' · 🔀 ผสม: Spot '+spotCount+' รายการ + PO '+poCount+' รายการ · ตัด PO: '+bill._cutPoIds.join(', ');
+          } else {
+            msg += ' · 📋 ตัด PO ซื้อ: '+bill._cutPoIds.join(', ');
+          }
+        }
         erp.showToast(msg,'success');
       } catch (e) {
         console.error('save:', e);
@@ -7314,6 +7343,29 @@ app.component('view-purchase', {
       erp.showToast('✓ เซฟเลขบัญชีเข้า Master Data Supplier แล้ว');
     }
 
+    /* 🆕 Quick-add sales person — เพิ่มเข้าฐานข้อมูลทันที + auto-select ในบิล */
+    function quickAddSales() {
+      const name = (prompt('ชื่อเซลที่ดูแล:') || '').trim();
+      if (!name) return;
+      // ถ้ามีชื่อนี้อยู่แล้ว → auto-select
+      const existing = (db.salespersons||[]).find(s => s && (s.name||'').trim().toLowerCase() === name.toLowerCase());
+      if (existing) {
+        form.value.salesId = existing.id;
+        erp.showToast('✓ มีเซล "'+name+'" ในระบบแล้ว — เลือกให้อัตโนมัติ');
+        return;
+      }
+      // เพิ่มใหม่
+      if (!Array.isArray(db.salespersons)) db.salespersons = [];
+      const id = 'SP'+String(((db.salespersons||[]).length+1)).padStart(3,'0');
+      const code = 'S'+String(((db.salespersons||[]).length+1)).padStart(2,'0');
+      const newSales = { id, code, name, phone:'', email:'', commissionPct:0, baseSalary:0, active:true, note:'เพิ่มจากบิลซื้อ' };
+      db.salespersons.push(newSales);
+      form.value.salesId = id;
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      erp.logAudit('QUICK_ADD_SALES','salespersons',null,newSales);
+      erp.showToast('✓ เพิ่มเซล "'+name+'" เข้าฐานข้อมูลแล้ว — auto-select ในบิล');
+    }
+
     return {
       db, erp, form, showForm, search, filtered, billTotals, editingId,
       filterMode, filterSource, filterDateFrom, filterDateTo,
@@ -7325,6 +7377,8 @@ app.component('view-purchase', {
       showSwapModal, swapTarget, swapForm, swapTotals, openSwapSupplier, recalcSwapLine, saveSupplierSwap,
       // Bank account
       getSupplierBank, updateSupplierBank, getSupplierPhone,
+      // 🆕 Quick-add sales
+      quickAddSales,
     };
   },
   template: `
@@ -7353,6 +7407,7 @@ app.component('view-purchase', {
         <button type="button" @click="filterSource=''" :class="['px-3 py-1 rounded text-xs font-medium border', filterSource===''?'bg-slate-700 text-white border-slate-700':'bg-white border-slate-300 hover:bg-slate-50']">ทั้งหมด</button>
         <button type="button" @click="filterSource='SPOT_BUY'" :class="['px-3 py-1 rounded text-xs font-medium border', filterSource==='SPOT_BUY'?'bg-blue-600 text-white border-blue-600':'bg-white border-slate-300 hover:bg-blue-50']">📦 SPOT BUY</button>
         <button type="button" @click="filterSource='PO_RECEIPT'" :class="['px-3 py-1 rounded text-xs font-medium border', filterSource==='PO_RECEIPT'?'bg-indigo-600 text-white border-indigo-600':'bg-white border-slate-300 hover:bg-indigo-50']">📋 PO_RECEIPT</button>
+        <button type="button" @click="filterSource='MIXED'" :class="['px-3 py-1 rounded text-xs font-medium border', filterSource==='MIXED'?'bg-fuchsia-600 text-white border-fuchsia-600':'bg-white border-slate-300 hover:bg-fuchsia-50']">🔀 ผสม</button>
         <span class="ml-auto text-xs text-slate-500">📊 พบ <b class="text-slate-700">{{filtered.length}}</b> บิล</span>
       </div>
     </div>
@@ -7446,21 +7501,23 @@ app.component('view-purchase', {
             <div v-if="form.transactionMode==='TRADING'" class="text-xs text-purple-700 bg-purple-50 border border-purple-200 p-2 rounded mb-3">
               ℹ️ รายการ <strong>Trading</strong> — ไม่เข้า Stock, ไม่กระทบ WAC, ตั้ง AP ปกติ · ไปจับคู่ขายในเมนู "Trading Matching"
             </div>
-            <!-- ที่มาบิล -->
-            <div class="flex gap-2">
-              <button type="button" @click="setSource('SPOT_BUY')" :class="['flex-1 px-4 py-2 rounded-lg text-sm font-medium border-2 transition', form.purchaseSource==='SPOT_BUY' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-300 hover:border-blue-400']">📦 SPOT BUY (ซื้อสด)</button>
-              <button type="button" @click="setSource('PO_RECEIPT')" :class="['flex-1 px-4 py-2 rounded-lg text-sm font-medium border-2 transition', form.purchaseSource==='PO_RECEIPT' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-slate-300 hover:border-indigo-400']">📋 PO_RECEIPT (รับจาก PO)</button>
-            </div>
-            <div v-if="form.purchaseSource==='PO_RECEIPT'" class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mt-2 text-xs text-indigo-800">
-              ✅ <b>โหมด PO_RECEIPT</b> — เลือก PO ของแต่ละรายการ ในตารางสินค้าด้านล่าง<br>
-              💡 1 บิล สามารถตัดได้หลาย PO (รายการละ PO ก็ได้)
-              <div v-if="availablePOBuys.length === 0" class="text-xs text-amber-700 mt-1">⚠️ ไม่มี PO Buy ที่เปิดอยู่ — สร้างที่เมนู "PO Buy" ก่อน</div>
-              <div class="mt-2">
-                <label class="text-xs">📥 Quick Load (เลือก PO หลัก แล้วเติมรายการให้):</label>
-                <select v-model="form.poBuyId" @change="loadFromPO" class="w-full px-2 py-1.5 border rounded text-xs mt-1">
-                  <option value="">-- (ไม่บังคับ) --</option>
+            <!-- 🆕 ผสม Spot + PO ในบิลเดียวได้ — ไม่ต้องเลือกโหมดทั้งบิล -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-indigo-200 rounded-lg p-3">
+              <div class="flex items-start gap-2">
+                <span class="text-2xl">🔀</span>
+                <div class="flex-1 text-xs text-slate-700">
+                  <div class="font-bold text-indigo-700 mb-1">ผสมได้ในบิลเดียว — Spot + ตัด PO</div>
+                  <div>ในบิล 1 ใบสามารถมีทั้ง <b class="text-blue-700">📦 Spot Buy (ซื้อสด)</b> และ <b class="text-indigo-700">📋 PO Receipt (ตัด PO)</b> — แต่ละรายการเลือก PO ของตัวเองในตารางด้านล่าง (เว้นว่าง = Spot)</div>
+                </div>
+              </div>
+              <!-- Quick Load (Optional) -->
+              <div v-if="availablePOBuys.length > 0" class="mt-2 flex items-center gap-2 text-xs">
+                <span class="text-slate-600 whitespace-nowrap">📥 Quick Load PO:</span>
+                <select v-model="form.poBuyId" @change="loadFromPO" class="flex-1 px-2 py-1 border rounded text-xs">
+                  <option value="">-- ไม่ใช้ Quick Load --</option>
                   <option v-for="po in availablePOBuys" :key="po.id" :value="po.id">{{ po.label }}</option>
                 </select>
+                <span class="text-slate-500">(เลือก = แทนที่รายการ)</span>
               </div>
             </div>
           </div>
@@ -7501,21 +7558,23 @@ app.component('view-purchase', {
                   <option v-for="b in (db.branches || []).filter(x => x && x.active)" :key="b.id" :value="b.id">{{ b.name }}</option>
                 </select>
               </div>
-              <div>
+              <!-- 🏬 คลัง — ซ่อนถ้าเป็น Trading -->
+              <div v-if="form.transactionMode !== 'TRADING'">
                 <label class="block text-xs font-medium text-slate-600 mb-1">🏬 คลัง *</label>
                 <select v-model="form.warehouseId" class="w-full px-3 py-2 border rounded-lg">
                   <option value="">-- เลือกคลัง --</option>
                   <option v-for="w in warehousesForBranch()" :key="w.id" :value="w.id">{{ w.name }}</option>
                 </select>
               </div>
-              <div>
+              <!-- 🛒 ช่องทางรับซื้อ — ซ่อนถ้าเป็น Trading (Trading คือช่องทางในตัว) -->
+              <div v-if="form.transactionMode !== 'TRADING'">
                 <label class="block text-xs font-medium text-slate-600 mb-1">🛒 ช่องทางรับซื้อ *</label>
                 <select v-model="form.channelId" class="w-full px-3 py-2 border rounded-lg">
                   <option value="">-- เลือกช่องทาง --</option>
                   <option v-for="c in (db.purchaseChannels || []).filter(x => x && x.active)" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
               </div>
-              <!-- 🚗 ทะเบียนรถ + ผู้ติดต่อ -->
+              <!-- 🚗 ทะเบียนรถ -->
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">🚗 ทะเบียนรถ <span class="text-slate-400 font-normal">(ถ้ามี)</span></label>
                 <input v-model="form.licensePlate" placeholder="เช่น 1กข-1234 / 70-1234" class="w-full px-3 py-2 border rounded-lg uppercase">
@@ -7524,9 +7583,16 @@ app.component('view-purchase', {
                 <label class="block text-xs font-medium text-slate-600 mb-1">📞 เบอร์โทรลูกค้า</label>
                 <input v-model="form.contactPhone" :placeholder="form.supplierId ? (getSupplierPhone(form.supplierId) || 'เบอร์โทร') : 'เลือก Supplier ก่อน'" class="w-full px-3 py-2 border rounded-lg">
               </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">👤 ชื่อผู้ติดต่อ</label>
-                <input v-model="form.contactName" placeholder="ชื่อคนนำของมาส่ง" class="w-full px-3 py-2 border rounded-lg">
+              <!-- 🆕 เซลที่ดูแล (dropdown จาก salespersons + quick-add) -->
+              <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">👤 เซลที่ดูแล <span class="text-slate-400 font-normal">(เว้นว่าง = ลูกค้าบริษัท)</span></label>
+                <div class="flex gap-2">
+                  <select v-model="form.salesId" class="flex-1 px-3 py-2 border rounded-lg">
+                    <option value="">— ลูกค้าบริษัท (ไม่มีเซลดูแล) —</option>
+                    <option v-for="s in (db.salespersons||[]).filter(x=>x && x.active!==false)" :key="s.id" :value="s.id">{{ s.name }} ({{s.code||'-'}})</option>
+                  </select>
+                  <button type="button" @click="quickAddSales" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs whitespace-nowrap" title="เพิ่มเซลใหม่เข้าฐานข้อมูล">+ เพิ่มเซล</button>
+                </div>
               </div>
             </div>
           </div>
@@ -7542,7 +7608,7 @@ app.component('view-purchase', {
                 <thead class="bg-gradient-to-r from-slate-100 to-slate-50">
                   <tr>
                     <th class="p-3 text-left text-slate-700">สินค้า *</th>
-                    <th v-if="form.purchaseSource==='PO_RECEIPT'" class="p-3 text-left w-48 text-indigo-700">📋 PO ที่ตัด</th>
+                    <th class="p-3 text-left w-52 text-indigo-700">📋 PO ที่ตัด <span class="text-xs font-normal text-slate-500">(เว้น = Spot)</span></th>
                     <th class="p-3 text-right w-28 text-slate-700">น้ำหนัก (กก.)</th>
                     <th class="p-3 text-right w-28 text-slate-700">ราคา/กก.</th>
                     <th class="p-3 text-right w-32 text-slate-700">ยอดรวม</th>
@@ -7557,12 +7623,14 @@ app.component('view-purchase', {
                       <input type="text" v-model="it.displayName" :placeholder="it.productId ? '📝 ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master: ' + (productName(it.productId)||'') + ')' : 'เลือกสินค้าก่อน...'" class="w-full px-2 py-1 border rounded text-xs mt-1.5 bg-yellow-50">
                       <div v-if="it.productId" class="text-xs mt-1 px-2 py-1 bg-emerald-50 rounded text-emerald-700">📦 คงเหลือ: <b>{{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId))}}</b> → หลังรับ: <b>{{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId) + Number(it.netWeight||0))}}</b> กก.</div>
                     </td>
-                    <td v-if="form.purchaseSource==='PO_RECEIPT'" class="p-2">
-                      <select v-model="it.poBuyId" class="w-full px-2 py-1.5 border rounded text-xs bg-indigo-50">
-                        <option value="">-- เลือก PO --</option>
-                        <option v-for="po in availablePOBuys" :key="po.id" :value="po.id">{{po.label}}</option>
+                    <td class="p-2">
+                      <select v-model="it.poBuyId" :class="['w-full px-2 py-1.5 border rounded text-xs', it.poBuyId ? 'bg-indigo-50 border-indigo-300 font-medium' : 'bg-blue-50 border-blue-200']">
+                        <option value="">📦 Spot Buy (ไม่ตัด PO)</option>
+                        <option v-for="po in availablePOBuys" :key="po.id" :value="po.id">📋 {{po.label}}</option>
                       </select>
-                      <div v-if="!it.poBuyId" class="text-[10px] text-amber-600 mt-1">⚠ ไม่ตัด PO</div>
+                      <div :class="['text-[10px] mt-1', it.poBuyId ? 'text-indigo-600' : 'text-blue-600']">
+                        {{it.poBuyId ? '📋 ตัด PO นี้' : '📦 ซื้อสด'}}
+                      </div>
                     </td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.netWeight" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.price" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
