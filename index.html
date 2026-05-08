@@ -6893,11 +6893,11 @@ app.component('view-purchase', {
         const f = form.value;
         const isTrading = f.transactionMode === 'TRADING';
         if (!f.supplierId) { alert('เลือก Supplier'); return; }
-        if (!f.branchId) { alert('เลือกสาขา'); return; }
+        if (!isTrading && !f.branchId) { alert('เลือกสาขา'); return; }
         if (!isTrading && !f.warehouseId) { alert('เลือกคลัง'); return; }
         if (!isTrading && !f.channelId) { alert('เลือกช่องทางรับซื้อ'); return; }
-        // 🆕 Trading mode: ล้าง warehouse + channel (Trading คือช่องทางในตัว, ไม่เข้า Stock)
-        if (isTrading) { f.warehouseId = ''; f.channelId = ''; }
+        // 🆕 Trading mode: ล้าง branch + warehouse + channel (Trading เป็นของมันเอง — ยอด/กำไรไปฝั่ง Trading)
+        if (isTrading) { f.branchId = ''; f.warehouseId = ''; f.channelId = ''; }
         const items = safeArr(f.items);
         if (!items.length) { alert('เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'); return; }
         // Recalc + validate each line
@@ -7551,7 +7551,8 @@ app.component('view-purchase', {
                   </div>
                 </div>
               </div>
-              <div>
+              <!-- 🏢 สาขา — ซ่อนถ้าเป็น Trading (Trading เป็นของมันเอง) -->
+              <div v-if="form.transactionMode !== 'TRADING'">
                 <label class="block text-xs font-medium text-slate-600 mb-1">🏢 สาขา *</label>
                 <select v-model="form.branchId" @change="form.warehouseId = ''" class="w-full px-3 py-2 border rounded-lg">
                   <option value="">-- เลือกสาขา --</option>
