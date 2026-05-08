@@ -28051,14 +28051,14 @@ app.component('view-backup', {
 
     async function pullFromSupabase() {
       if (!window.sb) { erp.showToast('Supabase ยังไม่พร้อม','error'); return; }
-      if (!confirm('📥 ดึงข้อมูลจาก Supabase Cloud ใส่ใน LocalStorage?\n\n⚠ ข้อมูลปัจจุบันใน Browser นี้จะถูกเขียนทับ\nแนะนำให้ Export Backup ก่อน\n\nดำเนินการต่อ?')) return;
+      if (!confirm('📥 ดึงข้อมูลจาก Supabase Cloud?\n\n✅ ปลอดภัย — ตารางใน cloud ที่ว่าง จะ KEEP ของ local\n✅ Save snapshot ก่อน pull (rollback ได้)\n\nดำเนินการต่อ?')) return;
 
       pulling.value = true;
       pullLog.value = [];
       pullProgress.value = { current: 0, total: _MIGRATION_ORDER.length, table: '' };
-      _logPull('📥 เริ่ม Pull ข้อมูลจาก Supabase...', 'info');
+      _logPull('📥 เริ่ม Pull ข้อมูลจาก Supabase (Smart Mode)...', 'info');
 
-      let totalRows = 0;
+      let totalRows = 0, skippedTables = 0;
       const newDb = JSON.parse(JSON.stringify(db)); // clone current db as base
 
       for (let i = 0; i < _MIGRATION_ORDER.length; i++) {
@@ -28067,7 +28067,8 @@ app.component('view-backup', {
         if (!cfg) continue;
 
         pullProgress.value = { ...pullProgress.value, current: i, table: `${cfg.target} → ${localKey}` };
-        _logPull(`📥 ${cfg.target} → ${localKey}`);
+
+        const localCount = (db[localKey]||[]).length;
 
         try {
           // Fetch all rows (paginated 1000 each)
@@ -28083,16 +28084,31 @@ app.component('view-backup', {
             from += pageSize;
           }
 
+          const cloudCount = allRows.length;
+
+          // SMART MODE: skip if cloud is empty but local has data
+          if (cloudCount === 0 && localCount > 0) {
+            _logPull(`  ⏭ ${cfg.target}: cloud ว่าง / local มี ${localCount} rows — KEEP local`, 'warn');
+            skippedTables++;
+            continue;
+          }
+
+          // SMART MODE: warn if cloud has fewer rows
+          if (cloudCount < localCount) {
+            _logPull(`  ⚠ ${cfg.target}: local ${localCount} > cloud ${cloudCount} — overwrite (อาจหายข้อมูล)`, 'warn');
+          }
+
           // Reverse map → camelCase
           const localRows = allRows.map(r => _mapKeysReverse(r, cfg.keyMap || {}));
           newDb[localKey] = localRows;
           totalRows += localRows.length;
-          _logPull(`  ✓ ${cfg.target}: ${localRows.length} rows`, 'ok');
+          _logPull(`  ✓ ${cfg.target}: ${cloudCount} rows (local เคยมี ${localCount})`, 'ok');
         } catch(e) {
           _logPull(`  ❌ ${cfg.target}: ${e.message}`, 'error');
         }
         await new Promise(r => setTimeout(r, 50));
       }
+      _logPull(`📊 สรุป: pull ${totalRows} rows · skip ${skippedTables} ตาราง (เพราะ cloud ว่าง)`, 'info');
 
       pullProgress.value.current = pullProgress.value.total;
       _logPull(`✅ ดึงข้อมูลเสร็จ — ${totalRows} rows`, 'ok');
