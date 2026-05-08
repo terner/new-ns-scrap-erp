@@ -135,16 +135,17 @@
           <option value="">ทุกสาขา</option>
           <option v-for="b in db.branches" :value="b.id">{{ b.name }}</option>
         </select>
-        <!-- Cloud Sync Indicator (Phase C) -->
-        <div v-if="syncStatus.enabled" :title="syncStatus.tooltip"
-          :class="['text-xs px-2 py-1 rounded font-medium flex items-center gap-1 cursor-default',
+        <!-- Cloud Sync Indicator (คลิกเพื่อ force sync ทันที) -->
+        <button v-if="syncStatus.enabled" @click="manualSyncNow" :title="syncStatus.tooltip + ' — คลิกเพื่อ Sync ทันที'"
+          :class="['text-xs px-2 py-1 rounded font-medium flex items-center gap-1 cursor-pointer hover:opacity-80 transition',
             syncStatus.state==='syncing' ? 'bg-blue-100 text-blue-700' :
-            syncStatus.state==='ok' ? 'bg-emerald-100 text-emerald-700' :
-            syncStatus.state==='error' ? 'bg-red-100 text-red-700' :
+            syncStatus.state==='ok' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+            syncStatus.state==='error' ? 'bg-red-100 text-red-700 hover:bg-red-200' :
             'bg-slate-100 text-slate-600']">
           <span>{{syncStatus.state==='syncing'?'⏳':syncStatus.state==='ok'?'☁️✓':syncStatus.state==='error'?'☁️✗':'☁️'}}</span>
           <span class="hidden md:inline">{{syncStatus.label}}</span>
-        </div>
+          <span class="text-[10px] opacity-70 hidden lg:inline">🔄</span>
+        </button>
         <div class="text-right hidden sm:block">
           <div class="text-sm font-medium text-slate-800">{{ currentUser.username }}</div>
           <div class="text-xs text-slate-500">{{ currentUser.role }}</div>
@@ -3614,8 +3615,8 @@ window.$erp = {
   /* Pull all tables (silent in-place merge) */
   async function pullAll() {
     if (isPulling || isPushing || !window.sb || !enabled) return;
-    // Skip pull if user has been very recently active (<5s) — likely typing
-    if (Date.now() - userInactiveSince < 5000) return;
+    // Skip pull if user has been very recently active (<2s) — likely typing
+    if (Date.now() - userInactiveSince < 2000) return;
     // Skip pull if there are pending pushes — push first
     if (dirtyTables.size > 0) return;
     isPulling = true;
@@ -3667,9 +3668,9 @@ window.$erp = {
   AS_TABLES.forEach(t => {
     watch(() => _GLOBAL_DB[t], () => {
       dirtyTables.add(t);
-      // Debounce 5s
+      // Debounce 1.5s (เร็วขึ้นจาก 5s)
       if (pushTimer) clearTimeout(pushTimer);
-      pushTimer = setTimeout(() => { pushDirty(); }, 5000);
+      pushTimer = setTimeout(() => { pushDirty(); }, 1500);
     }, { deep: true });
   });
 
@@ -3703,8 +3704,8 @@ window.$erp = {
       // Initial pull on boot (delay 3s so login finishes)
       setTimeout(() => pullAll(), 3000);
     }
-    // Recurring pull every 30s
-    pullTimer = setInterval(() => pullAll(), 30000);
+    // Recurring pull every 10s (เร็วขึ้นจาก 30s)
+    pullTimer = setInterval(() => pullAll(), 10000);
   }
   function shutdown() {
     if (!enabled) return;
@@ -4314,9 +4315,24 @@ const app = createApp({
       }
     }
 
+    /* 🆕 Manual Sync Now (เรียกจากปุ่ม indicator) — Push pending + Pull latest ทันที */
+    async function manualSyncNow() {
+      if (!window.$autoSync) { showToast('Auto-Sync ยังไม่พร้อม','error'); return; }
+      try {
+        showToast('⏳ กำลัง Sync ด่วน...', 'success');
+        // Push pending changes ก่อน
+        await window.$autoSync.pushNow();
+        // แล้ว Pull ข้อมูลล่าสุดทันที
+        await window.$autoSync.pullNow();
+        showToast('✓ Sync สำเร็จ — ข้อมูลล่าสุดแล้ว', 'success');
+      } catch(e) {
+        showToast('❌ Sync ล้มเหลว: '+e.message, 'error');
+      }
+    }
+
     return { db, currentUser, currentView, currentBranchId, sidebarOpen, loginForm, loginError, canViewCurrent,
       menuGroups: visibleMenuGroups, currentTitle, toast, login, logout, resetDemo,
-      syncStatus, dataEmptyBanner, forcePulling, forcePull };
+      syncStatus, dataEmptyBanner, forcePulling, forcePull, manualSyncNow };
   }
 });
 
@@ -7427,6 +7443,8 @@ app.component('view-purchase', {
             msg += ' · 📋 ตัด PO ซื้อ: '+bill._cutPoIds.join(', ');
           }
         }
+        // 🆕 Force push ทันที — ให้คนอื่นเห็นเร็ว (skip 1.5s debounce)
+        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
         erp.showToast(msg,'success');
       } catch (e) {
         console.error('save:', e);
@@ -8473,6 +8491,8 @@ app.component('view-payment', {
         showForm.value = false;
         editingVoucherId.value = null;
         erp.showToast(isEdit?'✓ แก้ไข Payment สำเร็จ':'✓ บันทึก Payment สำเร็จ','success');
+        // 🆕 Force push ทันที — ให้คนอื่นเห็นเร็ว
+        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
       } catch (e) {
         console.error('save error:', e);
         alert('Save error: ' + e.message);
@@ -9051,6 +9071,8 @@ app.component('view-receipt', {
         showForm.value = false;
         editingVoucherId.value = null;
         erp.showToast(isEdit?'✓ แก้ไข Receipt สำเร็จ':'✓ บันทึก Receipt สำเร็จ','success');
+        // 🆕 Force push ทันที
+        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
       } catch (e) { console.error(e); alert('Save error: '+e.message); }
     }
 
@@ -10505,6 +10527,8 @@ app.component('view-sales', {
       }
       showForm.value = false;
       erp.showToast('บันทึกบิลขายสำเร็จ — Stock และ AR อัปเดตแล้ว');
+      // 🆕 Force push ทันที
+      if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
     }
 
     function cancelBill(b) {
