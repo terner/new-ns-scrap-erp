@@ -3977,10 +3977,37 @@ const app = createApp({
     window.$erp.syncStatus = syncStatus;
     let _dbDirty = true;     // dirty flag — set true เมื่อข้อมูลเปลี่ยน
 
-    /* persist */
+    /* persist — ใส่ try/catch กัน quota error */
+    let _storageQuotaWarned = false;
     watch(db, () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      _dbDirty = true;        // mark dirty for cloud sync
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        _dbDirty = true;        // mark dirty for cloud sync
+      } catch(e) {
+        if (e.name === 'QuotaExceededError' || (e.message||'').includes('quota')) {
+          // ลบ snapshot/backup เก่าก่อน แล้วลองใหม่
+          if (!_storageQuotaWarned) {
+            console.warn('[storage] Quota exceeded — clearing old snapshots and backups');
+            _storageQuotaWarned = true;
+          }
+          // ล้าง snapshots
+          const keysToRemove = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k !== STORAGE_KEY && (k.startsWith('ns_erp_backup_') || k.includes('_pre_pull') || k.includes('_snapshot'))) keysToRemove.push(k);
+          }
+          keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+            _dbDirty = true;
+          } catch(e2) {
+            console.error('[storage] STILL fails after clearing snapshots:', e2.message);
+            // ระบบจะเก็บใน memory ต่อไป — ข้อมูลไม่หายระหว่าง session แต่ไม่ persist
+          }
+        } else {
+          console.error('[storage] save error:', e);
+        }
+      }
     }, { deep:true });
 
     function showToast(msg, type='success') {
@@ -30350,15 +30377,47 @@ app.component('view-backup', {
       pullProgress.value.current = pullProgress.value.total;
       _logPull(`✅ ดึงข้อมูลเสร็จ — ${totalRows} rows`, 'ok');
 
-      // Save to localStorage
+      // Save to localStorage — แยก step เพื่อกัน quota error ของ snapshot ทำให้ main save fail
+      // 1. ลบ snapshot เก่าก่อน (เผื่อมีอยู่ — ลบ free space)
+      try { localStorage.removeItem('ns_erp_db_v1_pre_pull'); } catch(e) {}
+      try { localStorage.removeItem('ns_erp_db_v1_pre_pull_old'); } catch(e) {}
+
+      // 2. พยายามเก็บ snapshot — ถ้า quota เต็มก็ skip (ไม่ critical)
       try {
         localStorage.setItem('ns_erp_db_v1_pre_pull', localStorage.getItem('ns_erp_db_v1') || '');
+      } catch(e) {
+        _logPull('⚠ ข้าม snapshot (LocalStorage เต็ม) — pull ต่อไป', 'warn');
+      }
+
+      // 3. บันทึก main DB — ถ้า fail ตรงนี้คือปัญหาจริง
+      try {
         localStorage.setItem('ns_erp_db_v1', JSON.stringify(newDb));
         _logPull('💾 บันทึกลง LocalStorage แล้ว — กรุณา refresh หน้า', 'info');
         pulling.value = false;
         if (confirm('✅ Sync Down เสร็จ — Refresh หน้าเดี๋ยวนี้?')) location.reload();
       } catch(e) {
         _logPull('❌ Save error: '+e.message, 'error');
+        // ถ้า quota เต็ม → ลบ snapshot อื่นๆ แล้วลองใหม่
+        if (e.message?.includes('quota')) {
+          _logPull('🔧 พยายามลบ snapshot เก่าทั้งหมด...', 'warn');
+          // List all keys with snapshot patterns + remove
+          const toRemove = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('ns_erp_backup_') || k.includes('_pre_pull') || k.includes('_snapshot'))) toRemove.push(k);
+          }
+          toRemove.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+          _logPull('🗑 ลบ snapshot/backup เก่า '+toRemove.length+' รายการ — ลองอีกครั้ง', 'warn');
+          try {
+            localStorage.setItem('ns_erp_db_v1', JSON.stringify(newDb));
+            _logPull('✓ บันทึกสำเร็จหลังลบ snapshot', 'ok');
+            pulling.value = false;
+            if (confirm('✅ Sync เสร็จ — Refresh?')) location.reload();
+            return;
+          } catch(e2) {
+            _logPull('❌ ยังบันทึกไม่ได้: '+e2.message, 'error');
+          }
+        }
         pulling.value = false;
       }
     }
