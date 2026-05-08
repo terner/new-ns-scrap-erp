@@ -27776,6 +27776,9 @@ app.component('view-backup', {
       return Array.from(seen.values());
     }
 
+    /* Columns ที่ห้าม drop (PK / NOT NULL critical) */
+    const _NEVER_DROP = new Set(['id', 'code', 'created_at']);
+
     async function _uploadBatch(table, rows, batchSize = 100) {
       let inserted = 0, failed = 0, skipped = 0;
       const dropCols = new Set();
@@ -27811,26 +27814,50 @@ app.component('view-backup', {
             migrateProgress.value = { ...migrateProgress.value, current: migrateProgress.value.current + chunk.length };
             break;
           }
-          // Try to extract column name from error (multiple regex patterns)
+          // Try to extract column name from error — but ONLY for "column does not exist" errors
+          // Do NOT extract from "null value in column X" — that means X exists and is required
           let badCol = null;
           const patterns = [
             /Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column/,
             /column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/,
-            /column ['"]?([a-zA-Z0-9_]+)['"]? of relation/,
+            // NOTE: removed "column ['"]?([a-zA-Z0-9_]+)['"]? of relation" pattern
+            // เพราะ match กับทั้ง "does not exist" และ "violates not-null" → ลบ id ผิด
           ];
           for (const p of patterns) {
             const m = error.message.match(p);
             if (m) { badCol = m[1]; break; }
+          }
+          // Protect critical columns from being dropped
+          if (badCol && _NEVER_DROP.has(badCol)) {
+            _logMig(`  ⛔ ห้าม drop "${badCol}" (PK) — skip batch`, 'error');
+            failed += chunk.length;
+            break;
           }
           if (badCol && !dropCols.has(badCol)) {
             dropCols.add(badCol);
             _logMig(`  🔧 drop column "${badCol}" และลองใหม่...`, 'warn');
             continue; // retry
           }
+          // NOT NULL violation — usually means we accidentally dropped/lost a required field
+          const notNullMatch = error.message.match(/null value in column ['"]?([a-zA-Z0-9_]+)['"]? of relation ['"]?([a-zA-Z0-9_]+)/);
+          if (notNullMatch) {
+            const nullCol = notNullMatch[1];
+            _logMig(`  ⛔ ${notNullMatch[2]}: column "${nullCol}" required but null — skip batch`, 'error');
+            failed += chunk.length;
+            break;
+          }
           // FK constraint violation → set the bad FK to null and retry
-          const fkMatch = error.message.match(/foreign key constraint ['"]?([a-zA-Z0-9_]+)_([a-zA-Z0-9_]+)_fkey/);
+          // Constraint format: {table}_{column}_fkey
+          // Example: accounts_branch_id_fkey → table=accounts, column=branch_id
+          // Use non-greedy matching to extract column name
+          const fkMatch = error.message.match(/foreign key constraint ['"]?([a-z_]+?)_([a-z_]+_id)_fkey/);
           if (fkMatch) {
-            const fkCol = fkMatch[2];   // e.g. "branch_id"
+            const fkCol = fkMatch[2];   // e.g. "branch_id" (always ends with _id)
+            if (_NEVER_DROP.has(fkCol)) {
+              _logMig(`  ⛔ FK on "${fkCol}" — ห้าม set null — skip batch`, 'error');
+              failed += chunk.length;
+              break;
+            }
             // Strip rows where this FK doesn't have a valid value (set to null)
             chunk = chunk.map(r => ({ ...r, [fkCol]: null }));
             _logMig(`  🔧 FK violation: set "${fkCol}"=null และลองใหม่...`, 'warn');
