@@ -2436,7 +2436,7 @@ function seedData() {
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:true,
         branchScope:'all' },
       { id:'R-WAREHOUSE', name:'คลัง', desc:'คลังสินค้า — Stock, Production, Transfer (เฉพาะสาขาตัวเอง)', isSystem:false,
-        menus:['changePassword','stockBalance','stockLedger','stockTransfer','production','productionReport','wipReport','machineUtil','mdProduct','mdBranch','gradeAdjustment','statusConvert','customerReturn'],
+        menus:['changePassword','stockBalance','stockLedger','stockTransfer','pendingSales','production','productionReport','wipReport','machineUtil','mdProduct','mdBranch','gradeAdjustment','statusConvert','customerReturn'],
         actions:{'stockTransfer':['view','create','edit','post','export'],'production':['view','create','edit','post','export'],'gradeAdjustment':['view','create','edit','export'],'*':['view','export']},
         seeCost:false, seeProfit:false, seeCash:false, seeFinancials:false, seeOpening:false,
         branchScope:'own' },
@@ -5409,6 +5409,44 @@ app.component('view-stockLedger', {
     const erp = window.$erp; const db = erp.db;
     const filterProduct = ref(''); const filterBranch = ref(''); const filterType = ref('');
     const fromDate = ref(''); const toDate = ref('');
+    const detailBill = ref(null);   // 🆕 selected bill for detail modal
+    const detailType = ref('');     // 'PB' | 'SB'
+
+    /* 🆕 หาชื่อคู่ค้า (ผู้ขายให้เรา/ผู้ซื้อจากเรา) จาก stock movement */
+    function getCounterparty(m) {
+      if (!m) return { name:'-', kind:'', clickable:false };
+      if (m.refType === 'PB' || m.refType === 'PB-CANCEL') {
+        const b = (db.purchaseBills||[]).find(x => x && x.id === m.refId);
+        if (b) {
+          const sup = (db.suppliers||[]).find(s => s && s.id === b.supplierId);
+          return { name: sup?.name || '-', kind:'ผู้ขาย', clickable:true, bill:b, billType:'PB' };
+        }
+      }
+      if (m.refType === 'SB' || m.refType === 'SB-CANCEL') {
+        const b = (db.salesBills||[]).find(x => x && x.id === m.refId);
+        if (b) {
+          const cust = (db.customers||[]).find(c => c && c.id === b.customerId);
+          return { name: cust?.name || '-', kind:'ผู้ซื้อ', clickable:true, bill:b, billType:'SB' };
+        }
+      }
+      // Other types: stock transfer, production, etc.
+      const labelMap = {
+        'ST':'โอนระหว่างสาขา', 'PI':'Production Input', 'PI-REV':'Production Input (Reverse)',
+        'PO2':'Production Output', 'PO2-REV':'Production Output (Reverse)',
+        'OB':'ยอดยกมา', 'GA':'ปรับเกรด', 'SC':'แปลง Status',
+        'CRO':'รับคืนสินค้า', 'PEND':'เบิกออกรอบิล'
+      };
+      return { name: labelMap[m.refType] || (m.refNo || '-'), kind:'', clickable:false };
+    }
+
+    function openDetail(m) {
+      const cp = getCounterparty(m);
+      if (!cp.clickable || !cp.bill) return;
+      detailBill.value = cp.bill;
+      detailType.value = cp.billType;
+    }
+    function closeDetail() { detailBill.value = null; detailType.value = ''; }
+
     const list = computed(() => {
       return db.stockLedger.filter(m => {
         if (filterProduct.value && m.productId !== filterProduct.value) return false;
@@ -5417,10 +5455,12 @@ app.component('view-stockLedger', {
         if (fromDate.value && m.date < fromDate.value) return false;
         if (toDate.value && m.date > toDate.value) return false;
         return true;
-      }).sort((a,b)=>(b.date||'').localeCompare(a.date||'') || (b.id||'').localeCompare(a.id||''));
+      }).map(m => ({ ...m, _cp: getCounterparty(m) }))
+        .sort((a,b)=>(b.date||'').localeCompare(a.date||'') || (b.id||'').localeCompare(a.id||''));
     });
     const movementTypes = computed(()=> [...new Set(db.stockLedger.map(m=>m.movementType))]);
-    return { db, erp, filterProduct, filterBranch, filterType, fromDate, toDate, list, movementTypes, fmt:erp.fmt };
+    return { db, erp, filterProduct, filterBranch, filterType, fromDate, toDate, list, movementTypes, fmt:erp.fmt,
+      detailBill, detailType, openDetail, closeDetail };
   },
   template: `
   <div>
@@ -5438,14 +5478,23 @@ app.component('view-stockLedger', {
     </div>
     <div class="bg-white rounded-xl shadow overflow-x-auto">
       <table class="w-full text-sm table-zebra">
-        <thead class="bg-slate-100"><tr><th class="p-2 text-left">วันที่</th><th class="p-2 text-left">เอกสาร</th><th class="p-2 text-left">ประเภท</th><th class="p-2 text-left">สินค้า</th><th class="p-2 text-left">สาขา/คลัง</th><th class="p-2 text-right">เข้า</th><th class="p-2 text-right">ออก</th><th class="p-2 text-right">ต้นทุน/หน่วย</th><th class="p-2 text-right">มูลค่าเข้า</th><th class="p-2 text-right">มูลค่าออก</th></tr></thead>
+        <thead class="bg-slate-100"><tr><th class="p-2 text-left">วันที่</th><th class="p-2 text-left">เลขบิล</th><th class="p-2 text-left">ผู้ขาย / ผู้ซื้อ</th><th class="p-2 text-left">ประเภท</th><th class="p-2 text-left">สินค้า</th><th class="p-2 text-right">เข้า</th><th class="p-2 text-right">ออก</th><th class="p-2 text-right">ต้นทุน/หน่วย</th><th class="p-2 text-right">มูลค่าเข้า</th><th class="p-2 text-right">มูลค่าออก</th></tr></thead>
         <tbody>
-          <tr v-for="m in list" :key="m.id" class="border-t">
+          <tr v-for="m in list" :key="m.id" class="border-t hover:bg-slate-50">
             <td class="p-2">{{m.date}}</td>
-            <td class="p-2 font-mono text-xs text-blue-600">{{m.refNo}}</td>
+            <td class="p-2">
+              <button v-if="m._cp.clickable" @click.stop="openDetail(m)" class="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{{m.refNo}} 🔍</button>
+              <span v-else class="font-mono text-xs text-slate-500">{{m.refNo||'-'}}</span>
+            </td>
+            <td class="p-2">
+              <div v-if="m._cp.clickable">
+                <span class="text-xs px-1.5 py-0.5 rounded mr-1" :class="m._cp.kind==='ผู้ขาย'?'bg-emerald-100 text-emerald-700':'bg-blue-100 text-blue-700'">{{m._cp.kind}}</span>
+                <span class="font-medium" :class="m._cp.kind==='ผู้ขาย'?'text-emerald-700':'text-blue-700'">{{m._cp.name}}</span>
+              </div>
+              <span v-else class="text-xs text-slate-500">{{m._cp.name}}</span>
+            </td>
             <td class="p-2"><span class="text-xs px-2 py-0.5 rounded" :class="m.qtyIn>0?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'">{{m.movementType}}</span></td>
             <td class="p-2">{{erp.productName(m.productId)}}<span v-if="m.lotNo" class="text-xs text-slate-400 ml-1">[{{m.lotNo}}]</span></td>
-            <td class="p-2 text-xs">{{erp.branchName(m.branchId)}} / {{erp.warehouseName(m.warehouseId)}}</td>
             <td class="p-2 text-right text-emerald-600">{{m.qtyIn?fmt(m.qtyIn):'-'}}</td>
             <td class="p-2 text-right text-red-600">{{m.qtyOut?fmt(m.qtyOut):'-'}}</td>
             <td class="p-2 text-right text-slate-500">{{fmt(m.unitCost)}}</td>
@@ -5455,6 +5504,69 @@ app.component('view-stockLedger', {
           <tr v-if="list.length===0"><td colspan="10" class="text-center py-8 text-slate-400">ยังไม่มี Stock Movement</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- 🆕 BILL DETAIL MODAL -->
+    <div v-if="detailBill" class="fixed inset-0 bg-black/50 z-50 overflow-y-auto" @click.self="closeDetail">
+      <div class="bg-white rounded-xl shadow-2xl max-w-4xl mx-auto my-4">
+        <div class="px-5 py-3 border-b flex justify-between items-center" :class="detailType==='PB'?'bg-emerald-50':'bg-blue-50'">
+          <h3 class="font-semibold text-lg">
+            {{detailType==='PB'?'📥 บิลรับซื้อ':'📤 บิลขาย'}} — {{detailBill.docNo}}
+          </h3>
+          <button @click="closeDetail" class="text-2xl text-slate-400 leading-none">&times;</button>
+        </div>
+        <div class="p-5 space-y-4 text-sm">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 rounded p-3">
+            <div><div class="text-xs text-slate-500">เลขที่บิล</div><div class="font-mono font-bold">{{detailBill.docNo}}</div></div>
+            <div><div class="text-xs text-slate-500">วันที่</div><div class="font-bold">{{detailBill.date}}</div></div>
+            <div><div class="text-xs text-slate-500">{{detailType==='PB'?'ผู้ขาย':'ผู้ซื้อ'}}</div>
+              <div class="font-bold" :class="detailType==='PB'?'text-emerald-700':'text-blue-700'">
+                {{detailType==='PB' ? (db.suppliers.find(s=>s.id===detailBill.supplierId)?.name||'-') : (db.customers.find(c=>c.id===detailBill.customerId)?.name||'-')}}
+              </div>
+            </div>
+            <div><div class="text-xs text-slate-500">สาขา</div><div class="font-bold">{{erp.branchName(detailBill.branchId)}}</div></div>
+            <div v-if="detailBill.licensePlate"><div class="text-xs text-slate-500">🚛 ทะเบียนรถ</div><div class="font-bold">{{detailBill.licensePlate}}</div></div>
+            <div v-if="detailBill.contactPhone"><div class="text-xs text-slate-500">📞 เบอร์โทร</div><div class="font-bold">{{detailBill.contactPhone}}</div></div>
+            <div v-if="detailBill.contactName"><div class="text-xs text-slate-500">👤 ผู้ติดต่อ</div><div class="font-bold">{{detailBill.contactName}}</div></div>
+            <div><div class="text-xs text-slate-500">สถานะ</div><div class="font-bold">{{detailBill.status||'-'}}</div></div>
+          </div>
+          <div>
+            <div class="font-semibold mb-2">📋 รายการสินค้า ({{(detailBill.items||[]).length}})</div>
+            <div class="overflow-x-auto border rounded-lg">
+              <table class="w-full text-xs">
+                <thead class="bg-slate-100">
+                  <tr>
+                    <th class="p-2 text-left">สินค้า</th>
+                    <th class="p-2 text-right">น้ำหนัก</th>
+                    <th class="p-2 text-right">ราคา/หน่วย</th>
+                    <th class="p-2 text-right">มูลค่า</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(it, idx) in (detailBill.items||[])" :key="idx" class="border-t">
+                    <td class="p-2">{{erp.productName(it.productId)||'-'}}<span v-if="it.lotNo" class="text-xs text-slate-400 ml-1">[{{it.lotNo}}]</span></td>
+                    <td class="p-2 text-right">{{fmt(it.netWeight||it.weight||0)}}</td>
+                    <td class="p-2 text-right">{{fmt(it.price||it.unitPrice||0)}}</td>
+                    <td class="p-2 text-right font-bold">{{fmt(it.netAmount||it.totalAmount||((it.netWeight||it.weight||0)*(it.price||it.unitPrice||0)))}}</td>
+                  </tr>
+                </tbody>
+                <tfoot class="bg-slate-50 font-bold">
+                  <tr>
+                    <td class="p-2 text-right" colspan="3">รวมทั้งสิ้น</td>
+                    <td class="p-2 text-right">{{fmt(detailBill.totalAmount||0)}}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          <div v-if="detailBill.notes" class="bg-yellow-50 border border-yellow-200 rounded p-3 text-xs">
+            <b>📝 หมายเหตุ:</b> {{detailBill.notes}}
+          </div>
+        </div>
+        <div class="px-5 py-3 border-t bg-slate-50 flex justify-end">
+          <button @click="closeDetail" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded">ปิด</button>
+        </div>
+      </div>
     </div>
   </div>`
 });
@@ -9518,7 +9630,9 @@ app.component('view-sales', {
     function blank() {
       return { docNo:'', date:erp.today(), refNo:'', customerId:'', branchId:'', warehouseId:'', channelId:'',
         transactionMode:'STOCK',         // 🔥 STOCK | TRADING
-        tradingFromPurchaseId:'',        // 🔥 link to Trading Purchase (auto-match)
+        tradingFromPurchaseId:'',        // 🔥 link to Trading Purchase (auto-match) — legacy single
+        tradingFromPurchaseIds:[],       // 🆕 รวมหลายบิลซื้อ Trading ใน 1 บิลขาย
+        _addPurchaseId:'',               // 🆕 temp picker (ไม่บันทึก)
         salesman:erp.currentUser.value?.username||'', creditTerm:0, note:'', items:[],
         licensePlate:'',                 // 🚗 ทะเบียนรถส่งของ
         contactPhone:'', contactName:'', // 📞 ผู้ติดต่อรับของ
@@ -9560,8 +9674,15 @@ app.component('view-sales', {
     function loadFromTradingPurchase() {
       const pb = erp.db.purchaseBills.find(b => b && b.id === form.tradingFromPurchaseId);
       if (!pb) return;
-      // copy items: product + qty same, price = 0 (user enters), tradingCostAmount = purchase netAmount
-      form.items = (pb.items||[]).map((it, i) => ({
+      // legacy single-select: REPLACE items + reset multi list
+      form.tradingFromPurchaseIds = [pb.id];
+      form.items = (pb.items||[]).map((it, i) => _makeTradingSaleItem(pb, it));
+      recalcAll();
+    }
+
+    /* 🆕 helper: create sale item from purchase bill line */
+    function _makeTradingSaleItem(pb, it) {
+      return {
         id: erp.uid('SL'),
         productId: it.productId,
         lotNo: it.lotNo || '',
@@ -9573,9 +9694,42 @@ app.component('view-sales', {
         tradingCostAmount: Number(it.netAmount || 0), // for trading-cost calc
         profit: 0,
         note: it.note || '',
-        sourcePurchaseLineId: it.id,        // link back to purchase line
+        sourcePurchaseLineId: it.id,
         sourcePurchaseBillId: pb.id,
-      }));
+        sourcePurchaseDocNo: pb.docNo,      // for display
+      };
+    }
+
+    /* 🆕 เพิ่มบิลซื้อ Trading อีก 1 ใบ — append items (ไม่ replace) */
+    function addTradingPurchase() {
+      const pid = form._addPurchaseId;
+      if (!pid) { alert('เลือกบิลซื้อ Trading ที่จะเพิ่ม'); return; }
+      if (!Array.isArray(form.tradingFromPurchaseIds)) form.tradingFromPurchaseIds = [];
+      if (form.tradingFromPurchaseIds.includes(pid)) {
+        alert('บิลซื้อนี้ถูกเลือกแล้ว');
+        form._addPurchaseId = '';
+        return;
+      }
+      const pb = erp.db.purchaseBills.find(b => b && b.id === pid);
+      if (!pb) return;
+      // append items from this PB
+      const newItems = (pb.items||[]).map(it => _makeTradingSaleItem(pb, it));
+      form.items = [...(form.items||[]), ...newItems];
+      form.tradingFromPurchaseIds.push(pid);
+      // sync legacy single-field to first PB (for backward compat with existing logic)
+      if (!form.tradingFromPurchaseId) form.tradingFromPurchaseId = pid;
+      form._addPurchaseId = '';
+      recalcAll();
+      erp.showToast('✓ เพิ่มบิลซื้อ Trading: '+pb.docNo+' ('+(pb.items||[]).length+' รายการ)');
+    }
+
+    /* 🆕 ลบบิลซื้อ Trading ออก — ลบ items ที่ source จาก PB นี้ */
+    function removeTradingPurchase(pbId) {
+      if (!confirm('ลบบิลซื้อนี้ออกจากบิลขาย?\nรายการสินค้าที่มาจากบิลนี้จะถูกลบด้วย')) return;
+      form.items = (form.items||[]).filter(it => it.sourcePurchaseBillId !== pbId);
+      form.tradingFromPurchaseIds = (form.tradingFromPurchaseIds||[]).filter(id => id !== pbId);
+      // re-sync legacy single field
+      form.tradingFromPurchaseId = form.tradingFromPurchaseIds[0] || '';
       recalcAll();
     }
 
@@ -9614,7 +9768,17 @@ app.component('view-sales', {
         }
       }
       Object.keys(form).forEach(k => delete form[k]);
-      if (item) { Object.assign(form, JSON.parse(JSON.stringify(item))); editing.value = item; }
+      if (item) {
+        Object.assign(form, JSON.parse(JSON.stringify(item))); editing.value = item;
+        // 🆕 Backward compat: ถ้าบิลเก่าไม่มี tradingFromPurchaseIds → derive จาก items.sourcePurchaseBillId หรือ legacy field
+        if (!Array.isArray(form.tradingFromPurchaseIds) || !form.tradingFromPurchaseIds.length) {
+          const fromItems = [...new Set((form.items||[]).map(it => it.sourcePurchaseBillId).filter(Boolean))];
+          if (fromItems.length > 0) form.tradingFromPurchaseIds = fromItems;
+          else if (form.tradingFromPurchaseId) form.tradingFromPurchaseIds = [form.tradingFromPurchaseId];
+          else form.tradingFromPurchaseIds = [];
+        }
+        if (!form._addPurchaseId) form._addPurchaseId = '';
+      }
       else {
         Object.assign(form, blank()); form.docNo = erp.nextDocNo('SB'); form.items = [blankItem()]; editing.value = null;
         // 📦 Pre-fill from Pending Sale (ถ้ามี)
@@ -9747,42 +9911,60 @@ app.component('view-sales', {
           });
         });
       }
-      // 🔥 TRADING auto-match: ถ้าผูกบิลซื้อ Trading ไว้ → สร้าง Trading Deal อัตโนมัติ
+      // 🔥 TRADING auto-match: ถ้าผูกบิลซื้อ Trading ไว้ → สร้าง Trading Deal อัตโนมัติ (รองรับหลายบิลซื้อ)
       // 🔧 FIX: ใช้ subtotal (ก่อน VAT) ไม่ใช่ totalAmount (หลัง VAT) เพื่อคิด GP จริง
-      if (isTrading && bill.tradingFromPurchaseId) {
-        try {
-          const pb = db.purchaseBills.find(p => p && p.id === bill.tradingFromPurchaseId);
-          if (pb) {
-            // ใช้ subtotal (ก่อน VAT) — ถ้าไม่มี ใช้ totalAmount เป็น fallback
-            const pbExVat = Number(pb.subtotal != null ? pb.subtotal : pb.totalAmount || 0);
-            const sbExVat = Number(bill.subtotal != null ? bill.subtotal : bill.totalAmount || 0);
-            const remainPB = pbExVat - erp.tradingMatchedSales(pb.id);
-            const matchedQty = (bill.items||[]).reduce((s,it)=>s+Number(it.weight||0),0);
-            const matchedCost = (bill.items||[]).reduce((s,it)=>s+Number(it.tradingCostAmount||it.totalCost||0),0);
-            const matchedSales = sbExVat;        // ✅ ก่อน VAT
-            const actualMatchCost = Math.min(matchedCost, remainPB);
-            const dealNo = 'TD-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+String((db.tradingDeals||[]).length+1).padStart(4,'0');
-            const newPBMatched = erp.tradingMatchedSales(pb.id) + actualMatchCost;
-            const pbFully = Math.abs(newPBMatched - pbExVat) < 0.01;
-            const status = pbFully ? 'Completed' : 'Partially Matched';
+      if (isTrading) {
+        // รวบรวม source PB ids — ใช้ tradingFromPurchaseIds (ใหม่) ก่อน, fallback เป็น tradingFromPurchaseId เก่า
+        const pbIds = Array.isArray(bill.tradingFromPurchaseIds) && bill.tradingFromPurchaseIds.length
+          ? bill.tradingFromPurchaseIds
+          : (bill.tradingFromPurchaseId ? [bill.tradingFromPurchaseId] : []);
+        if (pbIds.length > 0) {
+          try {
             if (!Array.isArray(db.tradingDeals)) db.tradingDeals = [];
-            db.tradingDeals.push({
-              id: 'TDEAL-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,5),
-              dealNo, date: bill.date,
-              purchaseBillId: pb.id, purchaseBillNo: pb.docNo,
-              salesBillId: bill.id, salesBillNo: bill.docNo,
-              productId: pb.items?.[0]?.productId || bill.items?.[0]?.productId || '',
-              supplierId: pb.supplierId, customerId: bill.customerId,
-              matchedQty, matchedPurchaseAmount: actualMatchCost, matchedSalesAmount: matchedSales,
-              exVat: true,    // ⚙️ flag: คำนวณจากยอดก่อน VAT
-              notes: 'Auto-matched on save (linked Trading Purchase) — ก่อน VAT',
-              status, autoCreated: true,
-              createdBy: bill.createdBy, createdAt: new Date().toISOString(),
+            const sbExVat = Number(bill.subtotal != null ? bill.subtotal : bill.totalAmount || 0);
+            // รวมต้นทุนทั้งหมดในบิลขาย (ใช้คำนวณ proportional sales allocation)
+            const totalCostInBill = (bill.items||[]).reduce((s,it)=>s+Number(it.tradingCostAmount||it.totalCost||0),0) || 1;
+            const dealsCreated = [];
+            pbIds.forEach((pid, idx) => {
+              const pb = db.purchaseBills.find(p => p && p.id === pid);
+              if (!pb) return;
+              const pbExVat = Number(pb.subtotal != null ? pb.subtotal : pb.totalAmount || 0);
+              const remainPB = pbExVat - erp.tradingMatchedSales(pb.id);
+              // items ที่มาจาก PB นี้
+              const itemsFromPB = (bill.items||[]).filter(it => it.sourcePurchaseBillId === pb.id);
+              const matchedQty = itemsFromPB.reduce((s,it)=>s+Number(it.weight||0),0);
+              const matchedCost = itemsFromPB.reduce((s,it)=>s+Number(it.tradingCostAmount||it.totalCost||0),0);
+              // matchedSales: proportional ตามสัดส่วนต้นทุน
+              const matchedSales = sbExVat * (matchedCost / totalCostInBill);
+              const actualMatchCost = Math.min(matchedCost, remainPB);
+              const dealNo = 'TD-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+String((db.tradingDeals||[]).length+1+idx).padStart(4,'0');
+              const newPBMatched = erp.tradingMatchedSales(pb.id) + actualMatchCost;
+              const pbFully = Math.abs(newPBMatched - pbExVat) < 0.01;
+              const status = pbFully ? 'Completed' : 'Partially Matched';
+              db.tradingDeals.push({
+                id: 'TDEAL-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,5)+'-'+idx,
+                dealNo, date: bill.date,
+                purchaseBillId: pb.id, purchaseBillNo: pb.docNo,
+                salesBillId: bill.id, salesBillNo: bill.docNo,
+                productId: pb.items?.[0]?.productId || itemsFromPB[0]?.productId || '',
+                supplierId: pb.supplierId, customerId: bill.customerId,
+                matchedQty, matchedPurchaseAmount: actualMatchCost, matchedSalesAmount: matchedSales,
+                exVat: true,
+                notes: pbIds.length > 1 ? 'Auto-matched (รวม '+pbIds.length+' บิลซื้อ → 1 บิลขาย) — ก่อน VAT' : 'Auto-matched on save — ก่อน VAT',
+                status, autoCreated: true,
+                createdBy: bill.createdBy, createdAt: new Date().toISOString(),
+              });
+              dealsCreated.push(dealNo);
+              erp.logAudit('TRADING_AUTO_MATCH','tradingDeals',null,{dealNo, gp: matchedSales-actualMatchCost, exVat:true, multiPB: pbIds.length>1});
             });
-            erp.logAudit('TRADING_AUTO_MATCH','tradingDeals',null,{dealNo, gp: matchedSales-actualMatchCost, exVat:true});
-            erp.showToast('✓ บันทึกบิลขาย + Auto-Match Trading Deal: '+dealNo+' (ก่อน VAT)','success');
-          }
-        } catch(e) { console.error('auto-match:', e); }
+            if (dealsCreated.length > 0) {
+              const msg = dealsCreated.length === 1
+                ? '✓ บันทึกบิลขาย + Auto-Match Trading Deal: '+dealsCreated[0]+' (ก่อน VAT)'
+                : '✓ บันทึกบิลขาย + Auto-Match '+dealsCreated.length+' Trading Deals (รวม '+pbIds.length+' บิลซื้อ → 1 บิลขาย)';
+              erp.showToast(msg,'success');
+            }
+          } catch(e) { console.error('auto-match:', e); }
+        }
       }
       // update PO Sell sold qty / status
       if (bill.salesSource === 'PO_DELIVERY' && bill.poSellId) {
@@ -9938,7 +10120,8 @@ app.component('view-sales', {
     return { db, erp, form, showForm, editing, showDetail, search, filterStatus, filterChannel,
       filterMode, filterDateFrom, filterDateTo,
       open, save, addItem, removeItem, recalcLine, cancelBill, deleteBill, filtered, statusBadge, statusText,
-      loadFromPOSell, availableTradingPurchases, loadFromTradingPurchase, billTotals, toggleVatIssued, goToPendingSale, fmt:erp.fmt };
+      loadFromPOSell, availableTradingPurchases, loadFromTradingPurchase, billTotals, toggleVatIssued, goToPendingSale, fmt:erp.fmt,
+      addTradingPurchase, removeTradingPurchase };
   },
   template: `
   <div>
@@ -10048,15 +10231,37 @@ app.component('view-sales', {
             </div>
           </div>
 
-          <!-- 🔥 Trading: เลือกบิลซื้อ Trading ที่จะขาย (auto-fill product/qty/cost) -->
+          <!-- 🔥 Trading: เลือกบิลซื้อ Trading ที่จะขาย (รองรับหลายบิล → รวมจับคู่) -->
           <div v-if="form.transactionMode==='TRADING'" class="bg-fuchsia-50 border-2 border-fuchsia-300 rounded-lg p-3">
-            <label class="block text-xs font-bold text-fuchsia-700 mb-1">🔗 เลือกบิลซื้อ Trading ที่จะขาย (Optional — auto-fill สินค้า + จำนวน + ต้นทุน)</label>
-            <select v-model="form.tradingFromPurchaseId" @change="loadFromTradingPurchase" class="w-full px-2 py-1.5 border rounded text-sm">
-              <option value="">— ไม่ผูก (ขายแยก / จับคู่ต้นทุนภายหลัง) —</option>
-              <option v-for="pb in availableTradingPurchases" :key="pb.id" :value="pb.id">{{pb.label}}</option>
-            </select>
-            <div v-if="form.tradingFromPurchaseId" class="text-xs text-emerald-700 mt-2 bg-white p-2 rounded">
-              ✓ ดึงสินค้า + จำนวน + ต้นทุนจากบิลซื้อแล้ว — กรอกแค่ <strong>ราคาขาย</strong> · เมื่อบันทึก ระบบจะ <strong>Auto-Match Trading Deal</strong> ให้อัตโนมัติ
+            <label class="block text-xs font-bold text-fuchsia-700 mb-1">🔗 บิลซื้อ Trading ที่จะรวมขาย <span class="text-slate-500 font-normal">(เลือกได้หลายบิล — รวมจับคู่ในบิลขาย 1 ใบ)</span></label>
+
+            <!-- รายการบิลซื้อที่เลือกแล้ว -->
+            <div v-if="(form.tradingFromPurchaseIds||[]).length>0" class="space-y-1 mb-2">
+              <div v-for="pid in (form.tradingFromPurchaseIds||[])" :key="pid" class="flex items-center justify-between bg-white border border-fuchsia-200 rounded p-2 text-xs">
+                <div class="flex-1">
+                  <span class="font-mono font-bold text-fuchsia-700">{{(db.purchaseBills.find(b=>b.id===pid)||{}).docNo||'?'}}</span>
+                  <span class="text-slate-500 mx-1">·</span>
+                  <span>{{erp.supplierName((db.purchaseBills.find(b=>b.id===pid)||{}).supplierId)}}</span>
+                  <span class="text-slate-500 mx-1">·</span>
+                  <span class="text-slate-600">{{(db.purchaseBills.find(b=>b.id===pid)||{}).date}}</span>
+                  <span class="text-slate-500 mx-1">·</span>
+                  <span class="text-emerald-700">มูลค่า {{fmt(Number((db.purchaseBills.find(b=>b.id===pid)||{}).totalAmount||0))}}</span>
+                </div>
+                <button @click="removeTradingPurchase(pid)" type="button" class="text-red-500 hover:text-red-700 px-2 font-bold">× ลบ</button>
+              </div>
+            </div>
+
+            <!-- เลือกบิลใหม่ -->
+            <div class="flex gap-2 items-center">
+              <select v-model="form._addPurchaseId" class="flex-1 px-2 py-1.5 border rounded text-sm">
+                <option value="">— เลือกบิลซื้อ Trading ที่จะเพิ่ม —</option>
+                <option v-for="pb in availableTradingPurchases.filter(x => !(form.tradingFromPurchaseIds||[]).includes(x.id))" :key="pb.id" :value="pb.id">{{pb.label}}</option>
+              </select>
+              <button @click="addTradingPurchase" type="button" :disabled="!form._addPurchaseId" class="bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded text-xs font-bold whitespace-nowrap">+ เพิ่มบิลซื้อ</button>
+            </div>
+
+            <div v-if="(form.tradingFromPurchaseIds||[]).length>0" class="text-xs text-emerald-700 mt-2 bg-white p-2 rounded">
+              ✓ รวม <strong>{{(form.tradingFromPurchaseIds||[]).length}} บิลซื้อ</strong> · {{(form.items||[]).length}} รายการสินค้า · กรอกแค่ <strong>ราคาขาย</strong> · เมื่อบันทึก ระบบจะ <strong>Auto-Match Trading Deal</strong> แยกตามแต่ละบิลซื้อ
             </div>
             <div v-else-if="!availableTradingPurchases.length" class="text-xs text-amber-700 mt-1">
               ⚠ ยังไม่มีบิลซื้อ Trading ที่ค้าง match — ไปสร้างที่เมนู "บิลรับซื้อ" + เลือก TRADING mode
