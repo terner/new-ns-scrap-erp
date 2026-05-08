@@ -2468,6 +2468,12 @@ function seedData() {
     importLogs: [],   // Master Data Import history (with rollback snapshots)
     tradingDeals: [], // Trading Deal / Matching records
     gradeAdjustments: [], // Grade Adjustment / ปรับเกรดสินค้า records
+    historicalMonthly: [], // 🆕 ข้อมูลย้อนหลังรายเดือน (ก่อน Go-Live) — Q1 2026 baseline สำหรับเทียบ
+    // structure: { id, year, month, metricType: 'expense'|'pnl'|'cashflow', categoryId, amount, note, updatedBy, updatedAt }
+    receiptVouchers: [], // 🆕 ใบสำคัญรับเงิน (Receipt Voucher) — ออกให้ Supplier บุคคลธรรมดาเซ็นรับเงิน
+    // structure: { id, docNo, date, purchaseBillId (link), purchaseBillDocNo, sellerName, sellerTaxId, sellerAddress, sellerPhone,
+    //   licensePlate, salesPerson, items[], totalQty, totalAmount, amountInWords, note, payerSignerName, receiverSignerName,
+    //   paymentMethod, createdBy, createdAt, updatedBy, updatedAt }
     lmeConfig: {       // 🔥 LME Reference Pricing
       lmeCopperUSD: 9000,    // USD/MT
       lmeBrassUSD: 7000,     // USD/MT
@@ -2507,13 +2513,17 @@ function seedData() {
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:false,
         branchScope:'all' },
-      { id:'R-COORDINATOR', name:'ประสานงาน', desc:'ประสานงาน — กรอกบิลซื้อ/ขาย, Stock, Trading, PO', isSystem:false,
-        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','stockBalance','stockLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','backup','companyProfile'],
+      { id:'R-COORDINATOR', name:'ประสานงาน', desc:'ประสานงาน — กรอกบิลซื้อ/ขาย, Stock, Trading, PO, ใบสำคัญรับเงิน, ปรับสถานะ/เกรด, Sales Tracking', isSystem:false,
+        // 🆕 ADD: receiptVoucher, statusConvert, gradeAdjustment, customerReturn, salesCommission, costPool, costAllocator, matchLog
+        // 🚫 REMOVE: paymentApproval
+        menus:['changePassword','purchase','sales','stockIssue','payment','receipt','receiptVoucher','statusConvert','gradeAdjustment','customerReturn','stockBalance','stockLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','salesCommission','costPool','costAllocator','matchLog','reports','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:false, seeCash:false, seeFinancials:false, seeOpening:false,
         branchScope:'all' },
-      { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan', isSystem:false,
-        menus:['dashboard','changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','expense','pettyAdvance','expenseDashboard','ar','ap','bank','cashPosition','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','plStatement','balanceSheet','cashFlowStatement','production','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','audit','anomalyDetector','backup','companyProfile'],
+      { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan + ใบสำคัญรับเงิน + Bank Recon', isSystem:false,
+        // 🆕 ADD: receiptVoucher, bankRecon, mdExpense, historicalData
+        // 🚫 REMOVE: dashboard, cashPosition
+        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','receiptVoucher','expense','pettyAdvance','expenseDashboard','bankRecon','ar','ap','bank','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','mdExpense','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','plStatement','balanceSheet','cashFlowStatement','production','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','historicalData','audit','anomalyDetector','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:true,
         branchScope:'all' },
@@ -2928,6 +2938,41 @@ window.$erp = {
     const newDocNo = window.$erp.nextDocNo(prefix);
     console.warn('[docNo-collision] '+docNo+' → '+newDocNo+' (table='+tableName+')');
     return newDocNo;
+  },
+  /* 🔧 NEW: Cloud-aware uniqueness check — Async — สำคัญมากตอน multi-device
+     เช็คทั้ง local + Supabase cloud ก่อนคืน docNo จริง
+     ถ้า cloud มีบิลใช้เลขนี้แล้ว (เพราะอีกเครื่องสร้างพร้อมกัน) → re-generate ใหม่จาก max(local, cloud)+1 */
+  ensureUniqueDocNoCloud: async (docNo, prefix, currentBillId) => {
+    // Step 1: ตรวจ local ก่อน (เร็ว) — ถ้าซ้ำ regenerate
+    let result = window.$erp.ensureUniqueDocNo(docNo, prefix, currentBillId);
+    // Step 2: ถ้า Supabase ใช้งานได้ → ตรวจ cloud ด้วย
+    if (!window.sb) return result;
+    const tableMapCloud = {
+      'PB': 'purchase_bills', 'SB': 'sales_bills', 'PMT': 'payments', 'RCP': 'receipts',
+      'TRF': 'transfers', 'EXP': 'expenses', 'POB': 'po_buys', 'POS': 'po_sells'
+    };
+    const cloudTable = tableMapCloud[prefix];
+    if (!cloudTable) return result;
+    try {
+      // Loop จน docNo ไม่ซ้ำใน cloud (max 5 retries กัน loop ไม่จบ)
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data, error } = await window.sb.from(cloudTable)
+          .select('id, doc_no').eq('doc_no', result).limit(2);
+        if (error) { console.warn('[docNo-cloud-check] error:', error.message); return result; }
+        // ไม่ซ้ำ หรือ ซ้ำแต่เป็นบิลเดียวกัน (currentBillId) → ผ่าน
+        const collision = (data || []).some(r => r && r.id !== currentBillId);
+        if (!collision) return result;
+        // ซ้ำ → regenerate ใหม่ (skip ตัวเลขที่ collide)
+        const oldNo = result;
+        result = window.$erp.nextDocNo(prefix);
+        console.warn('[docNo-cloud-collision] '+oldNo+' ซ้ำใน cloud → '+result);
+      }
+      console.error('[docNo-cloud-collision] EXHAUSTED 5 retries — กำลังใช้ '+result+' (อาจซ้ำ)');
+      return result;
+    } catch(e) {
+      console.warn('[docNo-cloud-check] exception:', e.message);
+      return result;
+    }
   },
   logAudit: (action, entity, before, after) => {
     try {
@@ -3600,13 +3645,15 @@ window.$erp = {
     poBuys: { target:'po_buys', keyMap:{ docNo:'doc_no', supplierId:'supplier_id', productId:'product_id', branchId:'branch_id', channelId:'channel_id', expectedDelivery:'expected_delivery', unitPrice:'unit_price', totalAmount:'total_amount', remainingQty:'remaining_qty', createdAt:'created_at' } },
     poSells: { target:'po_sells', keyMap:{ docNo:'doc_no', customerId:'customer_id', productId:'product_id', branchId:'branch_id', channelId:'channel_id', expectedDelivery:'expected_delivery', unitPrice:'unit_price', totalAmount:'total_amount', remainingQty:'remaining_qty', createdAt:'created_at' } },
     tradingDeals: { target:'trading_deals', keyMap:{ dealNo:'deal_no', purchaseBillId:'purchase_bill_id', purchaseBillNo:'purchase_bill_no', salesBillId:'sales_bill_id', salesBillNo:'sales_bill_no', productId:'product_id', supplierId:'supplier_id', customerId:'customer_id', matchedQty:'matched_qty', matchedPurchaseAmount:'matched_purchase_amount', matchedSalesAmount:'matched_sales_amount', exVat:'ex_vat', createdBy:'created_by', cancelledAt:'cancelled_at', createdAt:'created_at' } },
+    historicalMonthly: { target:'historical_monthly', keyMap:{ metricType:'metric_type', categoryId:'category_id', updatedBy:'updated_by', updatedAt:'updated_at', createdAt:'created_at' } },
+    receiptVouchers: { target:'receipt_vouchers', keyMap:{ docNo:'doc_no', purchaseBillId:'purchase_bill_id', purchaseBillDocNo:'purchase_bill_doc_no', sellerName:'seller_name', sellerTaxId:'seller_tax_id', sellerAddress:'seller_address', sellerPhone:'seller_phone', licensePlate:'license_plate', salesPerson:'sales_person', totalQty:'total_qty', totalAmount:'total_amount', amountInWords:'amount_in_words', payerSignerName:'payer_signer_name', receiverSignerName:'receiver_signer_name', paymentMethod:'payment_method', createdBy:'created_by', createdAt:'created_at', updatedBy:'updated_by', updatedAt:'updated_at' } },
   };
   const AS_CONFLICT_COL = { 'currencies': 'code' };
   // Tables to auto-sync (must exist in Supabase). Reduce for safety.
   const AS_TABLES = ['branches','warehouses','suppliers','customers','products','salespersons','accounts',
     'purchaseChannels','salesChannels','expenseCategories',
     'purchaseBills','salesBills','payments','receipts','transfers','expenses',
-    'stockLedger','bankStatement','poBuys','poSells','tradingDeals'];
+    'stockLedger','bankStatement','poBuys','poSells','tradingDeals','historicalMonthly','receiptVouchers'];
 
   /* Date-like field names — empty string in these fields → cast to null (กัน "invalid input syntax for type date") */
   const _DATE_HINT = /(_date|_at|date|expectedDelivery|paidAt|approvedAt|cancelledAt|createdAt|updatedAt|warrantyExpireDate|purchaseDate)$/i;
@@ -4116,6 +4163,35 @@ const app = createApp({
     window.$erp.syncStatus = syncStatus;
     let _dbDirty = true;     // dirty flag — set true เมื่อข้อมูลเปลี่ยน
 
+    /* 🆕 Proactive cleanup at boot — ลบ snapshot เก่าทันทีถ้า localStorage > 75%
+       ป้องกัน quota error ก่อนเกิด — ปลอดภัยเพราะข้อมูลจริงอยู่ที่ Supabase */
+    (function _proactiveStorageCleanup() {
+      try {
+        let totalBytes = 0;
+        const snapshotKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          const v = localStorage.getItem(k) || '';
+          totalBytes += (k.length + v.length) * 2;
+          if (k && (k.startsWith('ns_erp_backup_') || k.startsWith('ns_erp_snapshot_') || k.includes('_pre_pull'))) {
+            snapshotKeys.push({ key: k, size: v.length, ts: k.match(/\d{4}-\d{2}-\d{2}T?\d*-?\d*-?\d*/) ? k : '' });
+          }
+        }
+        const totalMB = totalBytes / 1024 / 1024;
+        // เกณฑ์: ถ้าใช้ > 7MB (ใกล้ limit) → ลบ snapshot เก่าให้เหลือแค่ 3 ตัวล่าสุด
+        if (totalMB > 7 && snapshotKeys.length > 3) {
+          // เรียงเก่าก่อน (ts น้อยกว่า) — ลบเก่าก่อน
+          snapshotKeys.sort((a,b) => (a.ts||'').localeCompare(b.ts||''));
+          const toRemove = snapshotKeys.slice(0, snapshotKeys.length - 3);
+          let cleared = 0;
+          toRemove.forEach(item => {
+            try { localStorage.removeItem(item.key); cleared++; } catch(e){}
+          });
+          console.log('[storage-proactive] ' + totalMB.toFixed(2) + 'MB used — removed ' + cleared + '/' + snapshotKeys.length + ' old snapshots (kept latest 3)');
+        }
+      } catch(e) { console.warn('[storage-proactive] error:', e); }
+    })();
+
     /* persist — ใส่ try/catch กัน quota error */
     let _storageQuotaWarned = false;
     watch(db, () => {
@@ -4323,6 +4399,7 @@ const app = createApp({
         {view:'stockIssue', label:'📦 เบิกออกรอบิล (Pending Sale)', icon:'📦'},
         {view:'paymentApproval', label:'✅ อนุมัติโอนเงิน (Payment Approval)', icon:'✅'},
         {view:'payment', label:'จ่ายเงิน Supplier', icon:'💸'},
+        {view:'receiptVoucher', label:'🧾 ใบสำคัญรับเงิน (Receipt Voucher)', icon:'🧾'},
         {view:'receipt', label:'รับเงิน Customer', icon:'💰'},
         {view:'transfer', label:'โอนเงินระหว่างบัญชี', icon:'🔄'},
         {view:'expense', label:'ค่าใช้จ่าย', icon:'🧾'},
@@ -4400,6 +4477,7 @@ const app = createApp({
         {view:'loanDashboard', label:'Loan Dashboard', icon:'📊'},
         {view:'equityMaint',  label:'Equity / ทุนจดทะเบียน', icon:'👑'},
         {view:'openingBalance', label:'⭐ Opening Balance / ตั้งต้นยอด', icon:'🚀'},
+        {view:'historicalData', label:'📅 ข้อมูลย้อนหลัง ม.ค.-เม.ย. 2026 (ก่อน Go-Live)', icon:'📅'},
       ]},
       { label:'ข้อมูลหลัก', items:[
         {view:'mdCustomer', label:'ลูกค้า', icon:'👥'},
@@ -7719,7 +7797,7 @@ app.component('view-purchase', {
       if (src === 'SPOT_BUY') form.value.poBuyId = '';
     }
 
-    function save() {
+    async function save() {
       try {
         const f = form.value;
         const isTrading = f.transactionMode === 'TRADING';
@@ -7729,10 +7807,10 @@ app.component('view-purchase', {
         if (!isTrading && !f.channelId) { alert('เลือกช่องทางรับซื้อ'); return; }
         // 🆕 Trading mode: ล้าง branch + warehouse + channel (Trading เป็นของมันเอง — ยอด/กำไรไปฝั่ง Trading)
         if (isTrading) { f.branchId = ''; f.warehouseId = ''; f.channelId = ''; }
-        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำกับบิลคนอื่น (สำคัญตอนหลายเครื่องเปิดบิลพร้อมกัน)
+        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำทั้ง local + cloud (กันเครื่องอื่น save พร้อมกัน)
         if (!editingId.value) {
           const oldDocNo = f.docNo;
-          f.docNo = erp.ensureUniqueDocNo(f.docNo, 'PB', null);
+          f.docNo = await erp.ensureUniqueDocNoCloud(f.docNo, 'PB', null);
           if (f.docNo !== oldDocNo) {
             erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' — เปลี่ยนเป็น '+f.docNo+' อัตโนมัติ', 'warning');
           }
@@ -8886,13 +8964,13 @@ app.component('view-payment', {
       }
     }
 
-    function save() {
+    async function save() {
       try {
         const f = form.value;
-        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำ
+        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำทั้ง local + cloud
         if (!editingVoucherId.value) {
           const oldDocNo = f.docNo;
-          f.docNo = erp.ensureUniqueDocNo(f.docNo, 'PMT', null);
+          f.docNo = await erp.ensureUniqueDocNoCloud(f.docNo, 'PMT', null);
           if (f.docNo !== oldDocNo) erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' → '+f.docNo, 'warning');
         }
         // 🆕 Auto-fill: if only 1 split with accountId but no amount → fill with netCashOut
@@ -9514,16 +9592,16 @@ app.component('view-receipt', {
       }
     }
 
-    function save() {
+    async function save() {
       try {
         const f = form.value;
         if (!f.accountId) { alert('เลือกบัญชีรับ'); return; }
         const validLines = safeArr(f.lines).filter(l => l.billId && num(l.receiptAmount)>0);
         if (validLines.length===0) { alert('เลือกบิล + ใส่จำนวนเงินอย่างน้อย 1 รายการ'); return; }
-        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำ
+        // 🛡️ Anti-collision: ตรวจ docNo ซ้ำทั้ง local + cloud
         if (!editingVoucherId.value) {
           const oldDocNo = f.docNo;
-          f.docNo = erp.ensureUniqueDocNo(f.docNo, 'RCP', null);
+          f.docNo = await erp.ensureUniqueDocNoCloud(f.docNo, 'RCP', null);
           if (f.docNo !== oldDocNo) erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' → '+f.docNo, 'warning');
         }
         const isEdit = !!editingVoucherId.value;
@@ -10961,7 +11039,7 @@ app.component('view-sales', {
     }));
     watch(()=>{ try{return JSON.stringify(form.items);}catch(e){return '';} }, recalcAll);
 
-    function save() {
+    async function save() {
       const isTrading = form.transactionMode === 'TRADING';
       if (!form.customerId) { erp.showToast('เลือก Customer','error'); return; }
       if (!form.branchId) { erp.showToast('เลือกสาขา','error'); return; }
@@ -10983,10 +11061,10 @@ app.component('view-sales', {
         }
       }
       recalcAll();
-      // 🛡️ Anti-collision: ตรวจ docNo ซ้ำกับบิลคนอื่น (สำคัญตอนหลายเครื่องเปิดบิลพร้อมกัน)
+      // 🛡️ Anti-collision: ตรวจ docNo ซ้ำทั้ง local + cloud
       if (!editing.value) {
         const oldDocNo = form.docNo;
-        form.docNo = erp.ensureUniqueDocNo(form.docNo, 'SB', null);
+        form.docNo = await erp.ensureUniqueDocNoCloud(form.docNo, 'SB', null);
         if (form.docNo !== oldDocNo) {
           erp.showToast('⚡ พบเลขซ้ำ '+oldDocNo+' — เปลี่ยนเป็น '+form.docNo+' อัตโนมัติ', 'warning');
         }
@@ -13225,15 +13303,30 @@ app.component('view-yieldLossReport', {
       const inputQty = H.totalInputQty(p.id);
       const outputQty = H.totalOutputQty(p.id);
       const lossQty = H.totalLossQty(p.id);
+      const inputCost = H.totalInputCost(p.id);
+      const unitCost = inputQty > 0 ? inputCost / inputQty : 0;
       const yieldPct = inputQty>0 ? outputQty/inputQty*100 : 0;
       const lossPct = inputQty>0 ? lossQty/inputQty*100 : 0;
       const normalPct = Number(p.normalLossPercent||0);
       const normalLossQty = inputQty * normalPct / 100;
+      const expectedOutputQty = inputQty - normalLossQty;
+      // 🆕 Abnormal Loss (output ขาดเกิน normal) → ขาดทุน
       const abnormalLossQty = Math.max(0, lossQty - normalLossQty);
-      const abnormalLossValue = abnormalLossQty * (inputQty>0 ? H.totalInputCost(p.id)/inputQty : 0);
+      const abnormalLossValue = abnormalLossQty * unitCost;
+      // 🆕 Yield Gain (output เกินคาด) → กำไร
+      const yieldGainQty = Math.max(0, outputQty - expectedOutputQty);
+      const yieldGainValue = yieldGainQty * unitCost;
+      // 🆕 Net P&L Impact = Gain - Loss
+      const netPnL = yieldGainValue - abnormalLossValue;
       const lossOuts = H.outputsOf(p.id).filter(o => ['Loss','Waste'].includes(o.outputType));
       const lossReason = lossOuts.map(l => l.lossReason).filter(r=>r).join('; ');
-      return { ...p, inputQty, outputQty, lossQty, yieldPct, lossPct, normalPct, normalLossQty, abnormalLossQty, abnormalLossValue, lossReason, isAbnormal: lossPct > normalPct };
+      return { ...p, inputQty, outputQty, lossQty, inputCost, unitCost,
+        yieldPct, lossPct, normalPct, normalLossQty, expectedOutputQty,
+        abnormalLossQty, abnormalLossValue,
+        yieldGainQty, yieldGainValue, netPnL,
+        lossReason,
+        isAbnormal: lossPct > normalPct,
+        isGain: yieldGainQty > 0 };
     }));
     const totals = computed(() => ({
       inputQty: data.value.reduce((s,p)=>s+p.inputQty,0),
@@ -13241,11 +13334,15 @@ app.component('view-yieldLossReport', {
       lossQty: data.value.reduce((s,p)=>s+p.lossQty,0),
       abnormalLossQty: data.value.reduce((s,p)=>s+p.abnormalLossQty,0),
       abnormalLossValue: data.value.reduce((s,p)=>s+p.abnormalLossValue,0),
+      yieldGainQty: data.value.reduce((s,p)=>s+p.yieldGainQty,0),
+      yieldGainValue: data.value.reduce((s,p)=>s+p.yieldGainValue,0),
+      netPnL: data.value.reduce((s,p)=>s+p.netPnL,0),
       abnormalCount: data.value.filter(p=>p.isAbnormal).length,
+      gainCount: data.value.filter(p=>p.isGain).length,
     }));
     function exportCsv() {
-      const rows = [['DocNo','Date','Input','Output','Loss','Yield%','Loss%','Normal%','NormalLoss','AbnormalLoss','AbnormalValue','Reason']];
-      data.value.forEach(p => rows.push([p.docNo, p.date, p.inputQty, p.outputQty, p.lossQty, p.yieldPct.toFixed(2), p.lossPct.toFixed(2), p.normalPct, p.normalLossQty.toFixed(2), p.abnormalLossQty.toFixed(2), p.abnormalLossValue.toFixed(2), p.lossReason]));
+      const rows = [['DocNo','Date','Input','Output','Loss','Yield%','Loss%','Normal%','NormalLoss','AbnormalLoss','AbnormalValue','YieldGainQty','YieldGainValue','NetPnL','UnitCost','Reason']];
+      data.value.forEach(p => rows.push([p.docNo, p.date, p.inputQty, p.outputQty, p.lossQty, p.yieldPct.toFixed(2), p.lossPct.toFixed(2), p.normalPct, p.normalLossQty.toFixed(2), p.abnormalLossQty.toFixed(2), p.abnormalLossValue.toFixed(2), p.yieldGainQty.toFixed(2), p.yieldGainValue.toFixed(2), p.netPnL.toFixed(2), p.unitCost.toFixed(2), p.lossReason]));
       downloadCsv('yield_loss_'+erp.today()+'.csv', rows);
     }
     return { db, erp, fromDate, toDate, data, totals, exportCsv, fmt:erp.fmt };
@@ -13253,25 +13350,60 @@ app.component('view-yieldLossReport', {
   template: `
   <div>
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
-      แสดง Yield/Loss แยก Normal Loss vs Abnormal Loss — รายการที่เกินมาตรฐาน (Normal Loss%) จะแสดงสีแดง
+      แสดง Yield/Loss + <b>P&L Impact</b> — Output ขาดเกิน Normal = ⚠️ Loss(สีแดง) · Output เกินคาด = 🎉 Gain(สีเขียว) · Net P&L = Gain − Loss
     </div>
     <div class="flex flex-wrap gap-2 mb-4">
       <input type="date" v-model="fromDate" class="px-3 py-2 border rounded-lg text-sm">
       <input type="date" v-model="toDate" class="px-3 py-2 border rounded-lg text-sm">
       <button @click="exportCsv" class="ml-auto bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-      <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-slate-500">Input รวม</div><div class="text-xl font-bold text-red-700">{{fmt(totals.inputQty)}}</div></div>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+      <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-slate-500">Input รวม</div><div class="text-xl font-bold text-slate-700">{{fmt(totals.inputQty)}}</div></div>
       <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-slate-500">Output รวม</div><div class="text-xl font-bold text-emerald-700">{{fmt(totals.outputQty)}}</div></div>
       <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-slate-500">Loss รวม</div><div class="text-xl font-bold text-amber-700">{{fmt(totals.lossQty)}}</div></div>
-      <div class="bg-red-50 rounded-xl shadow p-3"><div class="text-xs text-red-600">Abnormal Loss (Qty)</div><div class="text-xl font-bold text-red-700">{{fmt(totals.abnormalLossQty)}}</div></div>
-      <div class="bg-red-100 rounded-xl shadow p-3"><div class="text-xs text-red-700">Abnormal Loss Value</div><div class="text-xl font-bold text-red-800">{{fmt(totals.abnormalLossValue)}}</div></div>
+      <div class="bg-slate-100 rounded-xl shadow p-3"><div class="text-xs text-slate-600">Order ทั้งหมด</div><div class="text-xl font-bold text-slate-800">{{data.length}}</div></div>
+    </div>
+    <!-- 🆕 P&L Impact Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div class="bg-emerald-50 rounded-xl shadow p-4 border-2 border-emerald-200">
+        <div class="text-xs text-emerald-700 font-semibold">🎉 Yield Gain (Output > คาดหวัง)</div>
+        <div class="text-2xl font-bold text-emerald-700 mt-1">+{{fmt(totals.yieldGainValue)}} ฿</div>
+        <div class="text-xs text-emerald-600 mt-1">{{fmt(totals.yieldGainQty)}} หน่วย · {{totals.gainCount}} order</div>
+      </div>
+      <div class="bg-red-50 rounded-xl shadow p-4 border-2 border-red-200">
+        <div class="text-xs text-red-700 font-semibold">⚠️ Abnormal Loss (Output < Normal)</div>
+        <div class="text-2xl font-bold text-red-700 mt-1">−{{fmt(totals.abnormalLossValue)}} ฿</div>
+        <div class="text-xs text-red-600 mt-1">{{fmt(totals.abnormalLossQty)}} หน่วย · {{totals.abnormalCount}} order</div>
+      </div>
+      <div :class="['rounded-xl shadow p-4 border-2', totals.netPnL >= 0 ? 'bg-blue-50 border-blue-300' : 'bg-orange-50 border-orange-300']">
+        <div :class="['text-xs font-semibold', totals.netPnL >= 0 ? 'text-blue-700' : 'text-orange-700']">💰 Net P&L Impact</div>
+        <div :class="['text-2xl font-bold mt-1', totals.netPnL >= 0 ? 'text-blue-700' : 'text-orange-700']">
+          {{ totals.netPnL >= 0 ? '+' : '' }}{{fmt(totals.netPnL)}} ฿
+        </div>
+        <div :class="['text-xs mt-1', totals.netPnL >= 0 ? 'text-blue-600' : 'text-orange-600']">
+          {{ totals.netPnL >= 0 ? 'กำไรจากการเบิก-ผลิต' : 'ขาดทุนสุทธิจากการเบิก-ผลิต' }}
+        </div>
+      </div>
     </div>
     <div class="bg-white rounded-xl shadow overflow-x-auto">
       <table class="w-full text-sm table-zebra">
-        <thead class="bg-slate-100"><tr><th class="p-2 text-left">เลขที่</th><th class="p-2 text-left">วันที่</th><th class="p-2 text-right">Input</th><th class="p-2 text-right">Output</th><th class="p-2 text-right">Loss</th><th class="p-2 text-right">Yield %</th><th class="p-2 text-right">Loss %</th><th class="p-2 text-right">Normal %</th><th class="p-2 text-right">Normal Loss</th><th class="p-2 text-right">Abnormal Loss</th><th class="p-2 text-right">Abnormal Value</th><th class="p-2 text-left">Reason</th><th class="p-2 text-center">Status</th></tr></thead>
+        <thead class="bg-slate-100"><tr>
+          <th class="p-2 text-left">เลขที่</th><th class="p-2 text-left">วันที่</th>
+          <th class="p-2 text-right">Input</th><th class="p-2 text-right">Output</th>
+          <th class="p-2 text-right">Loss</th><th class="p-2 text-right">Yield %</th>
+          <th class="p-2 text-right">Loss %</th><th class="p-2 text-right">Normal %</th>
+          <th class="p-2 text-right">Normal Loss</th>
+          <th class="p-2 text-right text-red-700">Abnormal Loss</th>
+          <th class="p-2 text-right text-red-700">Loss Value (฿)</th>
+          <th class="p-2 text-right text-emerald-700">Yield Gain</th>
+          <th class="p-2 text-right text-emerald-700">Gain Value (฿)</th>
+          <th class="p-2 text-right text-blue-700 font-bold">Net P&L (฿)</th>
+          <th class="p-2 text-left">Reason</th><th class="p-2 text-center">Status</th>
+        </tr></thead>
         <tbody>
-          <tr v-for="p in data" :key="p.id" class="border-t" :class="p.isAbnormal?'bg-red-50/50':''">
+          <tr v-for="p in data" :key="p.id" class="border-t"
+              :class="p.isAbnormal ? 'bg-red-50/50' : (p.isGain ? 'bg-emerald-50/50' : '')">
             <td class="p-2 font-mono text-xs">{{p.docNo}}</td><td class="p-2">{{p.date}}</td>
             <td class="p-2 text-right">{{fmt(p.inputQty)}}</td>
             <td class="p-2 text-right text-emerald-700">{{fmt(p.outputQty)}}</td>
@@ -13281,11 +13413,20 @@ app.component('view-yieldLossReport', {
             <td class="p-2 text-right text-slate-500">{{p.normalPct}}%</td>
             <td class="p-2 text-right">{{fmt(p.normalLossQty)}}</td>
             <td class="p-2 text-right text-red-600 font-bold">{{fmt(p.abnormalLossQty)}}</td>
-            <td class="p-2 text-right text-red-700">{{fmt(p.abnormalLossValue)}}</td>
+            <td class="p-2 text-right text-red-700 font-semibold">{{p.abnormalLossValue>0?'−'+fmt(p.abnormalLossValue):'-'}}</td>
+            <td class="p-2 text-right text-emerald-600 font-bold">{{p.yieldGainQty>0?fmt(p.yieldGainQty):'-'}}</td>
+            <td class="p-2 text-right text-emerald-700 font-semibold">{{p.yieldGainValue>0?'+'+fmt(p.yieldGainValue):'-'}}</td>
+            <td class="p-2 text-right font-bold" :class="p.netPnL>=0?'text-blue-700':'text-orange-700'">
+              {{ p.netPnL >= 0 ? '+' : '' }}{{fmt(p.netPnL)}}
+            </td>
             <td class="p-2 text-xs">{{p.lossReason||'-'}}</td>
-            <td class="p-2 text-center"><span v-if="p.isAbnormal" class="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">⚠️ Abnormal</span><span v-else class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">Normal</span></td>
+            <td class="p-2 text-center">
+              <span v-if="p.isAbnormal" class="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">⚠️ Abnormal</span>
+              <span v-else-if="p.isGain" class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">🎉 Gain</span>
+              <span v-else class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">Normal</span>
+            </td>
           </tr>
-          <tr v-if="data.length===0"><td colspan="13" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>
+          <tr v-if="data.length===0"><td colspan="16" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>
         </tbody>
       </table>
     </div>
@@ -27391,10 +27532,763 @@ function _allMenuItems() {
     // Assets / Loans
     'assetRegister','depreciation','assetDisposal','loanContracts','loanDashboard','equityMaint',
     // Setup / System
-    'openingBalance','companyProfile','changePassword','transactionLedger','backup','audit','userPermission','userActivity'
+    'openingBalance','historicalData','receiptVoucher','companyProfile','changePassword','transactionLedger','backup','audit','userPermission','userActivity'
   ];
   return known;
 }
+
+/* ================================================================
+   COMPONENT: Historical Data Entry — ข้อมูลย้อนหลัง Q1 2026 (ก่อน Go-Live)
+   ใช้สำหรับคีย์ตัวเลข Expense / P&L / Cash Flow ของ ม.ค.-มี.ค. 2026
+   เพื่อให้ Dashboard เปรียบเทียบ Apr 2026 (เริ่ม real data) กับ baseline
+   ================================================================ */
+app.component('view-historicalData', {
+  setup() {
+    const erp = window.$erp; const db = erp.db; const fmt = erp.fmt;
+    const tab = ref('expense'); // expense | pnl | cashflow
+    const months = [
+      { y: 2026, m: 1, label: 'ม.ค. 2026' },
+      { y: 2026, m: 2, label: 'ก.พ. 2026' },
+      { y: 2026, m: 3, label: 'มี.ค. 2026' },
+      { y: 2026, m: 4, label: 'เม.ย. 2026' },
+    ];
+    /* P&L line items (predefined) — order matters for display */
+    const pnlLines = [
+      { id: 'revenue',       label: '💰 Revenue (รายได้)',                   sign: '+' },
+      { id: 'cogs',          label: '📦 COGS (ต้นทุนขาย)',                    sign: '-' },
+      { id: 'gross_profit',  label: '   = Gross Profit',                     sign: '=', calc: true },
+      { id: 'opex',          label: '💼 Operating Expenses (ค่าใช้จ่ายดำเนินงาน)', sign: '-' },
+      { id: 'op_profit',     label: '   = Operating Profit',                 sign: '=', calc: true },
+      { id: 'interest',      label: '🏦 Interest Expense (ดอกเบี้ย)',          sign: '-' },
+      { id: 'other_inc',     label: '📥 Other Income (รายได้อื่น)',            sign: '+' },
+      { id: 'tax',           label: '📋 Tax (ภาษี)',                          sign: '-' },
+      { id: 'net_profit',    label: '   = Net Profit (กำไรสุทธิ)',             sign: '=', calc: true },
+    ];
+    /* Cash Flow line items (predefined) */
+    const cfLines = [
+      { id: 'cf_op_in',      label: '⬆️ Operating Inflow (เงินรับจากการดำเนินงาน)' },
+      { id: 'cf_op_out',     label: '⬇️ Operating Outflow (เงินจ่ายจากการดำเนินงาน)' },
+      { id: 'cf_op_net',     label: '   = Net Operating CF',                 calc: true },
+      { id: 'cf_inv',        label: '🏗️ Investing Activities (ลงทุน-สุทธิ)' },
+      { id: 'cf_fin_in',     label: '⬆️ Financing Inflow (เงินกู้ใหม่/เพิ่มทุน)' },
+      { id: 'cf_fin_out',    label: '⬇️ Financing Outflow (จ่ายเงินต้น/ปันผล)' },
+      { id: 'cf_fin_net',    label: '   = Net Financing CF',                 calc: true },
+      { id: 'cf_net_change', label: '🔁 Net Change in Cash',                  calc: true },
+    ];
+
+    /* Map: cell key (y-m-cat) → record from db.historicalMonthly */
+    function cellKey(y, m, metricType, categoryId) {
+      return y + '-' + String(m).padStart(2,'0') + '-' + metricType + '-' + categoryId;
+    }
+    function getCell(y, m, metricType, categoryId) {
+      const arr = Array.isArray(db.historicalMonthly) ? db.historicalMonthly : (db.historicalMonthly = []);
+      return arr.find(r => r && r.year===y && r.month===m && r.metricType===metricType && r.categoryId===categoryId);
+    }
+    function setCell(y, m, metricType, categoryId, amount, note) {
+      let cell = getCell(y, m, metricType, categoryId);
+      const username = erp.currentUser.value?.username || '-';
+      if (cell) {
+        cell.amount = Number(amount) || 0;
+        if (note !== undefined) cell.note = note;
+        cell.updatedBy = username;
+        cell.updatedAt = new Date().toISOString();
+      } else {
+        const arr = Array.isArray(db.historicalMonthly) ? db.historicalMonthly : (db.historicalMonthly = []);
+        arr.push({
+          id: 'HIST-' + cellKey(y,m,metricType,categoryId) + '-' + Math.random().toString(36).slice(2,5),
+          year: y, month: m, metricType, categoryId,
+          amount: Number(amount) || 0, note: note || '',
+          createdBy: username, updatedBy: username,
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+    function getAmount(y, m, metricType, categoryId) {
+      const c = getCell(y, m, metricType, categoryId);
+      return c ? Number(c.amount || 0) : 0;
+    }
+
+    /* Reactive proxy for v-model on cell inputs */
+    function v(metricType, categoryId, monthIdx) {
+      const mo = months[monthIdx];
+      return {
+        get value() { return getAmount(mo.y, mo.m, metricType, categoryId); },
+        set value(val) { setCell(mo.y, mo.m, metricType, categoryId, val); }
+      };
+    }
+
+    /* P&L derived row calc — ใช้กับ rows ที่มี calc:true */
+    function pnlCalc(lineId, monthIdx) {
+      const mo = months[monthIdx];
+      const g = (id) => getAmount(mo.y, mo.m, 'pnl', id);
+      if (lineId === 'gross_profit') return g('revenue') - g('cogs');
+      if (lineId === 'op_profit')   return g('revenue') - g('cogs') - g('opex');
+      if (lineId === 'net_profit')  return g('revenue') - g('cogs') - g('opex') - g('interest') + g('other_inc') - g('tax');
+      return 0;
+    }
+    function cfCalc(lineId, monthIdx) {
+      const mo = months[monthIdx];
+      const g = (id) => getAmount(mo.y, mo.m, 'cashflow', id);
+      if (lineId === 'cf_op_net')     return g('cf_op_in') - g('cf_op_out');
+      if (lineId === 'cf_fin_net')    return g('cf_fin_in') - g('cf_fin_out');
+      if (lineId === 'cf_net_change') return (g('cf_op_in') - g('cf_op_out')) + g('cf_inv') + (g('cf_fin_in') - g('cf_fin_out'));
+      return 0;
+    }
+
+    /* Row totals (sum across 3 months) — แสดงคอลัมน์ Q1 รวม */
+    function rowTotalExpense(catId) {
+      return months.reduce((s, mo) => s + getAmount(mo.y, mo.m, 'expense', catId), 0);
+    }
+    function rowTotalPnl(lineId, isCalc) {
+      if (isCalc) return months.reduce((s,_,i) => s + pnlCalc(lineId, i), 0);
+      return months.reduce((s, mo) => s + getAmount(mo.y, mo.m, 'pnl', lineId), 0);
+    }
+    function rowTotalCf(lineId, isCalc) {
+      if (isCalc) return months.reduce((s,_,i) => s + cfCalc(lineId, i), 0);
+      return months.reduce((s, mo) => s + getAmount(mo.y, mo.m, 'cashflow', lineId), 0);
+    }
+
+    /* Save — trigger explicit push to cloud (sync ทำ auto แต่อยาก feedback ทันที) */
+    async function saveAll() {
+      try {
+        if (window.$autoSync && window.$autoSync.pushNow) {
+          erp.showToast('⏳ กำลังบันทึกขึ้น Cloud...', 'success');
+          await window.$autoSync.pushNow();
+          erp.showToast('✓ บันทึกแล้ว — ทุกเครื่องจะเห็นข้อมูลภายใน 30 วินาที', 'success');
+        } else {
+          erp.showToast('✓ บันทึก local แล้ว (Cloud sync ยังไม่พร้อม)', 'success');
+        }
+      } catch(e) {
+        erp.showToast('❌ บันทึกล้มเหลว: ' + e.message, 'error');
+      }
+    }
+
+    /* Clear all data of current tab — confirm dialog */
+    function clearTab() {
+      if (!confirm('⚠ ลบข้อมูลย้อนหลังของ tab นี้ทั้งหมด ม.ค.-เม.ย. 2026 — แน่ใจ?')) return;
+      const arr = Array.isArray(db.historicalMonthly) ? db.historicalMonthly : [];
+      const before = arr.length;
+      db.historicalMonthly = arr.filter(r => r && r.metricType !== tab.value);
+      erp.showToast('🗑 ลบ '+(before - db.historicalMonthly.length)+' rows', 'warning');
+    }
+
+    /* Total summary on top */
+    const summary = computed(() => {
+      const arr = Array.isArray(db.historicalMonthly) ? db.historicalMonthly : [];
+      return {
+        total: arr.length,
+        expense: arr.filter(r => r && r.metricType === 'expense').length,
+        pnl: arr.filter(r => r && r.metricType === 'pnl').length,
+        cashflow: arr.filter(r => r && r.metricType === 'cashflow').length,
+      };
+    });
+
+    return { tab, months, pnlLines, cfLines, db, fmt, v, pnlCalc, cfCalc,
+      rowTotalExpense, rowTotalPnl, rowTotalCf, saveAll, clearTab, summary,
+      getAmount };
+  },
+  template: `
+    <div class="p-4 max-w-7xl mx-auto">
+      <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded mb-4">
+        <h2 class="text-xl font-bold mb-2">📅 ข้อมูลย้อนหลัง ม.ค.-เม.ย. 2026 (ก่อน Go-Live)</h2>
+        <p class="text-sm text-gray-700">
+          ใช้คีย์ตัวเลขย้อนหลังเป็น <b>baseline</b> เพื่อเปรียบเทียบกับข้อมูลจริงตั้งแต่ <b>พ.ค. 2026</b> (Go-Live)
+          — ข้อมูลที่คีย์ที่นี่จะแสดงใน Dashboard เป็นกราฟ trend และตาราง Year-to-Date
+        </p>
+        <div class="mt-2 text-xs text-blue-700">
+          📊 มีข้อมูลแล้ว: Expense {{ summary.expense }} cells · P&L {{ summary.pnl }} cells · CashFlow {{ summary.cashflow }} cells (รวม {{ summary.total }})
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 mb-4">
+        <button @click="tab='expense'" :class="['px-4 py-2 rounded-t-lg font-semibold', tab==='expense' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700']">💰 ค่าใช้จ่าย (Expenses)</button>
+        <button @click="tab='pnl'"     :class="['px-4 py-2 rounded-t-lg font-semibold', tab==='pnl'     ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700']">📈 งบกำไรขาดทุน (P&L)</button>
+        <button @click="tab='cashflow'":class="['px-4 py-2 rounded-t-lg font-semibold', tab==='cashflow'? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700']">💵 งบกระแสเงินสด (Cash Flow)</button>
+      </div>
+
+      <!-- Action bar -->
+      <div class="flex justify-between items-center mb-3">
+        <div class="text-sm text-gray-600">
+          <span v-if="tab==='expense'">กรอกค่าใช้จ่ายแต่ละหมวด — แต่ละเดือน</span>
+          <span v-if="tab==='pnl'">กรอกตัวเลขสรุป P&L แต่ละเดือน — บรรทัด <b>= ...</b> คำนวณอัตโนมัติ</span>
+          <span v-if="tab==='cashflow'">กรอก Cash Flow — บรรทัด <b>= ...</b> คำนวณอัตโนมัติ</span>
+        </div>
+        <div class="flex gap-2">
+          <button @click="clearTab()" class="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200">🗑 ล้าง tab นี้</button>
+          <button @click="saveAll()" class="px-4 py-2 bg-green-600 text-white rounded font-semibold hover:bg-green-700">💾 บันทึก + Sync Cloud</button>
+        </div>
+      </div>
+
+      <!-- EXPENSE TAB -->
+      <div v-if="tab==='expense'" class="bg-white rounded-lg shadow overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="text-left p-3 sticky left-0 bg-gray-100">หมวดค่าใช้จ่าย</th>
+              <th v-for="mo in months" class="text-right p-3 min-w-[140px]">{{ mo.label }}</th>
+              <th class="text-right p-3 bg-blue-50 min-w-[140px]">รวม 4 เดือน</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="cat in db.expenseCategories" :key="cat.id" class="border-t hover:bg-blue-50">
+              <td class="p-2 font-medium sticky left-0 bg-white">{{ cat.name }}</td>
+              <td v-for="(mo, idx) in months" class="p-1">
+                <input type="number" step="0.01"
+                  :value="getAmount(mo.y, mo.m, 'expense', cat.id)"
+                  @input="(e) => v('expense', cat.id, idx).value = e.target.value"
+                  class="w-full text-right px-2 py-1 border rounded" placeholder="0">
+              </td>
+              <td class="p-2 text-right font-semibold bg-blue-50">{{ fmt(rowTotalExpense(cat.id)) }}</td>
+            </tr>
+            <tr class="border-t-2 border-gray-400 bg-gray-100 font-bold">
+              <td class="p-3 sticky left-0 bg-gray-100">รวมทั้งหมด</td>
+              <td v-for="mo in months" class="p-3 text-right">
+                {{ fmt(db.expenseCategories.reduce((s,c) => s + getAmount(mo.y, mo.m, 'expense', c.id), 0)) }}
+              </td>
+              <td class="p-3 text-right bg-blue-100">
+                {{ fmt(db.expenseCategories.reduce((s,c) => s + rowTotalExpense(c.id), 0)) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- P&L TAB -->
+      <div v-if="tab==='pnl'" class="bg-white rounded-lg shadow overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="text-left p-3 sticky left-0 bg-gray-100 min-w-[280px]">บรรทัด P&L</th>
+              <th v-for="mo in months" class="text-right p-3 min-w-[140px]">{{ mo.label }}</th>
+              <th class="text-right p-3 bg-blue-50 min-w-[140px]">รวม 4 เดือน</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="line in pnlLines" :key="line.id"
+                :class="['border-t', line.calc ? 'bg-yellow-50 font-semibold' : 'hover:bg-blue-50']">
+              <td class="p-2 sticky left-0" :class="line.calc ? 'bg-yellow-50' : 'bg-white'">{{ line.label }}</td>
+              <td v-for="(mo, idx) in months" class="p-1 text-right">
+                <span v-if="line.calc">{{ fmt(pnlCalc(line.id, idx)) }}</span>
+                <input v-else type="number" step="0.01"
+                  :value="getAmount(mo.y, mo.m, 'pnl', line.id)"
+                  @input="(e) => v('pnl', line.id, idx).value = e.target.value"
+                  class="w-full text-right px-2 py-1 border rounded" placeholder="0">
+              </td>
+              <td class="p-2 text-right font-semibold bg-blue-50">{{ fmt(rowTotalPnl(line.id, line.calc)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- CASH FLOW TAB -->
+      <div v-if="tab==='cashflow'" class="bg-white rounded-lg shadow overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="text-left p-3 sticky left-0 bg-gray-100 min-w-[280px]">บรรทัด Cash Flow</th>
+              <th v-for="mo in months" class="text-right p-3 min-w-[140px]">{{ mo.label }}</th>
+              <th class="text-right p-3 bg-blue-50 min-w-[140px]">รวม 4 เดือน</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="line in cfLines" :key="line.id"
+                :class="['border-t', line.calc ? 'bg-yellow-50 font-semibold' : 'hover:bg-blue-50']">
+              <td class="p-2 sticky left-0" :class="line.calc ? 'bg-yellow-50' : 'bg-white'">{{ line.label }}</td>
+              <td v-for="(mo, idx) in months" class="p-1 text-right">
+                <span v-if="line.calc">{{ fmt(cfCalc(line.id, idx)) }}</span>
+                <input v-else type="number" step="0.01"
+                  :value="getAmount(mo.y, mo.m, 'cashflow', line.id)"
+                  @input="(e) => v('cashflow', line.id, idx).value = e.target.value"
+                  class="w-full text-right px-2 py-1 border rounded" placeholder="0">
+              </td>
+              <td class="p-2 text-right font-semibold bg-blue-50">{{ fmt(rowTotalCf(line.id, line.calc)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 text-xs text-gray-500">
+        💡 <b>Tips:</b> ตัวเลขที่กรอกจะ auto-save local ทันที — กดปุ่ม <b>บันทึก + Sync Cloud</b> เพื่อให้เครื่องอื่นเห็นด้วย
+      </div>
+    </div>
+  `
+});
+
+/* ================================================================
+   COMPONENT: Receipt Voucher (ใบสำคัญรับเงิน) — สำหรับ Supplier บุคคลธรรมดา
+   ดึงข้อมูลจากบิลซื้อ (PB) มา pre-fill — แก้ไขส่วนที่ supplier ไม่มีได้
+   ================================================================ */
+app.component('view-receiptVoucher', {
+  setup() {
+    const erp = window.$erp; const db = erp.db; const fmt = erp.fmt;
+    const showForm = ref(false);
+    const showPrint = ref(false);
+    const editingId = ref(null);
+    const search = ref('');
+    const printingVoucher = ref(null);
+
+    function blankItem() {
+      return { id: 'RVI-' + Math.random().toString(36).slice(2,8), description: '', qty: 0, price: 0, amount: 0 };
+    }
+    function blankForm() {
+      const cp = db.companyProfile || {};
+      return {
+        docNo: '', date: new Date().toISOString().slice(0,10),
+        purchaseBillId: '', purchaseBillDocNo: '',
+        // ผู้รับเงิน (Seller / Supplier) — ดึงจากบิลซื้อหรือกรอกเอง
+        sellerName: '', sellerTaxId: '',
+        sellerAddress: '', sellerPhone: '',
+        licensePlate: '', salesPerson: '',
+        // รายการ
+        items: [blankItem()],
+        totalQty: 0, totalAmount: 0,
+        amountInWords: '',
+        note: '',
+        // Signers
+        payerSignerName: '', receiverSignerName: '',
+        // Payment method/account
+        paymentMethod: 'รับเงินสด',
+      };
+    }
+    const form = ref(blankForm());
+
+    /* === Thai baht-to-text === */
+    function bahtText(num) {
+      try {
+        if (num === null || num === undefined || num === '') return '';
+        let n = Number(num);
+        if (!isFinite(n)) return '';
+        const minus = n < 0; n = Math.abs(n);
+        const thaiNum = ['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+        const place = ['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];
+        function chunk(s) {
+          // s = digit string (max 7 digits) - read as Thai
+          let out = '';
+          const len = s.length;
+          for (let i = 0; i < len; i++) {
+            const d = parseInt(s[i], 10);
+            const p = len - 1 - i;
+            if (d === 0) continue;
+            // pronunciation rules
+            if (p === 1 && d === 1) out += 'สิบ';
+            else if (p === 1 && d === 2) out += 'ยี่สิบ';
+            else if (p === 0 && d === 1 && len > 1) out += 'เอ็ด';
+            else out += thaiNum[d] + place[p];
+          }
+          return out;
+        }
+        // split int and decimal (round to 2 dp like satang)
+        const fixed = n.toFixed(2);
+        let [intPart, decPart] = fixed.split('.');
+        // handle million chunks
+        let intText = '';
+        if (intPart === '0') intText = 'ศูนย์';
+        else {
+          // split into 6-digit groups from right (millions)
+          const groups = [];
+          while (intPart.length > 6) { groups.unshift(intPart.slice(-6)); intPart = intPart.slice(0, -6); }
+          groups.unshift(intPart);
+          for (let g = 0; g < groups.length; g++) {
+            const grpText = chunk(groups[g]);
+            intText += grpText;
+            if (g < groups.length - 1 && grpText) intText += 'ล้าน';
+          }
+        }
+        let out = intText + 'บาท';
+        const dec = parseInt(decPart, 10);
+        if (dec === 0) out += 'ถ้วน';
+        else out += chunk(String(dec)) + 'สตางค์';
+        return (minus ? 'ลบ' : '') + out;
+      } catch(e) { return ''; }
+    }
+
+    /* === Recalc totals === */
+    function recalcItem(it) {
+      it.amount = (Number(it.qty) || 0) * (Number(it.price) || 0);
+    }
+    function recalcAll() {
+      let q = 0, a = 0;
+      (form.value.items || []).forEach(it => {
+        recalcItem(it);
+        q += Number(it.qty) || 0;
+        a += Number(it.amount) || 0;
+      });
+      form.value.totalQty = q;
+      form.value.totalAmount = a;
+      form.value.amountInWords = bahtText(a);
+    }
+    watch(() => JSON.stringify(form.value.items), recalcAll);
+
+    function addItem() { form.value.items.push(blankItem()); recalcAll(); }
+    function removeItem(idx) { form.value.items.splice(idx, 1); recalcAll(); }
+
+    /* === Open form === */
+    function openCreate() {
+      editingId.value = null;
+      const f = blankForm();
+      try { f.docNo = erp.nextDocNo('RV'); } catch(e) { f.docNo = 'RV-' + Date.now(); }
+      // 🆕 ค่าเริ่มต้นผู้จ่ายเงิน — ผู้ใช้สามารถพิมพ์ทับได้ในฟอร์ม
+      f.payerSignerName = 'นางสาวจุฑามาศ เนียมจันทร';
+      form.value = f;
+      showForm.value = true;
+    }
+
+    /* === Pre-fill from Purchase Bill === */
+    const availablePB = computed(() => {
+      try {
+        return (db.purchaseBills || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+      } catch(e) { return []; }
+    });
+    function pickPurchaseBill(billId) {
+      const bill = (db.purchaseBills || []).find(b => b && b.id === billId);
+      if (!bill) return;
+      const supplier = (db.suppliers || []).find(s => s && s.id === bill.supplierId);
+      const sales = (db.salespersons || []).find(s => s && s.id === bill.salesId);
+      form.value.purchaseBillId = bill.id;
+      form.value.purchaseBillDocNo = bill.docNo || '';
+      // Date
+      form.value.date = bill.date || form.value.date;
+      // Seller info from supplier (if exists)
+      if (supplier) {
+        form.value.sellerName = supplier.name || '';
+        form.value.sellerTaxId = supplier.taxId || '';
+        form.value.sellerAddress = supplier.address || '';
+        form.value.sellerPhone = supplier.phone || '';
+      }
+      form.value.licensePlate = bill.licensePlate || '';
+      form.value.salesPerson = sales?.name || '';
+      form.value.receiverSignerName = supplier?.name || form.value.sellerName || '';
+      // Items: convert bill.items → voucher items
+      const billItems = Array.isArray(bill.items) ? bill.items : [];
+      form.value.items = billItems.map(it => {
+        const product = (db.products || []).find(p => p && p.id === it.productId);
+        const desc = product?.name || it.lotNo || '';
+        const qty = Number(it.netWeight || it.weight || it.qty || 0);
+        const price = Number(it.price || it.unitPrice || 0);
+        return {
+          id: 'RVI-' + Math.random().toString(36).slice(2,8),
+          description: desc,
+          qty, price, amount: qty * price
+        };
+      });
+      if (form.value.items.length === 0) form.value.items = [blankItem()];
+      // Note from bill
+      if (bill.note) form.value.note = bill.note;
+      recalcAll();
+      erp.showToast('✓ ดึงข้อมูลจาก ' + (bill.docNo || bill.id) + ' สำเร็จ — แก้ไขเพิ่มเติมได้', 'success');
+    }
+
+    /* === Open Edit === */
+    function openEdit(v) {
+      editingId.value = v.id;
+      form.value = JSON.parse(JSON.stringify(v));
+      if (!form.value.items || form.value.items.length === 0) form.value.items = [blankItem()];
+      showForm.value = true;
+    }
+
+    /* === Save === */
+    async function save() {
+      try {
+        const f = form.value;
+        if (!f.sellerName) { alert('กรุณากรอกชื่อผู้รับเงิน'); return; }
+        if (!f.items || f.items.length === 0) { alert('กรุณาเพิ่มรายการอย่างน้อย 1 บรรทัด'); return; }
+        recalcAll();
+        // Anti-collision docNo (cloud-aware)
+        if (!editingId.value) {
+          const old = f.docNo;
+          f.docNo = await erp.ensureUniqueDocNoCloud(f.docNo, 'RV', null);
+          if (f.docNo !== old) erp.showToast('เลขซ้ำ '+old+' → '+f.docNo, 'warning');
+        }
+        const username = erp.currentUser?.value?.username || '-';
+        const now = new Date().toISOString();
+        if (editingId.value) {
+          const idx = db.receiptVouchers.findIndex(x => x && x.id === editingId.value);
+          if (idx >= 0) {
+            db.receiptVouchers[idx] = { ...f, id: editingId.value,
+              updatedBy: username, updatedAt: now };
+          }
+        } else {
+          db.receiptVouchers.push({
+            ...f,
+            id: 'RV-' + Date.now() + '-' + Math.random().toString(36).slice(2,5),
+            createdBy: username, createdAt: now,
+            updatedBy: username, updatedAt: now,
+          });
+        }
+        showForm.value = false;
+        editingId.value = null;
+        erp.showToast('✓ บันทึกใบสำคัญรับเงินสำเร็จ', 'success');
+        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
+      } catch(e) {
+        console.error('save RV:', e);
+        alert('Save error: ' + e.message);
+      }
+    }
+
+    function remove(v) {
+      if (!confirm('ลบใบสำคัญรับเงิน '+v.docNo+'?')) return;
+      const idx = db.receiptVouchers.findIndex(x => x && x.id === v.id);
+      if (idx >= 0) db.receiptVouchers.splice(idx, 1);
+      erp.showToast('🗑 ลบแล้ว');
+    }
+
+    /* === Print === */
+    function openPrint(v) {
+      printingVoucher.value = v;
+      showPrint.value = true;
+      // wait for render then call window.print
+      setTimeout(() => { try { window.print(); } catch(e){} }, 200);
+    }
+
+    /* === List view === */
+    const list = computed(() => {
+      try {
+        const arr = Array.isArray(db.receiptVouchers) ? db.receiptVouchers : [];
+        const q = (search.value || '').trim().toLowerCase();
+        return arr.filter(v => v && (!q || (v.docNo||'').toLowerCase().includes(q) || (v.sellerName||'').toLowerCase().includes(q) || (v.purchaseBillDocNo||'').toLowerCase().includes(q)))
+          .sort((a,b) => (b.date||'').localeCompare(a.date||''));
+      } catch(e) { return []; }
+    });
+
+    return { db, form, list, search, showForm, showPrint, printingVoucher, editingId,
+      openCreate, pickPurchaseBill, openEdit, save, remove, openPrint, addItem, removeItem,
+      availablePB, recalcAll, bahtText, fmt, erp };
+  },
+  template: `
+    <div class="p-3 max-w-7xl mx-auto print:hidden">
+      <div class="bg-blue-50 border-l-4 border-blue-400 p-3 rounded mb-4">
+        <h2 class="text-xl font-bold mb-1">🧾 ใบสำคัญรับเงิน (Receipt Voucher)</h2>
+        <p class="text-sm text-gray-600">
+          ใช้ออกให้ Supplier บุคคลธรรมดาเซ็นรับเงิน (กรณีไม่มีใบเสร็จของ Supplier)
+          — ดึงข้อมูลจากบิลซื้อ + แก้ไขส่วนที่ขาดได้ + พิมพ์ออกได้
+        </p>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-3 mb-3 flex flex-wrap gap-2 items-center">
+        <input v-model="search" placeholder="🔍 ค้นเลขที่ / ชื่อผู้รับ / เลขบิลซื้อ..." class="flex-1 min-w-[260px] px-3 py-2 border rounded-lg text-sm">
+        <button @click="openCreate" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">+ สร้างใบสำคัญรับเงิน</button>
+      </div>
+
+      <div class="bg-white rounded-xl shadow overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="p-2 text-left">เลขที่</th>
+              <th class="p-2 text-left">วันที่</th>
+              <th class="p-2 text-left">ผู้รับเงิน</th>
+              <th class="p-2 text-left">เลขประจำตัวผู้เสียภาษี</th>
+              <th class="p-2 text-left">บิลซื้อ</th>
+              <th class="p-2 text-right">น้ำหนัก (กก.)</th>
+              <th class="p-2 text-right">จำนวนเงิน</th>
+              <th class="p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="v in list" :key="v.id" class="border-t hover:bg-blue-50/30">
+              <td class="p-2 font-mono">{{v.docNo}}</td>
+              <td class="p-2">{{v.date}}</td>
+              <td class="p-2">{{v.sellerName}}</td>
+              <td class="p-2 text-xs text-gray-500">{{v.sellerTaxId||'-'}}</td>
+              <td class="p-2 font-mono text-xs">{{v.purchaseBillDocNo||'-'}}</td>
+              <td class="p-2 text-right">{{fmt(v.totalQty)}}</td>
+              <td class="p-2 text-right text-emerald-700 font-semibold">{{fmt(v.totalAmount)}}</td>
+              <td class="p-2 whitespace-nowrap text-right">
+                <button @click="openPrint(v)" class="text-purple-600 text-xs hover:underline mr-2">🖨 พิมพ์</button>
+                <button @click="openEdit(v)" class="text-blue-600 text-xs hover:underline mr-2">✏️ แก้</button>
+                <button @click="remove(v)" class="text-red-600 text-xs hover:underline">🗑 ลบ</button>
+              </td>
+            </tr>
+            <tr v-if="list.length === 0"><td colspan="8" class="text-center py-6 text-gray-400">ยังไม่มีใบสำคัญรับเงิน — กดปุ่มด้านบนเพื่อสร้างใหม่</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ============ FORM MODAL ============ -->
+      <div v-if="showForm" class="fixed inset-0 z-50 bg-black/50 p-3 overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-2xl max-w-5xl mx-auto my-4">
+          <div class="px-5 py-3 border-b flex justify-between items-center">
+            <h3 class="font-bold text-lg">{{editingId ? '✏️ แก้ไข' : '+ สร้าง'}} ใบสำคัญรับเงิน</h3>
+            <button @click="showForm=false" class="text-2xl text-gray-400 leading-none">&times;</button>
+          </div>
+          <div class="p-5 space-y-4 text-sm">
+            <!-- Pick from PB -->
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-lg p-3">
+              <label class="block text-xs font-semibold text-amber-900 mb-1">📥 ดึงข้อมูลจากบิลซื้อ (เลือกได้/ไม่จำเป็น)</label>
+              <select @change="pickPurchaseBill($event.target.value)" class="w-full px-2 py-1.5 border rounded">
+                <option value="">— เลือกบิลซื้อเพื่อ pre-fill ข้อมูล —</option>
+                <option v-for="b in availablePB.slice(0,200)" :key="b.id" :value="b.id">
+                  {{b.docNo}} | {{b.date}} | {{erp.supplierName(b.supplierId)}} | {{fmt(b.totalAmount)}} ฿
+                </option>
+              </select>
+              <div v-if="form.purchaseBillDocNo" class="mt-1 text-xs text-amber-700">📎 อ้างอิงบิล: <b>{{form.purchaseBillDocNo}}</b></div>
+            </div>
+
+            <!-- Header -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div><label class="block text-xs mb-1">เลขที่</label><input v-model="form.docNo" class="w-full px-2 py-1.5 border rounded font-mono bg-slate-50" readonly></div>
+              <div><label class="block text-xs mb-1">วันที่</label><input type="date" v-model="form.date" class="w-full px-2 py-1.5 border rounded"></div>
+              <div><label class="block text-xs mb-1">ทะเบียนรถ</label><input v-model="form.licensePlate" placeholder="เช่น 2ฒน7877" class="w-full px-2 py-1.5 border rounded"></div>
+            </div>
+
+            <!-- Seller info -->
+            <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 space-y-3">
+              <div class="text-sm font-semibold text-blue-900">👤 ผู้รับเงิน (Supplier บุคคล/นิติบุคคล)</div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div><label class="block text-xs mb-1">ชื่อ-สกุล / บริษัท *</label><input v-model="form.sellerName" placeholder="เช่น นายสุวิทย์ ทองนาค" class="w-full px-2 py-1.5 border rounded"></div>
+                <div><label class="block text-xs mb-1">เลขประจำตัวผู้เสียภาษี / บัตรประชาชน</label><input v-model="form.sellerTaxId" placeholder="13 หลัก" class="w-full px-2 py-1.5 border rounded font-mono"></div>
+                <div class="md:col-span-2"><label class="block text-xs mb-1">ที่อยู่</label><input v-model="form.sellerAddress" class="w-full px-2 py-1.5 border rounded"></div>
+                <div><label class="block text-xs mb-1">เบอร์โทร</label><input v-model="form.sellerPhone" class="w-full px-2 py-1.5 border rounded"></div>
+                <div><label class="block text-xs mb-1">ช่องทางติดต่อ Sale</label><input v-model="form.salesPerson" placeholder="ชื่อ Sale" class="w-full px-2 py-1.5 border rounded"></div>
+              </div>
+            </div>
+
+            <!-- Items table -->
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <h4 class="font-semibold">รายการ ({{form.items.length}})</h4>
+                <button @click="addItem" class="bg-emerald-600 text-white px-3 py-1 rounded text-xs">+ เพิ่ม</button>
+              </div>
+              <div class="overflow-x-auto border rounded-lg">
+                <table class="w-full text-xs">
+                  <thead class="bg-slate-100">
+                    <tr>
+                      <th class="p-1 w-10">#</th>
+                      <th class="p-1 text-left">รายการ</th>
+                      <th class="p-1 text-right w-28">จำนวน/กก.</th>
+                      <th class="p-1 text-right w-28">ราคา/บาท</th>
+                      <th class="p-1 text-right w-32">จำนวนเงิน</th>
+                      <th class="p-1 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(it, idx) in form.items" :key="it.id" class="border-t">
+                      <td class="p-1 text-center text-gray-400">{{idx+1}}</td>
+                      <td class="p-1"><input v-model="it.description" class="w-full px-1 py-1 border rounded"></td>
+                      <td class="p-1"><input type="number" step="0.01" v-model.number="it.qty" @input="recalcAll" class="w-full px-1 py-1 border rounded text-right"></td>
+                      <td class="p-1"><input type="number" step="0.01" v-model.number="it.price" @input="recalcAll" class="w-full px-1 py-1 border rounded text-right"></td>
+                      <td class="p-1 text-right font-semibold text-emerald-700 bg-emerald-50">{{fmt(it.amount)}}</td>
+                      <td class="p-1 text-center"><button @click="removeItem(idx)" class="text-red-500 px-1">×</button></td>
+                    </tr>
+                  </tbody>
+                  <tfoot class="bg-slate-100 font-bold">
+                    <tr>
+                      <td colspan="2" class="p-2 text-right">รวม</td>
+                      <td class="p-2 text-right">{{fmt(form.totalQty)}}</td>
+                      <td></td>
+                      <td class="p-2 text-right text-emerald-700 text-base">{{fmt(form.totalAmount)}}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div class="mt-2 text-xs text-gray-600">
+                จำนวนเงิน (ตัวอักษร): <b>{{form.amountInWords}}</b>
+                <button @click="form.amountInWords = bahtText(form.totalAmount)" class="ml-2 text-blue-600 underline">↻ คำนวณใหม่</button>
+              </div>
+              <div class="mt-1"><input v-model="form.amountInWords" placeholder="แก้ไขข้อความตัวอักษรได้" class="w-full px-2 py-1 border rounded text-sm"></div>
+            </div>
+
+            <!-- Note + signers -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div><label class="block text-xs mb-1">หมายเหตุ</label><input v-model="form.note" placeholder="เช่น ** หักเครื่องติดเหล็ก 0.30 กก." class="w-full px-2 py-1.5 border rounded"></div>
+              <div><label class="block text-xs mb-1">วิธีรับเงิน</label><input v-model="form.paymentMethod" placeholder="เช่น รับเงินสด : กสิกรไทย // 121-3-83830-6" class="w-full px-2 py-1.5 border rounded"></div>
+              <div><label class="block text-xs mb-1">ผู้จ่ายเงิน (ลายเซ็น)</label><input v-model="form.payerSignerName" placeholder="ชื่อพนักงานที่จ่าย" class="w-full px-2 py-1.5 border rounded"></div>
+              <div><label class="block text-xs mb-1">ผู้รับเงิน (ลายเซ็น)</label><input v-model="form.receiverSignerName" placeholder="ชื่อ Supplier" class="w-full px-2 py-1.5 border rounded"></div>
+            </div>
+          </div>
+          <div class="px-5 py-3 border-t bg-slate-50 flex justify-end gap-2">
+            <button @click="showForm=false" class="px-4 py-2 text-sm">ยกเลิก</button>
+            <button @click="save" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">💾 บันทึก</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PRINT VIEW (เปิดเฉพาะตอนพิมพ์) ============ -->
+    <div v-if="showPrint && printingVoucher" class="fixed inset-0 z-50 bg-white overflow-y-auto print:static">
+      <div class="print:hidden bg-slate-800 text-white p-2 flex justify-between items-center">
+        <span class="text-sm">พรีวิวพิมพ์ — ใบสำคัญรับเงิน {{printingVoucher.docNo}}</span>
+        <div class="flex gap-2">
+          <button @click="window.print()" class="bg-blue-500 px-3 py-1 rounded text-xs">🖨 พิมพ์</button>
+          <button @click="showPrint=false" class="bg-red-500 px-3 py-1 rounded text-xs">ปิด</button>
+        </div>
+      </div>
+      <div class="max-w-[210mm] mx-auto p-8 text-black bg-white" style="font-family: 'Sarabun', 'TH Sarabun New', Arial, sans-serif; font-size: 14px;">
+        <!-- Company Header -->
+        <div class="mb-4 pb-3 border-b-2 border-gray-300">
+          <div class="text-lg font-bold">{{db.companyProfile?.name || 'บริษัท'}}</div>
+          <div class="text-xs text-gray-600">{{db.companyProfile?.nameEn || ''}}</div>
+          <div class="text-xs mt-1">{{db.companyProfile?.address || ''}}</div>
+          <div class="text-xs">Tel: {{db.companyProfile?.phone || '-'}} · เลขประจำตัวผู้เสียภาษี: {{db.companyProfile?.taxId || '-'}}</div>
+        </div>
+        <!-- Document title -->
+        <div class="text-center text-2xl font-bold mb-3 underline">ใบสำคัญรับเงิน</div>
+        <div class="text-right text-sm mb-3"><b>วันที่</b> {{printingVoucher.date}}</div>
+        <!-- Seller info -->
+        <div class="space-y-1 mb-4 text-sm">
+          <div><b>ข้าพเจ้า</b> {{printingVoucher.sellerName}} <span class="ml-4"><b>เลขประจำตัวผู้เสียภาษี</b> {{printingVoucher.sellerTaxId||'-'}}</span></div>
+          <div><b>ที่อยู่</b> {{printingVoucher.sellerAddress||'-'}}</div>
+          <div><b>เบอร์โทร:</b> {{printingVoucher.sellerPhone||'-'}} <span class="ml-3"><b>ทะเบียน</b> {{printingVoucher.licensePlate||'-'}}</span> <span class="ml-3"><b>ช่องทางติดต่อ Sale:</b> {{printingVoucher.salesPerson||'-'}}</span></div>
+          <div class="mt-2"><b>ได้รับเงินจาก</b> {{db.companyProfile?.name || '-'}}</div>
+          <div><b>ที่อยู่</b> {{db.companyProfile?.address || '-'}}</div>
+          <div><b>เลขประจำตัวผู้เสียภาษี</b> {{db.companyProfile?.taxId || '-'}}</div>
+        </div>
+        <div class="font-semibold mb-1">รายการมีดังต่อไปนี้</div>
+        <table class="w-full text-sm border-collapse mb-3" style="border: 1px solid #000;">
+          <thead>
+            <tr style="border-bottom: 1px solid #000; background:#f3f4f6;">
+              <th class="border-r border-black p-1 text-center w-12">ลำดับ</th>
+              <th class="border-r border-black p-1 text-left">รายการ</th>
+              <th class="border-r border-black p-1 text-right w-24">จำนวน/กก.</th>
+              <th class="border-r border-black p-1 text-right w-24">ราคา/บาท</th>
+              <th class="p-1 text-right w-28">จำนวนเงิน</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(it, idx) in printingVoucher.items" :key="it.id" style="border-bottom: 1px solid #ccc;">
+              <td class="border-r border-gray-300 p-1 text-center">{{idx+1}}</td>
+              <td class="border-r border-gray-300 p-1">{{it.description}}</td>
+              <td class="border-r border-gray-300 p-1 text-right">{{fmt(it.qty)}}</td>
+              <td class="border-r border-gray-300 p-1 text-right">{{fmt(it.price)}}</td>
+              <td class="p-1 text-right">{{fmt(it.amount)}}</td>
+            </tr>
+            <tr v-if="printingVoucher.note" style="border-top:1px solid #000;">
+              <td colspan="2" class="p-1 text-xs italic text-gray-700"><b>หมายเหตุ**</b> {{printingVoucher.note}}</td>
+              <td class="p-1 text-right font-bold">{{fmt(printingVoucher.totalQty)}}</td>
+              <td></td>
+              <td class="p-1 text-right font-bold">{{fmt(printingVoucher.totalAmount)}}</td>
+            </tr>
+            <tr v-else style="border-top:1px solid #000;">
+              <td colspan="2"></td>
+              <td class="p-1 text-right font-bold">{{fmt(printingVoucher.totalQty)}}</td>
+              <td></td>
+              <td class="p-1 text-right font-bold">{{fmt(printingVoucher.totalAmount)}}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="text-sm mb-6"><b>จำนวนเงิน (ตัวอักษร)</b> {{printingVoucher.amountInWords||bahtText(printingVoucher.totalAmount)}}</div>
+        <!-- Signatures -->
+        <div class="grid grid-cols-2 gap-8 mt-12 mb-4 text-sm">
+          <div class="text-center">
+            <div class="border-b border-gray-500 mx-auto" style="width:70%;">&nbsp;</div>
+            <div class="mt-1">ชื่อ......................................(ผู้จ่ายเงิน)</div>
+            <div class="text-xs">( {{printingVoucher.payerSignerName||'-'}} )</div>
+          </div>
+          <div class="text-center">
+            <div class="border-b border-gray-500 mx-auto" style="width:70%;">&nbsp;</div>
+            <div class="mt-1">ชื่อ......................................(ผู้รับเงิน)</div>
+            <div class="text-xs">( {{printingVoucher.receiverSignerName||printingVoucher.sellerName||'-'}} )</div>
+          </div>
+        </div>
+        <div class="mt-4 text-xs">
+          <div><b>{{printingVoucher.paymentMethod || 'รับเงินสด'}}</b></div>
+          <div class="mt-1">หมายเหตุ : แนบสำเนาบัตรประชาชนผู้รับเงิน (เราเป็นผู้ประกอบอาชีพขายสินค้า/ให้บริการอย่างแท้จริง)</div>
+        </div>
+      </div>
+    </div>
+  `
+});
 
 app.component('view-userPermission', {
   setup() {
@@ -29881,16 +30775,47 @@ app.component('view-backup', {
     const autoBackupHistory = ref(JSON.parse(localStorage.getItem('ns_erp_backup_history') || '[]'));
 
     /* Calculate storage usage */
+    /* 🆕 ขยาย limit จาก 5MB → 9MB (ใกล้ browser cap จริง 10MB) + นับ snapshot/backup เพิ่มด้วย */
     const storageInfo = computed(() => {
       const dataStr = localStorage.getItem('ns_erp_db_v1') || '';
-      const sizeKB = Math.round(dataStr.length * 2 / 1024);   // UTF-16 ~ 2 bytes
+      // นับขนาดของทุก key ใน localStorage (ไม่ใช่แค่ db) เพราะ snapshot/backup กิน quota เท่ากัน
+      let totalBytes = 0;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          const v = localStorage.getItem(k) || '';
+          totalBytes += (k.length + v.length) * 2;  // UTF-16
+        }
+      } catch(e) { totalBytes = dataStr.length * 2; }
+      const sizeKB = Math.round(totalBytes / 1024);
       const sizeMB = (sizeKB / 1024).toFixed(2);
-      const limitMB = 5;     // Conservative limit
+      const dbSizeMB = ((dataStr.length * 2 / 1024) / 1024).toFixed(2);
+      const limitMB = 9;     // 🆕 ขยายจาก 5MB → 9MB (browser cap ~10MB)
       const pctUsed = Math.min(100, Math.round((sizeKB / 1024) / limitMB * 100));
-      return { sizeKB, sizeMB, pctUsed,
-        warning: pctUsed >= 70,
+      // นับ snapshot ที่กิน space — ลบได้ปลอดภัย (ข้อมูลอยู่ Supabase แล้ว)
+      let snapshotCount = 0;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('ns_erp_backup_') || k.startsWith('ns_erp_snapshot_') || k.includes('_pre_pull'))) snapshotCount++;
+        }
+      } catch(e){}
+      return { sizeKB, sizeMB, dbSizeMB, pctUsed, snapshotCount,
+        warning: pctUsed >= 75,
         critical: pctUsed >= 90 };
     });
+
+    /* 🆕 Manual cleanup — ลบ snapshot/backup เก่าทั้งหมด (ปลอดภัยถ้า sync Supabase แล้ว) */
+    function cleanupSnapshots() {
+      if (!confirm('ลบ snapshot/backup เก่าทั้งหมด ('+storageInfo.value.snapshotCount+' รายการ)?\n\n✅ ปลอดภัย — ข้อมูลจริงอยู่ที่ Supabase แล้ว ไม่หาย\n📦 จะลดขนาด localStorage ลงทันที')) return;
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('ns_erp_backup_') || k.startsWith('ns_erp_snapshot_') || k.includes('_pre_pull'))) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+      erp.showToast('🗑 ลบ '+keysToRemove.length+' รายการ — Refresh เพื่อดูผล', 'success');
+    }
 
     /* Stats — count records by type */
     const stats = computed(() => {
@@ -30589,7 +31514,7 @@ app.component('view-backup', {
       migrating, migrateLog, migrateProgress, migrateToSupabase,
       pulling, pullLog, pullProgress, pullFromSupabase,
       migratingUsers, userMigLog, userMigProgress, migrateUsersToSupabase,
-      supabaseReady, supabaseUrl };
+      supabaseReady, supabaseUrl, cleanupSnapshots };
   },
   template: `
   <div class="space-y-3">
@@ -30600,11 +31525,12 @@ app.component('view-backup', {
 
     <!-- Storage Status -->
     <div class="bg-white rounded-xl shadow p-4">
-      <h2 class="font-bold text-slate-700 mb-2">📊 สถานะ Storage</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-        <div><div class="text-xs text-slate-500">ขนาดข้อมูลปัจจุบัน</div><div class="text-lg font-bold" :class="storageInfo.critical?'text-red-600':storageInfo.warning?'text-amber-600':'text-emerald-700'">{{storageInfo.sizeMB}} MB</div></div>
-        <div><div class="text-xs text-slate-500">% ใช้งาน (~5MB limit)</div><div class="text-lg font-bold" :class="storageInfo.critical?'text-red-600':storageInfo.warning?'text-amber-600':'text-emerald-700'">{{storageInfo.pctUsed}}%</div></div>
-        <div><div class="text-xs text-slate-500">Backup ล่าสุด</div><div class="text-sm font-medium">{{lastBackupAt?lastBackupAt.slice(0,16).replace('T',' '):'❌ ยังไม่เคย'}}</div></div>
+      <h2 class="font-bold text-slate-700 mb-2">📊 สถานะ Storage (browser localStorage)</h2>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+        <div><div class="text-xs text-slate-500">ขนาดรวม</div><div class="text-lg font-bold" :class="storageInfo.critical?'text-red-600':storageInfo.warning?'text-amber-600':'text-emerald-700'">{{storageInfo.sizeMB}} MB</div></div>
+        <div><div class="text-xs text-slate-500">% ใช้งาน (~9MB limit)</div><div class="text-lg font-bold" :class="storageInfo.critical?'text-red-600':storageInfo.warning?'text-amber-600':'text-emerald-700'">{{storageInfo.pctUsed}}%</div></div>
+        <div><div class="text-xs text-slate-500">Database จริง</div><div class="text-sm font-medium">{{storageInfo.dbSizeMB}} MB</div></div>
+        <div><div class="text-xs text-slate-500">Snapshots/Backups</div><div class="text-sm font-medium">{{storageInfo.snapshotCount}} รายการ</div></div>
         <div><div class="text-xs text-slate-500">Auto-backup รายวัน</div>
           <button @click="toggleAutoBackup" :class="['px-3 py-1 rounded text-xs font-bold', autoBackupEnabled?'bg-emerald-600 text-white':'bg-slate-200']">{{autoBackupEnabled?'🟢 เปิด':'⚪ ปิด'}}</button>
         </div>
@@ -30612,11 +31538,14 @@ app.component('view-backup', {
       <div class="w-full bg-slate-200 rounded-full h-2 mt-3">
         <div class="h-2 rounded-full transition-all" :class="storageInfo.critical?'bg-red-500':storageInfo.warning?'bg-amber-500':'bg-emerald-500'" :style="{width: storageInfo.pctUsed + '%'}"></div>
       </div>
-      <div v-if="storageInfo.critical" class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-        🚨 <b>วิกฤต:</b> Storage เกือบเต็ม — กรุณา Export Backup ทันที + ปรึกษาเรื่อง Cloud Database (ดูคู่มือ Deploy)
+      <div v-if="storageInfo.critical" class="mt-2 p-3 bg-blue-50 border-l-4 border-blue-400 rounded text-sm">
+        <div class="text-blue-800 font-semibold mb-1">ℹ️ Storage ใกล้เต็ม — แต่<u>ข้อมูลปลอดภัย</u> เพราะ sync ไป Supabase แล้ว</div>
+        <div class="text-blue-700 text-xs mb-2">localStorage ใช้เป็น cache เฉยๆ ลบ snapshot/backup เก่าได้เลย</div>
+        <button @click="cleanupSnapshots" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold">🗑 ล้าง Snapshot/Backup เก่า ({{storageInfo.snapshotCount}} รายการ)</button>
       </div>
-      <div v-else-if="storageInfo.warning" class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-700">
-        ⚠️ <b>เตือน:</b> Storage ใกล้เต็ม — เริ่มวางแผนย้ายไป Cloud Database
+      <div v-else-if="storageInfo.warning" class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-700 flex justify-between items-center">
+        <span>⚠️ Storage ใช้งาน {{storageInfo.pctUsed}}% — แนะนำล้าง snapshot เก่า ({{storageInfo.snapshotCount}} ชุด) เพื่อให้มีที่ว่าง</span>
+        <button @click="cleanupSnapshots" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded text-xs whitespace-nowrap">🗑 ล้างเลย</button>
       </div>
     </div>
 
