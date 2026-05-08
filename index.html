@@ -135,16 +135,18 @@
           <option value="">ทุกสาขา</option>
           <option v-for="b in db.branches" :value="b.id">{{ b.name }}</option>
         </select>
-        <!-- Cloud Sync Indicator (คลิก: error ดู errors / สำเร็จ force sync) -->
-        <button v-if="syncStatus.enabled" @click="syncStatus.state==='error' ? (showSyncErrors=true) : manualSyncNow()" :title="syncStatus.state==='error'?'คลิกเพื่อดู errors':syncStatus.tooltip + ' — คลิกเพื่อ Sync ทันที'"
+        <!-- Cloud Sync Indicator + Health (คลิก: error ดู errors / สำเร็จ force sync) -->
+        <button v-if="syncStatus.enabled" @click="syncStatus.state==='error' ? (showSyncErrors=true) : manualSyncNow()" :title="syncStatus.tooltip + ' · ' + syncHealthText + ' — คลิกเพื่อ Sync ทันที'"
           :class="['text-xs px-2 py-1 rounded font-medium flex items-center gap-1 cursor-pointer hover:opacity-80 transition',
             syncStatus.state==='syncing' ? 'bg-blue-100 text-blue-700' :
-            syncStatus.state==='ok' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
             syncStatus.state==='error' ? 'bg-red-100 text-red-700 hover:bg-red-200' :
+            syncHealthLevel==='healthy' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+            syncHealthLevel==='stale' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
+            syncHealthLevel==='critical' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' :
             'bg-slate-100 text-slate-600']">
-          <span>{{syncStatus.state==='syncing'?'⏳':syncStatus.state==='ok'?'☁️✓':syncStatus.state==='error'?'☁️✗':'☁️'}}</span>
+          <span>{{syncStatus.state==='syncing'?'⏳':syncStatus.state==='error'?'☁️✗':syncHealthLevel==='healthy'?'☁️✓':syncHealthLevel==='stale'?'☁️⏰':syncHealthLevel==='critical'?'☁️⚠':'☁️'}}</span>
           <span class="hidden md:inline">{{syncStatus.label}}</span>
-          <span class="text-[10px] opacity-70 hidden lg:inline">{{syncStatus.state==='error'?'⚠':'🔄'}}</span>
+          <span class="text-[10px] opacity-70 hidden lg:inline">{{syncHealthText}}</span>
         </button>
         <div class="text-right hidden sm:block">
           <div class="text-sm font-medium text-slate-800">{{ currentUser.username }}</div>
@@ -3645,13 +3647,41 @@ window.$erp = {
 
   /* State */
   const dirtyTables = new Set();        // tables modified locally → push pending
+  const failedTables = new Set();       // 🆕 tables ที่ push fail — รอ retry
   let pushTimer = null;                  // debounce timer
   let pullTimer = null;                  // 30s interval
+  let retryTimer = null;                 // 🆕 retry timer (30s)
   let isPushing = false;
   let isPulling = false;
   let lastSyncMsg = '';
+  let lastSuccessAt = 0;                 // 🆕 timestamp of last successful sync
   let userInactiveSince = Date.now();    // for "skip pull while editing" heuristic
   let enabled = false;
+  // 🔧 BUG FIX: ป้องกัน watch loop — ตั้ง true ระหว่าง pullAll mutate _GLOBAL_DB
+  // ถ้าไม่มี flag นี้: pull แก้ data → watch fire → dirtyTables.add → 1.5s ภายหลัง push ทุกตารางกลับ cloud
+  // เป็น loop ทุก 10 วิ ทำให้ network ใช้ bandwidth เปล่า + บิลใหม่จากเครื่องอื่นมีโอกาสถูก overwrite
+  let _applyingCloudUpdate = false;
+
+  /* 🆕 Persist failed tables across refresh — survive browser close */
+  const FAIL_QUEUE_KEY = 'ns_erp_sync_failed_queue';
+  function _saveFailedQueue() {
+    try {
+      const arr = Array.from(failedTables);
+      if (arr.length) localStorage.setItem(FAIL_QUEUE_KEY, JSON.stringify(arr));
+      else localStorage.removeItem(FAIL_QUEUE_KEY);
+    } catch(e) {}
+  }
+  function _loadFailedQueue() {
+    try {
+      const raw = localStorage.getItem(FAIL_QUEUE_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        arr.forEach(t => failedTables.add(t));
+        console.log('[autoSync] Restored '+arr.length+' failed tables from previous session');
+      }
+    } catch(e) {}
+  }
 
   function _updateStatus(state, label, tooltip) {
     const ss = window.$erp?.syncStatus;
@@ -3741,11 +3771,29 @@ window.$erp = {
           }
 
           // 3. FK violation → set FK column to null and retry
-          const fkMatch = msg.match(/foreign key constraint ['"]?([a-z_]+?)_([a-z_]+_id)_fkey/);
-          if (fkMatch) {
-            const fkCol = fkMatch[2];
+          // 🔧 BUG FIX: เดิมใช้ regex ([a-z_]+?)_([a-z_]+_id)_fkey ซึ่ง parse ผิดเวลา table มี 2 คำ
+          // เช่น constraint trading_deals_purchase_bill_id_fkey จะได้ fkCol = "deals_purchase_bill_id" (ผิด)
+          // วิธีใหม่: anchor ด้วย cfg.target เพื่อ split ถูกต้อง
+          let fkCol = null;
+          const fkPatternExact = new RegExp("foreign key constraint ['\"]?" + cfg.target.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + "_(.+?)_fkey", 'i');
+          const fkExact = msg.match(fkPatternExact);
+          if (fkExact) {
+            fkCol = fkExact[1];
+          } else {
+            // Fallback: ดึง column จาก message ตรงๆ ถ้า postgres บอกชื่อ column
+            const fkColDirect = msg.match(/Key \(([a-z_]+)\)=/i);
+            if (fkColDirect) fkCol = fkColDirect[1];
+          }
+          if (fkCol) {
             if (NEVER_DROP.has(fkCol)) {
               _logErr(cfg.target, 'FK on "'+fkCol+'" — ห้ามตั้ง null');
+              fail += chunk.length;
+              break;
+            }
+            // ตรวจว่า column มีอยู่จริงใน chunk — กัน loop ไม่จบเพราะ set non-existent column
+            const colExistsInChunk = chunk.some(r => Object.prototype.hasOwnProperty.call(r, fkCol));
+            if (!colExistsInChunk) {
+              _logErr(cfg.target, 'FK "'+fkCol+'" not in row — drop unrecoverable');
               fail += chunk.length;
               break;
             }
@@ -3769,24 +3817,15 @@ window.$erp = {
             break;
           }
 
-          // 5. Duplicate UNIQUE constraint (เช่น doc_no) → bump unique field และลองใหม่
+          // 5. Duplicate UNIQUE constraint (เช่น doc_no)
+          // 🔧 BUG FIX: เลิก bump suffix เพราะมันสร้าง row ใหม่ใน cloud (orphan) แทนที่จะ update เดิม
+          //   ผลคือ cloud มี 2 records: เดิม + bumped → user เห็นบิลซ้ำ + sync ข้ามเครื่องเพี้ยน
+          //   วิธีใหม่: log error แล้วข้าม batch — ให้ user แก้ doc_no ที่ต้นทาง หรือรัน supabase-fix-docno-unique.sql
           const uniqueMatch = msg.match(/duplicate key value violates unique constraint ['"]?([a-z_]+)['"]?/);
           if (uniqueMatch) {
-            const constraintName = uniqueMatch[1];
-            // Extract column name from constraint (pattern: tablename_column_key)
-            const colMatch = constraintName.match(/_([a-z_]+)_key$/);
-            if (colMatch) {
-              const col = colMatch[1];
-              // Bump value with random suffix
-              chunk = chunk.map(r => {
-                if (r[col]) {
-                  return { ...r, [col]: r[col] + '-' + Math.random().toString(36).slice(2,5).toUpperCase() };
-                }
-                return r;
-              });
-              _logErr(cfg.target, '⚠ duplicate "'+col+'" — bumped with suffix, retrying');
-              continue;  // retry
-            }
+            _logErr(cfg.target, '⚠ UNIQUE conflict ('+uniqueMatch[1]+') — รัน supabase-fix-docno-unique.sql หรือแก้ docNo ซ้ำ');
+            fail += chunk.length;
+            break;
           }
 
           // 6. Deadlock detected → wait + retry once
@@ -3805,6 +3844,12 @@ window.$erp = {
           break;
         }
       }
+      // 🔧 BUG FIX: ถ้า while loop ออกเพราะ attempts ครบ 12 โดย success=false
+      // → row หาย: ไม่ถูก push สำเร็จ และไม่ถูกนับเป็น fail (เดิม silent loss)
+      if (!success) {
+        fail += chunk.length;
+        _logErr(cfg.target, 'EXHAUSTED 12 retries — chunk dropped ('+chunk.length+' rows)');
+      }
     }
     if (dropCols.size > 0) console.warn('[autoSync] '+cfg.target+' dropped columns: '+[...dropCols].join(', '));
     return { ok, fail };
@@ -3813,27 +3858,34 @@ window.$erp = {
   /* Push all dirty tables (force=true → push ALL tables regardless of dirty) */
   async function pushDirty(force = false) {
     if (isPushing || !window.sb || !enabled) return;
-    // 🆕 Force mode: push ทุกตาราง ไม่สนว่า dirty หรือไม่ (สำหรับ manual sync หลัง refresh)
-    const toPush = force || dirtyTables.size === 0
-      ? AS_TABLES.slice()    // push ทุกตาราง
-      : Array.from(dirtyTables);
+    // 🆕 รวม dirty + failed (ตาราง fail จากรอบก่อน) — หรือ force = ทุกตาราง
+    const merged = new Set([...dirtyTables, ...failedTables]);
+    const toPush = force || merged.size === 0 ? AS_TABLES.slice() : Array.from(merged);
     if (toPush.length === 0) return;
     isPushing = true;
     _updateStatus('syncing', '⬆ Pushing... ('+toPush.length+' tables)', 'Auto-Push: '+toPush.slice(0,5).join(', ')+(toPush.length>5?'...':''));
     let totalOk = 0, totalFail = 0;
     dirtyTables.clear();
+    const tableFailures = new Set();   // ตาราง fail รอบนี้
     for (const t of toPush) {
       const { ok, fail } = await _pushTable(t);
       totalOk += ok; totalFail += fail;
+      if (fail > 0) tableFailures.add(t);
     }
     isPushing = false;
+    // 🆕 Update failed queue — เก็บเฉพาะที่ยัง fail
+    failedTables.clear();
+    tableFailures.forEach(t => failedTables.add(t));
+    _saveFailedQueue();
     if (totalFail > 0) {
-      _updateStatus('error', '⚠ Push '+totalFail+' fail', 'บางตารางพุชไม่สำเร็จ — คลิกดูรายละเอียด');
-      // Re-mark for retry next cycle (เฉพาะ table ที่ fail)
-      toPush.forEach(t => dirtyTables.add(t));
+      _updateStatus('error', '⚠ Push '+totalFail+' fail', 'จะ retry ใน 30 วินาที — คลิกดู errors');
+      // Schedule auto-retry in 30s (exponential backoff to max 5min)
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => pushDirty(false), 30000);
     } else {
       _updateStatus('ok', '☁️✓ Synced', 'Push สำเร็จ ('+totalOk+' rows · '+toPush.length+' tables)');
       lastSyncMsg = 'pushed '+totalOk+' rows';
+      lastSuccessAt = Date.now();
     }
   }
 
@@ -3846,45 +3898,59 @@ window.$erp = {
     if (dirtyTables.size > 0) return;
     isPulling = true;
     _updateStatus('syncing', '⬇ Pulling...', 'Auto-Pull กำลังตรวจ Cloud');
-    let totalRows = 0, errors = 0;
-    for (const localKey of AS_TABLES) {
-      const cfg = AS_MAP[localKey]; if (!cfg) continue;
-      try {
-        let allRows = [];
-        let from = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data, error } = await window.sb.from(cfg.target).select('*').range(from, from + pageSize - 1);
-          if (error) throw error;
-          if (!data || data.length === 0) break;
-          allRows = allRows.concat(data);
-          if (data.length < pageSize) break;
-          from += pageSize;
-        }
-        const cloudRows = allRows.map(r => _mapKeysReverseS(r, cfg.keyMap || {}));
-        // SMART: skip if cloud is empty but local has data (don't wipe local)
-        if (allRows.length === 0 && (_GLOBAL_DB[localKey] || []).length > 0) continue;
-        // 🆕 MERGE strategy (ไม่ลบ local rows ที่ cloud ไม่มี — จะถูก push ขึ้นรอบถัดไป)
-        const arr = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
+    let totalRows = 0, errors = 0, newRowCount = 0;
+    // 🔧 BUG FIX: เปิด flag ให้ watch รู้ว่า change มาจาก cloud — ห้าม trigger push กลับ
+    _applyingCloudUpdate = true;
+    try {
+      for (const localKey of AS_TABLES) {
+        const cfg = AS_MAP[localKey]; if (!cfg) continue;
         const conflictCol = AS_CONFLICT_COL[cfg.target] || 'id';
-        const cloudById = new Map();
-        cloudRows.forEach(r => { if (r && r[conflictCol] != null) cloudById.set(r[conflictCol], r); });
-        // STEP 1: Update existing local rows — ถ้า id มีใน cloud → เอา cloud version แทน
-        for (let j = 0; j < arr.length; j++) {
-          const localKey2 = arr[j] && arr[j][conflictCol];
-          if (localKey2 != null && cloudById.has(localKey2)) {
-            arr[j] = cloudById.get(localKey2);
-            cloudById.delete(localKey2);
+        try {
+          let allRows = [];
+          let from = 0;
+          const pageSize = 1000;
+          while (true) {
+            // 🔧 BUG FIX: เพิ่ม .order(conflictCol) เพื่อกัน paging ดึงซ้ำ/ตก row เวลา data เปลี่ยน
+            const { data, error } = await window.sb.from(cfg.target)
+              .select('*').order(conflictCol, { ascending: true })
+              .range(from, from + pageSize - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            allRows = allRows.concat(data);
+            if (data.length < pageSize) break;
+            from += pageSize;
           }
+          const cloudRows = allRows.map(r => _mapKeysReverseS(r, cfg.keyMap || {}));
+          // SMART: skip if cloud is empty but local has data (don't wipe local)
+          if (allRows.length === 0 && (_GLOBAL_DB[localKey] || []).length > 0) continue;
+          // 🆕 MERGE strategy (ไม่ลบ local rows ที่ cloud ไม่มี — จะถูก push ขึ้นรอบถัดไป)
+          const arr = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
+          const cloudById = new Map();
+          cloudRows.forEach(r => { if (r && r[conflictCol] != null) cloudById.set(r[conflictCol], r); });
+          // STEP 1: Update existing local rows — ถ้า id มีใน cloud → เอา cloud version แทน
+          for (let j = 0; j < arr.length; j++) {
+            const localKey2 = arr[j] && arr[j][conflictCol];
+            if (localKey2 != null && cloudById.has(localKey2)) {
+              arr[j] = cloudById.get(localKey2);
+              cloudById.delete(localKey2);
+            }
+          }
+          // STEP 2: Add cloud-only rows (id ที่ local ยังไม่มี)
+          if (cloudById.size > 0) {
+            newRowCount += cloudById.size;
+            cloudById.forEach(r => arr.push(r));
+          }
+          // STEP 3: KEEP local-only rows (cloud ยังไม่มี) — จะถูก push ใน cycle ถัดไป
+          totalRows += cloudRows.length;
+        } catch(e) {
+          errors++;
+          // 🔧 BUG FIX: เก็บ pull error ใน errorLog เพื่อให้ user เห็นใน modal (เดิม log แค่ console)
+          _logErr(cfg.target, 'PULL: ' + (e.message || String(e)).slice(0, 150));
+          console.warn('[autoSync] pull '+cfg.target+' error:', e.message);
         }
-        // STEP 2: Add cloud-only rows (id ที่ local ยังไม่มี)
-        cloudById.forEach(r => arr.push(r));
-        // STEP 3: KEEP local-only rows (cloud ยังไม่มี) — จะถูก push ใน cycle ถัดไป
-        totalRows += cloudRows.length;
-      } catch(e) {
-        errors++;
-        console.warn('[autoSync] pull '+cfg.target+' error:', e.message);
       }
+    } finally {
+      _applyingCloudUpdate = false;
     }
     isPulling = false;
     // 🆕 Auto-recalc AR/AP balances หลัง pull (กัน sync race ทำให้ paidAmount เพี้ยน)
@@ -3895,10 +3961,12 @@ window.$erp = {
       }
     } catch(e) { console.warn('recalc after pull:', e); }
     if (errors > 0) {
-      _updateStatus('error', '⚠ Pull '+errors+' errors', 'บางตาราง pull ไม่ได้');
+      _updateStatus('error', '⚠ Pull '+errors+' errors', 'บางตาราง pull ไม่ได้ — คลิกดู errors');
     } else {
-      _updateStatus('ok', '☁️✓ Synced', 'Pull สำเร็จ ('+totalRows+' rows)');
-      lastSyncMsg = 'pulled '+totalRows+' rows';
+      const nrTxt = newRowCount > 0 ? ' · 🆕 '+newRowCount+' rows ใหม่' : '';
+      _updateStatus('ok', '☁️✓ Synced', 'Pull สำเร็จ ('+totalRows+' rows'+nrTxt+')');
+      lastSyncMsg = 'pulled '+totalRows+' rows'+(newRowCount?' (+'+newRowCount+' new)':'');
+      lastSuccessAt = Date.now();
     }
   }
 
@@ -3911,6 +3979,9 @@ window.$erp = {
   // Watch each table separately to know which one changed
   AS_TABLES.forEach(t => {
     watch(() => _GLOBAL_DB[t], () => {
+      // 🔧 BUG FIX: ห้ามตั้ง dirty ถ้า change มาจาก pullAll (Cloud → Local)
+      // ไม่งั้น pull → mutate → watch fire → push กลับ cloud → loop ไม่จบ
+      if (_applyingCloudUpdate) return;
       dirtyTables.add(t);
       // Debounce 1.5s (เร็วขึ้นจาก 5s)
       if (pushTimer) clearTimeout(pushTimer);
@@ -3924,8 +3995,15 @@ window.$erp = {
     if (!window.sb) return;
     if (!window.$erp?.currentUser?.value) return;
     enabled = true;
-    console.log('[autoSync] enabled — pull every 30s, push debounced 5s');
-    _updateStatus('ok', '☁️ Auto-Sync ON', 'Auto-Pull ทุก 30 วิ + Auto-Push เมื่อมีการเปลี่ยนแปลง');
+    console.log('[autoSync] enabled — pull every 10s, push debounced 1.5s + auto-retry 30s');
+    _updateStatus('ok', '☁️ Auto-Sync ON', 'Auto-Pull ทุก 10 วิ + Auto-Push 1.5 วิ + Retry 30 วิ');
+    lastSuccessAt = Date.now();
+    // 🆕 Restore failed queue from previous session — retry these tables ASAP
+    _loadFailedQueue();
+    if (failedTables.size > 0) {
+      console.log('[autoSync] Found '+failedTables.size+' failed tables from last session — will retry');
+      setTimeout(() => pushDirty(false), 5000);   // retry after 5s
+    }
     // 🆕 First-time-on-device check: ถ้า master data ว่าง → pull ทันที (ไม่รอ 3 วิ)
     const customers = (_GLOBAL_DB.customers || []).length;
     const suppliers = (_GLOBAL_DB.suppliers || []).length;
@@ -3975,9 +4053,43 @@ window.$erp = {
     pullNow: () => pullAll(),
     isEnabled: () => enabled,
     dirtyTables: () => Array.from(dirtyTables),
+    failedTables: () => Array.from(failedTables),
     lastErrors: () => errorLog.slice(),
-    clearErrors: () => { errorLog.length = 0; },
-    status: () => ({ enabled, isPushing, isPulling, lastSyncMsg, dirty:Array.from(dirtyTables), errorCount: errorLog.length }),
+    clearErrors: () => { errorLog.length = 0; failedTables.clear(); _saveFailedQueue(); },
+    lastSuccessAt: () => lastSuccessAt,
+    secondsSinceSync: () => Math.floor((Date.now() - lastSuccessAt) / 1000),
+    status: () => ({ enabled, isPushing, isPulling, lastSyncMsg,
+      dirty: Array.from(dirtyTables), failed: Array.from(failedTables),
+      errorCount: errorLog.length, secondsSinceSync: Math.floor((Date.now() - lastSuccessAt)/1000) }),
+    // 🔧 NEW: diagnose() — รายงานละเอียดสำหรับ debug ตอน user ติดต่อขอความช่วยเหลือ
+    //   ใช้: เปิด Console (F12) → พิมพ์ window.$autoSync.diagnose()
+    diagnose: () => {
+      const counts = {};
+      AS_TABLES.forEach(t => { counts[t] = (_GLOBAL_DB[t] || []).length; });
+      const out = {
+        ok: enabled && !isPushing && !isPulling && failedTables.size === 0,
+        enabled, isPushing, isPulling,
+        applyingCloudUpdate: _applyingCloudUpdate,
+        secondsSinceSync: Math.floor((Date.now() - lastSuccessAt)/1000),
+        dirtyTables: Array.from(dirtyTables),
+        failedTables: Array.from(failedTables),
+        errorCount: errorLog.length,
+        recentErrors: errorLog.slice(0, 10),
+        rowCounts: counts,
+        supabaseReady: !!window.sb,
+        userLoggedIn: !!window.$erp?.currentUser?.value,
+      };
+      console.table(counts);
+      console.log('Status:', out);
+      return out;
+    },
+    // 🔧 NEW: ปลด stuck state ถ้า isPushing/isPulling ค้าง (จาก network drop ระหว่าง await)
+    unstick: () => {
+      const was = { isPushing, isPulling };
+      isPushing = false; isPulling = false; _applyingCloudUpdate = false;
+      console.log('[autoSync] unstuck — was:', was);
+      return was;
+    },
   };
 })();
 
@@ -4560,6 +4672,26 @@ const app = createApp({
     /* 🆕 Empty data banner — โผล่ถ้า master data ว่างหลัง 8 วินาที (เครื่องนี้ยังไม่เคย sync) */
     const dataEmptyBanner = ref(false);
     const forcePulling = ref(false);
+    /* 🆕 Sync health: tick every 5s to update "X วินาทีที่แล้ว" display */
+    const syncHealthTick = ref(0);
+    setInterval(() => { syncHealthTick.value++; }, 5000);
+    const syncHealthText = computed(() => {
+      const _ = syncHealthTick.value;  // force re-eval
+      if (!syncStatus.enabled) return '';
+      const sec = window.$autoSync?.secondsSinceSync?.() || 0;
+      if (sec < 30) return 'ล่าสุด: เพิ่งสด';
+      if (sec < 60) return 'ล่าสุด: '+sec+' วิที่แล้ว';
+      if (sec < 3600) return 'ล่าสุด: '+Math.floor(sec/60)+' นาทีที่แล้ว';
+      return 'ล่าสุด: '+Math.floor(sec/3600)+' ชม.ที่แล้ว';
+    });
+    const syncHealthLevel = computed(() => {
+      const _ = syncHealthTick.value;
+      if (!syncStatus.enabled) return 'idle';
+      const sec = window.$autoSync?.secondsSinceSync?.() || 0;
+      if (sec < 60) return 'healthy';
+      if (sec < 300) return 'stale';
+      return 'critical';
+    });
     setTimeout(() => {
       if (currentUser.value) {
         const c = (db.customers||[]).length;
@@ -4618,7 +4750,8 @@ const app = createApp({
     return { db, currentUser, currentView, currentBranchId, sidebarOpen, loginForm, loginError, canViewCurrent,
       menuGroups: visibleMenuGroups, currentTitle, toast, login, logout, resetDemo,
       syncStatus, dataEmptyBanner, forcePulling, forcePull, manualSyncNow,
-      showSyncErrors, getErrorList, clearSyncErrors };
+      showSyncErrors, getErrorList, clearSyncErrors,
+      syncHealthText, syncHealthLevel };
   }
 });
 
