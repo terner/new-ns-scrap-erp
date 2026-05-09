@@ -2520,10 +2520,10 @@ function seedData() {
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:false, seeCash:false, seeFinancials:false, seeOpening:false,
         branchScope:'all' },
-      { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan + ใบสำคัญรับเงิน + Bank Recon', isSystem:false,
-        // 🆕 ADD: receiptVoucher, bankRecon, mdExpense, historicalData
+      { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan + ใบสำคัญรับเงิน + Bank Recon + Import Master', isSystem:false,
+        // 🆕 ADD: receiptVoucher, bankRecon, mdExpense, historicalData, mdImport
         // 🚫 REMOVE: dashboard, cashPosition
-        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','receiptVoucher','expense','pettyAdvance','expenseDashboard','bankRecon','ar','ap','bank','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','mdExpense','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','plStatement','balanceSheet','cashFlowStatement','production','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','historicalData','audit','anomalyDetector','backup','companyProfile'],
+        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','receiptVoucher','expense','pettyAdvance','expenseDashboard','bankRecon','ar','ap','bank','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','mdExpense','mdImport','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','reports','plStatement','balanceSheet','cashFlowStatement','production','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','historicalData','audit','anomalyDetector','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:true,
         branchScope:'all' },
