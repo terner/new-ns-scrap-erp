@@ -6968,10 +6968,32 @@ app.component('view-dashboard', {
 
     const groupOptions = computed(() => Array.from(new Set(db.products.map(p=>p.metalGroup||'อื่นๆ'))).sort());
 
+    /* 🆕 Historical Baseline merge — รวมยอด ม.ค.-เม.ย. 2026 เข้ากับ live data
+       ใช้เฉพาะตอนไม่ filter Branch/Supplier/Customer/Product (เพราะ historical เก็บแบบ aggregate รายเดือน) */
+    const useHistorical = computed(() => !fBranch.value && !fSupplier.value && !fCustomer.value && !fProduct.value && !fGroup.value && !fChannel.value);
+    const histRange = computed(() => ({ from: dateFrom.value, to: dateTo.value }));
+    const histRevenue = computed(() => {
+      if (!useHistorical.value || !erp.historical) return 0;
+      return erp.historical.sumRange('pnl', 'revenue', histRange.value.from, histRange.value.to);
+    });
+    const histCogs = computed(() => {
+      if (!useHistorical.value || !erp.historical) return 0;
+      return erp.historical.sumRange('pnl', 'cogs', histRange.value.from, histRange.value.to);
+    });
+    const histPurchase = computed(() => {
+      if (!useHistorical.value || !erp.historical) return 0;
+      // ใช้ cogs เป็น proxy สำหรับ purchase ฝั่งซื้อ (ใน historical เก็บเป็น cogs)
+      return erp.historical.sumRange('pnl', 'cogs', histRange.value.from, histRange.value.to);
+    });
+    const histExpenses = computed(() => {
+      if (!useHistorical.value || !erp.historical) return 0;
+      return erp.historical.sumAllByType('expense', histRange.value.from, histRange.value.to);
+    });
+
     /* PURCHASE */
     const filteredPB = computed(() => db.purchaseBills.filter(matchPurchase));
     const todayPurchase = computed(()=> db.purchaseBills.filter(b=>b.status!=='cancelled' && b.date===today).reduce((s,b)=>s+Number(b.totalAmount||0),0));
-    const monthPurchase = computed(()=> filteredPB.value.reduce((s,b)=>s+Number(b.totalAmount||0),0));
+    const monthPurchase = computed(()=> filteredPB.value.reduce((s,b)=>s+Number(b.totalAmount||0),0) + histPurchase.value);
     const purchaseByChannel = computed(() => {
       const result = {};
       db.purchaseChannels.forEach(c => result[c.id] = { name:c.name, amount:0, weight:0, ap:0 });
@@ -6989,8 +7011,9 @@ app.component('view-dashboard', {
     /* SALES */
     const filteredSB = computed(() => db.salesBills.filter(matchSales));
     const todaySales = computed(()=> db.salesBills.filter(b=>b.status!=='cancelled' && b.date===today).reduce((s,b)=>s+Number(b.totalAmount||0),0));
-    const monthSales = computed(()=> filteredSB.value.reduce((s,b)=>s+Number(b.totalAmount||0),0));
-    const monthCost = computed(()=> filteredSB.value.reduce((s,b)=>s+Number(b.totalCost||0),0));
+    /* 🆕 รวม Historical Sales (ม.ค.-เม.ย.) เข้ากับ live data */
+    const monthSales = computed(()=> filteredSB.value.reduce((s,b)=>s+Number(b.totalAmount||0),0) + histRevenue.value);
+    const monthCost = computed(()=> filteredSB.value.reduce((s,b)=>s+Number(b.totalCost||0),0) + histCogs.value);
     const monthGP = computed(()=> monthSales.value - monthCost.value);
     const monthMargin = computed(()=> monthSales.value>0 ? (monthGP.value/monthSales.value*100) : 0);
     const salesByChannel = computed(() => {
@@ -7147,10 +7170,11 @@ app.component('view-dashboard', {
     });
     const inPrevRange = (d) => d && d >= prevPeriod.value.from && d <= prevPeriod.value.to;
 
-    /* Total Expenses (operating) */
+    /* Total Expenses (operating) — 🆕 รวม Historical baseline */
     const monthExpenses = computed(() => {
       try {
-        return (db.expenses||[]).filter(e => e && inDateRange(e.date)).reduce((s,e)=>s+Number(e.amount||0),0);
+        const live = (db.expenses||[]).filter(e => e && inDateRange(e.date)).reduce((s,e)=>s+Number(e.amount||0),0);
+        return live + histExpenses.value;
       } catch(e){ return 0; }
     });
     const prevMonthExpenses = computed(() => {
@@ -7323,11 +7347,11 @@ app.component('view-dashboard', {
     <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-2xl p-4 shadow-xl">
       <div class="flex flex-wrap items-center gap-2 mb-3">
         <span class="text-xs font-bold opacity-80">📅 ช่วงเวลา:</span>
-        <button @click="setPeriod('today')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='today'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">วันนี้</button>
-        <button @click="setPeriod('week')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='week'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">7 วัน</button>
-        <button @click="setPeriod('month')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='month'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">เดือนนี้</button>
+        <button @click="setPeriod('year')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='year'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">📊 ปีนี้</button>
         <button @click="setPeriod('quarter')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='quarter'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">ไตรมาส</button>
-        <button @click="setPeriod('year')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='year'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">ปีนี้</button>
+        <button @click="setPeriod('month')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='month'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">เดือนนี้</button>
+        <button @click="setPeriod('week')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='week'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">7 วัน</button>
+        <button @click="setPeriod('today')" :class="['px-3 py-1.5 rounded-lg text-xs font-bold', period==='today'?'bg-amber-400 text-slate-900':'bg-white/10 hover:bg-white/20']">วันนี้</button>
         <span class="mx-2 opacity-30">|</span>
         <input type="date" v-model="dateFrom" @change="period='custom'" class="px-2 py-1 bg-white/10 border border-white/20 rounded text-xs">
         <span>→</span>
@@ -23066,6 +23090,53 @@ app.component('view-plStatement', {
 
     function showDrill(title, items) { drill.value = { title, items }; }
 
+    /* 🆕 Quick presets — ตั้งค่า fromD/toD รวดเร็ว (ปีนี้, ไตรมาส, เดือนนี้, ฯลฯ) */
+    function setPreset(p) {
+      const t = new Date();
+      const y = t.getFullYear();
+      const m = t.getMonth();
+      const todayStr = erp.today();
+      if (p === 'today') { fromD.value = todayStr; toD.value = todayStr; }
+      else if (p === 'week') {
+        const d = new Date(); d.setDate(d.getDate()-6);
+        fromD.value = d.toISOString().slice(0,10); toD.value = todayStr;
+      }
+      else if (p === 'month') {
+        fromD.value = `${y}-${String(m+1).padStart(2,'0')}-01`;
+        toD.value = todayStr;
+      }
+      else if (p === 'quarter') {
+        const qStart = Math.floor(m/3) * 3;
+        fromD.value = `${y}-${String(qStart+1).padStart(2,'0')}-01`;
+        toD.value = todayStr;
+      }
+      else if (p === 'year') {
+        fromD.value = `${y}-01-01`;
+        toD.value = todayStr;
+      }
+      viewMode.value = 'period';
+    }
+    function isPreset(p) {
+      const t = new Date();
+      const y = t.getFullYear();
+      const m = t.getMonth();
+      const todayStr = erp.today();
+      const f = fromD.value, to = toD.value;
+      if (viewMode.value !== 'period') return false;
+      if (p === 'today') return f === todayStr && to === todayStr;
+      if (p === 'week') {
+        const d = new Date(); d.setDate(d.getDate()-6);
+        return f === d.toISOString().slice(0,10) && to === todayStr;
+      }
+      if (p === 'month') return f === `${y}-${String(m+1).padStart(2,'0')}-01` && to === todayStr;
+      if (p === 'quarter') {
+        const qStart = Math.floor(m/3) * 3;
+        return f === `${y}-${String(qStart+1).padStart(2,'0')}-01` && to === todayStr;
+      }
+      if (p === 'year') return f === `${y}-01-01` && to === todayStr;
+      return false;
+    }
+
     function exportXLSX() {
       if (viewMode.value === 'yearly' && yearlyData.value) {
         const y = yearlyData.value;
@@ -23141,7 +23212,7 @@ app.component('view-plStatement', {
 
     return { erp, db, fmt, viewMode, fromD, toD, selMonth, selYear, branchId, txnModeFilter,
       effRange, data, yearlyData, yearOptions, drill, showDrill, exportXLSX,
-      TRACKING_MONTHS, historicalBaseline };
+      TRACKING_MONTHS, historicalBaseline, setPreset, isPreset };
   },
   template:`
   <div class="space-y-4">
@@ -23176,6 +23247,13 @@ app.component('view-plStatement', {
 
       <!-- Period mode -->
       <template v-if="viewMode==='period'">
+        <!-- 🆕 Quick presets — ปีนี้เป็นปุ่มแรก -->
+        <button @click="setPreset('year')" :class="['px-3 py-1.5 rounded text-xs font-bold border', isPreset('year')?'bg-rose-600 text-white border-rose-600':'bg-white border-slate-300 hover:bg-rose-50']">📊 ปีนี้</button>
+        <button @click="setPreset('quarter')" :class="['px-3 py-1.5 rounded text-xs font-bold border', isPreset('quarter')?'bg-purple-600 text-white border-purple-600':'bg-white border-slate-300 hover:bg-purple-50']">ไตรมาส</button>
+        <button @click="setPreset('month')" :class="['px-3 py-1.5 rounded text-xs font-bold border', isPreset('month')?'bg-amber-600 text-white border-amber-600':'bg-white border-slate-300 hover:bg-amber-50']">เดือนนี้</button>
+        <button @click="setPreset('week')" :class="['px-3 py-1.5 rounded text-xs font-bold border', isPreset('week')?'bg-emerald-600 text-white border-emerald-600':'bg-white border-slate-300 hover:bg-emerald-50']">7 วัน</button>
+        <button @click="setPreset('today')" :class="['px-3 py-1.5 rounded text-xs font-bold border', isPreset('today')?'bg-blue-600 text-white border-blue-600':'bg-white border-slate-300 hover:bg-blue-50']">วันนี้</button>
+        <span class="text-xs text-slate-300">|</span>
         <label class="text-sm">จาก</label><input type="date" v-model="fromD" class="px-2 py-1.5 border rounded text-sm">
         <label class="text-sm">ถึง</label><input type="date" v-model="toD" class="px-2 py-1.5 border rounded text-sm">
       </template>
