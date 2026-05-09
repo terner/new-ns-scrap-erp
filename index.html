@@ -7870,11 +7870,14 @@ app.component('view-purchase', {
     const billTotals = computed(() => {
       const items = safeArr(form.value && form.value.items);
       const subtotal = items.reduce((s,it)=>s+num(it.netAmount),0);
+      // 🆕 น้ำหนักรวม + จำนวนรายการ — ให้ user เช็คว่าคีย์ครบ
+      const totalWeight = items.reduce((s,it)=>s+num(it.netWeight),0);
+      const itemCount = items.filter(it => it && it.productId && num(it.netWeight) > 0).length;
       const afterDiscount = Math.max(0, subtotal - num(form.value.discountTotal));
       const vatAmount = form.value.hasVat ? afterDiscount * 0.07 : 0;
       const grandTotal = afterDiscount + vatAmount;
       const totalCommission = 0;  // 🚫 ไม่ใช้แล้ว — เก็บไว้เพื่อ backward compat
-      return { subtotal, afterDiscount, vatAmount, grandTotal, totalCommission };
+      return { subtotal, totalWeight, itemCount, afterDiscount, vatAmount, grandTotal, totalCommission };
     });
 
     /* Available PO Buys (open/partial only) — pre-computed for dropdown */
@@ -8756,6 +8759,18 @@ app.component('view-purchase', {
                     </td>
                   </tr>
                 </tbody>
+                <!-- 🆕 Footer: น้ำหนักรวม + ยอดรวมรายการ — เช็คความครบถ้วน -->
+                <tfoot class="bg-emerald-50 font-bold border-t-2 border-emerald-300">
+                  <tr>
+                    <td colspan="2" class="p-2 text-right text-emerald-800">📦 รวม {{billTotals.itemCount}} รายการ:</td>
+                    <td class="p-2 text-center text-emerald-800 text-base">-</td>
+                    <td class="p-2 text-right text-emerald-800 text-base font-mono">{{fmt(billTotals.totalWeight)}}</td>
+                    <td colspan="2"></td>
+                    <td v-if="form.salesId"></td>
+                    <td class="p-2 text-right text-blue-700 text-base font-mono">{{fmt(billTotals.subtotal)}}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
             <!-- 🆕 Sales reminder — แทน Commission Summary เพราะค่าคอมคำนวณรวมเดือน ไม่ใช่ต่อบิล -->
@@ -8787,7 +8802,13 @@ app.component('view-purchase', {
                 </div>
               </div>
               <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 space-y-2">
-                <div class="flex justify-between text-sm"><span class="text-slate-600">ยอดรวมรายการ:</span><span class="font-mono">{{fmt(billTotals.subtotal)}}</span></div>
+                <!-- 🆕 น้ำหนักรวม + จำนวนรายการ — เช็คได้ว่าคีย์ครบไหม -->
+                <div class="bg-emerald-100 border border-emerald-300 rounded p-2 mb-1 flex justify-between items-center">
+                  <span class="text-emerald-800 font-semibold text-sm">📦 น้ำหนักรวมที่ซื้อ:</span>
+                  <span class="font-mono text-emerald-800 text-xl font-bold">{{fmt(billTotals.totalWeight)}} <span class="text-xs">กก.</span></span>
+                </div>
+                <div class="text-xs text-emerald-700 text-right -mt-1">({{billTotals.itemCount}} รายการ)</div>
+                <div class="flex justify-between text-sm border-t border-blue-200 pt-2"><span class="text-slate-600">ยอดรวมรายการ:</span><span class="font-mono">{{fmt(billTotals.subtotal)}}</span></div>
                 <div class="flex justify-between text-sm" v-if="form.discountTotal>0"><span class="text-slate-600">หักส่วนลด:</span><span class="text-red-600 font-mono">-{{fmt(form.discountTotal)}}</span></div>
                 <div class="flex justify-between text-sm border-t border-blue-300 pt-2"><span class="text-slate-600">หลังส่วนลด:</span><span class="font-mono">{{fmt(billTotals.afterDiscount)}}</span></div>
                 <div class="flex justify-between text-sm" v-if="form.hasVat"><span class="text-slate-600">VAT 7%:</span><span class="font-mono">{{fmt(billTotals.vatAmount)}}</span></div>
