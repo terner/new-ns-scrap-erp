@@ -8686,8 +8686,8 @@ app.component('view-purchase', {
                 <div class="font-bold text-purple-700">{{(db.salespersons||[]).find(s=>s&&s.id===form.salesId)?.name || '-'}}</div>
               </div>
               <div class="text-xs text-slate-600 text-right">
-                <div>📋 ค่าคอม = <b>ยอดรวมเดือน ≥ 1 ล้าน</b> → 0.1% (ล้านละ 1,000)</div>
-                <div class="text-[11px] text-slate-500 mt-0.5">เช็คยอดสะสมที่ <b>💼 Sales Tracking Dashboard</b></div>
+                <div>📋 ค่าคอม: ยอดรวมเดือน <b>≥ 1 ล้าน</b> → ทบละ <b>500,000 = 500 บาท</b></div>
+                <div class="text-[11px] text-slate-500 mt-0.5">(เศษไม่ถึง 500k ตัดทิ้ง · เช็คยอดที่ <b>💼 Sales Tracking Dashboard</b>)</div>
               </div>
             </div>
           </div>
@@ -32729,21 +32729,27 @@ app.component('view-salesCommission', {
       return sup?.salesId || '';
     }
 
-    /* 🆕 NEW RULE: คำนวณค่าคอม "รวมทั้งเดือน" (ไม่ใช่ต่อ item)
-       ถ้ายอดซื้อรวมเดือน ≥ 1 ล้านบาท → ค่าคอม = ยอด × 0.1% (ล้านละ 1,000)
-       ถ้า < 1 ล้าน → ค่าคอม = 0 (ไม่ได้)
+    /* 🆕 NEW RULE (CORRECTED): คำนวณค่าคอม "รวมทั้งเดือน" + ปัดลงเป็นทบ 500,000
+       เริ่มจ่ายเมื่อยอดซื้อสะสม ≥ 1,000,000 บาท
+       อัตรา: ทุก 500,000 บาท = 500 บาท (เศษไม่ถึง 500k ไม่นับ)
+       เทียบเท่า: ทุก 1,000,000 บาท = 1,000 บาท
        ตัวอย่าง:
-         800,000   → 0 (ไม่ครบเป้า)
-         1,000,000 → 1,000
-         1,500,000 → 1,500
-         2,000,000 → 2,000
-         3,000,000 → 3,000
-       🔧 BUG FIX: ใช้ "ยอดก่อน VAT" (subtotal ของ items) — เพราะ VAT เป็นเงินรัฐ ไม่นับเป็นยอดซื้อ */
-    const COMMISSION_THRESHOLD = 1000000;
-    const COMMISSION_RATE = 0.001;  // 0.1%
+         800,000   → 0       (ไม่ถึง 1M)
+         1,000,000 → 1,000   (2 ทบ × 500)
+         1,500,000 → 1,500   (3 ทบ × 500)
+         1,800,000 → 1,500   (3 ทบ × 500 — เศษ 300k ไม่ครบ ตัดทิ้ง)
+         2,000,000 → 2,000   (4 ทบ × 500)
+         2,500,000 → 2,500   (5 ทบ × 500)
+         3,000,000 → 3,000   (6 ทบ × 500)
+       สูตร: floor(amount / 500,000) × 500 — แต่ต้อง ≥ 1M ก่อน
+       🔧 BUG FIX: ใช้ "ยอดก่อน VAT" (subtotal ของ items) — VAT เป็นเงินรัฐ ไม่นับเป็นยอดซื้อ */
+    const COMMISSION_THRESHOLD = 1000000;     // ต้องครบเป้านี้ก่อนถึงจะได้ค่าคอม
+    const COMMISSION_TIER_AMOUNT = 500000;    // ทบละ 500,000 บาท
+    const COMMISSION_TIER_RATE = 500;          // ทบละ 500 บาท
     function _calcMonthlyCommission(totalAmount) {
       if (totalAmount < COMMISSION_THRESHOLD) return 0;
-      return Math.round(totalAmount * COMMISSION_RATE);
+      const tiers = Math.floor(totalAmount / COMMISSION_TIER_AMOUNT);
+      return tiers * COMMISSION_TIER_RATE;
     }
     /* helper — คำนวณยอดบิล "ก่อน VAT" (ใช้ subtotal ถ้ามี ไม่งั้น fallback netAmount sum หรือ totalAmount) */
     function _billAmountBeforeVat(b) {
@@ -33010,10 +33016,10 @@ app.component('view-salesCommission', {
               </tr>
               <tr class="bg-emerald-50">
                 <td colspan="7" class="p-2 text-right text-emerald-700">
-                  💼 ค่าคอมที่ได้ (เกณฑ์: ยอด ≥ {{fmt(COMMISSION_THRESHOLD)}} ฿):
+                  💼 ค่าคอมที่ได้ (เกณฑ์: ยอด ≥ {{fmt(COMMISSION_THRESHOLD)}} ฿ · ทบละ 500,000 = 500 บาท):
                 </td>
                 <td class="p-2 text-right text-emerald-700 text-base">
-                  {{fmt(billDetailRows.reduce((s,r)=>s+r.amount,0) >= COMMISSION_THRESHOLD ? Math.round(billDetailRows.reduce((s,r)=>s+r.amount,0) * 0.001) : 0)}}
+                  {{fmt((function(){ const a = billDetailRows.reduce((s,r)=>s+r.amount,0); return a >= COMMISSION_THRESHOLD ? Math.floor(a / 500000) * 500 : 0; })())}}
                 </td>
               </tr>
             </tfoot>
