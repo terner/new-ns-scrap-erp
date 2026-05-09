@@ -8268,6 +8268,55 @@ app.component('view-purchase', {
     /* 🆕 Toggle visibility ของ warehouse + channel selectors (ปกติซ่อน auto-fill จาก branch) */
     const showBranchDeps = ref(false);
 
+    /* 🆕 Robust Supplier picker — search input + filtered native select (ไม่พึ่ง custom searchable-select) */
+    const supplierSearchTerm = ref('');
+    const filteredSuppliers = computed(() => {
+      const all = (db.suppliers || []).filter(x => x && x.active);
+      const q = (supplierSearchTerm.value || '').toLowerCase().trim();
+      if (!q) return all.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', 'th'));
+      return all.filter(s =>
+        (s.name||'').toLowerCase().includes(q) ||
+        (s.code||'').toLowerCase().includes(q) ||
+        (s.phone||'').toLowerCase().includes(q) ||
+        (s.taxId||'').includes(q)
+      ).sort((a,b) => (a.name||'').localeCompare(b.name||'', 'th'));
+    });
+    function onSupplierPicked() {
+      // Trigger ให้ supplier watcher ทำงาน (ที่เรา set ไว้แล้วเพื่อ auto-fill phone, salesId)
+      supplierSearchTerm.value = '';   // ล้าง search term เพราะเลือกแล้ว
+    }
+    function quickAddSupplier() {
+      const name = (prompt('🏭 เพิ่ม Supplier ใหม่ — ใส่ชื่อ:') || '').trim();
+      if (!name) return;
+      // Check ซ้ำชื่อ
+      const dup = (db.suppliers||[]).find(s => s && (s.name||'').toLowerCase() === name.toLowerCase());
+      if (dup) {
+        if (!confirm('มี Supplier ชื่อ "'+name+'" อยู่แล้ว — เลือกใช้ตัวเดิม?')) return;
+        form.value.supplierId = dup.id;
+        return;
+      }
+      // Generate code
+      const existing = (db.suppliers||[]).map(s => s && s.code).filter(c => c && /^S\d+$/.test(c));
+      const maxNum = existing.reduce((max, c) => {
+        const n = parseInt(c.slice(1), 10);
+        return Number.isFinite(n) && n > max ? n : max;
+      }, 0);
+      const code = 'S' + String(maxNum + 1).padStart(4, '0');
+      const newSup = {
+        id: 'SUP-' + Date.now() + '-' + Math.random().toString(36).slice(2,5),
+        code, name, type: 'บุคคล',
+        taxId: '', address: '', phone: '', bankAccount: '', salesId: '',
+        active: true,
+        createdBy: erp.currentUser?.value?.username || '-',
+        createdAt: new Date().toISOString(),
+      };
+      if (!Array.isArray(db.suppliers)) db.suppliers = [];
+      db.suppliers.push(newSup);
+      form.value.supplierId = newSup.id;
+      erp.showToast('✓ เพิ่ม Supplier "'+name+'" ('+code+') แล้ว','success');
+      if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
+    }
+
     /* 🆕 เลือกสาขา + auto-fill warehouse + channel ตาม default ของสาขานั้น */
     function pickBranch(branchId) {
       form.value.branchId = branchId;
@@ -8527,6 +8576,8 @@ app.component('view-purchase', {
       open, openEdit, save, cancelBill, deleteBill, toggleVatReceived, warehousesForBranch, num,
       // 🆕 Branch picker (one-click + auto-fill warehouse + channel)
       pickBranch, showBranchDeps,
+      // 🆕 Robust Supplier picker
+      supplierSearchTerm, filteredSuppliers, onSupplierPicked, quickAddSupplier,
       addItem, removeItem, recalcItem,
       fmt, supplierName, branchName, channelName, accountName, productName,
       availablePOBuys, loadFromPO, setSource,
@@ -8698,9 +8749,24 @@ app.component('view-purchase', {
                 <input type="date" v-model="form.date" class="w-full px-3 py-2 border rounded-lg">
               </div>
               <div class="md:col-span-3">
-                <label class="block text-xs font-medium text-slate-600 mb-1">🏭 Supplier *</label>
-                <searchable-select v-model="form.supplierId" :options="(db.suppliers||[]).filter(x=>x && x.active)" label-field="name" code-field="code" placeholder="🔍 พิมพ์ชื่อ/รหัส Supplier..." input-class="w-full px-3 py-2 border rounded-lg"></searchable-select>
-                <!-- 💳 Bank Account inline — ถ้า supplier ยังไม่มีให้กรอกเลย เซฟกลับ master -->
+                <label class="block text-xs font-medium text-slate-600 mb-1">🏭 Supplier * <span class="text-slate-400 font-normal text-[11px]">({{(db.suppliers||[]).filter(x=>x && x.active).length}} ราย — พิมพ์ค้นหาที่ช่อง search ด้านล่าง)</span></label>
+                <!-- 🆕 Robust supplier picker — search + native select (ไม่พึ่ง custom component) -->
+                <div class="flex gap-2">
+                  <input type="text" v-model="supplierSearchTerm" placeholder="🔍 พิมพ์ชื่อ/รหัส Supplier เพื่อค้นหา..." class="flex-1 px-3 py-2 border rounded-lg" list="supplier-list-pb">
+                  <datalist id="supplier-list-pb">
+                    <option v-for="s in (db.suppliers||[]).filter(x=>x && x.active)" :key="s.id" :value="s.name + (s.code ? ' ('+s.code+')' : '') + (s.phone ? ' · '+s.phone : '')">{{s.name}}</option>
+                  </datalist>
+                  <button type="button" @click="quickAddSupplier" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-xs whitespace-nowrap">+ เพิ่ม Supplier</button>
+                </div>
+                <!-- Native select เป็น fallback หลัก — ใช้ได้แน่นอน -->
+                <select v-model="form.supplierId" @change="onSupplierPicked" class="w-full px-3 py-2 border rounded-lg mt-2 text-sm" size="1">
+                  <option value="">-- เลือก Supplier --</option>
+                  <option v-for="s in filteredSuppliers" :key="s.id" :value="s.id">{{s.name}}{{s.code ? ' ('+s.code+')' : ''}}{{s.phone ? ' · '+s.phone : ''}}</option>
+                </select>
+                <div v-if="form.supplierId" class="text-xs text-emerald-700 mt-1">
+                  ✓ เลือกแล้ว: <b>{{ (db.suppliers||[]).find(s => s && s.id === form.supplierId)?.name || '-' }}</b>
+                </div>
+                <!-- 💳 Bank Account inline -->
                 <div v-if="form.supplierId" class="mt-2 bg-slate-50 border border-slate-200 rounded p-2 text-xs">
                   <div class="flex items-center gap-2 flex-wrap">
                     <span class="font-bold text-slate-700">💳 เลขบัญชีธนาคาร:</span>
