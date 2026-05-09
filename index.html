@@ -3591,6 +3591,41 @@ window.$erp = {
       return _safeArr(_GLOBAL_DB.roles).find(x => x && x.id === 'R-ADMIN') || null;
     } catch (e) { return null; }
   },
+  /* 🆕 ลบ records จาก Supabase ตาม collection name + ids array
+     ใช้ทุกครั้งที่ลบ local เพื่อกัน auto-pull ดึงของเก่ากลับมา */
+  deleteCloud: async (localCollection, ids) => {
+    if (!window.sb || !Array.isArray(ids) || ids.length === 0) return;
+    const map = {
+      // Master
+      suppliers:'suppliers', customers:'customers', products:'products',
+      accounts:'accounts', branches:'branches', warehouses:'warehouses',
+      salespersons:'salespersons', purchaseChannels:'purchase_channels',
+      salesChannels:'sales_channels', expenseCategories:'expense_categories',
+      currencies:'currencies', overseasRecipients:'overseas_recipients',
+      // Transactions
+      purchaseBills:'purchase_bills', salesBills:'sales_bills',
+      payments:'payments', receipts:'receipts', transfers:'transfers',
+      expenses:'expenses', stockLedger:'stock_ledger', bankStatement:'bank_statement',
+      poBuys:'po_buys', poSells:'po_sells', tradingDeals:'trading_deals',
+      receiptVouchers:'receipt_vouchers', historicalMonthly:'historical_monthly',
+      // Production
+      productionOrders:'production_orders', productionInputs:'production_inputs',
+      productionOutputs:'production_outputs', processCosts:'process_costs',
+      // Misc
+      stockIssues:'stock_issues', gradeAdjustments:'grade_adjustments',
+      assetDisposals:'asset_disposals', loanPayments:'loan_payments',
+      depreciations:'depreciations',
+      // Users
+      users:'users', roles:'roles',
+    };
+    const cloudTbl = map[localCollection];
+    if (!cloudTbl) { console.warn('[deleteCloud] no cloud table for:', localCollection); return; }
+    try {
+      const { error } = await window.sb.from(cloudTbl).delete().in('id', ids);
+      if (error) console.warn('[deleteCloud] '+cloudTbl+': '+error.message);
+      else console.log('[deleteCloud] '+cloudTbl+' '+ids.length+' rows ✓');
+    } catch(e) { console.warn('[deleteCloud] exception:', e); }
+  },
   /* Check menu/view access */
   canView: (view) => {
     try {
@@ -8193,7 +8228,7 @@ app.component('view-purchase', {
         alert('Save error: ' + e.message);
       }
     }
-    function deleteBill(b) {
+    async function deleteBill(b) {
       const linked = _purchasePayments(b.id);
       if (linked.length > 0) {
         const totalPaid = linked.reduce((s,p) => s + Number(p.amount||0) + Number(p.withholdingTax||0) + Number(p.discount||0), 0);
@@ -8201,12 +8236,17 @@ app.component('view-purchase', {
         alert('🔒 ลบบิลนี้ไม่ได้\n\nบิลนี้มีการจ่ายเงินแล้ว '+linked.length+' รายการ\nรวมจ่ายไปแล้ว: '+fmt(totalPaid)+' บาท\nVoucher: '+docs+'\n\n👉 กรุณาลบ Payment Voucher เหล่านี้ก่อน\n   ไปที่หน้า "จ่ายเงิน Supplier" → เลือก voucher → ลบ');
         return;
       }
-      if (!confirm('ลบบิล ' + b.docNo + ' ถาวร?\n• ลบ Stock Ledger ที่เชื่อม\n• กระทบ WAC')) return;
+      if (!confirm('ลบบิล ' + b.docNo + ' ถาวร?\n• ลบ Stock Ledger ที่เชื่อม\n• กระทบ WAC\n• ลบทั้ง Local + Cloud')) return;
       try {
+        // Capture stockLedger ids ก่อนลบ — เพื่อลบใน cloud
+        const ledgerIds = safeArr(db.stockLedger).filter(s => s.refType === 'PB' && s.refId === b.id).map(s => s.id);
         db.purchaseBills = safeArr(db.purchaseBills).filter(x => !x || x.id !== b.id);
         db.stockLedger = safeArr(db.stockLedger).filter(s => !(s.refType === 'PB' && s.refId === b.id));
         try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch (e) {}
-        erp.showToast('ลบบิลสำเร็จ','success');
+        // 🆕 ลบ Cloud ด้วย
+        await erp.deleteCloud('purchaseBills', [b.id]);
+        if (ledgerIds.length > 0) await erp.deleteCloud('stockLedger', ledgerIds);
+        erp.showToast('🗑 ลบบิลสำเร็จ (local + cloud)','success');
       } catch (e) { alert('Error: ' + e.message); }
     }
     /* Toggle VAT invoice received status */
@@ -9415,10 +9455,10 @@ app.component('view-payment', {
       } catch (e) { console.error(e); return []; }
     });
 
-    function remove(g) {
-      if (!confirm('ลบ ' + g.docNo + ' ?\n• คืนยอด AP กลับ\n• ลบ bank statement entry')) return;
-      // Restore bill balances
+    async function remove(g) {
+      if (!confirm('ลบ ' + g.docNo + ' ?\n• คืนยอด AP กลับ\n• ลบ bank statement entry\n• ลบทั้ง Local + Cloud')) return;
       const rows = safeArr(db.payments).filter(p => p && (p.voucherId || p.id) === g.id);
+      const paymentIds = rows.map(p => p.id);
       rows.forEach(p => {
         const bill = safeArr(db.purchaseBills).find(b => b && b.id === p.billId);
         if (bill) {
@@ -9428,9 +9468,13 @@ app.component('view-payment', {
           bill.status = bill.paidAmount <= 0 ? 'unpaid' : (bill.payableBalance <= 0 ? 'paid' : 'partial');
         }
       });
+      const bsIds = db.bankStatement.filter(s => s.refType === 'PMT' && s.refId === g.id).map(s => s.id);
       db.payments = db.payments.filter(p => (p.voucherId || p.id) !== g.id);
       db.bankStatement = db.bankStatement.filter(s => !(s.refType === 'PMT' && s.refId === g.id));
-      erp.showToast('ลบสำเร็จ + คืนยอด AP กลับแล้ว','success');
+      // 🆕 ลบ Cloud
+      if (paymentIds.length) await erp.deleteCloud('payments', paymentIds);
+      if (bsIds.length) await erp.deleteCloud('bankStatement', bsIds);
+      erp.showToast('🗑 ลบสำเร็จ (local + cloud) + คืนยอด AP กลับแล้ว','success');
     }
 
     /* 📊 Outstanding Bills Panel — บิลค้างจ่ายแสดงในหน้านี้เลย */
@@ -10002,9 +10046,10 @@ app.component('view-receipt', {
                   });
       } catch (e) { console.error(e); return []; }
     });
-    function remove(g) {
-      if (!confirm('ลบ '+g.docNo+' ?\n• คืนยอด AR กลับ\n• ลบ bank statement entry')) return;
+    async function remove(g) {
+      if (!confirm('ลบ '+g.docNo+' ?\n• คืนยอด AR กลับ\n• ลบ bank statement entry\n• ลบทั้ง Local + Cloud')) return;
       const rows = safeArr(db.receipts).filter(r => r && (r.voucherId || r.id) === g.id);
+      const receiptIds = rows.map(r => r.id);
       rows.forEach(r => {
         const bill = safeArr(db.salesBills).find(b => b && b.id === r.billId);
         if (bill) {
@@ -10014,9 +10059,13 @@ app.component('view-receipt', {
           bill.status = bill.receivedAmount <= 0 ? 'unreceived' : (bill.receivableBalance <= 0 ? 'received' : 'partial');
         }
       });
+      const bsIds = db.bankStatement.filter(s => s.refType==='RCP' && s.refId===g.id).map(s => s.id);
       db.receipts = db.receipts.filter(r => (r.voucherId||r.id) !== g.id);
       db.bankStatement = db.bankStatement.filter(s => !(s.refType==='RCP' && s.refId===g.id));
-      erp.showToast('ลบสำเร็จ + คืนยอด AR กลับแล้ว','success');
+      // 🆕 ลบ Cloud
+      if (receiptIds.length) await erp.deleteCloud('receipts', receiptIds);
+      if (bsIds.length) await erp.deleteCloud('bankStatement', bsIds);
+      erp.showToast('🗑 ลบสำเร็จ (local + cloud) + คืนยอด AR กลับแล้ว','success');
     }
 
     /* 📊 Outstanding Bills Panel — บิลค้างรับแสดงในหน้านี้ */
@@ -10326,11 +10375,14 @@ app.component('view-transfer', {
         erp.showToast(isEdit?'✓ แก้ไขสำเร็จ':'✓ โอนสำเร็จ','success');
       } catch (e) { console.error(e); alert('Error: '+e.message); }
     }
-    function remove(t) {
-      if (!confirm('ลบ '+t.docNo+' ?')) return;
+    async function remove(t) {
+      if (!confirm('ลบ '+t.docNo+' ?\n• ลบทั้ง Local + Cloud')) return;
+      const bsIds = db.bankStatement.filter(s => s.refType==='TRF' && s.refId===t.id).map(s => s.id);
       db.transfers = db.transfers.filter(x=>x.id!==t.id);
       db.bankStatement = db.bankStatement.filter(s => !(s.refType==='TRF' && s.refId===t.id));
-      erp.showToast('ลบเรียบร้อย');
+      await erp.deleteCloud('transfers', [t.id]);
+      if (bsIds.length) await erp.deleteCloud('bankStatement', bsIds);
+      erp.showToast('🗑 ลบเรียบร้อย (local + cloud)');
     }
     /* Filters */
     const search = ref('');
@@ -10608,11 +10660,15 @@ app.component('view-expense', {
         erp.showToast('✓ จ่าย '+fmt(totalPay)+' จากบัญชี '+firstAcc.name);
       } catch(e) { alert('Error: '+e.message); }
     }
-    function remove(g) {
-      if (!confirm('ลบ '+g.docNo+' ?')) return;
+    async function remove(g) {
+      if (!confirm('ลบ '+g.docNo+' ?\n• ลบทั้ง Local + Cloud')) return;
+      const expIds = db.expenses.filter(e => (e.voucherId||e.id) === g.id).map(e => e.id);
+      const bsIds = db.bankStatement.filter(s => s.refType==='EXP' && s.refId===g.id).map(s => s.id);
       db.expenses = db.expenses.filter(e => (e.voucherId||e.id) !== g.id);
       db.bankStatement = db.bankStatement.filter(s => !(s.refType==='EXP' && s.refId===g.id));
-      erp.showToast('ลบเรียบร้อย');
+      if (expIds.length) await erp.deleteCloud('expenses', expIds);
+      if (bsIds.length) await erp.deleteCloud('bankStatement', bsIds);
+      erp.showToast('🗑 ลบเรียบร้อย (local + cloud)');
     }
     /* Filters */
     const search = ref('');
@@ -11641,7 +11697,7 @@ app.component('view-sales', {
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       erp.logAudit('VAT_INVOICE_ISSUED','salesBills',{id:b.id, docNo:b.docNo}, {issued: !wasIssued});
     }
-    function deleteBill(b) {
+    async function deleteBill(b) {
       const linked = _salesReceipts(b.id);
       if (linked.length > 0) {
         const totalRcv = linked.reduce((s,p) => s + Number(p.amount||0) + Number(p.withholdingTax||0) + Number(p.discount||0), 0);
@@ -11649,8 +11705,10 @@ app.component('view-sales', {
         alert('🔒 ลบบิลขายนี้ไม่ได้\n\nบิลนี้มีการรับเงินแล้ว '+linked.length+' รายการ\nรวมรับมาแล้ว: '+erp.fmt(totalRcv)+' บาท\nVoucher: '+docs+'\n\n👉 กรุณาลบ Receipt Voucher เหล่านี้ก่อน\n   ไปที่หน้า "รับเงิน Customer" → เลือก voucher → ลบ');
         return;
       }
-      if (!confirm('ลบบิล ' + b.docNo + ' ถาวร?\n• ลบ Stock Ledger ที่เชื่อม\n• ยกเลิก Trading Deal ที่ผูก\n• กระทบ COGS / Gross Profit')) return;
+      if (!confirm('ลบบิล ' + b.docNo + ' ถาวร?\n• ลบ Stock Ledger ที่เชื่อม\n• ยกเลิก Trading Deal ที่ผูก\n• กระทบ COGS / Gross Profit\n• ลบทั้ง Local + Cloud')) return;
       try {
+        // Capture stockLedger ids ก่อนลบ
+        const ledgerIds = (Array.isArray(db.stockLedger) ? db.stockLedger : []).filter(s => s.refType === 'SB' && s.refId === b.id).map(s => s.id);
         db.salesBills = (Array.isArray(db.salesBills) ? db.salesBills : []).filter(x => !x || x.id !== b.id);
         db.stockLedger = (Array.isArray(db.stockLedger) ? db.stockLedger : []).filter(s => !(s.refType === 'SB' && s.refId === b.id));
         // ลบ matchLogs ที่ผูกกับบิลนี้ (PO Delivery)
@@ -11669,7 +11727,10 @@ app.component('view-sales', {
         }
         try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch (e) {}
         erp.logAudit('delete','salesBill', b, null);
-        erp.showToast('ลบบิลขายสำเร็จ','success');
+        // 🆕 ลบ Cloud
+        await erp.deleteCloud('salesBills', [b.id]);
+        if (ledgerIds.length > 0) await erp.deleteCloud('stockLedger', ledgerIds);
+        erp.showToast('🗑 ลบบิลขายสำเร็จ (local + cloud)','success');
       } catch (e) { alert('Error: ' + e.message); }
     }
 
