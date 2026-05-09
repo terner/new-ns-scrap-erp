@@ -4893,7 +4893,46 @@ function makeMasterComponent(opts) {
         if (!q) return list.value;
         return list.value.filter(it => Object.values(it).some(v => String(v).toLowerCase().includes(q)));
       });
-      return { db, list, filtered, search, showModal, editing, form, open, save, remove, opts, fmt: erp.fmt };
+      /* 🆕 Bulk select + delete */
+      const selectedIds = ref(new Set());
+      function isSelected(id) { return selectedIds.value.has(id); }
+      function toggleOne(id) {
+        const s = new Set(selectedIds.value);
+        if (s.has(id)) s.delete(id); else s.add(id);
+        selectedIds.value = s;
+      }
+      const allVisibleSelected = computed(() => {
+        const ids = filtered.value.map(x => x.id);
+        return ids.length > 0 && ids.every(id => selectedIds.value.has(id));
+      });
+      function toggleAllVisible() {
+        const ids = filtered.value.map(x => x.id);
+        const s = new Set(selectedIds.value);
+        if (allVisibleSelected.value) ids.forEach(id => s.delete(id));
+        else ids.forEach(id => s.add(id));
+        selectedIds.value = s;
+      }
+      function clearSelection() { selectedIds.value = new Set(); }
+      function bulkDelete() {
+        const ids = Array.from(selectedIds.value);
+        if (ids.length === 0) return;
+        if (!confirm('ลบ '+ids.length+' รายการที่เลือก? — ลบไม่สามารถกู้คืนได้')) return;
+        let removed = 0;
+        ids.forEach(id => {
+          const idx = db[opts.collection].findIndex(x => x && x.id === id);
+          if (idx >= 0) {
+            const before = JSON.parse(JSON.stringify(db[opts.collection][idx]));
+            db[opts.collection].splice(idx, 1);
+            try { erp.logAudit('delete', opts.collection, before, null); } catch(e){}
+            removed++;
+          }
+        });
+        clearSelection();
+        erp.showToast('🗑 ลบ '+removed+' รายการแล้ว','success');
+        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
+      }
+      return { db, list, filtered, search, showModal, editing, form, open, save, remove, opts, fmt: erp.fmt,
+        selectedIds, isSelected, toggleOne, allVisibleSelected, toggleAllVisible, clearSelection, bulkDelete };
     },
     template: `
       <div>
@@ -4901,16 +4940,28 @@ function makeMasterComponent(opts) {
           <input v-model="search" placeholder="ค้นหา..." class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-64">
           <button @click="open()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ เพิ่มรายการ</button>
         </div>
+        <!-- 🆕 Bulk action bar — โผล่เมื่อเลือกอย่างน้อย 1 รายการ -->
+        <div v-if="selectedIds.size > 0" class="mb-3 bg-red-50 border-2 border-red-300 rounded-lg p-3 flex items-center gap-3 sticky top-0 z-10">
+          <span class="text-sm font-semibold text-red-700">☑ เลือกแล้ว <b>{{selectedIds.size}}</b> รายการ</span>
+          <button @click="bulkDelete" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-bold">🗑 ลบทั้งหมดที่เลือก ({{selectedIds.size}})</button>
+          <button @click="clearSelection" class="bg-slate-200 hover:bg-slate-300 px-3 py-2 rounded text-sm">✕ ล้างการเลือก</button>
+        </div>
         <div class="bg-white rounded-xl shadow overflow-x-auto">
           <table class="w-full text-sm table-zebra">
             <thead class="bg-slate-100 text-slate-700">
               <tr>
+                <th class="px-3 py-2 w-10 text-center">
+                  <input type="checkbox" :checked="allVisibleSelected" @change="toggleAllVisible" class="w-4 h-4 cursor-pointer" title="เลือก/ไม่เลือกทั้งหน้า">
+                </th>
                 <th v-for="c in opts.columns" :key="c.key" class="px-3 py-2 text-left font-semibold">{{ c.label }}</th>
                 <th class="px-3 py-2 w-24"></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in filtered" :key="item.id" class="border-t border-slate-100">
+              <tr v-for="item in filtered" :key="item.id" :class="['border-t border-slate-100', isSelected(item.id) ? 'bg-red-50/50' : '']">
+                <td class="px-3 py-2 text-center">
+                  <input type="checkbox" :checked="isSelected(item.id)" @change="toggleOne(item.id)" class="w-4 h-4 cursor-pointer">
+                </td>
                 <td v-for="c in opts.columns" :key="c.key" class="px-3 py-2">
                   <span v-if="c.format === 'money'">{{ fmt(item[c.key]) }}</span>
                   <span v-else-if="c.format === 'bool'">
@@ -4924,7 +4975,7 @@ function makeMasterComponent(opts) {
                   <button @click="remove(item)" class="text-red-600 hover:underline text-xs">ลบ</button>
                 </td>
               </tr>
-              <tr v-if="filtered.length===0"><td :colspan="opts.columns.length+1" class="text-center py-8 text-slate-400">ไม่พบข้อมูล</td></tr>
+              <tr v-if="filtered.length===0"><td :colspan="opts.columns.length+2" class="text-center py-8 text-slate-400">ไม่พบข้อมูล</td></tr>
             </tbody>
           </table>
         </div>
@@ -7741,8 +7792,8 @@ app.component('view-purchase', {
     }
     function recalcItem(it) {
       it.netAmount = num(it.netWeight) * num(it.price);
-      // 🆕 คำนวณค่าคอม (เฉพาะเมื่อมี facePrice > 0)
-      it.commission = _calcCommission(it);
+      // 🚫 ไม่คำนวณ commission ที่บิลซื้อแล้ว — ดูใน Sales Tracking Dashboard (รวมเดือน)
+      it.commission = 0;
     }
     /* Bill-level totals */
     const billTotals = computed(() => {
@@ -7751,7 +7802,7 @@ app.component('view-purchase', {
       const afterDiscount = Math.max(0, subtotal - num(form.value.discountTotal));
       const vatAmount = form.value.hasVat ? afterDiscount * 0.07 : 0;
       const grandTotal = afterDiscount + vatAmount;
-      const totalCommission = items.reduce((s,it) => s + _calcCommission(it), 0);
+      const totalCommission = 0;  // 🚫 ไม่ใช้แล้ว — เก็บไว้เพื่อ backward compat
       return { subtotal, afterDiscount, vatAmount, grandTotal, totalCommission };
     });
 
@@ -7887,14 +7938,14 @@ app.component('view-purchase', {
             amount: num(it.netAmount),
             discount: 0,
             netAmount: num(it.netAmount),
-            facePrice: num(it.facePrice),                // 🆕 ราคาหน้าใบ
-            commission: _calcCommission(it),             // 🆕 ค่าคอม (recalc to be sure)
+            facePrice: num(it.facePrice),                // 🆕 ราคาหน้าใบ — เก็บไว้ใช้ใน Sales Tracking
+            commission: 0,                               // 🚫 ไม่คำนวณต่อบิลแล้ว
             note: ''
           })),
           subtotal, discountTotal,
           hasVat: !!f.hasVat, vatAmount,
           totalAmount: grandTotal,
-          totalCommission: items.reduce((s,it) => s + _calcCommission(it), 0),  // 🆕 รวมค่าคอมทั้งบิล
+          totalCommission: 0,  // 🚫 ไม่ใช้แล้ว — ค่าคอมคำนวณใน Sales Dashboard (รวมเดือน)
           // Preserve paidAmount on edit
           paidAmount: isEdit ? Number((safeArr(db.purchaseBills).find(x=>x && x.id===id)||{}).paidAmount||0) : 0,
           payableBalance: grandTotal - (isEdit ? Number((safeArr(db.purchaseBills).find(x=>x && x.id===id)||{}).paidAmount||0) : 0),
@@ -8291,7 +8342,7 @@ app.component('view-purchase', {
       erp.showToast('✓ บันทึกเซลที่ดูแลเข้า Master Data Supplier แล้ว');
     }
 
-    /* 🆕 Auto-prefill phone + salesId เมื่อเลือก Supplier (เฉพาะตอนค่ายังว่าง) */
+    /* 🆕 Auto-prefill phone + salesId เมื่อเลือก Supplier */
     watch(() => form.value.supplierId, (newId, oldId) => {
       if (!newId || newId === oldId) return;
       const s = (db.suppliers||[]).find(x => x && x.id === newId);
@@ -8300,9 +8351,14 @@ app.component('view-purchase', {
       if (!form.value.contactPhone && s.phone) {
         form.value.contactPhone = s.phone;
       }
-      // Prefill salesId — เฉพาะกรณีฟอร์มยังว่าง
-      if (!form.value.salesId && s.salesId) {
-        form.value.salesId = s.salesId;
+      // 🔧 IMPROVED: เมื่อเปลี่ยน supplier — sync salesId จาก master เสมอ (ไม่ใช่แค่ตอนว่าง)
+      // เหตุผล: ถ้าเปลี่ยน supplier แล้ว salesId เก่ายังอยู่ ทำให้ค่าคอมไปลงผิดเซล
+      // ถ้า supplier ใหม่ไม่มี salesId → ปล่อยว่าง รอ user เลือกเอง (ผ่าน dropdown)
+      form.value.salesId = s.salesId || '';
+      // แจ้ง user เบาๆ ถ้า supplier ใหม่ยังไม่มีเซลผูก
+      if (!s.salesId && s.name) {
+        // ใช้ console เฉยๆ ไม่ขึ้น toast เพราะอาจน่ารำคาญตอนเปลี่ยน supplier บ่อย
+        console.log('[purchase-bill] Supplier "' + s.name + '" ยังไม่ผูกเซล — เลือกใน dropdown แล้วระบบจะเซฟกลับ Master');
       }
     });
 
@@ -8587,12 +8643,12 @@ app.component('view-purchase', {
                 <thead class="bg-gradient-to-r from-slate-100 to-slate-50">
                   <tr>
                     <th class="p-3 text-left text-slate-700">สินค้า *</th>
-                    <th class="p-3 text-left w-52 text-indigo-700">📋 PO ที่ตัด <span class="text-xs font-normal text-slate-500">(เว้น = Spot)</span></th>
-                    <th class="p-3 text-right w-28 text-slate-700">น้ำหนัก (กก.)</th>
-                    <th class="p-3 text-right w-28 text-slate-700">ราคา/กก.</th>
-                    <th v-if="form.salesId" class="p-3 text-right w-28 text-purple-700 bg-purple-50">💼 ราคาหน้าใบ</th>
-                    <th v-if="form.salesId" class="p-3 text-right w-28 text-emerald-700 bg-emerald-50">💰 ค่าคอม</th>
-                    <th class="p-3 text-right w-32 text-slate-700">ยอดรวม</th>
+                    <th class="p-3 text-left w-44 text-indigo-700">📋 PO <span class="text-xs font-normal text-slate-500">(เว้น = Spot)</span></th>
+                    <th class="p-3 text-center w-24 text-slate-600 text-xs">📦 คงเหลือ<br>→ หลังรับ</th>
+                    <th class="p-3 text-right w-24 text-slate-700">น้ำหนัก<br><span class="text-[10px] font-normal">(กก.)</span></th>
+                    <th class="p-3 text-right w-24 text-slate-700">ราคา/กก.</th>
+                    <th v-if="form.salesId" class="p-3 text-right w-24 text-purple-700 bg-purple-50">💼 ราคา<br>หน้าใบ</th>
+                    <th class="p-3 text-right w-28 text-slate-700">ยอดรวม</th>
                     <th class="p-3 w-10"></th>
                   </tr>
                 </thead>
@@ -8601,31 +8657,27 @@ app.component('view-purchase', {
                     <td class="p-2">
                       <searchable-select v-model="it.productId" :options="(db.products||[]).filter(x=>x && x.active!==false)" label-field="name" code-field="code" placeholder="🔍 พิมพ์รหัส/ชื่อสินค้า..." input-class="w-full px-2 py-1.5 border rounded"></searchable-select>
                       <!-- 📝 Custom display name — โชว์ในบิล (ถ้าว่าง = ใช้ชื่อ master) -->
-                      <input type="text" v-model="it.displayName" :placeholder="it.productId ? '📝 ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master: ' + (productName(it.productId)||'') + ')' : 'เลือกสินค้าก่อน...'" class="w-full px-2 py-1 border rounded text-xs mt-1.5 bg-yellow-50">
-                      <div v-if="it.productId" class="text-xs mt-1 px-2 py-1 bg-emerald-50 rounded text-emerald-700">📦 คงเหลือ: <b>{{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId))}}</b> → หลังรับ: <b>{{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId) + Number(it.netWeight||0))}}</b> กก.</div>
+                      <input type="text" v-model="it.displayName" :placeholder="it.productId ? '📝 ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)' : 'เลือกสินค้าก่อน...'" class="w-full px-2 py-1 border rounded text-xs mt-1.5 bg-yellow-50">
                     </td>
                     <td class="p-2">
                       <select v-model="it.poBuyId" :class="['w-full px-2 py-1.5 border rounded text-xs', it.poBuyId ? 'bg-indigo-50 border-indigo-300 font-medium' : 'bg-blue-50 border-blue-200']">
-                        <option value="">📦 Spot Buy (ไม่ตัด PO)</option>
+                        <option value="">📦 Spot Buy</option>
                         <option v-for="po in availablePOBuys" :key="po.id" :value="po.id">📋 {{po.label}}</option>
                       </select>
-                      <div :class="['text-[10px] mt-1', it.poBuyId ? 'text-indigo-600' : 'text-blue-600']">
-                        {{it.poBuyId ? '📋 ตัด PO นี้' : '📦 ซื้อสด'}}
+                    </td>
+                    <!-- 🆕 คงเหลือ/หลังรับ — ย้ายเป็น column แยก ขนาดกะทัดรัด -->
+                    <td class="p-1 text-center bg-emerald-50/60">
+                      <div v-if="it.productId" class="text-xs leading-tight">
+                        <div class="text-slate-600">{{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId))}}</div>
+                        <div class="text-emerald-700 font-bold">→ {{fmt(erp.stockOnHand(it.productId, form.branchId, form.warehouseId) + Number(it.netWeight||0))}}</div>
                       </div>
+                      <div v-else class="text-slate-300 text-xs">-</div>
                     </td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.netWeight" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.price" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
-                    <!-- 🆕 ราคาหน้าใบ + ค่าคอม (เฉพาะถ้า supplier มีเซลดูแล) -->
+                    <!-- 🆕 ราคาหน้าใบ — เก็บค่าไว้ใช้กับ Sales Tracking (ไม่คำนวณค่าคอมในนี้) -->
                     <td v-if="form.salesId" class="p-2 bg-purple-50">
-                      <input type="number" step="0.01" v-model.number="it.facePrice" @input="recalcItem(it)" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white">
-                    </td>
-                    <td v-if="form.salesId" class="p-2 text-right bg-emerald-50">
-                      <div v-if="it.facePrice > 0">
-                        <div v-if="Number(it.price||0) > Number(it.facePrice||0)" class="text-red-600 text-xs font-bold">⊘ เกินราคาหน้าใบ</div>
-                        <div v-else-if="num(it.netAmount) <= 1000000" class="text-amber-600 text-xs font-bold">⊘ ยอด ≤ 1 ล้าน</div>
-                        <div v-else class="font-bold text-emerald-700">{{fmt(num(it.netAmount)/1000000 * 1000)}}</div>
-                      </div>
-                      <div v-else class="text-xs text-slate-400 italic">-</div>
+                      <input type="number" step="0.01" v-model.number="it.facePrice" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white" title="ราคาที่ใส่ในใบ — ใช้คิดค่าคอมรวมเดือนใน Sales Dashboard">
                     </td>
                     <td class="p-2 text-right font-bold text-blue-700 bg-blue-50 px-3 rounded">{{fmt(it.netAmount)}}</td>
                     <td class="p-2 text-center">
@@ -8635,23 +8687,16 @@ app.component('view-purchase', {
                 </tbody>
               </table>
             </div>
-            <!-- 🆕 Commission Summary Banner — เฉพาะถ้า supplier มีเซลดูแล -->
-            <div v-if="form.salesId" class="mt-3 bg-gradient-to-r from-purple-50 to-emerald-50 border-2 border-purple-300 rounded-lg p-3 grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
-              <div class="flex items-center gap-2">
-                <span class="text-2xl">💼</span>
-                <div>
-                  <div class="text-xs text-slate-600">เซลที่ดูแล</div>
-                  <div class="font-bold text-purple-700">{{(db.salespersons||[]).find(s=>s&&s.id===form.salesId)?.name || '-'}}</div>
-                </div>
+            <!-- 🆕 Sales reminder — แทน Commission Summary เพราะค่าคอมคำนวณรวมเดือน ไม่ใช่ต่อบิล -->
+            <div v-if="form.salesId" class="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm flex items-center gap-3">
+              <span class="text-2xl">💼</span>
+              <div class="flex-1">
+                <div class="text-xs text-slate-600">เซลที่ดูแลบิลนี้</div>
+                <div class="font-bold text-purple-700">{{(db.salespersons||[]).find(s=>s&&s.id===form.salesId)?.name || '-'}}</div>
               </div>
-              <div class="text-center">
-                <div class="text-xs text-slate-600">📋 กฎค่าคอม</div>
-                <div class="text-xs text-slate-700"><b>ยอด > 1 ล้าน</b> + ราคา ≤ หน้าใบ → ล้านละ 1,000 (0.1%)</div>
-                <div class="text-[10px] text-slate-500 mt-0.5">ตัวอย่าง: 1.5 ล้าน = 1,500 ฿ · 1 ล้าน = 0 ฿ (ต้องเกิน)</div>
-              </div>
-              <div class="text-center bg-emerald-100 rounded p-2">
-                <div class="text-xs text-emerald-700">💰 ค่าคอมรวมบิลนี้</div>
-                <div class="text-2xl font-bold text-emerald-700">{{fmt(billTotals.totalCommission)}}</div>
+              <div class="text-xs text-slate-600 text-right">
+                <div>📋 ค่าคอม = <b>ยอดรวมเดือน ≥ 1 ล้าน</b> → 0.1% (ล้านละ 1,000)</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">เช็คยอดสะสมที่ <b>💼 Sales Tracking Dashboard</b></div>
               </div>
             </div>
           </div>
@@ -11321,7 +11366,7 @@ app.component('view-sales', {
 
     return { db, erp, form, showForm, editing, showDetail, search, filterStatus, filterChannel,
       filterMode, filterDateFrom, filterDateTo,
-      open, save, addItem, removeItem, recalcLine, cancelBill, deleteBill, filtered, statusBadge, statusText,
+      open, save, addItem, removeItem, recalcLine, recalcAll, cancelBill, deleteBill, filtered, statusBadge, statusText,
       loadFromPOSell, availableTradingPurchases, loadFromTradingPurchase, billTotals, toggleVatIssued, goToPendingSale, fmt:erp.fmt,
       addTradingPurchase, removeTradingPurchase,
       // 🆕 Customer salesId helpers
@@ -11840,7 +11885,12 @@ app.component('view-production', {
     }
     function saveInput() {
       const o = currentOrder.value;
-      if (!['Approved','In Production','Partially Completed'].includes(o.status)) { erp.showToast('สถานะต้อง Approved/In Production จึงเบิกได้','error'); return; }
+      // 🆕 อนุญาตให้แก้รายการเดิมได้แม้ Locked/Completed (มี confirm จาก openEditInput แล้ว)
+      const isEditing = !!editingInputId.value;
+      const allowedStatuses = isEditing
+        ? ['Approved','In Production','Partially Completed','Completed','Closed']
+        : ['Approved','In Production','Partially Completed'];
+      if (!allowedStatuses.includes(o.status)) { erp.showToast('สถานะต้อง Approved/In Production จึงเบิกได้','error'); return; }
       if (!inputForm.productId || !inputForm.qtyNet) { erp.showToast('กรอกสินค้า + น้ำหนัก','error'); return; }
       calcInput();
       const isEdit = !!editingInputId.value;
@@ -11849,7 +11899,16 @@ app.component('view-production', {
       if (isEdit) {
         oldRecord = db.productionInputs.find(x => x && x.id === editingInputId.value);
         // ลบ stock ledger ที่อ้างถึงรายการนี้ทั้งหมด (รวม WIP_IN และ PRODUCTION_INPUT_OUT)
+        const oldEntries = db.stockLedger.filter(s => s.refType === 'PI' && s.refId === editingInputId.value);
         db.stockLedger = db.stockLedger.filter(s => !(s.refType === 'PI' && s.refId === editingInputId.value));
+        // 🔧 BUG FIX #2: ลบจาก Supabase ด้วย — กัน autoSync pull ของเก่ากลับมา
+        if (window.sb && oldEntries.length > 0) {
+          const oldIds = oldEntries.map(e => e.id);
+          window.sb.from('stock_ledger').delete().in('id', oldIds).then(({ error }) => {
+            if (error) console.warn('[saveInput] ลบ cloud stock_ledger fail:', error.message);
+            else console.log('[saveInput] ลบ cloud stock_ledger '+oldIds.length+' rows สำเร็จ');
+          });
+        }
         // เช็ค stock onHand "หลังคืน qty เดิมแล้ว"
         const onHand = erp.stockOnHand(inputForm.productId, o.branchId, o.warehouseFromId);
         if (inputForm.qtyNet > onHand && !confirm('เบิกเกินสต๊อก ('+erp.fmt(onHand)+') — ต่อ?')) {
@@ -12025,8 +12084,12 @@ app.component('view-production', {
       // Auto-sync outputType from category
       syncOutputCategory();
 
-      // Status check — allow Approved / In Production / Partially Completed
-      if (!['In Production','Partially Completed','Approved'].includes(o.status)) {
+      // Status check — allow editing existing items even after Locked/Completed (มี confirm จาก openEditOutput แล้ว)
+      const isEditingOut = !!editingOutputId.value;
+      const allowedOutputStatuses = isEditingOut
+        ? ['Approved','In Production','Partially Completed','Completed','Closed']
+        : ['Approved','In Production','Partially Completed'];
+      if (!allowedOutputStatuses.includes(o.status)) {
         erp.showToast('สถานะใบสั่งผลิตต้องเป็น Approved/In Production จึงจะรับผลผลิตได้ (ปัจจุบัน: '+o.status+')','error'); return;
       }
       if (!outputForm.productId) { erp.showToast('กรุณาเลือกสินค้า','error'); return; }
@@ -12063,8 +12126,17 @@ app.component('view-production', {
       let oldRecord = null;
       if (isEdit) {
         oldRecord = db.productionOutputs.find(x => x && x.id === editingOutputId.value);
-        // ลบ stock ledger ของรายการเดิม
+        // ลบ stock ledger ของรายการเดิมจาก local
+        const oldEntries = db.stockLedger.filter(s => s.refType === 'PO2' && s.refId === editingOutputId.value);
         db.stockLedger = db.stockLedger.filter(s => !(s.refType === 'PO2' && s.refId === editingOutputId.value));
+        // 🔧 BUG FIX #2: ลบจาก Supabase ด้วย — กัน autoSync pull ของเก่ากลับมา (autoSync ไม่ลบ records — แค่ upsert)
+        if (window.sb && oldEntries.length > 0) {
+          const oldIds = oldEntries.map(e => e.id);
+          window.sb.from('stock_ledger').delete().in('id', oldIds).then(({ error }) => {
+            if (error) console.warn('[saveOutput] ลบ cloud stock_ledger fail:', error.message);
+            else console.log('[saveOutput] ลบ cloud stock_ledger '+oldIds.length+' rows สำเร็จ');
+          });
+        }
       }
       const id = isEdit ? editingOutputId.value : erp.uid('PO2');
       const nowUser = erp.currentUser.value?.username || '-';
@@ -12144,6 +12216,16 @@ app.component('view-production', {
           returnReason: isReturn ? out.returnReason : '',
           createdBy:out.createdBy
         });
+        // 🔧 BUG FIX #1: Sync product.itemStatus จาก outputCategory
+        // เดิม: product master ตั้งเป็น 'RM' ถาวร — output category ถูกเก็บใน stockLedger แต่ Stock Balance filter ใช้ p.itemStatus → output FG ก็ยังโชว์เป็น RM
+        // ใหม่: เมื่อ save output category = FG/RM → update product master ให้ตรง (ไม่ทำกับ Customer Return)
+        if (!isReturn && (cat === 'FG' || cat === 'RM')) {
+          const prod = db.products.find(p => p && p.id === out.productId);
+          if (prod && prod.itemStatus !== cat) {
+            prod.itemStatus = cat;
+            console.log('[saveOutput] อัปเดต product.itemStatus: '+prod.name+' → '+cat);
+          }
+        }
       }
       // 🔥 ห้าม auto-close — ต้องกดปิดงานเอง (changeStatus → Completed)
       if (o.status === 'Approved') changeStatus(o, 'In Production');
@@ -13026,7 +13108,17 @@ app.component('view-productionReport', {
       data.value.forEach(p => rows.push([p.date, p.docNo, p.productionType, db.machines.find(m=>m.id===p.machineId)?.name||'-', p.status, p.totalInputQty, p.totalOutputQty, p.totalLossQty, p.yieldPct.toFixed(2), p.totalRMCost, p.totalProcessCost, p.totalProductionCost, p.costPerKg.toFixed(2)]));
       downloadCsv('production_report_'+erp.today()+'.csv', rows);
     }
-    return { db, erp, fromDate, toDate, filterMachine, filterBranch, filterStatus, data, totals, byProduct, exportCsv, fmt:erp.fmt };
+    /* 🆕 Force-sync: pull from cloud + recalculate to ensure report ตรงกับ production page */
+    async function forceRefresh() {
+      try {
+        if (window.$autoSync) {
+          erp.showToast('⏳ ดึงข้อมูลล่าสุดจาก Cloud...','success');
+          await window.$autoSync.pullNow();
+          erp.showToast('✓ Refresh สำเร็จ — รายงานอัปเดตแล้ว','success');
+        }
+      } catch(e) { erp.showToast('Refresh fail: '+e.message,'error'); }
+    }
+    return { db, erp, fromDate, toDate, filterMachine, filterBranch, filterStatus, data, totals, byProduct, exportCsv, forceRefresh, fmt:erp.fmt };
   },
   template: `
   <div>
@@ -13036,7 +13128,8 @@ app.component('view-productionReport', {
       <select v-model="filterBranch" class="px-3 py-2 border rounded-lg text-sm"><option value="">ทุกสาขา</option><option v-for="b in db.branches" :value="b.id">{{b.name}}</option></select>
       <select v-model="filterMachine" class="px-3 py-2 border rounded-lg text-sm"><option value="">ทุกเครื่อง</option><option v-for="m in db.machines" :value="m.id">{{m.name}}</option></select>
       <select v-model="filterStatus" class="px-3 py-2 border rounded-lg text-sm"><option value="">ทุกสถานะ</option><option>In Production</option><option>Partially Completed</option><option>Completed</option><option>Closed</option></select>
-      <button @click="exportCsv" class="ml-auto bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
+      <button @click="forceRefresh" class="ml-auto bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">🔄 Refresh จาก Cloud</button>
+      <button @click="exportCsv" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4">
       <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-slate-500">ใบสั่งผลิต</div><div class="text-xl font-bold">{{totals.count}}</div></div>
@@ -26816,9 +26909,19 @@ app.component('view-openingBalance', {
             unitCost: cost,
             valueIn: qty * cost, valueOut: 0,
             paid: !!x.paid,
+            outputCategory: x.itemStatus || 'RM',     // 🆕 เก็บ category ที่ user ตั้งใน OB
             isOpening: true,
             createdAt: new Date().toISOString()
           });
+          // 🔧 BUG FIX #4: Sync product.itemStatus จาก OB stockItems.itemStatus
+          // เดิม: OB เพิ่ม stock เข้า ledger ได้ แต่ product master ไม่อัปเดต → Stock Balance แสดงเป็น RM (default) แทน FG
+          if (x.itemStatus && (x.itemStatus === 'FG' || x.itemStatus === 'RM' || x.itemStatus === 'WIP')) {
+            const prod = db.products.find(p => p && p.id === x.productId);
+            if (prod && prod.itemStatus !== x.itemStatus) {
+              prod.itemStatus = x.itemStatus;
+              console.log('[lockOpening] อัปเดต product.itemStatus: '+prod.name+' → '+x.itemStatus);
+            }
+          }
         });
 
         // 4. Lock
@@ -32453,32 +32556,31 @@ app.component('view-salesCommission', {
       return sup?.salesId || '';
     }
 
-    /* 🆕 คำนวณค่าคอมต่อ item — กฎ:
-       1. ซื้อ ≤ ราคาหน้าใบ
-       2. ยอดซื้อ > 1 ล้านบาท
-       → ค่าคอม = ยอด × 0.1% (ล้านละ 1,000 บาท) */
-    function _itemCommission(it) {
-      if (!it || !it.facePrice || Number(it.facePrice) <= 0) return 0;
-      if (Number(it.price||0) > Number(it.facePrice||0)) return 0;
-      const amount = Number(it.netAmount||0) || (Number(it.netWeight||0) * Number(it.price||0));
-      if (amount <= 1000000) return 0;  // ต้องเกิน 1 ล้าน
-      return amount / 1000000 * 1000;  // 0.1% ของยอดซื้อ
+    /* 🆕 NEW RULE: คำนวณค่าคอม "รวมทั้งเดือน" (ไม่ใช่ต่อ item)
+       ถ้ายอดซื้อรวมเดือน ≥ 1 ล้านบาท → ค่าคอม = ยอด × 0.1% (ล้านละ 1,000)
+       ถ้า < 1 ล้าน → ค่าคอม = 0 (ไม่ได้)
+       ตัวอย่าง: รวมเดือน 800k = 0 ฿ · รวมเดือน 1.5M = 1,500 ฿ */
+    const COMMISSION_THRESHOLD = 1000000;
+    const COMMISSION_RATE = 0.001;  // 0.1%
+    function _calcMonthlyCommission(totalAmount) {
+      if (totalAmount < COMMISSION_THRESHOLD) return 0;
+      return Math.round(totalAmount * COMMISSION_RATE);
     }
 
-    /* Per-Sales summary (cards) — ใช้ "บิลซื้อ" */
+    /* Per-Sales summary (cards) — ใช้ "บิลซื้อ" — กฎใหม่: รวมเดือน */
     const salesSummary = computed(() => {
       const sps = (db.salespersons||[]).filter(s => s && s.active !== false);
       const map = new Map();
       sps.forEach(s => map.set(s.id, {
         id: s.id, name: s.name, code: s.code, phone: s.phone, email: s.email, note: s.note,
         billCount: 0, qty: 0, purchaseAmt: 0, commission: 0,
-        eligibleItems: 0, ineligibleItems: 0,
-        suppliers: new Set()
+        suppliers: new Set(),
+        progressPct: 0,
       }));
       map.set('_UNASSIGNED_', {
         id:'_UNASSIGNED_', name:'(ไม่ได้กำหนด Sales)', code:'-',
         billCount:0, qty:0, purchaseAmt:0, commission:0,
-        eligibleItems:0, ineligibleItems:0, suppliers:new Set()
+        suppliers:new Set(), progressPct:0,
       });
       filteredBills.value.forEach(b => {
         const sid = getBillSalesId(b) || '_UNASSIGNED_';
@@ -32488,19 +32590,42 @@ app.component('view-salesCommission', {
         x.qty += (b.items||[]).reduce((s,i)=>s+Number(i.netWeight||0),0);
         x.purchaseAmt += Number(b.totalAmount||0);
         x.suppliers.add(b.supplierId);
-        // 🆕 คำนวณค่าคอม per item
-        (b.items||[]).forEach(it => {
-          if (!it.facePrice || Number(it.facePrice) <= 0) return;  // ไม่มีราคาหน้าใบ — ไม่นับ
-          const c = _itemCommission(it);
-          x.commission += c;
-          if (c > 0) x.eligibleItems++; else x.ineligibleItems++;
+      });
+      return Array.from(map.values()).map(x => {
+        // 🆕 คำนวณค่าคอมจากยอดรวมเดือน
+        x.commission = _calcMonthlyCommission(x.purchaseAmt);
+        x.progressPct = Math.min(100, Math.round(x.purchaseAmt / COMMISSION_THRESHOLD * 100));
+        x.remainingToTarget = Math.max(0, COMMISSION_THRESHOLD - x.purchaseAmt);
+        return {
+          ...x,
+          supplierCount: x.suppliers.size,
+          avgPrice: x.qty > 0 ? x.purchaseAmt / x.qty : 0,
+          eligible: x.purchaseAmt >= COMMISSION_THRESHOLD,
+        };
+      }).sort((a,b) => b.purchaseAmt - a.purchaseAmt);
+    });
+
+    /* 🆕 รายการบิลละเอียด — แสดงต่อ supplier ของ sales */
+    const billDetailRows = computed(() => {
+      if (!drillSales.value) return [];
+      const rows = [];
+      filteredBills.value.forEach(b => {
+        const sid = getBillSalesId(b) || '_UNASSIGNED_';
+        if (sid !== drillSales.value) return;
+        (b.items || []).forEach(it => {
+          rows.push({
+            date: b.date,
+            docNo: b.docNo,
+            supplierName: erp.supplierName(b.supplierId),
+            productName: (db.products||[]).find(p=>p&&p.id===it.productId)?.name || '-',
+            qty: Number(it.netWeight||0),
+            price: Number(it.price||0),
+            amount: Number(it.netAmount||0),
+            facePrice: Number(it.facePrice||0),
+          });
         });
       });
-      return Array.from(map.values()).map(x => ({
-        ...x,
-        supplierCount: x.suppliers.size,
-        avgPrice: x.qty > 0 ? x.purchaseAmt / x.qty : 0,
-      })).sort((a,b) => b.commission - a.commission);
+      return rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
     });
 
     /* Drill-down data — เมื่อคลิกการ์ด */
@@ -32586,7 +32711,8 @@ app.component('view-salesCommission', {
 
     return { erp, db, fmt, today, period, dateFrom, dateTo, drillSales, setPeriod,
       salesSummary, allSuppliers, assignSupplier, totals, exportCsv, drillData,
-      supplierSearch, supplierFilterSales, bulkAssignAll };
+      supplierSearch, supplierFilterSales, bulkAssignAll,
+      billDetailRows, COMMISSION_THRESHOLD };
   },
   template: `
   <div class="space-y-4">
@@ -32654,7 +32780,56 @@ app.component('view-salesCommission', {
         </div>
       </div>
 
-      <!-- Bill list -->
+      <!-- 🆕 รายการสินค้าละเอียด — เพื่อให้เซลเช็คยอดและราคาหน้าใบ -->
+      <div class="bg-white rounded-2xl shadow-lg p-5">
+        <h3 class="font-bold text-slate-800 mb-1">📊 รายการสินค้าละเอียด ({{billDetailRows.length}})</h3>
+        <div class="text-xs text-slate-500 mb-3">เซลใช้เช็คยอดสะสม + ราคาที่ใส่ในใบ vs ราคาซื้อจริง</div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-100"><tr>
+              <th class="p-2 text-left">วันที่</th>
+              <th class="p-2 text-left">เลขที่บิล</th>
+              <th class="p-2 text-left">Supplier</th>
+              <th class="p-2 text-left">สินค้า</th>
+              <th class="p-2 text-right">น้ำหนัก</th>
+              <th class="p-2 text-right">ราคาซื้อ</th>
+              <th class="p-2 text-right text-purple-700">ราคาหน้าใบ</th>
+              <th class="p-2 text-right">ยอดรวม</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="(r, i) in billDetailRows" :key="i" class="border-t hover:bg-blue-50/30">
+                <td class="p-2 text-xs">{{r.date}}</td>
+                <td class="p-2 font-mono text-xs">{{r.docNo}}</td>
+                <td class="p-2 text-xs">{{r.supplierName}}</td>
+                <td class="p-2 text-xs">{{r.productName}}</td>
+                <td class="p-2 text-right">{{fmt(r.qty)}}</td>
+                <td class="p-2 text-right">{{fmt(r.price)}}</td>
+                <td class="p-2 text-right text-purple-700 font-medium">{{r.facePrice > 0 ? fmt(r.facePrice) : '-'}}</td>
+                <td class="p-2 text-right font-bold text-blue-700">{{fmt(r.amount)}}</td>
+              </tr>
+              <tr v-if="billDetailRows.length===0"><td colspan="8" class="text-center py-6 text-slate-400">ยังไม่มีรายการในช่วงนี้</td></tr>
+            </tbody>
+            <tfoot class="bg-slate-100 font-bold">
+              <tr>
+                <td colspan="4" class="p-2 text-right">รวมทั้งช่วง:</td>
+                <td class="p-2 text-right">{{fmt(billDetailRows.reduce((s,r)=>s+r.qty,0))}}</td>
+                <td colspan="2"></td>
+                <td class="p-2 text-right text-blue-700 text-base">{{fmt(billDetailRows.reduce((s,r)=>s+r.amount,0))}}</td>
+              </tr>
+              <tr class="bg-emerald-50">
+                <td colspan="7" class="p-2 text-right text-emerald-700">
+                  💼 ค่าคอมที่ได้ (เกณฑ์: ยอด ≥ {{fmt(COMMISSION_THRESHOLD)}} ฿):
+                </td>
+                <td class="p-2 text-right text-emerald-700 text-base">
+                  {{fmt(billDetailRows.reduce((s,r)=>s+r.amount,0) >= COMMISSION_THRESHOLD ? Math.round(billDetailRows.reduce((s,r)=>s+r.amount,0) * 0.001) : 0)}}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bill list (ซื้อรวม) -->
       <div class="bg-white rounded-2xl shadow-lg p-5">
         <h3 class="font-bold text-slate-800 mb-3">📋 บิลรับซื้อทั้งหมด ({{drillData.bills.length}})</h3>
         <div class="overflow-x-auto">
@@ -32770,13 +32945,19 @@ app.component('view-salesCommission', {
           <div class="text-2xl font-bold text-blue-700 font-mono leading-tight">{{fmt(s.purchaseAmt)}}</div>
           <div v-if="s.avgPrice>0" class="text-xs text-blue-600">เฉลี่ย {{fmt(s.avgPrice)}} ฿/กก.</div>
         </div>
-        <!-- 💼 ค่าคอม (กฎ: ราคาซื้อ ≤ ราคาหน้าใบ → ตันละ 1,000) -->
-        <div class="bg-gradient-to-br from-emerald-100 to-green-100 rounded-xl p-3 text-center border-2 border-emerald-300">
-          <div class="text-xs text-emerald-700 font-medium">💼 ค่าคอมที่ได้</div>
-          <div class="text-3xl font-bold text-emerald-700 font-mono leading-tight">{{fmt(s.commission)}}</div>
-          <div class="text-xs text-emerald-600 mt-0.5">
-            <span class="text-emerald-700">✓ {{s.eligibleItems}} ได้</span> ·
-            <span class="text-red-600">⊘ {{s.ineligibleItems}} เกินราคาใบ</span>
+        <!-- 💼 ค่าคอม (กฎใหม่: รวมเดือน ≥ 1 ล้าน → 0.1%) -->
+        <div :class="['rounded-xl p-3 text-center border-2', s.eligible ? 'bg-gradient-to-br from-emerald-100 to-green-100 border-emerald-300' : 'bg-slate-50 border-slate-200']">
+          <div :class="['text-xs font-medium', s.eligible ? 'text-emerald-700' : 'text-slate-600']">💼 ค่าคอมเดือนนี้</div>
+          <div :class="['text-3xl font-bold font-mono leading-tight', s.eligible ? 'text-emerald-700' : 'text-slate-400']">{{fmt(s.commission)}}</div>
+          <!-- 🆕 Progress bar — แสดงความใกล้ถึง 1 ล้าน -->
+          <div class="mt-2">
+            <div class="bg-white rounded-full h-3 overflow-hidden border border-slate-200">
+              <div :class="['h-full transition-all', s.eligible ? 'bg-emerald-500' : (s.progressPct >= 75 ? 'bg-amber-400' : 'bg-blue-300')]" :style="{width: s.progressPct + '%'}"></div>
+            </div>
+            <div class="text-[11px] mt-1" :class="s.eligible ? 'text-emerald-700' : 'text-slate-600'">
+              <span v-if="s.eligible">✓ ครบเป้า 1 ล้าน · เกิน {{fmt(s.purchaseAmt - 1000000)}}</span>
+              <span v-else>{{s.progressPct}}% (ขาดอีก <b>{{fmt(s.remainingToTarget)}}</b> ฿)</span>
+            </div>
           </div>
         </div>
       </div>
