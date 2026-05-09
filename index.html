@@ -7419,84 +7419,90 @@ app.component('view-dashboard', {
         ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026
       </div>
 
-      <!-- 6 KPI Cards (Top Row) — Icon บน + Center Aligned -->
+      <!-- 6 KPI Cards (Top Row) — COMPACT (Icon ขวา) -->
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
         <!-- Revenue -->
-        <div class="bg-white rounded-lg shadow-sm p-3 border border-slate-100 text-center hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-base mx-auto mb-1.5">📈</div>
-          <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Revenue</div>
-          <div class="flex items-baseline justify-center gap-0.5 mt-1">
-            <span class="text-[10px] font-bold text-slate-700">฿</span>
-            <div class="text-sm font-bold text-slate-800 truncate">{{fmt(monthSales)}}</div>
+        <div class="bg-white rounded-lg shadow-sm p-2.5 border border-slate-100">
+          <div class="flex items-start justify-between">
+            <div class="min-w-0">
+              <div class="text-[10px] text-slate-500 font-medium">Revenue</div>
+              <div class="flex items-baseline gap-0.5"><span class="text-[10px] font-bold text-slate-700">฿</span><div class="text-base font-bold text-slate-800 truncate">{{fmt(monthSales)}}</div></div>
+            </div>
+            <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm flex-shrink-0">📈</div>
           </div>
-          <div class="text-[10px] mt-1 font-medium" :class="pctChange(monthSales, prevSales)>=0?'text-emerald-600':'text-red-600'">
-            {{pctChange(monthSales, prevSales)>=0?'▲':'▼'}}{{Math.abs(pctChange(monthSales, prevSales)).toFixed(1)}}% <span class="text-slate-400 font-normal">vs prev</span>
+          <div class="text-[10px] mt-1" :class="pctChange(monthSales, prevSales)>=0?'text-emerald-600':'text-red-600'">
+            {{pctChange(monthSales, prevSales)>=0?'▲':'▼'}}{{Math.abs(pctChange(monthSales, prevSales)).toFixed(1)}}% <span class="text-slate-400">vs prev</span>
           </div>
-          <div v-if="histRevenue > 0" class="text-[9px] mt-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded inline-block leading-tight">
+          <div v-if="histRevenue > 0" class="text-[9px] mt-0.5 px-1 py-0.5 bg-amber-100 text-amber-700 rounded inline-block leading-tight">
             📅 +Hist {{fmt(histRevenue)}}
           </div>
         </div>
 
         <!-- Expenses -->
-        <div class="bg-white rounded-lg shadow-sm p-3 border border-slate-100 text-center hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-base mx-auto mb-1.5">💸</div>
-          <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Expenses</div>
-          <div class="flex items-baseline justify-center gap-0.5 mt-1">
-            <span class="text-[10px] font-bold text-slate-700">฿</span>
-            <div class="text-sm font-bold text-slate-800 truncate">{{fmt(monthExpenses + monthCost)}}</div>
+        <div class="bg-white rounded-lg shadow-sm p-2.5 border border-slate-100">
+          <div class="flex items-start justify-between">
+            <div class="min-w-0">
+              <div class="text-[10px] text-slate-500 font-medium">Expenses</div>
+              <div class="flex items-baseline gap-0.5"><span class="text-[10px] font-bold text-slate-700">฿</span><div class="text-base font-bold text-slate-800 truncate">{{fmt(monthExpenses + monthCost)}}</div></div>
+            </div>
+            <div class="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-sm flex-shrink-0">💸</div>
           </div>
-          <div class="text-[10px] mt-1 font-medium" :class="pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)<=0?'text-emerald-600':'text-red-600'">
-            {{pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)>=0?'▲':'▼'}}{{Math.abs(pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)).toFixed(1)}}% <span class="text-slate-400 font-normal">vs prev</span>
+          <div class="text-[10px] mt-1" :class="pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)<=0?'text-emerald-600':'text-red-600'">
+            {{pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)>=0?'▲':'▼'}}{{Math.abs(pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)).toFixed(1)}}% <span class="text-slate-400">vs prev</span>
           </div>
-          <div v-if="(histExpenses + histCogs) > 0" class="text-[9px] mt-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded inline-block leading-tight">
+          <div v-if="(histExpenses + histCogs) > 0" class="text-[9px] mt-0.5 px-1 py-0.5 bg-amber-100 text-amber-700 rounded inline-block leading-tight">
             📅 +Hist {{fmt(histExpenses + histCogs)}}
           </div>
         </div>
 
         <!-- Net Profit -->
-        <div class="bg-white rounded-lg shadow-sm p-3 border border-slate-100 text-center hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-base mx-auto mb-1.5">🥧</div>
-          <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Net Profit</div>
-          <div class="flex items-baseline justify-center gap-0.5 mt-1">
-            <span class="text-[10px] font-bold text-slate-700">฿</span>
-            <div class="text-sm font-bold truncate" :class="netProfit>=0?'text-emerald-700':'text-red-700'">{{fmt(netProfit)}}</div>
+        <div class="bg-white rounded-lg shadow-sm p-2.5 border border-slate-100">
+          <div class="flex items-start justify-between">
+            <div class="min-w-0">
+              <div class="text-[10px] text-slate-500 font-medium">Net Profit</div>
+              <div class="flex items-baseline gap-0.5"><span class="text-[10px] font-bold text-slate-700">฿</span><div class="text-base font-bold truncate" :class="netProfit>=0?'text-emerald-700':'text-red-700'">{{fmt(netProfit)}}</div></div>
+            </div>
+            <div class="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-sm flex-shrink-0">🥧</div>
           </div>
-          <div class="text-[10px] mt-1 font-medium" :class="pctChange(netProfit, prevNetProfit)>=0?'text-emerald-600':'text-red-600'">
-            {{pctChange(netProfit, prevNetProfit)>=0?'▲':'▼'}}{{Math.abs(pctChange(netProfit, prevNetProfit)).toFixed(1)}}% <span class="text-slate-400 font-normal">vs prev</span>
+          <div class="text-[10px] mt-1" :class="pctChange(netProfit, prevNetProfit)>=0?'text-emerald-600':'text-red-600'">
+            {{pctChange(netProfit, prevNetProfit)>=0?'▲':'▼'}}{{Math.abs(pctChange(netProfit, prevNetProfit)).toFixed(1)}}% <span class="text-slate-400">vs prev</span>
           </div>
         </div>
 
         <!-- Cash Balance -->
-        <div class="bg-white rounded-lg shadow-sm p-3 border border-slate-100 text-center hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600 text-base mx-auto mb-1.5">💵</div>
-          <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Cash Balance</div>
-          <div class="flex items-baseline justify-center gap-0.5 mt-1">
-            <span class="text-[10px] font-bold text-slate-700">฿</span>
-            <div class="text-sm font-bold text-slate-800 truncate">{{fmt(cashBalance)}}</div>
+        <div class="bg-white rounded-lg shadow-sm p-2.5 border border-slate-100">
+          <div class="flex items-start justify-between">
+            <div class="min-w-0">
+              <div class="text-[10px] text-slate-500 font-medium">Cash Balance</div>
+              <div class="flex items-baseline gap-0.5"><span class="text-[10px] font-bold text-slate-700">฿</span><div class="text-base font-bold text-slate-800 truncate">{{fmt(cashBalance)}}</div></div>
+            </div>
+            <div class="w-7 h-7 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600 text-sm flex-shrink-0">💵</div>
           </div>
-          <div class="text-[10px] mt-1 text-slate-500">{{db.accounts.filter(a=>a.active && (a.type==='เงินสด'||a.type==='ธนาคาร')).length}} active accounts</div>
+          <div class="text-[10px] mt-1 text-slate-500">{{db.accounts.filter(a=>a.active && (a.type==='เงินสด'||a.type==='ธนาคาร')).length}} active</div>
         </div>
 
         <!-- AR -->
-        <div class="bg-white rounded-lg shadow-sm p-3 border border-slate-100 text-center hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-base mx-auto mb-1.5">👤</div>
-          <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wide">AR <span class="text-slate-400 normal-case">ลูกหนี้</span></div>
-          <div class="flex items-baseline justify-center gap-0.5 mt-1">
-            <span class="text-[10px] font-bold text-slate-700">฿</span>
-            <div class="text-sm font-bold text-slate-800 truncate">{{fmt(arTotal)}}</div>
+        <div class="bg-white rounded-lg shadow-sm p-2.5 border border-slate-100">
+          <div class="flex items-start justify-between">
+            <div class="min-w-0">
+              <div class="text-[10px] text-slate-500 font-medium">AR ลูกหนี้</div>
+              <div class="flex items-baseline gap-0.5"><span class="text-[10px] font-bold text-slate-700">฿</span><div class="text-base font-bold text-slate-800 truncate">{{fmt(arTotal)}}</div></div>
+            </div>
+            <div class="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-sm flex-shrink-0">👤</div>
           </div>
-          <div class="text-[10px] mt-1 text-slate-400">เกินกำหนด: <b class="text-amber-600">{{fmt(arAgingSummary['1-30']+arAgingSummary['31-60']+arAgingSummary['61-90']+arAgingSummary.over90)}}</b></div>
+          <div class="text-[10px] mt-1 text-slate-400">เกิน: <b class="text-amber-600">{{fmt(arAgingSummary['1-30']+arAgingSummary['31-60']+arAgingSummary['61-90']+arAgingSummary.over90)}}</b></div>
         </div>
 
         <!-- AP -->
-        <div class="bg-white rounded-lg shadow-sm p-3 border border-slate-100 text-center hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-base mx-auto mb-1.5">📋</div>
-          <div class="text-[10px] text-slate-500 font-medium uppercase tracking-wide">AP <span class="text-slate-400 normal-case">เจ้าหนี้</span></div>
-          <div class="flex items-baseline justify-center gap-0.5 mt-1">
-            <span class="text-[10px] font-bold text-slate-700">฿</span>
-            <div class="text-sm font-bold text-slate-800 truncate">{{fmt(apTotal)}}</div>
+        <div class="bg-white rounded-lg shadow-sm p-2.5 border border-slate-100">
+          <div class="flex items-start justify-between">
+            <div class="min-w-0">
+              <div class="text-[10px] text-slate-500 font-medium">AP เจ้าหนี้</div>
+              <div class="flex items-baseline gap-0.5"><span class="text-[10px] font-bold text-slate-700">฿</span><div class="text-base font-bold text-slate-800 truncate">{{fmt(apTotal)}}</div></div>
+            </div>
+            <div class="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-sm flex-shrink-0">📋</div>
           </div>
-          <div class="text-[10px] mt-1 text-slate-400">เกินกำหนด: <b class="text-red-600">{{fmt(apAgingSummary['1-30']+apAgingSummary['31-60']+apAgingSummary['61-90']+apAgingSummary.over90)}}</b></div>
+          <div class="text-[10px] mt-1 text-slate-400">เกิน: <b class="text-red-600">{{fmt(apAgingSummary['1-30']+apAgingSummary['31-60']+apAgingSummary['61-90']+apAgingSummary.over90)}}</b></div>
         </div>
       </div>
 
