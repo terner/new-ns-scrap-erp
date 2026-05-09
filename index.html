@@ -261,6 +261,160 @@
 const { createApp, reactive, ref, computed, watch, onMounted, h } = Vue;
 
 const STORAGE_KEY = 'ns_erp_db_v1';
+
+/* ════════════════════════════════════════════════════════════════
+   🆕 IndexedDB Shim — Transparent Storage Layer (limit ~1 GB)
+   ════════════════════════════════════════════════════════════════
+   ทำงาน:
+   - Patches localStorage.setItem/getItem/removeItem เฉพาะ 2 keys ของระบบ
+   - In-memory cache (sync access เหมือน localStorage)
+   - Async write to IndexedDB (debounced 300ms) + best-effort to localStorage (fallback)
+   - Bootstrap: ที่ boot → load จาก IndexedDB → ถ้าไม่มี → migrate จาก localStorage
+   ผลลัพธ์: code เดิม 111 callsite ใช้ localStorage.setItem/getItem ทำงานได้ตามปกติ
+   ════════════════════════════════════════════════════════════════ */
+(function installIDBShim() {
+  const TRACKED = new Set(['ns_erp_db_v1', 'ns_erp_sync_failed_queue']);
+  const DB_NAME = 'ns_erp_idb';
+  const STORE = 'kv';
+
+  // ---------- Mini IndexedDB wrapper ----------
+  let _dbPromise = null;
+  function _openDB() {
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = (e) => { e.target.result.createObjectStore(STORE); };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+    return _dbPromise;
+  }
+  async function idbGet(key) {
+    const db = await _openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSet(key, val) {
+    const db = await _openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(val, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbDel(key) {
+    const db = await _openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  // expose for debug
+  window._idb = { get: idbGet, set: idbSet, del: idbDel };
+
+  // ---------- In-memory cache (sync access) ----------
+  const _ram = {};
+  window._ramStorage = _ram;
+
+  // ---------- Async write queue (debounced) ----------
+  const _queue = {};
+  let _flushTimer = null;
+  function _scheduleFlush() {
+    clearTimeout(_flushTimer);
+    _flushTimer = setTimeout(async () => {
+      const batch = _queue; for (const k in _queue) delete _queue[k];
+      for (const [k, v] of Object.entries(batch)) {
+        try {
+          if (v === null) await idbDel(k);
+          else await idbSet(k, v);
+        } catch(e) { console.warn('[IDB] write fail:', k, e); }
+      }
+    }, 300);
+  }
+
+  // ---------- Patch Storage.prototype methods (only for tracked keys) ----------
+  const _origGet = Storage.prototype.getItem;
+  const _origSet = Storage.prototype.setItem;
+  const _origRemove = Storage.prototype.removeItem;
+
+  Storage.prototype.setItem = function(key, value) {
+    if (TRACKED.has(key)) {
+      _ram[key] = String(value);
+      _queue[key] = String(value);
+      _scheduleFlush();
+      // Best-effort write to localStorage too (backward compat — may fail with quota)
+      try { _origSet.call(this, key, value); } catch(e) {
+        // localStorage full — IDB handles it, just warn once
+        if (!window._lsQuotaWarned) {
+          console.warn('[Storage] localStorage quota exceeded — using IndexedDB only');
+          window._lsQuotaWarned = true;
+        }
+      }
+      return;
+    }
+    return _origSet.call(this, key, value);
+  };
+
+  Storage.prototype.getItem = function(key) {
+    if (TRACKED.has(key)) {
+      if (_ram[key] !== undefined) return _ram[key];
+      // not in cache → fallback to localStorage
+      const ls = _origGet.call(this, key);
+      if (ls != null) _ram[key] = ls;
+      return ls;
+    }
+    return _origGet.call(this, key);
+  };
+
+  Storage.prototype.removeItem = function(key) {
+    if (TRACKED.has(key)) {
+      delete _ram[key];
+      _queue[key] = null;
+      _scheduleFlush();
+      try { _origRemove.call(this, key); } catch(e) {}
+      return;
+    }
+    return _origRemove.call(this, key);
+  };
+
+  // ---------- Bootstrap: Load from IndexedDB into RAM cache ----------
+  // ⚠ Synchronous: We need to block until IDB is loaded.
+  // Use a simple busy-wait pattern by exposing a Promise that loadDB() awaits.
+  window._idbReady = (async () => {
+    for (const key of TRACKED) {
+      try {
+        const idbVal = await idbGet(key);
+        if (idbVal != null) {
+          _ram[key] = idbVal;
+        } else {
+          // Fallback: migrate from localStorage to IndexedDB
+          const lsVal = _origGet.call(localStorage, key);
+          if (lsVal != null) {
+            _ram[key] = lsVal;
+            try { await idbSet(key, lsVal); console.log('[IDB] migrated from localStorage:', key, '(' + (lsVal.length/1024).toFixed(1) + ' KB)'); } catch(e) { console.warn('[IDB] migration fail:', key, e); }
+          }
+        }
+      } catch(e) {
+        console.warn('[IDB] init fail:', key, e);
+        // Fallback: keep using localStorage
+        try {
+          const lsVal = _origGet.call(localStorage, key);
+          if (lsVal != null) _ram[key] = lsVal;
+        } catch(e2) {}
+      }
+    }
+    console.log('[IDB] Storage layer ready · cache:', Object.keys(_ram).map(k => k+':'+(_ram[k]?.length||0)+'B').join(', '));
+    return true;
+  })();
+})();
+
 const fmt = (n) => Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
 const fmtInt = (n) => Number(n||0).toLocaleString('th-TH');
 const today = () => new Date().toISOString().slice(0,10);
@@ -36041,9 +36195,40 @@ app.component('view-statusConvert', {
 });
 
 /* =================================================================
-   MOUNT APP
+   MOUNT APP — รอ IndexedDB ready แล้ว rehydrate _GLOBAL_DB ถ้า IDB
+   มีข้อมูลใหม่กว่า localStorage (เกิดเมื่อ quota เคย exceed)
    ================================================================= */
-app.mount('#app');
+(async () => {
+  try {
+    if (window._idbReady) {
+      await window._idbReady;
+      // 🆕 Rehydrate: ถ้า IDB cache มีข้อมูลที่ต่างจาก _GLOBAL_DB ที่โหลดจาก localStorage
+      const idbRaw = window._ramStorage && window._ramStorage[STORAGE_KEY];
+      if (idbRaw) {
+        try {
+          const idbData = JSON.parse(idbRaw);
+          const currentRaw = JSON.stringify(_GLOBAL_DB);
+          if (idbRaw !== currentRaw) {
+            console.log('[IDB] Rehydrating _GLOBAL_DB from IndexedDB (size:', (idbRaw.length/1024).toFixed(1)+' KB)');
+            // ลบ key เก่าออก แล้ว assign ใหม่ — Vue reactivity ติดตามได้
+            Object.keys(_GLOBAL_DB).forEach(k => { delete _GLOBAL_DB[k]; });
+            Object.assign(_GLOBAL_DB, idbData);
+          }
+        } catch(e) { console.warn('[IDB] rehydrate fail:', e); }
+      }
+    }
+  } catch (e) {
+    console.warn('[IDB] init error, fallback to localStorage:', e);
+  }
+  app.mount('#app');
+  // 🆕 แสดง storage status ใน console หลัง mount
+  setTimeout(() => {
+    try {
+      const sz = (JSON.stringify(_GLOBAL_DB).length / 1024 / 1024).toFixed(2);
+      console.log(`%c💾 Storage: ${sz} MB · IndexedDB ${window._idb ? '✓' : '✗'} · localStorage ${window._lsQuotaWarned ? '(quota exceeded — IDB only)' : '✓'}`, 'color:#0ea5e9;font-weight:bold');
+    } catch(e){}
+  }, 1000);
+})();
 </script>
 </body>
 </html>
