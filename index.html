@@ -5095,6 +5095,36 @@ function makeMasterComponent(opts) {
         selectedIds.value = s;
       }
       function clearSelection() { selectedIds.value = new Set(); }
+      /* 🆕 Export to Excel — ใช้ XLSX จาก CDN ที่ load อยู่แล้ว */
+      function exportExcel() {
+        try {
+          const all = list.value || [];
+          if (all.length === 0) { erp.showToast('ไม่มีข้อมูลให้ export','warning'); return; }
+          // Header (column labels)
+          const headers = (opts.fields || opts.columns || []).map(f => f.label || f.key);
+          const keys = (opts.fields || opts.columns || []).map(f => f.key);
+          // Rows
+          const rows = all.map(item => keys.map(k => {
+            const v = item[k];
+            if (v === null || v === undefined) return '';
+            if (typeof v === 'boolean') return v ? 'true' : 'false';
+            if (typeof v === 'object') return JSON.stringify(v);
+            return v;
+          }));
+          // Build sheet
+          const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+          ws['!cols'] = headers.map(() => ({ wch: 18 }));
+          ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, opts.title || opts.collection);
+          const fname = (opts.collection || 'master') + '_' + new Date().toISOString().slice(0,10) + '.xlsx';
+          XLSX.writeFile(wb, fname);
+          erp.showToast('✓ Export '+all.length+' รายการ → '+fname, 'success');
+        } catch(e) {
+          console.error('export:', e);
+          erp.showToast('Export fail: '+e.message, 'error');
+        }
+      }
       async function bulkDelete() {
         const ids = Array.from(selectedIds.value);
         if (ids.length === 0) return;
@@ -5116,13 +5146,17 @@ function makeMasterComponent(opts) {
         if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
       }
       return { db, list, filtered, search, showModal, editing, form, open, save, remove, opts, fmt: erp.fmt,
-        selectedIds, isSelected, toggleOne, allVisibleSelected, toggleAllVisible, clearSelection, bulkDelete };
+        selectedIds, isSelected, toggleOne, allVisibleSelected, toggleAllVisible, clearSelection, bulkDelete,
+        exportExcel };
     },
     template: `
       <div>
         <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <input v-model="search" placeholder="ค้นหา..." class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-64">
-          <button @click="open()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ เพิ่มรายการ</button>
+          <div class="flex gap-2">
+            <button @click="exportExcel" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm" title="Download Excel ของข้อมูลทั้งหมด">📊 Export Excel</button>
+            <button @click="open()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">+ เพิ่มรายการ</button>
+          </div>
         </div>
         <!-- 🆕 Bulk action bar — โผล่เมื่อเลือกอย่างน้อย 1 รายการ -->
         <div v-if="selectedIds.size > 0" class="mb-3 bg-red-50 border-2 border-red-300 rounded-lg p-3 flex items-center gap-3 sticky top-0 z-10">
