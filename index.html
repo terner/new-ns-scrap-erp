@@ -4944,13 +4944,39 @@ function makeMasterComponent(opts) {
         showModal.value = false;
         erp.showToast('บันทึกสำเร็จ');
       }
-      function remove(item) {
-        if (!confirm('ยืนยันการลบ ' + (item.name || item.code) + ' ?')) return;
+      /* 🔧 BUG FIX: ลบจาก Supabase ด้วย — กัน auto-pull ดึงของเก่ากลับมา (autoSync ทำแค่ upsert ไม่ลบ) */
+      function _cloudTableFor(localCollection) {
+        // map local collection name → Supabase table name
+        const map = {
+          suppliers:'suppliers', customers:'customers', products:'products',
+          accounts:'accounts', branches:'branches', warehouses:'warehouses',
+          salespersons:'salespersons', purchaseChannels:'purchase_channels',
+          salesChannels:'sales_channels', expenseCategories:'expense_categories',
+          currencies:'currencies', overseasRecipients:'overseas_recipients'
+        };
+        return map[localCollection] || null;
+      }
+      async function _deleteCloud(localCollection, ids) {
+        if (!window.sb || !ids || ids.length === 0) return;
+        const cloudTbl = _cloudTableFor(localCollection);
+        if (!cloudTbl) return;
+        try {
+          const { error } = await window.sb.from(cloudTbl).delete().in('id', ids);
+          if (error) console.warn('[delete-cloud] '+cloudTbl+': '+error.message);
+          else console.log('[delete-cloud] '+cloudTbl+' '+ids.length+' rows ✓');
+        } catch(e) { console.warn('[delete-cloud] exception:', e); }
+      }
+      async function remove(item) {
+        if (!confirm('ยืนยันการลบ ' + (item.name || item.code) + ' ?\n\n⚠ จะลบทั้ง Local + Supabase Cloud — เครื่องอื่นจะไม่เห็นข้อมูลนี้อีก')) return;
         const idx = db[opts.collection].findIndex(x=>x.id===item.id);
+        if (idx < 0) return;
         const before = JSON.parse(JSON.stringify(db[opts.collection][idx]));
+        const idToDelete = item.id;
         db[opts.collection].splice(idx,1);
         erp.logAudit('delete', opts.collection, before, null);
-        erp.showToast('ลบเรียบร้อย');
+        // 🔧 ลบจาก Supabase ด้วย
+        await _deleteCloud(opts.collection, [idToDelete]);
+        erp.showToast('🗑 ลบเรียบร้อย (local + cloud)');
       }
       const search = ref('');
       const filtered = computed(() => {
@@ -4978,22 +5004,24 @@ function makeMasterComponent(opts) {
         selectedIds.value = s;
       }
       function clearSelection() { selectedIds.value = new Set(); }
-      function bulkDelete() {
+      async function bulkDelete() {
         const ids = Array.from(selectedIds.value);
         if (ids.length === 0) return;
-        if (!confirm('ลบ '+ids.length+' รายการที่เลือก? — ลบไม่สามารถกู้คืนได้')) return;
-        let removed = 0;
+        if (!confirm('ลบ '+ids.length+' รายการที่เลือก?\n\n⚠ จะลบทั้ง Local + Supabase Cloud — เครื่องอื่นจะไม่เห็นข้อมูลเหล่านี้อีก\n(กู้คืนไม่ได้)')) return;
+        const idsToDelete = [];
         ids.forEach(id => {
           const idx = db[opts.collection].findIndex(x => x && x.id === id);
           if (idx >= 0) {
             const before = JSON.parse(JSON.stringify(db[opts.collection][idx]));
             db[opts.collection].splice(idx, 1);
             try { erp.logAudit('delete', opts.collection, before, null); } catch(e){}
-            removed++;
+            idsToDelete.push(id);
           }
         });
         clearSelection();
-        erp.showToast('🗑 ลบ '+removed+' รายการแล้ว','success');
+        // 🔧 ลบจาก Supabase ด้วย
+        await _deleteCloud(opts.collection, idsToDelete);
+        erp.showToast('🗑 ลบ '+idsToDelete.length+' รายการแล้ว (local + cloud)','success');
         if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
       }
       return { db, list, filtered, search, showModal, editing, form, open, save, remove, opts, fmt: erp.fmt,
