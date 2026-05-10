@@ -30136,41 +30136,55 @@ app.component('view-openingBalance', {
       erp.showToast('🔄 Re-Apply สำเร็จ — ค่าใหม่ขึ้นในระบบ','success');
     }
 
-    /* Save = WIPE ALL opening + RECREATE (destructive idempotent — gold standard)
-       กลยุทธ์ "ของจริงทุกครั้ง" — ป้องกัน duplicate cross-device แบบเด็ดขาด:
-       1. ลบ ALL stock_ledger/sales_bills/purchase_bills opening ทั้ง local+cloud
-       2. Reset applied=false ทุก item
-       3. Apply ใหม่หมด (composite id) → ไม่มีของเก่าค้าง
-       4. Push singleton openingBalance → cloud = source of truth
-       ผลลัพธ์: หลายเครื่อง save → cloud มีของจาก save ล่าสุด · ไม่มี duplicate */
+    /* 🆕 Save = MERGE-FIRST → APPLY ALL → CLEANUP ORPHANS (multi-device safe)
+       กลยุทธ์ใหม่ — ปลอดภัยสำหรับ multi-device:
+       1. PULL singleton จาก cloud
+       2. MERGE local items + cloud items (dedup by id) → ได้ master list
+       3. Apply merged list (composite id — upsert)
+       4. PUSH singleton (มีทั้ง local + remote)
+       5. Cleanup orphans (cloud entries ที่ไม่อยู่ใน merged list — ลบทั้ง local + cloud)
+       ผลลัพธ์: ถ้าคอมอื่นกรอกแล้ว → ไม่หาย; ทุกเครื่อง save → ได้ union ของทุกเครื่อง */
     async function save() {
       try {
         const username = erp.currentUser.value?.username || 'system';
 
-        // 🚨 STEP 1: WIPE ALL opening entries (local + cloud)
-        const allSL = db.stockLedger.filter(s => s && s.refType === 'OPENING').map(s => s.id);
-        const allSB = db.salesBills.filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('SB-OPN-'))).map(b => b.id);
-        const allPB = db.purchaseBills.filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('PB-OPN-'))).map(b => b.id);
+        // 🛑 STEP 0: หยุด autoSync ชั่วคราว (กัน race ระหว่าง pull/push)
+        try { if (window.$autoSync && window.$autoSync.stop) window.$autoSync.stop(); } catch(e){}
 
-        // Local wipe
-        if (allSL.length) db.stockLedger = db.stockLedger.filter(s => !s || !allSL.includes(s.id));
-        if (allSB.length) db.salesBills = db.salesBills.filter(b => !b || !allSB.includes(b.id));
-        if (allPB.length) db.purchaseBills = db.purchaseBills.filter(b => !b || !allPB.includes(b.id));
+        let mergedFromCloud = 0;
+        // 🆕 STEP 1: PULL cloud singleton (ดึงข้อมูลที่คอมอื่น push ขึ้นมา)
+        try {
+          if (window.sb) {
+            const { data, error } = await window.sb.from('opening_balance').select('*').eq('id', 'SINGLETON').single();
+            if (!error && data && data.data) {
+              const cloud = data.data;
+              // MERGE list types (dedup by id, local wins on conflict — เพราะ user เพิ่งแก้)
+              ['arItems','apItems','stockItems','otherReceivables','otherPayables'].forEach(k => {
+                const localArr = ob.value[k] || [];
+                const cloudArr = Array.isArray(cloud[k]) ? cloud[k] : [];
+                const localIds = new Set(localArr.map(x => x && x.id).filter(Boolean));
+                cloudArr.forEach(ci => {
+                  if (ci && ci.id && !localIds.has(ci.id)) {
+                    // เพิ่มเข้า local — ตั้ง applied=false เพื่อให้ apply ใหม่ในขั้นถัดไป
+                    const merged = JSON.parse(JSON.stringify(ci));
+                    merged.applied = false; merged.appliedRefId = '';
+                    localArr.push(merged);
+                    mergedFromCloud++;
+                  }
+                });
+                ob.value[k] = localArr;
+              });
+              console.log(`[Save MERGE] ดึง ${mergedFromCloud} items จาก cloud มารวม local`);
+            }
+          }
+        } catch(e) { console.warn('[Save MERGE] pull cloud failed:', e); }
 
-        // Cloud wipe (await — ต้องเสร็จก่อน apply ใหม่ ไม่งั้น cloud จะมี duplicates)
-        if (erp.deleteCloud) {
-          if (allSL.length) await erp.deleteCloud('stockLedger', allSL).catch(e => console.warn('cloud SL wipe:', e));
-          if (allSB.length) await erp.deleteCloud('salesBills', allSB).catch(e => console.warn('cloud SB wipe:', e));
-          if (allPB.length) await erp.deleteCloud('purchaseBills', allPB).catch(e => console.warn('cloud PB wipe:', e));
-        }
-        const wiped = allSL.length + allSB.length + allPB.length;
-
-        // 🚨 STEP 2: Reset applied=false ทุก item (เพื่อบังคับ apply ใหม่)
+        // STEP 2: Reset applied=false ทุก item (บังคับ apply ใหม่ → composite id ป้องกัน duplicate)
         ['arItems','apItems','stockItems','otherReceivables','otherPayables'].forEach(k => {
-          (ob.value[k]||[]).forEach(x => { x.applied = false; x.appliedRefId = ''; });
+          (ob.value[k]||[]).forEach(x => { if (x) { x.applied = false; x.appliedRefId = ''; } });
         });
 
-        // 🚨 STEP 3: Apply ใหม่ทั้งหมด (composite id — guaranteed unique)
+        // STEP 3: Apply ทุก item (composite id — upsert by deterministic id)
         let created = 0;
         (ob.value.arItems||[]).forEach(x => { if (_applyItem(x, 'AR')) created++; });
         (ob.value.apItems||[]).forEach(x => { if (_applyItem(x, 'AP')) created++; });
@@ -30178,20 +30192,49 @@ app.component('view-openingBalance', {
         (ob.value.otherReceivables||[]).forEach(x => { if (_applyItem(x, 'OR')) created++; });
         (ob.value.otherPayables||[]).forEach(x => { if (_applyItem(x, 'OP')) created++; });
 
-        // STEP 4: Persist + push singleton
+        // STEP 4: Cleanup orphans — ลบ cloud entries ที่ id ไม่อยู่ใน merged set
+        // (สำหรับกรณี user ลบ row บาง row ออก — ต้องเอาออกจาก cloud ด้วย)
+        const validRefIds = new Set();
+        ['arItems','apItems','stockItems'].forEach(k => {
+          (ob.value[k]||[]).forEach(x => {
+            const type = k === 'arItems' ? 'AR' : k === 'apItems' ? 'AP' : 'STOCK';
+            const id = _refIdFor(type, x);
+            if (id) validRefIds.add(id);
+          });
+        });
+        const orphanSL = (db.stockLedger||[]).filter(s => s && s.refType === 'OPENING' && !validRefIds.has(s.id)).map(s => s.id);
+        const orphanSB = (db.salesBills||[]).filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('SB-OPN-')) && !validRefIds.has(b.id)).map(b => b.id);
+        const orphanPB = (db.purchaseBills||[]).filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('PB-OPN-')) && !validRefIds.has(b.id)).map(b => b.id);
+        // Local
+        if (orphanSL.length) db.stockLedger = db.stockLedger.filter(s => !s || !orphanSL.includes(s.id));
+        if (orphanSB.length) db.salesBills = db.salesBills.filter(b => !b || !orphanSB.includes(b.id));
+        if (orphanPB.length) db.purchaseBills = db.purchaseBills.filter(b => !b || !orphanPB.includes(b.id));
+        // Cloud (await)
+        if (erp.deleteCloud) {
+          if (orphanSL.length) await erp.deleteCloud('stockLedger', orphanSL).catch(e => console.warn('cloud SL orphan:', e));
+          if (orphanSB.length) await erp.deleteCloud('salesBills', orphanSB).catch(e => console.warn('cloud SB orphan:', e));
+          if (orphanPB.length) await erp.deleteCloud('purchaseBills', orphanPB).catch(e => console.warn('cloud PB orphan:', e));
+        }
+        const orphanCount = orphanSL.length + orphanSB.length + orphanPB.length;
+
+        // STEP 5: Persist + push singleton (cloud = union ของทุกเครื่อง)
         localStorage.setItem('ns_erp_db_v1', JSON.stringify(db));
         if (window.$autoSync?.pushOpeningBalance) {
-          // Await — ให้ cloud singleton ตรงกับ local ก่อน toast
           await window.$autoSync.pushOpeningBalance();
         }
 
         const total = (ob.value.arItems?.length||0) + (ob.value.apItems?.length||0) + (ob.value.stockItems?.length||0) + (ob.value.otherReceivables?.length||0) + (ob.value.otherPayables?.length||0);
-        const msg = `✓ Save (เด็ดขาด) · wipe ${wiped} เก่า · สร้าง ${created} ใหม่ · รวม ${total} items · cloud sync แล้ว`;
+        let msg = `✓ Save (Multi-device safe) · รวม ${total} items · สร้าง ${created} entries`;
+        if (mergedFromCloud > 0) msg += ` · 🔄 ดึง ${mergedFromCloud} จากคอมอื่น`;
+        if (orphanCount > 0) msg += ` · 🧹 cleanup ${orphanCount} orphans`;
         erp.showToast(msg, 'success');
-        erp.logAudit('OPENING_SAVE_DESTRUCTIVE','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total, wiped, created});
+        erp.logAudit('OPENING_SAVE_MERGE','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total, created, mergedFromCloud, orphanCount});
       } catch (e) {
         console.error(e);
         erp.showToast('บันทึกผิดพลาด: '+e.message,'error');
+      } finally {
+        // ✅ Resume autoSync
+        try { if (window.$autoSync && window.$autoSync.start) window.$autoSync.start(); } catch(e){}
       }
     }
 
