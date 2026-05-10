@@ -29363,36 +29363,63 @@ app.component('view-openingBalance', {
       erp.showToast('🔄 Re-Apply สำเร็จ — ค่าใหม่ขึ้นในระบบ','success');
     }
 
-    /* Save = Cleanup orphaned + Apply/Update ทุก item (idempotent — กดซ้ำไม่ซ้ำซ้อน) */
+    /* Save = WIPE ALL opening + RECREATE (destructive idempotent — gold standard)
+       กลยุทธ์ "ของจริงทุกครั้ง" — ป้องกัน duplicate cross-device แบบเด็ดขาด:
+       1. ลบ ALL stock_ledger/sales_bills/purchase_bills opening ทั้ง local+cloud
+       2. Reset applied=false ทุก item
+       3. Apply ใหม่หมด (composite id) → ไม่มีของเก่าค้าง
+       4. Push singleton openingBalance → cloud = source of truth
+       ผลลัพธ์: หลายเครื่อง save → cloud มีของจาก save ล่าสุด · ไม่มี duplicate */
     async function save() {
       try {
-        // 🛡 STEP 1: Cleanup orphaned ทั้ง local + cloud (async)
-        const orphaned = await _cleanupOrphaned();
+        const username = erp.currentUser.value?.username || 'system';
 
-        // STEP 2: Apply/Update ทุก item — idempotent (ถ้ามีแล้ว → update, ถ้าไม่มี → create)
-        let newCount = 0; let updateCount = 0;
-        (ob.value.arItems||[]).forEach(x => { const r = _applyItem(x, 'AR'); if (r) newCount++; else if (x.applied) updateCount++; });
-        (ob.value.apItems||[]).forEach(x => { const r = _applyItem(x, 'AP'); if (r) newCount++; else if (x.applied) updateCount++; });
-        (ob.value.stockItems||[]).forEach(x => { const r = _applyItem(x, 'STOCK'); if (r) newCount++; else if (x.applied) updateCount++; });
-        (ob.value.otherReceivables||[]).forEach(x => { const r = _applyItem(x, 'OR'); if (r) newCount++; else if (x.applied) updateCount++; });
-        (ob.value.otherPayables||[]).forEach(x => { const r = _applyItem(x, 'OP'); if (r) newCount++; else if (x.applied) updateCount++; });
+        // 🚨 STEP 1: WIPE ALL opening entries (local + cloud)
+        const allSL = db.stockLedger.filter(s => s && s.refType === 'OPENING').map(s => s.id);
+        const allSB = db.salesBills.filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('SB-OPN-'))).map(b => b.id);
+        const allPB = db.purchaseBills.filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('PB-OPN-'))).map(b => b.id);
 
-        localStorage.setItem('ns_erp_db_v1', JSON.stringify(db));
-        // 🆕 Push openingBalance singleton ขึ้น cloud ทันที (sync ข้ามเครื่อง)
-        if (window.$autoSync?.pushOpeningBalance) {
-          window.$autoSync.pushOpeningBalance().then(() => console.log('[OB] singleton pushed'));
+        // Local wipe
+        if (allSL.length) db.stockLedger = db.stockLedger.filter(s => !s || !allSL.includes(s.id));
+        if (allSB.length) db.salesBills = db.salesBills.filter(b => !b || !allSB.includes(b.id));
+        if (allPB.length) db.purchaseBills = db.purchaseBills.filter(b => !b || !allPB.includes(b.id));
+
+        // Cloud wipe (await — ต้องเสร็จก่อน apply ใหม่ ไม่งั้น cloud จะมี duplicates)
+        if (erp.deleteCloud) {
+          if (allSL.length) await erp.deleteCloud('stockLedger', allSL).catch(e => console.warn('cloud SL wipe:', e));
+          if (allSB.length) await erp.deleteCloud('salesBills', allSB).catch(e => console.warn('cloud SB wipe:', e));
+          if (allPB.length) await erp.deleteCloud('purchaseBills', allPB).catch(e => console.warn('cloud PB wipe:', e));
         }
+        const wiped = allSL.length + allSB.length + allPB.length;
+
+        // 🚨 STEP 2: Reset applied=false ทุก item (เพื่อบังคับ apply ใหม่)
+        ['arItems','apItems','stockItems','otherReceivables','otherPayables'].forEach(k => {
+          (ob.value[k]||[]).forEach(x => { x.applied = false; x.appliedRefId = ''; });
+        });
+
+        // 🚨 STEP 3: Apply ใหม่ทั้งหมด (composite id — guaranteed unique)
+        let created = 0;
+        (ob.value.arItems||[]).forEach(x => { if (_applyItem(x, 'AR')) created++; });
+        (ob.value.apItems||[]).forEach(x => { if (_applyItem(x, 'AP')) created++; });
+        (ob.value.stockItems||[]).forEach(x => { if (_applyItem(x, 'STOCK')) created++; });
+        (ob.value.otherReceivables||[]).forEach(x => { if (_applyItem(x, 'OR')) created++; });
+        (ob.value.otherPayables||[]).forEach(x => { if (_applyItem(x, 'OP')) created++; });
+
+        // STEP 4: Persist + push singleton
+        localStorage.setItem('ns_erp_db_v1', JSON.stringify(db));
+        if (window.$autoSync?.pushOpeningBalance) {
+          // Await — ให้ cloud singleton ตรงกับ local ก่อน toast
+          await window.$autoSync.pushOpeningBalance();
+        }
+
         const total = (ob.value.arItems?.length||0) + (ob.value.apItems?.length||0) + (ob.value.stockItems?.length||0) + (ob.value.otherReceivables?.length||0) + (ob.value.otherPayables?.length||0);
-        const parts = [];
-        if (newCount > 0) parts.push(`สร้างใหม่ ${newCount}`);
-        if (updateCount > 0) parts.push(`update ${updateCount}`);
-        if (orphaned > 0) parts.push(`ล้าง orphan ${orphaned}`);
-        const msg = parts.length > 0
-          ? `✓ Save · ${parts.join(' · ')} (รวม ${total} items)`
-          : `✓ บันทึกแล้ว (${total} items)`;
+        const msg = `✓ Save (เด็ดขาด) · wipe ${wiped} เก่า · สร้าง ${created} ใหม่ · รวม ${total} items · cloud sync แล้ว`;
         erp.showToast(msg, 'success');
-        erp.logAudit('OPENING_SAVE_IDEMPOTENT','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total, newCount, updateCount, orphaned});
-      } catch (e) { erp.showToast('บันทึกผิดพลาด: '+e.message,'error'); }
+        erp.logAudit('OPENING_SAVE_DESTRUCTIVE','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total, wiped, created});
+      } catch (e) {
+        console.error(e);
+        erp.showToast('บันทึกผิดพลาด: '+e.message,'error');
+      }
     }
 
     /* 🆕 Force push to Cloud — ใช้ auto-sync */
