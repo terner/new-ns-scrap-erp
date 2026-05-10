@@ -28808,15 +28808,159 @@ app.component('view-openingBalance', {
     function addStock() { ob.value.stockItems.push({ id:'OB-ST-'+Date.now()+'-'+Math.random().toString(36).slice(2,5), productId:'', itemStatus:'RM', branchId:'', warehouseId:'', lotNo:'OPENING', qty:0, unitCost:0, paid:true, note:'' }); }
     function addOR() { ob.value.otherReceivables.push({ id:'OB-OR-'+Date.now()+'-'+Math.random().toString(36).slice(2,5), name:'', type:'Other Receivable', amount:0, dueDate:'', note:'' }); }
     function addOP() { ob.value.otherPayables.push({ id:'OB-OP-'+Date.now()+'-'+Math.random().toString(36).slice(2,5), name:'', type:'Other Payable', amount:0, dueDate:'', note:'' }); }
-    function removeFromList(list, id) { const idx = list.findIndex(x=>x && x.id===id); if (idx>=0) list.splice(idx,1); }
+    function removeFromList(list, id, type) {
+      const idx = list.findIndex(x=>x && x.id===id);
+      if (idx>=0) {
+        // 🆕 ถ้า apply แล้ว ต้อง unapply (ลบ entity ที่สร้าง) ก่อนลบ
+        if (type && list[idx].applied) {
+          _unapplyItem(list[idx], type);
+        }
+        list.splice(idx,1);
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      }
+    }
 
-    /* Save (without locking) — เซฟทันทีลง LocalStorage */
+    /* 🆕 Auto-Apply Per-Item — Save แล้วข้อมูลขึ้นทันที ไม่ต้อง Lock
+       แต่ละ item มี:
+         applied: true/false
+         appliedRefId: id ของ salesBill/purchaseBill/stockLedger ที่สร้าง
+       ตอน save จะ apply ทุก item ที่ valid + ยังไม่ applied อัตโนมัติ */
+    function _applyItem(item, type) {
+      const o = ob.value;
+      const cutoff = o.cutoffDate;
+      const username = erp.currentUser.value?.username || 'system';
+      const ts = new Date().toISOString();
+
+      try {
+        if (type === 'AR') {
+          if (!item.customerId || Number(item.amount||0) <= 0) return false;
+          const refId = 'SB-OPN-'+(item.id||'').replace(/[^A-Za-z0-9]/g,'')+'-'+Date.now().toString(36);
+          db.salesBills.push({
+            id: refId, docNo: item.billNo || ('OPN-AR-'+(item.id||'').slice(-6)),
+            date: item.billDate || cutoff,
+            customerId: item.customerId,
+            branchId: '', warehouseId: '', channelId: '',
+            salesman: '-', creditTerm: 0,
+            note: 'Opening Balance — '+(item.note||''),
+            items: [],
+            totalAmount: Number(item.amount||0), totalCost: 0, grossProfit: Number(item.amount||0),
+            receivedAmount: 0, receivableBalance: Number(item.amount||0),
+            status: 'opening', isOpening: true,
+            dueDate: item.dueDate||'',
+            createdAt: ts, createdBy: username
+          });
+          item.applied = true; item.appliedRefId = refId; item.appliedAt = ts;
+          return true;
+        }
+        if (type === 'AP') {
+          if (!item.supplierId || Number(item.amount||0) <= 0) return false;
+          const refId = 'PB-OPN-'+(item.id||'').replace(/[^A-Za-z0-9]/g,'')+'-'+Date.now().toString(36);
+          db.purchaseBills.push({
+            id: refId, docNo: item.billNo || ('OPN-AP-'+(item.id||'').slice(-6)),
+            date: item.billDate || cutoff,
+            supplierId: item.supplierId,
+            branchId: '', warehouseId: '', channelId: '',
+            purchaseType: 'เครดิต',
+            note: 'Opening Balance — '+(item.note||''),
+            items: [],
+            totalAmount: Number(item.amount||0), paidAmount: 0,
+            payableBalance: Number(item.amount||0),
+            status: 'opening', isOpening: true,
+            dueDate: item.dueDate||'',
+            createdAt: ts, createdBy: username
+          });
+          item.applied = true; item.appliedRefId = refId; item.appliedAt = ts;
+          return true;
+        }
+        if (type === 'STOCK') {
+          if (!item.productId || Number(item.qty||0) <= 0) return false;
+          const refId = 'SL-OPN-'+(item.id||'').replace(/[^A-Za-z0-9]/g,'')+'-'+Date.now().toString(36);
+          const qty = Number(item.qty||0); const cost = Number(item.unitCost||0);
+          db.stockLedger.push({
+            id: refId, date: cutoff,
+            refType: 'OPENING', refId: item.id, refNo: 'OPN-STK-'+(item.id||'').slice(-6),
+            movementType: 'OPENING_STOCK_IN',
+            productId: item.productId, lotNo: item.lotNo || 'OPENING',
+            branchId: item.branchId, warehouseId: item.warehouseId,
+            qtyIn: qty, qtyOut: 0,
+            unitCost: cost, valueIn: qty * cost, valueOut: 0,
+            paid: !!item.paid,
+            outputCategory: item.itemStatus || 'RM',
+            isOpening: true,
+            createdAt: ts, createdBy: username
+          });
+          // Sync product.itemStatus
+          if (item.itemStatus && ['FG','RM','WIP'].includes(item.itemStatus)) {
+            const prod = db.products.find(p => p && p.id === item.productId);
+            if (prod && prod.itemStatus !== item.itemStatus) prod.itemStatus = item.itemStatus;
+          }
+          item.applied = true; item.appliedRefId = refId; item.appliedAt = ts;
+          return true;
+        }
+        // OR/OP — ไม่สร้าง entity ใหม่ เก็บใน openingBalance ตรงๆ (ใช้ใน summary)
+        if (type === 'OR' || type === 'OP') {
+          if (!item.name || Number(item.amount||0) <= 0) return false;
+          item.applied = true; item.appliedAt = ts;
+          return true;
+        }
+      } catch(e) { console.warn('[_applyItem]', type, e); }
+      return false;
+    }
+
+    function _unapplyItem(item, type) {
+      if (!item.applied || !item.appliedRefId) {
+        item.applied = false; item.appliedRefId = ''; item.appliedAt = '';
+        return;
+      }
+      const refId = item.appliedRefId;
+      try {
+        if (type === 'AR') {
+          const idx = db.salesBills.findIndex(b => b && b.id === refId);
+          if (idx >= 0) db.salesBills.splice(idx, 1);
+        } else if (type === 'AP') {
+          const idx = db.purchaseBills.findIndex(b => b && b.id === refId);
+          if (idx >= 0) db.purchaseBills.splice(idx, 1);
+        } else if (type === 'STOCK') {
+          const idx = db.stockLedger.findIndex(s => s && s.id === refId);
+          if (idx >= 0) db.stockLedger.splice(idx, 1);
+        }
+      } catch(e) { console.warn('[_unapplyItem]', e); }
+      item.applied = false; item.appliedRefId = ''; item.appliedAt = '';
+    }
+
+    /* Toggle Apply per-item — ผู้ใช้กดปุ่มเองได้ */
+    function toggleApply(item, type) {
+      if (item.applied) _unapplyItem(item, type);
+      else _applyItem(item, type);
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      erp.showToast(item.applied ? '✓ Apply แล้ว — ขึ้นในระบบทันที' : '↶ ยกเลิก Apply', item.applied ? 'success' : 'warning');
+    }
+
+    /* Re-apply (สำหรับแก้ไข item ที่ apply แล้ว) — unapply + apply ใหม่ */
+    function reApply(item, type) {
+      if (item.applied) _unapplyItem(item, type);
+      _applyItem(item, type);
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      erp.showToast('🔄 Re-Apply สำเร็จ — ค่าใหม่ขึ้นในระบบ','success');
+    }
+
+    /* Save = บันทึก + Auto-apply ทุก item ที่ valid + ยังไม่ apply */
     function save() {
       try {
+        let applied = 0; let skipped = 0;
+        (ob.value.arItems||[]).forEach(x => { if (!x.applied && _applyItem(x, 'AR')) applied++; else if (x.applied) skipped++; });
+        (ob.value.apItems||[]).forEach(x => { if (!x.applied && _applyItem(x, 'AP')) applied++; else if (x.applied) skipped++; });
+        (ob.value.stockItems||[]).forEach(x => { if (!x.applied && _applyItem(x, 'STOCK')) applied++; else if (x.applied) skipped++; });
+        (ob.value.otherReceivables||[]).forEach(x => { if (!x.applied && _applyItem(x, 'OR')) applied++; else if (x.applied) skipped++; });
+        (ob.value.otherPayables||[]).forEach(x => { if (!x.applied && _applyItem(x, 'OP')) applied++; else if (x.applied) skipped++; });
+
         localStorage.setItem('ns_erp_db_v1', JSON.stringify(db));
         const total = (ob.value.arItems?.length||0) + (ob.value.apItems?.length||0) + (ob.value.stockItems?.length||0) + (ob.value.otherReceivables?.length||0) + (ob.value.otherPayables?.length||0);
-        erp.showToast('✓ บันทึก Opening Balance สำเร็จ ('+total+' รายการ — ยังไม่ Lock)', 'success');
-        erp.logAudit('OPENING_SAVE','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total});
+        const msg = applied > 0
+          ? `✓ Save + Apply ${applied} รายการใหม่ (รวม ${total} · เก่า ${skipped}) — ขึ้นในระบบทันที`
+          : `✓ บันทึกแล้ว (${total} รายการ · ${skipped} apply อยู่แล้ว)`;
+        erp.showToast(msg, 'success');
+        erp.logAudit('OPENING_SAVE_AUTO_APPLY','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total, applied, skipped});
       } catch (e) { erp.showToast('บันทึกผิดพลาด: '+e.message,'error'); }
     }
 
@@ -29209,6 +29353,8 @@ app.component('view-openingBalance', {
 
     return { erp, db, fmt, tab, ob, summary, addAR, addAP, addStock, addOR, addOP,
       removeFromList, save, forceSyncPush, lockOpening, unlockOpening, showLockResult,
+      // 🆕 Per-item apply
+      toggleApply, reApply,
       // 🆕 Excel import
       importLog, downloadTemplate, handleImportFile };
   },
@@ -29327,19 +29473,29 @@ app.component('view-openingBalance', {
           <button v-if="!ob.locked" @click="addAR" class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded">+ เพิ่ม</button>
         </div>
       </div>
+      <p class="text-xs text-slate-500 mb-2">💡 กด "Apply" ทีละ row เพื่อให้ AR ขึ้นในระบบทันที (ไม่ต้องรอ Lock) · แก้แล้วกด "Re-Apply" เพื่อ update</p>
       <table class="w-full text-sm">
-        <thead class="bg-slate-100"><tr><th class="p-2 text-left">ลูกค้า</th><th class="p-2 text-left">เลขที่บิล</th><th class="p-2 text-left">วันที่บิล</th><th class="p-2 text-right">ยอดค้าง</th><th class="p-2 text-left">วันครบกำหนด</th><th class="p-2">หมายเหตุ</th><th></th></tr></thead>
+        <thead class="bg-slate-100"><tr><th class="p-2 text-left">ลูกค้า</th><th class="p-2 text-left">เลขที่บิล</th><th class="p-2 text-left">วันที่บิล</th><th class="p-2 text-right">ยอดค้าง</th><th class="p-2 text-left">วันครบกำหนด</th><th class="p-2">หมายเหตุ</th><th class="p-2 text-center">สถานะ</th><th></th></tr></thead>
         <tbody>
-          <tr v-for="x in ob.arItems" :key="x.id" class="border-t">
+          <tr v-for="x in ob.arItems" :key="x.id" class="border-t" :class="x.applied?'bg-emerald-50/40':''">
             <td class="p-2"><select v-model="x.customerId" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"><option value="">-เลือก-</option><option v-for="c in db.customers" :key="c.id" :value="c.id">{{c.code}} - {{c.name}}</option></select></td>
             <td class="p-2"><input v-model="x.billNo" :disabled="ob.locked" class="w-full px-1 py-1 border rounded" placeholder="OPN-AR-001"></td>
             <td class="p-2"><input type="date" v-model="x.billDate" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"></td>
             <td class="p-2"><input type="number" v-model.number="x.amount" :disabled="ob.locked" class="w-full px-1 py-1 border rounded text-right"></td>
             <td class="p-2"><input type="date" v-model="x.dueDate" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"></td>
             <td class="p-2"><input v-model="x.note" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"></td>
-            <td class="p-2"><button v-if="!ob.locked" @click="removeFromList(ob.arItems, x.id)" class="text-red-600 text-xs">✕</button></td>
+            <td class="p-2 text-center">
+              <span v-if="x.applied" class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">✓ Applied</span>
+              <span v-else class="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-700">⏳ Pending</span>
+            </td>
+            <td class="p-2 flex gap-1">
+              <button v-if="!ob.locked && !x.applied" @click="toggleApply(x,'AR')" class="text-[10px] px-2 py-0.5 bg-emerald-600 text-white rounded font-bold">✓ Apply</button>
+              <button v-if="!ob.locked && x.applied" @click="reApply(x,'AR')" class="text-[10px] px-2 py-0.5 bg-blue-600 text-white rounded font-bold" title="Update changes">🔄</button>
+              <button v-if="!ob.locked && x.applied" @click="toggleApply(x,'AR')" class="text-[10px] px-1 py-0.5 bg-slate-200 text-slate-600 rounded" title="Unapply">↶</button>
+              <button v-if="!ob.locked" @click="removeFromList(ob.arItems, x.id, 'AR')" class="text-red-600 text-xs">✕</button>
+            </td>
           </tr>
-          <tr v-if="!ob.arItems.length"><td colspan="7" class="text-center py-4 text-slate-400">ยังไม่มีรายการ — กด "+ เพิ่ม"</td></tr>
+          <tr v-if="!ob.arItems.length"><td colspan="8" class="text-center py-4 text-slate-400">ยังไม่มีรายการ — กด "+ เพิ่ม"</td></tr>
         </tbody>
       </table>
     </div>
@@ -29357,19 +29513,29 @@ app.component('view-openingBalance', {
           <button v-if="!ob.locked" @click="addAP" class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded">+ เพิ่ม</button>
         </div>
       </div>
+      <p class="text-xs text-slate-500 mb-2">💡 กด "Apply" ทีละ row เพื่อให้ AP ขึ้นในระบบทันที</p>
       <table class="w-full text-sm">
-        <thead class="bg-slate-100"><tr><th class="p-2 text-left">Supplier</th><th class="p-2 text-left">เลขที่บิล</th><th class="p-2 text-left">วันที่บิล</th><th class="p-2 text-right">ยอดค้าง</th><th class="p-2 text-left">วันครบกำหนด</th><th class="p-2">หมายเหตุ</th><th></th></tr></thead>
+        <thead class="bg-slate-100"><tr><th class="p-2 text-left">Supplier</th><th class="p-2 text-left">เลขที่บิล</th><th class="p-2 text-left">วันที่บิล</th><th class="p-2 text-right">ยอดค้าง</th><th class="p-2 text-left">วันครบกำหนด</th><th class="p-2">หมายเหตุ</th><th class="p-2 text-center">สถานะ</th><th></th></tr></thead>
         <tbody>
-          <tr v-for="x in ob.apItems" :key="x.id" class="border-t">
+          <tr v-for="x in ob.apItems" :key="x.id" class="border-t" :class="x.applied?'bg-emerald-50/40':''">
             <td class="p-2"><select v-model="x.supplierId" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"><option value="">-เลือก-</option><option v-for="s in db.suppliers" :key="s.id" :value="s.id">{{s.code}} - {{s.name}}</option></select></td>
             <td class="p-2"><input v-model="x.billNo" :disabled="ob.locked" class="w-full px-1 py-1 border rounded" placeholder="OPN-AP-001"></td>
             <td class="p-2"><input type="date" v-model="x.billDate" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"></td>
             <td class="p-2"><input type="number" v-model.number="x.amount" :disabled="ob.locked" class="w-full px-1 py-1 border rounded text-right"></td>
             <td class="p-2"><input type="date" v-model="x.dueDate" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"></td>
             <td class="p-2"><input v-model="x.note" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"></td>
-            <td class="p-2"><button v-if="!ob.locked" @click="removeFromList(ob.apItems, x.id)" class="text-red-600 text-xs">✕</button></td>
+            <td class="p-2 text-center">
+              <span v-if="x.applied" class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">✓ Applied</span>
+              <span v-else class="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-700">⏳ Pending</span>
+            </td>
+            <td class="p-2 flex gap-1">
+              <button v-if="!ob.locked && !x.applied" @click="toggleApply(x,'AP')" class="text-[10px] px-2 py-0.5 bg-emerald-600 text-white rounded font-bold">✓ Apply</button>
+              <button v-if="!ob.locked && x.applied" @click="reApply(x,'AP')" class="text-[10px] px-2 py-0.5 bg-blue-600 text-white rounded font-bold" title="Update changes">🔄</button>
+              <button v-if="!ob.locked && x.applied" @click="toggleApply(x,'AP')" class="text-[10px] px-1 py-0.5 bg-slate-200 text-slate-600 rounded" title="Unapply">↶</button>
+              <button v-if="!ob.locked" @click="removeFromList(ob.apItems, x.id, 'AP')" class="text-red-600 text-xs">✕</button>
+            </td>
           </tr>
-          <tr v-if="!ob.apItems.length"><td colspan="7" class="text-center py-4 text-slate-400">ยังไม่มีรายการ</td></tr>
+          <tr v-if="!ob.apItems.length"><td colspan="8" class="text-center py-4 text-slate-400">ยังไม่มีรายการ</td></tr>
         </tbody>
       </table>
     </div>
@@ -29395,12 +29561,12 @@ app.component('view-openingBalance', {
           [{{l.at}}] {{l.msg}}
         </div>
       </div>
-      <p class="text-xs text-slate-500 mb-2">หมายเหตุ: เมื่อ Lock ระบบจะสร้าง Stock Ledger movement <code>OPENING_STOCK_IN</code> และ WAC คำนวณอัตโนมัติ</p>
+      <p class="text-xs text-slate-500 mb-2">💡 กด "Apply" ทีละ row เพื่อสร้าง Stock Ledger <code>OPENING_STOCK_IN</code> ทันที (ไม่ต้องรอ Lock) · ขึ้นใน Stock Balance + COGS ใช้ได้เลย</p>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead class="bg-slate-100"><tr><th class="p-2 text-left">สินค้า</th><th class="p-2 text-left">RM/WIP/FG</th><th class="p-2 text-left">สาขา</th><th class="p-2 text-left">คลัง</th><th class="p-2 text-left">Lot</th><th class="p-2 text-right">Qty</th><th class="p-2 text-right">WAC/หน่วย</th><th class="p-2 text-right">มูลค่า</th><th class="p-2 text-center">จ่ายแล้ว</th><th></th></tr></thead>
+          <thead class="bg-slate-100"><tr><th class="p-2 text-left">สินค้า</th><th class="p-2 text-left">RM/WIP/FG</th><th class="p-2 text-left">สาขา</th><th class="p-2 text-left">คลัง</th><th class="p-2 text-left">Lot</th><th class="p-2 text-right">Qty</th><th class="p-2 text-right">WAC/หน่วย</th><th class="p-2 text-right">มูลค่า</th><th class="p-2 text-center">จ่ายแล้ว</th><th class="p-2 text-center">สถานะ</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="x in ob.stockItems" :key="x.id" class="border-t">
+            <tr v-for="x in ob.stockItems" :key="x.id" class="border-t" :class="x.applied?'bg-emerald-50/40':''">
               <td class="p-2"><searchable-select v-model="x.productId" :options="db.products" label-field="name" code-field="code" :disabled="ob.locked" placeholder="🔍 พิมพ์รหัส/ชื่อสินค้า..." input-class="w-full px-1 py-1 border rounded" @change="x.itemStatus = (db.products.find(p=>p && p.id===x.productId)?.itemStatus) || x.itemStatus || 'RM'"></searchable-select></td>
               <td class="p-2"><select v-model="x.itemStatus" :disabled="ob.locked" class="w-full px-1 py-1 border rounded text-xs"><option value="RM">📦 RM</option><option value="WIP">⚙️ WIP</option><option value="FG">✅ FG</option></select></td>
               <td class="p-2"><select v-model="x.branchId" :disabled="ob.locked" class="w-full px-1 py-1 border rounded"><option value="">-</option><option v-for="b in db.branches" :key="b.id" :value="b.id">{{b.code}}</option></select></td>
@@ -29410,9 +29576,18 @@ app.component('view-openingBalance', {
               <td class="p-2"><input type="number" v-model.number="x.unitCost" :disabled="ob.locked" step="0.01" class="w-24 px-1 py-1 border rounded text-right"></td>
               <td class="p-2 text-right font-bold">{{fmt(Number(x.qty||0)*Number(x.unitCost||0))}}</td>
               <td class="p-2 text-center"><input type="checkbox" v-model="x.paid" :disabled="ob.locked"></td>
-              <td class="p-2"><button v-if="!ob.locked" @click="removeFromList(ob.stockItems, x.id)" class="text-red-600 text-xs">✕</button></td>
+              <td class="p-2 text-center">
+                <span v-if="x.applied" class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">✓ Applied</span>
+                <span v-else class="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-700">⏳ Pending</span>
+              </td>
+              <td class="p-2 flex gap-1">
+                <button v-if="!ob.locked && !x.applied" @click="toggleApply(x,'STOCK')" class="text-[10px] px-2 py-0.5 bg-emerald-600 text-white rounded font-bold">✓ Apply</button>
+                <button v-if="!ob.locked && x.applied" @click="reApply(x,'STOCK')" class="text-[10px] px-2 py-0.5 bg-blue-600 text-white rounded font-bold" title="Update changes">🔄</button>
+                <button v-if="!ob.locked && x.applied" @click="toggleApply(x,'STOCK')" class="text-[10px] px-1 py-0.5 bg-slate-200 text-slate-600 rounded" title="Unapply">↶</button>
+                <button v-if="!ob.locked" @click="removeFromList(ob.stockItems, x.id, 'STOCK')" class="text-red-600 text-xs">✕</button>
+              </td>
             </tr>
-            <tr v-if="!ob.stockItems.length"><td colspan="10" class="text-center py-4 text-slate-400">ยังไม่มีรายการ</td></tr>
+            <tr v-if="!ob.stockItems.length"><td colspan="11" class="text-center py-4 text-slate-400">ยังไม่มีรายการ</td></tr>
           </tbody>
         </table>
       </div>
@@ -29615,14 +29790,17 @@ app.component('view-openingBalance', {
         </div>
       </div>
 
-      <!-- Lock buttons -->
+      <!-- Save / Lock buttons -->
       <div class="bg-white rounded-xl shadow p-5">
-        <h2 class="text-lg font-bold mb-2">🔒 Lock Opening Balance</h2>
-        <p class="text-sm text-slate-500 mb-3">หลัง Lock ระบบจะสร้างเอกสารยกมาทั้งหมด: บิลซื้อ/ขาย AR/AP, Stock Ledger OPENING_STOCK_IN ที่ต่อยอดในเดือน Go-Live ได้</p>
-        <div class="flex gap-2">
-          <button @click="save" :disabled="ob.locked" class="px-5 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 disabled:opacity-50">💾 Save Draft</button>
-          <button v-if="!ob.locked" @click="lockOpening" class="px-5 py-2 bg-amber-600 text-white rounded font-bold hover:bg-amber-700">🔒 Lock Opening Balance</button>
-          <button v-else @click="unlockOpening" class="px-5 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">🔓 Unlock (ลบบิล/Stock Ledger ที่สร้าง)</button>
+        <h2 class="text-lg font-bold mb-2">💾 บันทึก + Lock</h2>
+        <p class="text-sm text-slate-500 mb-3">
+          <b class="text-emerald-700">💾 Save & Apply All</b> = บันทึก + Apply ทุก row ที่ valid (ขึ้นในระบบทันที)<br>
+          <b class="text-amber-700">🔒 Lock</b> = Final lock — ห้ามแก้/ลบหลังจากนี้ (optional · ใช้เมื่อข้อมูลครบแล้ว)
+        </p>
+        <div class="flex gap-2 flex-wrap">
+          <button @click="save" :disabled="ob.locked" class="px-5 py-2 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 disabled:opacity-50">💾 Save & Apply All</button>
+          <button v-if="!ob.locked" @click="lockOpening" class="px-5 py-2 bg-amber-600 text-white rounded font-bold hover:bg-amber-700">🔒 Final Lock</button>
+          <button v-else @click="unlockOpening" class="px-5 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">🔓 Unlock</button>
         </div>
       </div>
     </div>
