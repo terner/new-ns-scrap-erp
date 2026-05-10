@@ -4392,7 +4392,27 @@ window.$erp = {
           const cloudRows = allRows.map(r => _mapKeysReverseS(r, cfg.keyMap || {}));
           // SMART: skip if cloud is empty but local has data (don't wipe local)
           if (allRows.length === 0 && (_GLOBAL_DB[localKey] || []).length > 0) continue;
-          // 🆕 MERGE strategy (ไม่ลบ local rows ที่ cloud ไม่มี — จะถูก push ขึ้นรอบถัดไป)
+
+          // 🆕 BUG FIX: Master tables → ใช้ REPLACE mode (cloud = source of truth)
+          // ไม่ใช่ MERGE — เพราะ master tables ทำ push หลังเพิ่ม/แก้ master ทันที
+          // ถ้าใช้ MERGE → bug: บาง local rows ที่มี id null/undefined ทำให้ STEP 2 push ไม่ครบ
+          const MASTER_REPLACE_MODE = ['products','suppliers','customers','branches','warehouses',
+            'salespersons','accounts','purchaseChannels','salesChannels','expenseCategories',
+            'currencies','overseasRecipients','users','roles'];
+          if (MASTER_REPLACE_MODE.includes(localKey)) {
+            // REPLACE: wipe local + insert all cloud rows
+            const arrM = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
+            const beforeCount = arrM.length;
+            arrM.length = 0; // wipe
+            cloudRows.forEach(r => { if (r) arrM.push(r); });
+            const after = arrM.length;
+            const delta = after - beforeCount;
+            if (delta > 0) newRowCount += delta;
+            totalRows += cloudRows.length;
+            continue;
+          }
+
+          // 🆕 MERGE strategy (สำหรับ transactional tables — ไม่ลบ local rows ที่ cloud ไม่มี)
           const arr = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
           const cloudById = new Map();
           cloudRows.forEach(r => { if (r && r[conflictCol] != null) cloudById.set(r[conflictCol], r); });
@@ -28820,23 +28840,44 @@ app.component('view-openingBalance', {
       }
     }
 
-    /* 🆕 Auto-Apply Per-Item — Save แล้วข้อมูลขึ้นทันที ไม่ต้อง Lock
-       แต่ละ item มี:
-         applied: true/false
-         appliedRefId: id ของ salesBill/purchaseBill/stockLedger ที่สร้าง
-       ตอน save จะ apply ทุก item ที่ valid + ยังไม่ applied อัตโนมัติ */
+    /* 🆕 Auto-Apply Per-Item — Idempotent (กด save กี่ครั้งก็ไม่ซ้ำ)
+       ใช้ deterministic refId จาก item.id → ทำให้ Apply ซ้ำได้ปลอดภัย
+       ตรวจ existing ก่อนสร้าง → ถ้ามีแล้ว skip (ไม่สร้างซ้ำ) */
+    function _refIdFor(type, itemId) {
+      const cleanId = String(itemId||'').replace(/[^A-Za-z0-9]/g,'');
+      if (type === 'AR') return 'SB-OPN-' + cleanId;
+      if (type === 'AP') return 'PB-OPN-' + cleanId;
+      if (type === 'STOCK') return 'SL-OPN-' + cleanId;
+      return '';
+    }
     function _applyItem(item, type) {
       const o = ob.value;
       const cutoff = o.cutoffDate;
       const username = erp.currentUser.value?.username || 'system';
       const ts = new Date().toISOString();
+      const refId = _refIdFor(type, item.id);
 
       try {
         if (type === 'AR') {
           if (!item.customerId || Number(item.amount||0) <= 0) return false;
-          const refId = 'SB-OPN-'+(item.id||'').replace(/[^A-Za-z0-9]/g,'')+'-'+Date.now().toString(36);
+          // 🛡 Idempotent: ตรวจ existing — ถ้ามีอยู่แล้ว update + sync state
+          const existing = db.salesBills.find(b => b && b.id === refId);
+          if (existing) {
+            // Update existing (keep id) — รองรับการแก้ amount ที่ไม่ผ่าน reApply
+            existing.customerId = item.customerId;
+            existing.docNo = item.billNo || existing.docNo;
+            existing.date = item.billDate || cutoff;
+            existing.totalAmount = Number(item.amount||0);
+            existing.grossProfit = Number(item.amount||0);
+            existing.receivableBalance = Number(item.amount||0) - Number(existing.receivedAmount||0);
+            existing.dueDate = item.dueDate||'';
+            existing.note = 'Opening Balance — '+(item.note||'');
+            existing.updatedAt = ts;
+            item.applied = true; item.appliedRefId = refId; item.appliedAt = ts;
+            return false;       // not "new apply" — แค่ sync state
+          }
           db.salesBills.push({
-            id: refId, docNo: item.billNo || ('OPN-AR-'+(item.id||'').slice(-6)),
+            id: refId, docNo: item.billNo || ('OPN-AR-'+String(item.id||'').slice(-6)),
             date: item.billDate || cutoff,
             customerId: item.customerId,
             branchId: '', warehouseId: '', channelId: '',
@@ -28854,9 +28895,21 @@ app.component('view-openingBalance', {
         }
         if (type === 'AP') {
           if (!item.supplierId || Number(item.amount||0) <= 0) return false;
-          const refId = 'PB-OPN-'+(item.id||'').replace(/[^A-Za-z0-9]/g,'')+'-'+Date.now().toString(36);
+          const existing = db.purchaseBills.find(b => b && b.id === refId);
+          if (existing) {
+            existing.supplierId = item.supplierId;
+            existing.docNo = item.billNo || existing.docNo;
+            existing.date = item.billDate || cutoff;
+            existing.totalAmount = Number(item.amount||0);
+            existing.payableBalance = Number(item.amount||0) - Number(existing.paidAmount||0);
+            existing.dueDate = item.dueDate||'';
+            existing.note = 'Opening Balance — '+(item.note||'');
+            existing.updatedAt = ts;
+            item.applied = true; item.appliedRefId = refId; item.appliedAt = ts;
+            return false;
+          }
           db.purchaseBills.push({
-            id: refId, docNo: item.billNo || ('OPN-AP-'+(item.id||'').slice(-6)),
+            id: refId, docNo: item.billNo || ('OPN-AP-'+String(item.id||'').slice(-6)),
             date: item.billDate || cutoff,
             supplierId: item.supplierId,
             branchId: '', warehouseId: '', channelId: '',
@@ -28874,11 +28927,31 @@ app.component('view-openingBalance', {
         }
         if (type === 'STOCK') {
           if (!item.productId || Number(item.qty||0) <= 0) return false;
-          const refId = 'SL-OPN-'+(item.id||'').replace(/[^A-Za-z0-9]/g,'')+'-'+Date.now().toString(36);
+          const existing = db.stockLedger.find(s => s && s.id === refId);
+          if (existing) {
+            // Update existing (keep id) — แก้ qty/cost ก็ยัง refId เดิม
+            const qty = Number(item.qty||0); const cost = Number(item.unitCost||0);
+            existing.productId = item.productId;
+            existing.lotNo = item.lotNo || 'OPENING';
+            existing.branchId = item.branchId; existing.warehouseId = item.warehouseId;
+            existing.qtyIn = qty;
+            existing.unitCost = cost;
+            existing.valueIn = qty * cost;
+            existing.outputCategory = item.itemStatus || 'RM';
+            existing.paid = !!item.paid;
+            existing.updatedAt = ts;
+            // Sync product.itemStatus
+            if (item.itemStatus && ['FG','RM','WIP'].includes(item.itemStatus)) {
+              const prod = db.products.find(p => p && p.id === item.productId);
+              if (prod && prod.itemStatus !== item.itemStatus) prod.itemStatus = item.itemStatus;
+            }
+            item.applied = true; item.appliedRefId = refId; item.appliedAt = ts;
+            return false;
+          }
           const qty = Number(item.qty||0); const cost = Number(item.unitCost||0);
           db.stockLedger.push({
             id: refId, date: cutoff,
-            refType: 'OPENING', refId: item.id, refNo: 'OPN-STK-'+(item.id||'').slice(-6),
+            refType: 'OPENING', refId: item.id, refNo: 'OPN-STK-'+String(item.id||'').slice(-6),
             movementType: 'OPENING_STOCK_IN',
             productId: item.productId, lotNo: item.lotNo || 'OPENING',
             branchId: item.branchId, warehouseId: item.warehouseId,
@@ -28897,7 +28970,6 @@ app.component('view-openingBalance', {
           item.applied = true; item.appliedRefId = refId; item.appliedAt = ts;
           return true;
         }
-        // OR/OP — ไม่สร้าง entity ใหม่ เก็บใน openingBalance ตรงๆ (ใช้ใน summary)
         if (type === 'OR' || type === 'OP') {
           if (!item.name || Number(item.amount||0) <= 0) return false;
           item.applied = true; item.appliedAt = ts;
@@ -28905,6 +28977,41 @@ app.component('view-openingBalance', {
         }
       } catch(e) { console.warn('[_applyItem]', type, e); }
       return false;
+    }
+
+    /* 🆕 Cleanup Orphaned — ลบ opening entries ที่ไม่มี item ใน openingBalance รับผิดชอบ
+       (ทำตอน save → ป้องกัน duplicate จาก import เก่า/sync race) */
+    function _cleanupOrphaned() {
+      try {
+        const validAR = new Set((ob.value.arItems||[]).map(x => _refIdFor('AR', x.id)));
+        const validAP = new Set((ob.value.apItems||[]).map(x => _refIdFor('AP', x.id)));
+        const validST = new Set((ob.value.stockItems||[]).map(x => _refIdFor('STOCK', x.id)));
+
+        const beforeSL = db.stockLedger.length;
+        const beforeSB = db.salesBills.length;
+        const beforePB = db.purchaseBills.length;
+
+        // Remove orphaned opening entries (id starts with SL-OPN- but not in valid set)
+        db.stockLedger = db.stockLedger.filter(s => {
+          if (!s) return false;
+          if (!String(s.id||'').startsWith('SL-OPN-')) return true; // not opening — keep
+          return validST.has(s.id); // opening — keep only if valid
+        });
+        db.salesBills = db.salesBills.filter(b => {
+          if (!b) return false;
+          if (!String(b.id||'').startsWith('SB-OPN-')) return true;
+          return validAR.has(b.id);
+        });
+        db.purchaseBills = db.purchaseBills.filter(b => {
+          if (!b) return false;
+          if (!String(b.id||'').startsWith('PB-OPN-')) return true;
+          return validAP.has(b.id);
+        });
+
+        const removed = (beforeSL - db.stockLedger.length) + (beforeSB - db.salesBills.length) + (beforePB - db.purchaseBills.length);
+        if (removed > 0) console.log('[_cleanupOrphaned] removed', removed, 'orphaned opening entries');
+        return removed;
+      } catch(e) { console.warn('[_cleanupOrphaned]', e); return 0; }
     }
 
     function _unapplyItem(item, type) {
@@ -28936,31 +29043,38 @@ app.component('view-openingBalance', {
       erp.showToast(item.applied ? '✓ Apply แล้ว — ขึ้นในระบบทันที' : '↶ ยกเลิก Apply', item.applied ? 'success' : 'warning');
     }
 
-    /* Re-apply (สำหรับแก้ไข item ที่ apply แล้ว) — unapply + apply ใหม่ */
+    /* Re-apply (สำหรับแก้ไข item ที่ apply แล้ว) — apply เลย เพราะ idempotent แล้ว */
     function reApply(item, type) {
-      if (item.applied) _unapplyItem(item, type);
-      _applyItem(item, type);
+      _applyItem(item, type);    // idempotent: ถ้า existing → update | ถ้าไม่มี → create
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       erp.showToast('🔄 Re-Apply สำเร็จ — ค่าใหม่ขึ้นในระบบ','success');
     }
 
-    /* Save = บันทึก + Auto-apply ทุก item ที่ valid + ยังไม่ apply */
+    /* Save = Cleanup orphaned + Apply/Update ทุก item (idempotent — กดซ้ำไม่ซ้ำซ้อน) */
     function save() {
       try {
-        let applied = 0; let skipped = 0;
-        (ob.value.arItems||[]).forEach(x => { if (!x.applied && _applyItem(x, 'AR')) applied++; else if (x.applied) skipped++; });
-        (ob.value.apItems||[]).forEach(x => { if (!x.applied && _applyItem(x, 'AP')) applied++; else if (x.applied) skipped++; });
-        (ob.value.stockItems||[]).forEach(x => { if (!x.applied && _applyItem(x, 'STOCK')) applied++; else if (x.applied) skipped++; });
-        (ob.value.otherReceivables||[]).forEach(x => { if (!x.applied && _applyItem(x, 'OR')) applied++; else if (x.applied) skipped++; });
-        (ob.value.otherPayables||[]).forEach(x => { if (!x.applied && _applyItem(x, 'OP')) applied++; else if (x.applied) skipped++; });
+        // 🛡 STEP 1: Cleanup orphaned (ลบ opening entries ที่ไม่มี item แล้ว)
+        const orphaned = _cleanupOrphaned();
+
+        // STEP 2: Apply/Update ทุก item — idempotent (ถ้ามีแล้ว → update, ถ้าไม่มี → create)
+        let newCount = 0; let updateCount = 0;
+        (ob.value.arItems||[]).forEach(x => { const r = _applyItem(x, 'AR'); if (r) newCount++; else if (x.applied) updateCount++; });
+        (ob.value.apItems||[]).forEach(x => { const r = _applyItem(x, 'AP'); if (r) newCount++; else if (x.applied) updateCount++; });
+        (ob.value.stockItems||[]).forEach(x => { const r = _applyItem(x, 'STOCK'); if (r) newCount++; else if (x.applied) updateCount++; });
+        (ob.value.otherReceivables||[]).forEach(x => { const r = _applyItem(x, 'OR'); if (r) newCount++; else if (x.applied) updateCount++; });
+        (ob.value.otherPayables||[]).forEach(x => { const r = _applyItem(x, 'OP'); if (r) newCount++; else if (x.applied) updateCount++; });
 
         localStorage.setItem('ns_erp_db_v1', JSON.stringify(db));
         const total = (ob.value.arItems?.length||0) + (ob.value.apItems?.length||0) + (ob.value.stockItems?.length||0) + (ob.value.otherReceivables?.length||0) + (ob.value.otherPayables?.length||0);
-        const msg = applied > 0
-          ? `✓ Save + Apply ${applied} รายการใหม่ (รวม ${total} · เก่า ${skipped}) — ขึ้นในระบบทันที`
-          : `✓ บันทึกแล้ว (${total} รายการ · ${skipped} apply อยู่แล้ว)`;
+        const parts = [];
+        if (newCount > 0) parts.push(`สร้างใหม่ ${newCount}`);
+        if (updateCount > 0) parts.push(`update ${updateCount}`);
+        if (orphaned > 0) parts.push(`ล้าง orphan ${orphaned}`);
+        const msg = parts.length > 0
+          ? `✓ Save · ${parts.join(' · ')} (รวม ${total} items)`
+          : `✓ บันทึกแล้ว (${total} items)`;
         erp.showToast(msg, 'success');
-        erp.logAudit('OPENING_SAVE_AUTO_APPLY','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total, applied, skipped});
+        erp.logAudit('OPENING_SAVE_IDEMPOTENT','openingBalance',null,{cutoffDate:ob.value.cutoffDate, total, newCount, updateCount, orphaned});
       } catch (e) { erp.showToast('บันทึกผิดพลาด: '+e.message,'error'); }
     }
 
