@@ -384,33 +384,50 @@ const STORAGE_KEY = 'ns_erp_db_v1';
     return _origRemove.call(this, key);
   };
 
-  // ---------- Bootstrap: Load from IndexedDB into RAM cache ----------
-  // ⚠ Synchronous: We need to block until IDB is loaded.
-  // Use a simple busy-wait pattern by exposing a Promise that loadDB() awaits.
+  // ---------- Bootstrap: Load from localStorage FIRST, fallback to IndexedDB ----------
+  // 🆕 Priority: localStorage > IndexedDB (เพราะ localStorage write เป็น sync ตอน save → ใหม่กว่า IDB)
+  // IDB ใช้เฉพาะกรณี localStorage quota exceeded
   window._idbReady = (async () => {
     for (const key of TRACKED) {
       try {
+        const lsVal = _origGet.call(localStorage, key);
         const idbVal = await idbGet(key);
-        if (idbVal != null) {
-          _ram[key] = idbVal;
-        } else {
-          // Fallback: migrate from localStorage to IndexedDB
-          const lsVal = _origGet.call(localStorage, key);
-          if (lsVal != null) {
-            _ram[key] = lsVal;
-            try { await idbSet(key, lsVal); console.log('[IDB] migrated from localStorage:', key, '(' + (lsVal.length/1024).toFixed(1) + ' KB)'); } catch(e) { console.warn('[IDB] migration fail:', key, e); }
+
+        // เลือกค่าที่ "ใหญ่กว่า" (proxy สำหรับ "ใหม่กว่า" — ใหม่มักจะมี data มากกว่า)
+        // หรือ ที่ไม่ null
+        let useVal = null; let source = '';
+        if (lsVal != null && idbVal != null) {
+          // Both have value — prefer the larger (typically newer with more data)
+          if (lsVal.length >= idbVal.length) {
+            useVal = lsVal; source = 'localStorage (larger)';
+          } else {
+            useVal = idbVal; source = 'IDB (larger)';
           }
+        } else if (lsVal != null) {
+          useVal = lsVal; source = 'localStorage';
+        } else if (idbVal != null) {
+          useVal = idbVal; source = 'IDB (LS empty)';
+        }
+
+        if (useVal != null) {
+          _ram[key] = useVal;
+          // Sync to both storages
+          if (useVal === lsVal && (!idbVal || idbVal.length !== lsVal.length)) {
+            try { await idbSet(key, useVal); } catch(e) {}
+          } else if (useVal === idbVal && (!lsVal || lsVal.length !== idbVal.length)) {
+            try { _origSet.call(localStorage, key, useVal); } catch(e) {}
+          }
+          console.log('[Storage] '+key+' loaded from '+source+' ('+(useVal.length/1024).toFixed(1)+' KB)');
         }
       } catch(e) {
-        console.warn('[IDB] init fail:', key, e);
-        // Fallback: keep using localStorage
+        console.warn('[Storage] init fail:', key, e);
         try {
           const lsVal = _origGet.call(localStorage, key);
           if (lsVal != null) _ram[key] = lsVal;
         } catch(e2) {}
       }
     }
-    console.log('[IDB] Storage layer ready · cache:', Object.keys(_ram).map(k => k+':'+(_ram[k]?.length||0)+'B').join(', '));
+    console.log('[Storage] Layer ready · cache:', Object.keys(_ram).map(k => k+':'+(_ram[k]?.length||0)+'B').join(', '));
     return true;
   })();
 })();
@@ -7082,6 +7099,32 @@ app.component('view-stockLedger', {
     }
     function closeDetail() { detailBill.value = null; detailType.value = ''; }
 
+    /* 🆕 Edit Opening Stock — navigate to Opening Balance + highlight item */
+    function editOpening(m) {
+      try {
+        // Find the opening item ที่สร้าง entry นี้
+        // refId field ของ stock_ledger = item.id (จาก _applyItem)
+        const itemId = m.refId;
+        if (!itemId) {
+          erp.showToast('ไม่พบ item ต้นทาง — เปิดหน้า Opening Balance เอง','warning');
+        }
+        // Set localStorage flag เพื่อให้ Opening Balance view scroll ไปที่ item
+        try { sessionStorage.setItem('_ob_highlight_id', itemId || ''); } catch(e){}
+        // Navigate ไปหน้า Opening Balance
+        if (window.$erp?.setView) {
+          window.$erp.setView('openingBalance');
+        } else if (window.$erp?.currentView) {
+          window.$erp.currentView.value = 'openingBalance';
+        } else {
+          // Fallback — emit hash change
+          window.location.hash = '#openingBalance';
+        }
+        erp.showToast('🔗 ไปหน้า Opening Balance — แก้ไข item แล้วกด Save','success');
+      } catch(e) {
+        console.warn('[editOpening]', e);
+      }
+    }
+
     const list = computed(() => {
       return db.stockLedger.filter(m => {
         if (filterProduct.value && m.productId !== filterProduct.value) return false;
@@ -7095,7 +7138,7 @@ app.component('view-stockLedger', {
     });
     const movementTypes = computed(()=> [...new Set(db.stockLedger.map(m=>m.movementType))]);
     return { db, erp, filterProduct, filterBranch, filterType, fromDate, toDate, list, movementTypes, fmt:erp.fmt,
-      detailBill, detailType, openDetail, closeDetail };
+      detailBill, detailType, openDetail, closeDetail, editOpening };
   },
   template: `
   <div>
@@ -7125,6 +7168,7 @@ app.component('view-stockLedger', {
             <th class="p-2 text-right" style="width:110px">ต้นทุน/หน่วย</th>
             <th class="p-2 text-right" style="width:110px">มูลค่าเข้า</th>
             <th class="p-2 text-right" style="width:110px">มูลค่าออก</th>
+            <th class="p-2 text-center whitespace-nowrap" style="width:80px">แก้ไข</th>
           </tr>
         </thead>
         <tbody>
@@ -7148,8 +7192,13 @@ app.component('view-stockLedger', {
             <td class="p-2 text-right text-slate-500 font-mono">{{fmt(m.unitCost)}}</td>
             <td class="p-2 text-right font-mono">{{m.valueIn?fmt(m.valueIn):'-'}}</td>
             <td class="p-2 text-right font-mono">{{m.valueOut?fmt(m.valueOut):'-'}}</td>
+            <td class="p-2 text-center whitespace-nowrap">
+              <button v-if="m.refType==='OPENING'" @click="editOpening(m)" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-medium" title="ไปแก้ที่ Opening Balance">✏️ Opening</button>
+              <button v-else-if="m._cp.clickable" @click="openDetail(m)" class="text-xs text-slate-500 hover:text-slate-700">🔍</button>
+              <span v-else class="text-slate-300 text-xs">-</span>
+            </td>
           </tr>
-          <tr v-if="list.length===0"><td colspan="10" class="text-center py-8 text-slate-400">ยังไม่มี Stock Movement</td></tr>
+          <tr v-if="list.length===0"><td colspan="11" class="text-center py-8 text-slate-400">ยังไม่มี Stock Movement</td></tr>
         </tbody>
       </table>
     </div>
