@@ -9298,6 +9298,49 @@ app.component('view-purchase', {
       erp.showToast('✓ เพิ่มเซล "'+name+'" เข้าฐานข้อมูลแล้ว — auto-select ในบิล');
     }
 
+    /* 🆕 Multi-select bulk delete — บิลซื้อ */
+    const selectedBillIds = ref(new Set());
+    function toggleBillSelect(id) {
+      const s = new Set(selectedBillIds.value);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      selectedBillIds.value = s;
+    }
+    function clearBillSelection() { selectedBillIds.value = new Set(); }
+    function selectAllBillsInFilter() {
+      const ids = (filtered.value || []).filter(b => b && b.status !== 'cancelled').map(b => b.id);
+      selectedBillIds.value = new Set(ids);
+    }
+    async function bulkDeleteBills() {
+      const ids = Array.from(selectedBillIds.value);
+      if (!ids.length) { erp.showToast('ยังไม่ได้เลือกบิล', 'error'); return; }
+      // Check downstream payments
+      const blocked = [];
+      ids.forEach(id => {
+        const linked = _purchasePayments(id);
+        if (linked.length) blocked.push({id, count: linked.length});
+      });
+      if (blocked.length) {
+        if (!confirm(`⚠ มี ${blocked.length} บิล ที่มี Payment Voucher แล้ว — จะข้าม\n\nลบแค่ ${ids.length - blocked.length} บิลที่เหลือ?`)) return;
+      } else {
+        if (!confirm(`ลบ ${ids.length} บิลซื้อพร้อมกัน?\n\n• ลบ Stock Ledger ที่เชื่อม\n• กระทบ WAC\n• ลบทั้ง Local + Cloud — กู้คืนไม่ได้`)) return;
+      }
+      const blockedSet = new Set(blocked.map(b => b.id));
+      const toDelete = ids.filter(id => !blockedSet.has(id));
+      try { if (window.$autoSync && window.$autoSync.stop) window.$autoSync.stop(); } catch(e){}
+      try {
+        const ledgerIds = safeArr(db.stockLedger).filter(s => s.refType === 'PB' && toDelete.includes(s.refId)).map(s => s.id);
+        const set = new Set(toDelete);
+        db.purchaseBills = safeArr(db.purchaseBills).filter(x => !x || !set.has(x.id));
+        db.stockLedger = safeArr(db.stockLedger).filter(s => !(s.refType === 'PB' && set.has(s.refId)));
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch (e) {}
+        await erp.deleteCloud('purchaseBills', toDelete);
+        if (ledgerIds.length) await erp.deleteCloud('stockLedger', ledgerIds);
+        erp.showToast(`🗑 ลบ ${toDelete.length} บิลสำเร็จ${blocked.length?' · ข้าม '+blocked.length+' (มี Payment)':''}`,'success');
+        selectedBillIds.value = new Set();
+      } catch(e) { alert('Bulk delete error: '+e.message); }
+      finally { try { if (window.$autoSync && window.$autoSync.start) window.$autoSync.start(); } catch(e){} }
+    }
+
     /* 🚨 Force Delete ALL Imported Bills — เรียกจากหน้าบิลซื้อ */
     async function forceDeleteImportedHere() {
       const billsToDel = (db.purchaseBills||[]).filter(b => b && String(b.id||'').startsWith('PB-IMP-'));
@@ -9353,6 +9396,8 @@ app.component('view-purchase', {
       quickAddSales,
       // 🚨 Emergency
       forceDeleteImportedHere,
+      // 🆕 Multi-select
+      selectedBillIds, toggleBillSelect, clearBillSelection, selectAllBillsInFilter, bulkDeleteBills,
     };
   },
   template: `
@@ -9362,6 +9407,13 @@ app.component('view-purchase', {
       <button @click="forceDeleteImportedHere" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 whitespace-nowrap" title="ลบบิล Import (id: PB-IMP-*) ทั้งหมด — local + cloud">
         🚨 Force Delete Imported (PB-IMP-*)
       </button>
+    </div>
+
+    <!-- 🆕 Bulk Action Banner -->
+    <div v-if="selectedBillIds.size > 0" class="bg-rose-50 border-2 border-rose-400 rounded-xl p-3 mb-3 flex items-center gap-2 flex-wrap">
+      <span class="text-sm font-bold text-rose-700">เลือก {{selectedBillIds.size}} บิล</span>
+      <button @click="bulkDeleteBills" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700">🗑 ลบที่เลือก ({{selectedBillIds.size}})</button>
+      <button @click="clearBillSelection" class="px-3 py-1.5 border rounded text-xs hover:bg-slate-100">✕ ล้างเลือก</button>
     </div>
     <!-- 🔍 Filter bar -->
     <div class="bg-white rounded-xl shadow p-3 mb-4 space-y-2">
@@ -9391,6 +9443,9 @@ app.component('view-purchase', {
     <div class="bg-white rounded-xl shadow overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-slate-100"><tr>
+          <th class="p-2 text-center w-8">
+            <input type="checkbox" :checked="selectedBillIds.size > 0 && selectedBillIds.size === filtered.filter(b=>b.status!=='cancelled').length" @change="$event.target.checked ? selectAllBillsInFilter() : clearBillSelection()" title="เลือก/ล้างทั้งหมด">
+          </th>
           <th class="p-2 text-left">เลขที่</th>
           <th class="p-2 text-left">เลขที่อ้างอิง</th>
           <th class="p-2 text-left">วันที่</th>
@@ -9404,7 +9459,10 @@ app.component('view-purchase', {
           <th></th>
         </tr></thead>
         <tbody>
-          <tr v-for="row in filtered" :key="row.id" class="border-t hover:bg-blue-50/30">
+          <tr v-for="row in filtered" :key="row.id" class="border-t hover:bg-blue-50/30" :class="selectedBillIds.has(row.id)?'bg-rose-100':''">
+            <td class="p-2 text-center">
+              <input v-if="row.status!=='cancelled'" type="checkbox" :checked="selectedBillIds.has(row.id)" @change="toggleBillSelect(row.id)">
+            </td>
             <td class="p-2 font-mono">{{ row.docNo }}</td>
             <td class="p-2 font-mono text-xs text-slate-600">{{ row.refNo || '-' }}</td>
             <td class="p-2">{{ row.date }}</td>
@@ -9437,7 +9495,7 @@ app.component('view-purchase', {
             </td>
           </tr>
           <tr v-if="filtered.length === 0">
-            <td colspan="11" class="text-center py-10 text-slate-400">ยังไม่มีบิลรับซื้อ — กดปุ่ม "+ บิลรับซื้อใหม่"</td>
+            <td colspan="12" class="text-center py-10 text-slate-400">ยังไม่มีบิลรับซื้อ — กดปุ่ม "+ บิลรับซื้อใหม่"</td>
           </tr>
         </tbody>
       </table>
@@ -12408,11 +12466,173 @@ app.component('view-sales', {
 
     function goToPendingSale() { if (window._setView) window._setView('stockIssue'); }
 
+    /* 🆕 Recalculate กำไร — สำหรับบิลขายที่ขายก่อนซื้อ (WAC=0 → ผิด)
+       ใช้ WAC ปัจจุบันคำนวนใหม่ + อัพเดท stock_ledger valueOut */
+    async function recalcProfitForBill(b) {
+      if (!b || b.status === 'cancelled') return { ok: false, msg: 'บิล cancelled' };
+      if (b.transactionMode === 'TRADING') return { ok: false, msg: 'TRADING mode — ใช้ราคา deal ไม่ใช่ WAC' };
+      const items = b.items || [];
+      if (!items.length) return { ok: false, msg: 'ไม่มี items' };
+      let oldTotalCost = Number(b.totalCost||0);
+      let newTotalCost = 0;
+      const updates = [];
+      items.forEach(it => {
+        const oldUC = Number(it.unitCost||0);
+        // Use current WAC at this point
+        const wac = erp.avgCost(it.productId);
+        const weight = Number(it.weight||0);
+        const tc = wac * weight;
+        it.unitCost = wac;
+        it.totalCost = tc;
+        it.profit = Number(it.netAmount||0) - tc;
+        newTotalCost += tc;
+        updates.push({ productId: it.productId, oldUC, newUC: wac, weight, oldTC: oldUC*weight, newTC: tc });
+      });
+      b.totalCost = newTotalCost;
+      b.grossProfit = Number(b.totalAmount||0) - newTotalCost;
+      // Update stock_ledger entries (valueOut)
+      const slUpdates = [];
+      (db.stockLedger||[]).filter(s => s && s.refType === 'SB' && s.refId === b.id).forEach(s => {
+        const u = updates.find(x => x.productId === s.productId);
+        if (u) {
+          s.unitCost = u.newUC;
+          s.valueOut = u.newTC;
+          slUpdates.push(s.id);
+        }
+      });
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      // Push to cloud
+      try {
+        if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow();
+      } catch(e) { console.warn('[recalc] push failed:', e); }
+      erp.logAudit('RECALC_PROFIT','salesBill', {oldTotalCost}, {newTotalCost, diff: newTotalCost-oldTotalCost});
+      return { ok: true, oldTotalCost, newTotalCost, updates, slUpdates };
+    }
+    async function recalcProfitOne(b) {
+      if (b.transactionMode === 'TRADING') { erp.showToast('TRADING bill — ใช้ราคา deal ไม่ใช่ WAC', 'error'); return; }
+      const r = await recalcProfitForBill(b);
+      if (!r.ok) { erp.showToast(r.msg,'error'); return; }
+      const diff = r.newTotalCost - r.oldTotalCost;
+      const sign = diff >= 0 ? '+' : '';
+      erp.showToast(`✓ Recalc ${b.docNo}: cost ${erp.fmt(r.oldTotalCost)} → ${erp.fmt(r.newTotalCost)} (${sign}${erp.fmt(diff)}) · กำไรใหม่: ${erp.fmt(b.grossProfit)}`, 'success');
+    }
+    async function bulkRecalcProfit() {
+      // หาบิลขายที่กำไร = ยอดขาย หรือ totalCost=0 (ขายก่อนซื้อ)
+      const candidates = (filtered.value||[]).filter(b => b && b.status !== 'cancelled' && b.transactionMode !== 'TRADING' && (Number(b.totalCost||0) === 0 || Number(b.grossProfit||0) === Number(b.totalAmount||0)));
+      if (!candidates.length) { erp.showToast('ไม่พบบิลที่ต้อง recalc (ทุกบิลมีต้นทุนแล้ว)', 'success'); return; }
+      if (!confirm(`พบ ${candidates.length} บิลที่ต้อง recalc (cost=0 / กำไร=ยอดขาย)\n\nจะคำนวนใหม่โดยใช้ WAC ปัจจุบัน + update stock_ledger\n\nดำเนินการต่อ?`)) return;
+      try { if (window.$autoSync && window.$autoSync.stop) window.$autoSync.stop(); } catch(e){}
+      let okCount = 0, totalDiff = 0;
+      for (const b of candidates) {
+        const r = await recalcProfitForBill(b);
+        if (r.ok) { okCount++; totalDiff += (r.newTotalCost - r.oldTotalCost); }
+      }
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      try { if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+      try { if (window.$autoSync && window.$autoSync.start) window.$autoSync.start(); } catch(e){}
+      erp.showToast(`✓ Recalc ${okCount} บิลสำเร็จ · ต้นทุนเพิ่มรวม ${erp.fmt(totalDiff)}`, 'success');
+    }
+    /* 🆕 Auto-recalc เมื่อ stock_ledger เปลี่ยน — รัน recalc สำหรับบิลขายที่ cost=0 ทันทีที่มีบิลซื้อใหม่
+       (ใช้ debounce ป้องกัน flood) */
+    let _recalcTimer = null;
+    watch(() => (db.stockLedger||[]).filter(s => s && s.refType === 'PB').length, (newLen, oldLen) => {
+      if (newLen <= (oldLen||0)) return; // เพิ่มเฉพาะตอนมี ledger ใหม่
+      clearTimeout(_recalcTimer);
+      _recalcTimer = setTimeout(async () => {
+        // หาบิลขายที่ cost=0 (ขายก่อนซื้อ) — auto recalc เงียบๆ ไม่ alert
+        const zeroBills = (db.salesBills||[]).filter(b => b && b.status !== 'cancelled' && b.transactionMode !== 'TRADING' && Number(b.totalCost||0) === 0 && (b.items||[]).length > 0);
+        if (!zeroBills.length) return;
+        let recalcCount = 0;
+        for (const b of zeroBills) {
+          const items = b.items || [];
+          let total = 0;
+          items.forEach(it => {
+            const wac = erp.avgCost(it.productId);
+            const w = Number(it.weight||0);
+            it.unitCost = wac;
+            it.totalCost = wac * w;
+            it.profit = Number(it.netAmount||0) - it.totalCost;
+            total += it.totalCost;
+          });
+          if (total > 0) {
+            b.totalCost = total;
+            b.grossProfit = Number(b.totalAmount||0) - total;
+            // Update stock_ledger
+            (db.stockLedger||[]).filter(s => s && s.refType === 'SB' && s.refId === b.id).forEach(s => {
+              const it = items.find(x => x.productId === s.productId);
+              if (it) { s.unitCost = it.unitCost; s.valueOut = it.totalCost; }
+            });
+            recalcCount++;
+          }
+        }
+        if (recalcCount > 0) {
+          try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+          console.log(`[Auto-Recalc] ${recalcCount} บิลขายที่ cost=0 → คำนวนใหม่ตาม WAC แล้ว`);
+        }
+      }, 1000);
+    });
+
+    /* 🆕 Multi-select bulk delete — บิลขาย */
+    const selectedSalesIds = ref(new Set());
+    function toggleSalesSelect(id) {
+      const s = new Set(selectedSalesIds.value);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      selectedSalesIds.value = s;
+    }
+    function clearSalesSelection() { selectedSalesIds.value = new Set(); }
+    function selectAllSalesInFilter() {
+      const ids = (filtered.value || []).filter(b => b && b.status !== 'cancelled').map(b => b.id);
+      selectedSalesIds.value = new Set(ids);
+    }
+    async function bulkDeleteSales() {
+      const ids = Array.from(selectedSalesIds.value);
+      if (!ids.length) { erp.showToast('ยังไม่ได้เลือกบิล', 'error'); return; }
+      // Check downstream receipts
+      const blocked = [];
+      ids.forEach(id => {
+        const linked = (db.receipts||[]).filter(r => r && r.billId === id);
+        if (linked.length) blocked.push(id);
+      });
+      if (blocked.length) {
+        if (!confirm(`⚠ มี ${blocked.length} บิล ที่มี Receipt แล้ว — จะข้าม\n\nลบแค่ ${ids.length - blocked.length} บิลที่เหลือ?`)) return;
+      } else {
+        if (!confirm(`ลบ ${ids.length} บิลขายพร้อมกัน?\n\n• ลบ Stock Ledger ที่เชื่อม\n• ยกเลิก Trading Deals ที่ผูก\n• ลบทั้ง Local + Cloud — กู้คืนไม่ได้`)) return;
+      }
+      const blockedSet = new Set(blocked);
+      const toDelete = ids.filter(id => !blockedSet.has(id));
+      try { if (window.$autoSync && window.$autoSync.stop) window.$autoSync.stop(); } catch(e){}
+      try {
+        const set = new Set(toDelete);
+        const ledgerIds = (db.stockLedger||[]).filter(s => s && s.refType === 'SB' && set.has(s.refId)).map(s => s.id);
+        db.salesBills = (db.salesBills||[]).filter(x => !x || !set.has(x.id));
+        db.stockLedger = (db.stockLedger||[]).filter(s => !(s && s.refType === 'SB' && set.has(s.refId)));
+        // Cancel trading deals
+        if (Array.isArray(db.tradingDeals)) {
+          db.tradingDeals.forEach(d => {
+            if (d && set.has(d.salesBillId) && d.status !== 'Cancelled') {
+              d.status = 'Cancelled'; d.cancelledAt = new Date().toISOString();
+              d.cancelledReason = 'Bulk delete';
+            }
+          });
+        }
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch (e) {}
+        await erp.deleteCloud('salesBills', toDelete);
+        if (ledgerIds.length) await erp.deleteCloud('stockLedger', ledgerIds);
+        erp.showToast(`🗑 ลบ ${toDelete.length} บิลขายสำเร็จ${blocked.length?' · ข้าม '+blocked.length+' (มี Receipt)':''}`,'success');
+        selectedSalesIds.value = new Set();
+      } catch(e) { alert('Bulk delete error: '+e.message); }
+      finally { try { if (window.$autoSync && window.$autoSync.start) window.$autoSync.start(); } catch(e){} }
+    }
+
     return { db, erp, form, showForm, editing, showDetail, search, filterStatus, filterChannel,
       filterMode, filterDateFrom, filterDateTo,
       open, save, addItem, removeItem, recalcLine, recalcAll, cancelBill, deleteBill, filtered, statusBadge, statusText,
       loadFromPOSell, availableTradingPurchases, loadFromTradingPurchase, billTotals, toggleVatIssued, goToPendingSale, fmt:erp.fmt,
       addTradingPurchase, removeTradingPurchase,
+      // 🆕 Multi-select
+      selectedSalesIds, toggleSalesSelect, clearSalesSelection, selectAllSalesInFilter, bulkDeleteSales,
+      // 🆕 Recalc profit
+      recalcProfitOne, bulkRecalcProfit,
       // 🆕 Customer salesId helpers
       getCustomerSalesId, updateCustomerSalesId, quickAddSalesForCustomer };
   },
@@ -12437,7 +12657,8 @@ app.component('view-sales', {
         <span class="text-slate-400">→</span>
         <input type="date" v-model="filterDateTo" class="px-2 py-2 border rounded-lg text-sm" title="ถึงวันที่">
         <button v-if="search||filterDateFrom||filterDateTo||filterMode||filterStatus||filterChannel" @click="search='';filterDateFrom='';filterDateTo='';filterMode='';filterStatus='';filterChannel=''" type="button" class="px-3 py-2 text-xs bg-slate-100 hover:bg-slate-200 rounded">✕ ล้าง Filter</button>
-        <button @click="open()" class="ml-auto bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ บิลขายใหม่</button>
+        <button @click="bulkRecalcProfit" class="ml-auto bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-amber-700" title="หาบิลขายที่ cost=0 (ขายก่อนซื้อ) → คำนวนใหม่ตาม WAC ปัจจุบัน">🔄 Recalc กำไรบิลที่ขายก่อนซื้อ</button>
+        <button @click="open()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ บิลขายใหม่</button>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <span class="text-xs text-slate-500">ประเภท:</span>
@@ -12455,9 +12676,19 @@ app.component('view-sales', {
         <span class="ml-auto text-xs text-slate-500">📊 พบ <b class="text-slate-700">{{filtered.length}}</b> บิล</span>
       </div>
     </div>
+    <!-- 🆕 Bulk Action Banner -->
+    <div v-if="selectedSalesIds.size > 0" class="bg-rose-50 border-2 border-rose-400 rounded-xl p-3 mb-3 flex items-center gap-2 flex-wrap">
+      <span class="text-sm font-bold text-rose-700">เลือก {{selectedSalesIds.size}} บิล</span>
+      <button @click="bulkDeleteSales" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700">🗑 ลบที่เลือก ({{selectedSalesIds.size}})</button>
+      <button @click="clearSalesSelection" class="px-3 py-1.5 border rounded text-xs hover:bg-slate-100">✕ ล้างเลือก</button>
+    </div>
+
     <div class="bg-white rounded-xl shadow overflow-x-auto">
       <table class="w-full text-sm table-zebra">
         <thead class="bg-slate-100"><tr>
+          <th class="px-3 py-2 text-center w-8">
+            <input type="checkbox" :checked="selectedSalesIds.size > 0 && selectedSalesIds.size === filtered.filter(b=>b.status!=='cancelled').length" @change="$event.target.checked ? selectAllSalesInFilter() : clearSalesSelection()" title="เลือก/ล้างทั้งหมด">
+          </th>
           <th class="px-3 py-2 text-left">เลขที่</th><th class="px-3 py-2 text-left">วันที่</th>
           <th class="px-3 py-2 text-left">Customer</th>
           <th class="px-3 py-2 text-right">ยอดขาย</th>
@@ -12469,7 +12700,10 @@ app.component('view-sales', {
           <th></th>
         </tr></thead>
         <tbody>
-          <tr v-for="b in filtered" :key="b.id" class="border-t hover:bg-blue-50/30">
+          <tr v-for="b in filtered" :key="b.id" class="border-t hover:bg-blue-50/30" :class="selectedSalesIds.has(b.id)?'bg-rose-100':''">
+            <td class="px-3 py-2 text-center">
+              <input v-if="b.status!=='cancelled'" type="checkbox" :checked="selectedSalesIds.has(b.id)" @change="toggleSalesSelect(b.id)">
+            </td>
             <td class="px-3 py-2 font-mono">{{b.docNo}}<div v-if="b.refNo" class="text-xs text-slate-400">Ref: {{b.refNo}}</div></td>
             <td class="px-3 py-2">{{b.date}}</td>
             <td class="px-3 py-2">{{erp.customerName(b.customerId)}}</td>
@@ -12493,11 +12727,12 @@ app.component('view-sales', {
               <button @click="showDetail=b" class="text-blue-600 text-xs hover:underline mr-2">ดู</button>
               <button @click="erp.printDocument('delivery', b.id)" class="text-emerald-600 text-xs hover:underline mr-2" title="พิมพ์ใบส่งของ">🖨 ใบส่ง</button>
               <button @click="open(b)" class="text-slate-600 text-xs hover:underline mr-2">✏️ แก้</button>
+              <button v-if="b.status!=='cancelled' && b.transactionMode!=='TRADING'" @click="recalcProfitOne(b)" class="text-amber-600 text-xs hover:underline mr-2" title="คำนวนกำไรใหม่จาก WAC ปัจจุบัน">🔄 Recalc</button>
               <button v-if="b.status!=='cancelled'" @click="cancelBill(b)" class="text-amber-600 text-xs hover:underline mr-2">ยกเลิก</button>
               <button @click="deleteBill(b)" class="text-red-600 text-xs hover:underline">🗑 ลบ</button>
             </td>
           </tr>
-          <tr v-if="filtered.length===0"><td colspan="10" class="text-center py-10 text-slate-400">ยังไม่มีบิลขาย</td></tr>
+          <tr v-if="filtered.length===0"><td colspan="11" class="text-center py-10 text-slate-400">ยังไม่มีบิลขาย</td></tr>
         </tbody>
       </table>
     </div>
@@ -14789,6 +15024,64 @@ app.component('view-poBuy', {
       erp.logAudit('CHANGE_PURPOSE','poBuy', before, p);
       erp.showToast(`✓ ย้าย ${p.docNo}: ${sourceType} → ${targetType}`,'success');
     }
+
+    /* 🆕 Multi-select bulk move — PO Buy หลายๆบิลพร้อมกัน */
+    const selectedPOIds = ref(new Set());
+    function togglePOSelect(id) {
+      const s = new Set(selectedPOIds.value);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      selectedPOIds.value = s;
+    }
+    function clearPOSelection() { selectedPOIds.value = new Set(); }
+    function selectAllInFilter() {
+      // ทุก PO ที่ผ่าน filter ปัจจุบัน + ไม่ Cancelled
+      const ids = filtered.value.filter(p => p.status !== 'Cancelled').map(p => p.id);
+      selectedPOIds.value = new Set(ids);
+    }
+    function bulkMoveToCosting() {
+      const ids = Array.from(selectedPOIds.value);
+      const items = (db.poBuys||[]).filter(p => p && ids.includes(p.id) && p.requireDelivery !== false);
+      if (!items.length) { erp.showToast('ไม่มี PO ที่ย้ายได้ (อาจเป็น Costing อยู่แล้ว)', 'error'); return; }
+      if (!confirm(`ย้าย ${items.length} PO ไป Cost Pool / Deal Costing ?\n\n• ลบออกจาก PO Outstanding\n• ใช้สำหรับ matching กับ PO Sell เท่านั้น\n• ตั้ง requireDelivery=false + status=Received`)) return;
+      let moved = 0;
+      items.forEach(p => {
+        const before = JSON.parse(JSON.stringify(p));
+        p.requireDelivery = false;
+        p.isOpeningPool = true;
+        p.purpose = p.purpose || 'Trading';
+        if (p.items && p.items.length) p.items.forEach(it => { it.remainingQty = 0; });
+        else p.remainingQty = 0;
+        p.status = 'Received';
+        erp.logAudit('CHANGE_PURPOSE','poBuy', before, p);
+        moved++;
+      });
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      selectedPOIds.value = new Set();
+      erp.showToast(`✓ ย้าย ${moved} PO → Cost Pool`,'success');
+    }
+    function bulkMoveToDelivery() {
+      const ids = Array.from(selectedPOIds.value);
+      const items = (db.poBuys||[]).filter(p => p && ids.includes(p.id) && p.requireDelivery === false);
+      if (!items.length) { erp.showToast('ไม่มี PO ที่ย้ายกลับได้ (อาจเป็น Delivery อยู่แล้ว)', 'error'); return; }
+      if (!confirm(`ย้าย ${items.length} PO กลับเป็น "ส่งของจริง" ?\n\n• เพิ่มเข้า PO Outstanding\n• Track delivery (รับของได้)\n• Reset remainingQty = qty`)) return;
+      let moved = 0;
+      items.forEach(p => {
+        const before = JSON.parse(JSON.stringify(p));
+        p.requireDelivery = true;
+        p.isOpeningPool = false;
+        if (p.items && p.items.length) p.items.forEach(it => { it.remainingQty = Number(it.qty||0); });
+        else p.remainingQty = Number(p.qty||0);
+        const totalRemain = (p.items||[{remainingQty:p.remainingQty}]).reduce((s,it)=>s+Number(it.remainingQty||0),0);
+        const totalQty = (p.items||[{qty:p.qty}]).reduce((s,it)=>s+Number(it.qty||0),0);
+        p.status = totalRemain >= totalQty ? 'Open' : (totalRemain > 0 ? 'Partially Received' : 'Received');
+        erp.logAudit('CHANGE_PURPOSE','poBuy', before, p);
+        moved++;
+      });
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      selectedPOIds.value = new Set();
+      erp.showToast(`✓ ย้าย ${moved} PO → Delivery`,'success');
+    }
+
     const filterDateFrom = ref(''); const filterDateTo = ref('');
     // 🆕 Default: show เฉพาะ "ส่งของจริง" — Costing-only PO มีเยอะ + ใช้คนละ flow
     const filterPurpose = ref('delivery');   // 'delivery' (ส่งของจริง) | 'costing' (Cost Pool) | '' (ทั้งหมด)
@@ -14887,6 +15180,8 @@ app.component('view-poBuy', {
     });
 
     return { db, erp, form, showForm, editing, search, filterStatus, filterPurpose, purposeCounts, filterDateFrom, filterDateTo, filtered, open, save, cancel, statusBadge, togglePurpose,
+      // 🆕 Multi-select
+      selectedPOIds, togglePOSelect, clearPOSelection, selectAllInFilter, bulkMoveToCosting, bulkMoveToDelivery,
       addItem, removeItem, recalcItem, formTotals, dashboard, outstandingList, fmt:erp.fmt };
   },
   template:`
@@ -15027,9 +15322,20 @@ app.component('view-poBuy', {
         <div class="text-xs text-slate-500 mt-0.5">รวมทั้ง 2 ประเภท</div>
       </button>
     </div>
+    <!-- 🆕 Bulk Action Banner -->
+    <div v-if="selectedPOIds.size > 0" class="bg-amber-50 border-2 border-amber-400 rounded-xl p-3 flex items-center gap-2 flex-wrap">
+      <span class="text-sm font-bold text-amber-700">เลือก {{selectedPOIds.size}} PO</span>
+      <button @click="bulkMoveToCosting" class="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700">→💰 ย้ายไป Cost Pool ({{selectedPOIds.size}})</button>
+      <button @click="bulkMoveToDelivery" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700">→📦 ย้ายกลับ Delivery ({{selectedPOIds.size}})</button>
+      <button @click="clearPOSelection" class="px-3 py-1.5 border rounded text-xs hover:bg-slate-100">✕ ล้างเลือก</button>
+    </div>
+
     <div class="bg-white rounded-xl shadow overflow-x-auto">
       <table class="w-full text-sm table-zebra">
         <thead class="bg-slate-100"><tr>
+          <th class="p-2 text-center w-8">
+            <input type="checkbox" :checked="selectedPOIds.size > 0 && selectedPOIds.size === filtered.filter(p=>p.status!=='Cancelled').length" @change="$event.target.checked ? selectAllInFilter() : clearPOSelection()" title="เลือก/ล้างทั้งหมด">
+          </th>
           <th class="p-2 text-left">เลขที่</th><th class="p-2 text-left">วันที่</th>
           <th class="p-2 text-left">Supplier</th>
           <th class="p-2 text-left">รายการ</th>
@@ -15037,7 +15343,10 @@ app.component('view-poBuy', {
           <th class="p-2 text-right">รอรับรวม</th><th class="p-2 text-left">Delivery</th><th class="p-2 text-center">สถานะ</th><th></th>
         </tr></thead>
         <tbody>
-          <tr v-for="p in filtered" :key="p.id" class="border-t" :class="p.requireDelivery===false?'bg-emerald-50/30':''">
+          <tr v-for="p in filtered" :key="p.id" class="border-t" :class="[p.requireDelivery===false?'bg-emerald-50/30':'', selectedPOIds.has(p.id)?'bg-amber-100':'']">
+            <td class="p-2 text-center">
+              <input v-if="p.status!=='Cancelled'" type="checkbox" :checked="selectedPOIds.has(p.id)" @change="togglePOSelect(p.id)">
+            </td>
             <td class="p-2 font-mono">
               {{p.docNo}}
               <span v-if="p.requireDelivery===false" class="ml-1 text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded" title="Costing-only · ไม่เข้า PO Outstanding">💰 Costing</span>
@@ -15063,7 +15372,7 @@ app.component('view-poBuy', {
               <button v-if="p.status!=='Cancelled'" @click="cancel(p)" class="text-red-600 text-xs hover:underline">ยกเลิก</button>
             </td>
           </tr>
-          <tr v-if="filtered.length===0"><td colspan="10" class="text-center py-10 text-slate-400">ยังไม่มี PO Buy</td></tr>
+          <tr v-if="filtered.length===0"><td colspan="11" class="text-center py-10 text-slate-400">ยังไม่มี PO Buy</td></tr>
         </tbody>
       </table>
     </div>
