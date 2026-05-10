@@ -9317,12 +9317,17 @@ app.component('view-purchase', {
       getSupplierSalesId, updateSupplierPhone, updateSupplierSalesId,
       // 🆕 Quick-add sales
       quickAddSales,
+      // 🚨 Emergency
+      forceDeleteImportedHere,
     };
   },
   template: `
   <div>
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-      <strong>บิลรับซื้อ</strong> — รับซื้อเศษโลหะเข้าคลัง
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800 flex items-center justify-between gap-2">
+      <span><strong>บิลรับซื้อ</strong> — รับซื้อเศษโลหะเข้าคลัง</span>
+      <button @click="forceDeleteImportedHere" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 whitespace-nowrap" title="ลบบิล Import (id: PB-IMP-*) ทั้งหมด — local + cloud">
+        🚨 Force Delete Imported (PB-IMP-*)
+      </button>
     </div>
     <!-- 🔍 Filter bar -->
     <div class="bg-white rounded-xl shadow p-3 mb-4 space-y-2">
@@ -11837,6 +11842,42 @@ app.component('view-sales', {
         poSellId:'',
         createdBy:erp.currentUser.value?.username||'-', createdAt:new Date().toISOString() };
     }
+    /* 🚨 Force Delete ALL Imported Bills — เรียกจากหน้าบิลซื้อ */
+    async function forceDeleteImportedHere() {
+      const billsToDel = _trkSafe(db.purchaseBills).filter(b => b && String(b.id||'').startsWith('PB-IMP-'));
+      const billIds = billsToDel.map(b => b.id);
+      const slToDel = _trkSafe(db.stockLedger).filter(s => s && (
+        String(s.id||'').startsWith('SL-IMP-') || billIds.includes(s.refId)
+      ));
+      const slIds = slToDel.map(s => s.id);
+      if (!billIds.length && !slIds.length) {
+        erp.showToast('ไม่มีบิล Import ค้างอยู่ (PB-IMP-*)', 'error'); return;
+      }
+      if (!confirm(`🚨 EMERGENCY DELETE\n\nจะลบ:\n• ${billIds.length} บิลซื้อ (id ขึ้นต้น "PB-IMP-")\n• ${slIds.length} stock_ledger entries\n\nลบทั้ง local + cloud — กู้คืนไม่ได้!\nดำเนินการต่อ?`)) return;
+
+      // หยุด autoSync
+      try { if (window.$autoSync && window.$autoSync.stop) window.$autoSync.stop(); } catch(e){}
+      try {
+        if (billIds.length) {
+          const set = new Set(billIds);
+          db.purchaseBills = _trkSafe(db.purchaseBills).filter(b => !b || !set.has(b.id));
+        }
+        if (slIds.length) {
+          const set = new Set(slIds);
+          db.stockLedger = _trkSafe(db.stockLedger).filter(s => !s || !set.has(s.id));
+        }
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        if (billIds.length) await erp.deleteCloud('purchaseBills', billIds);
+        if (slIds.length) await erp.deleteCloud('stockLedger', slIds);
+        erp.logAudit('FORCE_DELETE_IMPORTED','purchaseBills', null, {bills: billIds.length, stockLedger: slIds.length});
+        erp.showToast(`✅ ลบ ${billIds.length} บิล + ${slIds.length} stock entries สำเร็จ`, 'success');
+      } catch(e) {
+        console.error(e); erp.showToast('Force delete error: '+e.message, 'error');
+      } finally {
+        try { if (window.$autoSync && window.$autoSync.start) window.$autoSync.start(); } catch(e){}
+      }
+    }
+
     /* Available Trading Purchases (with remaining unmatched cost) for dropdown */
     const availableTradingPurchases = computed(() => {
       try {
@@ -14690,6 +14731,66 @@ app.component('view-poBuy', {
       p.status = 'Cancelled';
       erp.logAudit('cancel','poBuy', before, p); erp.showToast('ยกเลิกแล้ว');
     }
+    /* 🆕 ย้าย PO Buy ระหว่าง 2 ประเภท: ส่งของจริง ↔ Cost Pool */
+    function togglePurpose(p) {
+      const isCurrentlyDelivery = p.requireDelivery !== false;
+      const targetType = isCurrentlyDelivery ? 'Cost Pool / Deal Costing' : 'ส่งของจริง';
+      const sourceType = isCurrentlyDelivery ? 'ส่งของจริง' : 'Cost Pool / Deal Costing';
+      // Warn ถ้าเป็น delivery ที่รับของแล้วบางส่วน
+      if (isCurrentlyDelivery) {
+        const items = p.items && p.items.length ? p.items : [{remainingQty:p.remainingQty, qty:p.qty}];
+        const totalQty = items.reduce((s,it)=>s+Number(it.qty||0),0);
+        const totalRemain = items.reduce((s,it)=>s+Number(it.remainingQty||0),0);
+        if (totalRemain < totalQty) {
+          if (!confirm(`⚠ ${p.docNo} รับของไปแล้ว ${(totalQty-totalRemain).toFixed(2)} กก. (จาก ${totalQty})\n\nย้ายไป Cost Pool จะ:\n• ลบออกจาก PO Outstanding\n• ไม่ track delivery อีก\n• ใช้สำหรับ matching กับ PO Sell เท่านั้น\n\nดำเนินการต่อ?`)) return;
+        } else {
+          if (!confirm(`ย้าย ${p.docNo} ไป "${targetType}"?\n\n• ลบออกจาก PO Outstanding (ไม่ต้องส่งของแล้ว)\n• ใช้สำหรับ matching กับ PO Sell เท่านั้น`)) return;
+        }
+      } else {
+        if (!confirm(`ย้าย ${p.docNo} กลับไป "${targetType}"?\n\n• เพิ่มเข้า PO Outstanding (ต้องส่งของจริง)\n• Track delivery (รับของได้)`)) return;
+      }
+      const before = JSON.parse(JSON.stringify(p));
+      p.requireDelivery = isCurrentlyDelivery ? false : true;
+      // ถ้าย้ายเป็น Cost Pool → set isOpeningPool=true ด้วย (สำหรับ Deal Costing)
+      if (!isCurrentlyDelivery) {
+        // ย้ายกลับไป delivery — ลบ flag
+        p.isOpeningPool = false;
+      } else {
+        p.isOpeningPool = true;
+        p.purpose = p.purpose || 'Trading';
+      }
+      // Update item remainingQty
+      if (p.items && p.items.length) {
+        p.items.forEach(it => {
+          if (!isCurrentlyDelivery) {
+            // กลับไป delivery — reset remainingQty = qty (ต้องรับใหม่)
+            it.remainingQty = Number(it.qty||0);
+          } else {
+            // ไป costing — set remainingQty = 0 (ส่งของหมดแล้ว)
+            it.remainingQty = 0;
+          }
+        });
+      } else {
+        // legacy single-item PO
+        if (!isCurrentlyDelivery) {
+          p.remainingQty = Number(p.qty||0);
+        } else {
+          p.remainingQty = 0;
+        }
+      }
+      // Update status — costing PO มี status='Received' เสมอ (เพราะไม่ต้องส่ง)
+      if (isCurrentlyDelivery) {
+        p.status = 'Received';  // ย้ายไป costing → ตั้ง Received
+      } else {
+        // ย้ายกลับ delivery — recompute status จาก receivedQty
+        const totalRemain = (p.items||[{remainingQty:p.remainingQty}]).reduce((s,it)=>s+Number(it.remainingQty||0),0);
+        const totalQty = (p.items||[{qty:p.qty}]).reduce((s,it)=>s+Number(it.qty||0),0);
+        p.status = totalRemain >= totalQty ? 'Open' : (totalRemain > 0 ? 'Partially Received' : 'Received');
+      }
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      erp.logAudit('CHANGE_PURPOSE','poBuy', before, p);
+      erp.showToast(`✓ ย้าย ${p.docNo}: ${sourceType} → ${targetType}`,'success');
+    }
     const filterDateFrom = ref(''); const filterDateTo = ref('');
     // 🆕 Default: show เฉพาะ "ส่งของจริง" — Costing-only PO มีเยอะ + ใช้คนละ flow
     const filterPurpose = ref('delivery');   // 'delivery' (ส่งของจริง) | 'costing' (Cost Pool) | '' (ทั้งหมด)
@@ -14787,7 +14888,7 @@ app.component('view-poBuy', {
       return out.sort((a,b)=>(a.deliveryDate||a.date||'').localeCompare(b.deliveryDate||b.date||''));
     });
 
-    return { db, erp, form, showForm, editing, search, filterStatus, filterPurpose, purposeCounts, filterDateFrom, filterDateTo, filtered, open, save, cancel, statusBadge,
+    return { db, erp, form, showForm, editing, search, filterStatus, filterPurpose, purposeCounts, filterDateFrom, filterDateTo, filtered, open, save, cancel, statusBadge, togglePurpose,
       addItem, removeItem, recalcItem, formTotals, dashboard, outstandingList, fmt:erp.fmt };
   },
   template:`
@@ -14959,6 +15060,8 @@ app.component('view-poBuy', {
             <td class="p-2 text-center"><span :class="['px-2 py-0.5 rounded-full text-xs', statusBadge(p.status)]">{{p.status}}</span></td>
             <td class="p-2 text-right whitespace-nowrap">
               <button @click="open(p)" class="text-blue-600 text-xs hover:underline mr-2">แก้</button>
+              <button v-if="p.status!=='Cancelled' && p.requireDelivery!==false" @click="togglePurpose(p)" class="text-emerald-700 text-xs hover:underline mr-2 font-medium" title="ย้ายไป Cost Pool / Deal Costing (ไม่เข้า PO Outstanding)">→💰 Costing</button>
+              <button v-if="p.status!=='Cancelled' && p.requireDelivery===false" @click="togglePurpose(p)" class="text-indigo-700 text-xs hover:underline mr-2 font-medium" title="ย้ายกลับเป็น ส่งของจริง (เข้า PO Outstanding)">→📦 Delivery</button>
               <button v-if="p.status!=='Cancelled'" @click="cancel(p)" class="text-red-600 text-xs hover:underline">ยกเลิก</button>
             </td>
           </tr>
