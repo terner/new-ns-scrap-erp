@@ -29120,39 +29120,78 @@ app.component('view-openingBalance', {
       return false;
     }
 
-    /* 🆕 Cleanup Orphaned — ลบ opening entries ที่ไม่มี item ใน openingBalance รับผิดชอบ
-       (ทำตอน save → ป้องกัน duplicate จาก import เก่า/sync race) */
-    function _cleanupOrphaned() {
+    /* 🆕 Cleanup Orphaned — ลบ opening entries ที่ไม่มี item รับผิดชอบ (LOCAL + CLOUD)
+       Aggressive: ลบทั้ง local + cloud (ผ่าน erp.deleteCloud) — ป้องกัน pull กลับมา */
+    async function _cleanupOrphaned() {
       try {
         const validAR = new Set((ob.value.arItems||[]).map(x => _refIdFor('AR', x.id)));
         const validAP = new Set((ob.value.apItems||[]).map(x => _refIdFor('AP', x.id)));
         const validST = new Set((ob.value.stockItems||[]).map(x => _refIdFor('STOCK', x.id)));
 
-        const beforeSL = db.stockLedger.length;
-        const beforeSB = db.salesBills.length;
-        const beforePB = db.purchaseBills.length;
+        // หา orphaned ids (เป็น opening แต่ไม่อยู่ใน valid)
+        const orphanedSL = db.stockLedger.filter(s =>
+          s && (s.refType === 'OPENING' || String(s.id||'').startsWith('SL-OPN-')) && !validST.has(s.id)
+        ).map(s => s.id);
+        const orphanedSB = db.salesBills.filter(b =>
+          b && (b.status === 'opening' || String(b.id||'').startsWith('SB-OPN-')) && !validAR.has(b.id)
+        ).map(b => b.id);
+        const orphanedPB = db.purchaseBills.filter(b =>
+          b && (b.status === 'opening' || String(b.id||'').startsWith('PB-OPN-')) && !validAP.has(b.id)
+        ).map(b => b.id);
 
-        // Remove orphaned opening entries (id starts with SL-OPN- but not in valid set)
-        db.stockLedger = db.stockLedger.filter(s => {
-          if (!s) return false;
-          if (!String(s.id||'').startsWith('SL-OPN-')) return true; // not opening — keep
-          return validST.has(s.id); // opening — keep only if valid
-        });
-        db.salesBills = db.salesBills.filter(b => {
-          if (!b) return false;
-          if (!String(b.id||'').startsWith('SB-OPN-')) return true;
-          return validAR.has(b.id);
-        });
-        db.purchaseBills = db.purchaseBills.filter(b => {
-          if (!b) return false;
-          if (!String(b.id||'').startsWith('PB-OPN-')) return true;
-          return validAP.has(b.id);
-        });
+        // 1. Local cleanup
+        if (orphanedSL.length) db.stockLedger = db.stockLedger.filter(s => !s || !orphanedSL.includes(s.id));
+        if (orphanedSB.length) db.salesBills = db.salesBills.filter(b => !b || !orphanedSB.includes(b.id));
+        if (orphanedPB.length) db.purchaseBills = db.purchaseBills.filter(b => !b || !orphanedPB.includes(b.id));
 
-        const removed = (beforeSL - db.stockLedger.length) + (beforeSB - db.salesBills.length) + (beforePB - db.purchaseBills.length);
-        if (removed > 0) console.log('[_cleanupOrphaned] removed', removed, 'orphaned opening entries');
+        // 2. Cloud cleanup (async, fire-and-forget) — กัน pull กลับมา
+        if (erp.deleteCloud) {
+          if (orphanedSL.length) erp.deleteCloud('stockLedger', orphanedSL).catch(e => console.warn('cloud cleanup SL:', e));
+          if (orphanedSB.length) erp.deleteCloud('salesBills', orphanedSB).catch(e => console.warn('cloud cleanup SB:', e));
+          if (orphanedPB.length) erp.deleteCloud('purchaseBills', orphanedPB).catch(e => console.warn('cloud cleanup PB:', e));
+        }
+
+        const removed = orphanedSL.length + orphanedSB.length + orphanedPB.length;
+        if (removed > 0) console.log('[_cleanupOrphaned] removed', removed, 'orphans (SL:'+orphanedSL.length+' SB:'+orphanedSB.length+' PB:'+orphanedPB.length+') · cloud delete async');
         return removed;
       } catch(e) { console.warn('[_cleanupOrphaned]', e); return 0; }
+    }
+
+    /* 🆕 RESET ALL OPENING — ลบทุก opening entries ทั้งหมด (local + cloud) + reset items */
+    async function resetAllOpening() {
+      if (!confirm('🗑 RESET Opening Balance ทั้งหมด?\n\n• ลบ Stock Ledger opening · Sales/Purchase Bills opening (local + cloud)\n• Reset applied=false ทุก item\n• กด Save & Apply All ใหม่หลังจากนี้\n\nดำเนินการต่อ?')) return;
+      try {
+        // ลบ local
+        const slOpening = db.stockLedger.filter(s => s && (s.refType === 'OPENING' || String(s.id||'').startsWith('SL-OPN-')));
+        const sbOpening = db.salesBills.filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('SB-OPN-')));
+        const pbOpening = db.purchaseBills.filter(b => b && (b.status === 'opening' || String(b.id||'').startsWith('PB-OPN-')));
+
+        db.stockLedger = db.stockLedger.filter(s => !s || !slOpening.includes(s));
+        db.salesBills = db.salesBills.filter(b => !b || !sbOpening.includes(b));
+        db.purchaseBills = db.purchaseBills.filter(b => !b || !pbOpening.includes(b));
+
+        // ลบ cloud
+        if (erp.deleteCloud) {
+          if (slOpening.length) await erp.deleteCloud('stockLedger', slOpening.map(s=>s.id));
+          if (sbOpening.length) await erp.deleteCloud('salesBills', sbOpening.map(b=>b.id));
+          if (pbOpening.length) await erp.deleteCloud('purchaseBills', pbOpening.map(b=>b.id));
+        }
+
+        // Reset applied state ทุก item
+        ['arItems','apItems','stockItems','otherReceivables','otherPayables'].forEach(k => {
+          (ob.value[k]||[]).forEach(x => { x.applied = false; x.appliedRefId = ''; x.appliedAt = ''; });
+        });
+
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        // Push singleton
+        if (window.$autoSync?.pushOpeningBalance) window.$autoSync.pushOpeningBalance();
+
+        const total = slOpening.length + sbOpening.length + pbOpening.length;
+        erp.showToast(`🗑 Reset สำเร็จ — ลบ ${total} entries (SL:${slOpening.length} SB:${sbOpening.length} PB:${pbOpening.length}) · กด Save & Apply All ใหม่`,'success');
+        erp.logAudit('OPENING_RESET','openingBalance',null,{slCount:slOpening.length, sbCount:sbOpening.length, pbCount:pbOpening.length});
+      } catch (e) {
+        console.error(e); erp.showToast('Reset ผิดพลาด: '+e.message,'error');
+      }
     }
 
     function _unapplyItem(item, type) {
@@ -29192,10 +29231,10 @@ app.component('view-openingBalance', {
     }
 
     /* Save = Cleanup orphaned + Apply/Update ทุก item (idempotent — กดซ้ำไม่ซ้ำซ้อน) */
-    function save() {
+    async function save() {
       try {
-        // 🛡 STEP 1: Cleanup orphaned (ลบ opening entries ที่ไม่มี item แล้ว)
-        const orphaned = _cleanupOrphaned();
+        // 🛡 STEP 1: Cleanup orphaned ทั้ง local + cloud (async)
+        const orphaned = await _cleanupOrphaned();
 
         // STEP 2: Apply/Update ทุก item — idempotent (ถ้ามีแล้ว → update, ถ้าไม่มี → create)
         let newCount = 0; let updateCount = 0;
@@ -29613,7 +29652,7 @@ app.component('view-openingBalance', {
     return { erp, db, fmt, tab, ob, summary, addAR, addAP, addStock, addOR, addOP,
       removeFromList, save, forceSyncPush, lockOpening, unlockOpening, showLockResult,
       // 🆕 Per-item apply
-      toggleApply, reApply,
+      toggleApply, reApply, resetAllOpening,
       // 🆕 Excel import
       importLog, downloadTemplate, handleImportFile };
   },
@@ -30049,15 +30088,17 @@ app.component('view-openingBalance', {
         </div>
       </div>
 
-      <!-- Save / Lock buttons -->
+      <!-- Save / Reset / Lock buttons -->
       <div class="bg-white rounded-xl shadow p-5">
-        <h2 class="text-lg font-bold mb-2">💾 บันทึก + Lock</h2>
+        <h2 class="text-lg font-bold mb-2">💾 บันทึก / Reset / Lock</h2>
         <p class="text-sm text-slate-500 mb-3">
-          <b class="text-emerald-700">💾 Save & Apply All</b> = บันทึก + Apply ทุก row ที่ valid (ขึ้นในระบบทันที)<br>
-          <b class="text-amber-700">🔒 Lock</b> = Final lock — ห้ามแก้/ลบหลังจากนี้ (optional · ใช้เมื่อข้อมูลครบแล้ว)
+          <b class="text-emerald-700">💾 Save & Apply All</b> = บันทึก + Apply ทุก row + ลบ orphan auto<br>
+          <b class="text-red-700">🗑 Reset All Opening</b> = ลบทุก opening entries (local + cloud) + reset apply state — ใช้เมื่อมี duplicate ค้าง<br>
+          <b class="text-amber-700">🔒 Lock</b> = Final lock (optional)
         </p>
         <div class="flex gap-2 flex-wrap">
           <button @click="save" :disabled="ob.locked" class="px-5 py-2 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 disabled:opacity-50">💾 Save & Apply All</button>
+          <button v-if="!ob.locked" @click="resetAllOpening" class="px-5 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700" title="ลบ stock_ledger / sales_bills / purchase_bills opening ทั้ง local + cloud + reset apply state">🗑 Reset All Opening</button>
           <button v-if="!ob.locked" @click="lockOpening" class="px-5 py-2 bg-amber-600 text-white rounded font-bold hover:bg-amber-700">🔒 Final Lock</button>
           <button v-else @click="unlockOpening" class="px-5 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">🔓 Unlock</button>
         </div>
