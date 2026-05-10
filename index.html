@@ -7340,9 +7340,10 @@ app.component('view-dashboard', {
     /* Match purchase bill against filters */
     function matchPurchase(b) {
       if (!b || b.status === 'cancelled') return false;
-      // 🆕 Opening Balance bills (id starts with PB-OPN-) ผ่านได้เสมอ ไม่กรอง date — เพื่อให้ dashboard เห็นยอด OB
-      const isOpening = b.status === 'opening' || (b.id||'').startsWith('PB-OPN-');
-      if (!isOpening && !inDateRange(b.date)) return false;
+      // 🚫 Pre-Go-Live bills (date < 2026-05-01) — ไม่นับเลย เพราะรวมใน historicalMonthly แล้ว (ป้องกัน double-count)
+      const goLive = (db.openingBalance && db.openingBalance.goLiveDate) || '2026-05-01';
+      if (b.date && b.date < goLive) return false;
+      if (!inDateRange(b.date)) return false;
       if (fBranch.value && b.branchId !== fBranch.value) return false;
       if (fSupplier.value && b.supplierId !== fSupplier.value) return false;
       if (fChannel.value && b.channelId !== fChannel.value) return false;
@@ -7362,9 +7363,10 @@ app.component('view-dashboard', {
     }
     function matchSales(b) {
       if (!b || b.status === 'cancelled') return false;
-      // 🆕 Opening Balance bills แสดงเสมอ
-      const isOpening = b.status === 'opening' || (b.id||'').startsWith('SB-OPN-');
-      if (!isOpening && !inDateRange(b.date)) return false;
+      // 🚫 Pre-Go-Live bills (date < 2026-05-01) — ไม่นับเลย เพราะรวมใน historicalMonthly แล้ว (ป้องกัน double-count)
+      const goLive = (db.openingBalance && db.openingBalance.goLiveDate) || '2026-05-01';
+      if (b.date && b.date < goLive) return false;
+      if (!inDateRange(b.date)) return false;
       if (fBranch.value && b.branchId !== fBranch.value) return false;
       if (fCustomer.value && b.customerId !== fCustomer.value) return false;
       if (fChannel.value && b.channelId !== fChannel.value) return false;
@@ -22096,7 +22098,9 @@ const CASHFLOW_CATEGORIES = {
 function _finRevenue(db, fromD, toD, branchId=null, mode=null) {
   // mode: null=all, 'STOCK', 'TRADING'
   const out = { gross:0, net:0, items:[] };
-  _trkSafe(db.salesBills).filter(b => b && b.status !== 'cancelled' && b.date >= fromD && b.date <= toD && (!branchId || b.branchId===branchId))
+  // 🚫 Pre-Go-Live cutoff — บิลก่อน goLiveDate ไม่นับ เพราะรวมใน historicalMonthly แล้ว (ป้องกัน double-count)
+  const _goLive = (db.openingBalance && db.openingBalance.goLiveDate) || '2026-05-01';
+  _trkSafe(db.salesBills).filter(b => b && b.status !== 'cancelled' && b.date >= fromD && b.date <= toD && b.date >= _goLive && (!branchId || b.branchId===branchId))
     .filter(b => {
       const m = b.transactionMode || 'STOCK';
       if (mode === 'STOCK') return m === 'STOCK';
@@ -22122,7 +22126,9 @@ function _finRevenue(db, fromD, toD, branchId=null, mode=null) {
 }
 function _finCOGS(db, fromD, toD, branchId=null, mode=null) {
   const out = { total:0, items:[] };
-  _trkSafe(db.salesBills).filter(b => b && b.status !== 'cancelled' && b.date >= fromD && b.date <= toD && (!branchId || b.branchId===branchId))
+  // 🚫 Pre-Go-Live cutoff — บิลก่อน goLiveDate ไม่นับ เพราะรวมใน historicalMonthly แล้ว
+  const _goLive = (db.openingBalance && db.openingBalance.goLiveDate) || '2026-05-01';
+  _trkSafe(db.salesBills).filter(b => b && b.status !== 'cancelled' && b.date >= fromD && b.date <= toD && b.date >= _goLive && (!branchId || b.branchId===branchId))
     .filter(b => {
       const m = b.transactionMode || 'STOCK';
       if (mode === 'STOCK') return m === 'STOCK';
