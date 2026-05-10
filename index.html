@@ -384,40 +384,34 @@ const STORAGE_KEY = 'ns_erp_db_v1';
     return _origRemove.call(this, key);
   };
 
-  // ---------- Bootstrap: Load from localStorage FIRST, fallback to IndexedDB ----------
-  // 🆕 Priority: localStorage > IndexedDB (เพราะ localStorage write เป็น sync ตอน save → ใหม่กว่า IDB)
-  // IDB ใช้เฉพาะกรณี localStorage quota exceeded
+  // ---------- Bootstrap: localStorage = PRIMARY (sync write) · IDB = FALLBACK only ----------
+  // 🆕 Priority: localStorage มาก่อนเสมอ — เพราะ write เป็น sync (แน่นอนใหม่)
+  // IDB ใช้เฉพาะกรณี localStorage = null (quota exceeded หรือ first boot)
+  // Reason: เลิกใช้ size comparison เพราะหลัง wipe → LS size เล็ก → IDB เก่ากลับมา (bug!)
   window._idbReady = (async () => {
     for (const key of TRACKED) {
       try {
         const lsVal = _origGet.call(localStorage, key);
-        const idbVal = await idbGet(key);
-
-        // เลือกค่าที่ "ใหญ่กว่า" (proxy สำหรับ "ใหม่กว่า" — ใหม่มักจะมี data มากกว่า)
-        // หรือ ที่ไม่ null
         let useVal = null; let source = '';
-        if (lsVal != null && idbVal != null) {
-          // Both have value — prefer the larger (typically newer with more data)
-          if (lsVal.length >= idbVal.length) {
-            useVal = lsVal; source = 'localStorage (larger)';
-          } else {
-            useVal = idbVal; source = 'IDB (larger)';
+
+        if (lsVal != null) {
+          // localStorage = source of truth (sync write จาก save() ล่าสุด)
+          useVal = lsVal; source = 'localStorage (primary)';
+          // Sync IDB ให้ตรง (background)
+          try { await idbSet(key, lsVal); } catch(e) {}
+        } else {
+          // localStorage ว่าง → fallback IDB (เคย save ไว้)
+          const idbVal = await idbGet(key);
+          if (idbVal != null) {
+            useVal = idbVal; source = 'IDB (LS empty fallback)';
+            // Restore to localStorage
+            try { _origSet.call(localStorage, key, idbVal); } catch(e) {}
           }
-        } else if (lsVal != null) {
-          useVal = lsVal; source = 'localStorage';
-        } else if (idbVal != null) {
-          useVal = idbVal; source = 'IDB (LS empty)';
         }
 
         if (useVal != null) {
           _ram[key] = useVal;
-          // Sync to both storages
-          if (useVal === lsVal && (!idbVal || idbVal.length !== lsVal.length)) {
-            try { await idbSet(key, useVal); } catch(e) {}
-          } else if (useVal === idbVal && (!lsVal || lsVal.length !== idbVal.length)) {
-            try { _origSet.call(localStorage, key, useVal); } catch(e) {}
-          }
-          console.log('[Storage] '+key+' loaded from '+source+' ('+(useVal.length/1024).toFixed(1)+' KB)');
+          console.log('[Storage] '+key+' from '+source+' ('+(useVal.length/1024).toFixed(1)+' KB)');
         }
       } catch(e) {
         console.warn('[Storage] init fail:', key, e);
@@ -29248,16 +29242,19 @@ app.component('view-openingBalance', {
       }
     }
 
-    /* 🆕 FORCE PULL OPENING — ลบ local opening + pull cloud (clean state)
-       ใช้กับเครื่องที่ค้าง duplicate เก่าหลังที่อีกเครื่อง dedup แล้ว */
+    /* 🆕 FORCE PULL OPENING — Cloud = truth, wipe local + IDB cache, sync เด็ดขาด
+       ใช้กับเครื่องที่ค้าง duplicate เก่าหลังที่อีกเครื่อง save แล้ว */
     async function forcePullOpening() {
       if (!window.sb) { erp.showToast('Supabase ไม่พร้อม','error'); return; }
-      if (!confirm('🌐 Force Pull Opening จาก Cloud?\n\n• ลบ stock_ledger opening ใน LOCAL ทั้งหมด\n• Pull cloud opening (ตาม cloud คือ truth)\n• Pull singleton openingBalance\n\nใช้เมื่ออีกเครื่อง dedup แล้ว แต่เครื่องนี้ยังเห็น duplicate ค้าง')) return;
+      if (!confirm('🌐 Force Pull Opening จาก Cloud?\n\n• ลบ stock_ledger opening ใน LOCAL + IDB\n• Pull cloud opening + singleton (cloud=truth)\n• ปิด autoSync ชั่วคราว → reload\n\nใช้เมื่อเครื่องนี้ยังเห็น duplicate แต่อีกเครื่อง save แล้ว')) return;
       try {
         const sb = window.sb;
         const cam = (k) => k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 
-        // 1. ลบ local stock_ledger opening
+        // 🛡 STEP 0: ปิด autoSync ชั่วคราว — ป้องกัน push/pull race ระหว่างทำ
+        if (window.$autoSync?.shutdown) window.$autoSync.shutdown();
+
+        // 1. ลบ local stock_ledger opening (ทุก entry)
         const beforeSL = db.stockLedger.length;
         db.stockLedger = db.stockLedger.filter(s => !s || s.refType !== 'OPENING');
         const removedLocal = beforeSL - db.stockLedger.length;
@@ -29280,13 +29277,22 @@ app.component('view-openingBalance', {
           Object.assign(t, obR.data.data);
         }
 
-        // 4. Persist
-        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        // 4. Persist — write ทั้ง localStorage + IDB ตรงๆ (bypass shim debounce)
+        const dbStr = JSON.stringify(db);
+        try { localStorage.setItem('ns_erp_db_v1', dbStr); } catch(e){}
+        // 🛡 Force IDB write (ไม่ผ่าน shim debounce — ทำทันที)
+        if (window._idb?.set) {
+          try { await window._idb.set('ns_erp_db_v1', dbStr); console.log('[ForcePull] IDB synced'); }
+          catch(e) { console.warn('[ForcePull] IDB write fail:', e); }
+        }
+
         erp.logAudit('OPENING_FORCE_PULL','openingBalance',null,{removedLocal, cloudSL: cloudSL.length, obItems: (db.openingBalance.stockItems||[]).length});
-        erp.showToast(`✓ Force Pull สำเร็จ — ลบ local เก่า ${removedLocal} · Cloud ใหม่ ${cloudSL.length} · OB items ${(db.openingBalance.stockItems||[]).length}`,'success');
-        setTimeout(() => location.reload(), 800);
+        erp.showToast(`✓ Force Pull เสร็จ · ลบ ${removedLocal} เก่า · Cloud ${cloudSL.length} · OB items ${(db.openingBalance.stockItems||[]).length} · Reloading...`,'success');
+        setTimeout(() => location.reload(), 1500);
       } catch (e) {
         console.error(e); erp.showToast('Force Pull ผิดพลาด: '+e.message,'error');
+        // Re-enable autoSync ถ้า fail
+        if (window.$autoSync?.boot) window.$autoSync.boot();
       }
     }
 
