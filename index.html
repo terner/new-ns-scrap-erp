@@ -29605,6 +29605,58 @@ app.component('view-openingBalance', {
       }
     }
 
+    /* 🆕 DELETE BY BRANCH — ลบ stock opening + linked AP เฉพาะ branch ที่เลือก */
+    async function deleteStockByBranch() {
+      const branches = _trkSafe(db.branches).filter(b => b && b.active !== false);
+      if (!branches.length) { erp.showToast('ไม่มีสาขา','error'); return; }
+      // Build dropdown text
+      const list = branches.map((b,i) => `${i+1}. ${b.code||'-'} - ${b.name||'-'}`).join('\n');
+      const idx = prompt(`เลือกสาขาที่จะลบ Stock Opening:\n\n${list}\n\nพิมพ์เลข (1-${branches.length}):`);
+      if (!idx || isNaN(Number(idx))) return;
+      const brIdx = Number(idx) - 1;
+      if (brIdx < 0 || brIdx >= branches.length) { erp.showToast('เลือกผิด','error'); return; }
+      const br = branches[brIdx];
+
+      try {
+        // Find affected
+        const slToDelete = db.stockLedger.filter(s => s && s.refType === 'OPENING' && s.branchId === br.id).map(s => s.id);
+        const obStocks = (ob.value.stockItems||[]).filter(x => x && x.branchId === br.id);
+        const obIds = obStocks.map(x => x.id);
+        const apToDelete = (ob.value.apItems||[]).filter(x => x && x.autoLinked && obIds.includes(x.linkedStockItemId));
+        const apIds = apToDelete.map(x => x.id);
+
+        if (!slToDelete.length && !obStocks.length && !apIds.length) {
+          erp.showToast(`ไม่พบ Opening Stock ใน ${br.code} - ${br.name}`,'warning');
+          return;
+        }
+        if (!confirm(`ลบ Opening Stock ของสาขา "${br.code} - ${br.name}"?\n\n• Stock Ledger: ${slToDelete.length} entries\n• OB Stock items: ${obStocks.length}\n• Shadow AP: ${apIds.length}\n\nดำเนินการต่อ?`)) return;
+
+        // Local cleanup
+        if (slToDelete.length) db.stockLedger = db.stockLedger.filter(s => !s || !slToDelete.includes(s.id));
+        if (obStocks.length) db.openingBalance.stockItems = db.openingBalance.stockItems.filter(x => !obIds.includes(x.id));
+        if (apIds.length) {
+          // Unapply each shadow AP first
+          apToDelete.forEach(apItem => { if (apItem.applied) _unapplyItem(apItem, 'AP'); });
+          db.openingBalance.apItems = db.openingBalance.apItems.filter(x => !apIds.includes(x.id));
+        }
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+
+        // Cloud cleanup
+        if (erp.deleteCloud && slToDelete.length) {
+          await erp.deleteCloud('stockLedger', slToDelete);
+        }
+        // Push singleton — reflect ที่ items list
+        if (window.$autoSync?.pushOpeningBalance) {
+          await window.$autoSync.pushOpeningBalance();
+        }
+
+        erp.logAudit('OPENING_DELETE_BY_BRANCH','openingBalance',null,{branch:br.code, sl:slToDelete.length, ob:obStocks.length, ap:apIds.length});
+        erp.showToast(`✓ ลบสำเร็จ — สาขา ${br.code} · SL ${slToDelete.length} · OB ${obStocks.length} · AP ${apIds.length}`,'success');
+      } catch (e) {
+        console.error(e); erp.showToast('ลบผิดพลาด: '+e.message,'error');
+      }
+    }
+
     /* 🆕 RESET ALL OPENING — ลบทุก opening entries ทั้งหมด (local + cloud) + reset items */
     async function resetAllOpening() {
       if (!confirm('🗑 RESET Opening Balance ทั้งหมด?\n\n• ลบ Stock Ledger opening · Sales/Purchase Bills opening (local + cloud)\n• Reset applied=false ทุก item\n• กด Save & Apply All ใหม่หลังจากนี้\n\nดำเนินการต่อ?')) return;
@@ -30127,7 +30179,7 @@ app.component('view-openingBalance', {
     return { erp, db, fmt, tab, ob, summary, addAR, addAP, addStock, addOR, addOP,
       removeFromList, save, forceSyncPush, lockOpening, unlockOpening, showLockResult,
       // 🆕 Per-item apply
-      toggleApply, reApply, resetAllOpening, dedupStockOpening, forcePullOpening,
+      toggleApply, reApply, resetAllOpening, dedupStockOpening, forcePullOpening, deleteStockByBranch,
       // 🆕 Excel import
       importLog, downloadTemplate, handleImportFile };
   },
@@ -30585,6 +30637,7 @@ app.component('view-openingBalance', {
         <div class="flex gap-2 flex-wrap">
           <button @click="save" :disabled="ob.locked" class="px-5 py-2 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 disabled:opacity-50">💾 Save & Apply All</button>
           <button v-if="!ob.locked" @click="dedupStockOpening" class="px-5 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700" title="ลบ stock_ledger + items ที่ productId+branch+warehouse+lot ซ้ำ (เก็บอันแรก)">🔍 ลบ Duplicate</button>
+          <button v-if="!ob.locked" @click="deleteStockByBranch" class="px-5 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700" title="ลบ Opening Stock เฉพาะสาขาที่เลือก (รวม shadow AP)">🏢 ลบตามสาขา</button>
           <button v-if="!ob.locked" @click="forcePullOpening" class="px-5 py-2 bg-cyan-600 text-white rounded font-bold hover:bg-cyan-700" title="ลบ local opening + pull จาก cloud (clean state) — ใช้เมื่อเครื่องนี้เห็น duplicate ค้าง แต่อีกเครื่อง dedup แล้ว">🌐 Force Pull Opening</button>
           <button v-if="!ob.locked" @click="resetAllOpening" class="px-5 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700" title="ลบ opening entries ทั้งหมด (local + cloud) + reset apply state">🗑 Reset All Opening</button>
           <button v-if="!ob.locked" @click="lockOpening" class="px-5 py-2 bg-amber-600 text-white rounded font-bold hover:bg-amber-700">🔒 Final Lock</button>
