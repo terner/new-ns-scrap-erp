@@ -9298,6 +9298,40 @@ app.component('view-purchase', {
       erp.showToast('✓ เพิ่มเซล "'+name+'" เข้าฐานข้อมูลแล้ว — auto-select ในบิล');
     }
 
+    /* 🚨 Force Delete ALL Imported Bills — เรียกจากหน้าบิลซื้อ */
+    async function forceDeleteImportedHere() {
+      const billsToDel = (db.purchaseBills||[]).filter(b => b && String(b.id||'').startsWith('PB-IMP-'));
+      const billIds = billsToDel.map(b => b.id);
+      const slToDel = (db.stockLedger||[]).filter(s => s && (
+        String(s.id||'').startsWith('SL-IMP-') || billIds.includes(s.refId)
+      ));
+      const slIds = slToDel.map(s => s.id);
+      if (!billIds.length && !slIds.length) {
+        erp.showToast('ไม่มีบิล Import ค้างอยู่ (PB-IMP-*)', 'error'); return;
+      }
+      if (!confirm(`🚨 EMERGENCY DELETE\n\nจะลบ:\n• ${billIds.length} บิลซื้อ (id ขึ้นต้น "PB-IMP-")\n• ${slIds.length} stock_ledger entries\n\nลบทั้ง local + cloud — กู้คืนไม่ได้!\nดำเนินการต่อ?`)) return;
+      try { if (window.$autoSync && window.$autoSync.stop) window.$autoSync.stop(); } catch(e){}
+      try {
+        if (billIds.length) {
+          const set = new Set(billIds);
+          db.purchaseBills = (db.purchaseBills||[]).filter(b => !b || !set.has(b.id));
+        }
+        if (slIds.length) {
+          const set = new Set(slIds);
+          db.stockLedger = (db.stockLedger||[]).filter(s => !s || !set.has(s.id));
+        }
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        if (billIds.length) await erp.deleteCloud('purchaseBills', billIds);
+        if (slIds.length) await erp.deleteCloud('stockLedger', slIds);
+        erp.logAudit('FORCE_DELETE_IMPORTED','purchaseBills', null, {bills: billIds.length, stockLedger: slIds.length});
+        erp.showToast(`✅ ลบ ${billIds.length} บิล + ${slIds.length} stock entries สำเร็จ`, 'success');
+      } catch(e) {
+        console.error(e); erp.showToast('Force delete error: '+e.message, 'error');
+      } finally {
+        try { if (window.$autoSync && window.$autoSync.start) window.$autoSync.start(); } catch(e){}
+      }
+    }
+
     return {
       db, erp, form, showForm, search, filtered, billTotals, editingId,
       filterMode, filterSource, filterDateFrom, filterDateTo,
@@ -11842,42 +11876,6 @@ app.component('view-sales', {
         poSellId:'',
         createdBy:erp.currentUser.value?.username||'-', createdAt:new Date().toISOString() };
     }
-    /* 🚨 Force Delete ALL Imported Bills — เรียกจากหน้าบิลซื้อ */
-    async function forceDeleteImportedHere() {
-      const billsToDel = _trkSafe(db.purchaseBills).filter(b => b && String(b.id||'').startsWith('PB-IMP-'));
-      const billIds = billsToDel.map(b => b.id);
-      const slToDel = _trkSafe(db.stockLedger).filter(s => s && (
-        String(s.id||'').startsWith('SL-IMP-') || billIds.includes(s.refId)
-      ));
-      const slIds = slToDel.map(s => s.id);
-      if (!billIds.length && !slIds.length) {
-        erp.showToast('ไม่มีบิล Import ค้างอยู่ (PB-IMP-*)', 'error'); return;
-      }
-      if (!confirm(`🚨 EMERGENCY DELETE\n\nจะลบ:\n• ${billIds.length} บิลซื้อ (id ขึ้นต้น "PB-IMP-")\n• ${slIds.length} stock_ledger entries\n\nลบทั้ง local + cloud — กู้คืนไม่ได้!\nดำเนินการต่อ?`)) return;
-
-      // หยุด autoSync
-      try { if (window.$autoSync && window.$autoSync.stop) window.$autoSync.stop(); } catch(e){}
-      try {
-        if (billIds.length) {
-          const set = new Set(billIds);
-          db.purchaseBills = _trkSafe(db.purchaseBills).filter(b => !b || !set.has(b.id));
-        }
-        if (slIds.length) {
-          const set = new Set(slIds);
-          db.stockLedger = _trkSafe(db.stockLedger).filter(s => !s || !set.has(s.id));
-        }
-        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
-        if (billIds.length) await erp.deleteCloud('purchaseBills', billIds);
-        if (slIds.length) await erp.deleteCloud('stockLedger', slIds);
-        erp.logAudit('FORCE_DELETE_IMPORTED','purchaseBills', null, {bills: billIds.length, stockLedger: slIds.length});
-        erp.showToast(`✅ ลบ ${billIds.length} บิล + ${slIds.length} stock entries สำเร็จ`, 'success');
-      } catch(e) {
-        console.error(e); erp.showToast('Force delete error: '+e.message, 'error');
-      } finally {
-        try { if (window.$autoSync && window.$autoSync.start) window.$autoSync.start(); } catch(e){}
-      }
-    }
-
     /* Available Trading Purchases (with remaining unmatched cost) for dropdown */
     const availableTradingPurchases = computed(() => {
       try {
