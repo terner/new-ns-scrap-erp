@@ -28981,14 +28981,37 @@ app.component('view-openingBalance', {
       }
     }
 
-    /* 🆕 Auto-Apply Per-Item — Idempotent (กด save กี่ครั้งก็ไม่ซ้ำ)
-       ใช้ deterministic refId จาก item.id → ทำให้ Apply ซ้ำได้ปลอดภัย
-       ตรวจ existing ก่อนสร้าง → ถ้ามีแล้ว skip (ไม่สร้างซ้ำ) */
-    function _refIdFor(type, itemId) {
-      const cleanId = String(itemId||'').replace(/[^A-Za-z0-9]/g,'');
-      if (type === 'AR') return 'SB-OPN-' + cleanId;
-      if (type === 'AP') return 'PB-OPN-' + cleanId;
-      if (type === 'STOCK') return 'SL-OPN-' + cleanId;
+    /* 🆕 Auto-Apply Per-Item — Idempotent + Cross-Device Unique
+       ใช้ COMPOSITE KEY เป็น refId — ทำให้ 2 เครื่องที่กรอก item ตรงกัน
+       (productId + branch + warehouse + lot) → ได้ id เดียวกัน → upsert → ไม่ซ้ำ
+
+       Backward compat: ถ้าเรียกผ่าน itemId (string) แทน item (object) → fallback แบบเก่า */
+    function _cleanForId(s) { return String(s||'').replace(/[^A-Za-z0-9]/g, '_'); }
+    function _refIdFor(type, item) {
+      // Backward compat — ถ้า item เป็น string (รุ่นเก่าเรียกแค่ itemId)
+      if (typeof item === 'string') {
+        return (type === 'AR' ? 'SB-OPN-' : type === 'AP' ? 'PB-OPN-' : type === 'STOCK' ? 'SL-OPN-' : '') + _cleanForId(item);
+      }
+      if (!item) return '';
+      // 🆕 Composite key — guaranteed unique per business identity
+      // Includes: productId + branch + warehouse + lot + itemStatus (RM/WIP/FG) + paid
+      // → ทุก combination มี 1 entry ป้องกัน duplicate cross-device
+      if (type === 'STOCK') {
+        const paidFlag = item.paid ? 'P' : 'U';   // P = Paid, U = Unpaid
+        return 'SL-OPN-' + _cleanForId(item.productId) + '-' +
+               _cleanForId(item.branchId||'NB') + '-' +
+               _cleanForId(item.warehouseId||'NW') + '-' +
+               _cleanForId(item.lotNo||'OPENING') + '-' +
+               _cleanForId(item.itemStatus||'RM') + '-' +
+               paidFlag;
+      }
+      if (type === 'AR') {
+        // composite: customerId + billNo (เพราะอาจมีหลายบิล/ลูกค้า)
+        return 'SB-OPN-' + _cleanForId(item.customerId) + '-' + _cleanForId(item.billNo || item.id || 'BILL');
+      }
+      if (type === 'AP') {
+        return 'PB-OPN-' + _cleanForId(item.supplierId) + '-' + _cleanForId(item.billNo || item.id || 'BILL');
+      }
       return '';
     }
     function _applyItem(item, type) {
@@ -28996,7 +29019,7 @@ app.component('view-openingBalance', {
       const cutoff = o.cutoffDate;
       const username = erp.currentUser.value?.username || 'system';
       const ts = new Date().toISOString();
-      const refId = _refIdFor(type, item.id);
+      const refId = _refIdFor(type, item);    // 🆕 ส่ง item (object) — ใช้ composite key
 
       try {
         if (type === 'AR') {
@@ -29121,12 +29144,13 @@ app.component('view-openingBalance', {
     }
 
     /* 🆕 Cleanup Orphaned — ลบ opening entries ที่ไม่มี item รับผิดชอบ (LOCAL + CLOUD)
-       Aggressive: ลบทั้ง local + cloud (ผ่าน erp.deleteCloud) — ป้องกัน pull กลับมา */
+       Aggressive: ลบทั้ง local + cloud (ผ่าน erp.deleteCloud) — ป้องกัน pull กลับมา
+       🆕 ตอนนี้ใช้ composite-key id → จะลบของเก่าที่ id pattern แบบเดิม (random itemId) อัตโนมัติ */
     async function _cleanupOrphaned() {
       try {
-        const validAR = new Set((ob.value.arItems||[]).map(x => _refIdFor('AR', x.id)));
-        const validAP = new Set((ob.value.apItems||[]).map(x => _refIdFor('AP', x.id)));
-        const validST = new Set((ob.value.stockItems||[]).map(x => _refIdFor('STOCK', x.id)));
+        const validAR = new Set((ob.value.arItems||[]).map(x => _refIdFor('AR', x)));
+        const validAP = new Set((ob.value.apItems||[]).map(x => _refIdFor('AP', x)));
+        const validST = new Set((ob.value.stockItems||[]).map(x => _refIdFor('STOCK', x)));
 
         // หา orphaned ids (เป็น opening แต่ไม่อยู่ใน valid)
         const orphanedSL = db.stockLedger.filter(s =>
@@ -29209,6 +29233,48 @@ app.component('view-openingBalance', {
         erp.showToast(`✓ ลบ duplicate สำเร็จ — SL:${slToDelete.length} · OB items:${obDups.length}`,'success');
       } catch (e) {
         console.error(e); erp.showToast('Dedup ผิดพลาด: '+e.message,'error');
+      }
+    }
+
+    /* 🆕 FORCE PULL OPENING — ลบ local opening + pull cloud (clean state)
+       ใช้กับเครื่องที่ค้าง duplicate เก่าหลังที่อีกเครื่อง dedup แล้ว */
+    async function forcePullOpening() {
+      if (!window.sb) { erp.showToast('Supabase ไม่พร้อม','error'); return; }
+      if (!confirm('🌐 Force Pull Opening จาก Cloud?\n\n• ลบ stock_ledger opening ใน LOCAL ทั้งหมด\n• Pull cloud opening (ตาม cloud คือ truth)\n• Pull singleton openingBalance\n\nใช้เมื่ออีกเครื่อง dedup แล้ว แต่เครื่องนี้ยังเห็น duplicate ค้าง')) return;
+      try {
+        const sb = window.sb;
+        const cam = (k) => k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+
+        // 1. ลบ local stock_ledger opening
+        const beforeSL = db.stockLedger.length;
+        db.stockLedger = db.stockLedger.filter(s => !s || s.refType !== 'OPENING');
+        const removedLocal = beforeSL - db.stockLedger.length;
+
+        // 2. Pull cloud stock_ledger opening
+        const slR = await sb.from('stock_ledger').select('*').eq('ref_type', 'OPENING');
+        if (slR.error) throw slR.error;
+        const cloudSL = slR.data || [];
+        cloudSL.forEach(r => {
+          const o = {};
+          Object.keys(r).forEach(k => { o[cam(k)] = r[k]; });
+          db.stockLedger.push(o);
+        });
+
+        // 3. Pull singleton opening_balance
+        const obR = await sb.from('opening_balance').select('*').eq('id', 'SINGLETON').maybeSingle();
+        if (obR.data && obR.data.data) {
+          const t = db.openingBalance;
+          Object.keys(t).forEach(k => { delete t[k]; });
+          Object.assign(t, obR.data.data);
+        }
+
+        // 4. Persist
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        erp.logAudit('OPENING_FORCE_PULL','openingBalance',null,{removedLocal, cloudSL: cloudSL.length, obItems: (db.openingBalance.stockItems||[]).length});
+        erp.showToast(`✓ Force Pull สำเร็จ — ลบ local เก่า ${removedLocal} · Cloud ใหม่ ${cloudSL.length} · OB items ${(db.openingBalance.stockItems||[]).length}`,'success');
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        console.error(e); erp.showToast('Force Pull ผิดพลาด: '+e.message,'error');
       }
     }
 
@@ -29707,7 +29773,7 @@ app.component('view-openingBalance', {
     return { erp, db, fmt, tab, ob, summary, addAR, addAP, addStock, addOR, addOP,
       removeFromList, save, forceSyncPush, lockOpening, unlockOpening, showLockResult,
       // 🆕 Per-item apply
-      toggleApply, reApply, resetAllOpening, dedupStockOpening,
+      toggleApply, reApply, resetAllOpening, dedupStockOpening, forcePullOpening,
       // 🆕 Excel import
       importLog, downloadTemplate, handleImportFile };
   },
@@ -30154,6 +30220,7 @@ app.component('view-openingBalance', {
         <div class="flex gap-2 flex-wrap">
           <button @click="save" :disabled="ob.locked" class="px-5 py-2 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 disabled:opacity-50">💾 Save & Apply All</button>
           <button v-if="!ob.locked" @click="dedupStockOpening" class="px-5 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700" title="ลบ stock_ledger + items ที่ productId+branch+warehouse+lot ซ้ำ (เก็บอันแรก)">🔍 ลบ Duplicate</button>
+          <button v-if="!ob.locked" @click="forcePullOpening" class="px-5 py-2 bg-cyan-600 text-white rounded font-bold hover:bg-cyan-700" title="ลบ local opening + pull จาก cloud (clean state) — ใช้เมื่อเครื่องนี้เห็น duplicate ค้าง แต่อีกเครื่อง dedup แล้ว">🌐 Force Pull Opening</button>
           <button v-if="!ob.locked" @click="resetAllOpening" class="px-5 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700" title="ลบ opening entries ทั้งหมด (local + cloud) + reset apply state">🗑 Reset All Opening</button>
           <button v-if="!ob.locked" @click="lockOpening" class="px-5 py-2 bg-amber-600 text-white rounded font-bold hover:bg-amber-700">🔒 Final Lock</button>
           <button v-else @click="unlockOpening" class="px-5 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">🔓 Unlock</button>
