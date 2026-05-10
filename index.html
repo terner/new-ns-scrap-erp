@@ -4447,6 +4447,12 @@ window.$erp = {
           console.log('[autoSync] Recalc balances: fixed '+r.fixedPB+' PBs, '+r.fixedSB+' SBs');
         }
       } catch(e) { console.warn('recalc after pull:', e); }
+
+      // 🆕 Pull singletons (openingBalance ฯลฯ)
+      for (const localKey of Object.keys(SINGLETONS)) {
+        try { await pullSingleton(localKey, SINGLETONS[localKey]); }
+        catch(e) { console.warn('[autoSync] singleton pull '+SINGLETONS[localKey], e); }
+      }
     } finally {
       _applyingCloudUpdate = false;
     }
@@ -4477,6 +4483,59 @@ window.$erp = {
       // Debounce 1.5s (เร็วขึ้นจาก 5s)
       if (pushTimer) clearTimeout(pushTimer);
       pushTimer = setTimeout(() => { pushDirty(); }, 1500);
+    }, { deep: true });
+  });
+
+  /* 🆕 Singleton tables (object เดี่ยว ไม่ใช่ array) — sync ผ่าน upsert id='SINGLETON' + jsonb data */
+  const SINGLETONS = {
+    openingBalance: 'opening_balance',
+    // เพิ่มได้: equity: 'equity_settings', ฯลฯ
+  };
+  let singletonPushTimer = null;
+  async function pushSingleton(localKey, tableName) {
+    if (!window.sb || !enabled || _applyingCloudUpdate) return;
+    try {
+      const data = _GLOBAL_DB[localKey];
+      if (data == null || typeof data !== 'object') return;
+      const username = window.$erp?.currentUser?.value?.username || 'system';
+      const { error } = await window.sb.from(tableName).upsert({
+        id: 'SINGLETON',
+        data: JSON.parse(JSON.stringify(data)),  // deep clone (avoid Vue Proxy issues)
+        updated_at: new Date().toISOString(),
+        updated_by: username
+      });
+      if (error) { _logErr(tableName, 'PUSH SINGLETON: '+error.message); console.warn('[singleton push]', tableName, error.message); }
+      else console.log('[singleton] ☁ pushed '+tableName);
+    } catch(e) { console.warn('[singleton push]', tableName, e); }
+  }
+  async function pullSingleton(localKey, tableName) {
+    if (!window.sb || !enabled) return;
+    try {
+      const { data, error } = await window.sb.from(tableName).select('*').eq('id', 'SINGLETON').maybeSingle();
+      if (error) { console.warn('[singleton pull]', tableName, error.message); return; }
+      if (!data?.data) return;
+      const target = _GLOBAL_DB[localKey];
+      if (target && typeof target === 'object') {
+        _applyingCloudUpdate = true;
+        try {
+          // Replace properties (preserve reactive proxy)
+          Object.keys(target).forEach(k => { delete target[k]; });
+          Object.assign(target, data.data);
+          console.log('[singleton] ⬇ pulled '+tableName);
+        } finally {
+          // restore flag after microtask
+          setTimeout(() => { _applyingCloudUpdate = false; }, 100);
+        }
+      }
+    } catch(e) { console.warn('[singleton pull]', tableName, e); }
+  }
+  // Watch each singleton — debounced push
+  Object.keys(SINGLETONS).forEach(localKey => {
+    const tableName = SINGLETONS[localKey];
+    watch(() => _GLOBAL_DB[localKey], () => {
+      if (_applyingCloudUpdate) return;
+      clearTimeout(singletonPushTimer);
+      singletonPushTimer = setTimeout(() => pushSingleton(localKey, tableName), 1500);
     }, { deep: true });
   });
 
@@ -4542,6 +4601,11 @@ window.$erp = {
     pushNow: () => { if (pushTimer) clearTimeout(pushTimer); return pushDirty(false); },     // dirty หรือ force
     pushAll: () => { if (pushTimer) clearTimeout(pushTimer); return pushDirty(true); },     // 🆕 บังคับ push ทุกตาราง
     pullNow: () => pullAll(),
+    // 🆕 Singleton sync (openingBalance ฯลฯ)
+    pushOpeningBalance: () => pushSingleton('openingBalance', 'opening_balance'),
+    pullOpeningBalance: () => pullSingleton('openingBalance', 'opening_balance'),
+    pushAllSingletons: async () => { for (const k of Object.keys(SINGLETONS)) await pushSingleton(k, SINGLETONS[k]); },
+    pullAllSingletons: async () => { for (const k of Object.keys(SINGLETONS)) await pullSingleton(k, SINGLETONS[k]); },
     isEnabled: () => enabled,
     dirtyTables: () => Array.from(dirtyTables),
     failedTables: () => Array.from(failedTables),
@@ -29065,6 +29129,10 @@ app.component('view-openingBalance', {
         (ob.value.otherPayables||[]).forEach(x => { const r = _applyItem(x, 'OP'); if (r) newCount++; else if (x.applied) updateCount++; });
 
         localStorage.setItem('ns_erp_db_v1', JSON.stringify(db));
+        // 🆕 Push openingBalance singleton ขึ้น cloud ทันที (sync ข้ามเครื่อง)
+        if (window.$autoSync?.pushOpeningBalance) {
+          window.$autoSync.pushOpeningBalance().then(() => console.log('[OB] singleton pushed'));
+        }
         const total = (ob.value.arItems?.length||0) + (ob.value.apItems?.length||0) + (ob.value.stockItems?.length||0) + (ob.value.otherReceivables?.length||0) + (ob.value.otherPayables?.length||0);
         const parts = [];
         if (newCount > 0) parts.push(`สร้างใหม่ ${newCount}`);
