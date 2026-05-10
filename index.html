@@ -17438,17 +17438,145 @@ app.component('view-pendingSales', {
       });
     });
 
+    /* ════════════════════════════════════════════════════════════════
+       🆕 Pool & Stock Inventory — รายตัว แยก RM/FG (ไม่เทียบ Diff
+       เพราะธรรมชาติไม่ตรงกัน: PO Buy อยู่ใน Pool แต่ยังไม่เข้า Stock)
+
+       PO On-Order   = PO Buy (จองซื้อ) − ส่วนที่ matched ไปแล้ว
+                      → ของที่จะเข้ามาในอนาคต (commitment)
+       Spot in Pool  = Spot Buy (รับซื้อจริง) − ส่วนที่ matched ไปแล้ว
+                      → cost pool พร้อมจับคู่ขาย
+       Stock จริง    = stockOnHand จาก stockLedger
+                      → ของที่อยู่ในคลังตามจริง (physical)
+       ════════════════════════════════════════════════════════════════ */
+    const costPoolReconciliation = computed(() => {
+      const map = new Map();
+
+      // 1. PO Buy → poBuyQty (จองซื้อ ยังไม่รับของ)
+      _trkSafe(db.poBuys).filter(p => p && p.status !== 'Cancelled' && p.status !== 'cancelled').forEach(p => {
+        const items = (p.items && p.items.length) ? p.items : [{ productId: p.productId, qty: Number(p.qty||0), unitPrice: Number(p.unitPrice||0) }];
+        items.forEach(it => {
+          const k = it.productId;
+          if (!k) return;
+          if (!map.has(k)) map.set(k, { productId: k, poBuyQty:0, poBuyValue:0, spotBuyQty:0, spotBuyValue:0, poMatched:0, spotMatched:0 });
+          const r = map.get(k);
+          r.poBuyQty += Number(it.qty||0);
+          r.poBuyValue += Number(it.qty||0) * Number(it.unitPrice||0);
+        });
+      });
+
+      // 2. Spot Buy (purchase bills posted) → spotBuyQty (ของรับจริงเข้า stock)
+      _trkSafe(db.purchaseBills).filter(b => b && b.status !== 'cancelled' && b.status !== 'draft').forEach(b => {
+        (b.items||[]).forEach(it => {
+          const k = it.productId;
+          if (!k) return;
+          if (!map.has(k)) map.set(k, { productId: k, poBuyQty:0, poBuyValue:0, spotBuyQty:0, spotBuyValue:0, poMatched:0, spotMatched:0 });
+          const r = map.get(k);
+          r.spotBuyQty += Number(it.netWeight||0);
+          r.spotBuyValue += Number(it.netAmount||0);
+        });
+      });
+
+      // 3. Match log: แยก matched ตาม source (PO_Buy vs Spot_Buy)
+      _trkSafe(db.matchLogs).filter(m => m && m.status !== 'reversed').forEach(m => {
+        const k = m.product_id || m.productId;
+        if (!k) return;
+        if (!map.has(k)) map.set(k, { productId: k, poBuyQty:0, poBuyValue:0, spotBuyQty:0, spotBuyValue:0, poMatched:0, spotMatched:0 });
+        const r = map.get(k);
+        const qty = Number(m.qty_used||m.qty||0);
+        const src = String(m.source_type||'').toLowerCase();
+        if (src === 'po_buy' || src === 'pobuy') r.poMatched += qty;
+        else r.spotMatched += qty;
+      });
+
+      // 4. Build final array
+      const arr = Array.from(map.values()).map(r => {
+        const product = (db.products||[]).find(p => p && p.id === r.productId);
+
+        // PO On-Order (จองซื้อ ยังไม่ matched — กำลังจะมา)
+        const poOnOrderQty = Math.max(0, r.poBuyQty - r.poMatched);
+        const poAvgPrice = r.poBuyQty > 0 ? r.poBuyValue / r.poBuyQty : 0;
+        const poOnOrderValue = poOnOrderQty * poAvgPrice;
+
+        // Spot in Pool (รับซื้อจริง − matched = พร้อมจับคู่ขาย)
+        const spotInPoolQty = Math.max(0, r.spotBuyQty - r.spotMatched);
+        const spotAvgPrice = r.spotBuyQty > 0 ? r.spotBuyValue / r.spotBuyQty : 0;
+        const spotInPoolValue = spotInPoolQty * spotAvgPrice;
+
+        // Stock จริงจาก stockLedger
+        const stockQty = erp.stockOnHand ? erp.stockOnHand(r.productId) : 0;
+        const stockWAC = erp.avgCost ? erp.avgCost(r.productId) : 0;
+        const stockValue = stockQty * stockWAC;
+
+        return {
+          productId: r.productId,
+          productCode: product?.code || '-',
+          productName: product?.name || '-',
+          itemStatus: product?.itemStatus || 'RM',
+          metalGroup: product?.metalGroup || '-',
+          // raw counts
+          poBuyQty: r.poBuyQty, spotBuyQty: r.spotBuyQty,
+          poMatched: r.poMatched, spotMatched: r.spotMatched,
+          // PO On-Order (จะเข้ามา)
+          poOnOrderQty, poAvgPrice, poOnOrderValue,
+          // Spot in Pool (พร้อมจับคู่)
+          spotInPoolQty, spotAvgPrice, spotInPoolValue,
+          // Stock จริง
+          stockQty, stockWAC, stockValue,
+        };
+      });
+
+      // Filter by selected groups + show only ที่มีของ
+      return arr.filter(r => {
+        if (selectedGroups.value.length > 0) {
+          if (selectedGroups.value.includes('__NONE__')) return false;
+          if (!selectedGroups.value.includes(r.metalGroup)) return false;
+        }
+        return r.poOnOrderQty > 0 || r.spotInPoolQty > 0 || r.stockQty > 0;
+      });
+    });
+
+    /* แยก RM / FG / WIP */
+    const reconRM = computed(() => costPoolReconciliation.value.filter(r => r.itemStatus === 'RM').sort((a,b)=>b.spotInPoolValue - a.spotInPoolValue));
+    const reconFG = computed(() => costPoolReconciliation.value.filter(r => r.itemStatus === 'FG').sort((a,b)=>b.spotInPoolValue - a.spotInPoolValue));
+    const reconWIP = computed(() => costPoolReconciliation.value.filter(r => r.itemStatus !== 'RM' && r.itemStatus !== 'FG').sort((a,b)=>b.spotInPoolValue - a.spotInPoolValue));
+
+    /* Totals */
+    const reconTotals = computed(() => {
+      const arr = costPoolReconciliation.value;
+      return {
+        productCount: arr.length,
+        totalPoOnOrderQty: arr.reduce((s,r)=>s+r.poOnOrderQty, 0),
+        totalPoOnOrderValue: arr.reduce((s,r)=>s+r.poOnOrderValue, 0),
+        totalSpotInPoolQty: arr.reduce((s,r)=>s+r.spotInPoolQty, 0),
+        totalSpotInPoolValue: arr.reduce((s,r)=>s+r.spotInPoolValue, 0),
+        totalStockQty: arr.reduce((s,r)=>s+r.stockQty, 0),
+        totalStockValue: arr.reduce((s,r)=>s+r.stockValue, 0),
+      };
+    });
+
+    /* Export */
+    function exportReconCsv() {
+      const rows = [['Product Code','Product Name','Group','Status','PO On-Order Qty','PO Avg Price','PO On-Order Value','Spot in Pool Qty','Spot Avg Price','Spot in Pool Value','Stock Qty (จริง)','Stock WAC','Stock Value']];
+      costPoolReconciliation.value.forEach(r => {
+        rows.push([r.productCode, r.productName, r.metalGroup, r.itemStatus, r.poOnOrderQty, r.poAvgPrice, r.poOnOrderValue, r.spotInPoolQty, r.spotAvgPrice, r.spotInPoolValue, r.stockQty, r.stockWAC, r.stockValue]);
+      });
+      downloadCsv('pool_vs_stock_'+erp.today()+'.csv', rows);
+    }
+
     return { db, erp, viewMode, selectedProductId, filterCustomer, filterChannel,
       allMetalGroups, selectedGroups, toggleGroup, selectAllGroups, selectNoneGroups,
       productSummary, productDetail, summaryTotals, saveLme, saveLmePercent,
       lmeBaseFor, lmeTargetForProduct, wacVsLme, lmeProductsCuBr,
-      exportCsv, fmt:erp.fmt };
+      exportCsv, fmt:erp.fmt,
+      // 🆕 Cost Pool vs Stock
+      costPoolReconciliation, reconRM, reconFG, reconWIP, reconTotals, exportReconCsv };
   },
   template: `
   <div class="space-y-3">
     <div class="bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl p-4 shadow">
       <h1 class="text-xl font-bold">⏰ รายการรอขาย / Pending Sales — เทียบกับ LME</h1>
-      <p class="text-sm opacity-80 mt-1">สรุปสินค้าที่รอขาย · เปรียบเทียบกับราคา LME · กำไร/ขาดทุน</p>
+      <p class="text-sm opacity-80 mt-1">สรุปสินค้าที่รอขาย · เปรียบเทียบกับราคา LME · กำไร/ขาดทุน · Cost Pool vs Stock</p>
     </div>
 
     <!-- LME CONFIG -->
@@ -17623,6 +17751,152 @@ app.component('view-pendingSales', {
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- 🆕 ════════════════════════════════════════════════════════════
+         📦 Pool & Stock Inventory — รายตัว แยก RM / FG
+         ════════════════════════════════════════════════════════════ -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white rounded-xl p-4 shadow mt-4">
+      <h2 class="text-lg font-bold flex items-center gap-2">📦 Pool & Stock Inventory <span class="text-xs font-normal opacity-80">(รายสินค้า · แยก RM/FG)</span></h2>
+      <p class="text-xs opacity-80 mt-1">
+        <b>PO On-Order</b> = จองซื้อ (ของกำลังจะมา) ·
+        <b>Spot in Pool</b> = บิลรับซื้อจริง − matched (พร้อมจับคู่ขาย) ·
+        <b>Stock จริง</b> = ของในคลัง (จาก Stock Ledger)
+      </p>
+      <p class="text-[10px] opacity-70 mt-1">⚠ Pool ≠ Stock โดยธรรมชาติ — เพราะ PO Buy อยู่ใน Pool แต่ของยังไม่เข้า Stock จริง</p>
+    </div>
+
+    <!-- Recon Totals Bar -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="bg-white rounded-xl shadow p-3 border-l-4 border-purple-500">
+        <div class="text-xs text-slate-500">📋 PO On-Order (จะเข้ามา)</div>
+        <div class="text-lg font-bold text-purple-700">{{fmt(reconTotals.totalPoOnOrderQty)}} กก.</div>
+        <div class="text-xs text-slate-400">≈ {{fmt(reconTotals.totalPoOnOrderValue)}} ฿</div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-3 border-l-4 border-emerald-500">
+        <div class="text-xs text-slate-500">💰 Spot in Pool (พร้อมจับคู่)</div>
+        <div class="text-lg font-bold text-emerald-700">{{fmt(reconTotals.totalSpotInPoolQty)}} กก.</div>
+        <div class="text-xs text-slate-400">≈ {{fmt(reconTotals.totalSpotInPoolValue)}} ฿</div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-3 border-l-4 border-blue-500">
+        <div class="text-xs text-slate-500">📦 Stock จริง (จาก Ledger)</div>
+        <div class="text-lg font-bold text-blue-700">{{fmt(reconTotals.totalStockQty)}} กก.</div>
+        <div class="text-xs text-slate-400">≈ {{fmt(reconTotals.totalStockValue)}} ฿ (WAC)</div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-3 border-l-4 border-slate-400">
+        <div class="text-xs text-slate-500">🔢 จำนวนสินค้า</div>
+        <div class="text-lg font-bold text-slate-700">{{reconTotals.productCount}} รายการ</div>
+        <button @click="exportReconCsv" class="text-xs text-indigo-600 hover:underline mt-1">📥 Export CSV</button>
+      </div>
+    </div>
+
+    <!-- RM Section -->
+    <div v-if="reconRM.length" class="bg-white rounded-xl shadow overflow-hidden">
+      <div class="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+        <h3 class="font-bold text-amber-900 text-sm">🟡 RM — วัตถุดิบ ({{reconRM.length}} รายการ)</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="p-2 text-left">รหัส / สินค้า</th>
+              <th class="p-2 text-left">หมวด</th>
+              <th class="p-2 text-right text-purple-700" colspan="2">PO On-Order</th>
+              <th class="p-2 text-right text-emerald-700" colspan="2">Spot in Pool</th>
+              <th class="p-2 text-right text-blue-700" colspan="2">Stock จริง</th>
+            </tr>
+            <tr class="text-[10px] text-slate-500 bg-slate-100">
+              <th></th><th></th>
+              <th class="p-1 text-right">Qty (กก.)</th><th class="p-1 text-right">฿/กก.</th>
+              <th class="p-1 text-right">Qty (กก.)</th><th class="p-1 text-right">฿/กก.</th>
+              <th class="p-1 text-right">Qty (กก.)</th><th class="p-1 text-right">WAC ฿/กก.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in reconRM" :key="r.productId" class="border-t hover:bg-slate-50">
+              <td class="p-2"><span class="font-mono text-slate-500">{{r.productCode}}</span> {{r.productName}}</td>
+              <td class="p-2 text-slate-600">{{r.metalGroup}}</td>
+              <td class="p-2 text-right" :class="r.poOnOrderQty>0?'font-bold text-purple-700':'text-slate-300'">{{fmt(r.poOnOrderQty)}}</td>
+              <td class="p-2 text-right text-slate-500">{{r.poOnOrderQty>0?fmt(r.poAvgPrice):'-'}}</td>
+              <td class="p-2 text-right" :class="r.spotInPoolQty>0?'font-bold text-emerald-700':'text-slate-300'">{{fmt(r.spotInPoolQty)}}</td>
+              <td class="p-2 text-right text-slate-500">{{r.spotInPoolQty>0?fmt(r.spotAvgPrice):'-'}}</td>
+              <td class="p-2 text-right" :class="r.stockQty>0?'font-bold text-blue-700':'text-slate-300'">{{fmt(r.stockQty)}}</td>
+              <td class="p-2 text-right text-slate-500">{{r.stockQty>0?fmt(r.stockWAC):'-'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FG Section -->
+    <div v-if="reconFG.length" class="bg-white rounded-xl shadow overflow-hidden">
+      <div class="px-4 py-2 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
+        <h3 class="font-bold text-emerald-900 text-sm">🟢 FG — สินค้าสำเร็จรูป ({{reconFG.length}} รายการ)</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="p-2 text-left">รหัส / สินค้า</th>
+              <th class="p-2 text-left">หมวด</th>
+              <th class="p-2 text-right text-purple-700" colspan="2">PO On-Order</th>
+              <th class="p-2 text-right text-emerald-700" colspan="2">Spot in Pool</th>
+              <th class="p-2 text-right text-blue-700" colspan="2">Stock จริง</th>
+            </tr>
+            <tr class="text-[10px] text-slate-500 bg-slate-100">
+              <th></th><th></th>
+              <th class="p-1 text-right">Qty (กก.)</th><th class="p-1 text-right">฿/กก.</th>
+              <th class="p-1 text-right">Qty (กก.)</th><th class="p-1 text-right">฿/กก.</th>
+              <th class="p-1 text-right">Qty (กก.)</th><th class="p-1 text-right">WAC ฿/กก.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in reconFG" :key="r.productId" class="border-t hover:bg-slate-50">
+              <td class="p-2"><span class="font-mono text-slate-500">{{r.productCode}}</span> {{r.productName}}</td>
+              <td class="p-2 text-slate-600">{{r.metalGroup}}</td>
+              <td class="p-2 text-right" :class="r.poOnOrderQty>0?'font-bold text-purple-700':'text-slate-300'">{{fmt(r.poOnOrderQty)}}</td>
+              <td class="p-2 text-right text-slate-500">{{r.poOnOrderQty>0?fmt(r.poAvgPrice):'-'}}</td>
+              <td class="p-2 text-right" :class="r.spotInPoolQty>0?'font-bold text-emerald-700':'text-slate-300'">{{fmt(r.spotInPoolQty)}}</td>
+              <td class="p-2 text-right text-slate-500">{{r.spotInPoolQty>0?fmt(r.spotAvgPrice):'-'}}</td>
+              <td class="p-2 text-right" :class="r.stockQty>0?'font-bold text-blue-700':'text-slate-300'">{{fmt(r.stockQty)}}</td>
+              <td class="p-2 text-right text-slate-500">{{r.stockQty>0?fmt(r.stockWAC):'-'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- WIP / อื่นๆ -->
+    <div v-if="reconWIP.length" class="bg-white rounded-xl shadow overflow-hidden">
+      <div class="px-4 py-2 bg-slate-100 border-b border-slate-200">
+        <h3 class="font-bold text-slate-700 text-sm">⚪ WIP / อื่นๆ ({{reconWIP.length}} รายการ)</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="p-2 text-left">รหัส / สินค้า</th>
+              <th class="p-2 text-left">หมวด · Status</th>
+              <th class="p-2 text-right text-purple-700">PO On-Order</th>
+              <th class="p-2 text-right text-emerald-700">Spot in Pool</th>
+              <th class="p-2 text-right text-blue-700">Stock จริง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in reconWIP" :key="r.productId" class="border-t">
+              <td class="p-2"><span class="font-mono text-slate-500">{{r.productCode}}</span> {{r.productName}}</td>
+              <td class="p-2 text-slate-600">{{r.metalGroup}} · {{r.itemStatus}}</td>
+              <td class="p-2 text-right">{{fmt(r.poOnOrderQty)}}</td>
+              <td class="p-2 text-right">{{fmt(r.spotInPoolQty)}}</td>
+              <td class="p-2 text-right">{{fmt(r.stockQty)}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="!reconRM.length && !reconFG.length && !reconWIP.length" class="bg-white rounded-xl shadow p-8 text-center text-slate-400">
+      ยังไม่มีข้อมูล Pool / Stock — เมื่อมี PO Buy / บิลซื้อ / Sales ระบบจะคำนวณให้อัตโนมัติ
     </div>
   </div>`
 });
