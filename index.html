@@ -28803,6 +28803,9 @@ app.component('view-importTxn', {
       }
       try {
         const collection = log.txnType === 'purchase' ? 'purchaseBills' : 'salesBills';
+        // 🆕 Local: เก็บ ids ที่จะลบก่อน restore (ใช้ตอนลบ cloud)
+        const idsToDeleteCloud = [...(log.createdIds||[])];
+
         // Restore from snapshot — safer
         if (log.snapshot && log.snapshot[collection]) {
           db[collection] = JSON.parse(JSON.stringify(log.snapshot[collection]));
@@ -28812,6 +28815,18 @@ app.component('view-importTxn', {
         // Stock ledger
         if (log.stockLedgerIds && log.stockLedgerIds.length) {
           db.stockLedger = _trkSafe(db.stockLedger).filter(s => !(s && log.stockLedgerIds.includes(s.id)));
+        }
+
+        // 🆕 CRITICAL: ลบ cloud ด้วย — ไม่งั้น autoSync จะ pull กลับมา
+        if (erp.deleteCloud && idsToDeleteCloud.length) {
+          erp.deleteCloud(collection, idsToDeleteCloud)
+            .then(() => console.log('[Rollback] cloud delete', collection, idsToDeleteCloud.length, 'rows ✓'))
+            .catch(e => console.warn('[Rollback] cloud delete error:', e));
+        }
+        if (erp.deleteCloud && log.stockLedgerIds && log.stockLedgerIds.length) {
+          erp.deleteCloud('stockLedger', log.stockLedgerIds)
+            .then(() => console.log('[Rollback] cloud stock_ledger delete', log.stockLedgerIds.length, 'rows ✓'))
+            .catch(e => console.warn('[Rollback] cloud stockLedger delete error:', e));
         }
         // PO updates revert
         (log.updatedPOs||[]).forEach(po => {
