@@ -4491,7 +4491,12 @@ window.$erp = {
     openingBalance: 'opening_balance',
     // เพิ่มได้: equity: 'equity_settings', ฯลฯ
   };
+  /* 🛡 Dirty flag: ถ้า local มี pending changes → skip pull (กัน override) */
+  const _dirtySingletons = new Set();
+  /* Track local update time per singleton — last write time */
+  const _singletonLocalTs = {};
   let singletonPushTimer = null;
+
   async function pushSingleton(localKey, tableName) {
     if (!window.sb || !enabled || _applyingCloudUpdate) return;
     try {
@@ -4504,16 +4509,35 @@ window.$erp = {
         updated_at: new Date().toISOString(),
         updated_by: username
       });
-      if (error) { _logErr(tableName, 'PUSH SINGLETON: '+error.message); console.warn('[singleton push]', tableName, error.message); }
-      else console.log('[singleton] ☁ pushed '+tableName);
+      if (error) {
+        _logErr(tableName, 'PUSH SINGLETON: '+error.message);
+        console.warn('[singleton push]', tableName, error.message);
+        // Keep dirty so we retry
+      } else {
+        _dirtySingletons.delete(localKey);  // ✅ Clear dirty หลัง push สำเร็จ
+        console.log('[singleton] ☁ pushed '+tableName+' (cleared dirty)');
+      }
     } catch(e) { console.warn('[singleton push]', tableName, e); }
   }
+
   async function pullSingleton(localKey, tableName) {
     if (!window.sb || !enabled) return;
+    // 🛡 Skip pull ถ้า local มี dirty changes — กัน override
+    if (_dirtySingletons.has(localKey)) {
+      console.log('[singleton] ⏸ skip pull '+tableName+' — local has pending changes');
+      return;
+    }
     try {
       const { data, error } = await window.sb.from(tableName).select('*').eq('id', 'SINGLETON').maybeSingle();
       if (error) { console.warn('[singleton pull]', tableName, error.message); return; }
       if (!data?.data) return;
+      // 🛡 Compare timestamps — ถ้า local ใหม่กว่า cloud → skip
+      const cloudTs = new Date(data.updated_at || 0).getTime();
+      const localTs = _singletonLocalTs[localKey] || 0;
+      if (localTs > cloudTs) {
+        console.log('[singleton] ⏸ skip pull '+tableName+' — local is newer ('+new Date(localTs).toISOString()+' > '+new Date(cloudTs).toISOString()+')');
+        return;
+      }
       const target = _GLOBAL_DB[localKey];
       if (target && typeof target === 'object') {
         _applyingCloudUpdate = true;
@@ -4521,6 +4545,7 @@ window.$erp = {
           // Replace properties (preserve reactive proxy)
           Object.keys(target).forEach(k => { delete target[k]; });
           Object.assign(target, data.data);
+          _singletonLocalTs[localKey] = cloudTs;
           console.log('[singleton] ⬇ pulled '+tableName);
         } finally {
           // restore flag after microtask
@@ -4529,11 +4554,14 @@ window.$erp = {
       }
     } catch(e) { console.warn('[singleton pull]', tableName, e); }
   }
-  // Watch each singleton — debounced push
+
+  // Watch each singleton — mark dirty + debounced push
   Object.keys(SINGLETONS).forEach(localKey => {
     const tableName = SINGLETONS[localKey];
     watch(() => _GLOBAL_DB[localKey], () => {
       if (_applyingCloudUpdate) return;
+      _dirtySingletons.add(localKey);          // 🆕 Mark dirty
+      _singletonLocalTs[localKey] = Date.now(); // 🆕 Update local timestamp
       clearTimeout(singletonPushTimer);
       singletonPushTimer = setTimeout(() => pushSingleton(localKey, tableName), 1500);
     }, { deep: true });
