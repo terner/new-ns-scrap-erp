@@ -29065,9 +29065,15 @@ app.component('view-importTxn', {
   },
   template:`
   <div class="space-y-4">
-    <div class="bg-gradient-to-r from-fuchsia-700 to-violet-700 text-white rounded-xl p-5 shadow">
-      <h1 class="text-2xl font-bold flex items-center gap-2">📑 Import บิลซื้อ / บิลขาย</h1>
-      <p class="text-sm opacity-80 mt-1">รองรับ SPOT_BUY · PO_RECEIPT · SPOT_SALES · PO_DELIVERY · Auto-post Stock + AP/AR + WAC + Rollback</p>
+    <div class="bg-gradient-to-r from-fuchsia-700 to-violet-700 text-white rounded-xl p-5 shadow flex items-center justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold flex items-center gap-2">📑 Import บิลซื้อ / บิลขาย</h1>
+        <p class="text-sm opacity-80 mt-1">รองรับ SPOT_BUY · PO_RECEIPT · SPOT_SALES · PO_DELIVERY · Auto-post Stock + AP/AR + WAC + Rollback</p>
+      </div>
+      <!-- 🚨 Emergency Force Delete — แสดงเสมอ ทั้ง 2 tab -->
+      <button @click="forceDeleteAllImported" class="px-4 py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 shadow-lg whitespace-nowrap" title="ลบบิล Import ทั้งหมด (PB-IMP-* / SB-IMP-*) จาก local + cloud">
+        🚨 Force Delete ALL Imported
+      </button>
     </div>
 
     <div class="bg-white rounded-xl shadow border">
