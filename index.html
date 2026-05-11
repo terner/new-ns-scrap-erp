@@ -5472,13 +5472,23 @@ function makeMasterComponent(opts) {
         }
         // 🆕 Auto-generate code ถ้าตั้ง opts.autoCode + ยังไม่มี code
         if (opts.autoCode && !form.code) {
-          const existing = (db[opts.collection]||[]).map(r => r && r.code).filter(c => c && /^[A-Z]\d+$/.test(c));
-          const maxNum = existing.reduce((max, c) => {
-            const n = parseInt(c.slice(1), 10);
-            return Number.isFinite(n) && n > max ? n : max;
-          }, 0);
-          const codePrefix = (opts.collection === 'suppliers' ? 'S' : opts.collection === 'customers' ? 'C' : opts.collection.charAt(0).toUpperCase());
-          form.code = codePrefix + String(maxNum + 1).padStart(4,'0');
+          // 🆕 รองรับ codeGenerator แบบ custom (เช่น Product ใช้ metalGroup เป็น prefix)
+          if (typeof opts.codeGenerator === 'function') {
+            try {
+              const generated = opts.codeGenerator(form, db);
+              if (generated) form.code = generated;
+            } catch(e) { console.warn('[autoCode] codeGenerator error:', e); }
+          }
+          // Fallback: format มาตรฐาน <Prefix><4-digit>
+          if (!form.code) {
+            const existing = (db[opts.collection]||[]).map(r => r && r.code).filter(c => c && /^[A-Z]\d+$/.test(c));
+            const maxNum = existing.reduce((max, c) => {
+              const n = parseInt(c.slice(1), 10);
+              return Number.isFinite(n) && n > max ? n : max;
+            }, 0);
+            const codePrefix = (opts.collection === 'suppliers' ? 'S' : opts.collection === 'customers' ? 'C' : opts.collection.charAt(0).toUpperCase());
+            form.code = codePrefix + String(maxNum + 1).padStart(4,'0');
+          }
         }
         if (editing.value) {
           const idx = db[opts.collection].findIndex(x=>x.id===editing.value.id);
@@ -5880,17 +5890,53 @@ app.component('view-mdProduct', makeMasterComponent({
     {key:'active', label:'สถานะ', format:'bool'},
   ],
   fields: [
-    {key:'code', label:'รหัสสินค้า', required:true},
+    {key:'code', label:'รหัสสินค้า (เว้นว่าง = auto-gen ตามหมวดโลหะ)', placeholder:'เว้นว่าง — ระบบจะสร้างให้ เช่น AL-003, FE-004'},
     {key:'name', label:'ชื่อสินค้า', required:true},
     {key:'metalGroup', label:'หมวดโลหะ (Metal Group) *', required:true},
     {key:'active', label:'สถานะใช้งาน', type:'bool'},
   ],
   validate: (f) => {
     const e=[];
-    if(!f.code) e.push('กรุณาใส่รหัส');
     if(!f.name) e.push('กรุณาใส่ชื่อ');
     if(!f.metalGroup) e.push('กรุณาใส่หมวดโลหะ');
     return e;
+  },
+  autoCode: true,    // 🆕 เปิด auto-gen รหัสสินค้า
+  /* 🆕 ใช้หมวดโลหะเป็น prefix — รักษา format เดิม (AL-001, FE-002, PP-003, ฯลฯ) */
+  codeGenerator: (form, db) => {
+    if (!form.metalGroup) return '';
+    /* Map ชื่อหมวดโลหะ → 2-letter code */
+    const prefixMap = {
+      'อลูมิเนียม':'AL','Aluminum':'AL','aluminium':'AL','AL':'AL',
+      'เหล็ก':'FE','Iron':'FE','Steel':'FE','FE':'FE',
+      'ทองแดง':'CU','Copper':'CU','CU':'CU',
+      'ทองเหลือง':'BR','Brass':'BR','BR':'BR',
+      'สแตนเลส':'SS','Stainless':'SS','SS':'SS',
+      'พลาสติก':'PL','Plastic':'PL','PL':'PL',
+      'กระดาษ':'PP','Paper':'PP','PP':'PP',
+      'แก้ว':'GL','Glass':'GL','GL':'GL',
+      'แบตเตอรี่':'BT','Battery':'BT','BT':'BT',
+      'ตะกั่ว':'PB','Lead':'PB','PB':'PB',
+      'สังกะสี':'ZN','Zinc':'ZN','ZN':'ZN',
+      'นิกเกิล':'NI','Nickel':'NI','NI':'NI',
+    };
+    let prefix = prefixMap[form.metalGroup] || prefixMap[String(form.metalGroup).trim()];
+    if (!prefix) {
+      /* ถ้าไม่อยู่ใน map → ใช้ 2 ตัวอักษรแรกของ metalGroup */
+      const raw = String(form.metalGroup||'').replace(/[^A-Za-z]/g,'').toUpperCase();
+      prefix = raw.substring(0,2) || 'XX';
+    }
+    /* หา max number ที่มีอยู่ใน collection (รองรับทั้ง AL-001 และ AL001) */
+    const re = new RegExp('^' + prefix + '-?(\\d+)$', 'i');
+    const maxNum = (db.products||[])
+      .map(p => p && p.code)
+      .filter(c => c && re.test(c))
+      .reduce((max, c) => {
+        const m = c.match(re);
+        const n = m ? parseInt(m[1], 10) : 0;
+        return Number.isFinite(n) && n > max ? n : max;
+      }, 0);
+    return prefix + '-' + String(maxNum + 1).padStart(3, '0');
   },
 }));
 
@@ -12944,12 +12990,11 @@ app.component('view-sales', {
               </div>
             </div>
 
-            <!-- เลือกบิลใหม่ -->
+            <!-- เลือกบิลใหม่ — searchable (พิมพ์ชื่อ Supplier / เลข PB / ชื่อสินค้า) -->
             <div class="flex gap-2 items-center">
-              <select v-model="form._addPurchaseId" class="flex-1 px-2 py-1.5 border rounded text-sm">
-                <option value="">— เลือกบิลซื้อ Trading ที่จะเพิ่ม —</option>
-                <option v-for="pb in availableTradingPurchases.filter(x => !(form.tradingFromPurchaseIds||[]).includes(x.id))" :key="pb.id" :value="pb.id">{{pb.label}}</option>
-              </select>
+              <div class="flex-1">
+                <searchable-select v-model="form._addPurchaseId" :options="availableTradingPurchases.filter(x => !(form.tradingFromPurchaseIds||[]).includes(x.id))" label-field="label" placeholder="🔍 พิมพ์ชื่อ Supplier / เลข PB / ชื่อสินค้า..." input-class="w-full px-2 py-1.5 border rounded text-sm"></searchable-select>
+              </div>
               <button @click="addTradingPurchase" type="button" :disabled="!form._addPurchaseId" class="bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded text-xs font-bold whitespace-nowrap">+ เพิ่มบิลซื้อ</button>
             </div>
 
