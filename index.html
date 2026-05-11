@@ -8811,17 +8811,18 @@ app.component('view-purchase', {
             productId: it.productId,
             displayName: (it.displayName||'').trim(),    // 📝 ชื่อ custom สำหรับโชว์ในบิล
             poBuyId: it.poBuyId || '',                   // 🔧 BUG FIX: preserve PO selection on edit
-            lotNo: '',
-            grossWeight: num(it.netWeight),
-            deductWeight: 0,
+            lotNo: it.lotNo || '',
+            // 🆕 รักษาค่า Gross/Tare/Net ที่ user กรอก (เดิม overwrite ทำให้หาย)
+            grossWeight: num(it.grossWeight) || num(it.netWeight),
+            deductWeight: num(it.deductWeight),
             netWeight: num(it.netWeight),
             price: num(it.price),
             amount: num(it.netAmount),
-            discount: 0,
+            discount: num(it.discount),
             netAmount: num(it.netAmount),
             facePrice: num(it.facePrice),                // 🆕 ราคาหน้าใบ — เก็บไว้ใช้ใน Sales Tracking
             commission: 0,                               // 🚫 ไม่คำนวณต่อบิลแล้ว
-            note: ''
+            note: it.note || ''
           })),
           subtotal, discountTotal,
           hasVat: !!f.hasVat, vatAmount,
@@ -8908,8 +8909,13 @@ app.component('view-purchase', {
             msg += ' · 📋 ตัด PO ซื้อ: '+bill._cutPoIds.join(', ');
           }
         }
-        // 🆕 Force push ทันที — ให้คนอื่นเห็นเร็ว (skip 1.5s debounce)
-        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
+        // 🆕 Force push ทันทีและรอจนเสร็จ — กัน auto-pull ดึงข้อมูลเก่ากลับมาทับ
+        // (เดิม fire-and-forget ทำให้ pull race ทับ edit)
+        try {
+          if (window.$autoSync && window.$autoSync.pushNow) {
+            await window.$autoSync.pushNow();
+          }
+        } catch(pushErr) { console.warn('[save] pushNow failed:', pushErr); }
         erp.showToast(msg,'success');
       } catch (e) {
         console.error('save:', e);
@@ -12363,9 +12369,12 @@ app.component('view-sales', {
     async function save() {
       const isTrading = form.transactionMode === 'TRADING';
       if (!form.customerId) { erp.showToast('เลือก Customer','error'); return; }
-      if (!form.branchId) { erp.showToast('เลือกสาขา','error'); return; }
+      // 🆕 Trading mode: ไม่ต้องมีสาขา/คลัง/ช่องทาง (ไม่ตัด Stock จึงไม่จำเป็น)
+      if (!isTrading && !form.branchId) { erp.showToast('เลือกสาขา','error'); return; }
       if (!isTrading && !form.warehouseId) { erp.showToast('เลือกคลัง','error'); return; }
-      if (!form.channelId) { erp.showToast('เลือกช่องทางขาย','error'); return; }
+      if (!isTrading && !form.channelId) { erp.showToast('เลือกช่องทางขาย','error'); return; }
+      // 🆕 Trading: ล้าง branch/warehouse/channel — เพื่อไม่ให้ link กับ stock
+      if (isTrading) { form.branchId = ''; form.warehouseId = ''; form.channelId = ''; }
       if (!(form.items||[]).length || form.items.some(it=>!it.productId || !it.weight)) { erp.showToast('เพิ่มรายการสินค้า + น้ำหนัก','error'); return; }
       // stock check — SKIP for TRADING (Trading ไม่ตัด Stock)
       if (!isTrading) {
@@ -12509,9 +12518,13 @@ app.component('view-sales', {
         }
       }
       showForm.value = false;
+      // 🆕 Force push ทันทีและรอจนเสร็จ — กัน auto-pull ดึงข้อมูลเก่ากลับมาทับ
+      try {
+        if (window.$autoSync && window.$autoSync.pushNow) {
+          await window.$autoSync.pushNow();
+        }
+      } catch(pushErr) { console.warn('[save] pushNow failed:', pushErr); }
       erp.showToast('บันทึกบิลขายสำเร็จ — Stock และ AR อัปเดตแล้ว');
-      // 🆕 Force push ทันที
-      if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
     }
 
     function cancelBill(b) {
