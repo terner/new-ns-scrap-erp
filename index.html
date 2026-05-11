@@ -6748,6 +6748,31 @@ app.component('view-stockBalance', {
     const erp = window.$erp; const db = erp.db;
     const filterBranch = ref(''); const filterProduct = ref(''); const filterGroup = ref(''); const filterStatus = ref('');
     const viewMode = ref('summary'); // 'summary' | 'detail'
+    /* 🆕 Helper: คำนวณ WIP per (productionOrder × target product × branch) */
+    const wipByProductBranch = computed(() => {
+      const map = new Map();   // key: productId|branchId → { qty, val, orders:[docNo] }
+      (db.productionOrders||[]).forEach(po => {
+        if (!po || !po.targetProductId) return;
+        if (['Cancelled'].includes(po.status)) return;
+        const inputs = (db.productionInputs||[]).filter(i => i && i.productionOrderId===po.id && i.status!=='reversed');
+        const outputs = (db.productionOutputs||[]).filter(o => o && o.productionOrderId===po.id && o.status!=='reversed');
+        const inQty = inputs.reduce((s,i)=>s+Number(i.qtyNet||0),0);
+        const outQty = outputs.reduce((s,o)=>s+Number(o.qtyNet||0),0);
+        const wipQty = Math.max(0, inQty - outQty);
+        if (wipQty <= 0) return;
+        const inCost = inputs.reduce((s,i)=>s+Number(i.totalCost||0),0);
+        const wac = inQty > 0 ? inCost / inQty : 0;
+        const wipVal = wipQty * wac;
+        const key = po.targetProductId + '|' + (po.branchId||'');
+        if (!map.has(key)) map.set(key, { productId: po.targetProductId, branchId: po.branchId||'', qty:0, val:0, orders:[] });
+        const x = map.get(key);
+        x.qty += wipQty;
+        x.val += wipVal;
+        x.orders.push(po.docNo||po.id);
+      });
+      return map;
+    });
+
     const balances = computed(() => {
       const result = [];
       db.products.forEach(p => {
@@ -6766,7 +6791,24 @@ app.component('view-stockBalance', {
               paidRatio: val > 0 ? (pu.paid/val)*100 : 100,
               metalGroup: p.metalGroup || 'อื่นๆ',
               itemStatus: p.itemStatus || 'RM',
-              avgCost: qty>0?val/qty:0 });
+              avgCost: qty>0?val/qty:0,
+              isWip: false });
+          }
+          // 🆕 WIP Virtual Row — เพิ่มถ้ามี WIP กำลังผลิตอยู่
+          const wipKey = p.id + '|' + b.id;
+          const wip = wipByProductBranch.value.get(wipKey);
+          if (wip && wip.qty > 0) {
+            result.push({
+              product: p, branch: b,
+              qty: wip.qty, val: wip.val,
+              available: 0,   // WIP ขายไม่ได้
+              paidVal: wip.val, unpaidVal: 0, paidRatio: 100,
+              metalGroup: p.metalGroup || 'อื่นๆ',
+              itemStatus: 'WIP',
+              avgCost: wip.qty > 0 ? wip.val/wip.qty : 0,
+              isWip: true,
+              wipOrders: wip.orders,
+            });
           }
         });
       });
@@ -9794,16 +9836,16 @@ app.component('view-purchase', {
               <table class="w-full text-sm">
                 <thead class="bg-gradient-to-r from-slate-100 to-slate-50">
                   <tr>
-                    <th class="p-3 text-left text-slate-700">สินค้า *</th>
-                    <th class="p-3 text-left w-44 text-indigo-700">📋 PO <span class="text-xs font-normal text-slate-500">(เว้น = Spot)</span></th>
-                    <th class="p-3 text-center w-24 text-slate-600 text-xs">📦 คงเหลือ<br>→ หลังรับ</th>
-                    <th class="p-3 text-right w-20 text-slate-600 bg-slate-50">⚖️ Gross<br><span class="text-[10px] font-normal">(น้ำหนักรวม)</span></th>
-                    <th class="p-3 text-right w-20 text-amber-700 bg-amber-50">➖ หัก<br><span class="text-[10px] font-normal">(Tare)</span></th>
-                    <th class="p-3 text-right w-24 text-emerald-700 bg-emerald-50">✓ น้ำหนักสุทธิ<br><span class="text-[10px] font-normal">(กก.)</span></th>
-                    <th class="p-3 text-right w-24 text-slate-700">ราคา/กก.</th>
-                    <th v-if="form.salesId" class="p-3 text-right w-24 text-purple-700 bg-purple-50">💼 ราคา<br>หน้าใบ</th>
-                    <th class="p-3 text-right w-28 text-slate-700">ยอดรวม</th>
-                    <th class="p-3 w-10"></th>
+                    <th class="p-2 text-left text-slate-700 min-w-[240px]">สินค้า *</th>
+                    <th class="p-2 text-left w-32 text-indigo-700 text-xs">📋 PO <span class="font-normal text-slate-500">(เว้น = Spot)</span></th>
+                    <th class="p-2 text-center w-20 text-slate-600 text-xs">📦 คงเหลือ<br>→ หลังรับ</th>
+                    <th class="p-2 text-right w-[88px] text-slate-600 bg-slate-50 text-xs">⚖️ Gross<br><span class="font-normal">(กก.)</span></th>
+                    <th class="p-2 text-right w-[80px] text-amber-700 bg-amber-50 text-xs">➖ หัก<br><span class="font-normal">(Tare)</span></th>
+                    <th class="p-2 text-right w-[92px] text-emerald-700 bg-emerald-50 text-xs">✓ สุทธิ<br><span class="font-normal">(กก.)</span></th>
+                    <th class="p-2 text-right w-20 text-slate-700 text-xs">ราคา/กก.</th>
+                    <th v-if="form.salesId" class="p-2 text-right w-20 text-purple-700 bg-purple-50 text-xs">💼 ราคา<br>หน้าใบ</th>
+                    <th class="p-2 text-right w-24 text-slate-700">ยอดรวม</th>
+                    <th class="p-2 w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -12284,7 +12326,7 @@ app.component('view-sales', {
       form.items.forEach(recalcLine);
       recalcAll();
     }
-    function blankItem() { return { id:erp.uid('SL'), productId:'', lotNo:'', weight:0, price:0, amount:0, discount:0, netAmount:0, unitCost:0, totalCost:0, profit:0, tradingCostAmount:0, note:'' }; }
+    function blankItem() { return { id:erp.uid('SL'), productId:'', lotNo:'', weight:0, price:0, amount:0, discount:0, netAmount:0, unitCost:0, totalCost:0, profit:0, tradingCostAmount:0, note:'', sourceMode:'STOCK', sourcePurchaseBillId:'' }; }
     function _salesReceipts(billId) {
       return (db.receipts || []).filter(r => r && r.billId === billId);
     }
@@ -12347,17 +12389,42 @@ app.component('view-sales', {
     function recalcLine(it) {
       it.amount = Number(it.weight||0) * Number(it.price||0);
       it.netAmount = Math.max(0, it.amount - Number(it.discount||0));
-      // For TRADING mode → use tradingCostAmount (manual or matched), else WAC
-      if (form.transactionMode === 'TRADING') {
-        it.unitCost = 0;  // Trading: cost is set via matching
-        it.totalCost = Number(it.tradingCostAmount||0);
+      // 🆕 Per-item source mode: TRADING ใช้ทุนจาก PB, STOCK ใช้ WAC
+      // fallback: ถ้าไม่ตั้ง sourceMode → ใช้ bill-level transactionMode
+      const isTradingItem = it.sourceMode === 'TRADING' || (!it.sourceMode && form.transactionMode === 'TRADING');
+      if (isTradingItem) {
+        // หาทุนจาก PB Trading ที่ผูก
+        const pb = it.sourcePurchaseBillId ? (db.purchaseBills||[]).find(b => b && b.id === it.sourcePurchaseBillId) : null;
+        if (pb) {
+          // ทุน/หน่วย จาก PB item ที่ตรงกัน
+          const pbItem = (pb.items||[]).find(p => p && p.productId === it.productId);
+          if (pbItem && Number(pbItem.netWeight || pbItem.weight || 0) > 0) {
+            it.unitCost = Number(pbItem.netAmount||0) / Number(pbItem.netWeight || pbItem.weight || 1);
+          } else {
+            // bill-level: total cost / total weight
+            const totalPbWt = (pb.items||[]).reduce((s,x)=>s+Number(x.netWeight||x.weight||0),0);
+            it.unitCost = totalPbWt > 0 ? Number(pb.totalAmount||0)/totalPbWt : 0;
+          }
+        } else {
+          it.unitCost = 0;
+        }
+        it.totalCost = it.unitCost * Number(it.weight||0);
       } else {
-        // unit cost = avg cost from stock at time of input
+        // STOCK: ใช้ WAC จากระบบ stockLedger
         it.unitCost = erp.avgCost(it.productId);
         it.totalCost = it.unitCost * Number(it.weight||0);
       }
       it.profit = it.netAmount - it.totalCost;
     }
+    /* 🆕 onItemSourceChange — เมื่อเปลี่ยน source (Stock/Trading) แต่ละ item */
+    function onItemSourceChange(it) {
+      if (it.sourceMode === 'STOCK') {
+        it.sourcePurchaseBillId = '';   // ล้าง PB link
+        it.tradingCostAmount = 0;
+      }
+      recalcLine(it);
+    }
+
     function recalcAll() {
       if (!Array.isArray(form.items)) return;
       form.items.forEach(recalcLine);
@@ -12379,29 +12446,52 @@ app.component('view-sales', {
     watch(()=>{ try{return JSON.stringify(form.items);}catch(e){return '';} }, recalcAll);
 
     async function save() {
-      const isTrading = form.transactionMode === 'TRADING';
       if (!form.customerId) { erp.showToast('เลือก Customer','error'); return; }
-      // 🆕 Trading mode: ไม่ต้องมีสาขา/คลัง/ช่องทาง (ไม่ตัด Stock จึงไม่จำเป็น)
-      if (!isTrading && !form.branchId) { erp.showToast('เลือกสาขา','error'); return; }
-      if (!isTrading && !form.warehouseId) { erp.showToast('เลือกคลัง','error'); return; }
-      if (!isTrading && !form.channelId) { erp.showToast('เลือกช่องทางขาย','error'); return; }
-      // 🆕 Trading: ล้าง branch/warehouse/channel — เพื่อไม่ให้ link กับ stock
-      if (isTrading) { form.branchId = ''; form.warehouseId = ''; form.channelId = ''; }
       if (!(form.items||[]).length || form.items.some(it=>!it.productId || !it.weight)) { erp.showToast('เพิ่มรายการสินค้า + น้ำหนัก','error'); return; }
-      // stock check — SKIP for TRADING (Trading ไม่ตัด Stock)
-      if (!isTrading) {
-        for (const it of form.items) {
-          const available = erp.stockAvailableForSale(it.productId, form.branchId, form.warehouseId);
-          const total = erp.stockOnHand(it.productId, form.branchId, form.warehouseId);
-          const reserved = total - available;
-          if (it.weight > available) {
-            const msg = reserved > 0
-              ? `สินค้า ${erp.productName(it.productId)} พร้อมขาย ${erp.fmt(available)} (มี Stock รวม ${erp.fmt(total)} แต่ ${erp.fmt(reserved)} เป็น Customer Return/Quarantine ขายไม่ได้) — ดำเนินการต่อ?`
-              : `สินค้า ${erp.productName(it.productId)} มีในคลัง ${erp.fmt(available)} แต่จะขาย ${erp.fmt(it.weight)} — ดำเนินการต่อ?`;
-            if (!confirm(msg)) return;
-          }
+
+      // 🆕 Per-item source mode: split items เป็น Stock vs Trading
+      const stockItems = (form.items||[]).filter(it => it && (it.sourceMode||'STOCK')!=='TRADING');
+      const tradingItems = (form.items||[]).filter(it => it && it.sourceMode==='TRADING');
+      const hasStockItems = stockItems.length > 0;
+      const hasTradingItems = tradingItems.length > 0;
+      // bill-level mode (derived)
+      const isMixed = hasStockItems && hasTradingItems;
+      const isTrading = !hasStockItems && hasTradingItems;
+      form.transactionMode = isMixed ? 'MIXED' : (isTrading ? 'TRADING' : 'STOCK');
+
+      // Stock items ต้องการสาขา/คลัง/ช่องทาง
+      if (hasStockItems) {
+        if (!form.branchId) { erp.showToast('Stock items ต้องเลือกสาขา','error'); return; }
+        if (!form.warehouseId) { erp.showToast('Stock items ต้องเลือกคลัง','error'); return; }
+        if (!form.channelId) { erp.showToast('Stock items ต้องเลือกช่องทางขาย','error'); return; }
+      }
+      // Trading items ต้องเลือก PB
+      for (const it of tradingItems) {
+        if (!it.sourcePurchaseBillId) {
+          erp.showToast(`Trading item: ${erp.productName(it.productId)} ยังไม่ได้เลือก PB Trading`,'error');
+          return;
         }
       }
+
+      // Stock check — เฉพาะ Stock items
+      for (const it of stockItems) {
+        const available = erp.stockAvailableForSale(it.productId, form.branchId, form.warehouseId);
+        const total = erp.stockOnHand(it.productId, form.branchId, form.warehouseId);
+        const reserved = total - available;
+        if (Number(it.weight) > available) {
+          const msg = reserved > 0
+            ? `สินค้า ${erp.productName(it.productId)} พร้อมขาย ${erp.fmt(available)} (มี Stock รวม ${erp.fmt(total)} แต่ ${erp.fmt(reserved)} เป็น Customer Return/Quarantine) — ดำเนินการต่อ?`
+            : `สินค้า ${erp.productName(it.productId)} มีในคลัง ${erp.fmt(available)} แต่จะขาย ${erp.fmt(it.weight)} — ดำเนินการต่อ?`;
+          if (!confirm(msg)) return;
+        }
+      }
+
+      // ถ้าทั้งบิลเป็น Trading (ไม่มี Stock items) → ล้าง branch/warehouse/channel
+      if (isTrading) { form.branchId = ''; form.warehouseId = ''; form.channelId = ''; }
+
+      // sync tradingFromPurchaseIds จากแต่ละ item (กรณี mixed)
+      form.tradingFromPurchaseIds = Array.from(new Set(tradingItems.map(it => it.sourcePurchaseBillId).filter(Boolean)));
+
       recalcAll();
       // 🛡️ Anti-collision: ตรวจ docNo ซ้ำทั้ง local + cloud
       if (!editing.value) {
@@ -12442,17 +12532,16 @@ app.component('view-sales', {
         db.salesBills.push(bill);
         erp.logAudit('create','salesBill', null, bill);
       }
-      // Stock Ledger — SKIP for TRADING mode (Trading ไม่ตัด Stock)
-      if (!isTrading) {
-        (bill.items||[]).forEach(it => {
-          db.stockLedger.push({
-            id:erp.uid('SL'), date:bill.date, refType:'SB', refId:bill.id, refNo:bill.docNo,
-            movementType:'ขายออก', productId:it.productId, lotNo:it.lotNo, branchId:bill.branchId, warehouseId:bill.warehouseId,
-            qtyIn:0, qtyOut:Number(it.weight), unitCost:it.unitCost, valueIn:0, valueOut:Number(it.totalCost),
-            purchaseChannelId:'', salesChannelId:bill.channelId, createdBy:bill.createdBy
-          });
+      // 🆕 Stock Ledger — สร้างเฉพาะ Stock items (Trading items ไม่ตัด Stock)
+      (bill.items||[]).forEach(it => {
+        if (it && it.sourceMode === 'TRADING') return;   // skip Trading items
+        db.stockLedger.push({
+          id:erp.uid('SL'), date:bill.date, refType:'SB', refId:bill.id, refNo:bill.docNo,
+          movementType:'ขายออก', productId:it.productId, lotNo:it.lotNo, branchId:bill.branchId, warehouseId:bill.warehouseId,
+          qtyIn:0, qtyOut:Number(it.weight), unitCost:it.unitCost, valueIn:0, valueOut:Number(it.totalCost),
+          purchaseChannelId:'', salesChannelId:bill.channelId, createdBy:bill.createdBy
         });
-      }
+      });
       // 🔥 TRADING auto-match: ถ้าผูกบิลซื้อ Trading ไว้ → สร้าง Trading Deal อัตโนมัติ (รองรับหลายบิลซื้อ)
       // 🔧 FIX: ใช้ subtotal (ก่อน VAT) ไม่ใช่ totalAmount (หลัง VAT) เพื่อคิด GP จริง
       if (isTrading) {
@@ -12883,7 +12972,7 @@ app.component('view-sales', {
 
     return { db, erp, form, showForm, editing, showDetail, search, filterStatus, filterChannel,
       filterMode, filterDateFrom, filterDateTo,
-      open, save, addItem, removeItem, recalcLine, recalcAll, cancelBill, deleteBill, filtered, statusBadge, statusText,
+      open, save, addItem, removeItem, recalcLine, recalcAll, onItemSourceChange, cancelBill, deleteBill, filtered, statusBadge, statusText,
       loadFromPOSell, availableTradingPurchases, loadFromTradingPurchase, billTotals, toggleVatIssued, goToPendingSale, fmt:erp.fmt,
       addTradingPurchase, removeTradingPurchase,
       // 🆕 Multi-select
@@ -13091,21 +13180,33 @@ app.component('view-sales', {
             <div class="overflow-x-auto border rounded-lg">
               <table class="w-full text-sm">
                 <thead class="bg-slate-100"><tr>
-                  <th class="p-2 text-left">สินค้า *</th>
-                  <th class="p-2 text-right w-32">จำนวน (กก.)</th>
-                  <th class="p-2 text-right w-32">ราคา/หน่วย</th>
-                  <th class="p-2 text-right w-32">ยอดรวม</th>
-                  <th class="p-2 text-center w-44 bg-amber-50">📊 Stock พร้อมขาย → หลังขาย</th>
+                  <th class="p-2 text-left min-w-[200px]">สินค้า *</th>
+                  <th class="p-2 text-left w-36 bg-fuchsia-50">🔀 ที่มา *</th>
+                  <th class="p-2 text-right w-28">จำนวน (กก.)</th>
+                  <th class="p-2 text-right w-28">ราคา/หน่วย</th>
+                  <th class="p-2 text-right w-28">ยอดรวม</th>
+                  <th class="p-2 text-center w-40 bg-amber-50">📊 Stock/ทุน → หลังขาย</th>
                   <th class="p-2 w-8"></th>
                 </tr></thead>
                 <tbody>
-                  <tr v-for="(it, idx) in (form.items||[])" :key="it.id" class="border-t">
+                  <tr v-for="(it, idx) in (form.items||[])" :key="it.id" class="border-t align-top">
                     <td class="p-1"><searchable-select v-model="it.productId" :options="db.products.filter(x=>x && x.active!==false)" label-field="name" code-field="code" placeholder="🔍 พิมพ์รหัส/ชื่อสินค้า..." input-class="w-full px-2 py-1.5 border rounded" @change="recalcLine(it)"></searchable-select></td>
+                    <!-- 🆕 ที่มา: STOCK หรือ TRADING (per-item) -->
+                    <td class="p-1 bg-fuchsia-50/30">
+                      <select v-model="it.sourceMode" @change="onItemSourceChange(it)" class="w-full px-2 py-1.5 border rounded text-xs font-bold" :class="it.sourceMode==='TRADING' ? 'text-fuchsia-700 bg-fuchsia-50' : 'text-emerald-700 bg-emerald-50'">
+                        <option value="STOCK">📦 Stock (ตัดคลัง)</option>
+                        <option value="TRADING">🔄 Trading (PB)</option>
+                      </select>
+                      <!-- ถ้าเลือก Trading → ให้เลือก PB Trading -->
+                      <div v-if="it.sourceMode==='TRADING'" class="mt-1.5">
+                        <searchable-select v-model="it.sourcePurchaseBillId" :options="availableTradingPurchases" label-field="label" placeholder="🔍 เลือก PB Trading..." input-class="w-full px-1.5 py-1 border rounded text-[11px]" @change="recalcLine(it)"></searchable-select>
+                      </div>
+                    </td>
                     <td class="p-1"><input type="number" step="0.01" v-model.number="it.weight" @input="recalcLine(it)" class="w-full px-2 py-1.5 border rounded text-right"></td>
                     <td class="p-1"><input type="number" step="0.01" v-model.number="it.price" @input="recalcLine(it)" class="w-full px-2 py-1.5 border rounded text-right"></td>
                     <td class="p-1 text-right font-bold text-blue-700 bg-blue-50 px-2">{{fmt(it.netAmount)}}</td>
                     <td class="p-1 text-xs bg-amber-50">
-                      <template v-if="it.productId">
+                      <template v-if="it.productId && it.sourceMode!=='TRADING'">
                         <div class="flex items-center justify-between gap-1">
                           <span class="text-slate-600">มี: <b>{{fmt(erp.stockAvailableForSale(it.productId, form.branchId, form.warehouseId))}}</b></span>
                           <span class="text-amber-700">→</span>
@@ -13114,6 +13215,12 @@ app.component('view-sales', {
                           </span>
                         </div>
                         <div v-if="(erp.stockAvailableForSale(it.productId, form.branchId, form.warehouseId) - Number(it.weight||0)) < 0" class="text-red-600 text-xs">⚠️ ติดลบ — Stock ไม่พอ!</div>
+                      </template>
+                      <template v-else-if="it.productId && it.sourceMode==='TRADING'">
+                        <div class="text-fuchsia-700">
+                          <span>ทุน: <b>{{fmt(it.unitCost)}}</b>/กก.</span>
+                          <div class="text-[10px] text-slate-500">กำไร: <b :class="it.profit>=0?'text-emerald-700':'text-red-600'">{{fmt(it.profit)}}</b></div>
+                        </div>
                       </template>
                       <span v-else class="text-slate-400">เลือกสินค้าก่อน</span>
                     </td>
@@ -13336,15 +13443,15 @@ app.component('view-production', {
     }
     /* DELETE — hard delete (ลบถาวร + ลบ Input/Output/Cost ทั้งหมด + ลบ Stock Ledger ที่เกี่ยวข้อง) */
     function deleteOrder(o) {
-      // 🔒 ห้ามลบใบสั่งผลิตที่จบงานแล้ว
-      if (['Closed','Completed'].includes(o.status)) {
-        alert('🔒 ลบใบสั่งผลิตนี้ไม่ได้\n\nสถานะ: ' + o.status + ' (จบงานแล้ว)\n\n👉 ถ้าต้องการแก้ไข ให้ Reverse Input/Output แต่ละรายการก่อน หรือเปลี่ยนสถานะกลับเป็น "In Production"');
-        return;
-      }
       const inputs = H.inputsOf(o.id);
       const outputs = H.outputsOf(o.id);
       const costs = H.costsOf(o.id);
       const hasData = inputs.length || outputs.length || costs.length;
+      const isClosed = ['Closed','Completed'].includes(o.status);
+      // 🆕 อนุญาตให้ลบใบที่จบงานแล้ว — แต่ confirm 2 ครั้ง
+      if (isClosed) {
+        if (!confirm(`⚠ ใบนี้ปิดงานแล้ว (สถานะ: ${o.status})\n\nการลบจะ:\n• คืน Stock ที่เบิก/ผลิตทั้งหมด\n• ลบ Process Cost ทั้งหมด\n• อาจกระทบ COGS ของบิลขายที่ผูกอยู่\n\nยืนยันลบ ${o.docNo}?`)) return;
+      }
       const msg = hasData
         ? `ลบ ${o.docNo} ถาวร?\n• ลบ Input ${inputs.length} รายการ\n• ลบ Output ${outputs.length} รายการ\n• ลบ Process Cost ${costs.length} รายการ\n• ลบ Stock Ledger ที่เกี่ยวข้องทั้งหมด\n\n⚠ คืน Stock ที่เบิกไปแล้วให้กลับ`
         : `ลบ ${o.docNo} ถาวร?`;
