@@ -8,6 +8,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
   /* ============================================================
      SUPABASE CONFIG — Sprint 3
@@ -2692,12 +2693,12 @@ function seedData() {
       { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan + ใบสำคัญรับเงิน + Bank Recon + Import Master', isSystem:false,
         // 🆕 ADD: receiptVoucher, bankRecon, mdExpense, historicalData, mdImport
         // 🚫 REMOVE: dashboard, cashPosition
-        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','receiptVoucher','expense','pettyAdvance','expenseDashboard','bankRecon','ar','ap','bank','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','mdExpense','mdImport','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','salesCommission','reports','plStatement','balanceSheet','cashFlowStatement','production','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','historicalData','audit','anomalyDetector','backup','companyProfile'],
+        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','receiptVoucher','expense','pettyAdvance','expenseDashboard','bankRecon','ar','ap','bank','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','mdExpense','mdImport','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','salesCommission','reports','plStatement','balanceSheet','cashFlowStatement','production','productionDashboard','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','historicalData','audit','anomalyDetector','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:true,
         branchScope:'all' },
       { id:'R-WAREHOUSE', name:'คลัง', desc:'คลังสินค้า — Stock, Production, Transfer (เฉพาะสาขาตัวเอง)', isSystem:false,
-        menus:['changePassword','stockBalance','stockLedger','stockTransfer','pendingSales','production','productionReport','wipReport','machineUtil','mdProduct','mdBranch','gradeAdjustment','stockAdjust','statusConvert','customerReturn','backup','companyProfile'],
+        menus:['changePassword','stockBalance','stockLedger','stockTransfer','pendingSales','production','productionDashboard','productionReport','wipReport','machineUtil','mdProduct','mdBranch','gradeAdjustment','stockAdjust','statusConvert','customerReturn','backup','companyProfile'],
         actions:{'stockTransfer':['view','create','edit','post','export'],'production':['view','create','edit','post','export'],'gradeAdjustment':['view','create','edit','export'],'stockAdjust':['view','create','edit','export'],'*':['view','export']},
         seeCost:false, seeProfit:false, seeCash:false, seeFinancials:false, seeOpening:false,
         branchScope:'own' },
@@ -3753,8 +3754,6 @@ window.$erp = {
 
           <div style="margin-top:12px;font-size:10px;color:#777;border-top:1px dashed #ccc;padding-top:6px">
             👤 ผู้ทำบิล: <b>${bill.createdBy||'-'}</b>
-            ${bill.createdAt?' · สร้าง '+String(bill.createdAt).slice(0,16).replace('T',' '):''}
-            ${bill.updatedAt?' · ✏️ แก้ไขล่าสุด '+String(bill.updatedAt).slice(0,16).replace('T',' ')+(bill.updatedBy?' โดย '+bill.updatedBy:''):''}
           </div>
 
           <div class="footer-note">
@@ -5024,6 +5023,7 @@ const app = createApp({
       ]},
       { label:'การผลิต', items:[
         {view:'production', label:'ใบสั่งผลิต', icon:'🏭'},
+        {view:'productionDashboard', label:'📊 Production Dashboard', icon:'📊'},
         {view:'wipReport', label:'WIP คงเหลือ', icon:'⏳'},
         {view:'productionReport', label:'รายงานการผลิต / Yield', icon:'📐'},
         {view:'productionCostReport', label:'Production Cost Report', icon:'💴'},
@@ -6579,37 +6579,133 @@ app.component('view-bank', {
       stmt.value.forEach(s => rows.push([s.date, s.type, s.desc, s.in, s.out, s.balance, s.refNo]));
       downloadCsv(erp.accountName(selectedAcc.value)+'_'+erp.today()+'.csv', rows);
     }
-    return { db, erp, selectedAcc, fromDate, toDate, stmt, summary, exportCsv, fmt:erp.fmt };
+
+    /* 🆕 Daily balance trend — for chart */
+    const balanceChartRef = ref(null);
+    const flowChartRef = ref(null);
+    let balanceChart = null, flowChart = null;
+    function renderCharts() {
+      if (typeof Chart === 'undefined') return;
+      const lines = stmt.value;
+      const labels = lines.map(l => l.date === '-' ? 'ยกมา' : l.date);
+      const balances = lines.map(l => l.balance);
+      const ins = lines.map(l => l.in||0);
+      const outs = lines.map(l => l.out||0);
+      try {
+        if (balanceChart) balanceChart.destroy();
+        if (balanceChartRef.value && labels.length) {
+          balanceChart = new Chart(balanceChartRef.value, {
+            type:'line', data:{ labels, datasets:[{ label:'ยอดคงเหลือ', data:balances, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', tension:0.3, fill:true }]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}}
+          });
+        }
+        if (flowChart) flowChart.destroy();
+        if (flowChartRef.value && labels.length) {
+          flowChart = new Chart(flowChartRef.value, {
+            type:'bar', data:{ labels, datasets:[
+              { label:'เงินเข้า', data:ins, backgroundColor:'#10b981' },
+              { label:'เงินออก', data:outs.map(v=>-v), backgroundColor:'#ef4444' },
+            ]},
+            options:{ responsive:true, maintainAspectRatio:false, scales:{x:{stacked:true},y:{stacked:true}}}
+          });
+        }
+      } catch(e) { console.warn('Bank chart:', e); }
+    }
+    onMounted(() => { setTimeout(renderCharts, 200); });
+    watch([selectedAcc, fromDate, toDate], () => { setTimeout(renderCharts, 100); });
+
+    return { db, erp, selectedAcc, fromDate, toDate, stmt, summary, exportCsv,
+      balanceChartRef, flowChartRef, fmt:erp.fmt };
   },
   template: `
-  <div>
-    <div class="flex flex-wrap gap-2 mb-4 items-center">
-      <select v-model="selectedAcc" class="px-3 py-2 border rounded-lg text-sm w-72">
-        <option v-for="a in db.accounts" :value="a.id">{{a.name}} ({{a.type}})</option>
-      </select>
-      <input type="date" v-model="fromDate" class="px-3 py-2 border rounded-lg text-sm">
-      <input type="date" v-model="toDate" class="px-3 py-2 border rounded-lg text-sm">
-      <button @click="exportCsv" class="ml-auto bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm">Export CSV</button>
+  <div class="space-y-4">
+    <!-- 🎨 HERO HEADER -->
+    <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 text-white rounded-2xl p-5 shadow-xl">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="text-3xl font-bold flex items-center gap-2">🏦 Bank Statement Dashboard</h1>
+          <p class="text-sm opacity-90 mt-1">เดินบัญชี — ดู Cash Flow รายบัญชีพร้อม Chart</p>
+        </div>
+        <div class="flex gap-2 items-center flex-wrap">
+          <select v-model="selectedAcc" class="px-3 py-2 rounded text-slate-900 text-sm w-64 font-medium">
+            <option v-for="a in db.accounts" :value="a.id">{{a.name}} ({{a.type}})</option>
+          </select>
+          <input type="date" v-model="fromDate" class="px-2 py-2 rounded text-slate-900 text-xs">
+          <span class="text-xs">→</span>
+          <input type="date" v-model="toDate" class="px-2 py-2 rounded text-slate-900 text-xs">
+          <button @click="exportCsv" class="bg-white/20 hover:bg-white/30 px-3 py-2 rounded text-xs font-bold">📤 CSV</button>
+        </div>
+      </div>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-      <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-slate-500">บัญชี</div><div class="font-semibold">{{summary.acc?.name}}</div></div>
-      <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-emerald-600">เงินเข้ารวม</div><div class="font-bold text-emerald-700">{{fmt(summary.inSum)}}</div></div>
-      <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-red-600">เงินออกรวม</div><div class="font-bold text-red-700">{{fmt(summary.outSum)}}</div></div>
-      <div class="bg-white rounded-xl shadow p-3"><div class="text-xs text-blue-600">ยอดคงเหลือ</div><div class="font-bold text-xl text-blue-700">{{fmt(summary.closing)}}</div></div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl shadow-md p-4">
+        <div class="text-xs text-slate-500">🏦 บัญชี</div>
+        <div class="font-bold text-lg text-slate-800 truncate">{{summary.acc?.name}}</div>
+        <div class="text-xs text-slate-400 mt-1">{{summary.acc?.type}}</div>
+      </div>
+      <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl shadow-md p-4">
+        <div class="text-xs text-emerald-600">📥 เงินเข้ารวม</div>
+        <div class="text-2xl font-bold text-emerald-700 font-mono">{{fmt(summary.inSum)}}</div>
+        <div class="text-xs text-emerald-500 mt-1">บาท</div>
+      </div>
+      <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl shadow-md p-4">
+        <div class="text-xs text-rose-600">📤 เงินออกรวม</div>
+        <div class="text-2xl font-bold text-rose-700 font-mono">{{fmt(summary.outSum)}}</div>
+        <div class="text-xs text-rose-500 mt-1">บาท</div>
+      </div>
+      <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl shadow-md p-4">
+        <div class="text-xs opacity-80">💰 ยอดคงเหลือ</div>
+        <div class="text-3xl font-bold font-mono">{{fmt(summary.closing)}}</div>
+        <div class="text-xs opacity-80 mt-1">บาท</div>
+      </div>
     </div>
-    <div class="bg-white rounded-xl shadow overflow-x-auto">
-      <table class="w-full text-sm table-zebra">
-        <thead class="bg-slate-100"><tr><th class="p-2 text-left">วันที่</th><th class="p-2 text-left">ประเภท</th><th class="p-2 text-left">รายละเอียด</th><th class="p-2 text-left">อ้างอิง</th><th class="p-2 text-right">เงินเข้า</th><th class="p-2 text-right">เงินออก</th><th class="p-2 text-right">คงเหลือ</th></tr></thead>
-        <tbody>
-          <tr v-for="s in stmt" :key="s.id||s.refNo" class="border-t" :class="s.type==='ยอดยกมา'?'bg-slate-100 font-semibold':''">
-            <td class="p-2">{{s.date}}</td><td class="p-2">{{s.type}}</td><td class="p-2">{{s.desc}}</td>
-            <td class="p-2 font-mono text-xs text-blue-600">{{s.refNo}}</td>
-            <td class="p-2 text-right text-emerald-600">{{s.in?fmt(s.in):'-'}}</td>
-            <td class="p-2 text-right text-red-600">{{s.out?fmt(s.out):'-'}}</td>
-            <td class="p-2 text-right font-medium">{{fmt(s.balance)}}</td>
-          </tr>
-        </tbody>
-      </table>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <h3 class="font-bold text-slate-700 mb-2">📈 ยอดคงเหลือสะสม</h3>
+        <div style="height: 280px"><canvas ref="balanceChartRef"></canvas></div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <h3 class="font-bold text-slate-700 mb-2">📊 กระแสเงิน (เข้า/ออก)</h3>
+        <div style="height: 280px"><canvas ref="flowChartRef"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Statement Table -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div class="bg-slate-50 border-b p-3 flex justify-between items-center">
+        <h3 class="font-bold text-slate-700">📋 รายการเดินบัญชี ({{stmt.length}} รายการ)</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gradient-to-r from-slate-700 to-slate-900 text-white sticky top-0">
+            <tr>
+              <th class="p-2 text-left">วันที่</th>
+              <th class="p-2 text-left">ประเภท</th>
+              <th class="p-2 text-left">รายละเอียด</th>
+              <th class="p-2 text-left">อ้างอิง</th>
+              <th class="p-2 text-right bg-emerald-700/40">📥 เข้า</th>
+              <th class="p-2 text-right bg-rose-700/40">📤 ออก</th>
+              <th class="p-2 text-right bg-blue-700/40">💰 คงเหลือ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in stmt" :key="s.id||s.refNo" class="border-t hover:bg-yellow-50 transition" :class="s.type==='ยอดยกมา'?'bg-amber-50 font-bold':''">
+              <td class="p-2 font-mono text-xs">{{s.date}}</td>
+              <td class="p-2 text-xs"><span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="s.type==='ยอดยกมา'?'bg-amber-200 text-amber-800':'bg-slate-200 text-slate-700'">{{s.type}}</span></td>
+              <td class="p-2 text-xs">{{s.desc}}</td>
+              <td class="p-2 font-mono text-xs text-blue-600">{{s.refNo}}</td>
+              <td class="p-2 text-right font-mono bg-emerald-50/30" :class="s.in>0?'text-emerald-700 font-bold':'text-slate-300'">{{s.in?fmt(s.in):'-'}}</td>
+              <td class="p-2 text-right font-mono bg-rose-50/30" :class="s.out>0?'text-rose-700 font-bold':'text-slate-300'">{{s.out?fmt(s.out):'-'}}</td>
+              <td class="p-2 text-right font-mono font-bold bg-blue-50/30" :class="s.balance>=0?'text-blue-700':'text-red-600'">{{fmt(s.balance)}}</td>
+            </tr>
+            <tr v-if="!stmt.length"><td colspan="7" class="text-center py-8 text-slate-400">ไม่มีรายการ</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>`
 });
@@ -7159,6 +7255,7 @@ app.component('view-stockLedger', {
     const erp = window.$erp; const db = erp.db;
     const filterProduct = ref(''); const filterBranch = ref(''); const filterType = ref('');
     const fromDate = ref(''); const toDate = ref('');
+    const filterNegativeOnly = ref(false);   // 🆕 filter เฉพาะที่ติดลบ
     const detailBill = ref(null);   // 🆕 selected bill for detail modal
     const detailType = ref('');     // 'PB' | 'SB'
 
@@ -7223,20 +7320,197 @@ app.component('view-stockLedger', {
       }
     }
 
+    /* 🆕 คำนวณ Running Balance ต่อ (product × branch × warehouse) */
+    const balanceMap = computed(() => {
+      const map = new Map();   // ledger.id → balance after this row
+      const bal = {};          // key → running balance
+      const allSorted = [...db.stockLedger].filter(m => m && m.productId).sort((a,b) =>
+        (a.date||'').localeCompare(b.date||'') ||
+        (String(a.createdAt||'').localeCompare(String(b.createdAt||''))) ||
+        (a.id||'').localeCompare(b.id||'')
+      );
+      allSorted.forEach(m => {
+        const key = (m.productId||'') + '|' + (m.branchId||'') + '|' + (m.warehouseId||'');
+        if (!(key in bal)) bal[key] = 0;
+        bal[key] += Number(m.qtyIn||0) - Number(m.qtyOut||0);
+        map.set(m.id, bal[key]);
+      });
+      return map;
+    });
+
     const list = computed(() => {
+      const bmap = balanceMap.value;
       return db.stockLedger.filter(m => {
         if (filterProduct.value && m.productId !== filterProduct.value) return false;
         if (filterBranch.value && m.branchId !== filterBranch.value) return false;
         if (filterType.value && m.movementType !== filterType.value) return false;
         if (fromDate.value && m.date < fromDate.value) return false;
         if (toDate.value && m.date > toDate.value) return false;
+        // 🆕 filter เฉพาะที่ติดลบ
+        if (filterNegativeOnly.value) {
+          const b = bmap.get(m.id);
+          if (b == null || b >= 0) return false;
+        }
         return true;
-      }).map(m => ({ ...m, _cp: getCounterparty(m) }))
-        .sort((a,b)=>(b.date||'').localeCompare(a.date||'') || (b.id||'').localeCompare(a.id||''));
+      }).map(m => {
+        const balance = bmap.get(m.id);
+        return {
+          ...m,
+          _cp: getCounterparty(m),
+          balance: balance == null ? 0 : balance,
+          isNegative: (balance != null && balance < 0),
+        };
+      }).sort((a,b)=>(b.date||'').localeCompare(a.date||'') || (b.id||'').localeCompare(a.id||''));
+    });
+
+    /* 🆕 นับจำนวนแถวที่ติดลบ */
+    const negativeCount = computed(() => {
+      const bmap = balanceMap.value;
+      let c = 0;
+      db.stockLedger.forEach(m => {
+        if (!m) return;
+        if (filterProduct.value && m.productId !== filterProduct.value) return;
+        if (filterBranch.value && m.branchId !== filterBranch.value) return;
+        const b = bmap.get(m.id);
+        if (b != null && b < 0) c++;
+      });
+      return c;
     });
     const movementTypes = computed(()=> [...new Set(db.stockLedger.map(m=>m.movementType))]);
-    return { db, erp, filterProduct, filterBranch, filterType, fromDate, toDate, list, movementTypes, fmt:erp.fmt,
-      detailBill, detailType, openDetail, closeDetail, editOpening };
+
+    /* 🆕 GRADE ADJUSTMENT MODAL — fix negative stock (รองรับหลายสินค้าต้นทาง) */
+    const showFixModal = ref(false);
+    const fixContext = ref(null);
+    const fixForm = reactive({
+      lines: [],     // [{ id, sourceProductId, qty, unitCost }]
+      note: '',
+    });
+
+    function newFixLine() {
+      return { id: 'FL'+Math.random().toString(36).slice(2,8), sourceProductId: '', qty: 0, unitCost: 0 };
+    }
+
+    function openFixModal(row) {
+      const shortage = Math.abs(row.balance || 0);
+      fixContext.value = {
+        productId: row.productId,
+        productName: erp.productName(row.productId),
+        branchId: row.branchId,
+        warehouseId: row.warehouseId,
+        shortageQty: shortage,
+        date: row.date,
+      };
+      // เริ่มต้นด้วย 1 บรรทัด — qty เป็น shortage เต็ม
+      const firstLine = newFixLine();
+      firstLine.qty = shortage;
+      fixForm.lines = [firstLine];
+      fixForm.note = 'ปรับเกรด — แก้ stock ติดลบ ' + erp.productName(row.productId);
+      showFixModal.value = true;
+    }
+    function closeFixModal() { showFixModal.value = false; fixContext.value = null; }
+    function addFixLine() { fixForm.lines.push(newFixLine()); }
+    function removeFixLine(idx) { if (fixForm.lines.length > 1) fixForm.lines.splice(idx, 1); }
+
+    /* 🆕 ทุน WAC ของสินค้าใน line — return per line */
+    function getSourceAvail(line) {
+      if (!line.sourceProductId || !fixContext.value) return { qty: 0, val: 0, avgCost: 0 };
+      const ctx = fixContext.value;
+      const onHand = erp.stockOnHand(line.sourceProductId, ctx.branchId, ctx.warehouseId);
+      const val = erp.stockValue(line.sourceProductId, ctx.branchId, ctx.warehouseId);
+      const avgCost = onHand > 0 ? val/onHand : 0;
+      return { qty: onHand, val, avgCost };
+    }
+    /* expose เป็น computed reactive */
+    const fixLinesAvail = computed(() => fixForm.lines.map(line => getSourceAvail(line)));
+
+    /* 🆕 Auto-fill unitCost ทุกครั้งที่เลือก source ในแต่ละ line */
+    function onLineSourceChange(line) {
+      const avail = getSourceAvail(line);
+      if (avail.avgCost > 0) line.unitCost = Number(avail.avgCost.toFixed(2));
+      else line.unitCost = 0;
+    }
+
+    /* รวมยอด */
+    const fixTotalQty = computed(() => fixForm.lines.reduce((s,l)=>s+Number(l.qty||0),0));
+    const fixTotalValue = computed(() => fixForm.lines.reduce((s,l)=>s+(Number(l.qty||0)*Number(l.unitCost||0)),0));
+
+    async function applyFix() {
+      const ctx = fixContext.value;
+      if (!ctx) return;
+      // Validate ทุก line
+      const validLines = fixForm.lines.filter(l => l.sourceProductId && Number(l.qty||0) > 0);
+      if (!validLines.length) { alert('ต้องมีอย่างน้อย 1 บรรทัด — เลือกสินค้า + ระบุจำนวน > 0'); return; }
+      // เช็คว่าแต่ละ line มี stock พอ
+      for (const l of validLines) {
+        const avail = getSourceAvail(l);
+        if (Number(l.qty) > avail.qty + 0.01) {
+          if (!confirm(`สินค้า ${erp.productName(l.sourceProductId)} มีในคลัง ${erp.fmt(avail.qty)} แต่จะตัด ${erp.fmt(l.qty)} — ต่อหรือไม่?`)) return;
+        }
+      }
+      const date = erp.today();
+      const ts = String(Date.now()).slice(-6);
+      const refNo = 'GA-' + date.replace(/-/g,'') + '-' + ts;
+      const user = (erp.currentUser.value || {}).username || '-';
+
+      // 1. สร้าง OUT entries สำหรับแต่ละ line
+      validLines.forEach((l, i) => {
+        const qty = Number(l.qty);
+        const cost = Number(l.unitCost);
+        const totalValue = qty * cost;
+        db.stockLedger.push({
+          id: erp.uid('SL'), date,
+          refType: 'GA', refId: refNo, refNo: refNo + (validLines.length>1 ? '-'+(i+1) : ''),
+          movementType: 'ปรับเกรด (ออก)',
+          productId: l.sourceProductId, lotNo: '',
+          branchId: ctx.branchId, warehouseId: ctx.warehouseId,
+          qtyIn: 0, qtyOut: qty,
+          unitCost: cost, valueIn: 0, valueOut: totalValue,
+          purchaseChannelId: '', salesChannelId: '',
+          note: fixForm.note,
+          createdBy: user, createdAt: new Date().toISOString(),
+        });
+      });
+
+      // 2. สร้าง IN entry — รวมยอดทั้งหมดเข้า target product (1 entry รวม)
+      const totalQty = fixTotalQty.value;
+      const totalVal = fixTotalValue.value;
+      const avgCost = totalQty > 0 ? totalVal / totalQty : 0;
+      db.stockLedger.push({
+        id: erp.uid('SL'), date,
+        refType: 'GA', refId: refNo, refNo,
+        movementType: 'ปรับเกรด (เข้า)',
+        productId: ctx.productId, lotNo: '',
+        branchId: ctx.branchId, warehouseId: ctx.warehouseId,
+        qtyIn: totalQty, qtyOut: 0,
+        unitCost: avgCost, valueIn: totalVal, valueOut: 0,
+        purchaseChannelId: '', salesChannelId: '',
+        note: fixForm.note + ' (รวม ' + validLines.length + ' source)',
+        createdBy: user, createdAt: new Date().toISOString(),
+      });
+
+      // Audit
+      erp.logAudit('GRADE_ADJUST','stockLedger', null, {
+        refNo, target: ctx.productName, sources: validLines.map(l => ({
+          name: erp.productName(l.sourceProductId), qty: Number(l.qty), cost: Number(l.unitCost)
+        })),
+        totalQty, totalValue: totalVal,
+      });
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      try {
+        if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow();
+      } catch(e) { console.warn('[applyFix push]', e); }
+      erp.showToast(`✓ ปรับเกรด ${validLines.length} source → ${ctx.productName} (${erp.fmt(totalQty)} กก.)`,'success');
+      closeFixModal();
+    }
+
+    return { db, erp, filterProduct, filterBranch, filterType, fromDate, toDate,
+      filterNegativeOnly, negativeCount,
+      list, movementTypes, fmt:erp.fmt,
+      detailBill, detailType, openDetail, closeDetail, editOpening,
+      // Fix modal
+      showFixModal, fixContext, fixForm, fixLinesAvail, fixTotalQty, fixTotalValue,
+      openFixModal, closeFixModal, applyFix, addFixLine, removeFixLine, onLineSourceChange,
+      getSourceAvail };
   },
   template: `
   <div>
@@ -7249,28 +7523,36 @@ app.component('view-stockLedger', {
       <input type="date" v-model="fromDate" class="px-3 py-2 border rounded-lg text-sm" title="จากวันที่">
       <span class="text-slate-400">→</span>
       <input type="date" v-model="toDate" class="px-3 py-2 border rounded-lg text-sm" title="ถึงวันที่">
-      <button v-if="filterProduct||filterBranch||filterType||fromDate||toDate" @click="filterProduct='';filterBranch='';filterType='';fromDate='';toDate=''" class="px-3 py-2 text-xs bg-slate-100 hover:bg-slate-200 rounded">✕ ล้าง</button>
+      <button v-if="filterProduct||filterBranch||filterType||fromDate||toDate||filterNegativeOnly" @click="filterProduct='';filterBranch='';filterType='';fromDate='';toDate='';filterNegativeOnly=false" class="px-3 py-2 text-xs bg-slate-100 hover:bg-slate-200 rounded">✕ ล้าง</button>
+      <!-- 🆕 Filter: เฉพาะที่ติดลบ -->
+      <button @click="filterNegativeOnly = !filterNegativeOnly"
+        :class="['px-3 py-2 text-xs font-bold rounded flex items-center gap-1.5',
+          filterNegativeOnly ? 'bg-red-600 text-white shadow-md animate-pulse' : 'bg-red-100 text-red-700 hover:bg-red-200']">
+        <span>⚠ ติดลบ</span>
+        <span :class="['px-1.5 py-0.5 rounded text-[10px]', filterNegativeOnly?'bg-white text-red-700':'bg-red-600 text-white']">{{negativeCount}}</span>
+      </button>
       <span class="ml-auto text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded">📊 พบ <b>{{list.length}}</b> รายการ</span>
     </div>
     <div class="bg-white rounded-xl shadow overflow-x-auto">
-      <table class="w-full text-sm table-zebra" style="min-width:1100px">
+      <table class="w-full text-sm table-zebra" style="min-width:1200px">
         <thead class="bg-slate-100">
           <tr>
             <th class="p-2 text-left whitespace-nowrap" style="width:90px">วันที่</th>
             <th class="p-2 text-left whitespace-nowrap" style="width:120px">เลขบิล</th>
-            <th class="p-2 text-left" style="min-width:240px">ผู้ขาย / ผู้ซื้อ (ชื่อ)</th>
+            <th class="p-2 text-left" style="min-width:200px">ผู้ขาย / ผู้ซื้อ</th>
             <th class="p-2 text-left whitespace-nowrap" style="width:130px">ประเภท</th>
-            <th class="p-2 text-left" style="min-width:200px">สินค้า</th>
-            <th class="p-2 text-right" style="width:90px">เข้า (กก.)</th>
-            <th class="p-2 text-right" style="width:90px">ออก (กก.)</th>
-            <th class="p-2 text-right" style="width:110px">ต้นทุน/หน่วย</th>
-            <th class="p-2 text-right" style="width:110px">มูลค่าเข้า</th>
-            <th class="p-2 text-right" style="width:110px">มูลค่าออก</th>
-            <th class="p-2 text-center whitespace-nowrap" style="width:80px">แก้ไข</th>
+            <th class="p-2 text-left" style="min-width:180px">สินค้า</th>
+            <th class="p-2 text-right" style="width:85px">เข้า</th>
+            <th class="p-2 text-right" style="width:85px">ออก</th>
+            <th class="p-2 text-right whitespace-nowrap bg-blue-100" style="width:110px">⚖️ คงเหลือ</th>
+            <th class="p-2 text-right" style="width:100px">ต้นทุน/น.</th>
+            <th class="p-2 text-right" style="width:100px">มูลค่าเข้า</th>
+            <th class="p-2 text-right" style="width:100px">มูลค่าออก</th>
+            <th class="p-2 text-center whitespace-nowrap" style="width:110px">การจัดการ</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in list" :key="m.id" class="border-t hover:bg-slate-50">
+          <tr v-for="m in list" :key="m.id" class="border-t hover:bg-slate-50" :class="m.isNegative?'bg-red-50/60 border-red-200':''">
             <td class="p-2 whitespace-nowrap">{{m.date}}</td>
             <td class="p-2 whitespace-nowrap">
               <button v-if="m._cp.clickable" @click.stop="openDetail(m)" class="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{{m.refNo}} 🔍</button>
@@ -7287,18 +7569,138 @@ app.component('view-stockLedger', {
             <td class="p-2"><span class="font-medium">{{erp.productName(m.productId)}}</span><span v-if="m.lotNo && m.lotNo!=='OPENING'" class="text-xs text-slate-400 ml-1">[{{m.lotNo}}]</span></td>
             <td class="p-2 text-right text-emerald-600 font-mono">{{m.qtyIn?fmt(m.qtyIn):'-'}}</td>
             <td class="p-2 text-right text-red-600 font-mono">{{m.qtyOut?fmt(m.qtyOut):'-'}}</td>
+            <!-- 🆕 คงเหลือ — Red ถ้าติดลบ -->
+            <td class="p-2 text-right font-mono font-bold" :class="m.isNegative?'bg-red-100 text-red-700':'bg-blue-50/40 text-blue-700'">
+              <span v-if="m.isNegative">⚠ {{fmt(m.balance)}}</span>
+              <span v-else>{{fmt(m.balance)}}</span>
+            </td>
             <td class="p-2 text-right text-slate-500 font-mono">{{fmt(m.unitCost)}}</td>
             <td class="p-2 text-right font-mono">{{m.valueIn?fmt(m.valueIn):'-'}}</td>
             <td class="p-2 text-right font-mono">{{m.valueOut?fmt(m.valueOut):'-'}}</td>
             <td class="p-2 text-center whitespace-nowrap">
-              <button v-if="m.refType==='OPENING'" @click="editOpening(m)" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-medium" title="ไปแก้ที่ Opening Balance">✏️ Opening</button>
+              <!-- 🆕 ปุ่ม "ปรับเกรด" ถ้าติดลบ -->
+              <button v-if="m.isNegative" @click="openFixModal(m)" class="text-xs px-2 py-1 bg-red-500 text-white hover:bg-red-600 rounded font-bold animate-pulse">🔧 ปรับเกรด</button>
+              <button v-else-if="m.refType==='OPENING'" @click="editOpening(m)" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-medium" title="ไปแก้ที่ Opening Balance">✏️ Opening</button>
               <button v-else-if="m._cp.clickable" @click="openDetail(m)" class="text-xs text-slate-500 hover:text-slate-700">🔍</button>
               <span v-else class="text-slate-300 text-xs">-</span>
             </td>
           </tr>
-          <tr v-if="list.length===0"><td colspan="11" class="text-center py-8 text-slate-400">ยังไม่มี Stock Movement</td></tr>
+          <tr v-if="list.length===0"><td colspan="12" class="text-center py-8 text-slate-400">ยังไม่มี Stock Movement</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- 🆕 GRADE ADJUSTMENT MODAL — แก้ stock ติดลบ (รองรับหลายสินค้าต้นทาง) -->
+    <div v-if="showFixModal" class="fixed inset-0 bg-black/60 z-50 overflow-y-auto" @click.self="closeFixModal">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto my-8">
+        <div class="px-5 py-4 border-b bg-red-50 flex justify-between items-center">
+          <h3 class="font-bold text-lg text-red-700">🔧 ปรับเกรดสินค้า — แก้ Stock ติดลบ</h3>
+          <button @click="closeFixModal" class="text-2xl text-slate-400 leading-none">&times;</button>
+        </div>
+        <div class="p-5 space-y-4 text-sm">
+          <!-- Context info -->
+          <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div class="text-xs text-red-600 mb-1">⚠ Stock ติดลบ — ต้องปรับเกรดมาทดแทน</div>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <div class="text-xs text-slate-500">สินค้าที่ขาด</div>
+                <div class="font-bold text-red-700">{{fixContext?.productName}}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">คลัง</div>
+                <div class="font-medium">{{erp.warehouseName(fixContext?.warehouseId) || '-'}}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">ขาด (กก.)</div>
+                <div class="font-bold text-red-700 text-xl">{{fmt(fixContext?.shortageQty)}}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-source table -->
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-xs font-bold">🔍 สินค้าต้นทาง — รองรับหลายชนิด (กดเพิ่มบรรทัดได้)</label>
+              <button @click="addFixLine" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-bold">+ เพิ่มบรรทัด</button>
+            </div>
+            <div class="overflow-x-auto border rounded-lg">
+              <table class="w-full text-xs">
+                <thead class="bg-slate-100">
+                  <tr>
+                    <th class="p-2 text-left" style="min-width:240px">สินค้า *</th>
+                    <th class="p-2 text-right" style="width:90px">มีในคลัง</th>
+                    <th class="p-2 text-right" style="width:90px">WAC</th>
+                    <th class="p-2 text-right" style="width:110px">จำนวน (กก.) *</th>
+                    <th class="p-2 text-right" style="width:110px">ทุน/หน่วย *</th>
+                    <th class="p-2 text-right" style="width:110px">มูลค่า</th>
+                    <th class="p-2 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(line, idx) in fixForm.lines" :key="line.id" class="border-t">
+                    <td class="p-1">
+                      <searchable-select v-model="line.sourceProductId" :options="(db.products||[]).filter(x=>x && x.active!==false && x.id!==fixContext?.productId)" label-field="name" code-field="code" extra-field="metalGroup" placeholder="🔍 พิมพ์ชื่อ/รหัส..." input-class="w-full px-2 py-1 border rounded text-xs" @change="onLineSourceChange(line)"></searchable-select>
+                    </td>
+                    <td class="p-1 text-right text-emerald-700 font-mono text-xs">{{fmt(fixLinesAvail[idx].qty)}}</td>
+                    <td class="p-1 text-right text-slate-600 font-mono text-xs">{{fmt(fixLinesAvail[idx].avgCost)}}</td>
+                    <td class="p-1"><input type="number" step="0.01" v-model.number="line.qty" class="w-full px-2 py-1 border rounded text-right font-mono"></td>
+                    <td class="p-1"><input type="number" step="0.01" v-model.number="line.unitCost" class="w-full px-2 py-1 border rounded text-right font-mono"></td>
+                    <td class="p-1 text-right font-bold text-blue-700 font-mono">{{fmt(line.qty * line.unitCost)}}</td>
+                    <td class="p-1 text-center">
+                      <button v-if="fixForm.lines.length>1" @click="removeFixLine(idx)" type="button" class="text-red-500 hover:bg-red-100 rounded w-6 h-6">×</button>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot class="bg-emerald-50 font-bold border-t-2 border-emerald-300">
+                  <tr>
+                    <td colspan="3" class="p-2 text-right text-emerald-800">รวม:</td>
+                    <td class="p-2 text-right font-mono text-emerald-800"
+                      :class="Math.abs(fixTotalQty - (fixContext?.shortageQty||0)) < 0.01 ? 'text-emerald-700' : 'text-amber-700'">
+                      {{fmt(fixTotalQty)}}
+                    </td>
+                    <td></td>
+                    <td class="p-2 text-right font-mono text-blue-700">{{fmt(fixTotalValue)}}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <!-- Status: ขาดเท่าไร / เกินเท่าไร -->
+            <div v-if="fixContext && fixTotalQty !== fixContext.shortageQty" class="mt-2 text-xs px-3 py-2 rounded"
+              :class="fixTotalQty < fixContext.shortageQty ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'">
+              <span v-if="fixTotalQty < fixContext.shortageQty">
+                ⚠ ขาด {{fmt(fixContext.shortageQty - fixTotalQty)}} กก. — รวมไม่พอแก้ stock ติดลบ
+              </span>
+              <span v-else>
+                📊 รวมเกิน {{fmt(fixTotalQty - fixContext.shortageQty)}} กก. — stock จะเป็นบวก
+              </span>
+            </div>
+            <div v-else-if="fixContext && fixTotalQty > 0" class="mt-2 text-xs px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
+              ✓ พอดี — รวมเท่ากับยอดที่ขาด
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold mb-1">📝 หมายเหตุ</label>
+            <input type="text" v-model="fixForm.note" class="w-full px-3 py-2 border rounded-lg" placeholder="เหตุผลในการปรับเกรด">
+          </div>
+
+          <!-- Summary -->
+          <div v-if="fixTotalQty > 0" class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs space-y-1">
+            <div class="font-bold text-blue-700 mb-1">📋 ระบบจะสร้าง {{fixForm.lines.filter(l=>l.sourceProductId&&l.qty>0).length + 1}} รายการใน Stock Ledger:</div>
+            <div v-for="(l, i) in fixForm.lines.filter(l=>l.sourceProductId && l.qty>0)" :key="i">
+              {{i+1}}. <b class="text-red-700">OUT:</b> {{erp.productName(l.sourceProductId)}} <b>-{{fmt(l.qty)}}</b> กก. × {{fmt(l.unitCost)}} = <b>{{fmt(l.qty * l.unitCost)}}</b>
+            </div>
+            <div class="border-t pt-1 mt-1">
+              ✓ <b class="text-emerald-700">IN:</b> {{fixContext?.productName}} <b>+{{fmt(fixTotalQty)}}</b> กก. (เฉลี่ย {{fmt(fixTotalValue / (fixTotalQty||1))}} ฿/กก.)
+            </div>
+          </div>
+        </div>
+        <div class="px-5 py-3 border-t bg-slate-50 flex justify-end gap-2">
+          <button @click="closeFixModal" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-lg">ยกเลิก</button>
+          <button @click="applyFix" :disabled="fixTotalQty<=0" class="px-5 py-2 text-sm bg-emerald-600 disabled:bg-slate-300 text-white rounded-lg hover:bg-emerald-700 font-bold">✓ บันทึกการปรับเกรด</button>
+        </div>
+      </div>
     </div>
 
     <!-- 🆕 BILL DETAIL MODAL -->
@@ -7920,14 +8322,23 @@ app.component('view-dashboard', {
       </div>
     </div>
 
-    <!-- 🌟 SUMMIT-STYLE Financial Dashboard -->
-    <div class="bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl p-4 border-2 border-slate-200">
-      <div class="flex items-baseline justify-between mb-4">
+    <!-- 🌟 HERO HEADER -->
+    <div class="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+      <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full"></div>
+      <div class="absolute -bottom-12 left-1/3 w-32 h-32 bg-white/10 rounded-full"></div>
+      <div class="relative flex items-baseline justify-between flex-wrap gap-3">
         <div>
-          <h2 class="text-2xl font-bold text-slate-800">Financial Dashboard</h2>
-          <p class="text-xs text-slate-500">ภาพรวมทางการเงิน · Real-time overview of financial performance</p>
+          <h2 class="text-3xl font-bold flex items-center gap-2">📊 Financial Dashboard</h2>
+          <p class="text-sm opacity-90 mt-1">ภาพรวมทางการเงิน · Real-time overview</p>
         </div>
-        <div class="text-xs text-slate-500">📅 {{dateFrom}} → {{dateTo}}</div>
+        <div class="text-xs bg-white/20 px-3 py-1.5 rounded-full font-medium">📅 {{dateFrom}} → {{dateTo}}</div>
+      </div>
+    </div>
+
+    <!-- 🌟 SUMMIT-STYLE Financial Dashboard -->
+    <div class="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="hidden">
+        <h2 class="text-2xl font-bold text-slate-800">Financial Dashboard</h2>
       </div>
 
       <!-- 🆕 Historical Baseline indicator -->
@@ -7942,92 +8353,80 @@ app.component('view-dashboard', {
         ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026
       </div>
 
-      <!-- 6 KPI Cards (Top Row) -->
+      <!-- 6 KPI Cards (Top Row) — 🎨 Gradient Modern -->
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
         <!-- Revenue -->
-        <div class="bg-white rounded-xl shadow-sm p-4 border border-slate-100">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="text-xs text-slate-500">Revenue</div>
-              <div class="flex items-baseline gap-0.5 mt-1"><span class="text-xs font-bold text-slate-700">฿</span><div class="text-xl font-bold text-slate-800">{{fmt(monthSales)}}</div></div>
+        <div class="bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-2xl shadow-lg p-4 relative overflow-hidden hover:shadow-xl transition">
+          <div class="absolute -top-3 -right-3 text-6xl opacity-10">📈</div>
+          <div class="relative">
+            <div class="text-xs opacity-80 font-medium">Revenue</div>
+            <div class="text-xs opacity-60">ยอดขาย</div>
+            <div class="text-2xl font-bold font-mono mt-1">{{fmt(monthSales)}}</div>
+            <div class="text-xs mt-2 px-2 py-0.5 rounded-full inline-block" :class="pctChange(monthSales, prevSales)>=0?'bg-emerald-400/30':'bg-rose-400/30'">
+              {{pctChange(monthSales, prevSales)>=0?'▲':'▼'}} {{Math.abs(pctChange(monthSales, prevSales)).toFixed(1)}}%
             </div>
-            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-lg">📈</div>
-          </div>
-          <div class="text-xs mt-2" :class="pctChange(monthSales, prevSales)>=0?'text-emerald-600':'text-red-600'">
-            {{pctChange(monthSales, prevSales)>=0?'▲':'▼'}} {{Math.abs(pctChange(monthSales, prevSales)).toFixed(1)}}% <span class="text-slate-400">vs prev</span>
-          </div>
-          <div v-if="histRevenue > 0" class="text-[10px] mt-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded inline-block">
-            📅 รวม Historical {{fmt(histRevenue)}}
+            <div v-if="histRevenue > 0" class="text-[10px] mt-1 opacity-90">📅 Hist: {{fmt(histRevenue)}}</div>
           </div>
         </div>
 
         <!-- Expenses -->
-        <div class="bg-white rounded-xl shadow-sm p-4 border border-slate-100">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="text-xs text-slate-500">Expenses</div>
-              <div class="flex items-baseline gap-0.5 mt-1"><span class="text-xs font-bold text-slate-700">฿</span><div class="text-xl font-bold text-slate-800">{{fmt(monthExpenses + monthCost)}}</div></div>
+        <div class="bg-gradient-to-br from-rose-500 to-red-600 text-white rounded-2xl shadow-lg p-4 relative overflow-hidden hover:shadow-xl transition">
+          <div class="absolute -top-3 -right-3 text-6xl opacity-10">💸</div>
+          <div class="relative">
+            <div class="text-xs opacity-80 font-medium">Expenses</div>
+            <div class="text-xs opacity-60">ค่าใช้จ่าย + COGS</div>
+            <div class="text-2xl font-bold font-mono mt-1">{{fmt(monthExpenses + monthCost)}}</div>
+            <div class="text-xs mt-2 px-2 py-0.5 rounded-full inline-block" :class="pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)<=0?'bg-emerald-400/30':'bg-rose-400/30'">
+              {{pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)>=0?'▲':'▼'}} {{Math.abs(pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)).toFixed(1)}}%
             </div>
-            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg">💸</div>
-          </div>
-          <div class="text-xs mt-2" :class="pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)<=0?'text-emerald-600':'text-red-600'">
-            {{pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)>=0?'▲':'▼'}} {{Math.abs(pctChange(monthExpenses+monthCost, prevMonthExpenses+prevCost)).toFixed(1)}}% <span class="text-slate-400">vs prev</span>
-          </div>
-          <div v-if="(histExpenses + histCogs) > 0" class="text-[10px] mt-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded inline-block">
-            📅 รวม Historical {{fmt(histExpenses + histCogs)}}
+            <div v-if="(histExpenses + histCogs) > 0" class="text-[10px] mt-1 opacity-90">📅 Hist: {{fmt(histExpenses + histCogs)}}</div>
           </div>
         </div>
 
         <!-- Net Profit -->
-        <div class="bg-white rounded-xl shadow-sm p-4 border border-slate-100">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="text-xs text-slate-500">Net Profit</div>
-              <div class="flex items-baseline gap-0.5 mt-1"><span class="text-xs font-bold text-slate-700">฿</span><div class="text-xl font-bold" :class="netProfit>=0?'text-emerald-700':'text-red-700'">{{fmt(netProfit)}}</div></div>
+        <div :class="['rounded-2xl shadow-lg p-4 relative overflow-hidden hover:shadow-xl transition text-white', netProfit>=0?'bg-gradient-to-br from-emerald-500 to-teal-600':'bg-gradient-to-br from-red-500 to-rose-700']">
+          <div class="absolute -top-3 -right-3 text-6xl opacity-10">🥧</div>
+          <div class="relative">
+            <div class="text-xs opacity-80 font-medium">Net Profit</div>
+            <div class="text-xs opacity-60">กำไรสุทธิ</div>
+            <div class="text-2xl font-bold font-mono mt-1">{{fmt(netProfit)}}</div>
+            <div class="text-xs mt-2 px-2 py-0.5 rounded-full inline-block" :class="pctChange(netProfit, prevNetProfit)>=0?'bg-emerald-400/30':'bg-rose-400/30'">
+              {{pctChange(netProfit, prevNetProfit)>=0?'▲':'▼'}} {{Math.abs(pctChange(netProfit, prevNetProfit)).toFixed(1)}}%
             </div>
-            <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg">🥧</div>
-          </div>
-          <div class="text-xs mt-2" :class="pctChange(netProfit, prevNetProfit)>=0?'text-emerald-600':'text-red-600'">
-            {{pctChange(netProfit, prevNetProfit)>=0?'▲':'▼'}} {{Math.abs(pctChange(netProfit, prevNetProfit)).toFixed(1)}}% <span class="text-slate-400">vs prev</span>
           </div>
         </div>
 
         <!-- Cash Balance -->
-        <div class="bg-white rounded-xl shadow-sm p-4 border border-slate-100">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="text-xs text-slate-500">Cash Balance</div>
-              <div class="flex items-baseline gap-0.5 mt-1"><span class="text-xs font-bold text-slate-700">฿</span><div class="text-xl font-bold text-slate-800">{{fmt(cashBalance)}}</div></div>
-            </div>
-            <div class="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600 text-lg">💵</div>
+        <div class="bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-2xl shadow-lg p-4 relative overflow-hidden hover:shadow-xl transition">
+          <div class="absolute -top-3 -right-3 text-6xl opacity-10">💵</div>
+          <div class="relative">
+            <div class="text-xs opacity-80 font-medium">Cash Balance</div>
+            <div class="text-xs opacity-60">เงินสด/ธนาคาร</div>
+            <div class="text-2xl font-bold font-mono mt-1">{{fmt(cashBalance)}}</div>
+            <div class="text-xs mt-2 opacity-90">{{db.accounts.filter(a=>a.active && (a.type==='เงินสด'||a.type==='ธนาคาร')).length}} accounts</div>
           </div>
-          <div class="text-xs mt-2 text-slate-500">{{db.accounts.filter(a=>a.active && (a.type==='เงินสด'||a.type==='ธนาคาร')).length}} active accounts</div>
         </div>
 
         <!-- AR -->
-        <div class="bg-white rounded-xl shadow-sm p-4 border border-slate-100">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="text-xs text-slate-500">Accounts Receivable</div>
-              <div class="text-xs text-slate-400">ลูกหนี้</div>
-              <div class="flex items-baseline gap-0.5 mt-1"><span class="text-xs font-bold text-slate-700">฿</span><div class="text-xl font-bold text-slate-800">{{fmt(arTotal)}}</div></div>
-            </div>
-            <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-lg">👤</div>
+        <div class="bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white rounded-2xl shadow-lg p-4 relative overflow-hidden hover:shadow-xl transition">
+          <div class="absolute -top-3 -right-3 text-6xl opacity-10">👤</div>
+          <div class="relative">
+            <div class="text-xs opacity-80 font-medium">AR ลูกหนี้</div>
+            <div class="text-xs opacity-60">Receivable</div>
+            <div class="text-2xl font-bold font-mono mt-1">{{fmt(arTotal)}}</div>
+            <div class="text-xs mt-2 opacity-90">เกินกำหนด: <b>{{fmt(arAgingSummary['1-30']+arAgingSummary['31-60']+arAgingSummary['61-90']+arAgingSummary.over90)}}</b></div>
           </div>
-          <div class="text-xs mt-2 text-slate-400">เกินกำหนด: <b class="text-amber-600">{{fmt(arAgingSummary['1-30']+arAgingSummary['31-60']+arAgingSummary['61-90']+arAgingSummary.over90)}}</b></div>
         </div>
 
         <!-- AP -->
-        <div class="bg-white rounded-xl shadow-sm p-4 border border-slate-100">
-          <div class="flex items-start justify-between">
-            <div>
-              <div class="text-xs text-slate-500">Accounts Payable</div>
-              <div class="text-xs text-slate-400">เจ้าหนี้</div>
-              <div class="flex items-baseline gap-0.5 mt-1"><span class="text-xs font-bold text-slate-700">฿</span><div class="text-xl font-bold text-slate-800">{{fmt(apTotal)}}</div></div>
-            </div>
-            <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-lg">📋</div>
+        <div class="bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-2xl shadow-lg p-4 relative overflow-hidden hover:shadow-xl transition">
+          <div class="absolute -top-3 -right-3 text-6xl opacity-10">📋</div>
+          <div class="relative">
+            <div class="text-xs opacity-80 font-medium">AP เจ้าหนี้</div>
+            <div class="text-xs opacity-60">Payable</div>
+            <div class="text-2xl font-bold font-mono mt-1">{{fmt(apTotal)}}</div>
+            <div class="text-xs mt-2 opacity-90">เกินกำหนด: <b>{{fmt(apAgingSummary['1-30']+apAgingSummary['31-60']+apAgingSummary['61-90']+apAgingSummary.over90)}}</b></div>
           </div>
-          <div class="text-xs mt-2 text-slate-400">เกินกำหนด: <b class="text-red-600">{{fmt(apAgingSummary['1-30']+apAgingSummary['31-60']+apAgingSummary['61-90']+apAgingSummary.over90)}}</b></div>
         </div>
       </div>
 
@@ -19553,7 +19952,7 @@ app.component('view-businessCalendar', {
       ym.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     }
 
-    return { db, erp, ym, view, days, totals, changeMonth, fmt:erp.fmt };
+    return { db, erp, ym, view, days, totals, changeMonth, today, fmt:erp.fmt };
   },
   template: `
   <div>
@@ -19612,22 +20011,51 @@ app.component('view-businessCalendar', {
       </div>
     </div>
     <div class="bg-white rounded-xl shadow overflow-x-auto">
-      <!-- COMBINED -->
-      <table v-if="view==='combined'" class="w-full text-xs table-zebra">
-        <thead class="bg-slate-100"><tr><th class="p-2 text-left">วัน</th><th class="p-2 text-right">ซื้อ</th><th class="p-2 text-right">ขาย</th><th class="p-2 text-right">COGS</th><th class="p-2 text-right">GP</th><th class="p-2 text-right">ค่าใช้จ่าย</th><th class="p-2 text-right">รับ</th><th class="p-2 text-right">จ่าย</th><th class="p-2 text-right">Net Cash</th><th class="p-2 text-right">AR+</th><th class="p-2 text-right">AP+</th></tr></thead>
+      <!-- COMBINED — 🎨 สีๆ ดูง่าย -->
+      <table v-if="view==='combined'" class="w-full text-xs">
+        <thead class="bg-gradient-to-r from-slate-700 to-slate-900 text-white sticky top-0">
+          <tr>
+            <th class="p-2 text-left rounded-tl-lg">วัน</th>
+            <th class="p-2 text-right bg-blue-700/40">📥 ซื้อ</th>
+            <th class="p-2 text-right bg-emerald-700/40">📤 ขาย</th>
+            <th class="p-2 text-right">COGS</th>
+            <th class="p-2 text-right bg-purple-700/40">💎 GP</th>
+            <th class="p-2 text-right bg-amber-700/40">💸 ค่าใช้จ่าย</th>
+            <th class="p-2 text-right bg-emerald-700/40">💰 รับ</th>
+            <th class="p-2 text-right bg-rose-700/40">💸 จ่าย</th>
+            <th class="p-2 text-right bg-indigo-700/40">📊 Net Cash</th>
+            <th class="p-2 text-right">AR+</th>
+            <th class="p-2 text-right rounded-tr-lg">AP+</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr v-for="d in days" :key="d.date" class="border-t" :class="d.dow===0||d.dow===6?'bg-slate-50':''">
-            <td class="p-2"><span class="font-medium">{{d.day}}</span> <span class="text-slate-400">{{['อา','จ','อ','พ','พฤ','ศ','ส'][d.dow]}}</span></td>
-            <td class="p-2 text-right text-blue-700">{{d.purchaseAmt?fmt(d.purchaseAmt):'-'}}</td>
-            <td class="p-2 text-right text-emerald-700">{{d.saleAmt?fmt(d.saleAmt):'-'}}</td>
-            <td class="p-2 text-right">{{d.cogs?fmt(d.cogs):'-'}}</td>
-            <td class="p-2 text-right font-medium" :class="d.gp>=0?'text-emerald-700':'text-red-600'">{{d.gp?fmt(d.gp):'-'}}</td>
-            <td class="p-2 text-right text-red-600">{{d.expenseAmt?fmt(d.expenseAmt):'-'}}</td>
-            <td class="p-2 text-right text-emerald-600">{{d.receiptAmt?fmt(d.receiptAmt):'-'}}</td>
-            <td class="p-2 text-right text-red-600">{{d.paymentAmt?fmt(d.paymentAmt):'-'}}</td>
-            <td class="p-2 text-right font-bold" :class="d.netCashFlow>=0?'text-emerald-700':'text-red-600'">{{d.netCashFlow?fmt(d.netCashFlow):'-'}}</td>
-            <td class="p-2 text-right text-blue-700">{{d.arInc?fmt(d.arInc):'-'}}</td>
-            <td class="p-2 text-right text-red-700">{{d.apInc?fmt(d.apInc):'-'}}</td>
+          <tr v-for="d in days" :key="d.date" class="border-t hover:bg-yellow-50 transition"
+            :class="[
+              d.dow===0?'bg-rose-50/40':(d.dow===6?'bg-blue-50/40':''),
+              d.date===today?'ring-2 ring-amber-400 bg-amber-50':'',
+              (d.purchaseAmt+d.saleAmt+d.expenseAmt)>0?'':'opacity-50'
+            ]">
+            <td class="p-2 whitespace-nowrap">
+              <span class="font-bold text-base" :class="d.date===today?'text-amber-700':'text-slate-700'">{{d.day}}</span>
+              <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                :class="d.dow===0?'bg-rose-100 text-rose-700':(d.dow===6?'bg-blue-100 text-blue-700':'bg-slate-100 text-slate-600')">
+                {{['อา','จ','อ','พ','พฤ','ศ','ส'][d.dow]}}
+              </span>
+              <span v-if="d.date===today" class="ml-1 text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold">วันนี้</span>
+            </td>
+            <td class="p-2 text-right font-mono bg-blue-50/30" :class="d.purchaseAmt>0?'text-blue-700 font-bold':'text-slate-300'">{{d.purchaseAmt?fmt(d.purchaseAmt):'-'}}</td>
+            <td class="p-2 text-right font-mono bg-emerald-50/30" :class="d.saleAmt>0?'text-emerald-700 font-bold':'text-slate-300'">{{d.saleAmt?fmt(d.saleAmt):'-'}}</td>
+            <td class="p-2 text-right font-mono" :class="d.cogs>0?'text-slate-600':'text-slate-300'">{{d.cogs?fmt(d.cogs):'-'}}</td>
+            <td class="p-2 text-right font-mono bg-purple-50/30 font-bold" :class="d.gp>=0?(d.gp>0?'text-purple-700':'text-slate-300'):'text-red-600'">{{d.gp?fmt(d.gp):'-'}}</td>
+            <td class="p-2 text-right font-mono bg-amber-50/30" :class="d.expenseAmt>0?'text-amber-700 font-bold':'text-slate-300'">{{d.expenseAmt?fmt(d.expenseAmt):'-'}}</td>
+            <td class="p-2 text-right font-mono bg-emerald-50/30" :class="d.receiptAmt>0?'text-emerald-700 font-bold':'text-slate-300'">{{d.receiptAmt?fmt(d.receiptAmt):'-'}}</td>
+            <td class="p-2 text-right font-mono bg-rose-50/30" :class="d.paymentAmt>0?'text-rose-700 font-bold':'text-slate-300'">{{d.paymentAmt?fmt(d.paymentAmt):'-'}}</td>
+            <td class="p-2 text-right font-bold font-mono bg-indigo-50/30" :class="d.netCashFlow>0?'text-emerald-700':(d.netCashFlow<0?'text-red-600':'text-slate-300')">
+              <span v-if="d.netCashFlow!==0">{{d.netCashFlow>0?'▲ ':'▼ '}}{{fmt(Math.abs(d.netCashFlow))}}</span>
+              <span v-else>-</span>
+            </td>
+            <td class="p-2 text-right font-mono" :class="d.arInc>0?'text-blue-700':'text-slate-300'">{{d.arInc?fmt(d.arInc):'-'}}</td>
+            <td class="p-2 text-right font-mono" :class="d.apInc>0?'text-red-700':'text-slate-300'">{{d.apInc?fmt(d.apInc):'-'}}</td>
           </tr>
         </tbody>
       </table>
@@ -31933,7 +32361,7 @@ function _allMenuItems() {
     // Trading
     'tradingDashboard','tradingMatching',
     // Production
-    'production','productionReport','wipReport','machineUtil','productionCostReport','yieldLossReport',
+    'production','productionDashboard','productionReport','wipReport','machineUtil','productionCostReport','yieldLossReport',
     // Dual Costing
     'poBuy','poSell','costPool','costAllocator','dualMargin','matchLog','dealMargin','compareMargin',
     // Grade Adjustment + Status Convert
@@ -38807,9 +39235,266 @@ app.component('view-dailyReport', {
       };
     });
 
+    /* ════════════════════════════════════════════════════════════════
+       🆕 RANGE FILTER + DASHBOARD ANALYTICS
+       ════════════════════════════════════════════════════════════════ */
+    const rangeMode = ref('today');   // today, yesterday, last7, last30, last90, month, custom
+    const rangeFrom = ref(today);
+    const rangeTo = ref(today);
+
+    function applyRangeMode(mode) {
+      rangeMode.value = mode;
+      const t = new Date(today);
+      if (mode === 'today') { rangeFrom.value = today; rangeTo.value = today; }
+      else if (mode === 'yesterday') {
+        const y = new Date(t); y.setDate(y.getDate()-1);
+        const ys = y.toISOString().slice(0,10);
+        rangeFrom.value = ys; rangeTo.value = ys;
+      }
+      else if (mode === 'last7') {
+        const s = new Date(t); s.setDate(s.getDate()-6);
+        rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today;
+      }
+      else if (mode === 'last30') {
+        const s = new Date(t); s.setDate(s.getDate()-29);
+        rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today;
+      }
+      else if (mode === 'last90') {
+        const s = new Date(t); s.setDate(s.getDate()-89);
+        rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today;
+      }
+      else if (mode === 'month') {
+        const s = new Date(t.getFullYear(), t.getMonth(), 1);
+        rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today;
+      }
+    }
+
+    /* Bills/expenses ในช่วง */
+    const pbInRange = computed(() => _safeArr(db.purchaseBills)
+      .filter(b => b && b.status !== 'cancelled' && b.date >= rangeFrom.value && b.date <= rangeTo.value));
+    const sbInRange = computed(() => _safeArr(db.salesBills)
+      .filter(b => b && b.status !== 'cancelled' && b.date >= rangeFrom.value && b.date <= rangeTo.value));
+    const expensesInRange = computed(() => _safeArr(db.expenses)
+      .filter(e => e && e.date >= rangeFrom.value && e.date <= rangeTo.value));
+
+    /* Range KPI */
+    const rangeKpi = computed(() => {
+      const pq = pbInRange.value.reduce((s,b)=>s+(b.items||[]).reduce((x,i)=>x+Number(i.netWeight||0),0),0);
+      const pa = pbInRange.value.reduce((s,b)=>s+Number(b.totalAmount||0),0);
+      const sq = sbInRange.value.reduce((s,b)=>s+(b.items||[]).reduce((x,i)=>x+Number(i.weight||0),0),0);
+      const sa = sbInRange.value.reduce((s,b)=>s+Number(b.totalAmount||0),0);
+      const cogs = sbInRange.value.reduce((s,b)=>s+Number(b.totalCost||0),0);
+      const gp = sa - cogs;
+      const exp = expensesInRange.value.reduce((s,e)=>s+Number(e.amount||0),0);
+      return { pbCount: pbInRange.value.length, sbCount: sbInRange.value.length,
+        pbQty:pq, pbAmt:pa, sbQty:sq, sbAmt:sa, cogs, gp,
+        gpPct: sa>0 ? gp/sa*100 : 0, expenses: exp, netProfit: gp - exp };
+    });
+
+    /* Top 10 Suppliers — ยอดซื้อ */
+    const topSuppliers = computed(() => {
+      const m = new Map();
+      pbInRange.value.forEach(b => {
+        const sid = b.supplierId || '';
+        if (!m.has(sid)) m.set(sid, { id:sid, name:erp.supplierName(sid)||'-', qty:0, amt:0, bills:0 });
+        const x = m.get(sid);
+        x.qty += (b.items||[]).reduce((s,i)=>s+Number(i.netWeight||0),0);
+        x.amt += Number(b.totalAmount||0);
+        x.bills++;
+      });
+      return Array.from(m.values()).sort((a,b)=>b.amt-a.amt).slice(0,10);
+    });
+
+    /* Top 10 Customers — ยอดขาย */
+    const topCustomers = computed(() => {
+      const m = new Map();
+      sbInRange.value.forEach(b => {
+        const cid = b.customerId || '';
+        if (!m.has(cid)) m.set(cid, { id:cid, name:erp.customerName(cid)||'-', qty:0, amt:0, gp:0, bills:0 });
+        const x = m.get(cid);
+        x.qty += (b.items||[]).reduce((s,i)=>s+Number(i.weight||0),0);
+        x.amt += Number(b.totalAmount||0);
+        x.gp += Number(b.totalAmount||0) - Number(b.totalCost||0);
+        x.bills++;
+      });
+      return Array.from(m.values()).map(c => ({ ...c, gpPct: c.amt>0?c.gp/c.amt*100:0 }))
+        .sort((a,b)=>b.amt-a.amt).slice(0,10);
+    });
+
+    /* Top 5 สินค้ารับเข้า + ออก */
+    function topProducts(bills, isPurchase) {
+      const m = new Map();
+      bills.forEach(b => {
+        (b.items||[]).forEach(it => {
+          const pid = it.productId || '';
+          const p = (db.products||[]).find(x => x && x.id === pid);
+          if (!m.has(pid)) m.set(pid, {
+            id:pid, name:p?.name||'-', code:p?.code||'-', group:p?.metalGroup||'อื่นๆ',
+            qty:0, amt:0
+          });
+          const x = m.get(pid);
+          const w = Number(isPurchase ? it.netWeight : it.weight) || 0;
+          x.qty += w;
+          x.amt += w * Number(it.price||0);
+        });
+      });
+      return Array.from(m.values()).sort((a,b)=>b.amt-a.amt).slice(0,5);
+    }
+    const topProductsIn = computed(() => topProducts(pbInRange.value, true));
+    const topProductsOut = computed(() => topProducts(sbInRange.value, false));
+
+    /* Top หมวด — ทั้งซื้อและขาย */
+    function topGroups(bills, isPurchase) {
+      const m = new Map();
+      bills.forEach(b => {
+        (b.items||[]).forEach(it => {
+          const p = (db.products||[]).find(x => x && x.id === it.productId);
+          const g = p?.metalGroup || 'อื่นๆ';
+          if (!m.has(g)) m.set(g, { group:g, qty:0, amt:0 });
+          const x = m.get(g);
+          const w = Number(isPurchase ? it.netWeight : it.weight) || 0;
+          x.qty += w;
+          x.amt += w * Number(it.price||0);
+        });
+      });
+      return Array.from(m.values()).sort((a,b)=>b.amt-a.amt);
+    }
+    const topGroupsIn = computed(() => topGroups(pbInRange.value, true));
+    const topGroupsOut = computed(() => topGroups(sbInRange.value, false));
+
+    /* 🆕 รวมหมวดสินค้า ซื้อ+ขาย — ใช้แสดงใต้ pie chart */
+    const groupSummary = computed(() => {
+      const m = new Map();
+      topGroupsIn.value.forEach(g => {
+        if (!m.has(g.group)) m.set(g.group, { group:g.group, qty:0, amt:0 });
+        const x = m.get(g.group); x.qty += g.qty; x.amt += g.amt;
+      });
+      topGroupsOut.value.forEach(g => {
+        if (!m.has(g.group)) m.set(g.group, { group:g.group, qty:0, amt:0 });
+        const x = m.get(g.group); x.qty += g.qty; x.amt += g.amt;
+      });
+      return Array.from(m.values()).sort((a,b)=>b.amt-a.amt);
+    });
+
+    /* 🆕 ยอดซื้อแต่ละ Sale — จำนวน supplier/กก./ยอดซื้อ (เปลี่ยนจาก sales → purchase) */
+    const bySalesperson = computed(() => {
+      const m = new Map();
+      pbInRange.value.forEach(b => {
+        const sid = b.salesId || '__no_sales__';
+        const sp = (db.salespersons||[]).find(s => s && s.id === sid);
+        if (!m.has(sid)) m.set(sid, {
+          id:sid, name:sp?.name || (sid==='__no_sales__' ? '(ไม่ระบุเซล)' : sid),
+          suppliers:new Set(), qty:0, amt:0, bills:0
+        });
+        const x = m.get(sid);
+        x.suppliers.add(b.supplierId);
+        x.qty += (b.items||[]).reduce((s,i)=>s+Number(i.netWeight||0),0);
+        x.amt += Number(b.totalAmount||0);
+        x.bills++;
+      });
+      return Array.from(m.values()).map(s => ({
+        ...s, suppliers: s.suppliers.size
+      })).sort((a,b)=>b.amt-a.amt);
+    });
+
+    /* ════════════════════════════════════════════════════════════════
+       🆕 CHART.JS — bar/pie charts
+       ════════════════════════════════════════════════════════════════ */
+    const chartGroupRef = ref(null);    // canvas สำหรับ pie หมวด
+    const chartTrendRef = ref(null);    // canvas สำหรับ line ยอดซื้อ/ขาย
+    let chartGroup = null, chartTrend = null;
+
+    /* Daily trend (purchase + sales) — ทุกวันในช่วง */
+    const dailyTrend = computed(() => {
+      const dates = [];
+      const d = new Date(rangeFrom.value);
+      const end = new Date(rangeTo.value);
+      while (d <= end) { dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+      const pbMap = {}, sbMap = {};
+      pbInRange.value.forEach(b => { pbMap[b.date] = (pbMap[b.date]||0) + Number(b.totalAmount||0); });
+      sbInRange.value.forEach(b => { sbMap[b.date] = (sbMap[b.date]||0) + Number(b.totalAmount||0); });
+      return {
+        labels: dates,
+        purchase: dates.map(d => pbMap[d]||0),
+        sales: dates.map(d => sbMap[d]||0),
+      };
+    });
+
+    function renderCharts() {
+      if (typeof Chart === 'undefined') return;
+      // Pie: หมวดสินค้า (รวมซื้อ+ขาย)
+      try {
+        const groupsAll = new Map();
+        topGroupsIn.value.forEach(g => groupsAll.set(g.group, (groupsAll.get(g.group)||0) + g.amt));
+        topGroupsOut.value.forEach(g => groupsAll.set(g.group, (groupsAll.get(g.group)||0) + g.amt));
+        const labels = Array.from(groupsAll.keys());
+        const data = Array.from(groupsAll.values());
+        if (chartGroup) chartGroup.destroy();
+        if (chartGroupRef.value && labels.length) {
+          chartGroup = new Chart(chartGroupRef.value, {
+            type: 'doughnut',
+            data: { labels, datasets: [{ data, backgroundColor:
+              ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#a855f7','#f97316'] }] },
+            options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }}
+          });
+        }
+      } catch(e) { console.warn('Chart group failed:', e); }
+
+      // Line: รายวัน ซื้อ vs ขาย
+      try {
+        const td = dailyTrend.value;
+        if (chartTrend) chartTrend.destroy();
+        if (chartTrendRef.value && td.labels.length) {
+          chartTrend = new Chart(chartTrendRef.value, {
+            type: 'line',
+            data: { labels: td.labels, datasets: [
+              { label:'ซื้อ', data:td.purchase, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', tension:0.3 },
+              { label:'ขาย', data:td.sales, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', tension:0.3 },
+            ]},
+            options: { responsive:true, maintainAspectRatio:false }
+          });
+        }
+      } catch(e) { console.warn('Chart trend failed:', e); }
+    }
+
+    /* render charts หลัง mount + watch */
+    onMounted(() => { setTimeout(renderCharts, 200); });
+    watch([rangeFrom, rangeTo], () => { setTimeout(renderCharts, 100); });
+
+    /* 🆕 PDF Export — ใช้ window.print() + print-friendly CSS */
+    function exportPDF() {
+      // เพิ่ม print style ลงใน head ถ้ายังไม่มี
+      if (!document.getElementById('daily-report-print-style')) {
+        const style = document.createElement('style');
+        style.id = 'daily-report-print-style';
+        style.textContent = `
+          @media print {
+            body { background: white !important; }
+            .no-print, button, nav, aside, .sidebar, [class*="bg-gradient"] { display: none !important; }
+            .bg-gradient-to-r, .bg-gradient-to-br { background: #4f46e5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .rounded-2xl, .rounded-xl { border-radius: 8px !important; box-shadow: none !important; border: 1px solid #cbd5e1 !important; }
+            .shadow-lg, .shadow-xl, .shadow { box-shadow: none !important; }
+            table { font-size: 10px !important; }
+            .grid { display: grid !important; }
+            canvas { max-height: 240px !important; }
+            @page { size: A4; margin: 10mm; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      // เปิด print dialog
+      setTimeout(() => window.print(), 100);
+    }
+
     return { erp, db, fmt, today, selectedDate, isToday, gotoToday, gotoPrev, gotoNext,
       purchaseBills, purchaseTotals, salesBills, salesTotals, groupBreakdown, expandedGroup,
-      expenses, expenseTotal, expenseByCategory, cashMovement };
+      expenses, expenseTotal, expenseByCategory, cashMovement,
+      // 🆕 Range
+      rangeMode, rangeFrom, rangeTo, applyRangeMode, rangeKpi,
+      topSuppliers, topCustomers, topProductsIn, topProductsOut,
+      topGroupsIn, topGroupsOut, groupSummary, bySalesperson, dailyTrend,
+      exportPDF,
+      chartGroupRef, chartTrendRef };
   },
   template: `
   <div class="space-y-4">
@@ -39049,6 +39734,233 @@ app.component('view-dailyReport', {
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         🆕 ANALYTICS DASHBOARD — Range Filter + Top 10/5 + Charts
+         ════════════════════════════════════════════════════════════════ -->
+    <div class="border-t-4 border-amber-300 pt-4 mt-6">
+      <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl p-5 shadow-lg mb-4">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 class="text-2xl font-bold">📊 Analytics Dashboard</h1>
+            <p class="text-xs opacity-90 mt-1">รายงานสรุปแบบช่วงเวลา + Top 10/5 + Charts</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button @click="applyRangeMode('today')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='today'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">วันนี้</button>
+            <button @click="applyRangeMode('yesterday')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='yesterday'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">เมื่อวาน</button>
+            <button @click="applyRangeMode('last7')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='last7'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">7 วัน</button>
+            <button @click="applyRangeMode('last30')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='last30'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">30 วัน</button>
+            <button @click="applyRangeMode('last90')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='last90'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">90 วัน</button>
+            <button @click="applyRangeMode('month')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='month'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">เดือนนี้</button>
+            <span class="text-xs opacity-80">|</span>
+            <input type="date" v-model="rangeFrom" @change="rangeMode='custom'" class="px-2 py-1 rounded text-slate-900 text-xs">
+            <span class="text-xs">→</span>
+            <input type="date" v-model="rangeTo" @change="rangeMode='custom'" class="px-2 py-1 rounded text-slate-900 text-xs">
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Cards: ซื้อ(เงิน) / ซื้อ(กก.) / ขาย(เงิน) / ขาย(กก.) / ค่าใช้จ่าย -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-xs text-blue-600">📥 ยอดซื้อ ({{rangeKpi.pbCount}} บิล)</div>
+          <div class="text-2xl font-bold text-blue-700 font-mono">{{fmt(rangeKpi.pbAmt)}}</div>
+          <div class="text-xs text-blue-500">บาท</div>
+        </div>
+        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+          <div class="text-xs text-indigo-600">⚖️ น้ำหนักรับซื้อ</div>
+          <div class="text-2xl font-bold text-indigo-700 font-mono">{{fmt(rangeKpi.pbQty)}}</div>
+          <div class="text-xs text-indigo-500">กิโลกรัม</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-xs text-emerald-600">📤 ยอดขาย ({{rangeKpi.sbCount}} บิล)</div>
+          <div class="text-2xl font-bold text-emerald-700 font-mono">{{fmt(rangeKpi.sbAmt)}}</div>
+          <div class="text-xs text-emerald-500">บาท</div>
+        </div>
+        <div class="bg-teal-50 border border-teal-200 rounded-xl p-3">
+          <div class="text-xs text-teal-600">⚖️ น้ำหนักขาย</div>
+          <div class="text-2xl font-bold text-teal-700 font-mono">{{fmt(rangeKpi.sbQty)}}</div>
+          <div class="text-xs text-teal-500">กิโลกรัม</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-xs text-amber-600">💸 ค่าใช้จ่าย</div>
+          <div class="text-2xl font-bold text-amber-700 font-mono">{{fmt(rangeKpi.expenses)}}</div>
+          <div class="text-xs text-amber-500">บาท</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white rounded-2xl shadow-lg p-4">
+          <h3 class="font-bold text-slate-700 mb-2">📈 ยอดซื้อ vs ขาย (รายวัน)</h3>
+          <div style="height: 280px"><canvas ref="chartTrendRef"></canvas></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-lg p-4">
+          <h3 class="font-bold text-slate-700 mb-2">🥧 มูลค่าตามหมวดสินค้า</h3>
+          <!-- 🆕 Pie chart + ตารางรายละเอียด อยู่ข้างกัน -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
+            <div style="height: 260px"><canvas ref="chartGroupRef"></canvas></div>
+            <div class="max-h-64 overflow-y-auto">
+              <table class="w-full text-xs">
+                <thead class="text-slate-500 bg-slate-50 sticky top-0"><tr>
+                  <th class="text-left p-1.5">หมวด</th>
+                  <th class="text-right p-1.5">กก.</th>
+                  <th class="text-right p-1.5">มูลค่า</th>
+                </tr></thead>
+                <tbody>
+                  <tr v-for="g in groupSummary" :key="g.group" class="border-t">
+                    <td class="p-1.5 font-medium">{{g.group}}</td>
+                    <td class="p-1.5 text-right">{{fmt(g.qty)}}</td>
+                    <td class="p-1.5 text-right font-bold text-indigo-700">{{fmt(g.amt)}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top 10 Suppliers + Customers -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div class="bg-blue-50 border-b p-3">
+            <h3 class="font-bold text-blue-700">🥇 Top 10 ผู้ขาย (ยอดซื้อสูงสุด)</h3>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50"><tr>
+              <th class="p-2 text-left w-8">#</th>
+              <th class="p-2 text-left">ชื่อผู้ขาย</th>
+              <th class="p-2 text-right">บิล</th>
+              <th class="p-2 text-right">น้ำหนัก</th>
+              <th class="p-2 text-right">ยอดซื้อ</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="(s,i) in topSuppliers" :key="s.id" class="border-t hover:bg-blue-50/30">
+                <td class="p-2 font-bold text-blue-700">{{i+1}}</td>
+                <td class="p-2 text-xs">{{s.name}}</td>
+                <td class="p-2 text-right text-xs">{{s.bills}}</td>
+                <td class="p-2 text-right text-xs">{{fmt(s.qty)}}</td>
+                <td class="p-2 text-right font-bold text-blue-700">{{fmt(s.amt)}}</td>
+              </tr>
+              <tr v-if="!topSuppliers.length"><td colspan="5" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div class="bg-emerald-50 border-b p-3">
+            <h3 class="font-bold text-emerald-700">🥇 Top 10 ผู้ซื้อ (ยอดขายสูงสุด)</h3>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50"><tr>
+              <th class="p-2 text-left w-8">#</th>
+              <th class="p-2 text-left">ชื่อลูกค้า</th>
+              <th class="p-2 text-right">บิล</th>
+              <th class="p-2 text-right">น้ำหนัก</th>
+              <th class="p-2 text-right">ยอดขาย</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="(c,i) in topCustomers" :key="c.id" class="border-t hover:bg-emerald-50/30">
+                <td class="p-2 font-bold text-emerald-700">{{i+1}}</td>
+                <td class="p-2 text-xs">{{c.name}}</td>
+                <td class="p-2 text-right text-xs">{{c.bills}}</td>
+                <td class="p-2 text-right text-xs">{{fmt(c.qty)}}</td>
+                <td class="p-2 text-right font-bold text-emerald-700">{{fmt(c.amt)}}</td>
+              </tr>
+              <tr v-if="!topCustomers.length"><td colspan="5" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top 5 Products In/Out -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div class="bg-indigo-50 border-b p-3">
+            <h3 class="font-bold text-indigo-700">📦 Top 5 สินค้ารับเข้า (ตามมูลค่า)</h3>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50"><tr>
+              <th class="p-2 text-left w-8">#</th>
+              <th class="p-2 text-left">Code</th>
+              <th class="p-2 text-left">สินค้า</th>
+              <th class="p-2 text-left">หมวด</th>
+              <th class="p-2 text-right">กก.</th>
+              <th class="p-2 text-right">มูลค่า</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="(p,i) in topProductsIn" :key="p.id" class="border-t">
+                <td class="p-2 font-bold text-indigo-700">{{i+1}}</td>
+                <td class="p-2 font-mono text-xs">{{p.code}}</td>
+                <td class="p-2 text-xs">{{p.name}}</td>
+                <td class="p-2 text-xs text-slate-500">{{p.group}}</td>
+                <td class="p-2 text-right text-xs">{{fmt(p.qty)}}</td>
+                <td class="p-2 text-right font-bold text-indigo-700">{{fmt(p.amt)}}</td>
+              </tr>
+              <tr v-if="!topProductsIn.length"><td colspan="6" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div class="bg-teal-50 border-b p-3">
+            <h3 class="font-bold text-teal-700">📦 Top 5 สินค้าขายออก (ตามมูลค่า)</h3>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50"><tr>
+              <th class="p-2 text-left w-8">#</th>
+              <th class="p-2 text-left">Code</th>
+              <th class="p-2 text-left">สินค้า</th>
+              <th class="p-2 text-left">หมวด</th>
+              <th class="p-2 text-right">กก.</th>
+              <th class="p-2 text-right">มูลค่า</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="(p,i) in topProductsOut" :key="p.id" class="border-t">
+                <td class="p-2 font-bold text-teal-700">{{i+1}}</td>
+                <td class="p-2 font-mono text-xs">{{p.code}}</td>
+                <td class="p-2 text-xs">{{p.name}}</td>
+                <td class="p-2 text-xs text-slate-500">{{p.group}}</td>
+                <td class="p-2 text-right text-xs">{{fmt(p.qty)}}</td>
+                <td class="p-2 text-right font-bold text-teal-700">{{fmt(p.amt)}}</td>
+              </tr>
+              <tr v-if="!topProductsOut.length"><td colspan="6" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 🆕 By Salesperson — ยอดซื้อแยกตามเซลที่ดูแล -->
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-4">
+        <div class="bg-purple-50 border-b p-3">
+          <h3 class="font-bold text-purple-700">💼 ยอดซื้อแยกตามเซลที่ดูแล (Supplier)</h3>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50"><tr>
+            <th class="p-2 text-left">เซล</th>
+            <th class="p-2 text-right">บิล</th>
+            <th class="p-2 text-right">จำนวน Supplier</th>
+            <th class="p-2 text-right">น้ำหนัก</th>
+            <th class="p-2 text-right">ยอดซื้อ</th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="s in bySalesperson" :key="s.id" class="border-t hover:bg-purple-50/30">
+              <td class="p-2 font-medium">{{s.name}}</td>
+              <td class="p-2 text-right text-xs">{{s.bills}}</td>
+              <td class="p-2 text-right text-xs">{{s.suppliers}}</td>
+              <td class="p-2 text-right text-xs">{{fmt(s.qty)}}</td>
+              <td class="p-2 text-right font-bold text-purple-700">{{fmt(s.amt)}}</td>
+            </tr>
+            <tr v-if="!bySalesperson.length"><td colspan="5" class="text-center py-6 text-slate-400">ไม่มีข้อมูล</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 🆕 PDF Export button -->
+      <div class="flex justify-end gap-2 mb-4 no-print">
+        <button @click="exportPDF" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md flex items-center gap-2">
+          🖨 Export PDF / Print
+        </button>
       </div>
     </div>
   </div>`
@@ -39912,6 +40824,310 @@ app.component('view-anomalyDetector', {
         💡 <b>Tip:</b> รันทุกครั้งหลัง Pull จาก Cloud — ถ้าเห็น <span class="text-red-600 font-bold">วิกฤต (critical)</span> ต้องแก้ก่อน Push กลับ
         เพราะอาจ overwrite ข้อมูลคนอื่น
       </div>
+    </div>
+  </div>`
+});
+
+/* =================================================================
+   📊 PRODUCTION DASHBOARD — รายงานการผลิต + Charts รายวัน/เดือน
+   ================================================================= */
+app.component('view-productionDashboard', {
+  setup() {
+    const erp = window.$erp; const db = erp.db; const fmt = erp.fmt;
+    const today = erp.today();
+    const rangeMode = ref('last30');
+    const rangeFrom = ref('');
+    const rangeTo = ref(today);
+
+    function applyRange(mode) {
+      rangeMode.value = mode;
+      const t = new Date(today);
+      if (mode === 'today') { rangeFrom.value = today; rangeTo.value = today; }
+      else if (mode === 'last7') { const s = new Date(t); s.setDate(s.getDate()-6); rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today; }
+      else if (mode === 'last30') { const s = new Date(t); s.setDate(s.getDate()-29); rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today; }
+      else if (mode === 'last90') { const s = new Date(t); s.setDate(s.getDate()-89); rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today; }
+      else if (mode === 'month') { const s = new Date(t.getFullYear(), t.getMonth(), 1); rangeFrom.value = s.toISOString().slice(0,10); rangeTo.value = today; }
+      else if (mode === 'year') { rangeFrom.value = t.getFullYear() + '-01-01'; rangeTo.value = today; }
+    }
+    applyRange('last30');
+
+    /* ──────── Data slices ──────── */
+    const ordersInRange = computed(() => (db.productionOrders||[]).filter(o => o && o.date >= rangeFrom.value && o.date <= rangeTo.value));
+    const inputsInRange = computed(() => (db.productionInputs||[]).filter(i => i && i.status!=='reversed' && i.date >= rangeFrom.value && i.date <= rangeTo.value));
+    const outputsInRange = computed(() => (db.productionOutputs||[]).filter(o => o && o.status!=='reversed' && o.date >= rangeFrom.value && o.date <= rangeTo.value));
+
+    /* ──────── KPIs ──────── */
+    const kpi = computed(() => {
+      const inQty = inputsInRange.value.reduce((s,i)=>s+Number(i.qtyNet||0),0);
+      const inCost = inputsInRange.value.reduce((s,i)=>s+Number(i.totalCost||0),0);
+      const outQty = outputsInRange.value.filter(o=>!['Loss','Waste'].includes(o.outputType))
+        .reduce((s,o)=>s+Number(o.qtyNet||0),0);
+      const lossQty = outputsInRange.value.filter(o=>['Loss','Waste'].includes(o.outputType))
+        .reduce((s,o)=>s+Number(o.qtyNet||0),0);
+      const wipQty = Math.max(0, inQty - outQty - lossQty);
+      const yieldPct = inQty > 0 ? outQty/inQty*100 : 0;
+      const lossPct = inQty > 0 ? lossQty/inQty*100 : 0;
+      const allOrders = (db.productionOrders||[]).filter(o => o);
+      const openOrders = allOrders.filter(o => !['Closed','Completed','Cancelled'].includes(o.status));
+      const totalWipQty = openOrders.reduce((acc, po) => {
+        const inQ = (db.productionInputs||[]).filter(i => i && i.productionOrderId===po.id && i.status!=='reversed').reduce((s,i)=>s+Number(i.qtyNet||0),0);
+        const outQ = (db.productionOutputs||[]).filter(o => o && o.productionOrderId===po.id && o.status!=='reversed').reduce((s,o)=>s+Number(o.qtyNet||0),0);
+        return acc + Math.max(0, inQ - outQ);
+      }, 0);
+      return {
+        orders: ordersInRange.value.length,
+        inputs: inputsInRange.value.length,
+        outputs: outputsInRange.value.length,
+        inQty, inCost, outQty, lossQty, wipQty, yieldPct, lossPct,
+        avgCost: outQty>0 ? inCost/outQty : 0,
+        totalWipQty,
+      };
+    });
+
+    /* ──────── รายวันใน range — for Line chart ──────── */
+    const dailyData = computed(() => {
+      const dates = [];
+      const d = new Date(rangeFrom.value); const end = new Date(rangeTo.value);
+      while (d <= end) { dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+      const inMap = {}, outMap = {}, lossMap = {};
+      inputsInRange.value.forEach(i => { inMap[i.date] = (inMap[i.date]||0) + Number(i.qtyNet||0); });
+      outputsInRange.value.forEach(o => {
+        if (['Loss','Waste'].includes(o.outputType)) lossMap[o.date] = (lossMap[o.date]||0) + Number(o.qtyNet||0);
+        else outMap[o.date] = (outMap[o.date]||0) + Number(o.qtyNet||0);
+      });
+      return { labels: dates, inputs: dates.map(d=>inMap[d]||0), outputs: dates.map(d=>outMap[d]||0), losses: dates.map(d=>lossMap[d]||0) };
+    });
+
+    /* ──────── รายเดือน 12 เดือนล่าสุด — for Bar chart ──────── */
+    const monthlyData = computed(() => {
+      const now = new Date();
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const m = new Date(now.getFullYear(), now.getMonth()-i, 1);
+        months.push(m.toISOString().slice(0,7));
+      }
+      const inMap = {}, outMap = {};
+      (db.productionInputs||[]).forEach(i => {
+        if (!i || i.status==='reversed') return;
+        const ym = String(i.date||'').slice(0,7);
+        inMap[ym] = (inMap[ym]||0) + Number(i.qtyNet||0);
+      });
+      (db.productionOutputs||[]).forEach(o => {
+        if (!o || o.status==='reversed' || ['Loss','Waste'].includes(o.outputType)) return;
+        const ym = String(o.date||'').slice(0,7);
+        outMap[ym] = (outMap[ym]||0) + Number(o.qtyNet||0);
+      });
+      return { labels: months, inputs: months.map(m=>inMap[m]||0), outputs: months.map(m=>outMap[m]||0) };
+    });
+
+    /* ──────── Top 10 สินค้าที่ผลิตมากสุด ──────── */
+    const topProducts = computed(() => {
+      const m = new Map();
+      outputsInRange.value.filter(o => !['Loss','Waste'].includes(o.outputType)).forEach(o => {
+        const pid = o.productId;
+        const p = (db.products||[]).find(x => x && x.id === pid);
+        if (!m.has(pid)) m.set(pid, { id:pid, name:p?.name||'-', code:p?.code||'-', qty:0, cost:0, batches:0 });
+        const x = m.get(pid);
+        x.qty += Number(o.qtyNet||0);
+        x.cost += Number(o.allocatedCost||0);
+        x.batches++;
+      });
+      return Array.from(m.values()).map(x => ({ ...x, avgCost: x.qty>0?x.cost/x.qty:0 })).sort((a,b)=>b.qty-a.qty).slice(0,10);
+    });
+
+    /* ──────── สถานะใบสั่งผลิต — for Pie chart ──────── */
+    const orderStatus = computed(() => {
+      const m = { 'Open':0, 'In Production':0, 'Completed':0, 'Closed':0, 'Cancelled':0 };
+      (db.productionOrders||[]).forEach(o => {
+        const s = o?.status || 'Open';
+        if (m[s] === undefined) m[s] = 0;
+        m[s]++;
+      });
+      return Object.entries(m).filter(([k,v])=>v>0).map(([k,v])=>({status:k,count:v}));
+    });
+
+    /* ──────── Machine Utilization ──────── */
+    const machineUtil = computed(() => {
+      const m = new Map();
+      outputsInRange.value.forEach(o => {
+        const po = (db.productionOrders||[]).find(p => p && p.id === o.productionOrderId);
+        const mid = po?.machineId || '__no_machine__';
+        const mc = (db.machines||[]).find(x => x && x.id === mid);
+        if (!m.has(mid)) m.set(mid, { id:mid, name:mc?.name || 'ไม่ระบุเครื่อง', qty:0, batches:0 });
+        const x = m.get(mid);
+        x.qty += Number(o.qtyNet||0);
+        x.batches++;
+      });
+      return Array.from(m.values()).sort((a,b)=>b.qty-a.qty);
+    });
+
+    /* ──────── Charts ──────── */
+    const chartDailyRef = ref(null);
+    const chartMonthlyRef = ref(null);
+    const chartStatusRef = ref(null);
+    let chartDaily=null, chartMonthly=null, chartStatus=null;
+
+    function renderCharts() {
+      if (typeof Chart === 'undefined') return;
+      try {
+        if (chartDaily) chartDaily.destroy();
+        if (chartDailyRef.value) {
+          const dd = dailyData.value;
+          chartDaily = new Chart(chartDailyRef.value, {
+            type:'line', data:{ labels:dd.labels, datasets:[
+              { label:'Input', data:dd.inputs, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', tension:0.3 },
+              { label:'Output', data:dd.outputs, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', tension:0.3 },
+              { label:'Loss', data:dd.losses, borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.1)', tension:0.3 },
+            ]},
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}} }
+          });
+        }
+      } catch(e) { console.warn('Daily chart:', e); }
+      try {
+        if (chartMonthly) chartMonthly.destroy();
+        if (chartMonthlyRef.value) {
+          const md = monthlyData.value;
+          chartMonthly = new Chart(chartMonthlyRef.value, {
+            type:'bar', data:{ labels:md.labels, datasets:[
+              { label:'Input', data:md.inputs, backgroundColor:'#3b82f6' },
+              { label:'Output', data:md.outputs, backgroundColor:'#10b981' },
+            ]},
+            options:{ responsive:true, maintainAspectRatio:false }
+          });
+        }
+      } catch(e) { console.warn('Monthly chart:', e); }
+      try {
+        if (chartStatus) chartStatus.destroy();
+        if (chartStatusRef.value && orderStatus.value.length) {
+          chartStatus = new Chart(chartStatusRef.value, {
+            type:'doughnut', data:{
+              labels: orderStatus.value.map(x=>x.status),
+              datasets:[{ data: orderStatus.value.map(x=>x.count),
+                backgroundColor:['#3b82f6','#f59e0b','#10b981','#6b7280','#ef4444'] }]
+            },
+            options:{ responsive:true, plugins:{legend:{position:'right'}}}
+          });
+        }
+      } catch(e) { console.warn('Status chart:', e); }
+    }
+    onMounted(() => { setTimeout(renderCharts, 200); });
+    watch([rangeFrom, rangeTo], () => { setTimeout(renderCharts, 100); });
+
+    return { erp, fmt, today, rangeMode, rangeFrom, rangeTo, applyRange,
+      kpi, topProducts, orderStatus, machineUtil,
+      chartDailyRef, chartMonthlyRef, chartStatusRef };
+  },
+  template: `
+  <div class="space-y-4">
+    <!-- HEADER -->
+    <div class="bg-gradient-to-r from-purple-700 to-pink-600 text-white rounded-2xl p-5 shadow-lg">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="text-3xl font-bold">📊 Production Dashboard</h1>
+          <p class="text-sm opacity-90 mt-1">รายงานการผลิตแบบสรุป — รายวัน / รายเดือน + Charts</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button @click="applyRange('today')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='today'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">วันนี้</button>
+          <button @click="applyRange('last7')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='last7'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">7 วัน</button>
+          <button @click="applyRange('last30')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='last30'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">30 วัน</button>
+          <button @click="applyRange('last90')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='last90'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">90 วัน</button>
+          <button @click="applyRange('month')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='month'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">เดือนนี้</button>
+          <button @click="applyRange('year')" :class="['px-3 py-1.5 rounded text-xs', rangeMode==='year'?'bg-white text-purple-700 font-bold':'bg-white/20 hover:bg-white/30']">ปีนี้</button>
+          <input type="date" v-model="rangeFrom" @change="rangeMode='custom'" class="px-2 py-1 rounded text-slate-900 text-xs">
+          <span class="text-xs">→</span>
+          <input type="date" v-model="rangeTo" @change="rangeMode='custom'" class="px-2 py-1 rounded text-slate-900 text-xs">
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+        <div class="text-xs text-blue-600">🏭 ใบสั่งผลิต</div>
+        <div class="text-2xl font-bold text-blue-700">{{kpi.orders}}</div>
+        <div class="text-xs text-blue-500">Input {{kpi.inputs}} | Output {{kpi.outputs}}</div>
+      </div>
+      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+        <div class="text-xs text-emerald-600">📦 ผลิตได้ (สินค้าออก)</div>
+        <div class="text-2xl font-bold text-emerald-700 font-mono">{{fmt(kpi.outQty)}}</div>
+        <div class="text-xs text-emerald-500">กก. (ไม่รวม Loss)</div>
+      </div>
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+        <div class="text-xs text-amber-600">⏳ WIP คงเหลือ (ทั้งระบบ)</div>
+        <div class="text-2xl font-bold text-amber-700 font-mono">{{fmt(kpi.totalWipQty)}}</div>
+        <div class="text-xs text-amber-500">กก. ที่ยังผลิตค้างอยู่</div>
+      </div>
+      <div class="bg-purple-50 border border-purple-200 rounded-xl p-3">
+        <div class="text-xs text-purple-600">📐 Yield %</div>
+        <div class="text-2xl font-bold text-purple-700">{{kpi.yieldPct.toFixed(1)}}%</div>
+        <div class="text-xs text-red-600">Loss {{kpi.lossPct.toFixed(1)}}%</div>
+      </div>
+    </div>
+
+    <!-- Charts (Daily + Monthly) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <h3 class="font-bold text-slate-700 mb-2">📈 ผลิตรายวัน (Input/Output/Loss)</h3>
+        <div style="height: 300px"><canvas ref="chartDailyRef"></canvas></div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <h3 class="font-bold text-slate-700 mb-2">📊 ผลิตรายเดือน (12 เดือนล่าสุด)</h3>
+        <div style="height: 300px"><canvas ref="chartMonthlyRef"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Order Status Pie + Top Products -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="bg-white rounded-2xl shadow-lg p-4">
+        <h3 class="font-bold text-slate-700 mb-2">🎯 สถานะใบสั่งผลิต</h3>
+        <div style="height: 280px"><canvas ref="chartStatusRef"></canvas></div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden lg:col-span-2">
+        <div class="bg-emerald-50 border-b p-3"><h3 class="font-bold text-emerald-700">🥇 Top 10 สินค้าที่ผลิตมากสุด</h3></div>
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50"><tr>
+            <th class="p-2 text-left w-8">#</th>
+            <th class="p-2 text-left">Code</th>
+            <th class="p-2 text-left">สินค้า</th>
+            <th class="p-2 text-right">รอบ</th>
+            <th class="p-2 text-right">น้ำหนัก</th>
+            <th class="p-2 text-right">ต้นทุนรวม</th>
+            <th class="p-2 text-right">ต้นทุน/กก.</th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="(p,i) in topProducts" :key="p.id" class="border-t">
+              <td class="p-2 font-bold text-emerald-700">{{i+1}}</td>
+              <td class="p-2 font-mono text-xs">{{p.code}}</td>
+              <td class="p-2 text-xs">{{p.name}}</td>
+              <td class="p-2 text-right text-xs">{{p.batches}}</td>
+              <td class="p-2 text-right font-bold">{{fmt(p.qty)}}</td>
+              <td class="p-2 text-right text-xs">{{fmt(p.cost)}}</td>
+              <td class="p-2 text-right text-xs text-slate-600">{{fmt(p.avgCost)}}</td>
+            </tr>
+            <tr v-if="!topProducts.length"><td colspan="7" class="text-center py-6 text-slate-400">ยังไม่มีข้อมูลในช่วงนี้</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Machine Utilization -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div class="bg-indigo-50 border-b p-3"><h3 class="font-bold text-indigo-700">⚙️ Machine Utilization (ปริมาณผลิตต่อเครื่อง)</h3></div>
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50"><tr>
+          <th class="p-2 text-left">เครื่องจักร</th>
+          <th class="p-2 text-right">รอบที่ใช้</th>
+          <th class="p-2 text-right">น้ำหนักผลิต</th>
+        </tr></thead>
+        <tbody>
+          <tr v-for="m in machineUtil" :key="m.id" class="border-t">
+            <td class="p-2">{{m.name}}</td>
+            <td class="p-2 text-right">{{m.batches}}</td>
+            <td class="p-2 text-right font-bold text-indigo-700">{{fmt(m.qty)}}</td>
+          </tr>
+          <tr v-if="!machineUtil.length"><td colspan="3" class="text-center py-6 text-slate-400">ยังไม่มีข้อมูล</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>`
 });
