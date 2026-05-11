@@ -8659,6 +8659,12 @@ app.component('view-purchase', {
       form.value.items.splice(idx, 1);
     }
     function recalcItem(it) {
+      // 🆕 ถ้ามี gross + deduct → คำนวณ net = gross - deduct (auto)
+      const g = num(it.grossWeight);
+      const d = num(it.deductWeight);
+      if (g > 0 || d > 0) {
+        it.netWeight = Math.max(0, g - d);
+      }
       it.netAmount = num(it.netWeight) * num(it.price);
       // 🚫 ไม่คำนวณ commission ที่บิลซื้อแล้ว — ดูใน Sales Tracking Dashboard (รวมเดือน)
       it.commission = 0;
@@ -8669,12 +8675,14 @@ app.component('view-purchase', {
       const subtotal = items.reduce((s,it)=>s+num(it.netAmount),0);
       // 🆕 น้ำหนักรวม + จำนวนรายการ — ให้ user เช็คว่าคีย์ครบ
       const totalWeight = items.reduce((s,it)=>s+num(it.netWeight),0);
+      const totalGross = items.reduce((s,it)=>s+num(it.grossWeight),0);     // 🆕
+      const totalDeduct = items.reduce((s,it)=>s+num(it.deductWeight),0);   // 🆕
       const itemCount = items.filter(it => it && it.productId && num(it.netWeight) > 0).length;
       const afterDiscount = Math.max(0, subtotal - num(form.value.discountTotal));
       const vatAmount = form.value.hasVat ? afterDiscount * 0.07 : 0;
       const grandTotal = afterDiscount + vatAmount;
       const totalCommission = 0;  // 🚫 ไม่ใช้แล้ว — เก็บไว้เพื่อ backward compat
-      return { subtotal, totalWeight, itemCount, afterDiscount, vatAmount, grandTotal, totalCommission };
+      return { subtotal, totalWeight, totalGross, totalDeduct, itemCount, afterDiscount, vatAmount, grandTotal, totalCommission };
     });
 
     /* Available PO Buys (open/partial only) — pre-computed for dropdown */
@@ -9771,7 +9779,9 @@ app.component('view-purchase', {
                     <th class="p-3 text-left text-slate-700">สินค้า *</th>
                     <th class="p-3 text-left w-44 text-indigo-700">📋 PO <span class="text-xs font-normal text-slate-500">(เว้น = Spot)</span></th>
                     <th class="p-3 text-center w-24 text-slate-600 text-xs">📦 คงเหลือ<br>→ หลังรับ</th>
-                    <th class="p-3 text-right w-24 text-slate-700">น้ำหนัก<br><span class="text-[10px] font-normal">(กก.)</span></th>
+                    <th class="p-3 text-right w-20 text-slate-600 bg-slate-50">⚖️ Gross<br><span class="text-[10px] font-normal">(น้ำหนักรวม)</span></th>
+                    <th class="p-3 text-right w-20 text-amber-700 bg-amber-50">➖ หัก<br><span class="text-[10px] font-normal">(Tare)</span></th>
+                    <th class="p-3 text-right w-24 text-emerald-700 bg-emerald-50">✓ น้ำหนักสุทธิ<br><span class="text-[10px] font-normal">(กก.)</span></th>
                     <th class="p-3 text-right w-24 text-slate-700">ราคา/กก.</th>
                     <th v-if="form.salesId" class="p-3 text-right w-24 text-purple-700 bg-purple-50">💼 ราคา<br>หน้าใบ</th>
                     <th class="p-3 text-right w-28 text-slate-700">ยอดรวม</th>
@@ -9799,7 +9809,18 @@ app.component('view-purchase', {
                       </div>
                       <div v-else class="text-slate-300 text-xs">-</div>
                     </td>
-                    <td class="p-2"><input type="number" step="0.01" v-model.number="it.netWeight" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
+                    <!-- ⚖️ Gross (น้ำหนักรวม) -->
+                    <td class="p-2 bg-slate-50">
+                      <input type="number" step="0.01" v-model.number="it.grossWeight" @input="recalcItem(it)" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white">
+                    </td>
+                    <!-- ➖ หัก (Tare/Deduct) -->
+                    <td class="p-2 bg-amber-50">
+                      <input type="number" step="0.01" v-model.number="it.deductWeight" @input="recalcItem(it)" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white">
+                    </td>
+                    <!-- ✓ น้ำหนักสุทธิ (auto = Gross - Tare ถ้ามี Gross/Tare; แก้ตรงได้) -->
+                    <td class="p-2 bg-emerald-50">
+                      <input type="number" step="0.01" v-model.number="it.netWeight" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono font-bold text-emerald-800 bg-white">
+                    </td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.price" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
                     <!-- 🆕 ราคาหน้าใบ — เก็บค่าไว้ใช้กับ Sales Tracking (ไม่คำนวณค่าคอมในนี้) -->
                     <td v-if="form.salesId" class="p-2 bg-purple-50">
@@ -9811,13 +9832,15 @@ app.component('view-purchase', {
                     </td>
                   </tr>
                 </tbody>
-                <!-- 🆕 Footer: น้ำหนักรวม + ยอดรวมรายการ — เช็คความครบถ้วน -->
+                <!-- 🆕 Footer: น้ำหนักรวม Gross/หัก/Net + ยอดรวมรายการ -->
                 <tfoot class="bg-emerald-50 font-bold border-t-2 border-emerald-300">
                   <tr>
                     <td colspan="2" class="p-2 text-right text-emerald-800">📦 รวม {{billTotals.itemCount}} รายการ:</td>
                     <td class="p-2 text-center text-emerald-800 text-base">-</td>
-                    <td class="p-2 text-right text-emerald-800 text-base font-mono">{{fmt(billTotals.totalWeight)}}</td>
-                    <td colspan="2"></td>
+                    <td class="p-2 text-right text-slate-700 text-base font-mono bg-slate-100">{{fmt(billTotals.totalGross)}}</td>
+                    <td class="p-2 text-right text-amber-700 text-base font-mono bg-amber-100">{{fmt(billTotals.totalDeduct)}}</td>
+                    <td class="p-2 text-right text-emerald-800 text-base font-mono bg-emerald-100">{{fmt(billTotals.totalWeight)}}</td>
+                    <td></td>
                     <td v-if="form.salesId"></td>
                     <td class="p-2 text-right text-blue-700 text-base font-mono">{{fmt(billTotals.subtotal)}}</td>
                     <td></td>
