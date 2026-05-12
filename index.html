@@ -12688,7 +12688,8 @@ app.component('view-expense', {
 
     /* 🆕 Cleanup duplicate expense lines — กวาด lines ที่ซ้ำกัน (จาก sync issues เก่า)
        กลยุทธ์: group ตาม voucherId → ใน group เดียวกัน ถ้ามี lines เดียวกัน (categoryId+amount+vat+wht) → เก็บแค่ 1
-       ลบทั้ง local + cloud */
+       ลบทั้ง local + cloud
+       เรียกจาก: ปุ่ม UI หรือ Console: window.$cleanupExpenseDuplicates() */
     async function cleanupDuplicateLines() {
       const all = safeArr(db.expenses);
       if (!all.length) { alert('ไม่มี expense lines ในระบบ'); return; }
@@ -12743,6 +12744,10 @@ app.component('view-expense', {
       }
       try { if (window.$autoSync?.pushNow) await window.$autoSync.pushNow(); } catch(e){}
       alert(`✅ ลบ duplicate สำเร็จ\n• Local: ${toDelete.length} lines\n• Cloud: ${cloudOk} ลบสำเร็จ${cloudFail?' · ' + cloudFail + ' fail':''}\n• เงินคืน: ${fmt(dupAmount)} บาท`);
+    }
+    // 🆕 expose to window for console access (backup ถ้าหาปุ่มไม่เจอ)
+    if (typeof window !== 'undefined') {
+      window.$cleanupExpenseDuplicates = cleanupDuplicateLines;
     }
 
     /* 🆕 Payee suggestions — รวมจาก expenses เก่า + suppliers + customers (unique names) */
@@ -12830,9 +12835,14 @@ app.component('view-expense', {
       <button @click="open" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 whitespace-nowrap">
         ➕ เพิ่มค่าใช้จ่าย
       </button>
-      <!-- 🆕 Cleanup duplicate lines — สำหรับบิลที่มี line ซ้ำจาก sync เก่า -->
-      <button @click="cleanupDuplicateLines" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 whitespace-nowrap" title="หา + ลบ expense lines ที่ซ้ำกันในบิลเดียวกัน">
-        🧹 ลบ Line ซ้ำ
+    </div>
+    <!-- 🆕 Cleanup duplicate lines — แสดงเด่นๆ ในแถวแยกพื้นสีส้ม -->
+    <div class="mb-3 bg-orange-50 border-2 border-orange-300 rounded-lg p-3 flex items-center justify-between gap-2 flex-wrap">
+      <div class="text-sm text-orange-800 flex-1 min-w-[260px]">
+        <strong>🚨 พบบิลที่มี Line ซ้ำ?</strong> — กดปุ่มขวานี้ ระบบจะหา + ลบ lines ซ้ำในแต่ละ voucher อัตโนมัติ (เก็บตัวเก่าสุดไว้)
+      </div>
+      <button @click="cleanupDuplicateLines" class="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 whitespace-nowrap border-2 border-orange-800">
+        🧹 ลบ Line ซ้ำในระบบ
       </button>
     </div>
 
