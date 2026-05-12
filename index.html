@@ -2970,6 +2970,60 @@ const _GLOBAL_DB = reactive(loadDB());
 const _safeFind = (arr, id) => (Array.isArray(arr) ? arr.find(x => x && x.id === id) : null);
 const _safeArr = (a) => Array.isArray(a) ? a : [];
 
+/* 🆕 GLOBAL: Cleanup duplicate expense lines — เรียกได้ทุกที่ (ทั้ง UI button + Console)
+   ใช้: window.$cleanupExpenseDuplicates()  ← พิมพ์ใน F12 Console ได้เลย ไม่ต้องเข้า view */
+window.$cleanupExpenseDuplicates = async function() {
+  const db = _GLOBAL_DB;
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const fmt = (n) => Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const all = Array.isArray(db.expenses) ? db.expenses : [];
+  if (!all.length) { alert('ไม่มี expense lines ในระบบ'); return; }
+  const byVoucher = new Map();
+  all.forEach(e => {
+    if (!e) return;
+    const vid = e.voucherId || e.id || 'unk';
+    if (!byVoucher.has(vid)) byVoucher.set(vid, []);
+    byVoucher.get(vid).push(e);
+  });
+  const toDelete = [];
+  let dupVouchers = 0, dupAmount = 0;
+  byVoucher.forEach((lines, vid) => {
+    if (lines.length < 2) return;
+    const seen = new Map();
+    const dupsInVoucher = [];
+    lines.sort((a,b) => String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+    lines.forEach(l => {
+      const key = `${l.categoryId||''}|${num(l.amount)}|${num(l.vat)}|${num(l.wht)}|${(l.desc||'').trim()}`;
+      if (seen.has(key)) {
+        dupsInVoucher.push(l);
+        dupAmount += num(l.amount) + num(l.vat);
+      } else seen.set(key, l);
+    });
+    if (dupsInVoucher.length > 0) {
+      dupVouchers++;
+      dupsInVoucher.forEach(d => toDelete.push(d.id));
+    }
+  });
+  if (!toDelete.length) { alert('✓ ไม่พบ expense lines ที่ซ้ำกัน'); return; }
+  if (!confirm(`🔍 พบ duplicate lines: ${toDelete.length} lines ใน ${dupVouchers} vouchers\n💰 ยอดรวมที่ซ้ำ: ${fmt(dupAmount)} บาท\n\n• ลบ duplicate ใน local + cloud\n• เก็บตัวเก่าสุดไว้ (ตาม createdAt)\n\nดำเนินการ?`)) return;
+  try { window.$autoSync?.addTombstones?.('expenses', toDelete); } catch(e){}
+  db.expenses = db.expenses.filter(e => !toDelete.includes(e.id));
+  try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+  let cloudOk = 0, cloudFail = 0;
+  if (window.sb) {
+    for (let i = 0; i < toDelete.length; i += 100) {
+      const chunk = toDelete.slice(i, i+100);
+      try {
+        const r = await window.sb.from('expenses').delete().in('id', chunk).select('id');
+        if (r.error) cloudFail += chunk.length;
+        else cloudOk += (r.data?.length || chunk.length);
+      } catch(e) { cloudFail += chunk.length; }
+    }
+  }
+  try { if (window.$autoSync?.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+  alert(`✅ ลบ duplicate สำเร็จ\n• Local: ${toDelete.length} lines\n• Cloud: ${cloudOk} ลบสำเร็จ${cloudFail?' · ' + cloudFail + ' fail':''}\n• เงินคืน: ${fmt(dupAmount)} บาท`);
+};
+
 window.$erp = {
   db: _GLOBAL_DB,
   currentUser: ref(null),
