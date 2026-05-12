@@ -10750,12 +10750,16 @@ app.component('view-payment', {
         });
         const supplierLabel = Array.from(supplierNames).join(', ').slice(0,80) || 'หลายราย';
         // 🆕 Split-aware bank statement: 1 entry per account
+        // ⚠ Defense: ลบของเก่าซ้ำที่อาจหลงเหลือก่อน push ใหม่ (กัน duplicate จาก auto-pull race)
+        db.bankStatement = (db.bankStatement||[]).filter(s => !(s && s.refType === 'PMT' && s.refId === voucherId));
         const splitsToWrite = validSplits.length > 0
           ? validSplits
           : [{ accountId: f.accountId, amount: totals.value.netCashOut }];
+        // 🆕 Use deterministic IDs based on voucherId + split index — ป้องกัน duplicate insert
         splitsToWrite.forEach((sp, idx) => {
           db.bankStatement.push({
-            id: newId('BS'), date: f.date, accountId: sp.accountId,
+            id: 'BS-PMT-' + voucherId + '-' + idx,   // ⭐ deterministic id (idempotent)
+            date: f.date, accountId: sp.accountId,
             type: 'จ่ายเงินให้ Supplier',
             desc: f.docNo + ' - ' + supplierLabel + (splitsToWrite.length > 1 ? ' (split '+(idx+1)+'/'+splitsToWrite.length+')' : ''),
             in: 0, out: num(sp.amount),
@@ -11365,8 +11369,11 @@ app.component('view-receipt', {
           });
         });
         const customerLabel = Array.from(customerNames).join(', ').slice(0,80) || 'หลายราย';
+        // 🆕 Defense + deterministic id — กัน duplicate
+        db.bankStatement = (db.bankStatement||[]).filter(s => !(s && s.refType === 'RCP' && s.refId === voucherId));
         db.bankStatement.push({
-          id: newId('BS'), date: f.date, accountId: f.accountId,
+          id: 'BS-RCP-' + voucherId,   // ⭐ deterministic id
+          date: f.date, accountId: f.accountId,
           type: 'รับเงินจากลูกค้า',
           desc: f.docNo + ' - ' + customerLabel,
           in: totals.value.netCashIn, out: 0,
