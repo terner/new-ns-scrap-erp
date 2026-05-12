@@ -6662,6 +6662,35 @@ app.component('view-bank', {
       downloadCsv(erp.accountName(selectedAcc.value)+'_'+erp.today()+'.csv', rows);
     }
 
+    /* 🆕 ลบ bankStatement ซ้ำ (PMT/RCP) — เรียกใช้จากปุ่มในหน้า */
+    async function cleanupDuplicates() {
+      const stmts = (db.bankStatement||[]).filter(s => s && (s.refType === 'PMT' || s.refType === 'RCP'));
+      const groups = new Map();
+      stmts.forEach(s => {
+        const key = `${s.refType}|${s.refId}|${s.date}|${s.accountId}|${Number(s.out||0).toFixed(2)}|${Number(s.in||0).toFixed(2)}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(s);
+      });
+      const dupGroups = Array.from(groups.values()).filter(g => g.length > 1);
+      if (!dupGroups.length) { alert('✓ ไม่พบ duplicate'); return; }
+      const toDelete = [];
+      let totalDupAmt = 0;
+      dupGroups.forEach(g => {
+        g.sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+        g.slice(1).forEach(r => { toDelete.push(r.id); totalDupAmt += Number(r.out||0) + Number(r.in||0); });
+      });
+      if (!confirm(`พบ duplicate ${dupGroups.length} ชุด\nจะลบ ${toDelete.length} entries\n💰 รวม ${totalDupAmt.toLocaleString()} บาท\n\nดำเนินการ?`)) return;
+      db.bankStatement = db.bankStatement.filter(s => !toDelete.includes(s.id));
+      for (let i=0; i<toDelete.length; i+=100) {
+        const chunk = toDelete.slice(i, i+100);
+        try { await window.sb.from('bank_statement').delete().in('id', chunk); } catch(e){}
+      }
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      try { if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+      alert(`✅ ลบ ${toDelete.length} entries\n💰 เงินคืน: ${totalDupAmt.toLocaleString()} บาท`);
+      setTimeout(() => location.reload(), 1500);
+    }
+
     /* 🆕 Daily balance trend — for chart */
     const balanceChartRef = ref(null);
     const flowChartRef = ref(null);
@@ -6696,7 +6725,7 @@ app.component('view-bank', {
     onMounted(() => { setTimeout(renderCharts, 200); });
     watch([selectedAcc, fromDate, toDate], () => { setTimeout(renderCharts, 100); });
 
-    return { db, erp, selectedAcc, fromDate, toDate, stmt, summary, exportCsv,
+    return { db, erp, selectedAcc, fromDate, toDate, stmt, summary, exportCsv, cleanupDuplicates,
       balanceChartRef, flowChartRef, fmt:erp.fmt };
   },
   template: `
@@ -6716,6 +6745,7 @@ app.component('view-bank', {
           <span class="text-xs">→</span>
           <input type="date" v-model="toDate" class="px-2 py-2 rounded text-slate-900 text-xs">
           <button @click="exportCsv" class="bg-white/20 hover:bg-white/30 px-3 py-2 rounded text-xs font-bold">📤 CSV</button>
+          <button @click="cleanupDuplicates" class="bg-red-500 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold" title="ตรวจ + ลบ bankStatement ที่ซ้ำ (PMT/RCP)">🧹 ลบ Duplicate</button>
         </div>
       </div>
     </div>
@@ -12984,6 +13014,9 @@ app.component('view-sales', {
       }
       it.profit = it.netAmount - it.totalCost;
     }
+    /* 🆕 hasStockItem — มีอย่างน้อย 1 item ที่ source=STOCK → บังคับสาขา/คลัง/ช่องทาง */
+    const hasStockItem = computed(() => (form.items||[]).some(it => it && (it.sourceMode||'STOCK')!=='TRADING'));
+
     /* 🆕 onItemSourceChange — เมื่อเปลี่ยน source (Stock/Trading) แต่ละ item */
     function onItemSourceChange(it) {
       if (it.sourceMode === 'STOCK') {
@@ -13540,7 +13573,7 @@ app.component('view-sales', {
 
     return { db, erp, form, showForm, editing, showDetail, search, filterStatus, filterChannel,
       filterMode, filterDateFrom, filterDateTo,
-      open, save, addItem, removeItem, recalcLine, recalcAll, onItemSourceChange, cancelBill, deleteBill, filtered, statusBadge, statusText,
+      open, save, addItem, removeItem, recalcLine, recalcAll, onItemSourceChange, hasStockItem, cancelBill, deleteBill, filtered, statusBadge, statusText,
       loadFromPOSell, availableTradingPurchases, loadFromTradingPurchase, billTotals, toggleVatIssued, goToPendingSale, fmt:erp.fmt,
       addTradingPurchase, removeTradingPurchase,
       // 🆕 Multi-select
@@ -13735,9 +13768,9 @@ app.component('view-sales', {
             <div><label class="block text-xs text-slate-600 mb-1">วันที่</label><input type="date" v-model="form.date" class="w-full px-2 py-1.5 border rounded"></div>
             <div><label class="block text-xs text-slate-600 mb-1">Customer *</label><searchable-select v-model="form.customerId" :options="db.customers.filter(x=>x.active)" label-field="name" code-field="code" :disabled="form.salesSource==='PO_DELIVERY' && form.poSellId" placeholder="🔍 พิมพ์ชื่อลูกค้า..." input-class="w-full px-2 py-1.5 border rounded"></searchable-select></div>
             <div><label class="block text-xs text-slate-600 mb-1">Credit Term (วัน)</label><input type="number" v-model.number="form.creditTerm" class="w-full px-2 py-1.5 border rounded"></div>
-            <div><label class="block text-xs text-slate-600 mb-1">สาขา *</label><select v-model="form.branchId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="b in db.branches.filter(x=>x.active)" :value="b.id">{{b.name}}</option></select></div>
-            <div><label class="block text-xs text-slate-600 mb-1">คลัง *</label><select v-model="form.warehouseId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="w in db.warehouses.filter(x=>x.active && (!form.branchId || x.branchId===form.branchId))" :value="w.id">{{w.name}}</option></select></div>
-            <div><label class="block text-xs text-slate-600 mb-1">ช่องทางขาย *</label><select v-model="form.channelId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="c in db.salesChannels.filter(x=>x.active)" :value="c.id">{{c.name}}</option></select></div>
+            <div><label class="block text-xs text-slate-600 mb-1">สาขา <span v-if="hasStockItem" class="text-red-500">*</span><span v-else class="text-slate-400 text-[10px]">(Trading ไม่จำเป็น)</span></label><select v-model="form.branchId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="b in db.branches.filter(x=>x.active)" :value="b.id">{{b.name}}</option></select></div>
+            <div><label class="block text-xs text-slate-600 mb-1">คลัง <span v-if="hasStockItem" class="text-red-500">*</span><span v-else class="text-slate-400 text-[10px]">(Trading ไม่จำเป็น)</span></label><select v-model="form.warehouseId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="w in db.warehouses.filter(x=>x.active && (!form.branchId || x.branchId===form.branchId))" :value="w.id">{{w.name}}</option></select></div>
+            <div><label class="block text-xs text-slate-600 mb-1">ช่องทางขาย <span v-if="hasStockItem" class="text-red-500">*</span><span v-else class="text-slate-400 text-[10px]">(Trading ไม่จำเป็น)</span></label><select v-model="form.channelId" class="w-full px-2 py-1.5 border rounded"><option value="">--</option><option v-for="c in db.salesChannels.filter(x=>x.active)" :value="c.id">{{c.name}}</option></select></div>
             <div><label class="block text-xs text-slate-600 mb-1">🚗 ทะเบียนรถส่งของ <span class="text-slate-400 font-normal">(ถ้ามี)</span></label><input v-model="form.licensePlate" placeholder="เช่น 1กข-1234" class="w-full px-2 py-1.5 border rounded uppercase"></div>
             <div><label class="block text-xs text-slate-600 mb-1">📞 เบอร์โทรลูกค้า</label><input v-model="form.contactPhone" placeholder="เบอร์ติดต่อ" class="w-full px-2 py-1.5 border rounded"></div>
             <div><label class="block text-xs text-slate-600 mb-1">👤 ผู้รับของ</label><input v-model="form.contactName" placeholder="ชื่อคนรับของ" class="w-full px-2 py-1.5 border rounded"></div>
@@ -38400,16 +38433,63 @@ app.component('view-transactionLedger', {
       erp.showToast('คำนวณใหม่แล้ว','success');
     }
 
+    /* 🆕 ลบ bankStatement ที่ซ้ำ (PMT/RCP/EXP/TRF) */
+    async function cleanupDuplicates() {
+      // ดู bankStatement ทุก refType ที่อาจซ้ำ
+      const stmts = (db.bankStatement||[]).filter(s => s && s.refId);
+      const groups = new Map();
+      stmts.forEach(s => {
+        const key = `${s.refType}|${s.refId}|${s.date}|${s.accountId}|${Number(s.out||0).toFixed(2)}|${Number(s.in||0).toFixed(2)}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(s);
+      });
+      const dupGroups = Array.from(groups.values()).filter(g => g.length > 1);
+      if (!dupGroups.length) { alert('✓ ไม่พบ duplicate ใน Transaction Ledger'); return; }
+
+      const toDelete = [];
+      let totalDupAmt = 0;
+      dupGroups.forEach(group => {
+        group.sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+        const [keep, ...rest] = group;
+        rest.forEach(r => { toDelete.push(r.id); totalDupAmt += Number(r.out||0) + Number(r.in||0); });
+      });
+
+      // แยกตาม refType ให้ดู
+      const byType = {};
+      dupGroups.forEach(g => { const t = g[0].refType||'-'; byType[t] = (byType[t]||0) + (g.length-1); });
+      const typeReport = Object.entries(byType).map(([k,v]) => `  • ${k}: ${v} entries`).join('\n');
+
+      console.log(`พบ ${dupGroups.length} ชุดซ้ำ — จะลบ ${toDelete.length} entries`);
+      console.log('แยกตามประเภท:', byType);
+
+      if (!confirm(`📋 พบ duplicate ใน Transaction Ledger\n\n${typeReport}\n\n• รวม ${toDelete.length} entries\n• ยอดที่จะลบ: ${totalDupAmt.toLocaleString()} บาท\n\nดำเนินการ?`)) return;
+
+      db.bankStatement = db.bankStatement.filter(s => !toDelete.includes(s.id));
+      for (let i=0; i<toDelete.length; i+=100) {
+        const chunk = toDelete.slice(i, i+100);
+        try { await window.sb.from('bank_statement').delete().in('id', chunk); } catch(e){}
+      }
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      try { if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+      alert(`✅ ลบ ${toDelete.length} entries\n💰 เงินคืน: ${totalDupAmt.toLocaleString()} บาท`);
+      setTimeout(() => location.reload(), 1500);
+    }
+
     return { erp, db, fmt, filterAccount, filterDateFrom, filterDateTo, filterRefType, search,
       accountBalances, grandTotal, odUsedTotal, ledger, summary, verification,
-      editingId, editForm, startEdit, saveEdit, deleteEntry, exportCsv, refreshBalances,
+      editingId, editForm, startEdit, saveEdit, deleteEntry, exportCsv, refreshBalances, cleanupDuplicates,
       actualCounts, saveActualCount, jumpToSource };
   },
   template: `
   <div class="space-y-3">
-    <div class="bg-gradient-to-r from-cyan-700 to-blue-700 text-white rounded-xl p-4 shadow">
-      <h1 class="text-xl font-bold">📒 Transaction Ledger — เช็คเงินเข้า-ออกทุกบัญชี</h1>
-      <p class="text-sm opacity-90 mt-1">ตรวจสอบทุกการเคลื่อนไหวในบัญชีธนาคาร · แก้ไขรายการได้ถ้าผิด · ดูยอดคงเหลือสรุปด้านบน</p>
+    <div class="bg-gradient-to-r from-cyan-700 to-blue-700 text-white rounded-xl p-4 shadow flex justify-between items-center flex-wrap gap-3">
+      <div>
+        <h1 class="text-xl font-bold">📒 Transaction Ledger — เช็คเงินเข้า-ออกทุกบัญชี</h1>
+        <p class="text-sm opacity-90 mt-1">ตรวจสอบทุกการเคลื่อนไหวในบัญชีธนาคาร · แก้ไขรายการได้ถ้าผิด</p>
+      </div>
+      <button @click="cleanupDuplicates" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-1.5" title="ตรวจ + ลบ bankStatement ที่ซ้ำกัน">
+        🧹 ลบ Duplicate ยอดซ้ำ
+      </button>
     </div>
 
     <!-- 💰 Account Balance Summary -->
