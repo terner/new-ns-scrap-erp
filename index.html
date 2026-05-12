@@ -6983,14 +6983,28 @@ app.component('view-ar', {
     function ageDays(date) { return Math.floor((today - new Date(date)) / 86400000); }
     function ageBucket(d) { return d<=0?'Current': d<=30?'1-30': d<=60?'31-60': d<=90?'61-90':'>90'; }
     const list = computed(() => {
-      return db.salesBills.filter(b => b.status!=='cancelled' && (b.receivableBalance||0) > 0)
+      // 🔧 BUG FIX: Live computed จาก receipts (กัน UI flicker ระหว่าง sync)
+      const receivedMap = new Map();
+      (db.receipts||[]).forEach(r => {
+        if (!r || !r.billId) return;
+        const total = Number(r.amount||0);
+        receivedMap.set(r.billId, (receivedMap.get(r.billId) || 0) + total);
+      });
+      return db.salesBills.filter(b => {
+        if (!b || b.status === 'cancelled') return false;
+        const liveReceived = receivedMap.get(b.id) || 0;
+        const liveBalance = Math.max(0, Number(b.totalAmount||0) - liveReceived);
+        return liveBalance > 0.01;
+      })
         .filter(b => !filterCustomer.value || b.customerId===filterCustomer.value)
         .filter(b => !filterChannel.value || b.channelId===filterChannel.value)
         .filter(b => !erp.currentBranchId.value || b.branchId===erp.currentBranchId.value)
         .map(b => {
           const due = new Date(b.date); due.setDate(due.getDate() + Number(b.creditTerm||0));
           const aging = ageDays(due.toISOString().slice(0,10));
-          return {...b, dueDate:due.toISOString().slice(0,10), aging, bucket:ageBucket(aging)};
+          const liveReceived = receivedMap.get(b.id) || 0;
+          const liveBalance = Math.max(0, Number(b.totalAmount||0) - liveReceived);
+          return {...b, receivedAmount: liveReceived, receivableBalance: liveBalance, dueDate:due.toISOString().slice(0,10), aging, bucket:ageBucket(aging)};
         })
         .filter(r => !filterAging.value || r.bucket===filterAging.value)
         .sort((a,b)=>b.aging-a.aging);
@@ -7145,7 +7159,21 @@ app.component('view-ap', {
     function ageDays(date) { return Math.floor((today - new Date(date)) / 86400000); }
     function ageBucket(d) { return d<=0?'Current':d<=30?'1-30':d<=60?'31-60':d<=90?'61-90':'>90'; }
     const list = computed(() => {
-      return db.purchaseBills.filter(b => b.status!=='cancelled' && (b.payableBalance||0) > 0)
+      // 🔧 BUG FIX: คำนวณ payableBalance แบบ LIVE จาก payments (กัน UI flicker ระหว่าง sync)
+      // เดิม: ใช้ b.payableBalance จาก field — stale ระหว่าง pull cycle ทำให้บิลที่จ่ายแล้วโผล่กลับมา
+      // ใหม่: คำนวณจาก db.payments ตรงๆ — ไม่ขึ้นกับ pull state ของ purchaseBills
+      const paidMap = new Map();
+      (db.payments||[]).forEach(p => {
+        if (!p || !p.billId) return;
+        const total = Number(p.amount||0) + Number(p.withholdingTax||0) + Number(p.discount||0);
+        paidMap.set(p.billId, (paidMap.get(p.billId) || 0) + total);
+      });
+      return db.purchaseBills.filter(b => {
+        if (!b || b.status === 'cancelled') return false;
+        const livePaid = paidMap.get(b.id) || 0;
+        const liveBalance = Math.max(0, Number(b.totalAmount||0) - livePaid);
+        return liveBalance > 0.01;
+      })
         .filter(b => !filterSupplier.value || b.supplierId===filterSupplier.value)
         .filter(b => !filterChannel.value || b.channelId===filterChannel.value)
         .filter(b => !erp.currentBranchId.value || b.branchId===erp.currentBranchId.value)
@@ -7153,7 +7181,9 @@ app.component('view-ap', {
           const sup = db.suppliers.find(s=>s.id===b.supplierId);
           const due = new Date(b.date); due.setDate(due.getDate() + Number(sup?.creditTerm||0));
           const aging = ageDays(due.toISOString().slice(0,10));
-          return {...b, dueDate:due.toISOString().slice(0,10), aging, bucket:ageBucket(aging)};
+          const livePaid = paidMap.get(b.id) || 0;
+          const liveBalance = Math.max(0, Number(b.totalAmount||0) - livePaid);
+          return {...b, paidAmount: livePaid, payableBalance: liveBalance, dueDate:due.toISOString().slice(0,10), aging, bucket:ageBucket(aging)};
         })
         .filter(r => !filterAging.value || r.bucket===filterAging.value)
         .sort((a,b)=>b.aging-a.aging);
