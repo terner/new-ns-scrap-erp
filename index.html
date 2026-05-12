@@ -40068,16 +40068,44 @@ app.component('view-transactionLedger', {
           });
         }
       });
+      // 🆕 Build lookup: voucherId → list of bill docNos
+      const pmtBillsMap = new Map();   // voucherId → [{billId, docNo, type:'PB'}]
+      (db.payments||[]).forEach(p => {
+        if (!p || !p.billId) return;
+        const vid = p.voucherId || p.id;
+        const bill = (db.purchaseBills||[]).find(b => b && b.id === p.billId);
+        if (!pmtBillsMap.has(vid)) pmtBillsMap.set(vid, []);
+        pmtBillsMap.get(vid).push({ billId: p.billId, docNo: bill?.docNo || p.billId, type: 'PB' });
+      });
+      const rcpBillsMap = new Map();
+      (db.receipts||[]).forEach(r => {
+        if (!r || !r.billId) return;
+        const vid = r.voucherId || r.id;
+        const bill = (db.salesBills||[]).find(b => b && b.id === r.billId);
+        if (!rcpBillsMap.has(vid)) rcpBillsMap.set(vid, []);
+        rcpBillsMap.get(vid).push({ billId: r.billId, docNo: bill?.docNo || r.billId, type: 'SB' });
+      });
       // Bank statement entries
       _trkSafe(db.bankStatement).forEach(s => {
         if (!s) return;
         const acc = _trkSafe(db.accounts).find(a => a && a.id === s.accountId);
+        // 🆕 หา linked bills จาก voucherId
+        let linkedBills = [];
+        if (s.refType === 'PMT' && pmtBillsMap.has(s.refId)) {
+          // unique by docNo
+          const seen = new Set();
+          pmtBillsMap.get(s.refId).forEach(b => { if (!seen.has(b.docNo)) { seen.add(b.docNo); linkedBills.push(b); } });
+        } else if (s.refType === 'RCP' && rcpBillsMap.has(s.refId)) {
+          const seen = new Set();
+          rcpBillsMap.get(s.refId).forEach(b => { if (!seen.has(b.docNo)) { seen.add(b.docNo); linkedBills.push(b); } });
+        }
         list.push({
           id: s.id, accountId: s.accountId, accountName: acc?.name || '-',
           date: s.date || '', refType: s.refType || '-', refId: s.refId || '', refNo: s.refNo || '-',
           note: s.note || s.description || '', payee: s.payee || '',
           in: Number(s.in||0), out: Number(s.out||0),
           createdBy: s.createdBy || '',
+          linkedBills,    // 🆕 รายการบิลที่ผูกกับรายการนี้
           raw: s,
         });
       });
@@ -40153,6 +40181,20 @@ app.component('view-transactionLedger', {
       } else {
         alert('ประเภท '+row.refType+' ยังไม่รองรับ — กรุณาแก้ที่หน้าต้นทาง');
       }
+    }
+    /* 🆕 Jump to purchase/sales bill — ใช้กับ linked bills */
+    function jumpToBill(bill) {
+      const view = bill.type === 'PB' ? 'purchase' : 'sales';
+      try { sessionStorage.setItem('ns_erp_jump_to_bill', bill.billId); } catch(e){}
+      const main = document.querySelector('#app').__vnode?.component?.proxy;
+      if (main && main.currentView !== undefined) {
+        main.currentView = view;
+      } else if (window.$erp?.setView) {
+        window.$erp.setView(view);
+      } else {
+        window.location.hash = view;
+      }
+      erp.showToast(`ไปที่ ${bill.type === 'PB' ? 'บิลซื้อ' : 'บิลขาย'} ${bill.docNo}`,'info');
     }
     function saveEdit() {
       const idx = db.bankStatement.findIndex(s => s && s.id === editingId.value);
@@ -40289,7 +40331,7 @@ app.component('view-transactionLedger', {
     return { erp, db, fmt, filterAccount, filterDateFrom, filterDateTo, filterRefType, search,
       accountBalances, grandTotal, odUsedTotal, ledger, summary, verification,
       editingId, editForm, startEdit, saveEdit, deleteEntry, exportCsv, refreshBalances, cleanupDuplicates,
-      actualCounts, saveActualCount, jumpToSource };
+      actualCounts, saveActualCount, jumpToSource, jumpToBill };
   },
   template: `
   <div class="space-y-3">
@@ -40408,6 +40450,7 @@ app.component('view-transactionLedger', {
           <th class="p-2 text-left">บัญชี</th>
           <th class="p-2 text-left">ประเภท</th>
           <th class="p-2 text-left">เลขที่</th>
+          <th class="p-2 text-left">📋 บิลซื้อ/ขาย</th>
           <th class="p-2 text-left">ผู้รับ/ส่ง</th>
           <th class="p-2 text-left">รายละเอียด</th>
           <th class="p-2 text-right text-emerald-700">เงินเข้า</th>
@@ -40421,12 +40464,25 @@ app.component('view-transactionLedger', {
               <td class="p-2 text-xs">{{row.accountName}}</td>
               <td class="p-2"><span :class="['text-xs px-2 py-0.5 rounded', row.refType==='PMT'?'bg-red-100 text-red-700':row.refType==='RCP'?'bg-emerald-100 text-emerald-700':row.refType==='EXP'?'bg-amber-100 text-amber-700':row.refType==='TRF'?'bg-blue-100 text-blue-700':'bg-slate-100 text-slate-700']">{{row.refType}}</span></td>
               <td class="p-2 font-mono text-xs">{{row.refNo}}</td>
+              <!-- 🆕 PB/SB linked bills — คลิกเปิดบิลได้ -->
+              <td class="p-2 text-xs">
+                <div v-if="row.linkedBills && row.linkedBills.length" class="flex flex-wrap gap-1">
+                  <button v-for="b in row.linkedBills.slice(0,3)" :key="b.billId"
+                    @click="jumpToBill(b)"
+                    :class="['font-mono px-1.5 py-0.5 rounded text-[10px] font-bold hover:opacity-80', b.type==='PB'?'bg-blue-100 text-blue-700 border border-blue-300':'bg-emerald-100 text-emerald-700 border border-emerald-300']"
+                    :title="'คลิกเปิด '+(b.type==='PB'?'บิลซื้อ':'บิลขาย')+' '+b.docNo">
+                    {{b.docNo}}
+                  </button>
+                  <span v-if="row.linkedBills.length > 3" class="text-slate-500 text-[10px]" :title="row.linkedBills.map(b=>b.docNo).join(', ')">+{{row.linkedBills.length - 3}}</span>
+                </div>
+                <span v-else class="text-slate-300">-</span>
+              </td>
               <td class="p-2 text-xs">{{row.payee||'-'}}</td>
               <td class="p-2 text-xs">{{row.note||'-'}}</td>
               <td class="p-2 text-right font-medium text-emerald-700 font-mono">{{row.in>0?fmt(row.in):'-'}}</td>
               <td class="p-2 text-right font-medium text-red-600 font-mono">{{row.out>0?fmt(row.out):'-'}}</td>
               <td class="p-2 text-center whitespace-nowrap">
-                <button v-if="!row.isOpening && row.refType && ['PMT','RCP','EXP','TRF','ITF','ORC'].includes(row.refType)" @click="jumpToSource(row)" class="text-purple-600 text-xs hover:underline mr-1" title="ไปที่บิลต้นทาง">🔗</button>
+                <button v-if="!row.isOpening && row.refType && ['PMT','RCP','EXP','TRF','ITF','ORC'].includes(row.refType)" @click="jumpToSource(row)" class="text-purple-600 text-xs hover:underline mr-1" title="ไปที่หน้าจ่าย/รับเงิน">🔗</button>
                 <button v-if="!row.isOpening" @click="startEdit(row)" class="text-blue-600 text-xs hover:underline mr-1" title="แก้ไขที่นี่">✏️</button>
                 <button v-if="!row.isOpening" @click="deleteEntry(row)" class="text-red-600 text-xs hover:underline" title="ลบ">🗑</button>
                 <span v-if="row.isOpening" class="text-xs text-slate-400">opening</span>
@@ -40437,6 +40493,7 @@ app.component('view-transactionLedger', {
               <td class="p-1"><select v-model="editForm.accountId" class="w-full px-1 py-1 border rounded text-xs"><option v-for="a in db.accounts" :key="a.id" :value="a.id">{{a.name}}</option></select></td>
               <td class="p-2 text-xs">{{editForm.refType||'-'}}</td>
               <td class="p-2 font-mono text-xs">{{editForm.refNo||'-'}}</td>
+              <td class="p-2 text-xs text-slate-400">-</td>
               <td class="p-1"><input v-model="editForm.payee" class="w-full px-1 py-1 border rounded text-xs"></td>
               <td class="p-1"><input v-model="editForm.note" class="w-full px-1 py-1 border rounded text-xs"></td>
               <td class="p-1"><input type="number" step="0.01" v-model.number="editForm.in" class="w-full px-1 py-1 border rounded text-xs text-right"></td>
@@ -40447,7 +40504,7 @@ app.component('view-transactionLedger', {
               </td>
             </tr>
           </template>
-          <tr v-if="!ledger.length"><td colspan="9" class="text-center py-8 text-slate-400">ไม่มีรายการ</td></tr>
+          <tr v-if="!ledger.length"><td colspan="10" class="text-center py-8 text-slate-400">ไม่มีรายการ</td></tr>
         </tbody>
       </table>
     </div>
