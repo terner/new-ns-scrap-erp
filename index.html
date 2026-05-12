@@ -2970,6 +2970,127 @@ const _GLOBAL_DB = reactive(loadDB());
 const _safeFind = (arr, id) => (Array.isArray(arr) ? arr.find(x => x && x.id === id) : null);
 const _safeArr = (a) => Array.isArray(a) ? a : [];
 
+/* 🆕 GLOBAL: Diagnose expense sync — เทียบ local กับ cloud
+   ใช้: window.$diagnoseExpenseSync()  ← F12 Console */
+window.$diagnoseExpenseSync = async function() {
+  const db = _GLOBAL_DB;
+  const localArr = Array.isArray(db.expenses) ? db.expenses : [];
+  // Group local by voucher
+  const localVouchers = new Map();
+  localArr.forEach(e => {
+    if (!e) return;
+    const vid = e.voucherId || e.id || 'unk';
+    if (!localVouchers.has(vid)) localVouchers.set(vid, { vid, docNo:e.docNo, date:e.date, count:0, total:0 });
+    const g = localVouchers.get(vid);
+    g.count++; g.total += Number(e.amount||0);
+  });
+  // Pull cloud
+  if (!window.sb) { alert('❌ Supabase ยังไม่ connect — login ก่อน'); return; }
+  let cloudArr = [];
+  try {
+    const { data, error } = await window.sb.from('expenses').select('*');
+    if (error) { alert('❌ Pull cloud fail: '+error.message); return; }
+    cloudArr = data || [];
+  } catch(e) { alert('❌ '+e.message); return; }
+  const cloudVouchers = new Map();
+  cloudArr.forEach(e => {
+    if (!e) return;
+    const vid = e.voucher_id || e.id || 'unk';
+    if (!cloudVouchers.has(vid)) cloudVouchers.set(vid, { vid, docNo:e.doc_no, date:e.date, count:0, total:0 });
+    const g = cloudVouchers.get(vid);
+    g.count++; g.total += Number(e.amount||0);
+  });
+  // Compare
+  const allVids = new Set([...localVouchers.keys(), ...cloudVouchers.keys()]);
+  const mismatches = [];
+  const onlyLocal = [];
+  const onlyCloud = [];
+  allVids.forEach(vid => {
+    const l = localVouchers.get(vid);
+    const c = cloudVouchers.get(vid);
+    if (l && !c) onlyLocal.push(l);
+    else if (!l && c) onlyCloud.push(c);
+    else if (l && c && (l.count !== c.count || Math.abs(l.total - c.total) > 0.01)) {
+      mismatches.push({ vid, docNo:l.docNo||c.docNo, local:l, cloud:c });
+    }
+  });
+  const report = {
+    localTotal: localArr.length,
+    cloudTotal: cloudArr.length,
+    localVouchers: localVouchers.size,
+    cloudVouchers: cloudVouchers.size,
+    onlyLocal: onlyLocal.length,
+    onlyCloud: onlyCloud.length,
+    mismatches: mismatches.length,
+    details: { onlyLocal: onlyLocal.slice(0,10), onlyCloud: onlyCloud.slice(0,10), mismatches: mismatches.slice(0,10) }
+  };
+  console.log('📊 Expense Sync Diagnose:', report);
+  console.table(onlyCloud.slice(0,20));
+  alert(`📊 Expense Sync Report:\n\n` +
+    `📱 Local: ${report.localVouchers} vouchers (${report.localTotal} lines)\n` +
+    `☁️ Cloud: ${report.cloudVouchers} vouchers (${report.cloudTotal} lines)\n\n` +
+    `❌ มีใน local ไม่มีใน cloud: ${report.onlyLocal} vouchers (รอ push)\n` +
+    `❌ มีใน cloud ไม่มีใน local: ${report.onlyCloud} vouchers (รอ pull / ถูก tombstone block)\n` +
+    `⚠ count/total ไม่ตรง: ${report.mismatches} vouchers\n\n` +
+    `📋 รายละเอียดดูใน Console (F12)\n\n` +
+    `💡 ถ้า onlyCloud > 0 → กด Force Refresh: window.\$forceRefreshExpenseFromCloud()`);
+  return report;
+};
+
+/* 🆕 GLOBAL: Force refresh expenses from cloud — ทำเมื่อ local กับ cloud ไม่ตรง
+   ใช้: window.$forceRefreshExpenseFromCloud()  ← จะลบ local + load ใหม่จาก cloud */
+window.$forceRefreshExpenseFromCloud = async function() {
+  if (!window.sb) { alert('❌ Supabase ยังไม่ connect'); return; }
+  if (!confirm('⚠ Force Refresh Expenses จาก Cloud?\n\n' +
+    '• ลบ local expenses + bankStatement (EXP refs) ทั้งหมด\n' +
+    '• Pull ใหม่จาก cloud (cloud = source of truth)\n' +
+    '• ล้าง tombstones expenses\n\n' +
+    '⚠ ถ้ามีบิลที่สร้างใน local แต่ยังไม่ sync → จะหาย')) return;
+  const db = _GLOBAL_DB;
+  // 1. Clear tombstones for expenses
+  try {
+    const raw = localStorage.getItem('ns_erp_tombstones_v1');
+    if (raw) {
+      const t = JSON.parse(raw);
+      if (t.expenses) delete t.expenses;
+      if (t.bankStatement) {
+        // Keep only non-EXP tombstones (we don't know which is EXP, so clear all bankStatement)
+        delete t.bankStatement;
+      }
+      localStorage.setItem('ns_erp_tombstones_v1', JSON.stringify(t));
+    }
+  } catch(e){}
+  // 2. Pull fresh from cloud
+  try {
+    const { data, error } = await window.sb.from('expenses').select('*');
+    if (error) { alert('❌ Pull fail: '+error.message); return; }
+    // Map snake_case → camelCase
+    const cloudRows = (data||[]).map(r => ({
+      ...r,
+      docNo: r.doc_no, categoryId: r.category_id, netAmount: r.net_amount,
+      accountId: r.account_id, branchId: r.branch_id, taxInvoiceNo: r.tax_invoice_no,
+      approvedBy: r.approved_by, approvedAt: r.approved_at, paidAt: r.paid_at,
+      paidStatus: r.paid_status, voucherId: r.voucher_id, dueDate: r.due_date,
+      refDocNo: r.ref_doc_no, whtPct: r.wht_pct,
+      createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at
+    }));
+    // Pull bankStatement EXP refs
+    const { data: bsData } = await window.sb.from('bank_statement').select('*').eq('ref_type','EXP');
+    const bsRows = (bsData||[]).map(s => ({
+      ...s,
+      accountId: s.account_id, refType: s.ref_type, refId: s.ref_id, refNo: s.ref_no,
+      createdBy: s.created_by, createdAt: s.created_at
+    }));
+    // Replace local
+    db.expenses = cloudRows;
+    db.bankStatement = (db.bankStatement||[]).filter(s => !(s && s.refType === 'EXP'));
+    bsRows.forEach(s => db.bankStatement.push(s));
+    try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+    alert(`✅ Force Refresh สำเร็จ\n\n📊 ดึงมา ${cloudRows.length} expense lines + ${bsRows.length} bank statements\n\nRefresh page เพื่อให้ UI update`);
+    setTimeout(() => location.reload(), 1000);
+  } catch(e) { alert('❌ '+e.message); }
+};
+
 /* 🆕 GLOBAL: Cleanup duplicate expense lines — เรียกได้ทุกที่ (ทั้ง UI button + Console)
    ใช้: window.$cleanupExpenseDuplicates()  ← พิมพ์ใน F12 Console ได้เลย ไม่ต้องเข้า view */
 window.$cleanupExpenseDuplicates = async function() {
@@ -12876,6 +12997,8 @@ app.component('view-expense', {
       search, filterDateFrom, filterDateTo, filterCategory, filterPayee, filterAccount, filterPaidStatus,
       open, openEdit, close: close_, save, remove, addLine, removeLine, recalcLineVat, recalcLineWht, fmt: erp.fmt,
       payNow, quickPay, expSummary, payeeSuggestions, cleanupDuplicateLines,
+      diagnoseExpenseSync: () => window.$diagnoseExpenseSync(),
+      forceRefreshExpenseFromCloud: () => window.$forceRefreshExpenseFromCloud(),
       // 🆕 Export
       exportExpenses };
   },
@@ -12890,14 +13013,22 @@ app.component('view-expense', {
         ➕ เพิ่มค่าใช้จ่าย
       </button>
     </div>
-    <!-- 🆕 Cleanup duplicate lines — แสดงเด่นๆ ในแถวแยกพื้นสีส้ม -->
-    <div class="mb-3 bg-orange-50 border-2 border-orange-300 rounded-lg p-3 flex items-center justify-between gap-2 flex-wrap">
-      <div class="text-sm text-orange-800 flex-1 min-w-[260px]">
-        <strong>🚨 พบบิลที่มี Line ซ้ำ?</strong> — กดปุ่มขวานี้ ระบบจะหา + ลบ lines ซ้ำในแต่ละ voucher อัตโนมัติ (เก็บตัวเก่าสุดไว้)
+    <!-- 🆕 Sync Tools — เครื่องมือซ่อมข้อมูล expense (แสดงเด่นๆ พื้นส้ม) -->
+    <div class="mb-3 bg-orange-50 border-2 border-orange-300 rounded-lg p-3 space-y-2">
+      <div class="text-sm text-orange-800">
+        <strong>🛠 Expense Sync Tools</strong> — ใช้เวลาข้อมูล expense ไม่ตรงกันระหว่างเครื่อง / มี line ซ้ำ
       </div>
-      <button @click="cleanupDuplicateLines" class="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 whitespace-nowrap border-2 border-orange-800">
-        🧹 ลบ Line ซ้ำในระบบ
-      </button>
+      <div class="flex flex-wrap gap-2">
+        <button @click="diagnoseExpenseSync" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-2" title="เทียบ local vs cloud — ดูว่าตรงกันไหม">
+          📊 Diagnose: เทียบ Local vs Cloud
+        </button>
+        <button @click="forceRefreshExpenseFromCloud" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-2" title="ลบ local แล้วโหลดใหม่จาก cloud — ใช้เมื่อ cloud มีข้อมูลที่ local ไม่มี">
+          ☁️ Force Refresh จาก Cloud
+        </button>
+        <button @click="cleanupDuplicateLines" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-2" title="หา + ลบ expense lines ที่ซ้ำกันในบิลเดียวกัน">
+          🧹 ลบ Line ซ้ำในระบบ
+        </button>
+      </div>
     </div>
 
     <!-- 📊 DASHBOARD CARDS -->
