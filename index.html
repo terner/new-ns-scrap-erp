@@ -4415,6 +4415,8 @@ window.$erp = {
     if (Date.now() - userInactiveSince < 2000) return;
     // Skip pull if there are pending pushes — push first
     if (dirtyTables.size > 0) return;
+    // 🆕 ลบ tombstoned rows ออกจาก local ก่อน pull — กัน case ที่ user refresh แล้วเจอ local เก่า
+    try { _purgeLocalTombstoned(); } catch(e){}
     isPulling = true;
     _updateStatus('syncing', '⬇ Pulling...', 'Auto-Pull กำลังตรวจ Cloud');
     let totalRows = 0, errors = 0, newRowCount = 0;
@@ -4713,7 +4715,32 @@ window.$erp = {
         if (parsed && typeof parsed === 'object') TOMBSTONES = parsed;
       }
       cleanupTombstones();
+      // 🆕 BUG FIX: ลบ tombstoned ids ออกจาก local ทันที (กัน case ที่ localStorage ยังเก็บ row ที่ลบไปแล้ว)
+      _purgeLocalTombstoned();
     } catch(e) { console.warn('tombstone load:', e); TOMBSTONES = {}; }
+  }
+  /* 🆕 ลบ tombstoned ids ออกจาก _GLOBAL_DB ทันที — เรียกตอน boot + หลัง delete */
+  function _purgeLocalTombsToned() { _purgeLocalTombstoned(); }   // alias
+  function _purgeLocalTombstoned() {
+    try {
+      let purged = 0;
+      Object.keys(TOMBSTONES).forEach(coll => {
+        const store = TOMBSTONES[coll];
+        if (!store || !_GLOBAL_DB[coll] || !Array.isArray(_GLOBAL_DB[coll])) return;
+        const tombIds = new Set(Object.keys(store).filter(id => store[id] > Date.now()));
+        if (tombIds.size === 0) return;
+        const before = _GLOBAL_DB[coll].length;
+        _GLOBAL_DB[coll] = _GLOBAL_DB[coll].filter(r => !r || !tombIds.has(r.id));
+        const after = _GLOBAL_DB[coll].length;
+        if (before > after) {
+          console.log(`[tombstone-purge] ${coll}: removed ${before - after} local rows (tombstoned)`);
+          purged += (before - after);
+        }
+      });
+      if (purged > 0) {
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(_GLOBAL_DB)); } catch(e){}
+      }
+    } catch(e) { console.warn('purge tombstone:', e); }
   }
   function _saveTombstones() {
     try { localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(TOMBSTONES)); } catch(e){}
@@ -12491,6 +12518,8 @@ app.component('view-expense', {
       } catch(e) { console.warn('pre-delete scan:', e); }
       db.expenses = db.expenses.filter(e => (e.voucherId||e.id) !== g.id);
       db.bankStatement = db.bankStatement.filter(s => !(s.refType==='EXP' && s.refId===g.id));
+      // 🆕 BUG FIX: save localStorage ทันที — กัน Vue watch debounce ทำให้ refresh ก่อน save
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       // 🆕 BUG FIX: ลบใน cloud ทั้ง 3 ทาง — by id + by voucher_id + by doc_no (fallback)
       let cloudFail = '';
       let cloudDeleted = 0;
@@ -12541,8 +12570,10 @@ app.component('view-expense', {
       } catch(e) { cloudFail = (cloudFail?cloudFail+'; ':'')+e.message; }
       // 🆕 บังคับ push ทันที — กัน watch debounce 1.5s
       try { if (window.$autoSync?.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+      // 🆕 save localStorage อีกรอบหลัง push (กัน push ทำให้ db เปลี่ยน)
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       if (cloudFail) {
-        alert(`⚠ ลบ local แล้ว แต่ cloud บางส่วนไม่สำเร็จ:\n\n${cloudFail}\n\n💡 บิลถูก tombstone 24 ชม. แล้ว — refresh ไม่กลับมา\nถ้ายังเจอ → ลอง refresh + ลบอีกครั้ง`);
+        alert(`⚠ ลบ local แล้ว แต่ cloud บางส่วนไม่สำเร็จ:\n\n${cloudFail}\n\n💡 บิลถูก tombstone 24 ชม. แล้ว — refresh ไม่กลับมา\nถ้ายังเจอ → กดปุ่ม "🔄 Force Pull จาก Cloud" ที่ status indicator`);
       } else {
         erp.showToast(`🗑 ลบเรียบร้อย — local + cloud ${cloudDeleted} rows`,'success');
       }
