@@ -2705,10 +2705,10 @@ function seedData() {
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:false, seeCash:false, seeFinancials:false, seeOpening:false,
         branchScope:'all' },
-      { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan + ใบสำคัญรับเงิน + Bank Recon + Import Master', isSystem:false,
-        // 🆕 ADD: receiptVoucher, bankRecon, mdExpense, historicalData, mdImport
+      { id:'R-POOPAE', name:'Poopae', desc:'Role พิเศษ — เข้าถึงพิเศษ + Production + Asset + Loan + ใบสำคัญรับเงิน + Bank Recon + Import Master + โอนเงินระหว่างบัญชี', isSystem:false,
+        // 🆕 ADD: receiptVoucher, bankRecon, mdExpense, historicalData, mdImport, transfer
         // 🚫 REMOVE: dashboard, cashPosition
-        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','receiptVoucher','expense','pettyAdvance','expenseDashboard','bankRecon','ar','ap','bank','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','mdExpense','mdImport','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','salesCommission','reports','plStatement','balanceSheet','cashFlowStatement','production','productionDashboard','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','historicalData','audit','anomalyDetector','backup','companyProfile'],
+        menus:['changePassword','purchase','sales','stockIssue','paymentApproval','payment','receipt','receiptVoucher','transfer','expense','pettyAdvance','expenseDashboard','bankRecon','ar','ap','bank','stockBalance','stockLedger','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdChannel','mdAccount','mdExpense','mdImport','importTxn','pendingSales','poOutstanding','poBuy','poSell','tradingDashboard','tradingMatching','salesCommission','reports','plStatement','balanceSheet','cashFlowStatement','production','productionDashboard','productionReport','wipReport','productionCostReport','yieldLossReport','machineUtil','loanContracts','loanDashboard','assetRegister','depreciation','assetDisposal','equityMaint','openingBalance','historicalData','audit','anomalyDetector','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:true,
         branchScope:'all' },
@@ -4286,7 +4286,7 @@ window.$erp = {
     payments: { target:'payments', keyMap:{ docNo:'doc_no', billId:'bill_id', supplierId:'supplier_id', accountId:'account_id', withholdingTax:'withholding_tax', netAmount:'net_amount', branchId:'branch_id', voucherId:'voucher_id', createdBy:'created_by', createdAt:'created_at' } },
     receipts: { target:'receipts', keyMap:{ docNo:'doc_no', billId:'bill_id', customerId:'customer_id', accountId:'account_id', withholdingTax:'withholding_tax', netAmount:'net_amount', branchId:'branch_id', voucherId:'voucher_id', createdBy:'created_by', createdAt:'created_at' } },
     transfers: { target:'transfers', keyMap:{ docNo:'doc_no', fromAccountId:'from_account_id', toAccountId:'to_account_id', createdBy:'created_by', createdAt:'created_at' } },
-    expenses: { target:'expenses', keyMap:{ docNo:'doc_no', categoryId:'category_id', netAmount:'net_amount', accountId:'account_id', branchId:'branch_id', taxInvoiceNo:'tax_invoice_no', approvedBy:'approved_by', approvedAt:'approved_at', paidAt:'paid_at', paidStatus:'paid_status', voucherId:'voucher_id', dueDate:'due_date', refDocNo:'ref_doc_no', whtPct:'wht_pct', createdBy:'created_by', createdAt:'created_at', updatedAt:'updated_at' } },
+    expenses: { target:'expenses', keyMap:{ docNo:'doc_no', categoryId:'category_id', netAmount:'net_amount', accountId:'account_id', branchId:'branch_id', taxInvoiceNo:'tax_invoice_no', approvedBy:'approved_by', approvedAt:'approved_at', paidAt:'paid_at', paidStatus:'paid_status', voucherId:'voucher_id', dueDate:'due_date', refDocNo:'ref_doc_no', whtPct:'wht_pct', payeeBank:'payee_bank', payeeAccountNo:'payee_account_no', payeeAccountName:'payee_account_name', createdBy:'created_by', createdAt:'created_at', updatedAt:'updated_at' } },
     stockLedger: { target:'stock_ledger', keyMap:{ productId:'product_id', warehouseId:'warehouse_id', branchId:'branch_id', movementType:'movement_type', refType:'ref_type', refId:'ref_id', refNo:'ref_no', qtyIn:'qty_in', qtyOut:'qty_out', valueIn:'value_in', valueOut:'value_out', unitCost:'unit_cost', purchaseChannelId:'purchase_channel_id', salesChannelId:'sales_channel_id', createdBy:'created_by', createdAt:'created_at' } },
     bankStatement: { target:'bank_statement', keyMap:{ accountId:'account_id', refType:'ref_type', refId:'ref_id', refNo:'ref_no', cashFlowCategory:'cash_flow_category', createdBy:'created_by', createdAt:'created_at', in:'amount_in', out:'amount_out' } },
     poBuys: { target:'po_buys', keyMap:{ docNo:'doc_no', supplierId:'supplier_id', productId:'product_id', branchId:'branch_id', channelId:'channel_id', expectedDelivery:'expected_delivery', unitPrice:'unit_price', totalAmount:'total_amount', remainingQty:'remaining_qty', createdAt:'created_at' } },
@@ -4663,11 +4663,12 @@ window.$erp = {
           });
           if (mergeSkippedTomb) console.log(`[pull-tombstone-merge] ${localKey}: skipped ${mergeSkippedTomb} recently-deleted rows`);
           const pullStartTs = Date.now();
-          // 🆕 TRANSACTIONAL tables ที่จะเปิด CLOUD-TRUTH mode (ลบ orphans อัตโนมัติ)
-          const CLOUD_TRUTH_TABLES = ['expenses','payments','receipts','purchaseBills','salesBills',
-            'transfers','poBuys','poSells','stockLedger','bankStatement','tradingDeals',
-            'receiptVouchers','productionOrders'];
-          const cloudTruthMode = CLOUD_TRUTH_TABLES.includes(localKey);
+          // 🔧 BUG FIX: ปิด CLOUD-TRUTH orphan detection by default — เคยลบบิลที่ไม่ใช่ orphan จริง
+          // เปิดเฉพาะถ้า user ตั้ง localStorage.ns_erp_enable_orphan_purge = '1' (manual opt-in)
+          // ใช้ tombstone-based delete แทน — explicit + safe กว่า
+          const CLOUD_TRUTH_TABLES = [];   // เปิดเฉพาะ table ที่ทดสอบแล้ว
+          const userOptIn = (function() { try { return localStorage.getItem('ns_erp_enable_orphan_purge') === '1'; } catch(e) { return false; } })();
+          const cloudTruthMode = userOptIn && CLOUD_TRUTH_TABLES.includes(localKey);
           // STEP 1: Update existing local rows — LWW (Last-Write-Wins) — ห้าม pull ทับ local ที่ใหม่กว่า
           //         + stamp _cloudVerifiedAt บน rows ที่เห็นใน cloud
           for (let j = 0; j < arr.length; j++) {
@@ -12532,7 +12533,9 @@ app.component('view-expense', {
     const form = ref(makeBlankForm());
     function emptyLine() { return { id: newId('EXL'), categoryId:'', description:'', amount:0, hasVat: false, vatAmount:0, whtPct: 0, whtAmount:0 }; }
     function makeBlankForm() {
-      return { docNo:'', date: todayStr(), dueDate:'', refDocNo:'', payeeName:'', accountId:'', method:'โอน', branchId:'', notes:'', lines:[emptyLine()] };
+      return { docNo:'', date: todayStr(), dueDate:'', refDocNo:'', payeeName:'',
+        payeeBank:'', payeeAccountNo:'', payeeAccountName:'',   // 🆕 ข้อมูลบัญชีผู้รับเงิน (สำหรับโอน)
+        accountId:'', method:'โอน', branchId:'', notes:'', lines:[emptyLine()] };
     }
     /* Auto-compute VAT 7% per line if hasVat checked */
     function recalcLineVat(line) {
@@ -12586,6 +12589,9 @@ app.component('view-expense', {
           dueDate: first.dueDate || '',
           refDocNo: first.refDocNo || '',
           payeeName: first.payee || '',
+          payeeBank: first.payeeBank || '',                   // 🆕
+          payeeAccountNo: first.payeeAccountNo || '',         // 🆕
+          payeeAccountName: first.payeeAccountName || '',     // 🆕
           accountId: first.accountId || '',
           method: first.method || 'โอน',
           branchId: first.branchId || '',
@@ -12664,6 +12670,8 @@ app.component('view-expense', {
             whtPct: num(line.whtPct) || 0,
             hasVat: !!line.hasVat,
             accountId: f.accountId, payee: f.payeeName, branchId: f.branchId,
+            // 🆕 ข้อมูลบัญชีผู้รับเงิน (สำหรับโอนเงิน)
+            payeeBank: f.payeeBank || '', payeeAccountNo: f.payeeAccountNo || '', payeeAccountName: f.payeeAccountName || '',
             method: f.method || 'โอน', notes: f.notes || '',
             paidStatus, paidAt,
             createdBy: erp.currentUser.value?.username || '-',
@@ -12685,13 +12693,16 @@ app.component('view-expense', {
         }
         showForm.value = false;
         editingVoucherId.value = null;
+        // 🆕 BUG FIX: save localStorage ทันที + auto-switch filter ให้เห็นบิลที่เพิ่งสร้าง
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        filterPaidStatus.value = 'all';   // ให้เห็นบิลใหม่ทันที (ทั้ง pending + paid)
         // 🆕 บังคับ push ทันที — กัน edit แล้วยังไม่ sync
         try { if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow(); } catch(e){}
         erp.showToast(isPay ? (isEdit?'✓ แก้ไขค่าใช้จ่าย + จ่ายแล้ว':'✓ บันทึก + จ่ายเงินแล้ว') : (isEdit?'✓ แก้ไขใบแจ้งหนี้ (รอจ่าย)':'✓ บันทึกใบแจ้งหนี้ (รอจ่าย)'),'success');
       } catch (e) { console.error(e); alert('Error: '+e.message); }
     }
     function payNow(g) {
-      if (!confirm('💸 จ่ายค่าใช้จ่าย '+g.docNo+' จำนวน '+fmt(g.total)+' บาท?\n\nระบบจะเปิดฟอร์มให้เลือกบัญชี+วิธีจ่าย')) return;
+      if (!confirm('💸 จ่ายค่าใช้จ่าย '+g.docNo+'\n\nNet Pay (จ่ายจริง): '+fmt(g.netPay||g.total)+' บาท\n(ยอด '+fmt(g.total)+'+VAT '+fmt(g.vatTotal||0)+'-WHT '+fmt(g.whtTotal||0)+')\n\nระบบจะเปิดฟอร์มให้เลือกบัญชี+วิธีจ่าย')) return;
       // open the existing voucher in edit mode → save with mode='pay'
       openEdit(g);
       setTimeout(() => {
@@ -12703,7 +12714,7 @@ app.component('view-expense', {
       // Quick: ใช้บัญชีแรกที่มี — สำหรับ 1-click pay
       const firstAcc = (db.accounts||[]).find(a => a && a.active && (a.type==='เงินสด'||a.type==='ธนาคาร'));
       if (!firstAcc) { alert('ไม่มีบัญชี active'); return; }
-      if (!confirm('💸 Quick Pay '+g.docNo+' = '+fmt(g.total)+' จากบัญชี: '+firstAcc.name+' ?')) return;
+      if (!confirm('💸 Quick Pay '+g.docNo+'\n\nNet Pay (จ่ายจริง): '+fmt(g.netPay||g.total)+' บาท\nบัญชี: '+firstAcc.name+'\n\nดำเนินการ?')) return;
       try {
         // mark all expense lines as paid
         (db.expenses||[]).filter(e => e && (e.voucherId||e.id) === g.id).forEach(e => {
@@ -12711,18 +12722,22 @@ app.component('view-expense', {
           e.paidAt = new Date().toISOString();
           if (!e.accountId) e.accountId = firstAcc.id;
         });
-        // create bankStatement entry
-        const totalPay = g.total;
+        // 🔧 BUG FIX: ใช้ Net Pay (amount + VAT - WHT) แทน amount เปล่า — ตัดบัญชีถูกต้อง
+        const totalPay = num(g.netPay) || (num(g.total) + num(g.vatTotal) - num(g.whtTotal));
+        // 🔧 deterministic id — กัน duplicate
         db.bankStatement.push({
-          id: newId('BS'), date: erp.today(), accountId: firstAcc.id,
+          id: 'BS-EXP-' + g.id,
+          date: erp.today(), accountId: firstAcc.id,
           type: 'จ่ายค่าใช้จ่าย',
           desc: g.docNo + ' - ' + (g.payee || ''),
           in: 0, out: totalPay,
           refType: 'EXP', refId: g.id, refNo: g.docNo,
-          createdBy: erp.currentUser.value?.username || '-'
+          createdBy: erp.currentUser.value?.username || '-',
+          createdAt: new Date().toISOString()
         });
-        erp.logAudit('PAY_EXPENSE','expenses',{docNo:g.docNo}, {amount:totalPay, fromAccount:firstAcc.name});
-        erp.showToast('✓ จ่าย '+fmt(totalPay)+' จากบัญชี '+firstAcc.name);
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        erp.logAudit('PAY_EXPENSE','expenses',{docNo:g.docNo}, {netPay:totalPay, fromAccount:firstAcc.name});
+        erp.showToast('✓ จ่าย Net Pay '+fmt(totalPay)+' จากบัญชี '+firstAcc.name);
       } catch(e) { alert('Error: '+e.message); }
     }
     async function remove(g) {
@@ -12817,7 +12832,7 @@ app.component('view-expense', {
     const filterCategory = ref('');
     const filterPayee = ref('');
     const filterAccount = ref('');
-    const filterPaidStatus = ref('pending');   // 🆕 default: pending only (hide paid)
+    const filterPaidStatus = ref('all');   // 🔧 BUG FIX: default 'all' — กัน user งง ตอนสร้างแล้วไม่เห็น (เดิม 'pending' ซ่อนบิลที่จ่ายแล้ว)
 
     const list = computed(() => {
       try {
@@ -12828,14 +12843,25 @@ app.component('view-expense', {
           if (!groups[vid]) groups[vid] = {
             id:vid, docNo:e.docNo||'-', date:e.date||'', payee:e.payee||'-',
             accountId:e.accountId||'', categories: new Set(), count:0, total:0, paidCount:0,
-            dueDate: e.dueDate || '', refDocNo: e.refDocNo || ''   // 🆕
+            vatTotal:0, whtTotal:0, netPay:0,   // 🆕 รวม VAT + WHT + Net Pay
+            dueDate: e.dueDate || '', refDocNo: e.refDocNo || ''
           };
           if (e.categoryId) groups[vid].categories.add(e.categoryId);
-          groups[vid].count++; groups[vid].total += num(e.amount);
+          groups[vid].count++;
+          groups[vid].total += num(e.amount);
+          // 🆕 รวม VAT + WHT แต่ละ voucher
+          groups[vid].vatTotal += num(e.vat);
+          groups[vid].whtTotal += num(e.wht);
           // 🔧 BUG FIX: count เฉพาะ paidStatus==='paid' (เดิม !== 'pending' → undefined ถูกนับเป็นจ่าย → bug)
           if (e.paidStatus === 'paid') groups[vid].paidCount++;
         });
-        let arr = Object.values(groups).map(g => ({ ...g, categoryIds: Array.from(g.categories), paidStatus: g.paidCount === g.count ? 'paid' : (g.paidCount === 0 ? 'pending' : 'partial') }));
+        let arr = Object.values(groups).map(g => ({
+          ...g,
+          categoryIds: Array.from(g.categories),
+          // 🆕 NET PAY = ยอด + VAT - WHT (เงินที่จ่ายจริง)
+          netPay: g.total + g.vatTotal - g.whtTotal,
+          paidStatus: g.paidCount === g.count ? 'paid' : (g.paidCount === 0 ? 'pending' : 'partial')
+        }));
         // 🆕 Filter by paid status (default: pending — ซ่อนรายการที่จ่ายแล้ว)
         if (filterPaidStatus.value && filterPaidStatus.value !== 'all') {
           arr = arr.filter(g => g.paidStatus === filterPaidStatus.value);
@@ -13184,14 +13210,15 @@ app.component('view-expense', {
           <th class="p-2 text-left">บัญชี</th>
           <th class="p-2 text-center">สถานะ</th>
           <th class="p-2 text-right">รายการ</th>
-          <th class="p-2 text-right">รวม</th>
+          <th class="p-2 text-right bg-red-50 text-red-700">💰 Net Pay<br><span class="text-[10px] font-normal">(ยอดจ่ายจริง)</span></th>
+          <th class="p-2 text-right text-slate-500"><span class="text-[10px]">ยอด/VAT/WHT</span></th>
           <th class="p-2 text-center">การกระทำ</th>
         </tr></thead>
         <tbody>
           <tr v-for="g in list" :key="g.id" class="border-t" :class="g.paidStatus==='pending' ? 'bg-amber-50/40' : ''">
             <td class="p-2 font-mono">{{g.docNo}}</td>
             <td class="p-2">{{g.date}}</td>
-            <!-- 🆕 ครบกำหนด — ถ้าเกินวันแล้วยังไม่จ่าย → แดง -->
+            <!-- ครบกำหนด — ถ้าเกินวันแล้วยังไม่จ่าย → แดง -->
             <td class="p-2 text-xs">
               <span v-if="g.dueDate" :class="g.paidStatus!=='paid' && g.dueDate < (new Date().toISOString().slice(0,10)) ? 'text-red-600 font-bold' : 'text-slate-700'">
                 {{g.dueDate}}
@@ -13208,14 +13235,23 @@ app.component('view-expense', {
               <span v-else class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">⚙ บางส่วน</span>
             </td>
             <td class="p-2 text-right">{{g.count}}</td>
-            <td class="p-2 text-right font-medium" :class="g.paidStatus==='pending' ? 'text-amber-700' : 'text-red-600'">{{fmt(g.total)}}</td>
+            <!-- 🆕 NET PAY (เด่น) = amount + VAT - WHT -->
+            <td class="p-2 text-right font-bold text-base bg-red-50/60" :class="g.paidStatus==='pending' ? 'text-amber-700' : 'text-red-700'">
+              {{fmt(g.netPay)}}
+            </td>
+            <!-- 🆕 รายละเอียดยอด: amount / VAT / WHT — เล็กๆ -->
+            <td class="p-2 text-right text-xs text-slate-600 whitespace-nowrap">
+              <div>ยอด: <b>{{fmt(g.total)}}</b></div>
+              <div v-if="g.vatTotal > 0" class="text-emerald-700">+VAT: {{fmt(g.vatTotal)}}</div>
+              <div v-if="g.whtTotal > 0" class="text-amber-700">-WHT: {{fmt(g.whtTotal)}}</div>
+            </td>
             <td class="p-2 text-center whitespace-nowrap">
               <button v-if="g.paidStatus!=='paid'" @click="quickPay(g)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2 py-1 rounded mr-1 font-bold" title="จ่ายเงินทันที">💸 จ่าย</button>
               <button @click="openEdit(g)" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs px-2 py-1 rounded mr-1 font-bold" title="แก้ไข">✏️</button>
               <button @click="remove(g)" class="bg-red-100 hover:bg-red-600 hover:text-white text-red-700 text-xs px-2 py-1 rounded font-bold" title="ลบบิล">🗑 ลบ</button>
             </td>
           </tr>
-          <tr v-if="list.length===0"><td colspan="10" class="text-center py-8 text-slate-400">ยังไม่มีรายการ</td></tr>
+          <tr v-if="list.length===0"><td colspan="11" class="text-center py-8 text-slate-400">ยังไม่มีรายการ</td></tr>
         </tbody>
       </table>
     </div>
@@ -13255,6 +13291,33 @@ app.component('view-expense', {
               </select>
             </div>
           </div>
+
+          <!-- 🆕 บัญชีผู้รับเงิน — สำหรับโอนเงิน + แสดงในใบอนุมัติ -->
+          <div class="bg-cyan-50 border-2 border-cyan-300 rounded-lg p-3">
+            <div class="text-sm font-bold text-cyan-800 mb-2">🏦 บัญชีปลายทาง (สำหรับโอน) <span class="text-xs font-normal text-cyan-600">— แสดงในใบอนุมัติโอนเงิน</span></div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div><label class="block text-xs mb-1">ธนาคาร</label>
+                <input v-model="form.payeeBank" list="bank-suggestions" placeholder="เช่น กรุงเทพ, กสิกร, ไทยพาณิชย์" class="w-full px-2 py-1.5 border rounded">
+                <datalist id="bank-suggestions">
+                  <option value="กรุงเทพ"></option>
+                  <option value="กสิกรไทย"></option>
+                  <option value="ไทยพาณิชย์"></option>
+                  <option value="กรุงไทย"></option>
+                  <option value="ทหารไทยธนชาต (TTB)"></option>
+                  <option value="กรุงศรีอยุธยา"></option>
+                  <option value="ออมสิน"></option>
+                  <option value="ธ.ก.ส."></option>
+                </datalist>
+              </div>
+              <div><label class="block text-xs mb-1">เลขที่บัญชี</label>
+                <input v-model="form.payeeAccountNo" placeholder="เช่น 123-4-56789-0" class="w-full px-2 py-1.5 border rounded font-mono">
+              </div>
+              <div><label class="block text-xs mb-1">ชื่อบัญชี <span class="text-slate-400">(ถ้าต่างจากผู้รับ)</span></label>
+                <input v-model="form.payeeAccountName" :placeholder="form.payeeName||'ตามชื่อผู้รับเงิน'" class="w-full px-2 py-1.5 border rounded">
+              </div>
+            </div>
+          </div>
+
           <div>
             <div class="flex justify-between items-center mb-2">
               <h4 class="font-medium">รายการค่าใช้จ่าย ({{(form.lines||[]).length}})</h4>
@@ -19697,14 +19760,20 @@ app.component('view-paymentApproval', {
         // 🔧 Dedupe: ใช้ voucherId หรือ docNo (สำหรับ legacy rows ที่ไม่มี voucherId)
         const key = e.voucherId || e.docNo || e.id;
         if (!groups.has(key)) {
+          // 🆕 ใช้ payeeBank/payeeAccountNo จากบิลก่อน — fallback ไป supplier master
+          const bankName = e.payeeBank || _payeeBankName(e.payee);
+          const accountNo = e.payeeAccountNo || _payeeBank(e.payee);
+          const accountName = e.payeeAccountName || e.payee;
           groups.set(key, {
             id: key, docNo: e.docNo, date: e.date, payee: e.payee||'-',
             accountId: e.accountId, branchId: e.branchId, notes: e.notes||'',
+            dueDate: e.dueDate || '', refDocNo: e.refDocNo || '',   // 🆕
             paidStatus: e.paidStatus || 'pending',
             totalAmount: 0, items: [],
-            _payeeBank: _payeeBank(e.payee),
-            _payeeBankName: _payeeBankName(e.payee),
-            _recipientBank: e.recipientBank || ''   // 🆕 manual override
+            _payeeBank: accountNo,         // 🆕 เลขบัญชี (ถ้ามีใน expense)
+            _payeeBankName: bankName,      // 🆕 ชื่อธนาคาร
+            _payeeAccountName: accountName, // 🆕 ชื่อบัญชี
+            _recipientBank: e.recipientBank || ''   // legacy
           });
         }
         const g = groups.get(key);
@@ -19796,16 +19865,26 @@ app.component('view-paymentApproval', {
       const today = erp.today();
       const headerHtml = tab.value === 'cost'
         ? '<th>วันที่</th><th>Supplier</th><th>เลขบัญชีธนาคาร</th><th>ยอดเต็ม</th><th>ชำระแล้ว</th><th>คงเหลือ</th><th>ยอดที่จะจ่าย</th>'
-        : '<th>วันที่</th><th>ผู้รับเงิน</th><th>หมายเหตุ</th><th>ยอดเต็ม</th><th>ยอดที่จะจ่าย</th>';
+        : '<th>เลขที่/วันที่</th><th>⏰ ครบกำหนด</th><th>ผู้รับเงิน</th><th>🏦 เลขบัญชี / ธนาคาร</th><th>📄 อ้างอิง / หมายเหตุ</th><th>ยอดที่จะจ่าย</th>';
       const rowsHtml = selected.map(item => {
         const pay = Number(selectedIds.value[item.id]?.payAmount||0);
         if (tab.value === 'cost') {
           return '<tr><td>'+item.date+'</td><td>'+item._supplierName+'</td><td style="font-family:monospace;font-weight:bold;font-size:14px;background:#fef9c3;padding:6px 10px">'+(item._supplierBank||'<span style="color:red">⚠ ไม่มี</span>')+'</td><td style="text-align:right">'+fmt(item.totalAmount)+'</td><td style="text-align:right">'+fmt(item.paidAmount)+'</td><td style="text-align:right">'+fmt(item.payableBalance)+'</td><td style="text-align:right;font-weight:bold;background:#fef3c7">'+fmt(pay)+'</td></tr>';
         } else {
-          return '<tr><td>'+item.date+'</td><td>'+item.payee+'</td><td>'+(item.notes||'')+'</td><td style="text-align:right">'+fmt(item.totalAmount)+'</td><td style="text-align:right;font-weight:bold;background:#fef3c7">'+fmt(pay)+'</td></tr>';
+          // 🆕 EXPENSE: แสดง doc + date + due + payee + bank + ref/notes + pay
+          const bankBlock = item._payeeBank
+            ? '<div style="font-family:monospace;font-weight:bold;font-size:14px;background:#fef9c3;padding:4px 8px;border-radius:4px;display:inline-block">'+item._payeeBank+'</div>'
+              + (item._payeeBankName?'<div style="font-size:10px;color:#64748b;margin-top:2px">🏦 '+item._payeeBankName+'</div>':'')
+              + (item._payeeAccountName && item._payeeAccountName !== item.payee ? '<div style="font-size:10px;color:#64748b">ชื่อบช: '+item._payeeAccountName+'</div>':'')
+            : '<span style="color:#dc2626">⚠ ไม่มีเลขบัญชี</span>';
+          const dueBlock = item.dueDate
+            ? '<span style="'+(item.dueDate < today ? 'color:#dc2626;font-weight:bold' : '')+'">'+item.dueDate+(item.dueDate < today ? ' ⚠':'')+'</span>'
+            : '<span style="color:#94a3b8">-</span>';
+          const refBlock = (item.refDocNo ? '<div style="font-family:monospace">📄 '+item.refDocNo+'</div>' : '') + (item.notes ? '<div style="color:#64748b;font-size:11px">'+item.notes+'</div>' : '');
+          return '<tr><td><div style="font-family:monospace;font-weight:bold">'+item.docNo+'</div><div style="color:#64748b;font-size:11px">'+item.date+'</div></td><td>'+dueBlock+'</td><td><b>'+item.payee+'</b></td><td>'+bankBlock+'</td><td>'+(refBlock||'<span style="color:#94a3b8">-</span>')+'</td><td style="text-align:right;font-weight:bold;background:#fef3c7">'+fmt(pay)+'</td></tr>';
         }
       }).join('');
-      const colspan = tab.value === 'cost' ? 6 : 4;
+      const colspan = tab.value === 'cost' ? 6 : 5;
       win.document.write('<html><head><meta charset="utf-8"><title>ใบอนุมัติโอนเงิน</title><style>body{font-family:"Sarabun",sans-serif;padding:20px;font-size:13px}h1{margin:0}h2{margin:5px 0;color:#0369a1}table{width:100%;border-collapse:collapse;margin-top:15px}th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left}th{background:#f1f5f9}tfoot td{font-weight:bold;background:#fef3c7}.footer{margin-top:30px;display:flex;justify-content:space-around}.sig{text-align:center;width:200px}.sig-line{border-top:1px solid #000;margin-top:60px;padding-top:5px}</style></head><body>');
       win.document.write('<h1>'+company+'</h1>');
       win.document.write('<h2>📋 ใบอนุมัติโอนเงิน — '+(tab.value==='cost'?'ต้นทุน (AP/บิลซื้อ)':'ค่าใช้จ่าย')+'</h2>');
@@ -19914,11 +19993,11 @@ app.component('view-paymentApproval', {
         <thead class="bg-slate-100 sticky top-0">
           <tr>
             <th class="p-2 w-8"><input type="checkbox" @change="$event.target.checked ? selectAll() : deselectAll()"></th>
-            <th class="p-2 text-left">เลขที่</th>
-            <th class="p-2 text-left">วันที่</th>
+            <th class="p-2 text-left">เลขที่/วันที่</th>
+            <th class="p-2 text-left">⏰ ครบกำหนด</th>
             <th class="p-2 text-left">ผู้รับเงิน</th>
-            <th class="p-2 text-left">เลขบัญชี / ธนาคาร</th>
-            <th class="p-2 text-left">หมายเหตุ</th>
+            <th class="p-2 text-left">🏦 เลขบัญชี / ธนาคาร</th>
+            <th class="p-2 text-left">รายละเอียด / 📄 อ้างอิง</th>
             <th class="p-2 text-right">ยอดเต็ม</th>
             <th class="p-2 text-right">ยอดที่จะจ่าย</th>
             <th class="p-2 text-center">สถานะ</th>
@@ -19927,21 +20006,37 @@ app.component('view-paymentApproval', {
         <tbody>
           <tr v-for="g in expenseList" :key="g.id" class="border-t" :class="g._approved ? 'bg-emerald-50' : ''">
             <td class="p-2"><input type="checkbox" :checked="selectedIds[g.id]?.selected || false" @change="ensureSelected(g).selected = $event.target.checked"></td>
-            <td class="p-2 font-mono text-xs">{{g.docNo}}</td>
-            <td class="p-2 text-xs">{{g.date}}</td>
-            <td class="p-2"><b>{{g.payee}}</b></td>
-            <!-- 🆕 เลขบัญชี: lookup จาก supplier ที่ตรงกับ payee name -->
+            <td class="p-2 text-xs">
+              <div class="font-mono font-bold">{{g.docNo}}</div>
+              <div class="text-slate-500">{{g.date}}</div>
+            </td>
+            <td class="p-2 text-xs">
+              <span v-if="g.dueDate" :class="g.dueDate < (new Date().toISOString().slice(0,10)) ? 'text-red-600 font-bold' : 'text-slate-700'">
+                {{g.dueDate}}
+                <span v-if="g.dueDate < (new Date().toISOString().slice(0,10))" class="block text-[10px] text-red-500">⚠ เลยกำหนด</span>
+              </span>
+              <span v-else class="text-slate-300">-</span>
+            </td>
+            <td class="p-2">
+              <b>{{g.payee}}</b>
+              <div v-if="g._payeeAccountName && g._payeeAccountName !== g.payee" class="text-[10px] text-slate-500">ชื่อบช: {{g._payeeAccountName}}</div>
+            </td>
+            <!-- เลขบัญชี + ธนาคาร — แสดงชัดเจน สำหรับโอน -->
             <td class="p-2">
               <div v-if="g._payeeBank">
                 <span class="font-mono font-bold text-base text-blue-900 bg-yellow-100 px-2 py-1 rounded select-all whitespace-nowrap">{{g._payeeBank}}</span>
-                <div v-if="g._payeeBankName" class="text-[10px] text-slate-500 mt-0.5">{{g._payeeBankName}}</div>
+                <div v-if="g._payeeBankName" class="text-[10px] text-slate-500 mt-0.5">🏦 {{g._payeeBankName}}</div>
               </div>
-              <span v-else class="text-xs text-amber-600">⚠ ไม่มี — ตรวจ Master Data</span>
+              <span v-else class="text-xs text-amber-600">⚠ ไม่มี — แก้ที่บิลหรือ Master</span>
             </td>
-            <td class="p-2 text-xs text-slate-500">{{g.notes}}</td>
-            <td class="p-2 text-right">{{fmt(g.totalAmount)}}</td>
+            <td class="p-2 text-xs">
+              <div v-if="g.refDocNo" class="font-mono text-slate-700">📄 {{g.refDocNo}}</div>
+              <div v-if="g.notes" class="text-slate-500">{{g.notes}}</div>
+              <span v-if="!g.refDocNo && !g.notes" class="text-slate-300">-</span>
+            </td>
+            <td class="p-2 text-right font-bold text-red-700">{{fmt(g.totalAmount)}}</td>
             <td class="p-2 text-right">
-              <input type="number" step="0.01" :value="ensureSelected(g).payAmount" @input="selectedIds[g.id].payAmount = Number($event.target.value)" class="w-28 px-2 py-1 border rounded text-xs text-right bg-amber-50">
+              <input type="number" step="0.01" :value="ensureSelected(g).payAmount" @input="selectedIds[g.id].payAmount = Number($event.target.value)" class="w-28 px-2 py-1 border rounded text-xs text-right bg-amber-50 font-bold">
             </td>
             <td class="p-2 text-center text-xs">
               <span v-if="g._approved" class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">✓ อนุมัติแล้ว</span>
