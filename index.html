@@ -10715,6 +10715,8 @@ app.component('view-payment', {
               bill.paidAmount = Math.max(0, num(bill.paidAmount) - oldAllocated);
               bill.payableBalance = Math.max(0, num(bill.totalAmount) - bill.paidAmount);
               bill.status = bill.paidAmount <= 0 ? 'unpaid' : (bill.payableBalance <= 0 ? 'paid' : 'partial');
+              bill.updatedAt = new Date().toISOString();
+              bill.updatedBy = ((erp.currentUser && erp.currentUser.value && erp.currentUser.value.username) || '-');
             }
           });
           // Remove old payments + bank statement entries
@@ -10731,6 +10733,8 @@ app.component('view-payment', {
             bill.paidAmount = num(bill.paidAmount) + allocated;
             bill.payableBalance = Math.max(0, num(bill.totalAmount) - bill.paidAmount);
             bill.status = bill.payableBalance <= 0 ? 'paid' : 'partial';
+            bill.updatedAt = new Date().toISOString();
+            bill.updatedBy = ((erp.currentUser && erp.currentUser.value && erp.currentUser.value.username) || '-');
             if (bill.supplierId) supplierNames.add(erp.supplierName(bill.supplierId));
           }
           const billSupplierId = bill?.supplierId || line.supplierId || '';
@@ -10761,9 +10765,11 @@ app.component('view-payment', {
         });
         showForm.value = false;
         editingVoucherId.value = null;
+        // 🆕 Force push ทันทีและรอ — กัน auto-pull ดึง bill เก่ามาทับ paidAmount
+        try {
+          if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow();
+        } catch(pushErr) { console.warn('[payment save] push failed:', pushErr); }
         erp.showToast(isEdit?'✓ แก้ไข Payment สำเร็จ':'✓ บันทึก Payment สำเร็จ','success');
-        // 🆕 Force push ทันที — ให้คนอื่นเห็นเร็ว
-        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
       } catch (e) {
         console.error('save error:', e);
         alert('Save error: ' + e.message);
@@ -10811,6 +10817,8 @@ app.component('view-payment', {
           bill.paidAmount = Math.max(0, num(bill.paidAmount) - allocated);
           bill.payableBalance = Math.max(0, num(bill.totalAmount) - bill.paidAmount);
           bill.status = bill.paidAmount <= 0 ? 'unpaid' : (bill.payableBalance <= 0 ? 'paid' : 'partial');
+          bill.updatedAt = new Date().toISOString();
+          bill.updatedBy = ((erp.currentUser && erp.currentUser.value && erp.currentUser.value.username) || '-');
         }
       });
       const bsIds = db.bankStatement.filter(s => s.refType === 'PMT' && s.refId === g.id).map(s => s.id);
@@ -11326,6 +11334,8 @@ app.component('view-receipt', {
               bill.receivedAmount = Math.max(0, num(bill.receivedAmount) - oldAllocated);
               bill.receivableBalance = Math.max(0, num(bill.totalAmount) - bill.receivedAmount);
               bill.status = bill.receivedAmount <= 0 ? 'unreceived' : (bill.receivableBalance <= 0 ? 'received' : 'partial');
+              bill.updatedAt = new Date().toISOString();
+              bill.updatedBy = ((erp.currentUser && erp.currentUser.value && erp.currentUser.value.username) || '-');
             }
           });
           db.receipts = safeArr(db.receipts).filter(r => r && (r.voucherId || r.id) !== voucherId);
@@ -11339,6 +11349,8 @@ app.component('view-receipt', {
             bill.receivedAmount = num(bill.receivedAmount) + allocated;
             bill.receivableBalance = Math.max(0, num(bill.totalAmount) - bill.receivedAmount);
             bill.status = bill.receivableBalance <= 0 ? 'received' : 'partial';
+            bill.updatedAt = new Date().toISOString();
+            bill.updatedBy = ((erp.currentUser && erp.currentUser.value && erp.currentUser.value.username) || '-');
             if (bill.customerId) customerNames.add(erp.customerName(bill.customerId));
           }
           const billCustomerId = bill?.customerId || line.customerId || '';
@@ -11363,9 +11375,11 @@ app.component('view-receipt', {
         });
         showForm.value = false;
         editingVoucherId.value = null;
+        // 🆕 Force push ทันทีและรอ — กัน auto-pull ดึง bill เก่ามาทับ receivedAmount
+        try {
+          if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow();
+        } catch(pushErr) { console.warn('[receipt save] push failed:', pushErr); }
         erp.showToast(isEdit?'✓ แก้ไข Receipt สำเร็จ':'✓ บันทึก Receipt สำเร็จ','success');
-        // 🆕 Force push ทันที
-        if (window.$autoSync) setTimeout(() => window.$autoSync.pushNow(), 100);
       } catch (e) { console.error(e); alert('Save error: '+e.message); }
     }
 
@@ -11402,6 +11416,8 @@ app.component('view-receipt', {
           bill.receivedAmount = Math.max(0, num(bill.receivedAmount) - allocated);
           bill.receivableBalance = Math.max(0, num(bill.totalAmount) - bill.receivedAmount);
           bill.status = bill.receivedAmount <= 0 ? 'unreceived' : (bill.receivableBalance <= 0 ? 'received' : 'partial');
+          bill.updatedAt = new Date().toISOString();
+          bill.updatedBy = ((erp.currentUser && erp.currentUser.value && erp.currentUser.value.username) || '-');
         }
       });
       const bsIds = db.bankStatement.filter(s => s.refType==='RCP' && s.refId===g.id).map(s => s.id);
