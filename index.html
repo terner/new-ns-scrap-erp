@@ -12300,8 +12300,14 @@ app.component('view-expense', {
   },
   template: `
   <div>
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-      <strong>🧾 ค่าใช้จ่าย Expense Voucher</strong> — บันทึกใบแจ้งหนี้ก่อน → จ่ายภายหลังก็ได้ · ✓ มี VAT ระบบคำนวณ 7%
+    <!-- 🆕 Primary action: + Expense ที่หน้าหลัก -->
+    <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 flex-1 min-w-[280px]">
+        <strong>🧾 ค่าใช้จ่าย Expense Voucher</strong> — บันทึกใบแจ้งหนี้ก่อน → จ่ายภายหลังก็ได้ · ✓ มี VAT ระบบคำนวณ 7%
+      </div>
+      <button @click="open" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 whitespace-nowrap">
+        ➕ เพิ่มค่าใช้จ่าย
+      </button>
     </div>
 
     <!-- 📊 DASHBOARD CARDS -->
