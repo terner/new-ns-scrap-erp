@@ -4503,6 +4503,24 @@ window.$erp = {
     }
   },
   /* Check menu/view access */
+  /* 🆕 USER_BLOCKED: หน้าที่ระบุ → user เหล่านี้ "ไม่เห็นเมนู + เข้าไม่ได้"
+     กลุ่ม ns-aom (ฝ่ายซื้อ/ขาย) ไม่ต้องเห็นหน้าการเงิน
+     Admin/Owner bypass อัตโนมัติ */
+  USER_BLOCKED: {
+    // 💸 หน้าการเงิน — ฝ่ายซื้อ/ขายไม่ต้องเห็น
+    'payment': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'receipt': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'transfer': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'paymentApproval': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'expense': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'expenseDashboard': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'pettyAdvance': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'ar': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'ap': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'bank': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'transactionLedger': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+    'cashPosition': ['ns-aom','ns-kwan','ns-ploy','ns-mint','ns-tik','ns-or'],
+  },
   /* 🆕 USER_WRITERS: หน้าที่ระบุ → user เหล่านี้เท่านั้นเขียนได้ (create/edit/delete/post)
      คนอื่น = READ-ONLY (ดูได้ + export ได้ แต่ปุ่มสร้าง/แก้/ลบจะถูก block)
      Admin/Owner bypass อัตโนมัติ */
@@ -4514,7 +4532,7 @@ window.$erp = {
     'payment': ['ns-poopae','ns-dao'],
     'receipt': ['ns-tong'],
     'transfer': ['june','ns-june','poopae','ns-poopae'],
-    'paymentApproval': ['poopae','ns-poopae','ns-tong','ns-june','june'],
+    'paymentApproval': ['poopae','ns-poopae','ns-dao','june','ns-june'],
     // 💰 ค่าใช้จ่าย
     'expense': ['june','ns-june'],
     'expenseDashboard': ['june','ns-june'],
@@ -4527,9 +4545,17 @@ window.$erp = {
     try {
       const r = window.$erp.currentRole();
       if (!r) return true; // demo mode — allow all
-      // 🔧 BUG FIX v2: เปลี่ยนจาก USER_RESTRICTED (block view) เป็น USER_WRITERS (block write only)
-      // → ทุกคนดูได้ (sync issues ลดลง 90%) แต่เขียนได้แค่คน writer
-      // canView ตอนนี้ใช้แค่ role-based menus
+      // 🆕 USER_BLOCKED check — block ระดับ user (ซ่อนเมนู + เข้าไม่ได้)
+      const blockedUsers = window.$erp.USER_BLOCKED?.[view];
+      if (blockedUsers) {
+        const isAdminRole = r.id === 'R-ADMIN' || r.id === 'R-OWNER';
+        if (!isAdminRole) {
+          const u = window.$erp.currentUser?.value;
+          const uname = (u?.username || '').toLowerCase();
+          if (blockedUsers.includes(uname)) return false;
+        }
+      }
+      // ทุกคนที่ไม่ถูก block + role permission ok → ดูได้
       if (r.menus === '*' || (Array.isArray(r.menus) && r.menus.includes('*'))) return true;
       if (Array.isArray(r.menus)) return r.menus.includes(view);
       return true;
