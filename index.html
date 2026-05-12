@@ -3072,16 +3072,42 @@ window.$forcePushExpenseToCloud = async function() {
   const totalAmt = toDelete.reduce((s, e) => s + Number(e.amount||0), 0);
   if (!confirm(`⚠⚠⚠ FORCE PUSH LOCAL → CLOUD ⚠⚠⚠\n\n📱 Local: ${localArr.length} expense lines (${new Set(localArr.map(e=>e&&e.voucherId)).size} vouchers)\n☁️ Cloud: ${cloudData.length} expense lines\n\n🗑 จะลบจาก Cloud: ${toDelete.length} lines (${grouped.size} vouchers)\n💰 รวม: ${fmt(totalAmt)} บาท\n\nตัวอย่าง:\n${preview}${more}\n\n⚠ การกระทำนี้ถาวร — ทำลายข้อมูล cloud ที่ local ไม่มี\n💡 เครื่องอื่นต้อง refresh + กด Force Refresh from Cloud\n\nดำเนินการ?`)) return;
   if (!confirm(`ยืนยันอีกครั้ง: ลบ ${toDelete.length} expense lines จาก cloud?\n\nพิมพ์ใน console ก่อนกด OK:\n  JSON.stringify(window.$diagnoseExpenseSync.toDelete = arguments).slice(0,100)\nเผื่อต้องการ backup`)) return;
-  // 5. ลบทีละ 100 + tombstone
+  // 5. ลบทีละ 100 — บันทึก count จริง + error messages
   const idsToDelete = toDelete.map(e => e.id);
   let deleted = 0, failed = 0;
+  const errors = [];
   for (let i = 0; i < idsToDelete.length; i += 100) {
     const chunk = idsToDelete.slice(i, i+100);
     try {
       const r = await window.sb.from('expenses').delete().in('id', chunk).select('id');
-      if (r.error) failed += chunk.length;
-      else deleted += (r.data?.length || chunk.length);
-    } catch(e) { failed += chunk.length; }
+      if (r.error) {
+        failed += chunk.length;
+        errors.push(r.error.message);
+      } else {
+        // 🔧 BUG FIX: ใช้ ?? แทน || — กัน 0 fall-through เป็น chunk.length
+        const actualDeleted = (r.data && Array.isArray(r.data)) ? r.data.length : 0;
+        deleted += actualDeleted;
+        if (actualDeleted === 0 && chunk.length > 0) {
+          errors.push('DELETE returned 0 rows — น่าจะถูก RLS block');
+          failed += chunk.length;
+        }
+      }
+    } catch(e) { failed += chunk.length; errors.push(e.message); }
+  }
+  // ⚠ ถ้า deleted = 0 ทั้งหมด → แสดง error + วิธีแก้
+  if (deleted === 0 && idsToDelete.length > 0) {
+    const errMsg = errors[0] || 'no error message';
+    alert(`❌ ลบ Cloud ไม่ได้เลย — 0 rows deleted\n\n` +
+      `🔍 สาเหตุที่น่าจะใช่ที่สุด:\n` +
+      `   1. Supabase RLS (Row-Level Security) block DELETE\n` +
+      `   2. ไม่มี policy "delete" สำหรับ table expenses\n` +
+      `   3. User ไม่ใช่ owner ของ row\n\n` +
+      `Error: ${errMsg}\n\n` +
+      `💡 แก้ใน Supabase Dashboard:\n` +
+      `   ไป Authentication → Policies → expenses\n` +
+      `   เพิ่ม policy "Enable delete for all users" → USING (true)\n\n` +
+      `📄 หรือรัน SQL: supabase-fix-rls-expenses.sql`);
+    return;
   }
   // 6. ลบ bank_statement ที่เกี่ยวข้อง
   const voucherIds = Array.from(grouped.keys());
@@ -3090,14 +3116,21 @@ window.$forcePushExpenseToCloud = async function() {
     const chunk = voucherIds.slice(i, i+100);
     try {
       const r = await window.sb.from('bank_statement').delete().eq('ref_type','EXP').in('ref_id', chunk).select('id');
-      if (r.data) bsDeleted += r.data.length;
+      if (r.data && Array.isArray(r.data)) bsDeleted += r.data.length;
     } catch(e){}
   }
   // 7. Tombstones (24 ชม.) — กัน orphan detection / pull restore
   try { window.$autoSync?.addTombstones?.('expenses', idsToDelete); } catch(e){}
   // 8. Push local เพื่อให้ cloud มีของ local ครบ
   try { if (window.$autoSync?.pushAll) await window.$autoSync.pushAll(); } catch(e){}
-  alert(`✅ Force Push Local → Cloud สำเร็จ\n\n🗑 ลบ Cloud: ${deleted} expense lines${failed?' · '+failed+' fail':''}\n🗑 ลบ Bank Statement: ${bsDeleted} rows\n☁ Push Local: ${localArr.length} lines\n\n⚠ เครื่องอื่นต้องทำตามนี้:\n1. Hard refresh\n2. หน้าค่าใช้จ่าย → กดปุ่ม "☁️ Force Refresh จาก Cloud"\n→ ข้อมูลจะตรงกันทุกเครื่อง`);
+  alert(`✅ Force Push Local → Cloud\n\n` +
+    `🗑 ลบ Cloud: ${deleted}/${idsToDelete.length} expense lines${failed?' · ❌ '+failed+' fail':''}\n` +
+    `🗑 ลบ Bank Statement: ${bsDeleted} rows\n` +
+    `☁ Push Local: ${localArr.length} lines\n\n` +
+    (failed > 0 ? `⚠ บางส่วนลบไม่ได้ — ตรวจ RLS policy ใน Supabase Dashboard\n` : '') +
+    `⚠ เครื่องอื่นต้องทำตามนี้:\n` +
+    `1. Hard refresh\n` +
+    `2. หน้าค่าใช้จ่าย → กดปุ่ม "☁️ Force Refresh จาก Cloud"`);
 };
 
 /* 🆕 GLOBAL: Force refresh expenses from cloud — ทำเมื่อ local กับ cloud ไม่ตรง
@@ -9814,14 +9847,25 @@ app.component('view-purchase', {
       form.value.items.splice(idx, 1);
     }
     function recalcItem(it) {
-      // 🆕 ถ้ามี gross + deduct → คำนวณ net = gross - deduct (auto)
+      // 🔧 BUG FIX: เลิก auto-overwrite netWeight ทุกครั้ง — รบกวน user ตอนแก้ net เอง
+      // ใช้ onGrossOrTareChange แทน — เฉพาะตอนแก้ gross/tare → คำนวณ net ใหม่
+      it.netAmount = num(it.netWeight) * num(it.price);
+      it.commission = 0;
+    }
+    /* 🆕 onGrossOrTareChange — เรียกตอนแก้ Gross หรือ Tare → คำนวณ net = gross - tare */
+    function onGrossOrTareChange(it) {
       const g = num(it.grossWeight);
       const d = num(it.deductWeight);
-      if (g > 0 || d > 0) {
+      // ถ้า Gross มี → auto-set Net = Gross - Tare (เคารพ user)
+      if (g > 0) {
         it.netWeight = Math.max(0, g - d);
       }
       it.netAmount = num(it.netWeight) * num(it.price);
-      // 🚫 ไม่คำนวณ commission ที่บิลซื้อแล้ว — ดูใน Sales Tracking Dashboard (รวมเดือน)
+      it.commission = 0;
+    }
+    /* 🆕 onNetChange — เรียกตอนแก้ Net โดยตรง → ไม่แตะ Gross/Tare (manual override) */
+    function onNetChange(it) {
+      it.netAmount = num(it.netWeight) * num(it.price);
       it.commission = 0;
     }
     /* Bill-level totals */
@@ -10674,7 +10718,7 @@ app.component('view-purchase', {
       pickBranch, showBranchDeps,
       // 🆕 Robust Supplier picker
       supplierSearchTerm, filteredSuppliers, onSupplierPicked, quickAddSupplier,
-      addItem, removeItem, recalcItem,
+      addItem, removeItem, recalcItem, onGrossOrTareChange, onNetChange,
       fmt, supplierName, branchName, channelName, accountName, productName,
       availablePOBuys, loadFromPO, setSource,
       // Swap
@@ -10995,17 +11039,17 @@ app.component('view-purchase', {
                       </div>
                       <div v-else class="text-slate-300 text-xs">-</div>
                     </td>
-                    <!-- ⚖️ Gross (น้ำหนักรวม) -->
+                    <!-- ⚖️ Gross (น้ำหนักรวม) — แก้ได้ + auto-set net -->
                     <td class="p-2 bg-slate-50">
-                      <input type="number" step="0.01" v-model.number="it.grossWeight" @input="recalcItem(it)" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white">
+                      <input type="number" step="0.01" v-model.number="it.grossWeight" @input="onGrossOrTareChange(it)" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white" title="แก้ Gross → auto-set Net = Gross - Tare">
                     </td>
-                    <!-- ➖ หัก (Tare/Deduct) -->
+                    <!-- ➖ หัก (Tare/Deduct) — แก้ได้ + auto-set net -->
                     <td class="p-2 bg-amber-50">
-                      <input type="number" step="0.01" v-model.number="it.deductWeight" @input="recalcItem(it)" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white">
+                      <input type="number" step="0.01" v-model.number="it.deductWeight" @input="onGrossOrTareChange(it)" placeholder="0.00" class="w-full px-2 py-1.5 border rounded text-right font-mono bg-white" title="แก้ Tare → auto-set Net = Gross - Tare">
                     </td>
-                    <!-- ✓ น้ำหนักสุทธิ (auto = Gross - Tare ถ้ามี Gross/Tare; แก้ตรงได้) -->
+                    <!-- ✓ น้ำหนักสุทธิ — แก้ตรงได้ (override Gross/Tare) -->
                     <td class="p-2 bg-emerald-50">
-                      <input type="number" step="0.01" v-model.number="it.netWeight" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono font-bold text-emerald-800 bg-white">
+                      <input type="number" step="0.01" v-model.number="it.netWeight" @input="onNetChange(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono font-bold text-emerald-800 bg-white" title="แก้ Net ตรงๆ — ไม่กระทบ Gross/Tare">
                     </td>
                     <td class="p-2"><input type="number" step="0.01" v-model.number="it.price" @input="recalcItem(it)" class="w-full px-2 py-1.5 border rounded text-right font-mono"></td>
                     <!-- 🆕 ราคาหน้าใบ — เก็บค่าไว้ใช้กับ Sales Tracking (ไม่คำนวณค่าคอมในนี้) -->
@@ -12594,7 +12638,67 @@ app.component('view-expense', {
     const erp = window.$erp; const db = erp.db;
     const showForm = ref(false);
     const form = ref(makeBlankForm());
-    function emptyLine() { return { id: newId('EXL'), categoryId:'', description:'', amount:0, hasVat: false, vatAmount:0, whtPct: 0, whtAmount:0 }; }
+    function emptyLine() { return { id: newId('EXL'), categoryId:'', categoryName:'', description:'', amount:0, hasVat: false, vatAmount:0, whtPct: 0, whtAmount:0 }; }
+
+    /* 🆕 Category lookup map — id → object */
+    const categoryById = computed(() => {
+      const map = {};
+      (db.expenseCategories||[]).forEach(c => { if (c && c.id) map[c.id] = c; });
+      return map;
+    });
+    /* 🆕 ตรวจว่าชื่อนี้ตรงกับ category ที่มีอยู่ไหม (case-insensitive) */
+    function categoryNameMatch(name) {
+      if (!name) return null;
+      const v = String(name).trim().toLowerCase();
+      if (!v) return null;
+      return (db.expenseCategories||[]).find(c => c && c.active!==false && (c.name||'').trim().toLowerCase() === v);
+    }
+    /* 🆕 onInput: ผู้ใช้พิมพ์ → ถ้าตรงกับ category ที่มี → set categoryId, ถ้าไม่ → เก็บใน categoryName เพื่อรอสร้าง */
+    function onCategoryInput(line, val) {
+      const trimmed = String(val || '').trim();
+      line.categoryName = trimmed;
+      const match = categoryNameMatch(trimmed);
+      if (match) {
+        line.categoryId = match.id;
+        line.categoryName = '';   // clear staging since matched
+      } else {
+        line.categoryId = '';
+      }
+    }
+    /* 🆕 onBlur: ถ้าผู้ใช้พิมพ์แต่ไม่ได้สร้าง → clear (กันค้างใน UI) */
+    function onCategoryBlur(line) {
+      // ทำต่อให้ค้างไว้เพื่อให้กดปุ่ม "+ เพิ่ม" ได้ — ไม่ clear
+    }
+    /* 🆕 สร้าง category ใหม่ + select + push ไป cloud */
+    function createCategoryFromLine(line) {
+      const name = String(line.categoryName || '').trim();
+      if (!name) return;
+      // ตรวจซ้ำ
+      const existing = categoryNameMatch(name);
+      if (existing) {
+        line.categoryId = existing.id;
+        line.categoryName = '';
+        erp.showToast('หมวด "'+name+'" มีอยู่แล้ว — เลือกให้แทน','info');
+        return;
+      }
+      if (!confirm('สร้างหมวดใหม่ "'+name+'" เข้าฐานข้อมูล?\n\nจะใช้กับบิลนี้ + เครื่องอื่นเห็นด้วย')) return;
+      // สร้าง id แบบ deterministic จากชื่อ (กัน duplicate ระหว่างเครื่อง)
+      const existingIds = (db.expenseCategories||[]).map(c => c && c.id).filter(Boolean);
+      let n = (db.expenseCategories||[]).length + 1;
+      let newId_ = 'EX' + String(n).padStart(4,'0');
+      while (existingIds.includes(newId_)) { n++; newId_ = 'EX' + String(n).padStart(4,'0'); }
+      const newCat = { id: newId_, name, active: true };
+      if (!Array.isArray(db.expenseCategories)) db.expenseCategories = [];
+      db.expenseCategories.push(newCat);
+      line.categoryId = newCat.id;
+      line.categoryName = '';
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      erp.logAudit('create', 'expenseCategories', null, newCat);
+      // Push ขึ้น cloud ทันที (master = sync เร็ว)
+      try { if (window.$autoSync?.pushNow) window.$autoSync.pushNow(); } catch(e){}
+      erp.showToast('✓ สร้างหมวด "'+name+'" + บันทึกฐานข้อมูล','success');
+    }
+
     function makeBlankForm() {
       return { docNo:'', date: todayStr(), dueDate:'', refDocNo:'', payeeName:'',
         payeeBank:'', payeeAccountNo:'', payeeAccountName:'',   // 🆕 ข้อมูลบัญชีผู้รับเงิน (สำหรับโอน)
@@ -12980,12 +13084,16 @@ app.component('view-expense', {
         const tot = all.filter(e => (e.date||'').slice(0,7) === ym).reduce((s,e)=>s+num(e.amount),0);
         trend.push({ month: ym.slice(5)+'/'+ym.slice(2,4), total: tot });
       }
+      // 🔧 BUG FIX: ใช้ Net Pay (amount + VAT - WHT) ตรงกับ column "Net Pay" ในตาราง
+      // เดิม: pendingTotal = sum(amount) → ตัวเลขไม่ตรงกับ Net Pay ใน column
       return {
-        monthlyTotal: monthly.reduce((s,e)=>s+num(e.amount),0),
+        // Monthly: รวม net pay (amount + vat - wht) ของทั้งเดือน
+        monthlyTotal: monthly.reduce((s,e)=>s + num(e.amount) + num(e.vat) - num(e.wht), 0),
         monthlyVouchers: new Set(monthly.map(e => e.voucherId||e.id)).size,
-        pendingTotal: pending.reduce((s,g)=>s+g.total,0),
+        // Pending: รวม net pay ของบิลที่รอจ่าย — ตรงกับ Net Pay column
+        pendingTotal: pending.reduce((s,g)=>s + (Number(g.netPay) || (Number(g.total) + Number(g.vatTotal||0) - Number(g.whtTotal||0))), 0),
         pendingCount: pending.length,
-        paidTotal: paid.reduce((s,g)=>s+g.total,0),
+        paidTotal: paid.reduce((s,g)=>s + (Number(g.netPay) || (Number(g.total) + Number(g.vatTotal||0) - Number(g.whtTotal||0))), 0),
         paidCount: paid.length,
         topCats, topPayees, trend,
         catTotal: topCats.reduce((s,c)=>s+c.total,0),
@@ -13128,6 +13236,8 @@ app.component('view-expense', {
       search, filterDateFrom, filterDateTo, filterCategory, filterPayee, filterAccount, filterPaidStatus,
       open, openEdit, close: close_, save, remove, addLine, removeLine, recalcLineVat, recalcLineWht, fmt: erp.fmt,
       payNow, quickPay, expSummary, payeeSuggestions, cleanupDuplicateLines,
+      // 🆕 Category typing + auto-create
+      categoryById, categoryNameMatch, onCategoryInput, onCategoryBlur, createCategoryFromLine,
       diagnoseExpenseSync: () => window.$diagnoseExpenseSync(),
       forceRefreshExpenseFromCloud: () => window.$forceRefreshExpenseFromCloud(),
       forcePushExpenseToCloud: () => window.$forcePushExpenseToCloud(),
@@ -13175,17 +13285,17 @@ app.component('view-expense', {
       <div class="bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white rounded-xl shadow p-4">
         <div class="text-xs opacity-90">📅 ค่าใช้จ่ายเดือนนี้</div>
         <div class="text-2xl font-bold">{{fmt(expSummary.monthlyTotal)}}</div>
-        <div class="text-xs opacity-80 mt-1">{{expSummary.monthlyVouchers}} voucher</div>
+        <div class="text-xs opacity-80 mt-1">{{expSummary.monthlyVouchers}} voucher · Net Pay (+VAT -WHT)</div>
       </div>
       <div class="bg-amber-50 border-2 border-amber-300 rounded-xl shadow p-4">
-        <div class="text-xs text-amber-700">⏳ รอจ่าย (Pending)</div>
+        <div class="text-xs text-amber-700">⏳ รอจ่าย (Net Pay)</div>
         <div class="text-2xl font-bold text-amber-700">{{fmt(expSummary.pendingTotal)}}</div>
-        <div class="text-xs text-amber-600 mt-1">{{expSummary.pendingCount}} voucher</div>
+        <div class="text-xs text-amber-600 mt-1">{{expSummary.pendingCount}} voucher · ตรงกับ Net Pay column</div>
       </div>
       <div class="bg-emerald-50 border-2 border-emerald-300 rounded-xl shadow p-4">
-        <div class="text-xs text-emerald-700">✓ จ่ายแล้ว</div>
+        <div class="text-xs text-emerald-700">✓ จ่ายแล้ว (Net Pay)</div>
         <div class="text-2xl font-bold text-emerald-700">{{fmt(expSummary.paidTotal)}}</div>
-        <div class="text-xs text-emerald-600 mt-1">{{expSummary.paidCount}} voucher</div>
+        <div class="text-xs text-emerald-600 mt-1">{{expSummary.paidCount}} voucher · ตรงกับ Net Pay column</div>
       </div>
       <div class="bg-white rounded-xl shadow p-4">
         <div class="text-xs text-slate-600 mb-1">📈 6 เดือนล่าสุด</div>
@@ -13394,10 +13504,14 @@ app.component('view-expense', {
               <h4 class="font-medium">รายการค่าใช้จ่าย ({{(form.lines||[]).length}})</h4>
               <button @click="addLine" type="button" class="bg-emerald-600 text-white px-3 py-1.5 rounded text-xs">+ เพิ่มบรรทัด</button>
             </div>
+            <!-- 🆕 Datalist สำหรับ autocomplete หมวดค่าใช้จ่าย -->
+            <datalist id="exp-category-suggestions">
+              <option v-for="c in (db.expenseCategories||[]).filter(x=>x && x.active!==false)" :key="c.id" :value="c.name"></option>
+            </datalist>
             <div class="overflow-x-auto border rounded-lg">
               <table class="w-full text-xs">
                 <thead class="bg-slate-100"><tr>
-                  <th class="p-2 text-left w-44">หมวด</th>
+                  <th class="p-2 text-left w-44">หมวด <span class="text-[10px] text-emerald-700 font-normal">(พิมพ์ใหม่ได้)</span></th>
                   <th class="p-2 text-left">รายละเอียด</th>
                   <th class="p-2 text-right w-24">จำนวน</th>
                   <th class="p-2 text-center w-14">VAT</th>
@@ -13409,10 +13523,26 @@ app.component('view-expense', {
                 <tbody>
                   <tr v-for="(line, idx) in (form.lines||[])" :key="line.id" class="border-t">
                     <td class="p-1">
-                      <select v-model="line.categoryId" class="w-full px-1 py-1 border rounded text-xs"><option value="">-- เลือกหมวด --</option><option v-for="c in (db.expenseCategories||[])" :key="c.id" :value="c.id">{{c.name}}</option></select>
+                      <!-- 🆕 พิมพ์ค้นหา + auto-create หมวดใหม่ -->
+                      <div class="relative">
+                        <input
+                          :value="line.categoryName || (categoryById[line.categoryId]?.name || '')"
+                          @input="onCategoryInput(line, $event.target.value)"
+                          @blur="onCategoryBlur(line)"
+                          list="exp-category-suggestions"
+                          placeholder="🔍 พิมพ์ค้นหาหรือสร้างใหม่..."
+                          class="w-full px-1 py-1 border rounded text-xs" />
+                        <!-- ปุ่ม "+ เพิ่มหมวดใหม่" — โผล่ตอนพิมพ์ชื่อที่ยังไม่มี -->
+                        <button v-if="line.categoryName && !categoryNameMatch(line.categoryName)"
+                          type="button"
+                          @click="createCategoryFromLine(line)"
+                          class="w-full mt-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs px-2 py-1 rounded font-bold border-2 border-emerald-700">
+                          + เพิ่ม "{{line.categoryName}}" เข้าฐานข้อมูล
+                        </button>
+                      </div>
                       <!-- 🔥 Quick Category Buttons — กดเลือกหมวดเร็ว -->
                       <div class="flex flex-wrap gap-1 mt-1">
-                        <button v-for="c in (db.expenseCategories||[]).filter(x=>x && x.active!==false).slice(0,8)" :key="c.id" type="button" @click="line.categoryId = c.id" :class="['px-2 py-0.5 text-xs rounded border', line.categoryId===c.id ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400']">{{c.name}}</button>
+                        <button v-for="c in (db.expenseCategories||[]).filter(x=>x && x.active!==false).slice(0,8)" :key="c.id" type="button" @click="line.categoryId = c.id; line.categoryName = ''" :class="['px-2 py-0.5 text-xs rounded border', line.categoryId===c.id ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400']">{{c.name}}</button>
                       </div>
                     </td>
                     <td class="p-1"><input v-model="line.description" class="w-full px-1 py-1 border rounded"></td>
@@ -19783,9 +19913,24 @@ app.component('view-paymentApproval', {
     const filterApprovedOnly = ref(false);
     const selectedIds = ref({});  // map: billId/expId -> { selected, payAmount }
 
-    /* Source 1: Purchase Bills with payable balance > 0 */
+    /* Source 1: Purchase Bills with payable balance > 0
+       🔧 BUG FIX: คำนวณ payable แบบ LIVE จาก payments แทนใช้ b.payableBalance (อาจ stale จาก cloud pull)
+       กัน case: "เด้งกลับ" — Device A ตัดชำระแล้ว แต่ Device B ยังเห็นบิลค้างเพราะ pull cloud มาก่อน Device A push
+       Solution: คำนวณจาก db.payments local ตรงๆ — pull จาก cloud ก็ครอบคลุม payments ใน table เดียวกัน */
     const apList = computed(() => {
-      const arr = (db.purchaseBills||[]).filter(b => b && b.status !== 'cancelled' && Number(b.payableBalance||0) > 0.01);
+      // 🆕 Build paid map จาก payments (live)
+      const paidMap = new Map();
+      (db.payments||[]).forEach(p => {
+        if (!p || !p.billId) return;
+        const total = Number(p.amount||0) + Number(p.withholdingTax||0) + Number(p.discount||0);
+        paidMap.set(p.billId, (paidMap.get(p.billId) || 0) + total);
+      });
+      const arr = (db.purchaseBills||[]).filter(b => {
+        if (!b || b.status === 'cancelled') return false;
+        const livePaid = paidMap.get(b.id) || 0;
+        const liveBalance = Math.max(0, Number(b.totalAmount||0) - livePaid);
+        return liveBalance > 0.01;
+      });
       const q = (search.value||'').toLowerCase();
       return arr.filter(b => {
         if (filterDateFrom.value && (b.date||'') < filterDateFrom.value) return false;
@@ -19798,8 +19943,13 @@ app.component('view-paymentApproval', {
         return true;
       }).map(b => {
         const sup = (db.suppliers||[]).find(s => s && s.id === b.supplierId);
+        // 🆕 ใช้ live computed balance — กัน stale
+        const livePaid = paidMap.get(b.id) || 0;
+        const liveBalance = Math.max(0, Number(b.totalAmount||0) - livePaid);
         return {
           ...b,
+          paidAmount: livePaid,           // override กับ live
+          payableBalance: liveBalance,    // override กับ live
           _supplierName: sup?.name || '-',
           _supplierBank: sup?.bankAccount || '',
           _supplierTaxId: sup?.taxId || '',
@@ -19850,13 +20000,19 @@ app.component('view-paymentApproval', {
         const g = groups.get(key);
         g.totalAmount += Number(e.amount||0) + Number(e.vat||0) - Number(e.wht||0);
         g.items.push(e);
-        // Use most-paid status across lines (paid if all paid)
-        if (e.paidStatus === 'paid' && g.paidStatus === 'pending') g.paidStatus = 'paid';
+        g._allPaid = (g._allPaid === undefined ? true : g._allPaid) && (e.paidStatus === 'paid');
+        g._anyPaid = g._anyPaid || (e.paidStatus === 'paid');
       });
       const q = (search.value||'').toLowerCase();
-      return Array.from(groups.values()).filter(g => {
-        // 🆕 ซ่อนรายการที่จ่ายแล้วโดย default
-        if (g.paidStatus === 'paid') return false;
+      return Array.from(groups.values()).map(g => {
+        // 🔧 BUG FIX: derive paidStatus จาก ALL lines (not OR-merge — เดิม flap ระหว่าง pending/paid)
+        if (g._allPaid) g.paidStatus = 'paid';
+        else if (g._anyPaid) g.paidStatus = 'partial';
+        else g.paidStatus = 'pending';
+        return g;
+      }).filter(g => {
+        // ซ่อนรายการที่จ่ายแล้ว/partial — เหลือเฉพาะ pending ใน approval list
+        if (g.paidStatus !== 'pending') return false;
         if (filterDateFrom.value && (g.date||'') < filterDateFrom.value) return false;
         if (filterDateTo.value && (g.date||'') > filterDateTo.value) return false;
         if (q) { const t = ((g.docNo||'')+' '+(g.payee||'')).toLowerCase(); if (!t.includes(q)) return false; }
@@ -19972,15 +20128,33 @@ app.component('view-paymentApproval', {
       return selectedIds.value[item.id];
     }
 
+    /* 🆕 Force pull + recalc — ใช้เมื่อเครื่องอื่นตัดชำระแล้ว แต่ยังเห็นค้าง */
+    async function forceSyncNow() {
+      try {
+        erp.showToast('⏳ กำลัง Pull ข้อมูลล่าสุด...','info');
+        if (window.$autoSync?.pullNow) await window.$autoSync.pullNow();
+        const r = erp.recalcBillBalances ? erp.recalcBillBalances() : {fixedPB:0,fixedSB:0};
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        erp.showToast(`✓ Sync เสร็จ · recalc ${r.fixedPB} บิลซื้อ + ${r.fixedSB} บิลขาย`,'success');
+      } catch(e) { erp.showToast('Sync fail: '+e.message,'error'); }
+    }
+
     return { erp, db, fmt, tab, search, filterDateFrom, filterDateTo, filterApprovedOnly,
       apList, expenseList, summary, selectedIds, ensureSelected,
-      approve, unapprove, approveSelected, selectAll, deselectAll, printApprovalSheet };
+      approve, unapprove, approveSelected, selectAll, deselectAll, printApprovalSheet,
+      forceSyncNow };
   },
   template: `
   <div>
-    <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl p-5 shadow mb-4">
-      <h1 class="text-2xl font-bold">✅ อนุมัติโอนเงิน (Payment Approval)</h1>
-      <p class="text-sm opacity-80 mt-1">เช็ครายการที่จะจ่าย → กดอนุมัติ → พิมพ์ใบอนุมัติส่งให้ cashier</p>
+    <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl p-5 shadow mb-4 flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <h1 class="text-2xl font-bold">✅ อนุมัติโอนเงิน (Payment Approval)</h1>
+        <p class="text-sm opacity-80 mt-1">เช็ครายการที่จะจ่าย → กดอนุมัติ → พิมพ์ใบอนุมัติส่งให้ cashier</p>
+      </div>
+      <!-- 🆕 ปุ่ม Force Sync — กันข้อมูลเด้งกลับเมื่อเครื่องอื่นตัดชำระไปแล้ว -->
+      <button @click="forceSyncNow" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2" title="ดึงข้อมูลล่าสุด + คำนวนยอดค้างใหม่ — ใช้เมื่อเครื่องอื่นตัดชำระแล้ว">
+        🔄 Refresh ยอดค้าง
+      </button>
     </div>
 
     <!-- Tabs -->
