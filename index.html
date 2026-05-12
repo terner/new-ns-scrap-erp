@@ -7594,12 +7594,31 @@ app.component('view-stockBalance', {
       return map;
     });
 
+    /* 🆕 Derive product itemStatus จาก stockLedger movements ล่าสุด — กรณี product master ยัง outdated
+       ถ้ามี PRODUCTION_OUTPUT_IN (FG output) ล่าสุด → FG
+       เลย: master.itemStatus เป็น fallback */
+    function _deriveItemStatus(productId, branchId) {
+      const ledger = (db.stockLedger||[]).filter(s => s && s.productId === productId && (!branchId || s.branchId === branchId));
+      if (!ledger.length) return null;
+      ledger.sort((a,b) => String(b.date||'').localeCompare(String(a.date||'')) || String(b.id||'').localeCompare(String(a.id||'')));
+      // Look at last 10 movements for IN movements (positive qty)
+      for (const s of ledger.slice(0, 10)) {
+        if (Number(s.qtyIn||0) > 0) {
+          const mt = s.movementType || '';
+          if (mt === 'PRODUCTION_OUTPUT_IN' || s.outputCategory === 'FG') return 'FG';
+          if (mt === 'PRODUCTION_OUTPUT_RM_IN' || s.outputCategory === 'RM') return 'RM';
+          // Purchase IN, Transfer IN → RM
+          if (mt.includes('PURCHASE') || mt.includes('TRANSFER_IN') || mt.includes('OPENING')) return null; // ใช้ master
+        }
+      }
+      return null;
+    }
     const balances = computed(() => {
       const result = [];
       db.products.forEach(p => {
         if (filterProduct.value && p.id !== filterProduct.value) return;
         if (filterGroup.value && (p.metalGroup||'อื่นๆ') !== filterGroup.value) return;
-        if (filterStatus.value && (p.itemStatus||'RM') !== filterStatus.value) return;
+        // 🔧 derive itemStatus จาก stockLedger ถ้าไม่ตรง master
         const branches = db.branches.filter(b => !filterBranch.value || b.id===filterBranch.value);
         branches.forEach(b => {
           const qty = erp.stockOnHand(p.id, b.id);
@@ -7607,11 +7626,15 @@ app.component('view-stockBalance', {
           const available = erp.stockAvailableForSale ? erp.stockAvailableForSale(p.id, b.id) : qty;
           const pu = erp.stockPaidUnpaid ? erp.stockPaidUnpaid(p.id, b.id) : { paid:val, unpaid:0 };
           if (qty !== 0 || val !== 0) {
+            // 🆕 derive itemStatus: ถ้ามี FG output ล่าสุดสำหรับ product+branch นี้ → FG
+            const derivedStatus = _deriveItemStatus(p.id, b.id);
+            const finalStatus = derivedStatus || p.itemStatus || 'RM';
+            if (filterStatus.value && finalStatus !== filterStatus.value) return;
             result.push({ product:p, branch:b, qty, val, available,
               paidVal: pu.paid, unpaidVal: pu.unpaid,
               paidRatio: val > 0 ? (pu.paid/val)*100 : 100,
               metalGroup: p.metalGroup || 'อื่นๆ',
-              itemStatus: p.itemStatus || 'RM',
+              itemStatus: finalStatus,
               avgCost: qty>0?val/qty:0,
               isWip: false });
           }
@@ -15603,11 +15626,15 @@ app.component('view-production', {
         // 🔧 BUG FIX #1: Sync product.itemStatus จาก outputCategory
         // เดิม: product master ตั้งเป็น 'RM' ถาวร — output category ถูกเก็บใน stockLedger แต่ Stock Balance filter ใช้ p.itemStatus → output FG ก็ยังโชว์เป็น RM
         // ใหม่: เมื่อ save output category = FG/RM → update product master ให้ตรง (ไม่ทำกับ Customer Return)
+        //       + เพิ่ม updatedAt สำหรับ LWW + บังคับ push ทันที — กัน cloud pull ทับ
         if (!isReturn && (cat === 'FG' || cat === 'RM')) {
           const prod = db.products.find(p => p && p.id === out.productId);
           if (prod && prod.itemStatus !== cat) {
             prod.itemStatus = cat;
+            prod.updatedAt = new Date().toISOString();   // 🆕 LWW timestamp
             console.log('[saveOutput] อัปเดต product.itemStatus: '+prod.name+' → '+cat);
+            // 🆕 บังคับ push ทันที — กัน Master REPLACE mode pull ทับด้วย itemStatus เก่า
+            try { if (window.$autoSync?.pushNow) setTimeout(()=>window.$autoSync.pushNow(), 50); } catch(e){}
           }
         }
 
