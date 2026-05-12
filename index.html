@@ -5100,16 +5100,6 @@ window.$erp = {
           console.warn('[autoSync] pull '+cfg.target+' error:', e.message);
         }
       }
-      // 🆕 Auto-recalc AR/AP balances หลัง pull (กัน sync race ทำให้ paidAmount เพี้ยน)
-      // 🔧 BUG FIX: ย้ายเข้ามาใน try block — ถ้าวางหลัง _applyingCloudUpdate=false
-      //   recalc จะแก้ paidAmount/payableBalance → watch fire → push กลับ cloud → loop
-      try {
-        const r = window.$erp?.recalcBillBalances?.();
-        if (r && (r.fixedPB > 0 || r.fixedSB > 0)) {
-          console.log('[autoSync] Recalc balances: fixed '+r.fixedPB+' PBs, '+r.fixedSB+' SBs');
-        }
-      } catch(e) { console.warn('recalc after pull:', e); }
-
       // 🆕 Pull singletons (openingBalance ฯลฯ)
       for (const localKey of Object.keys(SINGLETONS)) {
         try { await pullSingleton(localKey, SINGLETONS[localKey]); }
@@ -5118,6 +5108,18 @@ window.$erp = {
     } finally {
       _applyingCloudUpdate = false;
     }
+    // 🔧 BUG FIX v2: ย้าย recalc ออกมาหลัง _applyingCloudUpdate=false
+    //   เดิม: recalc inside try → mutations ไม่ trigger watch → ไม่ push → cloud stale → loop infinitely
+    //   ใหม่: recalc outside try → mutations trigger watch → mark dirty → push → cloud fixed → loop หยุด
+    try {
+      const r = window.$erp?.recalcBillBalances?.();
+      if (r && (r.fixedPB > 0 || r.fixedSB > 0)) {
+        console.log('[autoSync] Recalc balances: fixed '+r.fixedPB+' PBs, '+r.fixedSB+' SBs · push pending');
+        // 🆕 บังคับ mark dirty (กัน watch debounce ไม่ทันรอบนี้)
+        if (r.fixedPB > 0) dirtyTables.add('purchaseBills');
+        if (r.fixedSB > 0) dirtyTables.add('salesBills');
+      }
+    } catch(e) { console.warn('recalc after pull:', e); }
     isPulling = false; _updateSyncState();
     if (errors > 0) {
       _updateStatus('error', '⚠ Pull '+errors+' errors', 'บางตาราง pull ไม่ได้ — คลิกดู errors');
