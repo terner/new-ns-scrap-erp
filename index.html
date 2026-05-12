@@ -7485,31 +7485,65 @@ app.component('view-bank', {
 
     /* 🆕 ลบ bankStatement ซ้ำ (PMT/RCP) — เรียกใช้จากปุ่มในหน้า */
     async function cleanupDuplicates() {
-      const stmts = (db.bankStatement||[]).filter(s => s && (s.refType === 'PMT' || s.refType === 'RCP'));
+      // 🆕 รวม cloud + local (กันเครื่องอื่น push บิลซ้ำมา)
+      let cloudRows = [];
+      try {
+        const { data, error } = await window.sb.from('bank_statement').select('*').in('ref_type', ['PMT','RCP']);
+        if (!error && data) cloudRows = data;
+      } catch(e) { console.warn('cloud fetch:', e.message); }
+      const allMap = new Map();
+      (db.bankStatement||[]).filter(s => s && (s.refType === 'PMT' || s.refType === 'RCP')).forEach(s => allMap.set(s.id, s));
+      cloudRows.forEach(s => {
+        if (!s || !s.id || allMap.has(s.id)) return;
+        allMap.set(s.id, { ...s, refType: s.ref_type, refId: s.ref_id, refNo: s.ref_no, accountId: s.account_id, createdAt: s.created_at });
+      });
+      const stmts = Array.from(allMap.values());
+
       const groups = new Map();
       stmts.forEach(s => {
-        const key = `${s.refType}|${s.refId}|${s.date}|${s.accountId}|${Number(s.out||0).toFixed(2)}|${Number(s.in||0).toFixed(2)}`;
+        const refKey = s.refNo || s.refId || s.id;
+        const key = `${s.refType}|${refKey}|${s.date}|${s.accountId}|${Number(s.out||0).toFixed(2)}|${Number(s.in||0).toFixed(2)}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(s);
       });
       const dupGroups = Array.from(groups.values()).filter(g => g.length > 1);
-      if (!dupGroups.length) { alert('✓ ไม่พบ duplicate'); return; }
+      if (!dupGroups.length) { alert('✓ ไม่พบ duplicate (Cloud + Local)'); return; }
       const toDelete = [];
       let totalDupAmt = 0;
       dupGroups.forEach(g => {
         g.sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
         g.slice(1).forEach(r => { toDelete.push(r.id); totalDupAmt += Number(r.out||0) + Number(r.in||0); });
       });
-      if (!confirm(`พบ duplicate ${dupGroups.length} ชุด\nจะลบ ${toDelete.length} entries\n💰 รวม ${totalDupAmt.toLocaleString()} บาท\n\nดำเนินการ?`)) return;
-      db.bankStatement = db.bankStatement.filter(s => !toDelete.includes(s.id));
+      if (!confirm(`พบ duplicate ${dupGroups.length} ชุด (Cloud+Local)\nจะลบ ${toDelete.length} entries\n💰 รวม ${totalDupAmt.toLocaleString()} บาท\n\nระบบจะ:\n• ใส่ tombstones (กันเครื่องอื่น push กลับ)\n• ลบจาก Cloud + Local\n\nดำเนินการ?`)) return;
+      // 🆕 INSERT cloud tombstones
+      try {
+        const username = window.$erp?.currentUser?.value?.username || 'system';
+        const now = new Date().toISOString();
+        const tombs = toDelete.map(id => ({
+          id: 'bankStatement:' + id, table_name: 'bankStatement',
+          record_id: id, deleted_at: now, deleted_by: username,
+          reason: 'Cleanup duplicate from Bank view'
+        }));
+        for (let i = 0; i < tombs.length; i += 200) {
+          await window.sb.from('deletion_tombstones').upsert(tombs.slice(i,i+200), { onConflict: 'id' });
+        }
+        window.$autoSync?.addTombstones?.('bankStatement', toDelete);
+      } catch(e) { console.warn('tombstone:', e.message); }
+      // ลบ Cloud
+      let cloudDel = 0;
       for (let i=0; i<toDelete.length; i+=100) {
         const chunk = toDelete.slice(i, i+100);
-        try { await window.sb.from('bank_statement').delete().in('id', chunk); } catch(e){}
+        try {
+          const r = await window.sb.from('bank_statement').delete().in('id', chunk).select('id');
+          if (r.data) cloudDel += r.data.length;
+        } catch(e){}
       }
+      // ลบ Local
+      db.bankStatement = db.bankStatement.filter(s => !toDelete.includes(s.id));
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       try { if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow(); } catch(e){}
-      alert(`✅ ลบ ${toDelete.length} entries\n💰 เงินคืน: ${totalDupAmt.toLocaleString()} บาท`);
-      setTimeout(() => location.reload(), 1500);
+      alert(`✅ ลบ ${toDelete.length} entries\n☁ Cloud: ${cloudDel} ลบจริง\n🪦 Tombstones: ${toDelete.length}\n💰 เงินคืน: ${totalDupAmt.toLocaleString()} บาท`);
+      setTimeout(() => location.reload(), 2000);
     }
 
     /* 🆕 Daily balance trend — for chart */
@@ -40035,16 +40069,38 @@ app.component('view-transactionLedger', {
 
     /* 🆕 ลบ bankStatement ที่ซ้ำ (PMT/RCP/EXP/TRF) */
     async function cleanupDuplicates() {
-      // ดู bankStatement ทุก refType ที่อาจซ้ำ
-      const stmts = (db.bankStatement||[]).filter(s => s && s.refId);
+      // 🆕 ดู cloud + local รวมกัน — เพราะเครื่องอื่นอาจ push บิลซ้ำมา
+      // 1. โหลด cloud bank_statement ทุก records ก่อน
+      let cloudRows = [];
+      try {
+        const { data, error } = await window.sb.from('bank_statement').select('*');
+        if (!error && data) cloudRows = data;
+      } catch(e) { console.warn('cloud fetch fail:', e.message); }
+
+      // รวม local + cloud (dedupe by id)
+      const allMap = new Map();
+      (db.bankStatement||[]).forEach(s => { if (s && s.id) allMap.set(s.id, s); });
+      cloudRows.forEach(s => {
+        if (!s || !s.id || allMap.has(s.id)) return;
+        // normalize cloud row keys (snake → camel)
+        allMap.set(s.id, {
+          ...s,
+          refType: s.ref_type, refId: s.ref_id, refNo: s.ref_no,
+          accountId: s.account_id, createdAt: s.created_at, createdBy: s.created_by
+        });
+      });
+      const stmts = Array.from(allMap.values()).filter(s => s && s.refId);
+
       const groups = new Map();
       stmts.forEach(s => {
-        const key = `${s.refType}|${s.refId}|${s.date}|${s.accountId}|${Number(s.out||0).toFixed(2)}|${Number(s.in||0).toFixed(2)}`;
+        // 🆕 Key ใช้ refNo (เลขบิล) แทน refId — กันกรณี id ต่างแต่อ้างบิลเดียวกัน
+        const refKey = s.refNo || s.refId || s.id;
+        const key = `${s.refType}|${refKey}|${s.date}|${s.accountId}|${Number(s.out||0).toFixed(2)}|${Number(s.in||0).toFixed(2)}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(s);
       });
       const dupGroups = Array.from(groups.values()).filter(g => g.length > 1);
-      if (!dupGroups.length) { alert('✓ ไม่พบ duplicate ใน Transaction Ledger'); return; }
+      if (!dupGroups.length) { alert('✓ ไม่พบ duplicate ใน Transaction Ledger (รวม Cloud + Local)'); return; }
 
       const toDelete = [];
       let totalDupAmt = 0;
@@ -40059,20 +40115,43 @@ app.component('view-transactionLedger', {
       dupGroups.forEach(g => { const t = g[0].refType||'-'; byType[t] = (byType[t]||0) + (g.length-1); });
       const typeReport = Object.entries(byType).map(([k,v]) => `  • ${k}: ${v} entries`).join('\n');
 
-      console.log(`พบ ${dupGroups.length} ชุดซ้ำ — จะลบ ${toDelete.length} entries`);
-      console.log('แยกตามประเภท:', byType);
+      // Preview
+      const previewIds = dupGroups.slice(0,3).map(g => `${g[0].refType}: ${g[0].refNo||g[0].refId} (×${g.length})`).join('\n  ');
 
-      if (!confirm(`📋 พบ duplicate ใน Transaction Ledger\n\n${typeReport}\n\n• รวม ${toDelete.length} entries\n• ยอดที่จะลบ: ${totalDupAmt.toLocaleString()} บาท\n\nดำเนินการ?`)) return;
+      if (!confirm(`📋 พบ duplicate ใน Cloud + Local\n\n${typeReport}\n\nตัวอย่าง:\n  ${previewIds}\n\n• รวม ${toDelete.length} entries\n• ยอดที่จะลบ: ${totalDupAmt.toLocaleString()} บาท\n\nระบบจะ:\n• ใส่ tombstones (กันเครื่องอื่น push กลับ)\n• ลบจาก Cloud\n• ลบจาก Local\n\nดำเนินการ?`)) return;
 
-      db.bankStatement = db.bankStatement.filter(s => !toDelete.includes(s.id));
+      // 🆕 INSERT cloud tombstones ก่อน (สำคัญ!)
+      try {
+        const username = erp.currentUser?.value?.username || 'system';
+        const now = new Date().toISOString();
+        const tombs = toDelete.map(id => ({
+          id: 'bankStatement:' + id, table_name: 'bankStatement',
+          record_id: id, deleted_at: now, deleted_by: username,
+          reason: 'Cleanup duplicate from Transaction Ledger'
+        }));
+        for (let i = 0; i < tombs.length; i += 200) {
+          const chunk = tombs.slice(i, i+200);
+          await window.sb.from('deletion_tombstones').upsert(chunk, { onConflict: 'id' });
+        }
+        // Local tombstones
+        window.$autoSync?.addTombstones?.('bankStatement', toDelete);
+      } catch(e) { console.warn('tombstone insert:', e.message); }
+
+      // ลบ cloud
+      let cloudDeleted = 0;
       for (let i=0; i<toDelete.length; i+=100) {
         const chunk = toDelete.slice(i, i+100);
-        try { await window.sb.from('bank_statement').delete().in('id', chunk); } catch(e){}
+        try {
+          const r = await window.sb.from('bank_statement').delete().in('id', chunk).select('id');
+          if (r.data) cloudDeleted += r.data.length;
+        } catch(e){}
       }
+      // ลบ local
+      db.bankStatement = db.bankStatement.filter(s => !toDelete.includes(s.id));
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       try { if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow(); } catch(e){}
-      alert(`✅ ลบ ${toDelete.length} entries\n💰 เงินคืน: ${totalDupAmt.toLocaleString()} บาท`);
-      setTimeout(() => location.reload(), 1500);
+      alert(`✅ ลบ ${toDelete.length} entries สำเร็จ\n☁ Cloud: ${cloudDeleted} ลบจริง\n🪦 Tombstones: ${toDelete.length} ids → เครื่องอื่นจะลบเองภายใน 10 วินาที\n💰 เงินคืน: ${totalDupAmt.toLocaleString()} บาท`);
+      setTimeout(() => location.reload(), 2000);
     }
 
     return { erp, db, fmt, filterAccount, filterDateFrom, filterDateTo, filterRefType, search,
