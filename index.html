@@ -4221,11 +4221,23 @@ window.$erp = {
       return out;
     }
   },
-  /* 🆕 ลบ records จาก Supabase ตาม collection name + ids array
-     ใช้ทุกครั้งที่ลบ local เพื่อกัน auto-pull ดึงของเก่ากลับมา
-     🔧 BUG FIX: return {ok, error, deleted} เพื่อให้ caller รู้ผล + แจ้ง user */
+  /* 🆕 ลบ records จาก Supabase + บันทึก tombstone ขึ้น cloud
+     เครื่องอื่นจะ pull tombstones และลบ local เอง (กัน push กลับมา) */
   deleteCloud: async (localCollection, ids) => {
     if (!window.sb || !Array.isArray(ids) || ids.length === 0) return { ok:true, deleted:0 };
+    // 🆕 INSERT tombstones ขึ้น cloud — กันเครื่องอื่น push ของเก่ากลับมา
+    try {
+      const username = window.$erp?.currentUser?.value?.username || 'system';
+      const now = new Date().toISOString();
+      const tombs = ids.map(id => ({
+        id: localCollection + ':' + id,    // composite key
+        table_name: localCollection,
+        record_id: id,
+        deleted_at: now,
+        deleted_by: username
+      }));
+      await window.sb.from('deletion_tombstones').upsert(tombs, { onConflict: 'id' });
+    } catch(e) { console.warn('[deleteCloud] tombstone insert fail:', e.message); }
     const map = {
       // Master
       suppliers:'suppliers', customers:'customers', products:'products',
@@ -4503,7 +4515,14 @@ window.$erp = {
   /* Push 1 table — Smart retry on schema/FK errors (เหมือน manual migrate) */
   async function _pushTable(localKey) {
     const cfg = AS_MAP[localKey]; if (!cfg) return { ok:0, fail:0 };
-    const rows = (_GLOBAL_DB[localKey] || []).filter(r => r && r.id);
+    let rows = (_GLOBAL_DB[localKey] || []).filter(r => r && r.id);
+    if (!rows.length) return { ok:0, fail:0 };
+    // 🆕 Skip tombstoned rows — กัน push ของที่ลบไปแล้ว (cloud tombstone หรือ local tombstone)
+    const filtered = rows.filter(r => !isTombstoned(localKey, r.id));
+    if (filtered.length < rows.length) {
+      console.log(`[push-skip-tomb] ${localKey}: skipped ${rows.length - filtered.length} tombstoned rows`);
+    }
+    rows = filtered;
     if (!rows.length) return { ok:0, fail:0 };
     const conflictCol = AS_CONFLICT_COL[cfg.target] || 'id';
     let mapped = _dedupeS(rows.map(r => {
@@ -4682,12 +4701,49 @@ window.$erp = {
   }
 
   /* Pull all tables (silent in-place merge) */
+  /* 🆕 Pull cloud tombstones — เครื่องอื่นที่ลบจะ insert tombstone ขึ้น cloud
+     เครื่องนี้ดึง tombstones มา + ลบ local + skip push */
+  let _lastTombstonePullTs = 0;
+  async function pullCloudTombstones() {
+    if (!window.sb) return;
+    try {
+      // ดึง tombstones ที่ใหม่กว่า last pull (incremental)
+      let q = window.sb.from('deletion_tombstones').select('*');
+      if (_lastTombstonePullTs > 0) {
+        q = q.gte('deleted_at', new Date(_lastTombstonePullTs - 60000).toISOString());
+      }
+      const { data, error } = await q.limit(1000);
+      if (error) {
+        // ถ้า table ยังไม่มี → silent (user ยังไม่ run SQL)
+        if (!/relation.*deletion_tombstones.*does not exist/i.test(error.message)) {
+          console.warn('[tombstone-pull]', error.message);
+        }
+        return;
+      }
+      if (data && data.length) {
+        const byTable = {};
+        data.forEach(t => {
+          if (!byTable[t.table_name]) byTable[t.table_name] = [];
+          byTable[t.table_name].push(t.record_id);
+        });
+        Object.keys(byTable).forEach(tbl => {
+          addTombstones(tbl, byTable[tbl]);
+        });
+        console.log(`[tombstone-pull] received ${data.length} cloud tombstones across ${Object.keys(byTable).length} tables`);
+        _purgeLocalTombstoned();
+      }
+      _lastTombstonePullTs = Date.now();
+    } catch(e) { console.warn('[tombstone-pull] exception:', e.message); }
+  }
+
   async function pullAll() {
     if (isPulling || isPushing || !window.sb || !enabled) return;
     // Skip pull if user has been very recently active (<2s) — likely typing
     if (Date.now() - userInactiveSince < 2000) return;
     // Skip pull if there are pending pushes — push first
     if (dirtyTables.size > 0) return;
+    // 🆕 ดึง cloud tombstones ก่อน — รู้ว่าเครื่องอื่นลบอะไรบ้าง
+    await pullCloudTombstones();
     // 🆕 ลบ tombstoned rows ออกจาก local ก่อน pull — กัน case ที่ user refresh แล้วเจอ local เก่า
     try { _purgeLocalTombstoned(); } catch(e){}
     isPulling = true;
