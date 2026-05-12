@@ -3037,6 +3037,69 @@ window.$diagnoseExpenseSync = async function() {
   return report;
 };
 
+/* 🆕 GLOBAL: Force push LOCAL → CLOUD (ลบ cloud orphans + push local)
+   ใช้เมื่อ: cloud มีข้อมูลผิด, local ถูก
+   ผลลัพธ์: cloud จะ mirror local 100%
+   ⚠ ทำลายข้อมูล cloud ที่ local ไม่มี — backup ก่อน! */
+window.$forcePushExpenseToCloud = async function() {
+  if (!window.sb) { alert('❌ Supabase ยังไม่ connect'); return; }
+  const db = _GLOBAL_DB;
+  const fmt = (n) => Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+  // 1. โหลด cloud
+  const { data: cloudData, error } = await window.sb.from('expenses').select('*');
+  if (error) { alert('❌ '+error.message); return; }
+  // 2. หา id ที่อยู่ใน cloud แต่ไม่อยู่ใน local
+  const localArr = Array.isArray(db.expenses) ? db.expenses : [];
+  const localIds = new Set(localArr.map(e => e && e.id).filter(Boolean));
+  const toDelete = (cloudData||[]).filter(c => c && c.id && !localIds.has(c.id));
+  if (toDelete.length === 0) {
+    alert('✓ Cloud ไม่มี orphans — local กับ cloud ตรงกันแล้ว');
+    return;
+  }
+  // 3. แสดง preview list
+  const previewCount = Math.min(10, toDelete.length);
+  const preview = toDelete.slice(0, previewCount).map(e =>
+    `• ${e.doc_no||'(no doc)'} | ${e.date||'-'} | ${e.payee||'-'} | ${fmt(e.amount||0)} บาท`
+  ).join('\n');
+  const more = toDelete.length > previewCount ? `\n... + อีก ${toDelete.length - previewCount} rows` : '';
+  // 4. Confirm 2 ครั้ง
+  const grouped = new Map();
+  toDelete.forEach(e => {
+    const k = e.voucher_id || e.id;
+    if (!grouped.has(k)) grouped.set(k, []);
+    grouped.get(k).push(e);
+  });
+  const totalAmt = toDelete.reduce((s, e) => s + Number(e.amount||0), 0);
+  if (!confirm(`⚠⚠⚠ FORCE PUSH LOCAL → CLOUD ⚠⚠⚠\n\n📱 Local: ${localArr.length} expense lines (${new Set(localArr.map(e=>e&&e.voucherId)).size} vouchers)\n☁️ Cloud: ${cloudData.length} expense lines\n\n🗑 จะลบจาก Cloud: ${toDelete.length} lines (${grouped.size} vouchers)\n💰 รวม: ${fmt(totalAmt)} บาท\n\nตัวอย่าง:\n${preview}${more}\n\n⚠ การกระทำนี้ถาวร — ทำลายข้อมูล cloud ที่ local ไม่มี\n💡 เครื่องอื่นต้อง refresh + กด Force Refresh from Cloud\n\nดำเนินการ?`)) return;
+  if (!confirm(`ยืนยันอีกครั้ง: ลบ ${toDelete.length} expense lines จาก cloud?\n\nพิมพ์ใน console ก่อนกด OK:\n  JSON.stringify(window.$diagnoseExpenseSync.toDelete = arguments).slice(0,100)\nเผื่อต้องการ backup`)) return;
+  // 5. ลบทีละ 100 + tombstone
+  const idsToDelete = toDelete.map(e => e.id);
+  let deleted = 0, failed = 0;
+  for (let i = 0; i < idsToDelete.length; i += 100) {
+    const chunk = idsToDelete.slice(i, i+100);
+    try {
+      const r = await window.sb.from('expenses').delete().in('id', chunk).select('id');
+      if (r.error) failed += chunk.length;
+      else deleted += (r.data?.length || chunk.length);
+    } catch(e) { failed += chunk.length; }
+  }
+  // 6. ลบ bank_statement ที่เกี่ยวข้อง
+  const voucherIds = Array.from(grouped.keys());
+  let bsDeleted = 0;
+  for (let i = 0; i < voucherIds.length; i += 100) {
+    const chunk = voucherIds.slice(i, i+100);
+    try {
+      const r = await window.sb.from('bank_statement').delete().eq('ref_type','EXP').in('ref_id', chunk).select('id');
+      if (r.data) bsDeleted += r.data.length;
+    } catch(e){}
+  }
+  // 7. Tombstones (24 ชม.) — กัน orphan detection / pull restore
+  try { window.$autoSync?.addTombstones?.('expenses', idsToDelete); } catch(e){}
+  // 8. Push local เพื่อให้ cloud มีของ local ครบ
+  try { if (window.$autoSync?.pushAll) await window.$autoSync.pushAll(); } catch(e){}
+  alert(`✅ Force Push Local → Cloud สำเร็จ\n\n🗑 ลบ Cloud: ${deleted} expense lines${failed?' · '+failed+' fail':''}\n🗑 ลบ Bank Statement: ${bsDeleted} rows\n☁ Push Local: ${localArr.length} lines\n\n⚠ เครื่องอื่นต้องทำตามนี้:\n1. Hard refresh\n2. หน้าค่าใช้จ่าย → กดปุ่ม "☁️ Force Refresh จาก Cloud"\n→ ข้อมูลจะตรงกันทุกเครื่อง`);
+};
+
 /* 🆕 GLOBAL: Force refresh expenses from cloud — ทำเมื่อ local กับ cloud ไม่ตรง
    ใช้: window.$forceRefreshExpenseFromCloud()  ← จะลบ local + load ใหม่จาก cloud */
 window.$forceRefreshExpenseFromCloud = async function() {
@@ -13067,6 +13130,7 @@ app.component('view-expense', {
       payNow, quickPay, expSummary, payeeSuggestions, cleanupDuplicateLines,
       diagnoseExpenseSync: () => window.$diagnoseExpenseSync(),
       forceRefreshExpenseFromCloud: () => window.$forceRefreshExpenseFromCloud(),
+      forcePushExpenseToCloud: () => window.$forcePushExpenseToCloud(),
       // 🆕 Export
       exportExpenses };
   },
@@ -13093,9 +13157,16 @@ app.component('view-expense', {
         <button @click="forceRefreshExpenseFromCloud" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-2" title="ลบ local แล้วโหลดใหม่จาก cloud — ใช้เมื่อ cloud มีข้อมูลที่ local ไม่มี">
           ☁️ Force Refresh จาก Cloud
         </button>
+        <!-- 🆕 ทางตรงข้าม: ลบ cloud orphans — ใช้เมื่อ cloud มีข้อมูลผิด -->
+        <button @click="forcePushExpenseToCloud" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-2 border-2 border-red-800" title="⚠ ลบ cloud orphans — ใช้เมื่อ cloud มีบิลผิด แต่ local ถูก">
+          🔥 Force Push Local → Cloud
+        </button>
         <button @click="cleanupDuplicateLines" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-2" title="หา + ลบ expense lines ที่ซ้ำกันในบิลเดียวกัน">
           🧹 ลบ Line ซ้ำในระบบ
         </button>
+      </div>
+      <div class="text-[10px] text-orange-700 italic">
+        💡 <b>Force Refresh:</b> เอา cloud ทับ local (cloud ถูก) · <b>Force Push:</b> เอา local ทับ cloud (local ถูก — ลบ cloud orphans)
       </div>
     </div>
 
