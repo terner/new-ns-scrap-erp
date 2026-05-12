@@ -4829,7 +4829,8 @@ window.$erp = {
   async function pullAll() {
     if (isPulling || isPushing || !window.sb || !enabled) return;
     // Skip pull if user has been very recently active (<2s) — likely typing
-    if (Date.now() - userInactiveSince < 2000) return;
+    // 🔧 ลด grace 2s → 500ms (เพื่อให้ pull รันตามเวลาดีกว่า)
+    if (Date.now() - userInactiveSince < 500) return;
     // Skip pull if there are pending pushes — push first
     if (dirtyTables.size > 0) return;
     // 🆕 ดึง cloud tombstones ก่อน — รู้ว่าเครื่องอื่นลบอะไรบ้าง
@@ -5004,8 +5005,10 @@ window.$erp = {
     }
   }
 
-  /* Track local activity for editing heuristic */
-  ['mousemove','keydown','click','input','focus'].forEach(ev => {
+  /* 🔧 BUG FIX: Track local activity เฉพาะตอน "พิมพ์/กรอกฟอร์ม"
+     เดิม: mousemove + click → pull ถูก block ตลอด เพราะคนเลื่อนเมาส์
+     ใหม่: เก็บเฉพาะ keydown/input — ปล่อยให้ pull รันถึงแม้ user เลื่อนเมาส์ */
+  ['keydown','input'].forEach(ev => {
     window.addEventListener(ev, () => { userInactiveSince = Date.now(); }, { passive:true, capture:true });
   });
 
