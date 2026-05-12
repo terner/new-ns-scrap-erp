@@ -4316,6 +4316,8 @@ window.$erp = {
     const out = {};
     for (const [k, v] of Object.entries(obj || {})) {
       if (v === undefined) continue;
+      // 🆕 Skip local-only fields ที่ขึ้นต้นด้วย _ (เช่น _cloudVerifiedAt)
+      if (k.startsWith('_')) continue;
       const sk = customMap[k] || _camelToSnake(k);
       // 🔧 Convert empty strings to null for date, numeric, OR FK fields
       if (v === '' && (_DATE_HINT.test(k) || _DATE_HINT.test(sk)
@@ -4646,7 +4648,10 @@ window.$erp = {
             continue;
           }
 
-          // 🆕 MERGE strategy (สำหรับ transactional tables — ไม่ลบ local rows ที่ cloud ไม่มี)
+          // 🆕 MERGE strategy + CLOUD-TRUTH ORPHAN DETECTION (permanent fix)
+          //    หลักการ: stamp _cloudVerifiedAt บน rows ที่เห็นใน cloud
+          //    Local rows ที่เคย verified (มี _cloudVerifiedAt) แต่ตอนนี้ไม่อยู่ใน cloud → ถูกลบบน cloud → ลบ local ด้วย
+          //    Local rows ที่ไม่เคย verified (สร้างใหม่ ยัง push ไม่ขึ้น) → คงไว้
           const arr = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
           const cloudById = new Map();
           let mergeSkippedTomb = 0;
@@ -4657,7 +4662,14 @@ window.$erp = {
             cloudById.set(r[conflictCol], r);
           });
           if (mergeSkippedTomb) console.log(`[pull-tombstone-merge] ${localKey}: skipped ${mergeSkippedTomb} recently-deleted rows`);
+          const pullStartTs = Date.now();
+          // 🆕 TRANSACTIONAL tables ที่จะเปิด CLOUD-TRUTH mode (ลบ orphans อัตโนมัติ)
+          const CLOUD_TRUTH_TABLES = ['expenses','payments','receipts','purchaseBills','salesBills',
+            'transfers','poBuys','poSells','stockLedger','bankStatement','tradingDeals',
+            'receiptVouchers','productionOrders'];
+          const cloudTruthMode = CLOUD_TRUTH_TABLES.includes(localKey);
           // STEP 1: Update existing local rows — LWW (Last-Write-Wins) — ห้าม pull ทับ local ที่ใหม่กว่า
+          //         + stamp _cloudVerifiedAt บน rows ที่เห็นใน cloud
           for (let j = 0; j < arr.length; j++) {
             const localKey2 = arr[j] && arr[j][conflictCol];
             if (localKey2 != null && cloudById.has(localKey2)) {
@@ -4669,19 +4681,49 @@ window.$erp = {
               if (cloudTs && localTs && localTs > cloudTs) {
                 // Local ใหม่กว่า → ไม่ overwrite + mark ให้ push ใน cycle ถัดไป
                 dirtyTables.add(localKey);
+                arr[j]._cloudVerifiedAt = pullStartTs;   // 🆕 stamp ว่า row นี้ verified กับ cloud แล้ว
                 console.log(`[pull-LWW] skip ${cfg.target} ${localKey2}: local newer (${localTs}) than cloud (${cloudTs})`);
               } else {
+                cloudRow._cloudVerifiedAt = pullStartTs;
                 arr[j] = cloudRow;
               }
               cloudById.delete(localKey2);
             }
           }
-          // STEP 2: Add cloud-only rows (id ที่ local ยังไม่มี)
+          // STEP 2: Add cloud-only rows (id ที่ local ยังไม่มี) — stamp verified
           if (cloudById.size > 0) {
             newRowCount += cloudById.size;
-            cloudById.forEach(r => arr.push(r));
+            cloudById.forEach(r => { r._cloudVerifiedAt = pullStartTs; arr.push(r); });
           }
-          // STEP 3: KEEP local-only rows (cloud ยังไม่มี) — จะถูก push ใน cycle ถัดไป
+          // STEP 3: 🆕 ORPHAN DETECTION (เฉพาะ CLOUD-TRUTH tables)
+          //         Local rows ที่เคย verified แต่ตอนนี้ไม่อยู่ใน cloud → ลบบน cloud แล้ว → ลบ local
+          //         Local rows ที่ไม่เคย verified (สร้างใหม่) → คงไว้ (จะ push ใน cycle ถัดไป)
+          if (cloudTruthMode) {
+            const cloudIdSet = new Set();
+            cloudRows.forEach(r => { if (r && r[conflictCol] != null) cloudIdSet.add(r[conflictCol]); });
+            const beforeLen = arr.length;
+            const purgedOrphans = [];
+            for (let k = arr.length - 1; k >= 0; k--) {
+              const row = arr[k];
+              if (!row) continue;
+              const rid = row[conflictCol];
+              if (rid == null) continue;
+              // เคย verified แต่ตอนนี้ไม่อยู่ใน cloud + ไม่ใช่ tombstoned (tombstone จัดการแล้ว)
+              if (row._cloudVerifiedAt && !cloudIdSet.has(rid) && !isTombstoned(localKey, rid)) {
+                // 🛡 Safety: ไม่ลบถ้า row เพิ่งสร้าง/แก้ใน 60 วินาที (อาจยังไม่ทัน push)
+                const rowTs = new Date(row.updatedAt || row.createdAt || 0).getTime();
+                const ageMs = Date.now() - rowTs;
+                if (ageMs > 0 && ageMs < 60000) continue;
+                // ✓ orphan แท้ — ถูกลบบน cloud
+                purgedOrphans.push({ id: rid, docNo: row.docNo });
+                arr.splice(k, 1);
+              }
+            }
+            if (purgedOrphans.length > 0) {
+              console.log(`[pull-orphan-purge] ${localKey}: removed ${purgedOrphans.length} orphans (deleted on cloud)`,
+                purgedOrphans.slice(0, 5).map(o => o.docNo || o.id).join(', '));
+            }
+          }
           totalRows += cloudRows.length;
         } catch(e) {
           errors++;
