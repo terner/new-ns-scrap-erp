@@ -2959,6 +2959,24 @@ function loadDB() {
         }
       });
     }
+    /* 🆕 migration v5 (2026-05-13): one-time clear _isSeed flag จาก local records
+       เคส: version ก่อนหน้า set _isSeed=true บนทุก seed records → push block → cloud ไม่ update
+       วิธีแก้: เคลียร์ flag ออกจากทุก records ที่ load จาก localStorage (ครั้งเดียว) */
+    if (!d._migrationV5_clearIsSeed) {
+      let cleared = 0;
+      Object.keys(d).forEach(k => {
+        if (Array.isArray(d[k])) {
+          d[k].forEach(r => {
+            if (r && typeof r === 'object' && r._isSeed) {
+              delete r._isSeed;
+              cleared++;
+            }
+          });
+        }
+      });
+      if (cleared > 0) console.log(`[migration v5] cleared _isSeed from ${cleared} records (one-time)`);
+      d._migrationV5_clearIsSeed = true;
+    }
     /* 🆕 migration v3 (FIXED 2026-05-13): roles cleanup — ไม่ทำลายการแก้ของ user
        เดิม: RESET full role จาก seed ทุก refresh → user แก้/ลบ ไม่อยู่
        ใหม่: ทำเฉพาะครั้งแรก (one-time) ผ่าน flag _roleCleanupV3
@@ -3171,6 +3189,41 @@ window.$pullMastersFromCloud = async function() {
   try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
   alert(`✅ Pull สำเร็จ\n\nsuppliers: ${db.suppliers.length}\ncustomers: ${db.customers.length}\nsalespersons: ${db.salespersons.length}\nproducts: ${db.products.length}\n\nRefresh page ใน 2 วินาที`);
   setTimeout(() => location.reload(), 2000);
+};
+
+/* 🆕 GLOBAL: Clear All Seed Flags — ล้าง _isSeed / _fromSeed ออกจาก local
+   ใช้กรณี: เผลอเปิด version ก่อน → _isSeed ติดไว้ → push ไม่ขึ้น cloud
+   ใช้: window.$clearAllSeedFlags() — clear ทั้งหมด + push ทันที */
+window.$clearAllSeedFlags = async function() {
+  const db = _GLOBAL_DB;
+  let cleared = 0;
+  delete db._fromSeed;
+  delete db._seedAt;
+  Object.keys(db).forEach(k => {
+    if (Array.isArray(db[k])) {
+      db[k].forEach(r => {
+        if (r && typeof r === 'object' && r._isSeed) {
+          delete r._isSeed;
+          cleared++;
+        }
+      });
+    }
+  });
+  try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+  try { sessionStorage.removeItem('ns_erp_block_push_after_reset'); } catch(e){}
+  console.log(`[clear-seed] ล้าง _isSeed flag จาก ${cleared} records`);
+  // Trigger push ทันที
+  try {
+    if (window.$autoSync?.pushNow) {
+      await window.$autoSync.pushNow();
+      alert(`✅ ล้าง seed flag สำเร็จ\n\n• Records: ${cleared}\n• Push ขึ้น cloud แล้ว\n\nเครื่องอื่นกด refresh/sync จะเห็นข้อมูลครบ`);
+    } else {
+      alert(`✅ ล้าง seed flag สำเร็จ (${cleared} records) — รอบ push ถัดไปจะส่งขึ้น cloud`);
+    }
+  } catch(e) {
+    alert(`ล้าง flag สำเร็จ แต่ push fail: ${e.message}`);
+  }
+  return { cleared };
 };
 
 /* 🆕 GLOBAL: Smart Auto-Fetch — ดึงเฉพาะ master ที่หายจาก cloud (เร็วกว่า pull ทั้งตาราง)
@@ -5932,20 +5985,15 @@ window.$erp = {
   /* Push 1 table — Smart retry on schema/FK errors (เหมือน manual migrate) */
   async function _pushTable(localKey) {
     const cfg = AS_MAP[localKey]; if (!cfg) return { ok:0, fail:0 };
-    // 🛡 SEED PROTECTION: ถ้า DB ยังเป็น seed (เพิ่ง reset / fresh install) → ห้าม push
-    //   กัน password='admin' default + master เก่า ขึ้นไปทับ cloud → ทำให้ user อื่นโดน reset ตาม
+    // 🛡 SEED PROTECTION (revised 2026-05-13): ใช้แค่ DB-level flag (ไม่ใช้ per-row _isSeed)
+    //   เพราะ per-row block ทำให้ records ที่ user เคยแก้ (แต่ original มาจาก seed) push ไม่ได้
+    //   → cloud ไม่ update → ผู้ใช้คนอื่น pull ได้ค่าเก่า
+    //   เก็บเฉพาะ DB-level: block ตอน DB เพิ่ง reset เท่านั้น (จะ clear หลัง pull cloud ครั้งแรก)
     if (_GLOBAL_DB._fromSeed === true) {
       console.warn('[push-block] '+localKey+': DB เป็น seed state — skip push (pull จาก cloud ก่อน)');
       return { ok:0, fail:0, skipped:'seed' };
     }
     let rows = (_GLOBAL_DB[localKey] || []).filter(r => r && r.id);
-    if (!rows.length) return { ok:0, fail:0 };
-    // 🛡 SEED PROTECTION per-row: filter rows ที่ติด _isSeed (ไม่เคยถูก user แก้)
-    const beforeSeedFilter = rows.length;
-    rows = rows.filter(r => !r._isSeed);
-    if (rows.length < beforeSeedFilter) {
-      console.warn(`[push-seed-block] ${localKey}: skipped ${beforeSeedFilter - rows.length} seed rows — รอ user แก้หรือ pull จาก cloud`);
-    }
     if (!rows.length) return { ok:0, fail:0 };
     // 🆕 Skip tombstoned rows — กัน push ของที่ลบไปแล้ว (cloud tombstone หรือ local tombstone)
     const filtered = rows.filter(r => !isTombstoned(localKey, r.id));
