@@ -25645,6 +25645,165 @@ app.component('view-assetRegister', {
       const a = document.createElement('a'); a.href = url; a.download = 'asset_register_'+erp.today()+'.csv'; a.click();
     }
 
+    /* 🆕 Download import template */
+    function downloadTemplate() {
+      const head = ['code','name','category','branch','department','location','responsiblePerson','purchaseDate','acquisitionType','originalCost','vatAmount','salvageValue','usefulLifeMonths','depreciationMethod','serialNo','licensePlate','chassisNo','engineNo','warrantyExpireDate','notes'];
+      const sample = [
+        ['AST-001','โต๊ะทำงานผู้บริหาร','Equipment','สมุทรสาคร','สำนักงาน','ชั้น 2','คุณสมชาย','2025-01-15','Purchased','15000','1050','1500','60','Straight Line','SN-001','','','','2027-01-15','โต๊ะไม้'],
+        ['AST-002','รถกระบะส่งของ','Vehicle','สมุทรสาคร','คลังสินค้า','-','คุณวิชัย','2024-06-01','Purchased','450000','31500','45000','84','Straight Line','VIN-123','กข 1234','','EN-456','2026-06-01','TOYOTA Hilux'],
+        ['AST-003','เครื่องตัดเหล็ก','Machinery','สมุทรสาคร','โรงงาน','พื้นที่ A','-','2023-08-10','Purchased','85000','5950','8500','120','Straight Line','M-789','','','','','เครื่องตัด HD'],
+      ];
+      const all = [head, ...sample];
+      const csv = '﻿'+all.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'asset_import_template.csv'; a.click();
+      erp.showToast('📥 Download template สำเร็จ — กรอกข้อมูลแล้ว Import กลับ','success');
+    }
+
+    /* 🆕 Import assets from CSV/Excel */
+    function importAssets(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      const isExcel = /\.xlsx?$/i.test(file.name);
+      reader.onload = (e) => {
+        try {
+          let rows = [];
+          if (isExcel) {
+            // Parse Excel using XLSX library
+            if (typeof XLSX === 'undefined') { alert('XLSX library not loaded — ใช้ CSV แทน'); return; }
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          } else {
+            // Parse CSV — basic parser
+            const text = String(e.target.result || '');
+            rows = text.split(/\r?\n/).filter(l => l.trim()).map(l => {
+              // Handle quoted CSV
+              const cells = [];
+              let cur = '', inQ = false;
+              for (let i = 0; i < l.length; i++) {
+                const c = l[i];
+                if (c === '"' && l[i+1] === '"') { cur += '"'; i++; }
+                else if (c === '"') { inQ = !inQ; }
+                else if (c === ',' && !inQ) { cells.push(cur); cur = ''; }
+                else cur += c;
+              }
+              cells.push(cur);
+              return cells;
+            });
+          }
+          if (rows.length < 2) { alert('ไฟล์ว่างหรือไม่มีข้อมูล'); return; }
+          // First row = headers
+          const headers = rows[0].map(h => String(h||'').trim());
+          const dataRows = rows.slice(1).filter(r => r.some(c => String(c||'').trim()));
+          // Map header to standard field names
+          const fieldMap = {
+            'code':'code', 'รหัส':'code', 'asset code':'code',
+            'name':'name', 'ชื่อ':'name', 'asset name':'name',
+            'category':'category', 'หมวด':'category',
+            'branch':'branchName', 'สาขา':'branchName',
+            'department':'department', 'แผนก':'department',
+            'location':'location', 'ที่ตั้ง':'location',
+            'responsibleperson':'responsiblePerson', 'ผู้รับผิดชอบ':'responsiblePerson',
+            'purchasedate':'purchaseDate', 'วันที่ซื้อ':'purchaseDate', 'purchase date':'purchaseDate',
+            'acquisitiontype':'acquisitionType', 'acquisition type':'acquisitionType',
+            'originalcost':'originalCost', 'ทุนเดิม':'originalCost', 'original cost':'originalCost',
+            'vatamount':'vatAmount', 'vat':'vatAmount', 'vat amount':'vatAmount',
+            'salvagevalue':'salvageValue', 'salvage':'salvageValue', 'salvage value':'salvageValue',
+            'usefullifemonths':'usefulLifeMonths', 'อายุใช้งาน':'usefulLifeMonths', 'useful life months':'usefulLifeMonths', 'useful months':'usefulLifeMonths',
+            'depreciationmethod':'depreciationMethod', 'depreciation method':'depreciationMethod',
+            'serialno':'serialNo', 'serial':'serialNo', 'serial no':'serialNo',
+            'licenseplate':'licensePlate', 'ทะเบียนรถ':'licensePlate', 'license plate':'licensePlate',
+            'chassisno':'chassisNo', 'chassis':'chassisNo', 'chassis no':'chassisNo',
+            'engineno':'engineNo', 'engine':'engineNo', 'engine no':'engineNo',
+            'warrantyexpiredate':'warrantyExpireDate', 'warranty expire date':'warrantyExpireDate',
+            'notes':'notes', 'หมายเหตุ':'notes',
+          };
+          const colMap = {};
+          headers.forEach((h, idx) => {
+            const key = h.toLowerCase().replace(/[\s_-]+/g,'');
+            if (fieldMap[key]) colMap[fieldMap[key]] = idx;
+            else if (fieldMap[h.toLowerCase()]) colMap[fieldMap[h.toLowerCase()]] = idx;
+          });
+          if (colMap.code === undefined || colMap.name === undefined) {
+            alert('ไฟล์ต้องมี column "code" และ "name" เป็นอย่างน้อย\n\nColumn ที่พบ: '+headers.join(', '));
+            return;
+          }
+          // Build asset records
+          const branches = db.branches || [];
+          const findBranch = (n) => {
+            if (!n) return '';
+            const s = String(n).trim().toLowerCase();
+            const b = branches.find(b => b && b.id === s) ||
+                      branches.find(b => b && (b.name||'').toLowerCase() === s) ||
+                      branches.find(b => b && (b.code||'').toLowerCase() === s);
+            return b?.id || '';
+          };
+          const existingCodes = new Set((db.assets||[]).map(a => a && a.code).filter(Boolean));
+          let added = 0, skipped = 0, errors = 0;
+          const errorList = [];
+          dataRows.forEach((row, idx) => {
+            try {
+              const code = String(row[colMap.code]||'').trim();
+              const name = String(row[colMap.name]||'').trim();
+              if (!code || !name) { skipped++; return; }
+              if (existingCodes.has(code)) {
+                errorList.push(`Row ${idx+2}: code "${code}" ซ้ำ — skip`);
+                skipped++; return;
+              }
+              const get = (field, def='') => colMap[field] !== undefined ? String(row[colMap[field]]||'').trim() : def;
+              const num = (field) => Number(String(row[colMap[field]]||0).replace(/,/g,'')) || 0;
+              const originalCost = num('originalCost');
+              const vatAmount = num('vatAmount');
+              const asset = {
+                id: erp.uid('AST'),
+                code, name,
+                category: get('category','Equipment'),
+                branchId: findBranch(get('branchName')),
+                department: get('department'),
+                location: get('location'),
+                responsiblePerson: get('responsiblePerson'),
+                purchaseDate: get('purchaseDate') || erp.today(),
+                acquisitionType: get('acquisitionType','Purchased'),
+                originalCost,
+                vatAmount,
+                netAssetCost: originalCost - vatAmount,
+                salvageValue: num('salvageValue'),
+                usefulLifeMonths: num('usefulLifeMonths') || 60,
+                depreciationMethod: get('depreciationMethod','Straight Line'),
+                assetStatus: 'Active',
+                serialNo: get('serialNo'),
+                licensePlate: get('licensePlate'),
+                chassisNo: get('chassisNo'),
+                engineNo: get('engineNo'),
+                warrantyExpireDate: get('warrantyExpireDate'),
+                notes: get('notes'),
+                createdBy: erp.currentUser.value?.username || 'import',
+                createdAt: new Date().toISOString()
+              };
+              if (asset.netAssetCost <= 0) { errorList.push(`Row ${idx+2}: "${code}" netAssetCost = 0`); errors++; return; }
+              db.assets.push(asset);
+              existingCodes.add(code);
+              added++;
+            } catch(e) { errors++; errorList.push(`Row ${idx+2}: ${e.message}`); }
+          });
+          try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+          erp.logAudit('IMPORT','assets',null,{added,skipped,errors});
+          // Force push to cloud
+          try { window.$autoSync?.pushNow?.(); } catch(e){}
+          const msg = `✅ Import สำเร็จ\n\n📥 เพิ่ม: ${added} รายการ\n⚠ ข้าม (ซ้ำ/ว่าง): ${skipped}\n❌ Error: ${errors}` +
+            (errorList.length ? '\n\nรายละเอียด:\n' + errorList.slice(0,10).join('\n') + (errorList.length>10?'\n...':'') : '');
+          alert(msg);
+        } catch(err) { alert('❌ Import ผิดพลาด: '+err.message); console.error(err); }
+      };
+      reader.onerror = () => alert('อ่านไฟล์ไม่ได้');
+      if (isExcel) reader.readAsArrayBuffer(file);
+      else reader.readAsText(file, 'UTF-8');
+      // Reset input so same file can be re-imported
+      event.target.value = '';
+    }
+
     /* 📊 Group by category for charts */
     const byCategory = computed(() => {
       const map = {};
@@ -25675,18 +25834,27 @@ app.component('view-assetRegister', {
     const totalMonthlyDep = computed(() => list.value.reduce((s,a)=>s+a.monthlyDep,0));
 
     return { erp, db, fmt, search, filterCat, filterStatus, list, totals, byCategory, byStatus, totalMonthlyDep, showModal, editId, form,
-      openAdd, openEdit, save, remove, calcNet, exportCSV,
+      openAdd, openEdit, save, remove, calcNet, exportCSV, downloadTemplate, importAssets,
       categories: FIN_ASSET_CATEGORIES, statuses: FIN_ASSET_STATUSES,
       acquisitionTypes: FIN_ACQUISITION_TYPES, depMethods: FIN_DEP_METHODS };
   },
   template:`
   <div class="space-y-4">
-    <div class="bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl p-5 shadow flex items-start justify-between">
+    <div class="bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl p-5 shadow flex items-start justify-between flex-wrap gap-2">
       <div>
         <h1 class="text-2xl font-bold flex items-center gap-2">🏗️ Fixed Asset Register / ทะเบียนทรัพย์สิน</h1>
         <p class="text-sm opacity-80 mt-1">บันทึก/ติดตาม Land · Building · Machinery · Vehicle · Equipment · Lease Asset</p>
       </div>
-      <button @click="openAdd" class="bg-white text-amber-700 px-4 py-2 rounded-lg font-bold hover:bg-amber-50">+ เพิ่มทรัพย์สิน</button>
+      <div class="flex flex-wrap gap-2 items-center">
+        <!-- 🆕 Import group -->
+        <button @click="downloadTemplate" class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-xs font-bold" title="ดาวน์โหลด CSV template">📄 Template</button>
+        <label class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold cursor-pointer" title="Import จาก CSV/Excel">
+          📥 Import
+          <input type="file" accept=".csv,.xlsx,.xls" @change="importAssets" class="hidden">
+        </label>
+        <button @click="exportCSV" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold">📤 Export CSV</button>
+        <button @click="openAdd" class="bg-white text-amber-700 px-4 py-2 rounded-lg font-bold hover:bg-amber-50">+ เพิ่มทรัพย์สิน</button>
+      </div>
     </div>
 
     <!-- 🎯 Mega Card + Donut + Monthly Dep -->
