@@ -2881,6 +2881,20 @@ function seedData() {
     amount:12000, accountId:'AC002', vat:0, wht:0, payee:'ทีมงาน', approvedBy:'Owner', branchId:'BR002', createdBy:'system' };
   data.expenses = [];
 
+  // 🛡 SEED FLAG: ติด marker ทุก records ที่มาจาก seed
+  // → push logic จะ block ไม่ให้ push records ที่มี _isSeed=true ขึ้น cloud
+  // → กัน reset demo ทำให้ password reset, master หาย, ฯลฯ ขึ้นไปทับ cloud
+  ['users','roles','suppliers','customers','products','branches','warehouses',
+   'salespersons','accounts','purchaseChannels','salesChannels','expenseCategories',
+   'machines','productionLines','currencies','overseasBeneficiaries',
+   'purchaseBills','salesBills','payments','receipts','expenses'].forEach(k => {
+    if (Array.isArray(data[k])) {
+      data[k].forEach(r => { if (r && typeof r === 'object') r._isSeed = true; });
+    }
+  });
+  data._fromSeed = true;   // mark entire DB as fresh seed
+  data._seedAt = new Date().toISOString();
+
   return data;
 }
 
@@ -3156,6 +3170,39 @@ window.$pullMastersFromCloud = async function() {
   }
   try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
   alert(`✅ Pull สำเร็จ\n\nsuppliers: ${db.suppliers.length}\ncustomers: ${db.customers.length}\nsalespersons: ${db.salespersons.length}\nproducts: ${db.products.length}\n\nRefresh page ใน 2 วินาที`);
+  setTimeout(() => location.reload(), 2000);
+};
+
+/* 🆕 GLOBAL: Restore from pre-reset auto-backup
+   ใช้กรณี: เผลอกด Reset Demo → ข้อมูลหาย → recover จาก auto-backup
+   ใช้: window.$restoreFromPreResetBackup()  — list backups available
+        window.$restoreFromPreResetBackup('ns_erp_backup_pre_reset_2026-05-13T17-15-00')  — restore specific */
+window.$restoreFromPreResetBackup = function(backupKey) {
+  const backups = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('ns_erp_backup_pre_reset_')) {
+      const raw = localStorage.getItem(k);
+      backups.push({ key: k, sizeKB: (raw.length/1024).toFixed(1), ts: k.replace('ns_erp_backup_pre_reset_','') });
+    }
+  }
+  backups.sort((a,b) => b.ts.localeCompare(a.ts));
+  if (!backupKey) {
+    if (!backups.length) { alert('❌ ไม่มี auto-backup'); return; }
+    console.table(backups);
+    alert(`📦 พบ ${backups.length} backups:\n\n` +
+      backups.slice(0,5).map(b => `• ${b.key.slice(-25)}\n  ${b.sizeKB} KB`).join('\n\n') +
+      `\n\nรัน:\nwindow.$restoreFromPreResetBackup('${backups[0].key}')`);
+    return backups;
+  }
+  const raw = localStorage.getItem(backupKey);
+  if (!raw) { alert('❌ ไม่พบ key: '+backupKey); return; }
+  try {
+    JSON.parse(raw);
+  } catch(e) { alert('❌ Backup เสียหาย: '+e.message); return; }
+  if (!confirm(`♻ Restore จาก ${backupKey}?\n\nLocal ปัจจุบันจะถูกเขียนทับ — refresh แล้วเห็นข้อมูลเดิม`)) return;
+  localStorage.setItem(STORAGE_KEY, raw);
+  alert('✅ Restore สำเร็จ — refresh ใน 2 วินาที');
   setTimeout(() => location.reload(), 2000);
 };
 
@@ -5796,7 +5843,20 @@ window.$erp = {
   /* Push 1 table — Smart retry on schema/FK errors (เหมือน manual migrate) */
   async function _pushTable(localKey) {
     const cfg = AS_MAP[localKey]; if (!cfg) return { ok:0, fail:0 };
+    // 🛡 SEED PROTECTION: ถ้า DB ยังเป็น seed (เพิ่ง reset / fresh install) → ห้าม push
+    //   กัน password='admin' default + master เก่า ขึ้นไปทับ cloud → ทำให้ user อื่นโดน reset ตาม
+    if (_GLOBAL_DB._fromSeed === true) {
+      console.warn('[push-block] '+localKey+': DB เป็น seed state — skip push (pull จาก cloud ก่อน)');
+      return { ok:0, fail:0, skipped:'seed' };
+    }
     let rows = (_GLOBAL_DB[localKey] || []).filter(r => r && r.id);
+    if (!rows.length) return { ok:0, fail:0 };
+    // 🛡 SEED PROTECTION per-row: filter rows ที่ติด _isSeed (ไม่เคยถูก user แก้)
+    const beforeSeedFilter = rows.length;
+    rows = rows.filter(r => !r._isSeed);
+    if (rows.length < beforeSeedFilter) {
+      console.warn(`[push-seed-block] ${localKey}: skipped ${beforeSeedFilter - rows.length} seed rows — รอ user แก้หรือ pull จาก cloud`);
+    }
     if (!rows.length) return { ok:0, fail:0 };
     // 🆕 Skip tombstoned rows — กัน push ของที่ลบไปแล้ว (cloud tombstone หรือ local tombstone)
     const filtered = rows.filter(r => !isTombstoned(localKey, r.id));
@@ -5994,6 +6054,17 @@ window.$erp = {
   /* Push all dirty tables (force=true → push ALL tables regardless of dirty) */
   async function pushDirty(force = false) {
     if (isPushing || !window.sb || !enabled) return;
+    // 🛡 SEED PROTECTION: block ทุก push จนกว่าจะ pull cloud สำเร็จครั้งแรก
+    try {
+      if (sessionStorage.getItem('ns_erp_block_push_after_reset') === '1') {
+        console.warn('[push-block] blocked by ns_erp_block_push_after_reset flag — waiting for pull first');
+        return;
+      }
+    } catch(e){}
+    if (_GLOBAL_DB._fromSeed === true) {
+      console.warn('[push-block] DB เป็น seed state — skip push ทั้งหมด รอ pull จาก cloud');
+      return;
+    }
     // 🆕 รวม dirty + failed (ตาราง fail จากรอบก่อน) — หรือ force = ทุกตาราง
     const merged = new Set([...dirtyTables, ...failedTables]);
     const toPush = force || merged.size === 0 ? AS_TABLES.slice() : Array.from(merged);
@@ -6283,6 +6354,14 @@ window.$erp = {
       _updateStatus('ok', '☁️✓ Synced', 'Pull สำเร็จ ('+totalRows+' rows'+nrTxt+')');
       lastSyncMsg = 'pulled '+totalRows+' rows'+(newRowCount?' (+'+newRowCount+' new)':'');
       lastSuccessAt = Date.now();
+      // 🛡 ถ้า pull สำเร็จ + ได้ rows จาก cloud → clear seed flag (DB ไม่ใช่ seed อีกแล้ว)
+      // กัน push block หลัง pull เสร็จ
+      if (totalRows > 0 && _GLOBAL_DB._fromSeed) {
+        delete _GLOBAL_DB._fromSeed;
+        console.log('[push-unblock] cleared _fromSeed flag after successful pull from cloud');
+      }
+      // Clear post-reset block — ปลดล็อก push หลัง pull สำเร็จ
+      try { sessionStorage.removeItem('ns_erp_block_push_after_reset'); } catch(e){}
     }
   }
 
@@ -6844,7 +6923,34 @@ const app = createApp({
     }
 
     function resetDemo() {
-      if (!confirm('ต้องการลบข้อมูลทั้งหมดและคืนค่าเริ่มต้นใช่หรือไม่?')) return;
+      // 🛡 STRONG WARNING 2026-05-13: Reset Demo เป็นอันตรายมาก
+      //   หลัง reset → seed data ตั้งต้นจะถูกใส่ใน local
+      //   แล้ว autoSync อาจ push seed (password='admin', master เก่า) ทับ cloud → ทุกคนเดือดร้อน
+      //   วิธีใหม่: ต้องพิมพ์ "RESET" ยืนยัน + เตือนเสียงดังว่าจะกระทบ cloud
+      const w1 = '⚠⚠⚠ คำเตือนระดับร้ายแรง ⚠⚠⚠\n\n' +
+        'Reset Demo จะ:\n' +
+        '1. ลบข้อมูลทั้งหมดบนเครื่องนี้\n' +
+        '2. ใส่ seed (ข้อมูลตัวอย่าง — password=admin/owner ฯลฯ)\n' +
+        '3. ⚠ ถ้าเครื่องนี้ออนไลน์ → อาจ push seed ทับ cloud → user อื่นโดน reset ตาม!\n\n' +
+        'แนะนำ: backup ก่อนรัน (Menu > Backup)\n\n' +
+        'ดำเนินการต่อ?';
+      if (!confirm(w1)) return;
+      const w2 = prompt('พิมพ์คำว่า "RESET" (ตัวพิมพ์ใหญ่) เพื่อยืนยัน:');
+      if (w2 !== 'RESET') { alert('❌ ยกเลิก — ไม่ได้พิมพ์ "RESET"'); return; }
+      // Auto-backup ก่อน reset
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+          localStorage.setItem('ns_erp_backup_pre_reset_'+ts, raw);
+          console.log('[reset] Auto-backup saved to localStorage key: ns_erp_backup_pre_reset_'+ts);
+        }
+      } catch(e) { console.warn('[reset] backup fail:', e); }
+      // 🛡 หยุด autoSync ก่อน — กัน seed push ทับ cloud หลัง reload
+      try {
+        if (window.$autoSync?.stop) window.$autoSync.stop();
+        sessionStorage.setItem('ns_erp_block_push_after_reset', '1');
+      } catch(e){}
       localStorage.removeItem(STORAGE_KEY);
       location.reload();
     }
@@ -37010,6 +37116,8 @@ app.component('view-userPermission', {
       if (!f.username) { erp.showToast('กรุณาใส่ username','error'); return; }
       const dup = (db.users||[]).find(u => u && u.username===f.username && u.id!==editingUser.value);
       if (dup) { erp.showToast('username ซ้ำ','error'); return; }
+      // 🛡 Clear seed flag — user แก้แล้ว → push ได้
+      delete db._fromSeed;
       // ตรวจ password ตอนสร้าง user ใหม่ — บังคับ
       if (!editingUser.value && (!f.password || String(f.password).length < 4)) {
         erp.showToast('กรุณาใส่ password (อย่างน้อย 4 ตัว)','error'); return;
@@ -37028,6 +37136,7 @@ app.component('view-userPermission', {
             passwordChangedAt: f.password ? nowIso : oldUser.passwordChangedAt,
             updatedAt: nowIso,
             createdAt: oldUser.createdAt || nowIso,
+            // 🛡 Clear seed flag — user-modified, push allowed
           };
           if (f.password) erp.logActivity('PWD_RESET','users', f.username, 'admin reset password');
         }
