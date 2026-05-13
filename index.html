@@ -36363,9 +36363,11 @@ app.component('view-receiptVoucher', {
       } catch(e) { return []; }
     });
 
+    // 🔧 Vue 3 production ไม่ให้ template access window — expose ผ่าน setup()
+    const doPrint = () => window.print();
     return { db, form, list, search, showForm, showPrint, printingVoucher, editingId,
       openCreate, pickPurchaseBill, openEdit, save, remove, openPrint, addItem, removeItem,
-      availablePB, recalcAll, bahtText, fmt, erp };
+      availablePB, recalcAll, bahtText, fmt, erp, doPrint };
   },
   template: `
     <div class="p-3 max-w-7xl mx-auto print:hidden">
@@ -36522,7 +36524,7 @@ app.component('view-receiptVoucher', {
       <div class="print:hidden bg-slate-800 text-white p-2 flex justify-between items-center">
         <span class="text-sm">พรีวิวพิมพ์ — ใบสำคัญรับเงิน {{printingVoucher.docNo}}</span>
         <div class="flex gap-2">
-          <button @click="window.print()" class="bg-blue-500 px-3 py-1 rounded text-xs">🖨 พิมพ์</button>
+          <button @click="doPrint" class="bg-blue-500 px-3 py-1 rounded text-xs">🖨 พิมพ์</button>
           <button @click="showPrint=false" class="bg-red-500 px-3 py-1 rounded text-xs">ปิด</button>
         </div>
       </div>
@@ -38270,8 +38272,14 @@ app.component('view-tradingMatching', {
       return 'bg-slate-100 text-slate-600';
     }
 
+    // 🔧 Vue 3 production ไม่ให้ template access window — expose ผ่าน setup()
+    const runRecomputeTradingCost = () => {
+      if (typeof window.$recomputeTradingDealCosts === 'function') return window.$recomputeTradingDealCosts(true);
+      alert('ฟังก์ชันยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
+    };
     return { erp, db, fmt, tab, tradingPurchases, tradingSales, deals, summary, topPairs, monthlyGP,
-      showMatchModal, matchForm, openMatch, autoFillFromBills, saveMatch, reverseMatch, statusBadge };
+      showMatchModal, matchForm, openMatch, autoFillFromBills, saveMatch, reverseMatch, statusBadge,
+      runRecomputeTradingCost };
   },
   template:`
   <div class="space-y-4">
@@ -38281,7 +38289,7 @@ app.component('view-tradingMatching', {
         <p class="text-sm opacity-80 mt-1">จับคู่บิลซื้อ Trading กับบิลขาย Trading → คำนวณ GP ต่อดีล (ก่อน VAT)</p>
       </div>
       <div class="flex gap-2">
-        <button @click="window.$recomputeTradingDealCosts && window.$recomputeTradingDealCosts(true)" class="bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200" title="หา Trading Deal ที่ cost=0 + คำนวณใหม่จาก PB.netAmount/netWeight">🔄 Recalc Cost</button>
+        <button @click="runRecomputeTradingCost" class="bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200" title="หา Trading Deal ที่ cost=0 + คำนวณใหม่จาก PB.netAmount/netWeight">🔄 Recalc Cost</button>
         <button @click="openMatch" class="bg-white text-fuchsia-700 px-4 py-2 rounded-lg font-bold hover:bg-fuchsia-50">+ จับคู่ใหม่</button>
       </div>
     </div>
