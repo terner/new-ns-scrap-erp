@@ -3568,6 +3568,124 @@ window.$cleanupExpenseDuplicates = async function() {
   alert(`✅ ลบ duplicate สำเร็จ\n• Local: ${toDelete.length} lines\n• Cloud: ${cloudOk} ลบสำเร็จ${cloudFail?' · ' + cloudFail + ' fail':''}\n• เงินคืน: ${fmt(dupAmount)} บาท`);
 };
 
+/* 🆕 GLOBAL: Diagnose stock for one product — ดูทุก movement ตามเวลา + จุดที่ติดลบ
+   ใช้: window.$diagnoseStockProduct(productId[, branchId[, warehouseId]])
+   ผลลัพธ์: console.table แสดงทุก IN/OUT เรียงตามเวลา + balance สะสม + flag จุดที่ติดลบ */
+window.$diagnoseStockProduct = function(productId, branchId, warehouseId) {
+  const db = _GLOBAL_DB;
+  if (!productId) {
+    console.warn('❌ ต้องระบุ productId — ใช้: $diagnoseStockProduct("PRD-XXX", "branchId", "warehouseId")');
+    console.log('📦 รายชื่อสินค้าใน stockLedger:');
+    const prodIds = [...new Set((db.stockLedger||[]).map(m=>m && m.productId).filter(Boolean))];
+    prodIds.slice(0,30).forEach(pid => {
+      const p = (db.products||[]).find(x=>x && x.id===pid);
+      console.log('  ', pid, '→', p?.name || '?');
+    });
+    return;
+  }
+  const prod = (db.products||[]).find(p => p && p.id === productId);
+  const productName = prod?.name || productId;
+  // กรอง
+  const movements = (db.stockLedger||[]).filter(m => {
+    if (!m || m.productId !== productId) return false;
+    if (branchId && m.branchId !== branchId) return false;
+    if (warehouseId && m.warehouseId !== warehouseId) return false;
+    return true;
+  }).sort((a,b) =>
+    (a.date||'').localeCompare(b.date||'') ||
+    (String(a.createdAt||'').localeCompare(String(b.createdAt||''))) ||
+    (a.id||'').localeCompare(b.id||'')
+  );
+  if (!movements.length) {
+    console.warn('❌ ไม่พบ movement สำหรับสินค้านี้:', productName);
+    return;
+  }
+  // คำนวณ running balance ต่อ branch|warehouse
+  const balByKey = {};
+  let firstNegIdx = -1;
+  const rows = movements.map((m, idx) => {
+    const key = (m.branchId||'') + '|' + (m.warehouseId||'');
+    if (!(key in balByKey)) balByKey[key] = 0;
+    balByKey[key] += Number(m.qtyIn||0) - Number(m.qtyOut||0);
+    const balance = balByKey[key];
+    if (balance < 0 && firstNegIdx < 0) firstNegIdx = idx;
+    const br = (db.branches||[]).find(b => b && b.id === m.branchId);
+    const wh = (db.warehouses||[]).find(w => w && w.id === m.warehouseId);
+    return {
+      '#': idx+1,
+      'วันที่': m.date,
+      'เลขบิล': m.refNo || '-',
+      'ประเภท': m.movementType || m.refType,
+      'สาขา': br?.name || (m.branchId||'-'),
+      'คลัง': wh?.name || (m.warehouseId||'-'),
+      'เข้า': Number(m.qtyIn||0),
+      'ออก': Number(m.qtyOut||0),
+      'คงเหลือ': Number(balance.toFixed(2)),
+      'ติดลบ?': balance < 0 ? '⚠ ติดลบ' : '',
+      'note': m.note || '',
+      'createdAt': m.createdAt || '',
+    };
+  });
+  console.log(`%c📦 Diagnose Stock — ${productName}`, 'font-weight:bold;font-size:14px;color:#0369a1');
+  console.log(`Branch filter: ${branchId||'(ทุกสาขา)'} | Warehouse filter: ${warehouseId||'(ทุกคลัง)'}`);
+  console.log(`Total movements: ${movements.length}`);
+  if (firstNegIdx >= 0) {
+    console.warn(`⚠ Stock เริ่มติดลบที่แถวที่ ${firstNegIdx+1}: ${rows[firstNegIdx]['เลขบิล']} (${rows[firstNegIdx]['ประเภท']}) วันที่ ${rows[firstNegIdx]['วันที่']}`);
+    console.warn(`   → ก่อนหน้า: ${firstNegIdx>0 ? rows[firstNegIdx-1]['คงเหลือ'] : 0}, แถวนี้: เข้า ${rows[firstNegIdx]['เข้า']} ออก ${rows[firstNegIdx]['ออก']} = ${rows[firstNegIdx]['คงเหลือ']}`);
+  } else {
+    console.log('✓ ไม่มีจุดที่ Stock ติดลบ');
+  }
+  // หา OUT movements ขนาดใหญ่
+  const bigOuts = rows.filter(r => r['ออก'] > 1000).sort((a,b) => b['ออก'] - a['ออก']).slice(0,10);
+  if (bigOuts.length) {
+    console.log('%c📤 OUT movements ที่ใหญ่สุด 10 อันดับ:', 'font-weight:bold;color:#dc2626');
+    console.table(bigOuts);
+  }
+  console.log('%c📋 ตารางทุก movement (เรียงตามเวลา):', 'font-weight:bold;color:#0369a1');
+  console.table(rows);
+  return { productName, totalMovements: movements.length, firstNegativeIdx: firstNegIdx, finalBalance: balByKey, rows };
+};
+
+/* 🆕 GLOBAL: หาทุกสินค้าที่ติดลบ — ใช้ที่ console: window.$listNegativeStock() */
+window.$listNegativeStock = function() {
+  const db = _GLOBAL_DB;
+  const movements = (db.stockLedger||[]).filter(m => m && m.productId).sort((a,b) =>
+    (a.date||'').localeCompare(b.date||'') ||
+    (String(a.createdAt||'').localeCompare(String(b.createdAt||''))) ||
+    (a.id||'').localeCompare(b.id||'')
+  );
+  const balByKey = {};
+  const negativeRows = [];
+  const finalNegative = {};
+  movements.forEach(m => {
+    const key = (m.productId||'') + '|' + (m.branchId||'') + '|' + (m.warehouseId||'');
+    if (!(key in balByKey)) balByKey[key] = 0;
+    balByKey[key] += Number(m.qtyIn||0) - Number(m.qtyOut||0);
+    if (balByKey[key] < 0) negativeRows.push({ key, bal: balByKey[key], m });
+  });
+  // หาสินค้าที่ตอนนี้ติดลบ (final balance < 0)
+  Object.entries(balByKey).forEach(([key, bal]) => {
+    if (bal < 0) {
+      const [pid, bid, wid] = key.split('|');
+      const p = (db.products||[]).find(x=>x && x.id===pid);
+      const br = (db.branches||[]).find(b=>b && b.id===bid);
+      const wh = (db.warehouses||[]).find(w=>w && w.id===wid);
+      finalNegative[key] = {
+        productId: pid, branchId: bid, warehouseId: wid,
+        productName: p?.name || pid,
+        branchName: br?.name || bid,
+        warehouseName: wh?.name || wid,
+        finalBalance: Number(bal.toFixed(2)),
+      };
+    }
+  });
+  const arr = Object.values(finalNegative).sort((a,b)=>a.finalBalance-b.finalBalance);
+  console.log(`%c⚠ พบสินค้าติดลบ (final balance): ${arr.length} รายการ`, 'font-weight:bold;color:#dc2626;font-size:14px');
+  console.table(arr);
+  console.log('💡 ใช้: $diagnoseStockProduct("productId", "branchId", "warehouseId") เพื่อดูรายละเอียด');
+  return arr;
+};
+
 window.$erp = {
   db: _GLOBAL_DB,
   currentUser: ref(null),
@@ -8857,6 +8975,65 @@ app.component('view-stockLedger', {
       closeFixModal();
     }
 
+    /* 🆕 TIMELINE MODAL — แสดงทุก movement ของสินค้านี้+คลังนี้ตามเวลา (ไม่ขึ้นกับ filter type) */
+    const showTimeline = ref(false);
+    const timelineCtx = ref(null);    // { productId, productName, branchId, warehouseId }
+    const timelineRows = computed(() => {
+      const ctx = timelineCtx.value;
+      if (!ctx) return [];
+      const movs = (db.stockLedger||[]).filter(m =>
+        m && m.productId === ctx.productId
+        && (ctx.branchId == null || m.branchId === ctx.branchId)
+        && (ctx.warehouseId == null || m.warehouseId === ctx.warehouseId)
+      ).sort((a,b) =>
+        (a.date||'').localeCompare(b.date||'') ||
+        (String(a.createdAt||'').localeCompare(String(b.createdAt||''))) ||
+        (a.id||'').localeCompare(b.id||'')
+      );
+      let bal = 0;
+      return movs.map((m, idx) => {
+        bal += Number(m.qtyIn||0) - Number(m.qtyOut||0);
+        return {
+          ...m,
+          _idx: idx+1,
+          _balance: bal,
+          _isNegative: bal < 0,
+          _isBigOut: Number(m.qtyOut||0) >= 1000,
+          _cp: getCounterparty(m),
+        };
+      });
+    });
+    /* แสดงเรียงจากเก่า → ใหม่ในตาราง (default), toggle ได้ */
+    const timelineNewestFirst = ref(true);
+    const timelineDisplay = computed(() => {
+      const rows = timelineRows.value;
+      return timelineNewestFirst.value ? [...rows].reverse() : rows;
+    });
+    /* highlight แถวแรกที่ติดลบ */
+    const timelineFirstNegIdx = computed(() => {
+      return timelineRows.value.findIndex(r => r._isNegative);
+    });
+    function openTimeline(row) {
+      timelineCtx.value = {
+        productId: row.productId,
+        productName: erp.productName(row.productId),
+        branchId: row.branchId,
+        warehouseId: row.warehouseId,
+        branchName: (db.branches||[]).find(b=>b && b.id===row.branchId)?.name || '-',
+        warehouseName: erp.warehouseName?.(row.warehouseId) || '-',
+      };
+      showTimeline.value = true;
+    }
+    function closeTimeline() { showTimeline.value = false; timelineCtx.value = null; }
+    /* นำทางไปบิลจาก timeline */
+    function gotoFromTimeline(m) {
+      const cp = getCounterparty(m);
+      if (cp.clickable && cp.bill) {
+        detailBill.value = cp.bill;
+        detailType.value = cp.billType;
+      }
+    }
+
     return { db, erp, filterProduct, filterBranch, filterType, fromDate, toDate,
       filterNegativeOnly, negativeCount,
       list, movementTypes, fmt:erp.fmt,
@@ -8864,7 +9041,10 @@ app.component('view-stockLedger', {
       // Fix modal
       showFixModal, fixContext, fixForm, fixLinesAvail, fixTotalQty, fixTotalValue,
       openFixModal, closeFixModal, applyFix, addFixLine, removeFixLine, onLineSourceChange,
-      getSourceAvail };
+      getSourceAvail,
+      // Timeline modal
+      showTimeline, timelineCtx, timelineRows, timelineDisplay, timelineFirstNegIdx,
+      timelineNewestFirst, openTimeline, closeTimeline, gotoFromTimeline };
   },
   template: `
   <div>
@@ -8886,6 +9066,15 @@ app.component('view-stockLedger', {
         <span :class="['px-1.5 py-0.5 rounded text-[10px]', filterNegativeOnly?'bg-white text-red-700':'bg-red-600 text-white']">{{negativeCount}}</span>
       </button>
       <span class="ml-auto text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded">📊 พบ <b>{{list.length}}</b> รายการ</span>
+    </div>
+    <!-- 🆕 Hint: ถ้ามี filter type → เตือนว่า balance รวม OUT ที่ไม่แสดง -->
+    <div v-if="filterType" class="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+      <span class="text-base">⚠</span>
+      <div>
+        <b>คุณกำลังกรองประเภท "{{filterType}}"</b> —
+        ⚖️ <b>คงเหลือ</b> เป็นยอดสะสมจาก <b>ทุกประเภท</b> (รวม OUT ที่ถูกซ่อนอยู่ด้วย) —
+        ถ้ายอดดู "กระโดด" ผิดปกติ ให้กดที่เลขคงเหลือหรือปุ่ม 📊 เพื่อดู Timeline ทุก movement
+      </div>
     </div>
     <div class="bg-white rounded-xl shadow overflow-x-auto">
       <table class="w-full text-sm table-zebra" style="min-width:1200px">
@@ -8923,8 +9112,10 @@ app.component('view-stockLedger', {
             <td class="p-2"><span class="font-medium">{{erp.productName(m.productId)}}</span><span v-if="m.lotNo && m.lotNo!=='OPENING'" class="text-xs text-slate-400 ml-1">[{{m.lotNo}}]</span></td>
             <td class="p-2 text-right text-emerald-600 font-mono">{{m.qtyIn?fmt(m.qtyIn):'-'}}</td>
             <td class="p-2 text-right text-red-600 font-mono">{{m.qtyOut?fmt(m.qtyOut):'-'}}</td>
-            <!-- 🆕 คงเหลือ — Red ถ้าติดลบ -->
-            <td class="p-2 text-right font-mono font-bold" :class="m.isNegative?'bg-red-100 text-red-700':'bg-blue-50/40 text-blue-700'">
+            <!-- 🆕 คงเหลือ — Red ถ้าติดลบ — click เพื่อดู timeline -->
+            <td class="p-2 text-right font-mono font-bold cursor-pointer hover:opacity-80" :class="m.isNegative?'bg-red-100 text-red-700':'bg-blue-50/40 text-blue-700'"
+                @click="openTimeline(m)"
+                title="ยอดสะสม IN-OUT ทุกประเภท (รวม OUT ที่ไม่แสดงในตารางถ้าคุณกรองประเภทอยู่) — กดเพื่อดู Timeline">
               <span v-if="m.isNegative">⚠ {{fmt(m.balance)}}</span>
               <span v-else>{{fmt(m.balance)}}</span>
             </td>
@@ -8932,11 +9123,14 @@ app.component('view-stockLedger', {
             <td class="p-2 text-right font-mono">{{m.valueIn?fmt(m.valueIn):'-'}}</td>
             <td class="p-2 text-right font-mono">{{m.valueOut?fmt(m.valueOut):'-'}}</td>
             <td class="p-2 text-center whitespace-nowrap">
-              <!-- 🆕 ปุ่ม "ปรับเกรด" ถ้าติดลบ -->
-              <button v-if="m.isNegative" @click="openFixModal(m)" class="text-xs px-2 py-1 bg-red-500 text-white hover:bg-red-600 rounded font-bold animate-pulse">🔧 ปรับเกรด</button>
-              <button v-else-if="m.refType==='OPENING'" @click="editOpening(m)" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-medium" title="ไปแก้ที่ Opening Balance">✏️ Opening</button>
-              <button v-else-if="m._cp.clickable" @click="openDetail(m)" class="text-xs text-slate-500 hover:text-slate-700">🔍</button>
-              <span v-else class="text-slate-300 text-xs">-</span>
+              <div class="flex items-center justify-center gap-1">
+                <!-- 🆕 ปุ่ม Timeline — ดูทุก movement ของสินค้านี้ -->
+                <button @click="openTimeline(m)" class="text-xs px-1.5 py-1 bg-sky-100 text-sky-700 hover:bg-sky-200 rounded" title="📊 ดู Timeline ทุก movement ของสินค้านี้ในคลังนี้">📊</button>
+                <!-- 🆕 ปุ่ม "ปรับเกรด" ถ้าติดลบ -->
+                <button v-if="m.isNegative" @click="openFixModal(m)" class="text-xs px-2 py-1 bg-red-500 text-white hover:bg-red-600 rounded font-bold animate-pulse">🔧 ปรับเกรด</button>
+                <button v-else-if="m.refType==='OPENING'" @click="editOpening(m)" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-medium" title="ไปแก้ที่ Opening Balance">✏️ Opening</button>
+                <button v-else-if="m._cp.clickable" @click="openDetail(m)" class="text-xs text-slate-500 hover:text-slate-700">🔍</button>
+              </div>
             </td>
           </tr>
           <tr v-if="list.length===0"><td colspan="12" class="text-center py-8 text-slate-400">ยังไม่มี Stock Movement</td></tr>
@@ -9116,6 +9310,79 @@ app.component('view-stockLedger', {
         </div>
         <div class="px-5 py-3 border-t bg-slate-50 flex justify-end">
           <button @click="closeDetail" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded">ปิด</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🆕 TIMELINE MODAL — ดูทุก movement ของสินค้านี้ตามเวลา (รวม OUT) -->
+    <div v-if="showTimeline" class="fixed inset-0 bg-black/60 z-50 overflow-y-auto" @click.self="closeTimeline">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-6xl mx-auto my-6">
+        <div class="px-5 py-4 border-b bg-sky-50 flex justify-between items-center">
+          <div>
+            <h3 class="font-bold text-lg text-sky-800">📊 Timeline — ทุก Movement ของสินค้านี้</h3>
+            <div class="text-sm text-slate-600 mt-1">
+              <b class="text-sky-700">{{timelineCtx?.productName}}</b>
+              · 🏢 {{timelineCtx?.branchName}}
+              · 📦 {{timelineCtx?.warehouseName}}
+              · พบ <b>{{timelineRows.length}}</b> รายการ
+              <span v-if="timelineFirstNegIdx >= 0" class="ml-2 text-red-700 font-bold">⚠ เริ่มติดลบที่แถวที่ {{timelineFirstNegIdx + 1}}</span>
+            </div>
+          </div>
+          <button @click="closeTimeline" class="text-2xl text-slate-400 leading-none">&times;</button>
+        </div>
+        <div class="px-5 py-3 bg-sky-50/40 border-b flex items-center gap-3 text-xs">
+          <button @click="timelineNewestFirst = !timelineNewestFirst" class="px-3 py-1.5 bg-white border rounded hover:bg-sky-100">
+            🔃 เรียง: <b>{{timelineNewestFirst ? 'ใหม่→เก่า' : 'เก่า→ใหม่'}}</b>
+          </button>
+          <span class="text-slate-600">💡 แถว <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">แดง</span> = ติดลบ · <span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-bold">ส้ม</span> = OUT ใหญ่ (≥1,000)</span>
+        </div>
+        <div class="p-4 max-h-[70vh] overflow-y-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-100 sticky top-0">
+              <tr>
+                <th class="p-2 text-left" style="width:50px">#</th>
+                <th class="p-2 text-left" style="width:90px">วันที่</th>
+                <th class="p-2 text-left" style="width:130px">เลขบิล</th>
+                <th class="p-2 text-left" style="min-width:160px">ประเภท</th>
+                <th class="p-2 text-left" style="min-width:160px">ผู้ขาย/ผู้ซื้อ</th>
+                <th class="p-2 text-right" style="width:100px">เข้า</th>
+                <th class="p-2 text-right" style="width:100px">ออก</th>
+                <th class="p-2 text-right bg-blue-100" style="width:120px">⚖️ คงเหลือ</th>
+                <th class="p-2 text-left" style="min-width:120px">หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in timelineDisplay" :key="r.id"
+                  class="border-t hover:bg-slate-50"
+                  :class="r._isNegative ? 'bg-red-50/70 border-red-200' : (r._isBigOut ? 'bg-orange-50/70' : '')">
+                <td class="p-2 text-slate-400">{{r._idx}}</td>
+                <td class="p-2 whitespace-nowrap">{{r.date}}</td>
+                <td class="p-2 whitespace-nowrap">
+                  <button v-if="r._cp.clickable" @click="gotoFromTimeline(r)" class="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline">{{r.refNo}} 🔍</button>
+                  <span v-else class="font-mono text-xs text-slate-500">{{r.refNo||'-'}}</span>
+                </td>
+                <td class="p-2"><span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="r.qtyIn>0?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'">{{r.movementType}}</span></td>
+                <td class="p-2">
+                  <span v-if="r._cp.kind" class="text-[10px] px-1.5 py-0.5 rounded font-bold mr-1" :class="r._cp.kind==='ผู้ขาย'?'bg-emerald-100 text-emerald-700':'bg-blue-100 text-blue-700'">{{r._cp.kind}}</span>
+                  <span :class="r._cp.kind==='ผู้ขาย'?'text-emerald-800 font-semibold':r._cp.kind==='ผู้ซื้อ'?'text-blue-800 font-semibold':'text-slate-500 italic'">{{r._cp.name}}</span>
+                </td>
+                <td class="p-2 text-right text-emerald-600 font-mono">{{r.qtyIn?fmt(r.qtyIn):'-'}}</td>
+                <td class="p-2 text-right font-mono" :class="r._isBigOut?'text-red-700 font-bold':'text-red-600'">{{r.qtyOut?fmt(r.qtyOut):'-'}}</td>
+                <td class="p-2 text-right font-mono font-bold" :class="r._isNegative?'bg-red-100 text-red-700':'bg-blue-50/40 text-blue-700'">
+                  <span v-if="r._isNegative">⚠ {{fmt(r._balance)}}</span>
+                  <span v-else>{{fmt(r._balance)}}</span>
+                </td>
+                <td class="p-2 text-slate-500 truncate" style="max-width:200px" :title="r.note">{{r.note||'-'}}</td>
+              </tr>
+              <tr v-if="timelineRows.length===0"><td colspan="9" class="text-center py-8 text-slate-400">ไม่มี movement</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-5 py-3 border-t bg-slate-50 flex items-center justify-between">
+          <div class="text-xs text-slate-600">
+            💡 <b>ทำไม Stock ติดลบ?</b> เพราะมี OUT (ขาย/เบิก/โอน/Production) มากกว่า IN — ดูแถวที่เป็นสีส้มหรือ Tab "ปรับเกรด" เพื่อแก้
+          </div>
+          <button @click="closeTimeline" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded">ปิด</button>
         </div>
       </div>
     </div>
