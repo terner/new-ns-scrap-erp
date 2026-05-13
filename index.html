@@ -7758,15 +7758,23 @@ function makeMasterComponent(opts) {
         alert(`✅ Merge สำเร็จ\n• รวม ${plan.length} ชื่อ → ${plan.length} ตัว\n• ลบ ${deletedIds.length} duplicates`);
       }
 
+      // 🆕 Force pull masters from cloud
+      const runPullMasters = () => {
+        if (typeof window.$pullMastersFromCloud === 'function') return window.$pullMastersFromCloud();
+        alert('ฟังก์ชันยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
+      };
+
       return { db, list, filtered, search, showModal, editing, form, open, save, remove, opts, fmt: erp.fmt,
         selectedIds, isSelected, toggleOne, allVisibleSelected, toggleAllVisible, clearSelection, bulkDelete,
-        exportExcel, mergeDuplicates };
+        exportExcel, mergeDuplicates, runPullMasters };
     },
     template: `
       <div>
         <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <input v-model="search" placeholder="ค้นหา..." class="px-3 py-2 border border-slate-300 rounded-lg text-sm w-full sm:w-64">
           <div class="flex gap-2 flex-wrap">
+            <!-- 🆕 Sync Master จาก Cloud — เฉพาะ suppliers / customers / products -->
+            <button v-if="['suppliers','customers','products'].includes(opts.collection)" @click="runPullMasters" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm" title="ดึง master จาก cloud มาทับ local (แก้กรณีชื่อหายในเครื่องนี้)">🔄 Sync Master</button>
             <!-- 🆕 Merge Duplicates — เฉพาะ suppliers / customers -->
             <button v-if="['suppliers','customers'].includes(opts.collection)" @click="mergeDuplicates" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-sm" title="ค้นหา + รวมชื่อที่ซ้ำกันอัตโนมัติ (เก็บตัวที่มีบิล)">🔧 รวมชื่อซ้ำ</button>
             <button @click="exportExcel" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm" title="Download Excel ของข้อมูลทั้งหมด">📊 Export Excel</button>
@@ -42470,12 +42478,20 @@ app.component('view-mdSalesperson', {
       const q = (search.value||'').toLowerCase();
       return (db.salespersons||[]).filter(s => !q || ((s.code||'')+' '+(s.name||'')).toLowerCase().includes(q));
     });
-    return { db, erp, showForm, editingId, form, search, filtered, open, openEdit, save, remove, fmt:erp.fmt };
+    // 🆕 Force pull masters
+    const runPullMasters = () => {
+      if (typeof window.$pullMastersFromCloud === 'function') return window.$pullMastersFromCloud();
+      alert('ฟังก์ชันยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
+    };
+    return { db, erp, showForm, editingId, form, search, filtered, open, openEdit, save, remove, fmt:erp.fmt, runPullMasters };
   },
   template: `
   <div>
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
-      <strong>👨‍💼 พนักงานขาย (Sales)</strong> — กำหนด commission % ของแต่ละคน + ผูกลูกค้าในหน้า "Sales Commission Dashboard"
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800 flex items-center justify-between gap-2">
+      <span><strong>👨‍💼 พนักงานขาย (Sales)</strong> — กำหนด commission % ของแต่ละคน + ผูกลูกค้าในหน้า "Sales Commission Dashboard"</span>
+      <button @click="runPullMasters" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 whitespace-nowrap shrink-0" title="ดึง master จาก cloud มาทับ local — แก้กรณี master หายหรือไม่ update">
+        🔄 Sync Master จาก Cloud
+      </button>
     </div>
     <div class="flex gap-2 mb-4">
       <input v-model="search" placeholder="🔍 ค้นหา..." class="px-3 py-2 border rounded-lg text-sm w-64">
