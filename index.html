@@ -16275,8 +16275,16 @@ app.component('view-sales', {
       return cd;   // YYYY-MM-DD or '' if not set
     });
     function isOpeningBill(b) {
+      if (!b) return false;
+      // 🆕 ตรวจ docNo prefix ก่อน — บิล OPN-AR-* / OPN-* คือ opening เสมอ (กำไรอยู่ใน opening balance แล้ว)
+      const doc = String(b.docNo || '').toUpperCase();
+      if (doc.startsWith('OPN-') || doc.startsWith('OPN_') || doc.startsWith('OPENING')) return true;
+      // ถ้า id เริ่มด้วย SB-OPN- / PB-OPN-
+      const id = String(b.id || '').toUpperCase();
+      if (id.includes('-OPN-') || id.startsWith('OPN-')) return true;
+      // fallback: date ≤ cutoff
       const cd = openingCutoff.value;
-      if (!cd || !b || !b.date) return false;
+      if (!cd || !b.date) return false;
       return String(b.date) <= String(cd);
     }
     function displayProfit(b) {
@@ -16504,6 +16512,61 @@ app.component('view-sales', {
     function _salesReceipts(billId) {
       return (db.receipts || []).filter(r => r && r.billId === billId);
     }
+    /* 🆕 ยกเลิกการชำระเงิน (receipts) ทั้งหมดของบิลนี้ — เพื่อ unlock edit/delete */
+    async function cancelAllReceiptsForBill(b) {
+      if (!b) return;
+      const linked = _salesReceipts(b.id);
+      if (linked.length === 0) { alert('✓ บิลนี้ไม่มี receipt — แก้ไข/ลบได้เลย'); return; }
+      const totalRcv = linked.reduce((s,r) => s + Number(r.amount||0) + Number(r.withholdingTax||0) + Number(r.discount||0), 0);
+      const docs = [...new Set(linked.map(r => r.voucherId || r.id))].slice(0,5).join(', ');
+      const msg = `💸 ยกเลิก Receipt ทั้งหมดของบิล ${b.docNo}?\n\n` +
+        `• จำนวน: ${linked.length} receipts\n` +
+        `• ยอดรวม: ${erp.fmt(totalRcv)} บาท\n` +
+        `• Vouchers: ${docs}\n\n` +
+        `⚠ จะลบ receipts (local + cloud + tombstone) → บิลกลับเป็น "ยังไม่รับเงิน" → แก้/ลบบิลได้\n` +
+        `⚠ Bank statement / Cash position อาจกระทบ — ตรวจหลังจากนี้\n\n` +
+        `ดำเนินการ?`;
+      if (!confirm(msg)) return;
+      window.setSaveStatus?.('saving', 'กำลังยกเลิก '+linked.length+' receipts');
+      try {
+        const ids = linked.map(r => r.id);
+        // Tombstone + ลบ local
+        try { window.$autoSync?.addTombstones?.('receipts', ids); } catch(e){}
+        db.receipts = (db.receipts||[]).filter(r => !r || !ids.includes(r.id));
+        // ลบ bank_statement ที่ ref_id ตรงกับ receipt
+        if (Array.isArray(db.bankStatement)) {
+          const bsIds = db.bankStatement.filter(s => s && ids.includes(s.refId)).map(s => s.id);
+          if (bsIds.length) {
+            try { window.$autoSync?.addTombstones?.('bankStatement', bsIds); } catch(e){}
+            db.bankStatement = db.bankStatement.filter(s => !s || !bsIds.includes(s.id));
+          }
+        }
+        // ปรับสถานะบิลกลับเป็น "unreceived"
+        b.receivedAmount = 0;
+        b.receivableBalance = Number(b.totalAmount || 0);
+        b.status = 'unreceived';
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        erp.logAudit('CANCEL_RECEIPTS','salesBill', {billDocNo:b.docNo, receiptIds:ids}, null);
+        // ลบจาก cloud
+        if (window.sb) {
+          for (const id of ids) {
+            try { await window.sb.from('receipts').delete().eq('id', id); } catch(e){}
+          }
+        }
+        if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
+        window.setSaveStatus?.('saved', 'ยกเลิก '+ids.length+' receipts + sync cloud');
+        erp.showToast(`✓ ยกเลิก ${ids.length} receipts บิล ${b.docNo} สำเร็จ — แก้บิลได้แล้ว`, 'success');
+      } catch(e) {
+        console.error('[cancelReceipts]', e);
+        window.setSaveStatus?.('failed', 'Cancel receipts fail: '+e.message);
+        alert('❌ Error: '+e.message);
+      }
+    }
+    /* 🆕 helper สำหรับ template — นับ receipts ของบิล (ไม่ trigger reactive recompute เกินจำเป็น) */
+    function billReceiptCount(b) {
+      if (!b) return 0;
+      return (db.receipts || []).filter(r => r && r.billId === b.id).length;
+    }
     function open(item=null) {
       if (item) {
         const linked = _salesReceipts(item.id);
@@ -16670,11 +16733,14 @@ app.component('view-sales', {
           .map(x => x.sourcePurchaseLineId)
           .filter(Boolean)
       );
-      const firstAvailable = usableItems.find(x => !otherLineIds.has(x.pi.id));
+      let firstAvailable = usableItems.find(x => !otherLineIds.has(x.pi.id));
+      // 🆕 2026-05-13: ถ้าทุก PB items ถูก fill หมดแล้ว → allow split — ใช้ pb item แรก (weight=0 ให้ user ใส่)
+      if (!firstAvailable && usableItems.length > 0) {
+        firstAvailable = { pi: usableItems[0].pi, remain: 0 };   // weight=0 → user ต้องใส่เอง
+        erp.showToast('ℹ ทุกรายการ PB นี้ถูก fill แล้ว — Split mode: ใส่น้ำหนักเอง','warning');
+      }
       if (!firstAvailable) {
-        // ทุก PB items ถูก fill ใน rows อื่นๆ ครบแล้ว → ไม่ต้อง fill row นี้
-        erp.showToast('ทุกรายการของ PB นี้ถูก fill ใน rows อื่นๆ แล้ว — ลบ row นี้ออกหรือเลือก PB อื่น','warning');
-        // clear sourcePurchaseBillId เพื่อไม่ให้ค้างค่า
+        erp.showToast('PB นี้ไม่มีรายการ — เลือก PB อื่น','warning');
         it.sourcePurchaseBillId = '';
         recalcLine(it);
         return;
@@ -16723,6 +16789,53 @@ app.component('view-sales', {
       } else {
         erp.showToast(`✓ Auto-fill: ${erp.productName(firstAvailable.pi.productId)} · ${erp.fmt(firstAvailable.remain)} กก.`,'success');
       }
+      recalcAll();
+    }
+
+    /* 🆕 splitTradingLine — แบ่ง row Trading เป็นอีก 1 row ขายราคาอื่น/นน.อื่น แต่ใช้ PB+lineId เดียวกัน
+       Use case: รับ trading 1000 กก. ราคา 100 → ขายเป็น 600 กก. ที่ 105 + 400 กก. ที่ 110 */
+    function splitTradingLine(it) {
+      if (!it || it.sourceMode !== 'TRADING' || !it.sourcePurchaseBillId || !it.sourcePurchaseLineId) {
+        alert('Row นี้ไม่ใช่ Trading หรือยังไม่ได้เลือก PB');
+        return;
+      }
+      const idx = form.items.findIndex(x => x === it);
+      if (idx < 0) return;
+      // คำนวณ remaining จาก PB qty - sum ของ rows อื่นที่ key เดียวกัน
+      const pb = (db.purchaseBills||[]).find(b => b && b.id === it.sourcePurchaseBillId);
+      const pbItem = pb && (pb.items||[]).find(p => p && p.id === it.sourcePurchaseLineId);
+      const pbQty = Number(pbItem?.netWeight || pbItem?.weight || 0);
+      const usedInForm = (form.items||[]).reduce((s, x) => {
+        if (!x) return s;
+        if (x.sourcePurchaseBillId === it.sourcePurchaseBillId && x.sourcePurchaseLineId === it.sourcePurchaseLineId) {
+          return s + Number(x.weight || 0);
+        }
+        return s;
+      }, 0);
+      const remaining = Math.max(0, pbQty - usedInForm);
+      if (remaining <= 0.001 && pbQty > 0) {
+        if (!confirm(`PB qty: ${pbQty.toFixed(2)} กก. ถูกใช้ครบแล้ว\nต้องการ split row ใหม่อยู่ดี (weight=0)?`)) return;
+      }
+      // สร้าง row ใหม่ — copy product+PB+cost จาก row เดิม, reset weight/price
+      const newRow = {
+        id: erp.uid('SL'),
+        productId: it.productId,
+        lotNo: it.lotNo || '',
+        weight: remaining > 0 ? remaining : 0,
+        price: 0,                              // user ใส่ราคาใหม่
+        amount: 0, discount: 0, netAmount: 0,
+        unitCost: Number(it.unitCost || 0),
+        totalCost: 0, profit: 0,
+        tradingCostAmount: 0,
+        note: '(Split จาก row '+(idx+1)+')',
+        sourceMode: 'TRADING',
+        sourcePurchaseBillId: it.sourcePurchaseBillId,
+        sourcePurchaseLineId: it.sourcePurchaseLineId,
+        sourcePurchaseDocNo: it.sourcePurchaseDocNo || '',
+      };
+      // Insert ทันทีหลัง row เดิม
+      form.items.splice(idx + 1, 0, newRow);
+      erp.showToast(`✓ Split — ใส่ราคาขายและน้ำหนักใน row ใหม่ (เหลือ ${remaining.toFixed(2)} กก.)`, 'success');
       recalcAll();
     }
 
@@ -16793,27 +16906,39 @@ app.component('view-sales', {
       // sync tradingFromPurchaseIds จากแต่ละ item (กรณี mixed)
       form.tradingFromPurchaseIds = Array.from(new Set(tradingItems.map(it => it.sourcePurchaseBillId).filter(Boolean)));
 
-      // 🛡️ Safety net: dedup Trading items ที่มี (sourcePurchaseBillId + sourcePurchaseLineId) เดียวกัน
-      // เก็บ row แรกที่เจอ — ทิ้ง row อื่นๆ (ปกติ onTradingPbChange กันไว้แล้ว แต่เผื่อพลาด)
-      const seenTradingKeys = new Set();
-      const dedupedItems = [];
-      let droppedCount = 0;
-      (form.items || []).forEach(it => {
-        if (!it) return;
-        if (it.sourceMode === 'TRADING' && it.sourcePurchaseBillId && it.sourcePurchaseLineId) {
-          const key = `${it.sourcePurchaseBillId}|${it.sourcePurchaseLineId}`;
-          if (seenTradingKeys.has(key)) {
-            droppedCount++;
-            console.warn('[sales save] drop duplicate Trading line', { pbId: it.sourcePurchaseBillId, lineId: it.sourcePurchaseLineId, weight: it.weight });
-            return;
-          }
-          seenTradingKeys.add(key);
+      // 🆕 2026-05-13: รองรับ SPLIT — สินค้าเดียวจาก PB เดียวกัน แบ่งขายหลาย row ราคาต่างกันได้
+      // เปลี่ยนจาก "dedup ทิ้งซ้ำ" → "รวม weight ต่อ (PB+lineId) แล้ว validate ไม่เกิน PB qty"
+      const splitWeightMap = new Map();   // key=PB|lineId → totalWeight
+      const splitDetails = new Map();     // key → {pbDocNo, productId, pbQty, lines:[]}
+      (form.items || []).forEach((it, idx) => {
+        if (!it || it.sourceMode !== 'TRADING' || !it.sourcePurchaseBillId || !it.sourcePurchaseLineId) return;
+        const key = `${it.sourcePurchaseBillId}|${it.sourcePurchaseLineId}`;
+        const w = Number(it.weight || 0);
+        splitWeightMap.set(key, (splitWeightMap.get(key) || 0) + w);
+        if (!splitDetails.has(key)) {
+          const pb = (db.purchaseBills||[]).find(p => p && p.id === it.sourcePurchaseBillId);
+          const pbItem = pb && (pb.items||[]).find(p => p && p.id === it.sourcePurchaseLineId);
+          splitDetails.set(key, {
+            pbDocNo: pb?.docNo || it.sourcePurchaseBillId,
+            productName: erp.productName(it.productId),
+            pbQty: Number(pbItem?.netWeight || pbItem?.weight || 0),
+            lines: [],
+          });
         }
-        dedupedItems.push(it);
+        splitDetails.get(key).lines.push({ rowIdx: idx+1, weight: w, price: Number(it.price||0) });
       });
-      if (droppedCount > 0) {
-        form.items = dedupedItems;
-        erp.showToast(`⚠ ลบบรรทัด Trading ซ้ำ ${droppedCount} รายการ ก่อนบันทึก`,'warning');
+      // Validate: ผลรวม weight ต่อ key ต้องไม่เกิน PB qty (tolerance 0.001)
+      const violations = [];
+      splitWeightMap.forEach((sumW, key) => {
+        const d = splitDetails.get(key);
+        if (!d) return;
+        if (d.pbQty > 0 && sumW > d.pbQty + 0.001) {
+          violations.push(`• ${d.pbDocNo} ${d.productName}: รวม ${sumW.toFixed(2)} กก. > ${d.pbQty.toFixed(2)} กก. (PB) — เกิน ${(sumW-d.pbQty).toFixed(2)}`);
+        }
+      });
+      if (violations.length) {
+        alert(`⚠ Trading split — น้ำหนักเกิน PB:\n\n${violations.join('\n')}\n\nกรุณาแก้น้ำหนักให้รวมแล้ว ≤ PB qty`);
+        return;
       }
 
       recalcAll();
@@ -17339,7 +17464,8 @@ app.component('view-sales', {
     return { db, erp, form, showForm, editing, showDetail, search, filterStatus, filterChannel,
       filterMode, filterMatch, matchStatus, filterDateFrom, filterDateTo,
       filterProfit, openingCutoff, isOpeningBill, displayProfit,   // 🆕 profit filter + opening
-      open, save, addItem, removeItem, recalcLine, recalcAll, onItemSourceChange, onTradingPbChange, hasStockItem, cancelBill, deleteBill, filtered, statusBadge, statusText,
+      cancelAllReceiptsForBill, billReceiptCount,   // 🆕 ยกเลิก receipt จากหน้าบิลขาย
+      open, save, addItem, removeItem, recalcLine, recalcAll, onItemSourceChange, onTradingPbChange, splitTradingLine, hasStockItem, cancelBill, deleteBill, filtered, statusBadge, statusText,
       loadFromPOSell, availableTradingPurchases, loadFromTradingPurchase, billTotals, toggleVatIssued, goToPendingSale, fmt:erp.fmt,
       addTradingPurchase, removeTradingPurchase,
       // 🆕 Multi-select
@@ -17474,6 +17600,9 @@ app.component('view-sales', {
               <button @click="erp.printDocument('delivery', b.id)" class="text-emerald-600 text-xs hover:underline mr-2" title="พิมพ์ใบส่งของ">🖨 ใบส่ง</button>
               <button @click="open(b)" class="text-slate-600 text-xs hover:underline mr-2">✏️ แก้</button>
               <button v-if="b.status!=='cancelled' && b.transactionMode!=='TRADING'" @click="recalcProfitOne(b)" class="text-amber-600 text-xs hover:underline mr-2" title="คำนวนกำไรใหม่จาก WAC ปัจจุบัน">🔄 Recalc</button>
+              <!-- 🆕 ปุ่ม ยกเลิก Receipts — โผล่เฉพาะบิลที่มี receipt — ช่วยปลดล็อกบิลให้แก้/ลบได้ -->
+              <button v-if="billReceiptCount(b) > 0" @click="cancelAllReceiptsForBill(b)" class="text-purple-600 text-xs hover:underline mr-2 font-bold"
+                :title="'ยกเลิก '+billReceiptCount(b)+' receipts ของบิลนี้ → แก้/ลบบิลได้'">💸 ยกเลิกรับเงิน ({{billReceiptCount(b)}})</button>
               <button v-if="b.status!=='cancelled'" @click="cancelBill(b)" class="text-amber-600 text-xs hover:underline mr-2">ยกเลิก</button>
               <button @click="deleteBill(b)" class="text-red-600 text-xs hover:underline">🗑 ลบ</button>
             </td>
@@ -17597,7 +17726,15 @@ app.component('view-sales', {
                       <!-- ถ้าเลือก Trading → ให้เลือก PB Trading (auto-fill product+qty) -->
                       <div v-if="it.sourceMode==='TRADING'" class="mt-1.5">
                         <searchable-select v-model="it.sourcePurchaseBillId" :options="availableTradingPurchases" label-field="label" placeholder="🔍 เลือก PB → auto-fill สินค้า+น้ำหนัก" input-class="w-full px-1.5 py-1 border rounded text-[11px]" @change="onTradingPbChange(it)"></searchable-select>
-                        <div v-if="it.sourcePurchaseDocNo" class="text-[10px] text-fuchsia-700 mt-0.5">🔄 จาก {{it.sourcePurchaseDocNo}}</div>
+                        <div v-if="it.sourcePurchaseDocNo" class="flex items-center gap-1 mt-0.5">
+                          <span class="text-[10px] text-fuchsia-700 flex-1">🔄 จาก {{it.sourcePurchaseDocNo}}</span>
+                          <!-- 🆕 ปุ่ม Split — สินค้าเดียวกัน 2 ราคา/2 นน. ตัดต้นทุนเดียวกัน -->
+                          <button type="button" v-if="it.sourcePurchaseLineId" @click="splitTradingLine(it)"
+                            class="text-[10px] px-1.5 py-0.5 bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200 rounded font-bold"
+                            title="แบ่งขายราคา/น้ำหนักอื่น จาก PB เดียวกัน">
+                            ➕ Split
+                          </button>
+                        </div>
                       </div>
                     </td>
                     <td class="p-1"><input type="number" step="0.01" v-model.number="it.weight" @input="recalcLine(it)" class="w-full px-2 py-1.5 border rounded text-right"></td>
