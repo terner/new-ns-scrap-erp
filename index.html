@@ -5687,20 +5687,25 @@ window.$erp = {
           const uniqueMatch = msg.match(/duplicate key value violates unique constraint ['"]?([a-z_]+)['"]?/);
           if (uniqueMatch) {
             const constraintName = uniqueMatch[1];
-            // 🆕 AUTO-HEAL: ถ้าเป็น stock_ledger dedup constraint → trigger local cleanup ทันที
+            // 🆕 AUTO-HEAL: ถ้าเป็น stock_ledger dedup constraint → trigger local cleanup + ABORT all chunks
             // (constraint นี้สร้างโดย supabase-fix-stock-ledger-dedup.sql)
+            // 🔧 BUG FIX 2: ต้อง abort ทั้ง for-loop ของ chunks ด้วย (ไม่ใช่แค่ while ของ retry)
+            //   เพราะ mapped array ที่ build ก่อนหน้า cleanup ยังมี dups → chunks ถัดไปก็จะ fail อีก
             if (cfg.target === 'stock_ledger' && /stock_ledger.*dedup|dedup.*stock_ledger/i.test(constraintName)) {
-              _logErr(cfg.target, '⚠ UNIQUE conflict ('+constraintName+') — auto-cleaning local duplicates...');
+              _logErr(cfg.target, '⚠ UNIQUE conflict ('+constraintName+') — auto-cleaning local duplicates + abort push...');
               if (typeof _purgeStockDuplicates === 'function') {
                 try {
                   const r = await _purgeStockDuplicates(true);
                   if (r && r.deleted > 0) {
-                    console.log(`%c🧹 [auto-heal] ลบ local stockLedger dups ${r.deleted} แถว — รอ retry รอบถัดไป`, 'color:#7c3aed;font-weight:bold');
+                    console.log(`%c🧹 [auto-heal] ลบ local stockLedger dups ${r.deleted} แถว — abort push, mark dirty ใหม่`, 'color:#7c3aed;font-weight:bold');
                   }
                 } catch(eHeal) { console.warn('[auto-heal dedup]', eHeal); }
               }
+              // Mark dirty เพื่อให้ push cycle ถัดไป retry กับ data ที่ clean แล้ว
+              try { dirtyTables.add(localKey); } catch(e){}
               fail += chunk.length;
-              break;
+              // 🆕 throw special flag เพื่อให้ outer for-loop หยุดทันที (ไม่ push chunks ที่เหลือ)
+              throw new Error('__ABORT_STOCK_LEDGER_AUTOHEAL__');
             }
             _logErr(cfg.target, '⚠ UNIQUE conflict ('+constraintName+') — รัน supabase-fix-docno-unique.sql หรือแก้ docNo ซ้ำ');
             fail += chunk.length;
@@ -5718,6 +5723,11 @@ window.$erp = {
           _logErr(cfg.target, msg.slice(0, 150));
           break;
         } catch(e) {
+          // 🆕 Special abort signal จาก auto-heal — แค่หยุด แต่ไม่ log เป็น exception
+          if (e && e.message === '__ABORT_STOCK_LEDGER_AUTOHEAL__') {
+            console.log('[autoSync] '+cfg.target+': auto-heal triggered, aborting current push cycle');
+            return { ok, fail, aborted: true };
+          }
           fail += chunk.length;
           _logErr(cfg.target, 'EXCEPTION: '+e.message);
           break;
