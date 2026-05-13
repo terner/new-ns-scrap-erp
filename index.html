@@ -5686,7 +5686,23 @@ window.$erp = {
           //   วิธีใหม่: log error แล้วข้าม batch — ให้ user แก้ doc_no ที่ต้นทาง หรือรัน supabase-fix-docno-unique.sql
           const uniqueMatch = msg.match(/duplicate key value violates unique constraint ['"]?([a-z_]+)['"]?/);
           if (uniqueMatch) {
-            _logErr(cfg.target, '⚠ UNIQUE conflict ('+uniqueMatch[1]+') — รัน supabase-fix-docno-unique.sql หรือแก้ docNo ซ้ำ');
+            const constraintName = uniqueMatch[1];
+            // 🆕 AUTO-HEAL: ถ้าเป็น stock_ledger dedup constraint → trigger local cleanup ทันที
+            // (constraint นี้สร้างโดย supabase-fix-stock-ledger-dedup.sql)
+            if (cfg.target === 'stock_ledger' && /stock_ledger.*dedup|dedup.*stock_ledger/i.test(constraintName)) {
+              _logErr(cfg.target, '⚠ UNIQUE conflict ('+constraintName+') — auto-cleaning local duplicates...');
+              if (typeof _purgeStockDuplicates === 'function') {
+                try {
+                  const r = await _purgeStockDuplicates(true);
+                  if (r && r.deleted > 0) {
+                    console.log(`%c🧹 [auto-heal] ลบ local stockLedger dups ${r.deleted} แถว — รอ retry รอบถัดไป`, 'color:#7c3aed;font-weight:bold');
+                  }
+                } catch(eHeal) { console.warn('[auto-heal dedup]', eHeal); }
+              }
+              fail += chunk.length;
+              break;
+            }
+            _logErr(cfg.target, '⚠ UNIQUE conflict ('+constraintName+') — รัน supabase-fix-docno-unique.sql หรือแก้ docNo ซ้ำ');
             fail += chunk.length;
             break;
           }
