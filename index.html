@@ -2721,8 +2721,14 @@ function seedData() {
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:true,
         branchScope:'all' },
       /* === Custom Roles ที่ใช้จริงในบริษัท (แก้/ลบได้) === */
-      { id:'R-ACCOUNTANT', name:'บัญชี', desc:'บัญชี — งบการเงิน, AR/AP, ภาษี + บิลซื้อ/ขาย + ข้อมูลย้อนหลัง', isSystem:false,
-        // 🆕 ADD: historicalData
+      { id:'R-ACCOUNTANT', name:'บัญชี', desc:'บัญชี — งบการเงิน, AR/AP, ภาษี + บิลซื้อ/ขาย (ไม่มีค่าใช้จ่าย — แยกให้บัญชีค่าใช้จ่าย)', isSystem:false,
+        // 🚫 REMOVE: expense, pettyAdvance, expenseDashboard, mdExpense (ย้ายไป R-ACCOUNT-EXPENSE)
+        menus:['changePassword','purchase','sales','stockIssue','payment','receipt','transfer','paymentApproval','billSwapHistory','stockBalance','stockLedger','tradingDashboard','tradingMatching','poBuy','poSell','poOutstanding','reports','audit','salesPlan','pendingSales','ar','ap','bank','cashPosition','plStatement','balanceSheet','cashFlowStatement','cashFlowAnalysis','workingCapital','taxVAT','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdAccount','mdImport','equityMaint','historicalData','backup','companyProfile'],
+        actions:{'*':['view','create','edit','post','export']},
+        seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:false,
+        branchScope:'all' },
+      /* 🆕 บัญชีค่าใช้จ่าย — เห็นทุกอย่างเหมือนบัญชี + ค่าใช้จ่าย (สำหรับ NS-June) */
+      { id:'R-ACCOUNT-EXPENSE', name:'บัญชีค่าใช้จ่าย', desc:'บัญชีค่าใช้จ่าย — เหมือนบัญชี + ค่าใช้จ่าย/petty advance/หมวดค่าใช้จ่าย', isSystem:false,
         menus:['changePassword','purchase','sales','stockIssue','payment','receipt','transfer','expense','pettyAdvance','expenseDashboard','paymentApproval','billSwapHistory','stockBalance','stockLedger','tradingDashboard','tradingMatching','poBuy','poSell','poOutstanding','reports','audit','salesPlan','pendingSales','ar','ap','bank','cashPosition','plStatement','balanceSheet','cashFlowStatement','cashFlowAnalysis','workingCapital','taxVAT','transactionLedger','mdCustomer','mdSupplier','mdProduct','mdAccount','mdExpense','mdImport','equityMaint','historicalData','backup','companyProfile'],
         actions:{'*':['view','create','edit','post','export']},
         seeCost:true, seeProfit:true, seeCash:true, seeFinancials:true, seeOpening:false,
@@ -2971,6 +2977,20 @@ function loadDB() {
       d._roleCleanupV3 = true;
       console.log('✓ Migration v3: roles updated from seed');
     }
+    /* 🆕 Migration v4: auto-assign NS-June ให้ role R-ACCOUNT-EXPENSE (บัญชีค่าใช้จ่าย) */
+    if (Array.isArray(d.users) && !d._migrationV4_juneRole) {
+      d.users.forEach(u => {
+        if (!u || !u.username) return;
+        const uname = String(u.username).toLowerCase();
+        if (uname === 'june' || uname === 'ns-june') {
+          if (u.roleId !== 'R-ACCOUNT-EXPENSE') {
+            console.log('[migration v4] อัปเดต '+u.username+' จาก '+u.roleId+' → R-ACCOUNT-EXPENSE');
+            u.roleId = 'R-ACCOUNT-EXPENSE';
+          }
+        }
+      });
+      d._migrationV4_juneRole = true;
+    }
     /* migration: customers ต้องมี salesId field (default '') */
     if (Array.isArray(d.customers)) {
       d.customers.forEach(c => { if (c && c.salesId === undefined) c.salesId = ''; });
@@ -2998,6 +3018,122 @@ function loadDB() {
 const _GLOBAL_DB = reactive(loadDB());
 const _safeFind = (arr, id) => (Array.isArray(arr) ? arr.find(x => x && x.id === id) : null);
 const _safeArr = (a) => Array.isArray(a) ? a : [];
+
+/* 🆕 GLOBAL: Recover lost master data — ค้นจาก localStorage backups
+   ใช้: window.$recoverMasters()  ← Console F12 */
+window.$recoverMasters = function() {
+  const db = _GLOBAL_DB;
+  const result = {
+    current: {
+      suppliers: (db.suppliers||[]).length,
+      customers: (db.customers||[]).length,
+      products: (db.products||[]).length,
+      salespersons: (db.salespersons||[]).length,
+    },
+    backups: []
+  };
+  // ค้นใน localStorage หา backup snapshots
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('ns_erp_backup_') || k.startsWith('ns_erp_snapshot_') || k.includes('_pre_pull') || k.includes('_pre_reset'))) {
+      try {
+        const raw = localStorage.getItem(k);
+        const data = JSON.parse(raw);
+        keys.push({
+          key: k,
+          size: raw.length,
+          suppliers: (data.suppliers||[]).length,
+          customers: (data.customers||[]).length,
+          products: (data.products||[]).length,
+          salespersons: (data.salespersons||[]).length,
+        });
+      } catch(e) {}
+    }
+  }
+  // เรียงตาม suppliers count desc
+  keys.sort((a,b) => (b.suppliers||0) - (a.suppliers||0));
+  result.backups = keys;
+  console.log('📦 Current local:', result.current);
+  console.table(result.backups);
+  // หา backup ที่ดีที่สุด (มี suppliers เยอะสุด)
+  const best = keys[0];
+  if (!best || (best.suppliers || 0) <= result.current.suppliers) {
+    alert(`🔍 Recovery Report:\n\nLocal ปัจจุบัน:\n• suppliers: ${result.current.suppliers}\n• customers: ${result.current.customers}\n• salespersons: ${result.current.salespersons}\n\n${keys.length === 0 ? 'ไม่พบ backup ใน localStorage' : 'Backup ที่มีไม่ได้ดีกว่า local ปัจจุบัน — ลองดึงจาก cloud แทน'}\n\n💡 ลองดึงจาก Supabase Dashboard:\n→ Tables → suppliers/customers/salespersons → ดูข้อมูลจริง`);
+    return result;
+  }
+  if (!confirm(`📦 พบ backup ที่ดีกว่า:\n\n  key: ${best.key}\n  suppliers: ${best.suppliers} (vs ${result.current.suppliers} ปัจจุบัน)\n  customers: ${best.customers} (vs ${result.current.customers})\n  salespersons: ${best.salespersons} (vs ${result.current.salespersons})\n\nกู้คืน 3 tables นี้?`)) return result;
+  try {
+    const raw = localStorage.getItem(best.key);
+    const data = JSON.parse(raw);
+    ['suppliers','customers','salespersons','products'].forEach(t => {
+      if (Array.isArray(data[t])) {
+        db[t] = JSON.parse(JSON.stringify(data[t]));
+      }
+    });
+    try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+    try { window.$autoSync?.pushNow?.(); } catch(e){}
+    alert(`✅ Recover สำเร็จ\n\n• suppliers: ${db.suppliers.length}\n• customers: ${db.customers.length}\n• salespersons: ${db.salespersons.length}\n• products: ${db.products.length}\n\n☁ Push ขึ้น cloud แล้ว — Refresh page`);
+    setTimeout(() => location.reload(), 1500);
+  } catch(e) { alert('❌ Recover fail: '+e.message); }
+  return result;
+};
+
+/* 🆕 GLOBAL: Pull masters from cloud directly — กู้จาก cloud
+   ใช้: window.$pullMastersFromCloud() */
+window.$pullMastersFromCloud = async function() {
+  if (!window.sb) { alert('❌ Supabase ยังไม่ connect'); return; }
+  const db = _GLOBAL_DB;
+  const tables = [
+    { local: 'suppliers', cloud: 'suppliers' },
+    { local: 'customers', cloud: 'customers' },
+    { local: 'salespersons', cloud: 'salespersons' },
+    { local: 'products', cloud: 'products' },
+  ];
+  const report = [];
+  for (const t of tables) {
+    try {
+      const { data, error } = await window.sb.from(t.cloud).select('*');
+      if (error) { report.push({ table: t.local, status: 'error: '+error.message }); continue; }
+      const cloudCount = (data||[]).length;
+      const localCount = (db[t.local]||[]).length;
+      if (cloudCount === 0 && localCount > 0) {
+        report.push({ table: t.local, local: localCount, cloud: 0, action: 'SKIP — cloud empty' });
+        continue;
+      }
+      if (cloudCount === 0 && localCount === 0) {
+        report.push({ table: t.local, local: 0, cloud: 0, action: 'no data' });
+        continue;
+      }
+      report.push({ table: t.local, local: localCount, cloud: cloudCount, action: 'REPLACE' });
+    } catch(e) { report.push({ table: t.local, status: 'exception' }); }
+  }
+  console.table(report);
+  const totalToReplace = report.filter(r => r.action === 'REPLACE').reduce((s,r) => s + r.cloud, 0);
+  if (!totalToReplace) { alert('ไม่มีข้อมูล master ใน cloud'); return; }
+  if (!confirm(`📦 พบใน cloud:\n${report.map(r => '• '+r.table+': '+(r.cloud||0)).join('\n')}\n\nReplace local ด้วย cloud (${totalToReplace} records)?`)) return;
+  for (const t of tables) {
+    try {
+      const { data } = await window.sb.from(t.cloud).select('*');
+      if (data && data.length > 0) {
+        db[t.local] = data.map(r => {
+          // map snake to camel for common fields
+          const o = { ...r };
+          if (r.bank_account) o.bankAccount = r.bank_account;
+          if (r.bank_name) o.bankName = r.bank_name;
+          if (r.tax_id) o.taxId = r.tax_id;
+          if (r.credit_term) o.creditTerm = r.credit_term;
+          if (r.metal_group) o.metalGroup = r.metal_group;
+          if (r.item_status) o.itemStatus = r.item_status;
+          return o;
+        });
+      }
+    } catch(e){}
+  }
+  try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+  alert(`✅ Pull สำเร็จ\n\nsuppliers: ${db.suppliers.length}\ncustomers: ${db.customers.length}\nsalespersons: ${db.salespersons.length}\nproducts: ${db.products.length}\n\nRefresh page ใน 2 วินาที`);
+  setTimeout(() => location.reload(), 2000);
+};
 
 /* 🆕 GLOBAL: Nuclear Cleanup — ลบทุก bankStatement ที่ refNo ตรง + tombstone ครบ + recreate
    ใช้: window.$nukeBankStatement('PMT2605-0080')
@@ -5078,11 +5214,21 @@ window.$erp = {
             'salespersons','accounts','purchaseChannels','salesChannels','expenseCategories',
             'currencies','overseasRecipients','users','roles'];
           if (MASTER_REPLACE_MODE.includes(localKey)) {
-            // REPLACE: wipe local + insert all cloud rows
-            // 🆕 Skip tombstoned IDs (เพิ่งลบ — กัน restore ก่อน cloud delete มาถึง)
             const arrM = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
             const beforeCount = arrM.length;
-            arrM.length = 0; // wipe
+            // 🔧 SAFETY: ถ้า cloud มี records น้อยกว่า local มาก (≥30%) → skip REPLACE + log warning
+            // กรณีเครื่องอื่นเผลอเคลียร์ data → cloud ว่าง → wipe ทุกเครื่อง
+            if (beforeCount > 5 && cloudRows.length < beforeCount * 0.7) {
+              const lossPct = ((beforeCount - cloudRows.length) / beforeCount * 100).toFixed(0);
+              console.warn(`[pull-safety] ${localKey}: SKIP REPLACE — cloud(${cloudRows.length}) << local(${beforeCount}) [-${lossPct}%]. ถ้าต้องการจริงๆ ใช้ window.$pullMastersFromCloud()`);
+              _logErr(cfg.target, `SAFETY: cloud มีน้อยกว่า local มาก (${cloudRows.length} vs ${beforeCount}) — ข้าม REPLACE`);
+              // ตั้ง dirty เพื่อ push local กลับขึ้น cloud (recover cloud จาก local)
+              dirtyTables.add(localKey);
+              totalRows += cloudRows.length;
+              continue;
+            }
+            // REPLACE: wipe local + insert all cloud rows
+            arrM.length = 0;
             let skippedTomb = 0;
             cloudRows.forEach(r => {
               if (!r) return;
