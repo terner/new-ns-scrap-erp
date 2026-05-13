@@ -6770,7 +6770,7 @@ function makeMasterComponent(opts) {
         editing.value = item;
         showModal.value = true;
       }
-      function save() {
+      async function save() {
         const errs = opts.validate ? opts.validate(form, db) : [];
         if (errs.length) { erp.showToast(errs.join(', '), 'error'); return; }
         // 🔧 BUG FIX: ห้ามแก้ openingBalance ของ accounts หลัง Lock Opening Balance
@@ -6780,7 +6780,16 @@ function makeMasterComponent(opts) {
           if (Math.abs(oldOB - newOB) > 0.001) {
             // 🆕 ให้ Admin/Owner unlock ได้ทันทีจาก dialog นี้ — ไม่ต้องไปหน้า Opening Balance
             const role = erp.currentRole?.();
-            const isAdmin = !role || role.actions === '*' || (role.id === 'admin' || role.id === 'owner');
+            // 🔧 BUG FIX: รองรับ role IDs ทั้ง 'admin'/'owner' (เก่า) + 'R-ADMIN'/'R-OWNER' (ใหม่)
+            // + actions เป็น string '*' หรือ object {'*':'*'} หรือ {'*':[...]}
+            const actionsAllStar = role && (
+              role.actions === '*' ||
+              (typeof role.actions === 'object' && (role.actions['*'] === '*' || (Array.isArray(role.actions['*']) && role.actions['*'].includes('*'))))
+            );
+            const rid = (role?.id || '').toUpperCase();
+            const isAdmin = !role || actionsAllStar
+              || rid === 'ADMIN' || rid === 'OWNER'
+              || rid === 'R-ADMIN' || rid === 'R-OWNER';
             if (isAdmin) {
               const cd = db.openingBalance.cutoffDate || '-';
               const ans = confirm(`🔒 แก้ "ยอดตั้งต้น" ของ "${editing.value.name}" ไม่ได้\n\nระบบ Lock Opening Balance ไว้แล้ว (วันที่ ${cd})\n\nต้องการ Unlock ทันทีไหม?\n\n• ${oldOB.toLocaleString()} → ${newOB.toLocaleString()}\n\n⚠ ยอดเก่าจะถูกเปลี่ยน — ส่งผลกับยอดคงเหลือบัญชีทั้งหมด`);
@@ -6823,18 +6832,75 @@ function makeMasterComponent(opts) {
             form.code = codePrefix + String(maxNum + 1).padStart(4,'0');
           }
         }
+        const nowIso = new Date().toISOString();
+        let savedRow = null;
         if (editing.value) {
           const idx = db[opts.collection].findIndex(x=>x.id===editing.value.id);
           const before = JSON.parse(JSON.stringify(db[opts.collection][idx]));
-          db[opts.collection][idx] = JSON.parse(JSON.stringify({...form, id: editing.value.id}));
-          erp.logAudit('update', opts.collection, before, db[opts.collection][idx]);
+          savedRow = JSON.parse(JSON.stringify({
+            ...form,
+            id: editing.value.id,
+            createdAt: before.createdAt || nowIso,
+            updatedAt: nowIso,
+          }));
+          db[opts.collection][idx] = savedRow;
+          erp.logAudit('update', opts.collection, before, savedRow);
         } else {
-          const newItem = JSON.parse(JSON.stringify({...form, id: erp.uid(opts.idPrefix||'X')}));
-          db[opts.collection].push(newItem);
-          erp.logAudit('create', opts.collection, null, newItem);
+          savedRow = JSON.parse(JSON.stringify({
+            ...form,
+            id: erp.uid(opts.idPrefix||'X'),
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          }));
+          db[opts.collection].push(savedRow);
+          erp.logAudit('create', opts.collection, null, savedRow);
+        }
+        // 🆕 บันทึก localStorage ทันที — กัน watch delay
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){ console.warn('[localStorage save]', e); }
+        // 🆕 Diagnostic log สำหรับ accounts.openingBalance — debug case "save แล้ว refresh กลับยอดเดิม"
+        if (opts.collection === 'accounts') {
+          console.log('[mdAccount save]', {
+            id: savedRow.id, name: savedRow.name,
+            openingBalance: savedRow.openingBalance,
+            updatedAt: savedRow.updatedAt,
+          });
         }
         showModal.value = false;
-        erp.showToast('บันทึกสำเร็จ');
+        // 🆕 Push to cloud ทันที — กัน pull cycle rewrite ก่อน push เสร็จ
+        // โดยเฉพาะ master tables (accounts/suppliers/customers/products) ที่ใช้ REPLACE mode pull
+        try {
+          if (window.$autoSync?.pushNow) {
+            await window.$autoSync.pushNow();
+            // 🆕 Verify หลัง push: query cloud ดูว่าค่าตรงไหม
+            if (opts.collection === 'accounts' && window.sb && savedRow) {
+              try {
+                const { data: cloudCheck, error: ckErr } = await window.sb.from('accounts')
+                  .select('id, opening_balance, updated_at').eq('id', savedRow.id).maybeSingle();
+                if (ckErr) {
+                  console.warn('[mdAccount verify cloud]', ckErr.message);
+                } else if (cloudCheck) {
+                  const cloudOB = Number(cloudCheck.opening_balance || 0);
+                  const localOB = Number(savedRow.openingBalance || 0);
+                  if (Math.abs(cloudOB - localOB) > 0.001) {
+                    console.error('[mdAccount MISMATCH]', { cloudOB, localOB, cloudUpdatedAt: cloudCheck.updated_at, localUpdatedAt: savedRow.updatedAt });
+                    erp.showToast('⚠ Cloud opening_balance ไม่ตรง local — ดู console','error');
+                    return;
+                  } else {
+                    console.log('[mdAccount verify ✓] cloud opening_balance ตรงกับ local', { cloudOB });
+                  }
+                } else {
+                  console.warn('[mdAccount verify cloud] not found in cloud — push อาจล้มเหลว');
+                }
+              } catch(e) { console.warn('[mdAccount verify exc]', e); }
+            }
+            erp.showToast('✓ บันทึกสำเร็จ + sync cloud','success');
+          } else {
+            erp.showToast('✓ บันทึกสำเร็จ (local only)','success');
+          }
+        } catch(e) {
+          console.warn('[master save push]', e);
+          erp.showToast('✓ บันทึก local — cloud push fail: '+e.message,'warning');
+        }
       }
       /* 🔧 BUG FIX: ลบจาก Supabase ด้วย — กัน auto-pull ดึงของเก่ากลับมา (autoSync ทำแค่ upsert ไม่ลบ) */
       function _cloudTableFor(localCollection) {
@@ -15259,56 +15325,95 @@ app.component('view-sales', {
 
     /* 🆕 onTradingPbChange — เมื่อเลือก PB Trading ใน item row → auto-fill productId + weight
        ถ้า PB มีหลาย items → fill row นี้ด้วย item แรก แล้ว append items ที่เหลือ
-       💡 user แค่เลือก PB ก็พอ ไม่ต้องพิมพ์สินค้า/น้ำหนัก เอง */
+       💡 user แค่เลือก PB ก็พอ ไม่ต้องพิมพ์สินค้า/น้ำหนัก เอง
+       🔧 BUG FIX 2026-05-13:
+       - กัน duplicate ตอน edit หรือคลิก dropdown ซ้ำ
+       - นับ weight จาก rows อื่นในฟอร์มเดียวกัน + บิลขายที่ save แล้ว (ยกเว้นบิลปัจจุบันที่กำลังแก้)
+       - skip first item ถ้ามีใน form.items อยู่แล้ว → ใช้ item ถัดไป */
     function onTradingPbChange(it) {
       if (!it || !it.sourcePurchaseBillId) { recalcLine(it); return; }
-      // skip ถ้า user เลือก PB เดียวกับเดิม + มีข้อมูลอยู่แล้ว
       const pb = (db.purchaseBills||[]).find(b => b && b.id === it.sourcePurchaseBillId);
       if (!pb) { recalcLine(it); return; }
       const pbItems = pb.items || [];
       if (pbItems.length === 0) { recalcLine(it); return; }
 
-      // คำนวณ remaining qty ต่อ PB item — กรณีมีบิลขายอื่นจับ Trading ไปแล้ว
+      // 🆕 ถ้า row นี้กำลังใช้ PB นี้และมี sourcePurchaseLineId อยู่แล้ว (เคย fill แล้ว)
+      // → แค่ recalc ไม่ต้อง refill / append → กัน duplicate ตอนคลิกซ้ำ
+      if (it.sourcePurchaseLineId && pbItems.some(p => p && p.id === it.sourcePurchaseLineId)) {
+        recalcLine(it);
+        return;
+      }
+
+      // คำนวณ remaining qty ต่อ PB item
+      // 🔧 BUG FIX: นับ weight จาก:
+      //   (a) form.items rows อื่น (ยังไม่ save) — กัน duplicate ในฟอร์มเดียวกัน
+      //   (b) บิลขายที่ save แล้ว (db.salesBills) ยกเว้นบิลปัจจุบัน (editing.value.id)
       function remainingQty(pb, pbItem) {
         try {
-          const allSales = (db.salesBills||[]).filter(s => s && s.status !== 'cancelled');
+          const currentBillId = editing.value?.id || null;
           let used = 0;
-          allSales.forEach(s => {
+          // (a) บิลขายอื่นๆ ที่ save แล้ว (ไม่รวมบิลปัจจุบันที่กำลัง edit)
+          (db.salesBills||[]).forEach(s => {
+            if (!s || s.status === 'cancelled') return;
+            if (currentBillId && s.id === currentBillId) return;   // skip บิลตัวเอง
             (s.items||[]).forEach(si => {
               if (si && si.sourcePurchaseBillId === pb.id && si.sourcePurchaseLineId === pbItem.id) {
                 used += Number(si.weight || 0);
               }
             });
           });
-          // exclude weight ที่ row ปัจจุบันเคยใช้อยู่ (ตอนแก้บิล)
-          if (it.sourcePurchaseLineId === pbItem.id) used -= Number(it.weight || 0);
+          // (b) rows อื่นๆ ใน form.items (ยกเว้น row ปัจจุบัน)
+          (form.items||[]).forEach(other => {
+            if (!other || other === it) return;   // skip row ตัวเอง
+            if (other.sourcePurchaseBillId === pb.id && other.sourcePurchaseLineId === pbItem.id) {
+              used += Number(other.weight || 0);
+            }
+          });
           return Math.max(0, Number(pbItem.netWeight || pbItem.weight || 0) - used);
         } catch(e) { return Number(pbItem.netWeight || pbItem.weight || 0); }
       }
 
-      // Fill row นี้ด้วย PB item แรกที่ยังเหลือ
       const usableItems = pbItems.map(pi => ({ pi, remain: remainingQty(pb, pi) })).filter(x => x.remain > 0.001);
       if (usableItems.length === 0) {
         erp.showToast('PB นี้ถูกจับขายไปครบแล้ว','warning');
         return;
       }
-      const first = usableItems[0];
-      it.productId = first.pi.productId;
-      it.weight = first.remain;
-      it.lotNo = first.pi.lotNo || '';
-      it.sourcePurchaseLineId = first.pi.id;
+
+      // 🆕 หา PB item แรกที่ยังไม่อยู่ใน form.items rows อื่น (กัน fill ซ้ำ)
+      const otherLineIds = new Set(
+        (form.items||[])
+          .filter(x => x && x !== it && x.sourcePurchaseBillId === pb.id)
+          .map(x => x.sourcePurchaseLineId)
+          .filter(Boolean)
+      );
+      const firstAvailable = usableItems.find(x => !otherLineIds.has(x.pi.id));
+      if (!firstAvailable) {
+        // ทุก PB items ถูก fill ใน rows อื่นๆ ครบแล้ว → ไม่ต้อง fill row นี้
+        erp.showToast('ทุกรายการของ PB นี้ถูก fill ใน rows อื่นๆ แล้ว — ลบ row นี้ออกหรือเลือก PB อื่น','warning');
+        // clear sourcePurchaseBillId เพื่อไม่ให้ค้างค่า
+        it.sourcePurchaseBillId = '';
+        recalcLine(it);
+        return;
+      }
+      it.productId = firstAvailable.pi.productId;
+      it.weight = firstAvailable.remain;
+      it.lotNo = firstAvailable.pi.lotNo || '';
+      it.sourcePurchaseLineId = firstAvailable.pi.id;
       it.sourcePurchaseDocNo = pb.docNo;
-      it.note = it.note || (first.pi.note || '');
-      // คำนวณ unitCost จาก PB item นี้
-      const pbItemWt = Number(first.pi.netWeight || first.pi.weight || 0);
-      it.unitCost = pbItemWt > 0 ? Number(first.pi.netAmount || 0) / pbItemWt : 0;
-      // ถ้า price ยังว่าง → ตั้งราคาแนะนำ = unitCost (user ปรับเองได้)
+      it.note = it.note || (firstAvailable.pi.note || '');
+      const pbItemWt = Number(firstAvailable.pi.netWeight || firstAvailable.pi.weight || 0);
+      it.unitCost = pbItemWt > 0 ? Number(firstAvailable.pi.netAmount || 0) / pbItemWt : 0;
       if (!it.price || it.price === 0) it.price = Math.round(it.unitCost * 100) / 100;
 
-      // ถ้า PB มี items อื่นที่ยังเหลือ → append เป็น item ใหม่ (skip ถ้าเคย append แล้ว)
-      const restItems = usableItems.slice(1);
-      const existingPbLineIds = new Set((form.items||[]).map(x => x && x.sourcePurchaseLineId).filter(Boolean));
-      const toAppend = restItems.filter(x => !existingPbLineIds.has(x.pi.id));
+      // 🆕 Append PB items อื่นๆ ที่ยังไม่ได้ fill (skip ทุกอันที่อยู่ใน form.items แล้ว + skip firstAvailable เพราะ fill ใน row นี้)
+      const existingPbLineIds = new Set(
+        (form.items||[])
+          .filter(x => x && x.sourcePurchaseBillId === pb.id)
+          .map(x => x.sourcePurchaseLineId)
+          .filter(Boolean)
+      );
+      existingPbLineIds.add(firstAvailable.pi.id);   // mark first as filled
+      const toAppend = usableItems.filter(x => !existingPbLineIds.has(x.pi.id));
       if (toAppend.length > 0) {
         toAppend.forEach(x => {
           const wt = Number(x.pi.netWeight || x.pi.weight || 0);
@@ -15330,9 +15435,9 @@ app.component('view-sales', {
             sourcePurchaseDocNo: pb.docNo,
           });
         });
-        erp.showToast(`✓ Auto-fill จาก ${pb.docNo} (${usableItems.length} รายการ)`,'success');
+        erp.showToast(`✓ Auto-fill จาก ${pb.docNo} (${1 + toAppend.length} รายการ)`,'success');
       } else {
-        erp.showToast(`✓ Auto-fill: ${erp.productName(first.pi.productId)} · ${erp.fmt(first.remain)} กก.`,'success');
+        erp.showToast(`✓ Auto-fill: ${erp.productName(firstAvailable.pi.productId)} · ${erp.fmt(firstAvailable.remain)} กก.`,'success');
       }
       recalcAll();
     }
@@ -15403,6 +15508,29 @@ app.component('view-sales', {
 
       // sync tradingFromPurchaseIds จากแต่ละ item (กรณี mixed)
       form.tradingFromPurchaseIds = Array.from(new Set(tradingItems.map(it => it.sourcePurchaseBillId).filter(Boolean)));
+
+      // 🛡️ Safety net: dedup Trading items ที่มี (sourcePurchaseBillId + sourcePurchaseLineId) เดียวกัน
+      // เก็บ row แรกที่เจอ — ทิ้ง row อื่นๆ (ปกติ onTradingPbChange กันไว้แล้ว แต่เผื่อพลาด)
+      const seenTradingKeys = new Set();
+      const dedupedItems = [];
+      let droppedCount = 0;
+      (form.items || []).forEach(it => {
+        if (!it) return;
+        if (it.sourceMode === 'TRADING' && it.sourcePurchaseBillId && it.sourcePurchaseLineId) {
+          const key = `${it.sourcePurchaseBillId}|${it.sourcePurchaseLineId}`;
+          if (seenTradingKeys.has(key)) {
+            droppedCount++;
+            console.warn('[sales save] drop duplicate Trading line', { pbId: it.sourcePurchaseBillId, lineId: it.sourcePurchaseLineId, weight: it.weight });
+            return;
+          }
+          seenTradingKeys.add(key);
+        }
+        dedupedItems.push(it);
+      });
+      if (droppedCount > 0) {
+        form.items = dedupedItems;
+        erp.showToast(`⚠ ลบบรรทัด Trading ซ้ำ ${droppedCount} รายการ ก่อนบันทึก`,'warning');
+      }
 
       recalcAll();
       // 🛡️ Anti-collision: ตรวจ docNo ซ้ำทั้ง local + cloud
@@ -35919,7 +36047,7 @@ app.component('view-userPermission', {
       userForm.value = clone;
       showUserModal.value = true;
     }
-    function saveUser() {
+    async function saveUser() {
       const f = userForm.value;
       if (!f.username) { erp.showToast('กรุณาใส่ username','error'); return; }
       const dup = (db.users||[]).find(u => u && u.username===f.username && u.id!==editingUser.value);
@@ -35928,29 +36056,61 @@ app.component('view-userPermission', {
       if (!editingUser.value && (!f.password || String(f.password).length < 4)) {
         erp.showToast('กรุณาใส่ password (อย่างน้อย 4 ตัว)','error'); return;
       }
+      const nowIso = new Date().toISOString();
       if (editingUser.value) {
         const idx = db.users.findIndex(u => u && u.id===editingUser.value);
         if (idx>=0) {
           const oldUser = db.users[idx];
           // ถ้า password ในฟอร์มว่าง = ไม่เปลี่ยน — ใช้ของเดิม
           const newPwd = f.password ? f.password : oldUser.password;
-          db.users[idx] = { ...f, id:editingUser.value, password: newPwd, passwordChangedAt: f.password ? new Date().toISOString() : oldUser.passwordChangedAt };
+          db.users[idx] = {
+            ...f,
+            id:editingUser.value,
+            password: newPwd,
+            passwordChangedAt: f.password ? nowIso : oldUser.passwordChangedAt,
+            updatedAt: nowIso,
+            createdAt: oldUser.createdAt || nowIso,
+          };
           if (f.password) erp.logActivity('PWD_RESET','users', f.username, 'admin reset password');
         }
       } else {
-        db.users.push({ ...f, id:'U-'+Date.now().toString(36), passwordChangedAt: new Date().toISOString() });
+        db.users.push({
+          ...f,
+          id:'U-'+Date.now().toString(36),
+          passwordChangedAt: nowIso,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        });
       }
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       erp.logAudit(editingUser.value?'UPDATE':'CREATE','users',null,{username:f.username});
       showUserModal.value = false;
-      erp.showToast('บันทึกสำเร็จ','success');
+      // 🆕 Push to cloud ทันที — กัน pull rewrite ก่อน push เสร็จ
+      try {
+        if (window.$autoSync?.pushNow) {
+          await window.$autoSync.pushNow();
+          erp.showToast('✓ บันทึกสำเร็จ + sync cloud','success');
+        } else {
+          erp.showToast('✓ บันทึกสำเร็จ (local only — cloud sync รอ)','success');
+        }
+      } catch(e) {
+        console.warn('[saveUser push]', e);
+        erp.showToast('✓ บันทึก local — cloud push fail: '+e.message,'warning');
+      }
     }
-    function deleteUser(u) {
+    async function deleteUser(u) {
       if (u.username === 'admin') { erp.showToast('ลบ admin ไม่ได้','error'); return; }
       if (!confirm('ลบ user '+u.username+'?')) return;
+      // 🆕 Tombstone ก่อน — กันเครื่องอื่น push กลับมา
+      try { window.$autoSync?.addTombstones?.('users', [u.id]); } catch(e){}
       db.users = db.users.filter(x => !x || x.id !== u.id);
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
-      erp.showToast('ลบสำเร็จ','success');
+      // 🆕 ลบจาก cloud + push
+      try {
+        if (window.sb) await window.sb.from('users').delete().eq('id', u.id);
+        if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
+      } catch(e){ console.warn('[deleteUser push]', e); }
+      erp.showToast('✓ ลบสำเร็จ','success');
     }
 
     function openAddRole() { editingRole.value = null; roleForm.value = blankRole(); showRoleModal.value = true; }
@@ -35963,34 +36123,54 @@ app.component('view-userPermission', {
       roleForm.value = cloned;
       showRoleModal.value = true;
     }
-    function saveRole() {
+    async function saveRole() {
       const f = roleForm.value;
       if (!f.name) { erp.showToast('กรุณาใส่ชื่อ Role','error'); return; }
       // Normalize back
       const out = JSON.parse(JSON.stringify(f));
       if (out.menus === '_ALL_') out.menus = '*';
       if (out.actions._ALL_) out.actions = { '*': out.actions._ALL_ };
+      const nowIso = new Date().toISOString();
+      out.updatedAt = nowIso;
       if (editingRole.value) {
         const idx = db.roles.findIndex(r => r && r.id===editingRole.value);
         if (idx>=0) {
           if (db.roles[idx].isSystem) { erp.showToast('แก้ Role System ไม่ได้ — ทำสำเนาก่อน','error'); return; }
+          out.createdAt = db.roles[idx].createdAt || nowIso;
           db.roles[idx] = { ...out, id:editingRole.value };
         }
       } else {
+        out.createdAt = nowIso;
         db.roles.push({ ...out, id:'R-'+Date.now().toString(36).toUpperCase(), isSystem:false });
       }
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       erp.logAudit(editingRole.value?'UPDATE':'CREATE','roles',null,{name:f.name});
       showRoleModal.value = false;
-      erp.showToast('บันทึกสำเร็จ','success');
+      // 🆕 Push to cloud ทันที
+      try {
+        if (window.$autoSync?.pushNow) {
+          await window.$autoSync.pushNow();
+          erp.showToast('✓ บันทึกสำเร็จ + sync cloud','success');
+        } else {
+          erp.showToast('✓ บันทึกสำเร็จ (local only)','success');
+        }
+      } catch(e) {
+        console.warn('[saveRole push]', e);
+        erp.showToast('✓ บันทึก local — cloud push fail: '+e.message,'warning');
+      }
     }
-    function deleteRole(r) {
+    async function deleteRole(r) {
       if (r.isSystem) { erp.showToast('ลบ System Role ไม่ได้','error'); return; }
       if ((db.users||[]).some(u => u && u.roleId === r.id)) { erp.showToast('มี user ใช้งาน role นี้อยู่','error'); return; }
       if (!confirm('ลบ role '+r.name+'?')) return;
+      try { window.$autoSync?.addTombstones?.('roles', [r.id]); } catch(e){}
       db.roles = db.roles.filter(x => !x || x.id !== r.id);
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
-      erp.showToast('ลบสำเร็จ','success');
+      try {
+        if (window.sb) await window.sb.from('roles').delete().eq('id', r.id);
+        if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
+      } catch(e){ console.warn('[deleteRole push]', e); }
+      erp.showToast('✓ ลบสำเร็จ','success');
     }
     function cloneRole(r) {
       const newR = { ...JSON.parse(JSON.stringify(r)), id:'R-'+Date.now().toString(36).toUpperCase(), name:r.name+' (Copy)', isSystem:false };
