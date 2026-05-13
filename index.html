@@ -5571,8 +5571,8 @@ window.$erp = {
     tradingDeals: { target:'trading_deals', keyMap:{ dealNo:'deal_no', purchaseBillId:'purchase_bill_id', purchaseBillNo:'purchase_bill_no', salesBillId:'sales_bill_id', salesBillNo:'sales_bill_no', productId:'product_id', supplierId:'supplier_id', customerId:'customer_id', matchedQty:'matched_qty', matchedPurchaseAmount:'matched_purchase_amount', matchedSalesAmount:'matched_sales_amount', exVat:'ex_vat', createdBy:'created_by', cancelledAt:'cancelled_at', createdAt:'created_at' } },
     historicalMonthly: { target:'historical_monthly', keyMap:{ metricType:'metric_type', categoryId:'category_id', updatedBy:'updated_by', updatedAt:'updated_at', createdAt:'created_at' } },
     receiptVouchers: { target:'receipt_vouchers', keyMap:{ docNo:'doc_no', purchaseBillId:'purchase_bill_id', purchaseBillDocNo:'purchase_bill_doc_no', sellerName:'seller_name', sellerTaxId:'seller_tax_id', sellerAddress:'seller_address', sellerPhone:'seller_phone', licensePlate:'license_plate', salesPerson:'sales_person', totalQty:'total_qty', totalAmount:'total_amount', amountInWords:'amount_in_words', payerSignerName:'payer_signer_name', receiverSignerName:'receiver_signer_name', paymentMethod:'payment_method', createdBy:'created_by', createdAt:'created_at', updatedBy:'updated_by', updatedAt:'updated_at' } },
-    users: { target:'users', keyMap:{ roleId:'role_id', branchId:'branch_id', createdAt:'created_at', updatedAt:'updated_at' } },
-    roles: { target:'roles', keyMap:{ isSystem:'is_system', seeCost:'see_cost', seeProfit:'see_profit', seeCash:'see_cash', seeFinancials:'see_financials', seeOpening:'see_opening', branchScope:'branch_scope' } },
+    users: { target:'users', keyMap:{ roleId:'role_id', branchId:'branch_id', createdAt:'created_at', updatedAt:'updated_at', passwordChangedAt:'password_changed_at', mustChangePwd:'must_change_pwd' } },
+    roles: { target:'roles', keyMap:{ isSystem:'is_system', seeCost:'see_cost', seeProfit:'see_profit', seeCash:'see_cash', seeFinancials:'see_financials', seeOpening:'see_opening', branchScope:'branch_scope', createdAt:'created_at', updatedAt:'updated_at' } },
   };
   const AS_CONFLICT_COL = { 'currencies': 'code' };
   // Tables to auto-sync (must exist in Supabase). Reduce for safety.
@@ -5686,7 +5686,9 @@ window.$erp = {
     errorLog.unshift({ at: new Date().toISOString().slice(11,19), table, msg });
     if (errorLog.length > 50) errorLog.length = 50;
   }
-  const NEVER_DROP = new Set(['id','code','created_at']);
+  // 🔧 BUG FIX 2026-05-13: ลด NEVER_DROP เหลือเฉพาะ 'id' — เพราะ created_at/code อาจไม่มีในบาง table (เช่น roles)
+  //   ทำให้ retry loop EXHAUSTED 12 ครั้ง — drop col ก็แก้ไม่ได้
+  const NEVER_DROP = new Set(['id']);
 
   /* Push 1 table — Smart retry on schema/FK errors (เหมือน manual migrate) */
   async function _pushTable(localKey) {
@@ -40849,7 +40851,8 @@ app.component('view-backup', {
     }
 
     /* Columns ที่ห้าม drop (PK / NOT NULL critical) */
-    const _NEVER_DROP = new Set(['id', 'code', 'created_at']);
+    // 🔧 BUG FIX 2026-05-13: ลด _NEVER_DROP เหลือเฉพาะ 'id' — เพราะ created_at/code อาจไม่มีในบาง table
+    const _NEVER_DROP = new Set(['id']);
 
     async function _uploadBatch(table, rows, batchSize = 100) {
       let inserted = 0, failed = 0, skipped = 0;
