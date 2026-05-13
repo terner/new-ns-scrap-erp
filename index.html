@@ -4321,13 +4321,15 @@ window.$erp = {
   today: () => new Date().toISOString().slice(0,10),
   uid: (p='ID') => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
   showToast: (msg, type='success') => { console.log('[toast]', type, msg); window._showToast && window._showToast(msg, type); },
-  /* Lookups */
-  branchName: (id) => _safeFind(_GLOBAL_DB.branches, id)?.name || '-',
-  warehouseName: (id) => _safeFind(_GLOBAL_DB.warehouses, id)?.name || '-',
-  productName: (id) => _safeFind(_GLOBAL_DB.products, id)?.name || '-',
-  supplierName: (id) => _safeFind(_GLOBAL_DB.suppliers, id)?.name || '-',
-  customerName: (id) => _safeFind(_GLOBAL_DB.customers, id)?.name || '-',
-  accountName: (id) => _safeFind(_GLOBAL_DB.accounts, id)?.name || '-',
+  /* Lookups
+     🔧 BUG FIX 2026-05-13: ถ้าหา master ไม่เจอ → return "⚠ id" แทน "-"
+        เพื่อให้ user รู้ว่าเครื่องนี้ยังไม่ sync master จาก cloud (ไม่ใช่ว่าบิลไม่มี supplier) */
+  branchName: (id) => _safeFind(_GLOBAL_DB.branches, id)?.name || (id ? '⚠ '+String(id).slice(-8) : '-'),
+  warehouseName: (id) => _safeFind(_GLOBAL_DB.warehouses, id)?.name || (id ? '⚠ '+String(id).slice(-8) : '-'),
+  productName: (id) => _safeFind(_GLOBAL_DB.products, id)?.name || (id ? '⚠ '+String(id).slice(-8) : '-'),
+  supplierName: (id) => _safeFind(_GLOBAL_DB.suppliers, id)?.name || (id ? '⚠ Sync master (id: '+String(id).slice(-8)+')' : '-'),
+  customerName: (id) => _safeFind(_GLOBAL_DB.customers, id)?.name || (id ? '⚠ Sync master (id: '+String(id).slice(-8)+')' : '-'),
+  accountName: (id) => _safeFind(_GLOBAL_DB.accounts, id)?.name || (id ? '⚠ '+String(id).slice(-8) : '-'),
   channelName: (id, list) => _safeFind(list, id)?.name || '-',
   beneficiaryName: (id) => _safeFind(_GLOBAL_DB.overseasBeneficiaries, id)?.name || '-',
   /* Balance / Stock */
@@ -9838,6 +9840,75 @@ app.component('view-stockLedger', {
       alert('Cleanup ยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
     };
 
+    /* 🆕 Quick Move Branch — แก้ branch/warehouse ของ stockLedger entry แต่ละ row
+       - 1-row mode: แก้เฉพาะ entry นี้
+       - All-product mode: ย้าย stockLedger ทุก row ของ productId นี้ไป target branch/warehouse */
+    const showMoveModal = ref(false);
+    const moveCtx = ref(null);   // { row, mode: 'one'|'allProduct', branchId, warehouseId }
+    function openMoveModal(row, mode) {
+      moveCtx.value = {
+        row: row,
+        mode: mode || 'one',
+        productId: row.productId,
+        productName: erp.productName(row.productId),
+        currentBranchId: row.branchId || '',
+        currentWarehouseId: row.warehouseId || '',
+        branchId: row.branchId || '',   // จะเลือกใหม่ใน form
+        warehouseId: row.warehouseId || '',
+      };
+      showMoveModal.value = true;
+    }
+    function closeMoveModal() { showMoveModal.value = false; moveCtx.value = null; }
+    const warehousesForMoveBranch = computed(() => {
+      const c = moveCtx.value;
+      if (!c || !c.branchId) return (db.warehouses||[]);
+      return (db.warehouses||[]).filter(w => w && (w.branchId === c.branchId || !w.branchId));
+    });
+    async function applyMoveBranch() {
+      const c = moveCtx.value;
+      if (!c) return;
+      const newBranchId = c.branchId || '';
+      const newWarehouseId = c.warehouseId || '';
+      const targets = [];
+      if (c.mode === 'allProduct') {
+        // ย้ายทุก stockLedger ของ productId นี้ (ที่มี branch/warehouse ตรงกับ current — กัน mass overwrite)
+        (db.stockLedger||[]).forEach((m, idx) => {
+          if (!m || m.productId !== c.productId) return;
+          // เลือกเฉพาะ entries ที่มี branchId/warehouseId ตรงกับ current (move from-to)
+          // หรือไม่เลือก filter ถ้า user ต้องการรวมทุกอัน → ขอ confirm
+          targets.push(idx);
+        });
+      } else {
+        const idx = (db.stockLedger||[]).findIndex(m => m && m.id === c.row.id);
+        if (idx >= 0) targets.push(idx);
+      }
+      if (!targets.length) { alert('ไม่พบ entries ให้ย้าย'); return; }
+      const bName = (db.branches||[]).find(b=>b && b.id===newBranchId)?.name || '(ว่าง)';
+      const wName = (db.warehouses||[]).find(w=>w && w.id===newWarehouseId)?.name || '(ว่าง)';
+      const msg = c.mode === 'allProduct'
+        ? `🏢 ย้าย stockLedger ทุก row ของ "${c.productName}"\n\n• จำนวน: ${targets.length} แถว\n• สาขาใหม่: ${bName}\n• คลังใหม่: ${wName}\n\n⚠ เปลี่ยน branchId/warehouseId ของ entries เหล่านี้ทันที (local + cloud)\n\nยืนยัน?`
+        : `🏢 ย้าย stockLedger entry นี้?\n\n• ${c.row.refNo || c.row.id}\n• สาขา: ${(db.branches||[]).find(b=>b&&b.id===c.currentBranchId)?.name || '(ว่าง)'} → ${bName}\n• คลัง: ${(db.warehouses||[]).find(w=>w&&w.id===c.currentWarehouseId)?.name || '(ว่าง)'} → ${wName}\n\nยืนยัน?`;
+      if (!confirm(msg)) return;
+      const nowIso = new Date().toISOString();
+      const updatedIds = [];
+      targets.forEach(i => {
+        if (db.stockLedger[i]) {
+          db.stockLedger[i].branchId = newBranchId;
+          db.stockLedger[i].warehouseId = newWarehouseId;
+          db.stockLedger[i].updatedAt = nowIso;
+          updatedIds.push(db.stockLedger[i].id);
+        }
+      });
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+      // Push cloud
+      try {
+        if (window.$autoSync?.pushTable) await window.$autoSync.pushTable('stockLedger');
+        else if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
+      } catch(e) { console.warn('[moveBranch push]', e); }
+      erp.showToast(`✓ ย้าย ${updatedIds.length} แถวสำเร็จ — sync cloud แล้ว`, 'success');
+      closeMoveModal();
+    }
+
     return { db, erp, filterProduct, filterBranch, filterType, fromDate, toDate,
       filterNegativeOnly, negativeCount, balanceMode,
       runCleanupDups, runCleanupOrphans,
@@ -9849,7 +9920,9 @@ app.component('view-stockLedger', {
       getSourceAvail,
       // Timeline modal
       showTimeline, timelineCtx, timelineRows, timelineDisplay, timelineFirstNegIdx,
-      timelineNewestFirst, openTimeline, closeTimeline, gotoFromTimeline };
+      timelineNewestFirst, openTimeline, closeTimeline, gotoFromTimeline,
+      // Move Branch modal
+      showMoveModal, moveCtx, warehousesForMoveBranch, openMoveModal, closeMoveModal, applyMoveBranch };
   },
   template: `
   <div>
@@ -9952,6 +10025,8 @@ app.component('view-stockLedger', {
               <div class="flex items-center justify-center gap-1">
                 <!-- 🆕 ปุ่ม Timeline — ดูทุก movement ของสินค้านี้ -->
                 <button @click="openTimeline(m)" class="text-xs px-1.5 py-1 bg-sky-100 text-sky-700 hover:bg-sky-200 rounded" title="📊 ดู Timeline ทุก movement ของสินค้านี้ในคลังนี้">📊</button>
+                <!-- 🆕 ปุ่ม "ย้ายคลัง" — แก้ branch/warehouse ของ entry นี้ -->
+                <button @click="openMoveModal(m, 'one')" class="text-xs px-1.5 py-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded" title="🏢 ย้าย branch/warehouse ของ entry นี้">🏢</button>
                 <!-- 🆕 ปุ่ม "ปรับเกรด" ถ้าติดลบ -->
                 <button v-if="m.isNegative" @click="openFixModal(m)" class="text-xs px-2 py-1 bg-red-500 text-white hover:bg-red-600 rounded font-bold animate-pulse">🔧 ปรับเกรด</button>
                 <button v-else-if="m.refType==='OPENING'" @click="editOpening(m)" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-medium" title="ไปแก้ที่ Opening Balance">✏️ Opening</button>
@@ -10209,6 +10284,58 @@ app.component('view-stockLedger', {
             💡 <b>ทำไม Stock ติดลบ?</b> เพราะมี OUT (ขาย/เบิก/โอน/Production) มากกว่า IN — ดูแถวที่เป็นสีส้มหรือ Tab "ปรับเกรด" เพื่อแก้
           </div>
           <button @click="closeTimeline" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded">ปิด</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🆕 MOVE BRANCH MODAL — ย้าย branch/warehouse ของ stockLedger entry -->
+    <div v-if="showMoveModal && moveCtx" class="fixed inset-0 bg-black/60 z-50 overflow-y-auto" @click.self="closeMoveModal">
+      <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg shadow-xl">
+          <div class="px-5 py-4 border-b flex justify-between items-center bg-indigo-50">
+            <h3 class="text-lg font-bold text-indigo-700">🏢 ย้าย Branch / Warehouse</h3>
+            <button @click="closeMoveModal" class="text-2xl text-slate-400 leading-none">&times;</button>
+          </div>
+          <div class="p-5 space-y-3 text-sm">
+            <div class="bg-slate-50 rounded p-3">
+              <div class="text-xs text-slate-500">สินค้า</div>
+              <div class="font-bold">{{moveCtx.productName}}</div>
+              <div class="text-xs text-slate-500 mt-2">ปัจจุบัน</div>
+              <div class="text-xs">
+                สาขา: <b>{{(db.branches||[]).find(b=>b&&b.id===moveCtx.currentBranchId)?.name || '(ว่าง)'}}</b>
+                · คลัง: <b>{{(db.warehouses||[]).find(w=>w&&w.id===moveCtx.currentWarehouseId)?.name || '(ว่าง)'}}</b>
+              </div>
+              <div v-if="moveCtx.mode==='one'" class="text-xs text-slate-500 mt-1">
+                Entry: <span class="font-mono">{{moveCtx.row.refNo || moveCtx.row.id}}</span> · ประเภท: <b>{{moveCtx.row.movementType}}</b>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold mb-1">📌 สาขาใหม่</label>
+              <select v-model="moveCtx.branchId" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">— (ไม่ระบุ) —</option>
+                <option v-for="b in (db.branches||[])" :key="b.id" :value="b.id">{{b.name}}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold mb-1">📦 คลังใหม่</label>
+              <select v-model="moveCtx.warehouseId" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">— (ไม่ระบุ) —</option>
+                <option v-for="w in warehousesForMoveBranch" :key="w.id" :value="w.id">{{w.name}}</option>
+              </select>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800">
+              💡 <b>โหมด:</b>
+              <label class="ml-2"><input type="radio" v-model="moveCtx.mode" value="one"> ย้ายเฉพาะ entry นี้</label>
+              <label class="ml-3"><input type="radio" v-model="moveCtx.mode" value="allProduct"> ย้ายทุก entry ของสินค้านี้</label>
+            </div>
+            <div v-if="moveCtx.mode==='allProduct'" class="bg-rose-50 border border-rose-200 rounded p-2 text-xs text-rose-700">
+              ⚠ <b>โหมด "ทุก entry"</b> จะย้าย stockLedger ทุกแถวของ "{{moveCtx.productName}}" ไปยัง branch/warehouse ที่เลือก — ใช้เพื่อรวมข้อมูลที่กระจัดกระจาย
+            </div>
+          </div>
+          <div class="px-5 py-3 border-t bg-slate-50 flex justify-end gap-2">
+            <button @click="closeMoveModal" class="px-4 py-2 text-sm hover:bg-slate-200 rounded">ยกเลิก</button>
+            <button @click="applyMoveBranch" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-bold">🏢 ย้าย + Sync Cloud</button>
+          </div>
         </div>
       </div>
     </div>
@@ -12481,6 +12608,24 @@ app.component('view-purchase', {
       }
     }
 
+    /* 🆕 Detect missing suppliers — บิลอ้าง supplierId ที่ไม่อยู่ใน master local */
+    const missingSupplierCount = computed(() => {
+      const supSet = new Set((db.suppliers||[]).map(s => s && s.id).filter(Boolean));
+      let count = 0;
+      (db.purchaseBills||[]).forEach(b => {
+        if (!b || !b.supplierId) return;
+        if (!supSet.has(b.supplierId)) count++;
+      });
+      return count;
+    });
+    /* 🆕 Force pull masters from cloud — แก้ supplier/customer/product/sales หายในเครื่องนี้ */
+    const runPullMasters = () => {
+      if (typeof window.$pullMastersFromCloud === 'function') {
+        return window.$pullMastersFromCloud();
+      }
+      alert('ฟังก์ชันยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
+    };
+
     return {
       db, erp, form, showForm, search, filtered, billTotals, editingId,
       filterMode, filterSource, filterDateFrom, filterDateTo,
@@ -12506,14 +12651,32 @@ app.component('view-purchase', {
       selectedBillIds, toggleBillSelect, clearBillSelection, selectAllBillsInFilter, bulkDeleteBills,
       // 🆕 Export
       exportPurchaseBills, fixDuplicateDocNos,
+      // 🆕 Missing-supplier detector + force pull
+      missingSupplierCount, runPullMasters,
     };
   },
   template: `
   <div>
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800 flex items-center justify-between gap-2">
       <span><strong>บิลรับซื้อ</strong> — รับซื้อเศษโลหะเข้าคลัง</span>
-      <button @click="forceDeleteImportedHere" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 whitespace-nowrap" title="ลบบิล Import (id: PB-IMP-*) ทั้งหมด — local + cloud">
-        🚨 Force Delete Imported (PB-IMP-*)
+      <div class="flex gap-2">
+        <button @click="runPullMasters" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 whitespace-nowrap" title="ดึง master (supplier/customer/product/sales) จาก cloud มาทับ local — แก้กรณี master หายหรือชื่อไม่ขึ้น">
+          🔄 Sync Master จาก Cloud
+        </button>
+        <button @click="forceDeleteImportedHere" class="px-3 py-1.5 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 whitespace-nowrap" title="ลบบิล Import (id: PB-IMP-*) ทั้งหมด — local + cloud">
+          🚨 Force Delete Imported (PB-IMP-*)
+        </button>
+      </div>
+    </div>
+
+    <!-- 🆕 Missing supplier banner — เตือนเมื่อมีบิลอ้าง supplier ที่ไม่มีใน local master -->
+    <div v-if="missingSupplierCount > 0" class="bg-amber-50 border-2 border-amber-400 rounded-lg p-3 mb-4 flex items-center justify-between gap-2 animate-pulse">
+      <div class="text-sm text-amber-800">
+        ⚠ พบ <b class="text-amber-900">{{missingSupplierCount}}</b> บิลที่ supplier ไม่มีใน local master —
+        เครื่องนี้ยังไม่ sync supplier ครบจาก cloud (เครื่องอื่นอาจเห็นชื่อปกติ)
+      </div>
+      <button @click="runPullMasters" class="px-3 py-1.5 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 whitespace-nowrap shrink-0">
+        🔄 Pull Masters เดี๋ยวนี้
       </button>
     </div>
 
