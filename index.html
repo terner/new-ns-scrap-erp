@@ -3786,6 +3786,132 @@ window.$cleanupStockDuplicates = async function(dryRun) {
   return { deleted: toDelete.length, cloudOk, cloudFail, affectedBills: byBill.size };
 };
 
+/* 🆕 GLOBAL: Recompute Trading Deal costs ที่ matchedPurchaseAmount = 0
+   เหตุ: บิล Trading ที่มาจาก import มี unitCost = 0 เพราะ PB.price = 0
+         → totalCost = 0 → matchedCost ใน deal = 0
+   วิธี: ดึง cost จาก PB.items[].netAmount/netWeight × item.weight
+   ใช้: window.$recomputeTradingDealCosts([dryRun=true])
+        - dryRun=true (default): แค่รายงาน
+        - dryRun=false: แก้จริง + push cloud
+*/
+window.$recomputeTradingDealCosts = async function(dryRun) {
+  if (dryRun !== false) dryRun = true;
+  const db = _GLOBAL_DB;
+  const deals = Array.isArray(db.tradingDeals) ? db.tradingDeals : [];
+  const fmt = (n) => Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const toFix = [];
+  deals.forEach(d => {
+    if (!d) return;
+    if (d.status === 'cancelled' || d.status === 'Cancelled') return;
+    const currentCost = Number(d.matchedPurchaseAmount || 0);
+    const currentQty = Number(d.matchedQty || 0);
+    // Only consider deals with cost = 0 but qty > 0 (broken state)
+    if (currentCost > 0.001 || currentQty <= 0.001) return;
+
+    const pb = (db.purchaseBills||[]).find(b => b && b.id === d.purchaseBillId);
+    const sb = (db.salesBills||[]).find(b => b && b.id === d.salesBillId);
+    if (!pb || !sb) return;
+
+    // คำนวณ cost จาก SB items ที่มาจาก PB นี้
+    const itemsFromPB = (sb.items||[]).filter(it => it && it.sourcePurchaseBillId === pb.id);
+    if (itemsFromPB.length === 0) return;
+
+    let computedCost = 0;
+    itemsFromPB.forEach(it => {
+      const explicit = Number(it.tradingCostAmount || it.totalCost || 0);
+      if (explicit > 0.001) { computedCost += explicit; return; }
+      const pbItem = (pb.items||[]).find(p => p && p.productId === it.productId
+        && (!it.sourcePurchaseLineId || p.id === it.sourcePurchaseLineId));
+      if (pbItem) {
+        const pbWt = Number(pbItem.netWeight || pbItem.weight || 0);
+        const pbAmt = Number(pbItem.netAmount || 0);
+        const itemWt = Number(it.weight || 0);
+        if (pbWt > 0) computedCost += (pbAmt * itemWt / pbWt);
+      }
+    });
+
+    if (computedCost > 0.001) {
+      // คำนวณ matchedSales ใหม่ตามสัดส่วน
+      const sbExVat = Number(sb.subtotal != null ? sb.subtotal : sb.totalAmount || 0);
+      const totalCostInBill = (sb.items||[]).reduce((s,it) => {
+        const ic = Number(it.tradingCostAmount || it.totalCost || 0);
+        if (ic > 0.001) return s + ic;
+        // Same fallback for total
+        const pbForItem = (db.purchaseBills||[]).find(b => b && b.id === it.sourcePurchaseBillId);
+        if (pbForItem) {
+          const pi = (pbForItem.items||[]).find(p => p && p.productId === it.productId
+            && (!it.sourcePurchaseLineId || p.id === it.sourcePurchaseLineId));
+          if (pi) {
+            const pw = Number(pi.netWeight || pi.weight || 0);
+            const pa = Number(pi.netAmount || 0);
+            if (pw > 0) return s + (pa * Number(it.weight || 0) / pw);
+          }
+        }
+        return s;
+      }, 0) || 1;
+      const newMatchedSales = sbExVat * (computedCost / totalCostInBill);
+      toFix.push({
+        dealId: d.id,
+        dealNo: d.dealNo,
+        pbNo: pb.docNo, sbNo: sb.docNo,
+        oldCost: currentCost,
+        newCost: computedCost,
+        oldSales: Number(d.matchedSalesAmount || 0),
+        newSales: newMatchedSales,
+        qty: currentQty,
+        gp: newMatchedSales - computedCost,
+      });
+    }
+  });
+
+  console.log(`%c🔄 Trading Deal Cost Recompute`, 'font-weight:bold;font-size:14px;color:#0369a1');
+  console.log(`Total deals scanned: ${deals.length}`);
+  console.log(`Deals to fix (cost=0, qty>0, can recompute): ${toFix.length}`);
+  if (toFix.length) {
+    console.table(toFix.slice(0, 30).map(x => ({
+      dealNo: x.dealNo, pb: x.pbNo, sb: x.sbNo,
+      qty: fmt(x.qty),
+      oldCost: fmt(x.oldCost), newCost: fmt(x.newCost),
+      oldSales: fmt(x.oldSales), newSales: fmt(x.newSales),
+      newGP: fmt(x.gp),
+    })));
+  }
+
+  if (!toFix.length) {
+    alert('✓ ไม่มี Trading Deal ที่ต้องแก้ — cost ถูกต้องแล้ว');
+    return { fixed: 0 };
+  }
+
+  const totalCostRecover = toFix.reduce((s,x)=>s+x.newCost,0);
+  if (dryRun) {
+    alert(`🔍 Dry Run — พบ Trading Deal ที่ cost = 0:\n\n` +
+      `• ${toFix.length} deals\n` +
+      `• ต้นทุนที่จะเพิ่ม: ${fmt(totalCostRecover)} บาท\n\n` +
+      `รายละเอียดดูใน Console (F12)\n\n` +
+      `💡 ถ้ายืนยันแก้จริง → พิมพ์:\n  window.$recomputeTradingDealCosts(false)`);
+    return { previewed: toFix.length, toFix };
+  }
+
+  if (!confirm(`⚠ ยืนยันแก้ Trading Deal costs?\n\n• ${toFix.length} deals\n• ต้นทุนรวม: ${fmt(totalCostRecover)} บาท\n• Push cloud หลังแก้\n\nยืนยัน?`)) return;
+
+  toFix.forEach(x => {
+    const idx = db.tradingDeals.findIndex(d => d && d.id === x.dealId);
+    if (idx < 0) return;
+    db.tradingDeals[idx].matchedPurchaseAmount = x.newCost;
+    db.tradingDeals[idx].matchedSalesAmount = x.newSales;
+    db.tradingDeals[idx].updatedAt = new Date().toISOString();
+    db.tradingDeals[idx].notes = (db.tradingDeals[idx].notes || '') + ' [recomputed cost]';
+  });
+  try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+  try {
+    if (window.$autoSync?.pushTable) await window.$autoSync.pushTable('tradingDeals');
+    else if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
+  } catch(e){ console.warn('[recompute push]', e); }
+  alert(`✅ แก้สำเร็จ ${toFix.length} deals\n• ต้นทุนรวม: ${fmt(totalCostRecover)} บาท\n• Push cloud แล้ว\n\n💡 รีเฟรชหน้า Trading Matching เพื่อดูยอดใหม่`);
+  return { fixed: toFix.length, totalCostRecover };
+};
+
 /* 🆕 GLOBAL: หาทุกสินค้าที่ติดลบ — ใช้ที่ console: window.$listNegativeStock() */
 window.$listNegativeStock = function() {
   const db = _GLOBAL_DB;
@@ -5485,15 +5611,39 @@ window.$erp = {
               totalRows += cloudRows.length;
               continue;
             }
-            // REPLACE: wipe local + insert all cloud rows
+            // 🆕 BUG FIX 2026-05-13: เก็บ backup ของ local rows ก่อน clear
+            // → เผื่อ push ของ local ยังไม่ commit แต่ pull เข้ามาแล้ว → ปกป้อง local เปลี่ยนแปลงล่าสุด
+            const localBackup = new Map();
+            arrM.forEach(r => { if (r && r.id) localBackup.set(r.id, r); });
+            // REPLACE: wipe local + insert all cloud rows (with LWW protection)
             arrM.length = 0;
-            let skippedTomb = 0;
+            let skippedTomb = 0, lwwProtected = 0;
             cloudRows.forEach(r => {
               if (!r) return;
               if (r.id && isTombstoned(localKey, r.id)) { skippedTomb++; return; }
-              arrM.push(r);
+              // 🆕 LWW per-row: ถ้า local มี ts ใหม่กว่า cloud → ใช้ local + push กลับ
+              const localRow = localBackup.get(r.id);
+              const localTs = String(localRow?.updatedAt || localRow?.createdAt || '');
+              const cloudTs = String(r.updatedAt || r.createdAt || '');
+              if (localTs && cloudTs && localTs > cloudTs) {
+                lwwProtected++;
+                dirtyTables.add(localKey);
+                console.log(`[pull-LWW master] ${localKey} ${r.id}: keep LOCAL (ts=${localTs}) > cloud (ts=${cloudTs}) — รอ push`);
+                arrM.push(localRow);   // 🛡 ใช้ local ที่ใหม่กว่า
+              } else {
+                arrM.push(r);   // ใช้ cloud (ปกติ)
+              }
+            });
+            // 🆕 เพิ่ม local rows ที่ไม่มีใน cloud (เพิ่งสร้าง ยัง push ไม่ขึ้น) — กัน wipe
+            localBackup.forEach((localRow, id) => {
+              if (!cloudRows.find(r => r && r.id === id)) {
+                arrM.push(localRow);
+                dirtyTables.add(localKey);
+                console.log(`[pull-orphan-protect master] ${localKey} ${id}: local exists, cloud doesn't — keep + push`);
+              }
             });
             if (skippedTomb) console.log(`[pull-tombstone] ${localKey}: skipped ${skippedTomb} recently-deleted rows`);
+            if (lwwProtected) console.warn(`[pull-LWW master] ${localKey}: ${lwwProtected} rows มี local ts ใหม่กว่า cloud — mark dirty เพื่อ push`);
             const after = arrM.length;
             const delta = after - beforeCount;
             if (delta > 0) newRowCount += delta;
@@ -5854,6 +6004,15 @@ window.$erp = {
     boot, shutdown,
     pushNow: () => { if (pushTimer) clearTimeout(pushTimer); return pushDirty(false); },     // dirty หรือ force
     pushAll: () => { if (pushTimer) clearTimeout(pushTimer); return pushDirty(true); },     // 🆕 บังคับ push ทุกตาราง
+    // 🆕 ทำเครื่องหมาย tables เป็น dirty เพื่อให้ pushNow รอบหน้า push ตารางพวกนี้
+    markDirty: (tables) => { (Array.isArray(tables) ? tables : [tables]).forEach(t => dirtyTables.add(t)); },
+    // 🆕 Push specific table NOW (bypass watch debounce)
+    pushTable: async (tables) => {
+      if (pushTimer) clearTimeout(pushTimer);
+      const arr = Array.isArray(tables) ? tables : [tables];
+      arr.forEach(t => dirtyTables.add(t));
+      return pushDirty(false);
+    },
     pullNow: () => pullAll(),
     addTombstones, isTombstoned,  // 🆕 expose tombstone API
     tombstones: () => JSON.parse(JSON.stringify(TOMBSTONES)),
@@ -6868,9 +7027,11 @@ function makeMasterComponent(opts) {
         showModal.value = false;
         // 🆕 Push to cloud ทันที — กัน pull cycle rewrite ก่อน push เสร็จ
         // โดยเฉพาะ master tables (accounts/suppliers/customers/products) ที่ใช้ REPLACE mode pull
+        // 🔧 BUG FIX 2026-05-13: ใช้ pushTable(opts.collection) แทน pushNow() เพื่อบังคับ push ตารางนี้
+        // เผื่อ watch debounce ยังไม่ทันเสร็จ + กัน case ที่ dirtyTables มี table อื่น แต่ยังไม่มี collection นี้
         try {
-          if (window.$autoSync?.pushNow) {
-            await window.$autoSync.pushNow();
+          if (window.$autoSync?.pushTable) {
+            await window.$autoSync.pushTable(opts.collection);
             // 🆕 Verify หลัง push: query cloud ดูว่าค่าตรงไหม
             if (opts.collection === 'accounts' && window.sb && savedRow) {
               try {
@@ -15604,7 +15765,22 @@ app.component('view-sales', {
               // items ที่มาจาก PB นี้
               const itemsFromPB = (bill.items||[]).filter(it => it.sourcePurchaseBillId === pb.id);
               const matchedQty = itemsFromPB.reduce((s,it)=>s+Number(it.weight||0),0);
-              const matchedCost = itemsFromPB.reduce((s,it)=>s+Number(it.tradingCostAmount||it.totalCost||0),0);
+              // 🔧 BUG FIX 2026-05-13: ถ้า it.tradingCostAmount และ totalCost = 0 (เคสบิล import)
+              // → fallback คำนวณจาก PB.items[].netAmount * (item.weight / PB.item.netWeight)
+              const matchedCost = itemsFromPB.reduce((s,it) => {
+                const explicit = Number(it.tradingCostAmount || it.totalCost || 0);
+                if (explicit > 0.001) return s + explicit;
+                // Fallback: compute from PB item
+                const pbItem = (pb.items||[]).find(p => p && p.productId === it.productId
+                  && (!it.sourcePurchaseLineId || p.id === it.sourcePurchaseLineId));
+                if (pbItem) {
+                  const pbWt = Number(pbItem.netWeight || pbItem.weight || 0);
+                  const pbAmt = Number(pbItem.netAmount || 0);
+                  const itemWt = Number(it.weight || 0);
+                  if (pbWt > 0) return s + (pbAmt * itemWt / pbWt);
+                }
+                return s;
+              }, 0);
               // matchedSales: proportional ตามสัดส่วนต้นทุน
               const matchedSales = sbExVat * (matchedCost / totalCostInBill);
               const actualMatchCost = Math.min(matchedCost, remainPB);
@@ -37694,7 +37870,10 @@ app.component('view-tradingMatching', {
         <h1 class="text-2xl font-bold flex items-center gap-2">🤝 Trading Matching / จับคู่ดีล Trading</h1>
         <p class="text-sm opacity-80 mt-1">จับคู่บิลซื้อ Trading กับบิลขาย Trading → คำนวณ GP ต่อดีล (ก่อน VAT)</p>
       </div>
-      <button @click="openMatch" class="bg-white text-fuchsia-700 px-4 py-2 rounded-lg font-bold hover:bg-fuchsia-50">+ จับคู่ใหม่</button>
+      <div class="flex gap-2">
+        <button @click="window.$recomputeTradingDealCosts && window.$recomputeTradingDealCosts(true)" class="bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200" title="หา Trading Deal ที่ cost=0 + คำนวณใหม่จาก PB.netAmount/netWeight">🔄 Recalc Cost</button>
+        <button @click="openMatch" class="bg-white text-fuchsia-700 px-4 py-2 rounded-lg font-bold hover:bg-fuchsia-50">+ จับคู่ใหม่</button>
+      </div>
     </div>
 
     <!-- 🎯 Mega Card + Status Donut -->
