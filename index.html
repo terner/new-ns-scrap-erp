@@ -3173,6 +3173,95 @@ window.$pullMastersFromCloud = async function() {
   setTimeout(() => location.reload(), 2000);
 };
 
+/* 🆕 GLOBAL: Smart Auto-Fetch — ดึงเฉพาะ master ที่หายจาก cloud (เร็วกว่า pull ทั้งตาราง)
+   - หา supplier/customer/product/sales IDs ที่บิลอ้างแต่ไม่มีใน local
+   - Query cloud ด้วย .in('id', missingIds) — เฉพาะที่หาย
+   - silent=true → ไม่ alert; silent=false → แสดงผล
+   ใช้: window.$autoFetchMissingMasters(silent) */
+window.$autoFetchMissingMasters = async function(silent) {
+  if (!window.sb) return { ok: false, reason: 'no_sb' };
+  const db = _GLOBAL_DB;
+  // หา missing ids
+  const supSet = new Set((db.suppliers||[]).map(s => s && s.id).filter(Boolean));
+  const cusSet = new Set((db.customers||[]).map(c => c && c.id).filter(Boolean));
+  const prodSet = new Set((db.products||[]).map(p => p && p.id).filter(Boolean));
+  const salesSet = new Set((db.salespersons||[]).map(s => s && s.id).filter(Boolean));
+  const missingSup = new Set(), missingCus = new Set(), missingProd = new Set(), missingSales = new Set();
+  (db.purchaseBills||[]).forEach(b => {
+    if (!b) return;
+    if (b.supplierId && !supSet.has(b.supplierId)) missingSup.add(b.supplierId);
+    if (b.salesId && !salesSet.has(b.salesId)) missingSales.add(b.salesId);
+    (b.items||[]).forEach(it => {
+      if (it && it.productId && !prodSet.has(it.productId)) missingProd.add(it.productId);
+    });
+  });
+  (db.salesBills||[]).forEach(b => {
+    if (!b) return;
+    if (b.customerId && !cusSet.has(b.customerId)) missingCus.add(b.customerId);
+    if (b.salesId && !salesSet.has(b.salesId)) missingSales.add(b.salesId);
+    (b.items||[]).forEach(it => {
+      if (it && it.productId && !prodSet.has(it.productId)) missingProd.add(it.productId);
+    });
+  });
+  const totalMissing = missingSup.size + missingCus.size + missingProd.size + missingSales.size;
+  if (totalMissing === 0) return { ok: true, deleted: 0, message: 'no_missing' };
+  const result = { suppliers: 0, customers: 0, products: 0, salespersons: 0, errors: [] };
+  const _fetchInto = async (tbl, ids, target) => {
+    if (!ids.size) return 0;
+    try {
+      const idList = Array.from(ids);
+      // chunked .in() queries — Supabase has 100-item limit
+      let added = 0;
+      for (let i = 0; i < idList.length; i += 100) {
+        const chunk = idList.slice(i, i+100);
+        const { data, error } = await window.sb.from(tbl).select('*').in('id', chunk);
+        if (error) { result.errors.push(tbl+': '+error.message); continue; }
+        if (data && data.length) {
+          data.forEach(r => {
+            // map snake to camel for common fields
+            const o = { ...r };
+            if (r.bank_account) o.bankAccount = r.bank_account;
+            if (r.bank_name) o.bankName = r.bank_name;
+            if (r.tax_id) o.taxId = r.tax_id;
+            if (r.credit_term) o.creditTerm = r.credit_term;
+            if (r.sales_id) o.salesId = r.sales_id;
+            if (r.role_id) o.roleId = r.role_id;
+            if (r.branch_id) o.branchId = r.branch_id;
+            if (r.created_at) o.createdAt = r.created_at;
+            if (r.updated_at) o.updatedAt = r.updated_at;
+            if (!Array.isArray(db[target])) db[target] = [];
+            const existingIdx = db[target].findIndex(x => x && x.id === r.id);
+            if (existingIdx >= 0) db[target][existingIdx] = o;
+            else db[target].push(o);
+            added++;
+          });
+        }
+      }
+      return added;
+    } catch(e) { result.errors.push(tbl+': '+e.message); return 0; }
+  };
+  result.suppliers = await _fetchInto('suppliers', missingSup, 'suppliers');
+  result.customers = await _fetchInto('customers', missingCus, 'customers');
+  result.products = await _fetchInto('products', missingProd, 'products');
+  result.salespersons = await _fetchInto('salespersons', missingSales, 'salespersons');
+  try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+  const totalAdded = result.suppliers + result.customers + result.products + result.salespersons;
+  if (!silent) {
+    alert(`🔄 Auto-Fetch Missing Masters\n\n` +
+      `📥 ดึงจาก cloud:\n` +
+      `• Suppliers: ${result.suppliers}/${missingSup.size}\n` +
+      `• Customers: ${result.customers}/${missingCus.size}\n` +
+      `• Products: ${result.products}/${missingProd.size}\n` +
+      `• Salespersons: ${result.salespersons}/${missingSales.size}\n\n` +
+      `✓ รวม: ${totalAdded}/${totalMissing}\n` +
+      (result.errors.length ? `❌ Errors:\n${result.errors.slice(0,3).join('\n')}\n` : '') +
+      (totalAdded < totalMissing ? `\n⚠ ที่หาย ${totalMissing-totalAdded} ราย — ไม่มีใน cloud เลย → ใช้ "🔧 สร้าง Placeholder"` : ''));
+  } else if (totalAdded > 0) {
+    console.log(`%c🔄 Auto-Fetch: เพิ่ม masters ${totalAdded} รายการ จาก cloud (suppliers:${result.suppliers}, customers:${result.customers}, products:${result.products}, sales:${result.salespersons})`, 'color:#0ea5e9;font-weight:bold');
+  }
+  return { ok: true, totalMissing, totalAdded, result };
+};
+
 /* 🆕 GLOBAL: Restore from pre-reset auto-backup
    ใช้กรณี: เผลอกด Reset Demo → ข้อมูลหาย → recover จาก auto-backup
    ใช้: window.$restoreFromPreResetBackup()  — list backups available
@@ -12833,6 +12922,20 @@ app.component('view-purchase', {
       });
       return count;
     });
+    /* 🆕 AUTO-trigger fetch master ทันทีที่เจอ missing (debounced, รัน 1 ครั้งต่อ session) */
+    let _autoFetchTriggered = false;
+    watch(missingSupplierCount, async (newVal) => {
+      if (newVal > 0 && !_autoFetchTriggered && window.$autoFetchMissingMasters) {
+        _autoFetchTriggered = true;
+        console.log(`[auto-fetch trigger] เจอ ${newVal} missing suppliers — auto-fetch จาก cloud`);
+        try {
+          const r = await window.$autoFetchMissingMasters(true);
+          if (r && r.totalAdded > 0) {
+            erp.showToast(`🔄 ดึง master ${r.totalAdded} ราย จาก cloud อัตโนมัติ`, 'success');
+          }
+        } catch(e) { console.warn('[auto-fetch trigger]', e); }
+      }
+    }, { immediate: true });
     /* 🆕 Force pull masters from cloud — แก้ supplier/customer/product/sales หายในเครื่องนี้ */
     const runPullMasters = () => {
       if (typeof window.$pullMastersFromCloud === 'function') {
@@ -45832,9 +45935,16 @@ app.component('view-statusConvert', {
           console.log(`%c🧹 Auto-cleanup (boot-2): ลบ stockLedger orphans ${o.deleted} แถว (บิลถูกลบไปแล้ว)`, 'color:#dc2626;font-weight:bold');
         }
       }
+      // 🆕 Auto-fetch missing masters from cloud — ดึงเฉพาะที่หายโดย targeted query
+      if (typeof window.$autoFetchMissingMasters === 'function') {
+        const r = await window.$autoFetchMissingMasters(true);
+        if (r && r.totalAdded > 0) {
+          console.log(`%c🔄 Auto-fetch masters (boot): ดึง ${r.totalAdded}/${r.totalMissing} masters จาก cloud`, 'color:#0ea5e9;font-weight:bold');
+        }
+      }
     } catch(e) { console.warn('[auto-dedup boot-2]', e); }
   }, 12000);
-  // Run every 2 minutes (silent) — dedup + orphan
+  // Run every 2 minutes (silent) — dedup + orphan + master-fetch
   setInterval(async () => {
     try {
       if (typeof _purgeStockDuplicates === 'function') {
@@ -45847,6 +45957,13 @@ app.component('view-statusConvert', {
         const o = await _purgeStockOrphans(true);
         if (o && o.deleted > 0) {
           console.log(`%c🧹 Auto-cleanup (2min): ลบ stockLedger orphans ${o.deleted} แถว`, 'color:#dc2626;font-weight:bold');
+        }
+      }
+      // 🆕 Auto-fetch missing masters every 2 min
+      if (typeof window.$autoFetchMissingMasters === 'function') {
+        const r = await window.$autoFetchMissingMasters(true);
+        if (r && r.totalAdded > 0) {
+          console.log(`%c🔄 Auto-fetch (2min): ดึง masters ${r.totalAdded}/${r.totalMissing} จาก cloud`, 'color:#0ea5e9;font-weight:bold');
         }
       }
     } catch(e) {}
