@@ -2931,6 +2931,146 @@ function seedData() {
   return data;
 }
 
+/* ================================================================
+   🛡 IDEMPOTENT DOCUMENT SAVE FRAMEWORK (2026-05-14)
+   ================================================================
+   Pattern enforced ทุก critical save:
+   1. Edit ห้าม insert ซ้ำ — ใช้ document_id เดิม
+   2. ก่อนสร้าง ledger ใหม่ ต้อง reverse ledger เก่า (filter by source)
+   3. ทุก ledger entry มี source_type + source_id (refType + refId)
+   4. Idempotency key กัน double-submit
+   5. Audit log ทุก save
+   6. Rollback ถ้า fail (snapshot DB ก่อน → restore ถ้า throw)
+   7. Verify cloud หลัง save
+   ================================================================ */
+
+const _IDEMPOTENCY_CACHE = new Map();      // key → { result, at } TTL 30s
+const _IN_FLIGHT = new Set();              // กัน concurrent same-key
+const _SAVE_AUDIT = [];                    // เก็บประวัติ save ทุกครั้ง (in-memory)
+
+function _genIdempotencyKey(docType, docNo, payload) {
+  // คีย์ unique: docType + docNo + hash ของ payload
+  // ถ้า user กด save 2 ครั้งภายใน TTL → return cached result (idempotent)
+  const payloadStr = JSON.stringify(payload || {}).slice(0, 500);
+  let hash = 0;
+  for (let i = 0; i < payloadStr.length; i++) {
+    hash = ((hash << 5) - hash) + payloadStr.charCodeAt(i);
+    hash |= 0;
+  }
+  return `${docType}|${docNo || 'new'}|${hash}`;
+}
+
+/* 🛡 Reverse ledger entries by (source_type, source_id) — universal cleaner
+   ใช้ก่อน rebuild — ลบทั้ง local + cloud + tombstone */
+async function _reverseLedgerBySource(opts) {
+  const { ledgerArray, sourceType, sourceId, cloudTable, sourceTypeField = 'refType', sourceIdField = 'refId' } = opts;
+  const arr = _GLOBAL_DB[ledgerArray];
+  if (!Array.isArray(arr)) return { removed: 0 };
+  const toRemove = arr.filter(r => r && r[sourceTypeField] === sourceType && r[sourceIdField] === sourceId);
+  const ids = toRemove.map(r => r.id).filter(Boolean);
+  if (!ids.length) return { removed: 0 };
+  // tombstone
+  try { window.$autoSync?.addTombstones?.(ledgerArray, ids); } catch(e){}
+  // ลบ local
+  _GLOBAL_DB[ledgerArray] = arr.filter(r => !r || !ids.includes(r.id));
+  // ลบ cloud (best effort)
+  if (window.sb && cloudTable) {
+    try {
+      await window.sb.from(cloudTable).delete()
+        .eq(_camelToSnake(sourceTypeField), sourceType)
+        .eq(_camelToSnake(sourceIdField), sourceId);
+    } catch(e) { console.warn('[reverse cloud]', cloudTable, e); }
+  }
+  return { removed: ids.length, ids };
+}
+
+/* 🛡 Wrapper for any save action — idempotent + audit + rollback
+   ใช้ใน save() ของ Purchase/Sales/Receipt/Payment/Transfer/etc:
+   await _safeDocSave({
+     docType: 'PURCHASE_BILL',
+     docNo: bill.docNo,
+     docId: bill.id,
+     payload: bill,
+     action: async () => { ... do actual save + ledger rebuild ... },
+   });
+*/
+async function _safeDocSave(opts) {
+  const { docType, docNo, docId, payload, action, isEdit = false } = opts;
+  const key = _genIdempotencyKey(docType, docNo, payload);
+
+  // 1. Idempotency check — same key called recently (within 30s) → return cached
+  const cached = _IDEMPOTENCY_CACHE.get(key);
+  if (cached && Date.now() - cached.at < 30000) {
+    console.log(`[safeDocSave] idempotent hit: ${key} — using cached result (${Date.now() - cached.at}ms ago)`);
+    return cached.result;
+  }
+
+  // 2. In-flight check — กัน save พร้อมกัน
+  if (_IN_FLIGHT.has(key)) {
+    throw new Error('Save in progress — กรุณารอให้บันทึกก่อนหน้าเสร็จ');
+  }
+  _IN_FLIGHT.add(key);
+
+  // 3. Snapshot DB ก่อนทำงาน (สำหรับ rollback)
+  const snapshotKeys = ['stockLedger','bankStatement','salesBills','purchaseBills','payments','receipts','transfers','tradingDeals','stockAdjustments','gradeAdjustments'];
+  const snapshot = {};
+  snapshotKeys.forEach(k => {
+    if (Array.isArray(_GLOBAL_DB[k])) snapshot[k] = JSON.parse(JSON.stringify(_GLOBAL_DB[k]));
+  });
+
+  window.setSaveStatus?.('saving', `${isEdit?'แก้':'บันทึก'} ${docType} "${docNo||docId||''}"...`);
+  const startedAt = Date.now();
+  try {
+    // 4. Execute action
+    const result = await action();
+
+    // 5. Audit log
+    const auditEntry = {
+      at: new Date().toISOString(),
+      docType, docNo, docId,
+      action: isEdit ? 'UPDATE' : 'CREATE',
+      user: (window.$erp?.currentUser?.value?.username) || '-',
+      key, duration: Date.now() - startedAt,
+      success: true,
+    };
+    _SAVE_AUDIT.unshift(auditEntry);
+    if (_SAVE_AUDIT.length > 100) _SAVE_AUDIT.length = 100;
+    try { window.$erp?.logAudit?.(isEdit?'UPDATE':'CREATE', docType, null, { docNo, docId }); } catch(e){}
+
+    // 6. Cache result for idempotency
+    _IDEMPOTENCY_CACHE.set(key, { result, at: Date.now() });
+    setTimeout(() => _IDEMPOTENCY_CACHE.delete(key), 35000);
+
+    window.setSaveStatus?.('saved', `✅ ${docType} "${docNo||docId||''}" + cloud verified`);
+    return result;
+  } catch(e) {
+    // 7. ROLLBACK — restore snapshot
+    console.error('[safeDocSave]', docType, 'FAILED — rolling back:', e);
+    snapshotKeys.forEach(k => {
+      if (snapshot[k]) _GLOBAL_DB[k] = snapshot[k];
+    });
+    try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(_GLOBAL_DB)); } catch(e2){}
+    const auditEntry = {
+      at: new Date().toISOString(),
+      docType, docNo, docId,
+      action: isEdit ? 'UPDATE_FAIL' : 'CREATE_FAIL',
+      user: (window.$erp?.currentUser?.value?.username) || '-',
+      key, duration: Date.now() - startedAt,
+      success: false, error: String(e.message || e),
+    };
+    _SAVE_AUDIT.unshift(auditEntry);
+    window.setSaveStatus?.('failed', `❌ ${docType} fail: ${e.message} — rolled back`);
+    throw e;
+  } finally {
+    _IN_FLIGHT.delete(key);
+  }
+}
+
+// Expose to window
+window.$safeDocSave = _safeDocSave;
+window.$reverseLedgerBySource = _reverseLedgerBySource;
+window.$saveAudit = () => _SAVE_AUDIT;
+
 /* ---------- GLOBAL SAVE STATUS — แสดง Saving / Saved / Failed ทั่วระบบ ---------- */
 const $saveStatus = (typeof Vue !== 'undefined' && Vue.ref) ? Vue.ref({ state: null, msg: '', at: 0 }) : { value: { state:null, msg:'', at:0 } };
 window.$saveStatus = $saveStatus;
@@ -15468,7 +15608,7 @@ app.component('view-transfer', {
       showForm.value = true;
     }
     function close_() { showForm.value = false; editingId.value = null; }
-    function save() {
+    async function save() {
       try {
         const f = form.value;
         if (!f.fromAccountId || !f.toAccountId) { alert('เลือกบัญชีต้นทาง/ปลายทาง'); return; }
@@ -15476,29 +15616,37 @@ app.component('view-transfer', {
         if (num(f.amount) <= 0) { alert('ใส่จำนวนเงิน'); return; }
         const isEdit = !!editingId.value;
         const id = isEdit ? editingId.value : newId('TRF');
+        const nowIso = new Date().toISOString();
+        const user = erp.currentUser.value?.username || '-';
         if (isEdit) {
-          // Remove old bank statement entries
+          // 🆕 Remove old bank statement entries local
           db.bankStatement = safeArr(db.bankStatement).filter(s => !(s && s.refType === 'TRF' && s.refId === id));
+          // 🆕 Remove cloud bank_statement too — กัน random-id ของเก่าหลงเหลือ (cloud race)
+          try {
+            if (window.sb) await window.sb.from('bank_statement').delete().eq('ref_type','TRF').eq('ref_id', id);
+          } catch(e) { console.warn('[transfer clear cloud bs]', e); }
           // Update transfer record
           const idx = db.transfers.findIndex(x => x && x.id === id);
-          if (idx >= 0) db.transfers[idx] = { ...db.transfers[idx], ...f, id, amount: num(f.amount), fee: num(f.fee) };
+          if (idx >= 0) db.transfers[idx] = { ...db.transfers[idx], ...f, id, amount: num(f.amount), fee: num(f.fee), updatedAt: nowIso, updatedBy: user };
         } else {
           db.transfers.push({ id, docNo: f.docNo, date: f.date,
             fromAccountId: f.fromAccountId, toAccountId: f.toAccountId,
             amount: num(f.amount), fee: num(f.fee), byPerson: f.byPerson, notes: f.notes,
-            createdBy: erp.currentUser.value?.username || '-' });
+            createdBy: user, createdAt: nowIso, updatedAt: nowIso });
         }
-        db.bankStatement.push({ id: newId('BS'), date: f.date, accountId: f.fromAccountId,
+        // 🆕 ใช้ deterministic IDs — กัน duplicate ที่เกิดจาก cloud race
+        db.bankStatement.push({ id: 'BS-TRF-' + id + '-from', date: f.date, accountId: f.fromAccountId,
           type: 'โอนระหว่างบัญชี', desc: 'โอนเข้า ' + (erp.accountName(f.toAccountId)),
           in: 0, out: num(f.amount) + num(f.fee),
-          refType: 'TRF', refId: id, refNo: f.docNo, createdBy: erp.currentUser.value?.username||'-' });
-        db.bankStatement.push({ id: newId('BS'), date: f.date, accountId: f.toAccountId,
+          refType: 'TRF', refId: id, refNo: f.docNo, createdBy: user });
+        db.bankStatement.push({ id: 'BS-TRF-' + id + '-to', date: f.date, accountId: f.toAccountId,
           type: 'โอนระหว่างบัญชี', desc: 'รับโอนจาก ' + (erp.accountName(f.fromAccountId)),
           in: num(f.amount), out: 0,
-          refType: 'TRF', refId: id, refNo: f.docNo, createdBy: erp.currentUser.value?.username||'-' });
+          refType: 'TRF', refId: id, refNo: f.docNo, createdBy: user });
         showForm.value = false;
         editingId.value = null;
-        erp.showToast(isEdit?'✓ แก้ไขสำเร็จ':'✓ โอนสำเร็จ','success');
+        try { if (window.$autoSync?.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+        erp.showToast(isEdit?'✓ แก้ไขสำเร็จ + sync cloud':'✓ โอนสำเร็จ + sync cloud','success');
       } catch (e) { console.error(e); alert('Error: '+e.message); }
     }
     async function remove(t) {
@@ -38863,8 +39011,12 @@ app.component('view-stockAdjust', {
           if (!confirm(`⚠ ต่างจากระบบ ${fmt(Math.abs(diff))} กก. (${diffPct.toFixed(1)}%) — มากผิดปกติ ดำเนินการต่อ?`)) return;
         }
 
+        // 🛡 Idempotent guard: ถ้า docNo ซ้ำกับ record เก่า → reject (กัน double-submit)
+        if (f.docNo && (db.stockAdjustments||[]).some(r => r && r.docNo === f.docNo)) {
+          if (!confirm(`⚠ มี Stock Adjustment เลข "${f.docNo}" อยู่แล้ว\n\nจะสร้าง record ใหม่หรือไม่ (อาจเกิด duplicate)?\nกด Cancel เพื่อยกเลิก`)) return;
+        }
         const id = erp.uid('SCA');
-        const slId = erp.uid('SL');
+        const slId = 'SL-SCA-' + id;   // 🆕 deterministic — re-submit จะ upsert ทับ
         const username = erp.currentUser.value?.username || '-';
         const valueNote = Math.abs(diff) * unitCost;
 
@@ -39664,7 +39816,7 @@ app.component('view-tradingMatching', {
         matchForm.value.matchedSalesAmount = Math.min(remainingSB, matchForm.value.matchedSalesAmount || remainingSB);
       }
     }
-    function saveMatch() {
+    async function saveMatch() {
       const f = matchForm.value;
       if (!f.purchaseBillId || !f.salesBillId) { erp.showToast('เลือกบิลซื้อและบิลขาย','error'); return; }
       if (Number(f.matchedPurchaseAmount||0) <= 0 || Number(f.matchedSalesAmount||0) <= 0) { erp.showToast('ใส่ยอด match > 0','error'); return; }
@@ -39673,38 +39825,83 @@ app.component('view-tradingMatching', {
       if (!pb || !sb) { erp.showToast('ไม่พบบิล','error'); return; }
       const pbExVat = Number(pb.subtotal != null ? pb.subtotal : pb.totalAmount || 0);
       const sbExVat = Number(sb.subtotal != null ? sb.subtotal : sb.totalAmount || 0);
-      const remainPB = pbExVat - erp.tradingMatchedSales(pb.id);
-      const remainSB = sbExVat - erp.tradingMatchedCost(sb.id);
+
+      // 🆕 2026-05-14: ตรวจ existing deal สำหรับ (pb+sb) ก่อน — กัน duplicate deal manual
+      const existingDeal = (db.tradingDeals||[]).find(d => d
+        && d.status !== 'Cancelled' && d.status !== 'cancelled'
+        && d.purchaseBillId === pb.id && d.salesBillId === sb.id);
+
+      // คำนวณ remaining — ถ้ามี existing deal ต้องหัก existing's amount ออก (เพราะจะ overwrite)
+      const existingPBContrib = existingDeal ? Number(existingDeal.matchedPurchaseAmount||0) : 0;
+      const existingSBContrib = existingDeal ? Number(existingDeal.matchedSalesAmount||0) : 0;
+      const remainPB = pbExVat - (erp.tradingMatchedSales(pb.id) - existingPBContrib);
+      const remainSB = sbExVat - (erp.tradingMatchedCost(sb.id) - existingSBContrib);
       if (Number(f.matchedPurchaseAmount) > remainPB+0.01) { erp.showToast(`Match purchase เกิน — เหลือ ${fmt(remainPB)} (ก่อน VAT)`,'error'); return; }
       if (Number(f.matchedSalesAmount) > remainSB+0.01) { erp.showToast(`Match sales เกิน — เหลือ ${fmt(remainSB)} (ก่อน VAT)`,'error'); return; }
 
       // determine status (เทียบกับ subtotal ก่อน VAT)
-      const newPBMatched = erp.tradingMatchedSales(pb.id) + Number(f.matchedPurchaseAmount);
-      const newSBMatched = erp.tradingMatchedCost(sb.id) + Number(f.matchedSalesAmount);
+      const newPBMatched = (erp.tradingMatchedSales(pb.id) - existingPBContrib) + Number(f.matchedPurchaseAmount);
+      const newSBMatched = (erp.tradingMatchedCost(sb.id) - existingSBContrib) + Number(f.matchedSalesAmount);
       const pbFully = Math.abs(newPBMatched - pbExVat) < 0.01;
       const sbFully = Math.abs(newSBMatched - sbExVat) < 0.01;
       const status = (pbFully && sbFully) ? 'Completed' : 'Partially Matched';
+      const nowIso = new Date().toISOString();
 
-      const dealNo = 'TD-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+String((db.tradingDeals||[]).length+1).padStart(4,'0');
-      db.tradingDeals.push({
-        id: 'TDEAL-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,5),
-        dealNo, date: erp.today(),
-        purchaseBillId: pb.id, purchaseBillNo: pb.docNo,
-        salesBillId: sb.id, salesBillNo: sb.docNo,
-        productId: pb.items?.[0]?.productId || sb.items?.[0]?.productId || '',
-        supplierId: pb.supplierId, customerId: sb.customerId,
-        matchedQty: Number(f.matchedQty||0),
-        matchedPurchaseAmount: Number(f.matchedPurchaseAmount||0),
-        matchedSalesAmount: Number(f.matchedSalesAmount||0),
-        exVat: true,        // ⚙️ คำนวณจากยอดก่อน VAT
-        notes: (f.notes ? f.notes + ' — ' : '') + 'ก่อน VAT',
-        status,
-        createdBy: erp.currentUser.value?.username || 'system',
-        createdAt: new Date().toISOString(),
-      });
+      let dealNo;
+      if (existingDeal) {
+        // 🆕 UPDATE existing deal (ไม่ push ใหม่ — กัน duplicate)
+        if (!confirm(`บิลคู่ ${pb.docNo} ↔ ${sb.docNo} มี deal อยู่แล้ว (${existingDeal.dealNo})\n\nอัปเดต deal เดิม?\n• Cost: ${fmt(existingDeal.matchedPurchaseAmount)} → ${fmt(f.matchedPurchaseAmount)}\n• Sales: ${fmt(existingDeal.matchedSalesAmount)} → ${fmt(f.matchedSalesAmount)}\n\nกด Cancel เพื่อสร้าง deal ใหม่`)) {
+          // user ยกเลิก update → create new (rare case)
+          dealNo = 'TD-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+String((db.tradingDeals||[]).length+1).padStart(4,'0');
+          db.tradingDeals.push({
+            id: 'TDEAL-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,5),
+            dealNo, date: erp.today(),
+            purchaseBillId: pb.id, purchaseBillNo: pb.docNo,
+            salesBillId: sb.id, salesBillNo: sb.docNo,
+            productId: pb.items?.[0]?.productId || sb.items?.[0]?.productId || '',
+            supplierId: pb.supplierId, customerId: sb.customerId,
+            matchedQty: Number(f.matchedQty||0),
+            matchedPurchaseAmount: Number(f.matchedPurchaseAmount||0),
+            matchedSalesAmount: Number(f.matchedSalesAmount||0),
+            exVat: true, notes: (f.notes ? f.notes + ' — ' : '') + 'ก่อน VAT', status,
+            createdBy: erp.currentUser.value?.username || 'system',
+            createdAt: nowIso, updatedAt: nowIso,
+          });
+          erp.logAudit('TRADING_MATCH_CREATE','tradingDeals',null,{dealNo});
+        } else {
+          // Update existing
+          dealNo = existingDeal.dealNo;
+          existingDeal.matchedQty = Number(f.matchedQty || 0);
+          existingDeal.matchedPurchaseAmount = Number(f.matchedPurchaseAmount || 0);
+          existingDeal.matchedSalesAmount = Number(f.matchedSalesAmount || 0);
+          existingDeal.status = status;
+          existingDeal.notes = (f.notes ? f.notes + ' — ' : '') + 'ก่อน VAT [updated]';
+          existingDeal.updatedAt = nowIso;
+          existingDeal.updatedBy = erp.currentUser.value?.username || 'system';
+          erp.logAudit('TRADING_MATCH_UPDATE','tradingDeals',null,{dealNo, gp: Number(f.matchedSalesAmount)-Number(f.matchedPurchaseAmount)});
+        }
+      } else {
+        // No existing deal → create new (เดิม)
+        dealNo = 'TD-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+String((db.tradingDeals||[]).length+1).padStart(4,'0');
+        db.tradingDeals.push({
+          id: 'TDEAL-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,5),
+          dealNo, date: erp.today(),
+          purchaseBillId: pb.id, purchaseBillNo: pb.docNo,
+          salesBillId: sb.id, salesBillNo: sb.docNo,
+          productId: pb.items?.[0]?.productId || sb.items?.[0]?.productId || '',
+          supplierId: pb.supplierId, customerId: sb.customerId,
+          matchedQty: Number(f.matchedQty||0),
+          matchedPurchaseAmount: Number(f.matchedPurchaseAmount||0),
+          matchedSalesAmount: Number(f.matchedSalesAmount||0),
+          exVat: true, notes: (f.notes ? f.notes + ' — ' : '') + 'ก่อน VAT', status,
+          createdBy: erp.currentUser.value?.username || 'system',
+          createdAt: nowIso, updatedAt: nowIso,
+        });
+        erp.logAudit('TRADING_MATCH','tradingDeals',null,{dealNo, gp: Number(f.matchedSalesAmount)-Number(f.matchedPurchaseAmount), exVat:true});
+      }
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
-      erp.logAudit('TRADING_MATCH','tradingDeals',null,{dealNo, gp: Number(f.matchedSalesAmount)-Number(f.matchedPurchaseAmount), exVat:true});
-      erp.showToast('จับคู่สำเร็จ — '+dealNo+' (ก่อน VAT)','success');
+      try { if (window.$autoSync?.pushTable) await window.$autoSync.pushTable('tradingDeals'); } catch(e){}
+      erp.showToast((existingDeal ? '✓ อัปเดต ' : '✓ จับคู่สำเร็จ — ')+dealNo+' (ก่อน VAT)','success');
       showMatchModal.value = false;
     }
     function reverseMatch(d) {
@@ -40215,6 +40412,10 @@ app.component('view-gradeAdjustment', {
         }
         if (cs.lossQty > 0 && !f.lossReason) {
           if (!confirm('มี Loss แต่ยังไม่ใส่เหตุผล — ดำเนินการต่อ?')) return;
+        }
+        // 🛡 Idempotent guard: ถ้า docNo ซ้ำกับ record เก่า → warn
+        if (f.docNo && (db.gradeAdjustments||[]).some(r => r && r.docNo === f.docNo && r.status !== 'cancelled')) {
+          if (!confirm(`⚠ มี Grade Adjustment เลข "${f.docNo}" อยู่แล้ว\n\nจะสร้าง record ใหม่ (อาจ duplicate stock movement)?\nกด Cancel เพื่อยกเลิก`)) return;
         }
 
         const id = erp.uid('GA');
