@@ -40095,6 +40095,31 @@ app.component('view-tradingMatching', {
       if (typeof window.$recomputeTradingDealCosts === 'function') return window.$recomputeTradingDealCosts(true);
       alert('ฟังก์ชันยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
     };
+    /* 🆕 Cleanup Trading Deal duplicates — wrapper สำหรับ template */
+    const runCleanupTradingDups = () => {
+      if (typeof window.$cleanupTradingDealDups === 'function') return window.$cleanupTradingDealDups(true);
+      alert('ฟังก์ชันยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
+    };
+    /* 🆕 Auto-cleanup เมื่อเข้าหน้า — รัน dryRun=true แสดง alert ถ้าเจอ */
+    onMounted(() => {
+      setTimeout(async () => {
+        try {
+          // หา deals ที่ (pb+sb) ซ้ำ (ที่ status != Cancelled)
+          const dealsArr = (db.tradingDeals||[]).filter(d => d && d.status !== 'Cancelled' && d.status !== 'cancelled' && d.purchaseBillId && d.salesBillId);
+          const groups = new Map();
+          dealsArr.forEach(d => {
+            const k = d.purchaseBillId + '|' + d.salesBillId;
+            if (!groups.has(k)) groups.set(k, 0);
+            groups.set(k, groups.get(k) + 1);
+          });
+          let totalDup = 0;
+          groups.forEach(c => { if (c > 1) totalDup += c - 1; });
+          if (totalDup > 0) {
+            console.warn(`[Trading Matching] พบ ${totalDup} duplicate deals — กดปุ่ม "🧹 ล้าง Dup" เพื่อ cleanup`);
+          }
+        } catch(e) {}
+      }, 1500);
+    });
     /* 🆕 Force pull trading_deals จาก cloud — ใช้กรณีสงสัยว่า local ค้างเก่า */
     async function refreshFromCloud() {
       if (!window.sb) { alert('❌ Supabase ไม่ connect'); return; }
@@ -40208,9 +40233,21 @@ app.component('view-tradingMatching', {
       try { await window.$autoSync?.pushTable?.('tradingDeals'); } catch(e){}
       erp.showToast(`✓ Recalc ${d.dealNo} สำเร็จ — Cost ${fmt(newCost)} · GP ${fmt(newGP)}`, 'success');
     }
+    // 🆕 Duplicate detector — แสดง banner ถ้าพบ
+    const dupDealCount = computed(() => {
+      const dealsArr = (db.tradingDeals||[]).filter(d => d && d.status !== 'Cancelled' && d.status !== 'cancelled' && d.purchaseBillId && d.salesBillId);
+      const groups = new Map();
+      dealsArr.forEach(d => {
+        const k = d.purchaseBillId + '|' + d.salesBillId;
+        groups.set(k, (groups.get(k) || 0) + 1);
+      });
+      let total = 0;
+      groups.forEach(c => { if (c > 1) total += c - 1; });
+      return total;
+    });
     return { erp, db, fmt, tab, tradingPurchases, tradingSales, deals, summary, topPairs, monthlyGP,
       showMatchModal, matchForm, openMatch, autoFillFromBills, saveMatch, reverseMatch, statusBadge,
-      runRecomputeTradingCost, recalcOneDeal, refreshFromCloud };
+      runRecomputeTradingCost, recalcOneDeal, refreshFromCloud, runCleanupTradingDups, dupDealCount };
   },
   template:`
   <div class="space-y-4">
@@ -40220,10 +40257,27 @@ app.component('view-tradingMatching', {
         <p class="text-sm opacity-80 mt-1">จับคู่บิลซื้อ Trading กับบิลขาย Trading → คำนวณ GP ต่อดีล (ก่อน VAT)</p>
       </div>
       <div class="flex gap-2 flex-wrap justify-end">
+        <!-- 🆕 ปุ่ม ล้าง Dup — โผล่เด่นถ้าพบ -->
+        <button v-if="dupDealCount > 0" @click="runCleanupTradingDups" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-700 animate-pulse" :title="'พบ '+dupDealCount+' duplicate deals (pb+sb ซ้ำ)'">🧹 ล้าง Dup ({{dupDealCount}})</button>
+        <button v-else @click="runCleanupTradingDups" class="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-purple-200" title="ตรวจ + ลบ duplicate deals (pb+sb เดียวกัน เก็บ updated ล่าสุด)">🧹 ตรวจ Dup</button>
         <button @click="refreshFromCloud" class="bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-200" title="Pull trading_deals จาก Supabase ใหม่ — ใช้กรณีสงสัยข้อมูล local ค้าง">📥 Pull จาก Cloud</button>
         <button @click="runRecomputeTradingCost" class="bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold hover:bg-amber-200" title="หา Trading Deal ที่ cost=0 + คำนวณใหม่จาก PB.netAmount/netWeight">🔄 Recalc Cost</button>
         <button @click="openMatch" class="bg-white text-fuchsia-700 px-4 py-2 rounded-lg font-bold hover:bg-fuchsia-50">+ จับคู่ใหม่</button>
       </div>
+    </div>
+
+    <!-- 🆕 Banner เตือนเมื่อพบ duplicate deals (pb+sb ซ้ำ) -->
+    <div v-if="dupDealCount > 0" class="bg-rose-50 border-2 border-rose-400 rounded-xl p-3 my-3 flex items-center justify-between gap-2">
+      <div class="text-sm text-rose-800">
+        ⚠ พบ <b class="text-rose-900">{{dupDealCount}}</b> Trading Deal ที่ (PB + SB) ซ้ำ —
+        ทำให้กำไรนับซ้ำใน Dashboard
+        <div class="text-xs text-rose-700 mt-1">
+          กดปุ่ม "🧹 ล้าง Dup" → ระบบจะเก็บ deal ที่ updatedAt ล่าสุดต่อกลุ่ม → cancel ที่เหลือ + sync cloud
+        </div>
+      </div>
+      <button @click="runCleanupTradingDups" class="px-3 py-1.5 bg-rose-600 text-white rounded text-xs font-bold hover:bg-rose-700 whitespace-nowrap shrink-0">
+        🧹 ล้าง Dup เดี๋ยวนี้
+      </button>
     </div>
 
     <!-- 🎯 Mega Card + Status Donut -->
