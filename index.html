@@ -39827,20 +39827,26 @@ app.component('view-tradingMatching', {
         }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     });
 
+    // 🆕 Toggle แสดง Cancelled — default ซ่อน
+    const showCancelled = ref(false);
     const deals = computed(() => {
-      return _trkSafe(db.tradingDeals).map(d => {
-        const pb = d.purchaseBillId ? _trkSafe(db.purchaseBills).find(x=>x && x.id===d.purchaseBillId) : null;
-        const sb = d.salesBillId ? _trkSafe(db.salesBills).find(x=>x && x.id===d.salesBillId) : null;
-        return { ...d,
-          purchaseDocNo: pb?.docNo || '-',
-          salesDocNo: sb?.docNo || '-',
-          supplierName: pb ? erp.supplierName(pb.supplierId) : '-',
-          customerName: sb ? erp.customerName(sb.customerId) : '-',
-          gp: Number(d.matchedSalesAmount||0) - Number(d.matchedPurchaseAmount||0),
-          gpPct: Number(d.matchedSalesAmount||0) > 0 ? ((Number(d.matchedSalesAmount||0)-Number(d.matchedPurchaseAmount||0))/Number(d.matchedSalesAmount||0))*100 : 0
-        };
-      }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      return _trkSafe(db.tradingDeals)
+        .filter(d => showCancelled.value || (d && d.status !== 'Cancelled' && d.status !== 'cancelled'))
+        .map(d => {
+          const pb = d.purchaseBillId ? _trkSafe(db.purchaseBills).find(x=>x && x.id===d.purchaseBillId) : null;
+          const sb = d.salesBillId ? _trkSafe(db.salesBills).find(x=>x && x.id===d.salesBillId) : null;
+          return { ...d,
+            purchaseDocNo: pb?.docNo || '-',
+            salesDocNo: sb?.docNo || '-',
+            supplierName: pb ? erp.supplierName(pb.supplierId) : '-',
+            customerName: sb ? erp.customerName(sb.customerId) : '-',
+            gp: Number(d.matchedSalesAmount||0) - Number(d.matchedPurchaseAmount||0),
+            gpPct: Number(d.matchedSalesAmount||0) > 0 ? ((Number(d.matchedSalesAmount||0)-Number(d.matchedPurchaseAmount||0))/Number(d.matchedSalesAmount||0))*100 : 0
+          };
+        }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     });
+    // นับ Cancelled สำหรับ toggle button label
+    const cancelledCount = computed(() => (db.tradingDeals||[]).filter(d => d && (d.status === 'Cancelled' || d.status === 'cancelled')).length);
 
     const summary = computed(() => {
       const active = deals.value.filter(d=>d.status!=='Cancelled');
@@ -40247,7 +40253,8 @@ app.component('view-tradingMatching', {
     });
     return { erp, db, fmt, tab, tradingPurchases, tradingSales, deals, summary, topPairs, monthlyGP,
       showMatchModal, matchForm, openMatch, autoFillFromBills, saveMatch, reverseMatch, statusBadge,
-      runRecomputeTradingCost, recalcOneDeal, refreshFromCloud, runCleanupTradingDups, dupDealCount };
+      runRecomputeTradingCost, recalcOneDeal, refreshFromCloud, runCleanupTradingDups, dupDealCount,
+      showCancelled, cancelledCount };
   },
   template:`
   <div class="space-y-4">
@@ -40398,9 +40405,14 @@ app.component('view-tradingMatching', {
 
     <!-- Tabs -->
     <div class="bg-white rounded-xl shadow border">
-      <div class="border-b flex">
+      <div class="border-b flex items-center">
         <button @click="tab='match'" :class="['px-5 py-3 text-sm font-medium border-b-2', tab==='match'?'border-fuchsia-600 text-fuchsia-700':'border-transparent text-slate-500']">🤝 Deals ({{deals.length}})</button>
         <button @click="tab='unmatched'" :class="['px-5 py-3 text-sm font-medium border-b-2', tab==='unmatched'?'border-fuchsia-600 text-fuchsia-700':'border-transparent text-slate-500']">⚠ Unmatched</button>
+        <!-- 🆕 Toggle Cancelled — default ซ่อน Cancelled deals ไม่ให้รก -->
+        <label v-if="tab==='match' && cancelledCount > 0" class="ml-auto mr-4 text-xs text-slate-600 flex items-center gap-1.5 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded">
+          <input type="checkbox" v-model="showCancelled" class="cursor-pointer">
+          <span>👁 แสดง Cancelled ({{cancelledCount}})</span>
+        </label>
       </div>
 
       <div v-if="tab==='match'" class="p-5 overflow-x-auto">
