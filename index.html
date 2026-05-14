@@ -43013,10 +43013,13 @@ app.component('view-backup', {
             failed += chunk.length;
             break;
           }
-          if (badCol && !dropCols.has(badCol)) {
-            dropCols.add(badCol);
-            _logMig(`  🔧 drop column "${badCol}" และลองใหม่...`, 'warn');
-            continue; // retry
+          if (badCol) {
+            // ⛔ FAIL LOUDLY — ห้าม silent drop ใน manual migrate ด้วย (ปลายทาง autoSync แก้แล้ว ต้องแก้ที่นี่ด้วย)
+            _logMig(`  ⛔ Schema mismatch: column "${badCol}" ไม่มีใน Supabase — STOP push (ห้าม drop เพราะข้อมูลจะหาย)`, 'error');
+            console.error('[migrate] '+table+': SCHEMA MISMATCH — column "'+badCol+'" missing. STOPPING to prevent data loss.');
+            try { window._showToast && window._showToast('⚠ Schema mismatch: '+table+'.'+badCol+' — แจ้ง admin', 'error'); } catch(e){}
+            failed += chunk.length;
+            break;
           }
           // NOT NULL violation — usually means we accidentally dropped/lost a required field
           const notNullMatch = error.message.match(/null value in column ['"]?([a-zA-Z0-9_]+)['"]? of relation ['"]?([a-zA-Z0-9_]+)/);
@@ -43026,22 +43029,15 @@ app.component('view-backup', {
             failed += chunk.length;
             break;
           }
-          // FK constraint violation → set the bad FK to null and retry
-          // Constraint format: {table}_{column}_fkey
-          // Example: accounts_branch_id_fkey → table=accounts, column=branch_id
-          // Use non-greedy matching to extract column name
+          // FK constraint violation → STOP (ห้าม set null อัตโนมัติ — ข้อมูลจะขาด link)
           const fkMatch = error.message.match(/foreign key constraint ['"]?([a-z_]+?)_([a-z_]+_id)_fkey/);
           if (fkMatch) {
-            const fkCol = fkMatch[2];   // e.g. "branch_id" (always ends with _id)
-            if (_NEVER_DROP.has(fkCol)) {
-              _logMig(`  ⛔ FK on "${fkCol}" — ห้าม set null — skip batch`, 'error');
-              failed += chunk.length;
-              break;
-            }
-            // Strip rows where this FK doesn't have a valid value (set to null)
-            chunk = chunk.map(r => ({ ...r, [fkCol]: null }));
-            _logMig(`  🔧 FK violation: set "${fkCol}"=null และลองใหม่...`, 'warn');
-            continue;
+            const fkCol = fkMatch[2];   // e.g. "branch_id"
+            _logMig(`  ⛔ FK violation "${fkCol}" — STOP (ห้าม null อัตโนมัติ) ตรวจ master data (${fkCol.replace('_id','')})`, 'error');
+            console.error('[migrate] '+table+': FK VIOLATION "'+fkCol+'" — STOPPING');
+            try { window._showToast && window._showToast('⚠ FK fail: '+table+'.'+fkCol+' อ้างถึง row ที่ไม่มี', 'error'); } catch(e){}
+            failed += chunk.length;
+            break;
           }
           // Duplicate ID error in batch → split into smaller batches
           if (error.message.includes('cannot affect row a second time') && batchSize > 1) {
