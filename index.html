@@ -7159,13 +7159,18 @@ window.$erp = {
           // SMART: skip if cloud is empty but local has data (don't wipe local)
           if (allRows.length === 0 && (_GLOBAL_DB[localKey] || []).length > 0) continue;
 
+          // 🆕 STEP 0: Master tables → ใช้ cloud เป็น source of truth (ลบของ local ที่ cloud ไม่มี = ถูกลบจริง)
+          //    ป้องกัน "ฟื้นของที่ลบแล้ว" — local rows ที่ cloud ไม่มี = ถูกลบที่อื่น = ลบ local ด้วย
           // 🆕 BUG FIX: Master tables → ใช้ REPLACE mode (cloud = source of truth)
           // ไม่ใช่ MERGE — เพราะ master tables ทำ push หลังเพิ่ม/แก้ master ทันที
           // ถ้าใช้ MERGE → bug: บาง local rows ที่มี id null/undefined ทำให้ STEP 2 push ไม่ครบ
+          const MASTER_TABLES = new Set(['customers','suppliers','products','salespersons',
+            'branches','warehouses','accounts','purchaseChannels','salesChannels',
+            'expenseCategories','paymentMethods','currencies']);
           const MASTER_REPLACE_MODE = ['products','suppliers','customers','branches','warehouses',
             'salespersons','accounts','purchaseChannels','salesChannels','expenseCategories',
             'currencies','overseasRecipients','users','roles'];
-          if (MASTER_REPLACE_MODE.includes(localKey)) {
+          if (MASTER_REPLACE_MODE.includes(localKey) || MASTER_TABLES.has(localKey)) {
             const arrM = _GLOBAL_DB[localKey] = _GLOBAL_DB[localKey] || [];
             const beforeCount = arrM.length;
             // 🔧 SAFETY: ถ้า cloud มี records น้อยกว่า local มาก (≥30%) → skip REPLACE + log warning
