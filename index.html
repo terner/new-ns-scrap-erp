@@ -3131,6 +3131,32 @@ function loadDB() {
       });
       d._migrationV4_juneRole = true;
     }
+    /* 🆕 Migration v6 (2026-05-14): role assignments
+       - ns-june → R-ACCOUNT-EXPENSE (เห็นค่าใช้จ่าย)
+       - ns-dao, ns-tong → R-ACCOUNTANT (ไม่มีค่าใช้จ่าย)  */
+    if (Array.isArray(d.users) && !d._migrationV6_roleAssign) {
+      d.users.forEach(u => {
+        if (!u || !u.username) return;
+        const uname = String(u.username).toLowerCase();
+        // ns-june → R-ACCOUNT-EXPENSE
+        if (uname === 'june' || uname === 'ns-june') {
+          if (u.roleId !== 'R-ACCOUNT-EXPENSE') {
+            console.log('[migration v6] '+u.username+' → R-ACCOUNT-EXPENSE (เพิ่มสิทธิค่าใช้จ่าย)');
+            u.roleId = 'R-ACCOUNT-EXPENSE';
+            u.updatedAt = new Date().toISOString();
+          }
+        }
+        // ns-dao + ns-tong → R-ACCOUNTANT (ลบสิทธิค่าใช้จ่าย)
+        if (uname === 'dao' || uname === 'ns-dao' || uname === 'tong' || uname === 'ns-tong') {
+          if (u.roleId === 'R-ACCOUNT-EXPENSE') {
+            console.log('[migration v6] '+u.username+' จาก R-ACCOUNT-EXPENSE → R-ACCOUNTANT (ลบสิทธิค่าใช้จ่าย)');
+            u.roleId = 'R-ACCOUNTANT';
+            u.updatedAt = new Date().toISOString();
+          }
+        }
+      });
+      d._migrationV6_roleAssign = true;
+    }
     /* migration: customers ต้องมี salesId field (default '') */
     if (Array.isArray(d.customers)) {
       d.customers.forEach(c => { if (c && c.salesId === undefined) c.salesId = ''; });
@@ -3397,6 +3423,167 @@ window.$autoFetchMissingMasters = async function(silent) {
     console.log(`%c🔄 Auto-Fetch: เพิ่ม masters ${totalAdded} รายการ จาก cloud (suppliers:${result.suppliers}, customers:${result.customers}, products:${result.products}, sales:${result.salespersons})`, 'color:#0ea5e9;font-weight:bold');
   }
   return { ok: true, totalMissing, totalAdded, result };
+};
+
+/* 🆕 GLOBAL: ลบ Receipt duplicates — receipts ที่ตัดบิลเดียวกันด้วยยอดเดียวกัน
+   key: billId + amount (tolerance 0.01)
+   วิธี: เก็บ receipt ที่ createdAt เก่าสุดต่อ key — ลบที่เหลือ + restore receivedAmount/receivableBalance + ลบ bank_statement
+   ใช้: window.$cleanupReceiptDups([dryRun=true]) */
+window.$cleanupReceiptDups = async function(dryRun) {
+  if (dryRun !== false) dryRun = true;
+  const db = _GLOBAL_DB;
+  const receipts = Array.isArray(db.receipts) ? db.receipts : [];
+  if (!receipts.length) { alert('❌ ไม่มี receipts'); return; }
+  const fmt = (n) => Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  // จัดกลุ่มตาม key (billId + amount rounded to 2 decimals)
+  const groups = new Map();
+  receipts.forEach(r => {
+    if (!r || !r.id || !r.billId) return;
+    const amt = Number(r.amount || 0);
+    if (amt <= 0.001) return;
+    const key = r.billId + '|' + amt.toFixed(2);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+
+  // หา dup groups
+  const dupGroups = [];
+  groups.forEach((arr, key) => {
+    if (arr.length < 2) return;
+    // เรียง createdAt asc — keep oldest
+    arr.sort((a,b) => String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+    const keeper = arr[0];
+    const dups = arr.slice(1);
+    const bill = (db.salesBills||[]).find(b => b && b.id === keeper.billId);
+    dupGroups.push({ key, keeper, dups, billDocNo: bill?.docNo || keeper.billDocNo || '-' });
+  });
+  if (!dupGroups.length) { alert('✓ ไม่พบ receipt duplicates'); return; }
+
+  const totalDup = dupGroups.reduce((s,g) => s + g.dups.length, 0);
+  console.log(`%c🔍 Receipt Dup Cleanup`, 'font-weight:bold;font-size:14px;color:#7c3aed');
+  console.table(dupGroups.map(g => ({
+    bill: g.billDocNo,
+    keep_voucher: g.keeper.voucherId || g.keeper.id,
+    keep_amount: fmt(g.keeper.amount),
+    dup_count: g.dups.length,
+    cancel: g.dups.map(d => d.voucherId || d.id).join(', ').slice(0,80),
+  })));
+
+  if (dryRun) {
+    const ans = confirm(`🔍 พบ Receipt duplicates:\n\n` +
+      `• ${dupGroups.length} บิลที่มี receipt ซ้ำ\n` +
+      `• ${totalDup} receipts จะถูกลบ\n` +
+      `• เก็บ receipt ที่ createdAt เก่าสุดต่อบิล\n\n` +
+      `จะ:\n` +
+      `1. ลบ receipt duplicates (local + cloud + tombstone)\n` +
+      `2. ลบ bank_statement entries ของ receipts ที่ลบ\n` +
+      `3. คืนยอด receivedAmount + receivableBalance ของบิล\n\n` +
+      `รายละเอียดดูใน Console — กด OK เพื่อลบจริง`);
+    if (!ans) return { totalDup, dupGroups, dryRun: true };
+  }
+
+  // 1. รวบ ids ที่จะลบ
+  const toDeleteIds = [];
+  const billsToUpdate = new Map();   // billId → totalRemovedAmount
+  dupGroups.forEach(g => {
+    g.dups.forEach(d => {
+      toDeleteIds.push(d.id);
+      const removed = Number(d.amount||0) + Number(d.withholdingTax||0) + Number(d.discount||0);
+      billsToUpdate.set(d.billId, (billsToUpdate.get(d.billId) || 0) + removed);
+    });
+  });
+
+  // 2. Tombstone + ลบ receipts local
+  try { window.$autoSync?.addTombstones?.('receipts', toDeleteIds); } catch(e){}
+  const delSet = new Set(toDeleteIds);
+  db.receipts = receipts.filter(r => !r || !delSet.has(r.id));
+
+  // 3. หา bank_statement ที่ refId อยู่ใน voucher ที่ลบ + ลบ
+  const dupVoucherIds = new Set();
+  dupGroups.forEach(g => g.dups.forEach(d => { dupVoucherIds.add(d.voucherId || d.id); }));
+  let bsToDelete = [];
+  if (Array.isArray(db.bankStatement)) {
+    bsToDelete = db.bankStatement.filter(s => s && s.refType === 'RCP' && dupVoucherIds.has(s.refId)).map(s => s.id);
+    if (bsToDelete.length) {
+      try { window.$autoSync?.addTombstones?.('bankStatement', bsToDelete); } catch(e){}
+      db.bankStatement = db.bankStatement.filter(s => !s || !bsToDelete.includes(s.id));
+    }
+  }
+
+  // 4. Restore bills
+  let billsFixed = 0;
+  billsToUpdate.forEach((removedAmt, billId) => {
+    const bill = (db.salesBills||[]).find(b => b && b.id === billId);
+    if (!bill) return;
+    bill.receivedAmount = Math.max(0, Number(bill.receivedAmount||0) - removedAmt);
+    bill.receivableBalance = Math.max(0, Number(bill.totalAmount||0) - bill.receivedAmount);
+    bill.status = bill.receivedAmount <= 0 ? 'unreceived' : (bill.receivableBalance <= 0 ? 'received' : 'partial');
+    bill.updatedAt = new Date().toISOString();
+    billsFixed++;
+  });
+
+  try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+
+  // 5. ลบจาก cloud
+  let cloudOk = 0, cloudFail = 0;
+  if (window.sb) {
+    for (let i = 0; i < toDeleteIds.length; i += 100) {
+      const chunk = toDeleteIds.slice(i, i+100);
+      try {
+        const r = await window.sb.from('receipts').delete().in('id', chunk).select('id');
+        if (r.error) cloudFail += chunk.length;
+        else cloudOk += (r.data?.length || 0);
+      } catch(e) { cloudFail += chunk.length; }
+    }
+    if (bsToDelete.length) {
+      try { await window.sb.from('bank_statement').delete().in('id', bsToDelete); } catch(e){}
+    }
+  }
+  try { if (window.$autoSync?.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+
+  alert(`✅ Cleanup สำเร็จ\n\n` +
+    `• ลบ receipts: ${toDeleteIds.length} (cloud: ${cloudOk}/${toDeleteIds.length})\n` +
+    `• ลบ bank_statement: ${bsToDelete.length}\n` +
+    `• คืนยอดบิล: ${billsFixed} บิล\n\n` +
+    `💡 หน้า "รับเงิน Customer" จะอัปเดตยอดให้`);
+  return { deleted: toDeleteIds.length, cloudOk, cloudFail, billsFixed, bsDeleted: bsToDelete.length };
+};
+
+/* 🆕 GLOBAL: ตั้ง role ของ user ด้วย username — ใช้ทันทีโดยไม่ต้องรอ migration
+   ใช้: window.$setUserRole('ns-june', 'R-ACCOUNT-EXPENSE')
+        window.$setUserRole(['ns-dao','ns-tong'], 'R-ACCOUNTANT') */
+window.$setUserRole = async function(usernames, roleId) {
+  const db = _GLOBAL_DB;
+  if (!db || !Array.isArray(db.users)) { alert('❌ users not ready'); return; }
+  const list = (Array.isArray(usernames) ? usernames : [usernames]).map(u => String(u).toLowerCase());
+  const validRole = (db.roles||[]).find(r => r && r.id === roleId);
+  if (!validRole) {
+    const available = (db.roles||[]).map(r => r && r.id).filter(Boolean).join(', ');
+    alert('❌ ไม่พบ role: '+roleId+'\n\nRoles ที่มี:\n'+available); return;
+  }
+  const updated = [];
+  db.users.forEach(u => {
+    if (!u || !u.username) return;
+    const uname = String(u.username).toLowerCase();
+    if (list.some(target => uname === target || uname === 'ns-'+target || ('ns-'+target) === uname)) {
+      if (u.roleId !== roleId) {
+        const oldRole = u.roleId;
+        u.roleId = roleId;
+        u.updatedAt = new Date().toISOString();
+        updated.push({ username: u.username, oldRole, newRole: roleId });
+      }
+    }
+  });
+  if (!updated.length) { alert('ℹ ไม่มี user ที่ต้องเปลี่ยน — ตรวจชื่อ + role ปัจจุบัน'); return; }
+  try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+  try {
+    if (window.$autoSync?.pushTable) await window.$autoSync.pushTable('users');
+    else if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
+  } catch(e) { console.warn('[setUserRole push]', e); }
+  console.table(updated);
+  alert(`✅ อัปเดต role สำเร็จ\n\n${updated.map(u => '• '+u.username+': '+u.oldRole+' → '+u.newRole).join('\n')}\n\npush cloud แล้ว — เครื่องอื่นกด refresh จะเห็นสิทธิใหม่`);
+  return updated;
 };
 
 /* 🆕 GLOBAL: ลบ Trading Deal duplicates — same (purchaseBillId + salesBillId) เกิน 1
@@ -14832,10 +15019,17 @@ app.component('view-receipt', {
     }
     const showOutstandingPanelR = ref(true);
 
+    // 🆕 Vue 3 prod ไม่ให้ template access window — wrap คำสั่ง cleanup
+    const runCleanupReceiptDups = () => {
+      if (typeof window.$cleanupReceiptDups === 'function') return window.$cleanupReceiptDups(true);
+      alert('ฟังก์ชันยังไม่โหลด — Hard refresh (Cmd+Shift+R)');
+    };
+
     return { db, erp, form, showForm, search, filterDateFrom, filterDateTo, filterAccount, list, totals, num, editingVoucherId,
       open, openEdit, close: close_, save, remove, addLine, removeLine, pickBill, availableBills,
       getBillDisplay, onBillTyped, actualReceivable: _actualReceivable, fmt: erp.fmt,
-      outstandingBillsR, arSummary, quickReceiveBill, showOutstandingPanelR, outstandingSearchR };
+      outstandingBillsR, arSummary, quickReceiveBill, showOutstandingPanelR, outstandingSearchR,
+      runCleanupReceiptDups };
   },
   template: `
   <div>
@@ -14930,7 +15124,11 @@ app.component('view-receipt', {
 
     <!-- 🔍 Filter bar -->
     <div class="bg-white rounded-xl shadow p-3 mb-4">
-      <div class="text-xs text-slate-500 mb-2">📜 ประวัติการรับเงินที่ทำไปแล้ว</div>
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-xs text-slate-500">📜 ประวัติการรับเงินที่ทำไปแล้ว</div>
+        <!-- 🆕 ปุ่มลบ Receipt duplicates -->
+        <button @click="runCleanupReceiptDups" class="text-xs px-2 py-1 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded font-bold" title="หา + ลบ receipts ที่ตัดบิลเดียวกัน + ยอดเดียวกัน (preview ก่อนลบ)">🧹 ล้าง Dup Receipts</button>
+      </div>
       <div class="flex flex-wrap gap-2 items-center">
         <input v-model="search" placeholder="🔍 ค้นหาเลข Voucher / ชื่อลูกค้า / เลขบิล..." class="flex-1 min-w-[260px] px-3 py-2 border rounded-lg text-sm">
         <label class="text-xs text-slate-500">วันที่รับ:</label>
