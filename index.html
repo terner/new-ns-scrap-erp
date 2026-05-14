@@ -8469,31 +8469,90 @@ function makeMasterComponent(opts) {
           p.removes.forEach(s => console.log(`  🗑 DEL: ${s.code||'?'} (${s.id}) — activity:${s._act} ${s._act>0?'→ย้ายมา':''}`));
         });
 
-        if (!confirm(`🔧 พบ ${dupGroups.length} ชื่อซ้ำ\n\n• ลบ ${totalRemoves} duplicates\n• ย้าย references ของ ${totalTransfers} ตัว → KEEP\n\nดำเนินการ?`)) return;
+        if (!confirm(`🔧 พบ ${dupGroups.length} ชื่อซ้ำ\n\n• ลบ ${totalRemoves} duplicates\n• ย้าย references ของ ${totalTransfers} ตัว → KEEP\n• ตรวจ cloud delete หลังลบ — กัน dup กลับมา\n\nดำเนินการ?`)) return;
+
+        window.setSaveStatus?.('saving', 'Merge '+opts.collection+' '+totalRemoves+' duplicates...');
+
+        // 🛡 STEP 1: Tombstone ALL deleted ids ก่อน — กัน pull cycle ดึง dup กลับมาระหว่างทำ
+        const allRemoveIds = plan.flatMap(p => p.removes.map(d => d.id));
+        try { window.$autoSync?.addTombstones?.(opts.collection, allRemoveIds); } catch(e){}
 
         const deletedIds = [];
+        const transferLog = [];
         for (const p of plan) {
           for (const dup of p.removes) {
+            // ย้าย references → KEEP
             refTables.forEach(([tbl, fld]) => {
               if (!Array.isArray(db[tbl])) return;
-              db[tbl].forEach(r => { if (r && r[fld] === dup.id) r[fld] = p.keep.id; });
+              let transferred = 0;
+              db[tbl].forEach(r => { if (r && r[fld] === dup.id) { r[fld] = p.keep.id; transferred++; } });
+              if (transferred > 0) transferLog.push(tbl+':'+transferred);
             });
             // รวม fields ที่ดีๆ ไป KEEP
-            ['phone','bankAccount','taxId','address','salesId'].forEach(k => {
+            ['phone','bankAccount','taxId','address','salesId','email','code'].forEach(k => {
               if (!p.keep[k] && dup[k]) p.keep[k] = dup[k];
             });
+            // Mark KEEP as updated → จะ push ขึ้น cloud
+            p.keep.updatedAt = new Date().toISOString();
+            // Local splice
             const idx = db[opts.collection].findIndex(s => s && s.id === dup.id);
             if (idx >= 0) db[opts.collection].splice(idx, 1);
             deletedIds.push(dup.id);
             erp.logAudit('MERGE_DUP', opts.collection, dup, { mergedInto: p.keep.id });
           }
         }
-        // Push delete to cloud
-        await _deleteCloud(opts.collection, deletedIds);
+
         try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
-        try { if (window.$autoSync && window.$autoSync.pushNow) await window.$autoSync.pushNow(); } catch(e){}
+
+        // 🛡 STEP 2: Cloud delete + VERIFY + RETRY
+        const cloudTbl = _cloudTableFor(opts.collection);
+        let cloudOk = 0, cloudFail = 0, retried = 0;
+        const stillInCloud = [];
+        if (window.sb && cloudTbl) {
+          // First attempt: bulk delete
+          for (let i = 0; i < deletedIds.length; i += 100) {
+            const chunk = deletedIds.slice(i, i+100);
+            try {
+              const { data, error } = await window.sb.from(cloudTbl).delete().in('id', chunk).select('id');
+              if (error) { cloudFail += chunk.length; }
+              else cloudOk += (data?.length || 0);
+            } catch(e) { cloudFail += chunk.length; }
+          }
+          // Verify: query back
+          try {
+            for (let i = 0; i < deletedIds.length; i += 100) {
+              const chunk = deletedIds.slice(i, i+100);
+              const { data } = await window.sb.from(cloudTbl).select('id').in('id', chunk);
+              if (data && data.length > 0) {
+                stillInCloud.push(...data.map(r => r.id));
+              }
+            }
+            // Retry once for stragglers
+            if (stillInCloud.length > 0) {
+              retried = stillInCloud.length;
+              for (let i = 0; i < stillInCloud.length; i += 100) {
+                const chunk = stillInCloud.slice(i, i+100);
+                try { await window.sb.from(cloudTbl).delete().in('id', chunk); } catch(e){}
+              }
+            }
+          } catch(e) { console.warn('[merge verify]', e); }
+        }
+
+        // 🛡 STEP 3: Push refs (purchaseBills/payments/etc that were re-pointed)
+        try {
+          if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
+        } catch(e) { console.warn('[merge push]', e); }
+
         clearSelection();
-        alert(`✅ Merge สำเร็จ\n• รวม ${plan.length} ชื่อ → ${plan.length} ตัว\n• ลบ ${deletedIds.length} duplicates`);
+        const transferSummary = transferLog.length ? '\n• Refs ย้าย: '+transferLog.join(', ') : '';
+        const cloudSummary = '\n• Cloud delete: '+cloudOk+'/'+deletedIds.length+(retried?(' (retried '+retried+')'):'')+(cloudFail?', fail '+cloudFail:'');
+        if (stillInCloud.length === 0 || (stillInCloud.length > 0 && retried > 0)) {
+          window.setSaveStatus?.('saved', `Merge ${plan.length} ชื่อ + ลบ ${deletedIds.length} ✓ cloud verified`);
+          alert(`✅ Merge สำเร็จ\n• รวม ${plan.length} ชื่อ\n• ลบ ${deletedIds.length} duplicates${transferSummary}${cloudSummary}\n\n💡 Tombstone ตั้งแล้ว — dup จะไม่กลับมา`);
+        } else {
+          window.setSaveStatus?.('failed', `Merge บางส่วน fail — ${stillInCloud.length} ยังอยู่ใน cloud`);
+          alert(`⚠ Merge บางส่วนสำเร็จ\n• ลบ local: ${deletedIds.length}${cloudSummary}\n\n⚠ ${stillInCloud.length} ยังอยู่ใน cloud — ลองรันใหม่ หรือเช็ค RLS`);
+        }
       }
 
       // 🆕 Force pull masters from cloud
