@@ -3436,13 +3436,14 @@ window.$cleanupReceiptDups = async function(dryRun) {
   if (!receipts.length) { alert('❌ ไม่มี receipts'); return; }
   const fmt = (n) => Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
 
-  // จัดกลุ่มตาม key (billId + amount rounded to 2 decimals)
+  // จัดกลุ่มตาม key (billId + amount rounded to 1 BAHT — tolerance ±0.5 baht)
+  // 🔧 BUG FIX 2026-05-14: เปลี่ยน toFixed(2) เป็น Math.round() → รองรับ rounding diff (เช่น 1,200,746.60 vs 1,200,746.62)
   const groups = new Map();
   receipts.forEach(r => {
     if (!r || !r.id || !r.billId) return;
     const amt = Number(r.amount || 0);
     if (amt <= 0.001) return;
-    const key = r.billId + '|' + amt.toFixed(2);
+    const key = r.billId + '|' + Math.round(amt);   // ปัด 1 บาท
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(r);
   });
@@ -3458,7 +3459,37 @@ window.$cleanupReceiptDups = async function(dryRun) {
     const bill = (db.salesBills||[]).find(b => b && b.id === keeper.billId);
     dupGroups.push({ key, keeper, dups, billDocNo: bill?.docNo || keeper.billDocNo || '-' });
   });
-  if (!dupGroups.length) { alert('✓ ไม่พบ receipt duplicates'); return; }
+
+  // 🆕 SECOND PASS: หา bills ที่ receivedAmount > totalAmount เกิน 0.5 บาท → over-paid (น่าจะมี dup ที่ไม่ตรง tolerance)
+  const overPaidBills = [];
+  (db.salesBills||[]).forEach(bill => {
+    if (!bill || bill.status === 'cancelled') return;
+    const billReceipts = receipts.filter(r => r && r.billId === bill.id);
+    if (billReceipts.length < 2) return;
+    const totalRcv = billReceipts.reduce((s,r) => s + Number(r.amount||0) + Number(r.withholdingTax||0) + Number(r.discount||0), 0);
+    const billTotal = Number(bill.totalAmount || 0);
+    if (totalRcv > billTotal + 0.5) {
+      // Over-paid → highlight all receipts of this bill
+      // เก็บ receipt ที่ amount น้อยสุดเป็น keeper, ที่เหลือ dup (เพราะ amount น้อย → น่าจะเป็น original, ที่เกินคือ dup)
+      // แต่เพื่อความ safe ให้ user เลือก — แค่ list ออกมา ไม่ delete อัตโนมัติ
+      billReceipts.sort((a,b) => String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+      const keeper = billReceipts[0];
+      const dups = billReceipts.slice(1);
+      // ตรวจว่ายังไม่ได้อยู่ใน dupGroups
+      const keeperKey = keeper.billId + '|' + Math.round(Number(keeper.amount||0));
+      const alreadyHandled = dupGroups.some(g => g.keeper.id === keeper.id);
+      if (!alreadyHandled) {
+        overPaidBills.push({ keeper, dups, billDocNo: bill.docNo, billTotal, totalRcv, overBy: totalRcv - billTotal });
+      }
+    }
+  });
+
+  // รวม overPaid เข้า dupGroups
+  overPaidBills.forEach(o => {
+    dupGroups.push({ key: 'overpaid|'+o.keeper.id, keeper: o.keeper, dups: o.dups, billDocNo: o.billDocNo, _overpaid: true });
+  });
+
+  if (!dupGroups.length) { alert('✓ ไม่พบ receipt duplicates หรือ over-paid bills'); return; }
 
   const totalDup = dupGroups.reduce((s,g) => s + g.dups.length, 0);
   console.log(`%c🔍 Receipt Dup Cleanup`, 'font-weight:bold;font-size:14px;color:#7c3aed');
@@ -43476,41 +43507,84 @@ app.component('view-mdSalesperson', {
       if (!form.name) { erp.showToast('กรุณาใส่ชื่อ','error'); return; }
       if (!Array.isArray(db.salespersons)) db.salespersons = [];
       const nowIso = new Date().toISOString();
+      const username = (erp.currentUser?.value?.username) || '-';
+      let saved;
       if (editingId.value) {
         const idx = db.salespersons.findIndex(x => x && x.id === editingId.value);
-        if (idx >= 0) db.salespersons[idx] = { ...form, id: editingId.value, updatedAt: nowIso };
+        if (idx >= 0) {
+          saved = { ...form, id: editingId.value, updatedAt: nowIso, updatedBy: username };
+          db.salespersons[idx] = saved;
+        }
       } else {
         const id = 'SP'+String(db.salespersons.length+1).padStart(3,'0');
-        db.salespersons.push({ ...form, id, createdAt: nowIso, updatedAt: nowIso });
+        saved = { ...form, id, createdAt: nowIso, updatedAt: nowIso, createdBy: username };
+        db.salespersons.push(saved);
       }
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       showForm.value = false;
-      // 🆕 Push + status badge
-      window.setSaveStatus?.('saving', 'กำลังบันทึก sales "'+form.name+'"');
+
+      // 🆕 PUSH + VERIFY — บันทึก cloud + ตรวจซ้ำว่าข้อมูลขึ้นจริง
+      window.setSaveStatus?.('saving', 'กำลังบันทึก sales "'+form.name+'" → cloud...');
       try {
-        if (window.$autoSync?.pushNow) {
-          await window.$autoSync.pushNow();
-          window.setSaveStatus?.('saved', 'บันทึก sales "'+form.name+'" + sync cloud');
-        } else { window.setSaveStatus?.('failed', 'sync ยังไม่พร้อม'); }
+        // ใช้ direct upsert ไป cloud (เร็วกว่า + จับ error ชัดเจน)
+        if (!window.sb) throw new Error('Supabase ไม่ connect');
+        const payload = {
+          id: saved.id,
+          code: saved.code || '',
+          name: saved.name,
+          phone: saved.phone || '',
+          email: saved.email || '',
+          commission_pct: Number(saved.commissionPct || 0),
+          base_salary: Number(saved.baseSalary || 0),
+          active: saved.active !== false,
+          note: saved.note || '',
+          created_at: saved.createdAt || nowIso,
+          updated_at: nowIso,
+        };
+        const { data, error } = await window.sb.from('salespersons').upsert(payload, { onConflict: 'id' }).select();
+        if (error) throw error;
+        // Verify
+        const { data: verify } = await window.sb.from('salespersons').select('id,name,commission_pct,base_salary').eq('id', saved.id).single();
+        if (!verify) throw new Error('Push สำเร็จแต่ verify หา cloud row ไม่เจอ');
+        const cloudCom = Number(verify.commission_pct||0);
+        const cloudSal = Number(verify.base_salary||0);
+        const localCom = Number(saved.commissionPct||0);
+        const localSal = Number(saved.baseSalary||0);
+        if (Math.abs(cloudCom-localCom) > 0.001 || Math.abs(cloudSal-localSal) > 0.01) {
+          throw new Error(`Verify ไม่ตรง — cloud: ${cloudCom}% ${cloudSal}฿ vs local: ${localCom}% ${localSal}฿`);
+        }
+        window.setSaveStatus?.('saved', '✅ บันทึก "'+saved.name+'" + sync cloud + verified');
+        erp.showToast('✅ บันทึกสำเร็จ + ตรวจ cloud แล้วตรง','success');
       } catch(e) {
-        window.setSaveStatus?.('failed', 'Cloud push fail: '+e.message);
+        console.error('[saveSalesperson]', e);
+        window.setSaveStatus?.('failed', '❌ Cloud save fail: '+e.message);
+        alert('⚠ บันทึก local แล้ว แต่ cloud push fail:\n\n'+e.message+'\n\nลองกดบันทึกอีกครั้ง หรือเช็คเน็ต/RLS');
       }
-      erp.showToast('บันทึกสำเร็จ','success');
     }
     async function remove(s) {
-      if (!confirm('ลบ '+s.name+'?')) return;
+      if (!confirm('ลบ '+s.name+'?\n\nจะลบทั้ง local และ cloud')) return;
+      // 1. Tombstone ก่อน (กัน pull ดึงกลับมา)
       try { window.$autoSync?.addTombstones?.('salespersons', [s.id]); } catch(e){}
-      db.salespersons = (db.salespersons||[]).filter(x => !x || x.id !== s.id);
-      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
-      window.setSaveStatus?.('saving', 'กำลังลบ sales "'+s.name+'"');
+      window.setSaveStatus?.('saving', 'กำลังลบ "'+s.name+'" → cloud...');
       try {
-        if (window.sb) await window.sb.from('salespersons').delete().eq('id', s.id);
-        if (window.$autoSync?.pushNow) await window.$autoSync.pushNow();
-        window.setSaveStatus?.('saved', 'ลบ sales "'+s.name+'" + sync cloud');
+        // 2. ลบจาก cloud ก่อน (ถ้า cloud fail → rollback local)
+        if (!window.sb) throw new Error('Supabase ไม่ connect');
+        const { error } = await window.sb.from('salespersons').delete().eq('id', s.id);
+        if (error) throw error;
+        // 3. Verify cloud delete
+        const { data: verify } = await window.sb.from('salespersons').select('id').eq('id', s.id);
+        if (verify && verify.length > 0) throw new Error('Cloud ยังมี row นี้อยู่หลัง delete');
+        // 4. ลบจาก local
+        db.salespersons = (db.salespersons||[]).filter(x => !x || x.id !== s.id);
+        try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
+        window.setSaveStatus?.('saved', '✅ ลบ "'+s.name+'" + cloud + verified');
+        erp.showToast('✅ ลบ "'+s.name+'" สำเร็จ + ตรวจ cloud แล้ว','success');
       } catch(e) {
-        window.setSaveStatus?.('failed', 'Delete cloud fail: '+e.message);
+        console.error('[deleteSalesperson]', e);
+        // Rollback tombstone — ไม่ลบ local ถ้า cloud fail
+        window.setSaveStatus?.('failed', '❌ Delete fail: '+e.message);
+        alert('⚠ ลบไม่สำเร็จ:\n\n'+e.message+'\n\n• ข้อมูล local ยังไม่ลบ — ลองอีกครั้ง\n• ถ้า RLS block — ติดต่อ admin');
       }
-      erp.showToast('ลบสำเร็จ','success');
     }
     const filtered = computed(() => {
       const q = (search.value||'').toLowerCase();
