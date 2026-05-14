@@ -7592,13 +7592,67 @@ window.$erp = {
   function _saveTombstones() {
     try { localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(TOMBSTONES)); } catch(e){}
   }
-  function addTombstones(localCollection, ids) {
-    if (!localCollection || !Array.isArray(ids)) return;
+  async function addTombstones(localCollection, ids) {
+    if (!localCollection || !Array.isArray(ids) || ids.length === 0) return;
+
+    // 1. Save to local (เดิม — กัน row ฟื้นบนเครื่องนี้)
     TOMBSTONES[localCollection] = TOMBSTONES[localCollection] || {};
     const exp = Date.now() + TOMBSTONE_TTL_MS;
     let added = 0;
-    ids.forEach(id => { if (id) { TOMBSTONES[localCollection][id] = exp; added++; } });
+    const validIds = [];
+    ids.forEach(id => {
+      if (id) {
+        TOMBSTONES[localCollection][id] = exp;
+        validIds.push(String(id));
+        added++;
+      }
+    });
     if (added > 0) _saveTombstones();
+
+    // 2. 🆕 Propagate to cloud (deletion_log) — กัน row ฟื้นบนเครื่องอื่น
+    if (!window.sb || !window.SUPABASE_CONFIG?.enabled || validIds.length === 0) return;
+
+    const cloudTable = _localToCloudTable(localCollection);
+    if (!cloudTable) {
+      console.warn('[tombstone-cloud] no cloud table for:', localCollection);
+      return;
+    }
+
+    const username = window.$erp?.currentUser?.value?.username || 'system';
+    const now = new Date().toISOString();
+
+    // Insert เป็น batch ขนาด 500 (กัน HTTP request ใหญ่เกิน)
+    const BATCH_SIZE = 500;
+    let cloudInserted = 0;
+    let cloudFailed = 0;
+
+    for (let i = 0; i < validIds.length; i += BATCH_SIZE) {
+      const chunk = validIds.slice(i, i + BATCH_SIZE);
+      const rows = chunk.map((rowId, idx) => ({
+        id: 'TOMB-' + Date.now() + '-' + i + '-' + idx + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+        table_name: cloudTable,
+        row_id: rowId,
+        deleted_at: now,
+        deleted_by: username,
+      }));
+
+      try {
+        const { error } = await window.sb.from('deletion_log').insert(rows);
+        if (error) {
+          console.warn('[tombstone-cloud] batch ' + (i/BATCH_SIZE + 1) + ' fail:', error.message);
+          cloudFailed += chunk.length;
+        } else {
+          cloudInserted += chunk.length;
+        }
+      } catch(e) {
+        console.warn('[tombstone-cloud] exception:', e.message);
+        cloudFailed += chunk.length;
+      }
+    }
+
+    if (cloudInserted > 0 || cloudFailed > 0) {
+      console.log('[tombstone-cloud] ' + cloudTable + ': inserted=' + cloudInserted + ' failed=' + cloudFailed);
+    }
   }
   function isTombstoned(localCollection, id) {
     const store = TOMBSTONES[localCollection];
