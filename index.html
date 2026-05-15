@@ -6882,11 +6882,33 @@ window.$erp = {
 
     // 🆕 PATCH 13: Pre-push tombstone check (cloud deletion_log) — ป้องกัน resurrection
     //   ก่อน push row ใดๆ → check ว่า id ∈ cloud tombstones → ถ้าใช่: skip + ลบ row จาก local
+    // 🆕 PATCH 16b (2026-05-15): exception สำหรับ stockLedger rows ที่ refId = active bill
+    //   เดิม: tombstone match → block ทันที → stock_ledger ของบิลที่ยังอยู่ถูกลบ (9 STOCK bills ผลิตภัณฑ์หาย)
+    //   ใหม่: ถ้า refId ตรงกับ purchaseBill/salesBill ที่ยังอยู่ → allow push (cloud tomb คือของเก่า ก่อน regen)
     try {
       const cloudTombs = await _fetchCloudTombstoneIds(cfg.target);
       if (cloudTombs.size > 0) {
-        const safe = rows.filter(r => !cloudTombs.has(String(r.id)));
-        const blocked = rows.filter(r => cloudTombs.has(String(r.id)));
+        // 🆕 PATCH 16b: build active-bill id set สำหรับ stockLedger
+        let activeBillIds = null;
+        if (localKey === 'stockLedger') {
+          activeBillIds = new Set();
+          _safeArr(_GLOBAL_DB.purchaseBills).forEach(b => { if (b && b.id) activeBillIds.add(b.id); });
+          _safeArr(_GLOBAL_DB.salesBills).forEach(b => { if (b && b.id) activeBillIds.add(b.id); });
+        }
+        let exemptCount = 0;
+        const safe = rows.filter(r => {
+          if (!cloudTombs.has(String(r.id))) return true;        // ไม่อยู่ใน tomb — ส่งต่อ
+          if (activeBillIds && r && r.refId && activeBillIds.has(r.refId)) {
+            exemptCount++;
+            return true;                                          // 🆕 PATCH 16b exempt — active bill
+          }
+          return false;
+        });
+        if (exemptCount > 0) {
+          console.warn('[PATCH 16b] EXEMPT '+exemptCount+' stockLedger rows (refId in active bills) — allow push despite tombstone match');
+        }
+        const safeSet = new Set(safe);
+        const blocked = rows.filter(r => !safeSet.has(r));
         if (blocked.length > 0) {
           console.warn(`[pre-push] ${localKey}: BLOCKED ${blocked.length}/${rows.length} rows (cloud tombstone match) — removing from local`);
           const blockedIds = new Set(blocked.map(r => r.id));
@@ -7058,6 +7080,43 @@ window.$erp = {
               success = true;   // mark success เพื่อออก while loop
               break;
             }
+            // 🆕 PATCH 15a Layer 2 (2026-05-15): doc_no UNIQUE retry
+            //   ถ้า constraint เกี่ยวกับ doc_no + table มี doc_no column → regenerate + retry (max 3 ครั้ง)
+            //   ใช้ ensureUniqueDocNoCloud (query fresh cloud max) — ไม่ใช่ bump suffix
+            //   id เดิม + doc_no ใหม่ → upsert ทับ row เดิมใน cloud (ไม่สร้าง orphan)
+            const PREFIX_BY_CLOUD = {
+              'purchase_bills':'PB','sales_bills':'SB','payments':'PMT','receipts':'RCP',
+              'transfers':'TRF','expenses':'EXP','po_buys':'POB','po_sells':'POS','receipt_vouchers':'RV'
+            };
+            const isDocNoCol = /doc_no/i.test(constraintName) || /doc_no/i.test(msg);
+            const prefixForRetry = PREFIX_BY_CLOUD[cfg.target];
+            const retryCount = Number(chunk.__docNoRetried || 0);
+            if (isDocNoCol && prefixForRetry && retryCount < 3 && window.$erp?.ensureUniqueDocNoCloud) {
+              _logErr(cfg.target, '⚠ doc_no collision — regen doc_no for chunk (attempt '+(retryCount+1)+'/3)');
+              console.warn('[push-retry doc_no] '+cfg.target+': regenerating doc_no for '+chunk.length+' rows (attempt '+(retryCount+1)+')');
+              const localArr = Array.isArray(_GLOBAL_DB[localKey]) ? _GLOBAL_DB[localKey] : null;
+              for (const row of chunk) {
+                if (!row || !row.doc_no) continue;
+                try {
+                  const newDoc = await window.$erp.ensureUniqueDocNoCloud(row.doc_no, prefixForRetry, row.id);
+                  if (newDoc && newDoc !== row.doc_no) {
+                    console.log('[push-retry doc_no] '+row.doc_no+' → '+newDoc+' (id='+row.id+')');
+                    row.doc_no = newDoc;
+                    // 🔧 sync local _GLOBAL_DB row — กัน push รอบหน้า revert doc_no เก่ากลับมา
+                    if (localArr) {
+                      const lr = localArr.find(x => x && x.id === row.id);
+                      if (lr) lr.docNo = newDoc;
+                    }
+                  }
+                } catch(eRegen) {
+                  console.warn('[push-retry doc_no] regen failed for id='+row.id+':', eRegen?.message);
+                }
+              }
+              try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(_GLOBAL_DB)); } catch(e){}
+              chunk.__docNoRetried = retryCount + 1;
+              continue;   // retry upsert with new doc_no
+            }
+            // ❌ ไม่ใช่ doc_no constraint หรือ retry หมด → fall through ไป STOP (เดิม)
             const colMatch = constraintName.match(/_([a-z_]+)_key$/);
             const col = colMatch ? colMatch[1] : 'unknown';
             _logErr(cfg.target, '⛔ Duplicate "'+col+'" ('+constraintName+') — STOP (ห้าม bump suffix อัตโนมัติ) แก้ค่าซ้ำใน local ก่อน push ใหม่');
@@ -13274,6 +13333,28 @@ app.component('view-purchase', {
                 }
               });
             } catch (e) { console.error('PO restore on edit:', e); }
+          }
+          // 🆕 PATCH 16a (2026-05-15): Cloud-vs-local SL guard ก่อน delete+regen
+          //   กัน "ghost regen" ที่ทำ stock_ledger หายใน production (9 STOCK bills, ~1.09M บาท)
+          //   เงื่อนไข BLOCK: local SL = 0 + cloud SL > 0 → user แก้บนข้อมูลไม่ครบ → abort save
+          //   เงื่อนไข PROCEED: local มี SL ≥ 1 → user edit จริง → regen ตามปกติ
+          //   ถ้า cloud-query fail → log warning + proceed (fail-open ไม่ block normal flow)
+          try {
+            const localSlCount = safeArr(db.stockLedger).filter(s => s && s.refType === 'PB' && s.refId === id).length;
+            if (localSlCount === 0 && window.sb) {
+              const { count: cloudSlCount, error: scErr } = await window.sb.from('stock_ledger')
+                .select('id', { count: 'exact', head: true }).eq('ref_id', id).eq('ref_type', 'PB');
+              if (!scErr && Number(cloudSlCount || 0) > 0) {
+                console.error('[PATCH 16a] BLOCK regen for '+f.docNo+' (id='+id+'): cloud='+cloudSlCount+' rows, local=0');
+                alert('⚠ PATCH 16a — Stock Ledger Guard\n\n'
+                    + 'บิล '+f.docNo+' มี stock_ledger ใน cloud ('+cloudSlCount+' rows) แต่ local ไม่มีเลย\n\n'
+                    + 'หาก save ต่อ → cloud stock_ledger จะถูกลบ → stock balance หาย\n\n'
+                    + 'แนะนำ: refresh หน้า (F5) เพื่อ force pull ข้อมูลใหม่ แล้วลองอีกครั้ง');
+                return;   // abort save — ผู้ใช้ต้อง pull ก่อน
+              }
+            }
+          } catch(eGuard) {
+            console.warn('[PATCH 16a] guard check failed:', eGuard?.message, '— proceed with caution');
           }
           // Remove old stock ledger entries for this bill
           db.stockLedger = safeArr(db.stockLedger).filter(s => !(s.refType === 'PB' && s.refId === id));
