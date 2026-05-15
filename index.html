@@ -6869,11 +6869,15 @@ window.$erp = {
     let rows = (_GLOBAL_DB[localKey] || []).filter(r => r && r.id);
     if (!rows.length) return { ok:0, fail:0 };
     // 🆕 Skip tombstoned rows — กัน push ของที่ลบไปแล้ว (cloud tombstone หรือ local tombstone)
-    const filtered = rows.filter(r => !isTombstoned(localKey, r.id));
-    if (filtered.length < rows.length) {
-      console.log(`[push-skip-tomb] ${localKey}: skipped ${rows.length - filtered.length} tombstoned rows`);
+    // 🔧 PATCH 13: ลบจาก local ด้วย (ไม่ใช่แค่ filter จาก push) — กัน push รอบหน้า + กัน UI โชว์ row ที่ลบแล้ว
+    const localTombBlocked = rows.filter(r => isTombstoned(localKey, r.id));
+    if (localTombBlocked.length > 0) {
+      const blockedIds = new Set(localTombBlocked.map(r => r.id));
+      console.log(`[push-skip-tomb] ${localKey}: skipped + REMOVED ${localTombBlocked.length} tombstoned rows from local`);
+      _GLOBAL_DB[localKey] = (_GLOBAL_DB[localKey] || []).filter(r => !r || !blockedIds.has(r.id));
+      try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(_GLOBAL_DB)); } catch(e){}
     }
-    rows = filtered;
+    rows = rows.filter(r => !isTombstoned(localKey, r.id));
     if (!rows.length) return { ok:0, fail:0 };
 
     // 🆕 PATCH 13: Pre-push tombstone check (cloud deletion_log) — ป้องกัน resurrection
