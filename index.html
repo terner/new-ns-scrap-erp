@@ -5751,6 +5751,97 @@ window.$erp = {
         + '\n\n💡 หลังจากนี้ — refresh หน้าเพื่อ pull SL ใหม่ + ตรวจ stock balance reports');
     return { generated, failed, affected: affected.map(b => b.doc_no), failedDocs };
   },
+  /* 🆕 PATCH 16d (2026-05-15): Cleanup orphan tombstones — admin tool
+     ใช้งาน:
+       window.$erp.cleanupOrphanTombstones()                    — DRY RUN (ดูจำนวน + sample)
+       window.$erp.cleanupOrphanTombstones({ dryRun: false })   — ลบจริงจาก deletion_log
+     ลบเฉพาะ tombstones ของ stock_ledger ที่ refId ตรงกับ active purchaseBill/salesBill
+     (1,000+ orphan tombstones ใน production จาก zombie pattern) */
+  cleanupOrphanTombstones: async (options = {}) => {
+    const { dryRun = true } = options;
+    if (!window.sb) { alert('⛔ Supabase not initialized'); return; }
+    const role = window.$erp.currentUser?.value?.role;
+    if (role !== 'admin') { alert('⛔ admin only — current role: ' + (role || 'none')); return; }
+    if (!dryRun && !confirm('⚠ Confirm WRITE: จะลบ deletion_log entries จริง\n\nกด Cancel ถ้ายังไม่แน่ใจ — ใช้ dryRun: true ก่อน')) return;
+    // 1. Fetch all stock_ledger tombstones
+    let allTombs = [];
+    try {
+      let from = 0; const page = 1000;
+      while (true) {
+        const { data, error } = await window.sb.from('deletion_log').select('id, row_id, table_name, deleted_at, deleted_by')
+          .eq('table_name', 'stock_ledger').order('deleted_at', { ascending: false }).range(from, from + page - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allTombs = allTombs.concat(data);
+        if (data.length < page) break;
+        from += page;
+      }
+    } catch(e) { alert('Fetch tombstones failed: ' + e.message); return; }
+    console.log('[cleanup-tombs] fetched ' + allTombs.length + ' stock_ledger tombstones from deletion_log');
+    // 2. Fetch active bills (PB + SB)
+    let activeBillIds = new Set();
+    try {
+      for (const tbl of ['purchase_bills', 'sales_bills']) {
+        let from = 0; const page = 1000;
+        while (true) {
+          const { data, error } = await window.sb.from(tbl).select('id').order('id').range(from, from + page - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          data.forEach(r => { if (r && r.id) activeBillIds.add(r.id); });
+          if (data.length < page) break;
+          from += page;
+        }
+      }
+    } catch(e) { alert('Fetch active bills failed: ' + e.message); return; }
+    console.log('[cleanup-tombs] ' + activeBillIds.size + ' active bill ids loaded');
+    // 3. For each tombstone, look up the stock_ledger row in cloud (it might still exist — zombie)
+    //    If cloud row exists + refId is active bill → tombstone is orphan, mark for deletion
+    const orphans = [];
+    const BATCH = 100;
+    for (let i = 0; i < allTombs.length; i += BATCH) {
+      const batch = allTombs.slice(i, i + BATCH);
+      const rowIds = batch.map(t => t.row_id);
+      try {
+        const { data: slRows, error } = await window.sb.from('stock_ledger')
+          .select('id, ref_id, ref_no').in('id', rowIds);
+        if (error) { console.warn('[cleanup-tombs] sl lookup error:', error.message); continue; }
+        const slMap = new Map((slRows || []).map(r => [r.id, r]));
+        for (const t of batch) {
+          const sl = slMap.get(t.row_id);
+          if (sl && sl.ref_id && activeBillIds.has(sl.ref_id)) {
+            orphans.push({ tombId: t.id, rowId: t.row_id, refId: sl.ref_id, refNo: sl.ref_no, deletedBy: t.deleted_by });
+          }
+        }
+      } catch(eBatch) { console.warn('[cleanup-tombs] batch error:', eBatch?.message); }
+    }
+    console.log('[cleanup-tombs] ' + orphans.length + ' orphan tombstones found (refId in active bills)');
+    console.table(orphans.slice(0, 20));
+    if (dryRun) {
+      alert('PATCH 16d Cleanup — DRY RUN\n\n'
+          + 'Total stock_ledger tombstones: ' + allTombs.length + '\n'
+          + 'Orphan (refId in active bills): ' + orphans.length + '\n\n'
+          + 'Sample (ดู console.table สำหรับเต็ม):\n'
+          + orphans.slice(0, 5).map(o => '• ' + o.rowId + ' → ' + o.refNo + ' (by ' + o.deletedBy + ')').join('\n')
+          + '\n\n👉 หากจะ cleanup จริง: window.$erp.cleanupOrphanTombstones({ dryRun: false })');
+      return { totalTombs: allTombs.length, orphans: orphans.length, dryRun: true };
+    }
+    // 4. Delete orphan tombstones from deletion_log (batch)
+    let deleted = 0, failed = 0;
+    for (let i = 0; i < orphans.length; i += BATCH) {
+      const batch = orphans.slice(i, i + BATCH);
+      const ids = batch.map(o => o.tombId);
+      try {
+        const { error } = await window.sb.from('deletion_log').delete().in('id', ids);
+        if (error) { failed += batch.length; console.error('[cleanup-tombs] batch delete fail:', error.message); }
+        else { deleted += batch.length; console.log('[cleanup-tombs] ✓ batch deleted', batch.length, 'orphans'); }
+      } catch(eDel) { failed += batch.length; console.error('[cleanup-tombs] exception:', eDel?.message); }
+    }
+    alert('PATCH 16d Cleanup — DONE\n\n'
+        + '✅ Deleted: ' + deleted + ' orphan tombstones\n'
+        + '❌ Failed: ' + failed
+        + '\n\n💡 ขั้นถัดไป: refresh ทุกเครื่อง + reset DELETION_LOG_KEY ที่ localStorage (กัน replay)');
+    return { totalTombs: allTombs.length, orphans: orphans.length, deleted, failed };
+  },
   logAudit: (action, entity, before, after) => {
     try {
       if (!Array.isArray(_GLOBAL_DB.auditLog)) _GLOBAL_DB.auditLog = [];
@@ -6818,13 +6909,32 @@ window.$erp = {
       const reverseMap = {};
       Object.entries(AS_MAP).forEach(([localKey, cfg]) => { reverseMap[cfg.target] = localKey; });
 
+      // 🆕 PATCH 16c (2026-05-15): Pull-side exemption สำหรับ stockLedger ของ active bill
+      //   เดิม: tombstone match → ลบ local row → ทำให้ admin local missing 180 rows (cloud 1,753 / local 1,573)
+      //   เหตุเพราะมี orphan tombstones 1,000+ ใน deletion_log ที่ผิด (refId ของ active bill)
+      //   ใหม่: ถ้า stockLedger row มี refId ตรงกับ active purchaseBill/salesBill → exempt (zombie pattern จะหยุด)
+      const activeBillIds = new Set();
+      _safeArr(_GLOBAL_DB.purchaseBills).forEach(b => { if (b && b.id) activeBillIds.add(b.id); });
+      _safeArr(_GLOBAL_DB.salesBills).forEach(b => { if (b && b.id) activeBillIds.add(b.id); });
+
       let applied = 0;
+      let exempted16c = 0;
       let latestTs = since;
       for (const t of data) {
         const localKey = reverseMap[t.table_name];
         if (!localKey) continue;
         const arr = _GLOBAL_DB[localKey];
         if (!Array.isArray(arr)) continue;
+        // 🆕 PATCH 16c: stockLedger exemption
+        if (localKey === 'stockLedger') {
+          const target = arr.find(r => r && String(r.id) === String(t.row_id));
+          if (target && target.refId && activeBillIds.has(target.refId)) {
+            exempted16c++;
+            console.warn('[PATCH 16c] EXEMPT stockLedger', t.row_id, 'refId='+target.refId, '(active bill) — keep local row');
+            if (t.deleted_at > latestTs) latestTs = t.deleted_at;
+            continue;   // skip delete
+          }
+        }
         const beforeLen = arr.length;
         const filtered = arr.filter(r => !r || String(r.id) !== String(t.row_id));
         if (filtered.length < beforeLen) {
@@ -6834,6 +6944,9 @@ window.$erp = {
           console.log('[tombstone] removed', t.table_name, t.row_id, 'from local');
         }
         if (t.deleted_at > latestTs) latestTs = t.deleted_at;
+      }
+      if (exempted16c > 0) {
+        console.warn('[PATCH 16c] TOTAL EXEMPTED:', exempted16c, 'stockLedger rows (active bill refs) — they will stay in local');
       }
       localStorage.setItem(DELETION_LOG_KEY, latestTs);
       if (applied > 0) {
