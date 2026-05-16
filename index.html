@@ -41353,7 +41353,10 @@ app.component('view-tradingMatching', {
       if (idx < 0) return;
       db.tradingDeals[idx].matchedPurchaseAmount = newCost;
       db.tradingDeals[idx].matchedSalesAmount = newSales;
-      db.tradingDeals[idx].grossProfit = newGP;
+      // 🆕 PATCH 24 (2026-05-15): REMOVED d.grossProfit = newGP
+      //   cloud trading_deals ไม่มี column "gross_profit" → ทุก push หลังกด Recalc ตก schema mismatch
+      //   GP คำนวณ on-the-fly จาก matchedSalesAmount - matchedPurchaseAmount ตอนแสดง UI
+      //   ถ้าอนาคตต้อง persist → ALTER TABLE trading_deals ADD COLUMN IF NOT EXISTS gross_profit NUMERIC;
       db.tradingDeals[idx].updatedAt = new Date().toISOString();
       try { localStorage.setItem('ns_erp_db_v1', JSON.stringify(db)); } catch(e){}
       try { await window.$autoSync?.pushTable?.('tradingDeals'); } catch(e){}
