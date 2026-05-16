@@ -18801,7 +18801,7 @@ app.component('view-sales', {
               const matchedQty = itemsFromPB.reduce((s,it)=>s+Number(it.weight||0),0);
               // 🔧 BUG FIX 2026-05-13: ถ้า it.tradingCostAmount และ totalCost = 0 (เคสบิล import)
               // → fallback คำนวณจาก PB.items[].netAmount * (item.weight / PB.item.netWeight)
-              const matchedCost = itemsFromPB.reduce((s,it) => {
+              let matchedCost = itemsFromPB.reduce((s,it) => {
                 const explicit = Number(it.tradingCostAmount || it.totalCost || 0);
                 if (explicit > 0.001) return s + explicit;
                 // Fallback: compute from PB item
@@ -18815,8 +18815,36 @@ app.component('view-sales', {
                 }
                 return s;
               }, 0);
+              // 🆕 PATCH 22 (2026-05-15): Path B fallback — bill-level allocation เมื่อ line-level ว่างทั้งหมด
+              //   bug เดิม: ถ้า PB.items มี netAmount=0 (เคส import) + SB.items ไม่มี tradingCostAmount/totalCost
+              //     → matchedCost = 0 → cost=0/GP=100% bug ซ้ำใน deal ใหม่ทุกครั้ง
+              //   fix: mirror logic จาก $recomputeTradingDealCosts (line 5115) — ใช้ pb.subtotal × (matchedQty/pbTotalQty)
+              let usedFallback22 = false;
+              if (matchedCost <= 0.001 && matchedQty > 0.001) {
+                const pbTotalQty = (pb.items||[]).reduce((s, p) => s + Number(p && (p.netWeight || p.weight) || 0), 0);
+                const pbTotalAmt = pbExVat;
+                if (pbTotalQty > 0.001 && pbTotalAmt > 0.001) {
+                  const allocQty = Math.min(matchedQty, pbTotalQty);
+                  const fallbackCost = pbTotalAmt * (allocQty / pbTotalQty);
+                  if (fallbackCost > 0.001) {
+                    matchedCost = fallbackCost;
+                    usedFallback22 = true;
+                    console.warn('[PATCH 22 fallback] '+pb.docNo+' → '+bill.docNo+': line-level cost=0 → bill-level allocation, cost='+fallbackCost.toFixed(2)+' (qty='+matchedQty.toFixed(2)+'/'+pbTotalQty.toFixed(2)+')');
+                  }
+                }
+              }
               // matchedSales: proportional ตามสัดส่วนต้นทุน
-              const matchedSales = sbExVat * (matchedCost / totalCostInBill);
+              // 🆕 PATCH 22: ถ้าใช้ fallback (line-level cost ทั้งหมดเป็น 0) → ใช้ qty proportional แทน cost-ratio
+              //   เพราะ totalCostInBill = 1 (จาก || 1) ตอน line-cost ว่าง → cost/1 = matchedCost (ผิด)
+              let matchedSales;
+              if (usedFallback22) {
+                const sbTotalQty = (bill.items||[]).reduce((s, it) => s + Number(it && (it.weight || it.netWeight) || 0), 0);
+                matchedSales = sbTotalQty > 0.001
+                  ? sbExVat * (Math.min(matchedQty, sbTotalQty) / sbTotalQty)
+                  : sbExVat;
+              } else {
+                matchedSales = sbExVat * (matchedCost / totalCostInBill);
+              }
               // 🆕 PATCH 20 (2026-05-15): clamp non-negative — safety belt กัน edge case ที่ remainPB ติดลบ
               //   (เช่น past data ที่มี deal เก่าผิดอยู่ → tradingMatchedCostByPB ได้ค่าผิดด้วย)
               const actualMatchCost = Math.max(0, Math.min(matchedCost, remainPB));
