@@ -24,6 +24,21 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
   const supabase = getSupabaseClient()
   const isSupabaseReady = Boolean(supabase)
 
+  async function resolveLoginEmail(loginIdentifier: string) {
+    if (!supabase) return null
+    if (isEmailIdentifier(loginIdentifier)) return loginIdentifier
+
+    const { data, error: lookupError } = await supabase.rpc('lookup_app_login_email', {
+      _identifier: loginIdentifier,
+    })
+
+    if (lookupError) {
+      throw new Error(lookupError.message)
+    }
+
+    return typeof data === 'string' && data.includes('@') ? data : null
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
@@ -40,15 +55,26 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
       return
     }
 
-    if (!isEmailIdentifier(parsed.data.identifier)) {
-      setError('ตอนนี้ระบบ Next รองรับการเข้าสู่ระบบด้วย email ของ Supabase ก่อน')
+    setIsLoading(true)
+
+    let loginEmail: string | null = null
+
+    try {
+      loginEmail = await resolveLoginEmail(parsed.data.identifier)
+    } catch (caught) {
+      setIsLoading(false)
+      setError(caught instanceof Error ? `ตรวจสอบบัญชีไม่สำเร็จ: ${caught.message}` : 'ตรวจสอบบัญชีไม่สำเร็จ')
       return
     }
 
-    setIsLoading(true)
+    if (!loginEmail) {
+      setIsLoading(false)
+      setError('ไม่พบบัญชีผู้ใช้งานที่เปิดใช้งานอยู่')
+      return
+    }
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: parsed.data.identifier,
+      email: loginEmail,
       password: parsed.data.password,
     })
 
@@ -144,7 +170,7 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
           <details className="mt-2 text-xs text-slate-500">
             <summary className="cursor-pointer hover:text-slate-700">ข้อมูลระบบ login</summary>
             <div className="mt-2 rounded border bg-slate-50 p-2 text-xs leading-relaxed">
-              ระบบใหม่ใช้ Supabase Auth เป็นเป้าหมาย ไม่ใช้รหัสผ่านจาก application table เดิม
+              ระบบใหม่ใช้ Supabase Auth เป็นเป้าหมาย รองรับ email หรือ username ที่ผูกกับ app user และไม่ใช้รหัสผ่านจาก application table เดิม
             </div>
           </details>
         </form>

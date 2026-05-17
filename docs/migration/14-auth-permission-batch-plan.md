@@ -29,13 +29,14 @@
   - `/reset-password`
   - `/login` links to forgot password
   - `proxy.ts` treats forgot/reset routes as public so Supabase recovery links can load
-- Username login is not implemented yet. Current UI accepts Email / Username, but non-email identifiers are rejected with a message.
+- Username login is implemented through `lookup_app_login_email(identifier)` over active `app_users`; the login page accepts either email or username and then signs in with Supabase Auth email/password.
 - Additive target auth/permission schema migration has been drafted as `20260518093001_create_app_auth_permission_tables.sql`.
 - Server auth context helper exists at `apps/next/src/lib/server/auth-context.ts`.
 - `/api/auth/me` exists as a protected route to return current auth/app user, roles, and permission codes.
 - Admin Supabase Auth user has been linked into `app_users` through `scripts/seed-app-admin.mjs`; the script reads `APP_ADMIN_EMAIL` or `DEV_LOGIN_IDENTIFIER` and does not store passwords.
 - App auth SQL helper functions exist in `dev-target`: `current_app_user_id`, `current_app_role_codes`, `current_app_permission_codes`, `is_app_admin`, and `has_app_permission`.
 - Next `proxy.ts` now checks `is_app_admin()` first, then falls back to legacy `user_profiles` admin guard during transition.
+- `lookup_app_login_email(identifier)` exists for pre-auth username/email lookup and is granted to `anon`/`authenticated`; it returns email only for active `app_users`.
 - RLS/permission model is not final; current gating is a temporary admin-only bridge before UAT.
 
 ## Legacy Findings
@@ -284,7 +285,7 @@ Validation:
 
 ## Open Decisions
 
-- Should username login be supported in the Next app, or should login become email-only?
+- Username login is supported through `app_users.username -> app_users.email -> Supabase Auth`; do not use legacy `public.users.password`.
 - Should `Owner` be equivalent to `Admin`, or a separate role with broad business visibility but limited system settings?
 - Should system roles be editable, clone-only, or fully locked?
 - Should role permissions be menu-only first, then action-level later, or action-level from the start?
@@ -302,3 +303,4 @@ Validation:
 | 2026-05-18 | Server auth context helper: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added server helper for Supabase user, `app_users`, roles, permissions, legacy profile fallback, and protected `/api/auth/me`; build route table includes `/api/auth/me` |
 | 2026-05-18 | Admin app user seed: `node --check scripts/seed-app-admin.mjs`, `APP_ADMIN_EMAIL=... npm run seed:app-admin`, row-count verification | Passed | Linked current admin Auth user to `app_users`; counts after seed: app_users 1, app_user_roles 1, admin_assignments 1 |
 | 2026-05-18 | App auth SQL helpers + proxy primary app guard: Supabase `db push --dry-run`, `db push`, function verification, `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added security-definer helper functions and updated proxy to check `is_app_admin()` before legacy profile fallback |
+| 2026-05-18 | Username login lookup: Supabase `db push --dry-run`, `db push`, lookup verification, `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added `lookup_app_login_email(identifier)` and updated login page to accept email or username without reading legacy password fields |
