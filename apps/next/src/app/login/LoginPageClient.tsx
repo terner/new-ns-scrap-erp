@@ -1,0 +1,122 @@
+'use client'
+
+import { FormEvent, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { isEmailIdentifier, loginSchema } from '@/lib/auth'
+import { getSupabaseClient } from '@/lib/supabase'
+
+export function LoginPageClient() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const supabase = getSupabaseClient()
+  const isSupabaseReady = Boolean(supabase)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+
+    const parsed = loginSchema.safeParse({ identifier, password })
+
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'ข้อมูล login ไม่ถูกต้อง')
+      return
+    }
+
+    if (!supabase) {
+      setError('ยังไม่ได้ตั้งค่า Supabase dev ใน environment')
+      return
+    }
+
+    if (!isEmailIdentifier(parsed.data.identifier)) {
+      setError('ตอนนี้ระบบ Next รองรับการเข้าสู่ระบบด้วย email ของ Supabase ก่อน')
+      return
+    }
+
+    setIsLoading(true)
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: parsed.data.identifier,
+      password: parsed.data.password,
+    })
+
+    setIsLoading(false)
+
+    if (signInError) {
+      setError(`เข้าสู่ระบบไม่สำเร็จ: ${signInError.message}`)
+      return
+    }
+
+    setPassword('')
+    router.push(searchParams.get('redirect') || '/')
+    router.refresh()
+  }
+
+  return (
+    <section className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+        <div className="mb-6 text-center">
+          <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white">
+            NS
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800">NS Scrap ERP</h1>
+          <p className="text-sm text-slate-500">ระบบบริหารโรงงานรับซื้อ-ขายเศษโลหะ</p>
+        </div>
+
+        {!isSupabaseReady ? (
+          <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            ยังไม่ได้ตั้งค่า Supabase dev ใน environment
+          </div>
+        ) : null}
+
+        <form className="space-y-4" onSubmit={submit}>
+          <label className="block text-sm font-medium text-slate-700">
+            Email / Username
+            <input
+              autoComplete="username"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder="ns-aom@nsscrap.com"
+              type="text"
+              value={identifier}
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Password
+            <input
+              autoComplete="current-password"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              type="password"
+              value={password}
+            />
+          </label>
+
+          {error ? <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+
+          <button
+            className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 py-2.5 font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+            disabled={isLoading || !isSupabaseReady}
+            type="submit"
+          >
+            {isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+          </button>
+
+          <details className="mt-2 text-xs text-slate-500">
+            <summary className="cursor-pointer hover:text-slate-700">ข้อมูลระบบ login</summary>
+            <div className="mt-2 rounded border bg-slate-50 p-2 text-xs leading-relaxed">
+              ระบบใหม่ใช้ Supabase Auth เป็นเป้าหมาย ไม่ใช้รหัสผ่านจาก application table เดิม
+            </div>
+          </details>
+        </form>
+      </div>
+    </section>
+  )
+}

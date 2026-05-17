@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AppNavigation } from '@/components/layout/AppNavigation'
+import { AuthStatus } from '@/components/layout/AuthStatus'
 import { pageTitleForPath } from '@/lib/navigation'
 
 type AppShellProps = {
@@ -14,6 +14,10 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const title = pageTitleForPath(pathname)
+
+  if (pathname === '/login') {
+    return <div className="min-h-screen bg-slate-100 text-slate-900">{children}</div>
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100 text-slate-900">
@@ -46,9 +50,7 @@ export function AppShell({ children }: AppShellProps) {
             <select aria-label="เลือกสาขา" className="hidden rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm sm:block" defaultValue="all">
               <option value="all">ทุกสาขา</option>
             </select>
-            <Link className="rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100" href="/login">
-              Login
-            </Link>
+            <AuthStatus />
           </div>
         </header>
 

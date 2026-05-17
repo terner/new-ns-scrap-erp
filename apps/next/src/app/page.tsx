@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/Card'
 
 const nextSteps = [
-  'ย้าย auth/session wiring เข้ามาที่ Next.js shell',
+  'กำหนด route protection และ permission guard ให้แต่ละ module',
   'กำหนด shared service contract กับ Supabase dev-target',
   'เลือกว่าจะ migrate route ไหนจาก Vue มาเป็น Next.js ก่อน',
 ]

@@ -147,5 +147,7 @@ export const navigationItems: NavigationItem[] = [
 ]
 
 export function pageTitleForPath(pathname: string) {
+  if (pathname === '/login') return 'เข้าสู่ระบบ'
+
   return navigationItems.find((item) => item.href === pathname)?.label ?? 'NS Scrap ERP'
 }
