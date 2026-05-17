@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   customerFormSchema,
   listCustomers,
@@ -76,22 +76,6 @@ function formatMoney(value: number | null) {
   return value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function compareCustomers(left: Customer, right: Customer, key: SortKey, direction: 'asc' | 'desc') {
-  const multiplier = direction === 'asc' ? 1 : -1
-  const leftValue = left[key]
-  const rightValue = right[key]
-
-  if (typeof leftValue === 'number' || typeof rightValue === 'number') {
-    return (((leftValue as number | null) ?? -Infinity) - ((rightValue as number | null) ?? -Infinity)) * multiplier
-  }
-
-  if (typeof leftValue === 'boolean' || typeof rightValue === 'boolean') {
-    return (Number(leftValue ?? false) - Number(rightValue ?? false)) * multiplier
-  }
-
-  return String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'th', { numeric: true }) * multiplier
-}
-
 export function CustomersPageClient() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [districts, setDistricts] = useState<ThaiDistrict[]>([])
@@ -99,25 +83,38 @@ export function CustomersPageClient() {
   const [formOpen, setFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [provinces, setProvinces] = useState<ThaiProvince[]>([])
   const [search, setSearch] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [sortKey, setSortKey] = useState<SortKey>('code')
   const [subdistricts, setSubdistricts] = useState<ThaiSubdistrict[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setError(null)
     setIsLoading(true)
     try {
-      const customerRows = await listCustomers()
-      setCustomers(customerRows)
+      const result = await listCustomers({
+        direction: sortDirection,
+        page,
+        pageSize,
+        q: search,
+        sort: sortKey,
+      })
+      setCustomers(result.rows)
+      setPage(result.page)
+      setTotal(result.total)
+      setTotalPages(result.totalPages)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลลูกค้าไม่ได้')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page, pageSize, search, sortDirection, sortKey])
 
   async function loadAddressData() {
     if (provinces.length && districts.length && subdistricts.length) {
@@ -135,34 +132,12 @@ export function CustomersPageClient() {
   }
 
   useEffect(() => {
-    void loadData()
-  }, [])
+    const timer = window.setTimeout(() => {
+      void loadData()
+    }, 250)
 
-  const filteredCustomers = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    const rows = !query
-      ? customers
-      : customers.filter((customer) =>
-          [
-            customer.id,
-            customer.code,
-            customer.name,
-            customer.type,
-            customer.taxId,
-            customer.phone,
-            customer.email,
-            customer.address,
-            customer.contact,
-            customer.creditTerm,
-            customer.creditLimit,
-            customer.salesId,
-            customer.notes,
-            customer.active ? 'ใช้งาน active' : 'ปิด inactive',
-          ].some((value) => String(value ?? '').toLowerCase().includes(query)),
-        )
-
-    return [...rows].sort((left, right) => compareCustomers(left, right, sortKey, sortDirection))
-  }, [customers, search, sortDirection, sortKey])
+    return () => window.clearTimeout(timer)
+  }, [loadData])
 
   async function openCreateForm() {
     setSelectedCustomer(null)
@@ -214,11 +189,13 @@ export function CustomersPageClient() {
   function setSort(key: SortKey) {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+      setPage(1)
       return
     }
 
     setSortKey(key)
     setSortDirection('asc')
+    setPage(1)
   }
 
   function sortLabel(key: SortKey) {
@@ -238,7 +215,16 @@ export function CustomersPageClient() {
       <div className="rounded-xl bg-white p-3 shadow">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="w-full md:max-w-md">
-            <input className="w-full rounded-lg border px-3 py-2 text-sm" onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหา..." type="search" value={search} />
+            <input
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              onChange={(event) => {
+                setPage(1)
+                setSearch(event.target.value)
+              }}
+              placeholder="ค้นหา..."
+              type="search"
+              value={search}
+            />
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white" type="button">
@@ -277,9 +263,6 @@ export function CustomersPageClient() {
           <table className="w-full text-sm">
             <thead className="bg-slate-100">
               <tr>
-                <th className="w-10 p-2 text-left">
-                  <input className="h-4 w-4 rounded border-slate-300" type="checkbox" />
-                </th>
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('code')}>รหัส{sortLabel('code')}</button></th>
                 <th className="min-w-[220px] p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('name')}>ชื่อบริษัท{sortLabel('name')}</button></th>
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('taxId')}>เลขผู้เสียภาษี{sortLabel('taxId')}</button></th>
@@ -296,9 +279,20 @@ export function CustomersPageClient() {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="border-t">
-                  <td className="p-2"><input className="h-4 w-4 rounded border-slate-300" type="checkbox" /></td>
+              {customers.map((customer) => (
+                <tr
+                  key={customer.id}
+                  className="cursor-pointer border-t hover:bg-slate-50"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void openEditForm(customer)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      void openEditForm(customer)
+                    }
+                  }}
+                >
                   <td className="p-2 font-mono text-xs">{customer.code}</td>
                   <td className="p-2 font-medium">{customer.name}</td>
                   <td className="p-2 font-mono text-xs">{displayValue(customer.taxId)}</td>
@@ -310,17 +304,80 @@ export function CustomersPageClient() {
                   <td className="p-2 text-right">{customer.creditTerm ?? '-'}</td>
                   <td className="p-2 text-right">{formatMoney(customer.creditLimit)}</td>
                   <td className={`p-2 text-center ${customer.active ? 'text-emerald-700' : 'text-slate-500'}`}>✓ {customer.active ? 'ใช้งาน' : 'ปิด'}</td>
-                  <td className="p-2 text-center"><button className="text-blue-600" type="button" onClick={() => void openEditForm(customer)}>แก้ไข</button></td>
-                  <td className="p-2 text-center"><button className="text-red-600" type="button" onClick={() => handleToggleActive(customer)}>ลบ</button></td>
+                  <td className="p-2 text-center">
+                    <button
+                      className="text-blue-600"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void openEditForm(customer)
+                      }}
+                    >
+                      แก้ไข
+                    </button>
+                  </td>
+                  <td className="p-2 text-center">
+                    <button
+                      className="text-red-600"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleToggleActive(customer)
+                      }}
+                    >
+                      ลบ
+                    </button>
+                  </td>
                 </tr>
               ))}
-              {filteredCustomers.length === 0 ? (
+              {customers.length === 0 ? (
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={14}>ไม่พบข้อมูลที่ค้นหา</td>
+                  <td className="p-4 text-center text-sm text-slate-500" colSpan={13}>ไม่พบข้อมูลที่ค้นหา</td>
                 </tr>
               ) : null}
             </tbody>
           </table>
+          <div className="flex flex-col gap-3 border-t border-slate-200 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              ทั้งหมด {total.toLocaleString('th-TH')} รายการ · หน้า {page.toLocaleString('th-TH')} / {totalPages.toLocaleString('th-TH')}
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                aria-label="จำนวนรายการต่อหน้า"
+                className="rounded border border-slate-300 px-2 py-1"
+                value={pageSize}
+                onChange={(event) => {
+                  setPage(1)
+                  setPageSize(Number(event.target.value))
+                }}
+              >
+                <option value={10}>10 / หน้า</option>
+                <option value={25}>25 / หน้า</option>
+                <option value={50}>50 / หน้า</option>
+                <option value={100}>100 / หน้า</option>
+              </select>
+              <button
+                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
+                disabled={page <= 1 || isLoading}
+                type="button"
+                onClick={() => {
+                  setPage(Math.max(1, page - 1))
+                }}
+              >
+                ก่อนหน้า
+              </button>
+              <button
+                className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
+                disabled={page >= totalPages || isLoading}
+                type="button"
+                onClick={() => {
+                  setPage(Math.min(totalPages, page + 1))
+                }}
+              >
+                ถัดไป
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </section>

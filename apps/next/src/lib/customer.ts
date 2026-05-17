@@ -29,7 +29,23 @@ export const customerSchema = z.object({
 })
 
 export const customerListSchema = z.array(customerSchema)
+export const customerListResultSchema = z.object({
+  rows: customerListSchema,
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+  total: z.number().int().min(0),
+  totalPages: z.number().int().min(1),
+})
 export type Customer = z.infer<typeof customerSchema>
+export type CustomerListResult = z.infer<typeof customerListResultSchema>
+
+export type CustomerListOptions = {
+  direction?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+  q?: string
+  sort?: string
+}
 
 export const customerFormSchema = z.object({
   id: z.string().trim().optional(),
@@ -69,9 +85,17 @@ async function readJson<TSchema extends z.ZodTypeAny>(response: Response, schema
   return schema.parse(payload)
 }
 
-export async function listCustomers(): Promise<Customer[]> {
-  const response = await fetch('/api/master-data/customers', { cache: 'no-store' })
-  return readJson(response, customerListSchema)
+export async function listCustomers(options: CustomerListOptions = {}): Promise<CustomerListResult> {
+  const params = new URLSearchParams()
+  if (options.q) params.set('q', options.q)
+  if (options.sort) params.set('sort', options.sort)
+  if (options.direction) params.set('direction', options.direction)
+  if (options.page) params.set('page', String(options.page))
+  if (options.pageSize) params.set('pageSize', String(options.pageSize))
+
+  const query = params.toString()
+  const response = await fetch(`/api/master-data/customers${query ? `?${query}` : ''}`, { cache: 'no-store' })
+  return readJson(response, customerListResultSchema)
 }
 
 export async function saveCustomer(values: CustomerFormValues): Promise<Customer> {
