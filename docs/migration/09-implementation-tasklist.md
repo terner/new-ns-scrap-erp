@@ -141,21 +141,33 @@
 
 ## Phase 3: Security and Access Model
 
+Tracker: [14-auth-permission-batch-plan.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/14-auth-permission-batch-plan.md)
+
+Reporting rule:
+- update the tracker after every auth/permission batch
+- record schema, API guard, route guard, reset-password, RLS, and validation changes
+- never record real passwords, tokens, service keys, or credential values
+
 ### 3.1 Auth Model
 
-- [ ] ยืนยันว่าจะใช้ `auth.users` เป็น source of truth
+- [x] ยืนยัน direction ว่าจะใช้ `auth.users` เป็น source of truth
 - [ ] ออกแบบ `app_users`
 - [ ] map `public.users` เดิมไป `app_users`
 - [ ] ยกเลิกการใช้ password ใน `public.users`
+- [ ] ทำ forgot/reset password flow ด้วย Supabase Auth
+- [ ] ตัดสินใจ username login: email-only หรือ username lookup -> email
 
 ### 3.2 Role and Permission Model
 
 - [ ] วิเคราะห์ `roles` และ `roles_config` เดิม
+- [x] Audit เบื้องต้นจาก Vue clone: role/menu fixture มี Admin, Owner, บัญชี, บัญชีค่าใช้จ่าย, ประสานงาน, Poopae, คลัง
 - [ ] ออกแบบ `permissions`
 - [ ] ออกแบบ `role_permissions`
 - [ ] ออกแบบ `user_roles`
 - [ ] ออกแบบ `user_branch_access`
 - [ ] migrate role matrix เดิม
+- [ ] map legacy menu keys ไป Next route paths
+- [ ] seed permission catalog จาก navigation/API/action model
 
 ### 3.3 Access Enforcement
 
@@ -163,6 +175,10 @@
 - [x] สร้าง `usePermission`
 - [x] สร้าง route guard
 - [x] สร้าง component guard สำหรับ action buttons
+- [x] Next `proxy.ts` มี admin-only guard ชั่วคราวผ่าน Supabase Auth + `user_profiles`
+- [ ] เปลี่ยนจาก admin-only guard เป็น normalized permission guard
+- [ ] เพิ่ม API permission guard สำหรับ view/create/update/export/status
+- [ ] เพิ่ม branch-scope enforcement สำหรับ role ที่จำกัดสาขา
 - [ ] นิยาม role ที่เห็น cost/profit/cash/financials
 
 ## Phase 4: Master Data and Key Basic Data

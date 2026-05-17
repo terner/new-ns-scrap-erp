@@ -26,6 +26,7 @@
 9. [09-implementation-tasklist.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/09-implementation-tasklist.md)
 10. [10-environment-status.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/10-environment-status.md)
 11. [13-next-master-data-progress.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/13-next-master-data-progress.md)
+12. [14-auth-permission-batch-plan.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/14-auth-permission-batch-plan.md)
 
 ## Recommended Order
 
@@ -40,3 +41,4 @@
 9. ใช้ `09-implementation-tasklist` แตกงานลงมือจริงราย phase
 10. ใช้ `10-environment-status` เช็ก dev/prod Supabase, MCP และ env ก่อนเริ่ม session ใหม่
 11. ใช้ `13-next-master-data-progress` ติดตามการ port กลุ่มข้อมูลหลักใน Next เป็น batch และบันทึกผล validation เป็นระยะ
+12. ใช้ `14-auth-permission-batch-plan` ติดตาม login, reset password, users, roles, permissions, API guards และ RLS
