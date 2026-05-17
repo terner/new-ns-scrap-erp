@@ -19,7 +19,7 @@ type Delegate = {
 }
 
 type SimpleMasterConfig = {
-  delegate: Delegate
+  delegate: () => Delegate
   prefix: string
   orderBy: unknown
   include?: unknown
@@ -31,7 +31,7 @@ const asRecord = (row: unknown) => row as Record<string, unknown>
 
 const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   directors: {
-    delegate: prisma.director_employees as Delegate,
+    delegate: () => prisma.director_employees as Delegate,
     prefix: 'D',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
     map: (row) => {
@@ -59,7 +59,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
     }),
   },
   machines: {
-    delegate: prisma.production_machines as Delegate,
+    delegate: () => prisma.production_machines as Delegate,
     prefix: 'MC',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
     include: { branches: true },
@@ -96,7 +96,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
     }),
   },
   productionLines: {
-    delegate: prisma.production_lines as Delegate,
+    delegate: () => prisma.production_lines as Delegate,
     prefix: 'PL',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
     include: { branches: true },
@@ -125,7 +125,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
     }),
   },
   paymentMethods: {
-    delegate: prisma.payment_methods as Delegate,
+    delegate: () => prisma.payment_methods as Delegate,
     prefix: 'PM-',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
     map: (row) => {
@@ -149,7 +149,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
     }),
   },
   remittancePurposes: {
-    delegate: prisma.overseas_remittance_purposes as Delegate,
+    delegate: () => prisma.overseas_remittance_purposes as Delegate,
     prefix: 'RP-',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
     map: (row) => {
@@ -175,13 +175,13 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
 }
 
 async function nextId(config: SimpleMasterConfig) {
-  const last = await config.delegate.findFirst({ orderBy: { id: 'desc' }, select: { id: true } })
+  const last = await config.delegate().findFirst({ orderBy: { id: 'desc' }, select: { id: true } })
   return nextSequentialCode(String(asRecord(last)?.id ?? ''), config.prefix, 3)
 }
 
 export async function listSimpleMasterData(kind: SimpleMasterKind) {
   const config = configs[kind]
-  const rows = await config.delegate.findMany({ orderBy: config.orderBy, include: config.include })
+  const rows = await config.delegate().findMany({ orderBy: config.orderBy, include: config.include })
   return masterDataListJson(rows.map(config.map))
 }
 
@@ -191,13 +191,13 @@ export async function saveSimpleMasterData(request: Request, kind: SimpleMasterK
   const id = values.id || values.code || await nextId(config)
   const code = values.code || id
   const data = config.data(values, id, code)
-  const row = await config.delegate.upsert({ where: { id }, create: data, update: data, include: config.include })
+  const row = await config.delegate().upsert({ where: { id }, create: data, update: data, include: config.include })
   return masterDataJson(config.map(row))
 }
 
 export async function patchSimpleMasterData(request: Request, kind: SimpleMasterKind, id: string) {
   const config = configs[kind]
   const values = updateMasterDataStatusSchema.parse(await request.json())
-  const row = await config.delegate.update({ where: { id }, data: { active: values.active }, include: config.include })
+  const row = await config.delegate().update({ where: { id }, data: { active: values.active }, include: config.include })
   return masterDataJson(config.map(row))
 }
