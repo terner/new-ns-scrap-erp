@@ -222,7 +222,9 @@
 - [x] สร้าง list view pattern เบื้องต้นจาก Branches pilot
 - [x] สร้าง create/edit form pattern เบื้องต้นจาก Branches/Warehouses/Customers pilots
 - [x] สร้าง active/inactive flow เบื้องต้นจาก Branches/Warehouses/Customers pilots
-- [ ] สร้าง import/export pattern
+- [x] สร้าง export pattern สำหรับ Next customer master: server-side Excel-compatible export ตาม search/filter/sort ปัจจุบัน
+- [x] กำหนด master-list pattern: search/filter/sort/count/pagination ทำใน frontend สำหรับ master data ขนาดเล็ก/กลาง
+- [ ] สร้าง import pattern
 - [ ] สร้าง audit metadata display
 
 ### 4.7 Next Master Data Port
@@ -247,6 +249,12 @@ Reporting rule:
 - [x] เพิ่ม additive migration สำหรับ master ที่ไม่มี DB จริง: `directors`, `machines`, `production_lines`, `payment_methods`, `remittance_purposes`
 - [x] เพิ่ม rename migration ให้ table name ชัดขึ้น: `director_employees`, `production_machines`, `production_lines`, `payment_methods`, `overseas_remittance_purposes`
 - [x] เปลี่ยน Next API ของ master 5 ตัวจาก fixture ไป Prisma target tables
+- [x] เพิ่ม customer classification fields: `type` จำกัดเป็น `บุคคล`/`นิติบุคคล` และเพิ่ม `market_scope` สำหรับ `ในประเทศ`/`ต่างประเทศ`
+- [x] เพิ่ม structured person-name fields สำหรับลูกค้าแบบบุคคลและผู้ติดต่อ
+- [x] เพิ่ม customer form/API syntax validation และ required-field validation ตาม project validation rule
+- [x] ปรับ customer address form เป็น postcode-first และ auto/filter จังหวัด/อำเภอ/ตำบล
+- [x] เพิ่ม customer frontend pagination/search/filter/sort/count UX และย้าย pagination ไปอยู่แถบเดียวกับจำนวนทั้งหมด
+- [x] เพิ่ม customer export API `/api/master-data/customers/export`
 - [ ] เพิ่ม automated smoke test สำหรับ master-data routes/API ทุกหน้า
 - [x] รัน build/type-check/lint หลังจบแต่ละ batch
 
@@ -259,6 +267,7 @@ Reporting rule:
 - [x] ออกแบบ target tables สำหรับ fixture-backed master ที่ต้องใช้ก่อน UAT: `machines`, `production_lines`
 - [x] ออกแบบ target tables สำหรับ fixture-backed finance/setup masters: `directors`, `payment_methods`, `remittance_purposes`
 - [x] ปรับชื่อ target tables ให้ชัดขึ้นโดยไม่ลบข้อมูล: `director_employees`, `production_machines`, `overseas_remittance_purposes`
+- [x] เพิ่ม customer classification/person/contact fields แบบ additive โดยไม่ลบข้อมูลเดิม
 - [ ] ตัดสินใจ target table/flow owner สำหรับ `directors` ว่าผูกกับ director loan / advance flows หรือคงเป็น setup-only ชั่วคราว
 - [ ] ออกแบบ schema สำหรับ document counters
 - [ ] ออกแบบ schema สำหรับ opening balance
@@ -320,6 +329,8 @@ Reporting rule:
 ### 7.1 Automated Tests
 
 - [ ] unit tests for validation schemas
+- [x] project validation rule documented in `AGENTS.md`
+- [x] project input-validation skill added at `.agents/skills/ns-scrap-erp-input-validation/SKILL.md`
 - [ ] unit tests for permission logic
 - [ ] tests for master data service functions
 - [ ] E2E smoke test for login
@@ -342,8 +353,9 @@ Reporting rule:
 
 ## Phase 8: Deployment Readiness
 
-- [ ] choose Vercel or Cloudflare Pages for interim deploy
-- [ ] configure environment variables
+- [x] configure current Vercel deployment path for `apps/next`
+- [x] configure current Vercel environment variables for `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- [ ] choose final/interim production hosting target after cost/runtime review
 - [ ] configure Supabase redirect URLs
 - [ ] configure preview deployment
 - [ ] create `staging-uat` Supabase project when ready for user testing
@@ -356,9 +368,9 @@ Reporting rule:
 
 ## Immediate Next Tasks
 
-1. เชื่อม Supabase Auth login ใน `old-apps/vue/` กับ `dev-target`
-2. ทำ session persistence, protected route และ logout flow
-3. map role/permission read model เบื้องต้นเพื่อควบคุม sidebar/action visibility
-4. ทำ browser smoke test: login, redirect เมื่อยังไม่ login, sidebar หลัง login, logout
-5. เดิน browser visual review ทีละหมวดเพื่อเก็บ wording/font/icon/layout mismatch ที่ยังเหลือ
-6. หลัง Auth/Role ใช้งานได้ ค่อยเริ่ม wire function จริงทีละ module โดยเริ่มจาก master data pilots
+1. ออกแบบ role/permission read model ถัดจาก admin-only login gate ปัจจุบัน
+2. ทำ browser smoke test รอบใหม่: login, redirect เมื่อยังไม่ login, sidebar หลัง login, logout, customer CRUD/export
+3. เพิ่ม automated smoke test สำหรับ master-data routes/API ทุกหน้า
+4. เดิน master data CRUD hardening ต่อ: suppliers/products/branches/warehouses/accounts ให้มี validation/export pattern เทียบกับ customer
+5. ตัดสินใจ small reference data strategy: code constants + DB seed/cache หรือ DB-driven config
+6. ทำ hosting/runtime cost review แยกต่างหากภายหลัง; ยังไม่บันทึกเป็น decision ในรอบนี้

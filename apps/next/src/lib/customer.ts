@@ -118,6 +118,7 @@ export type Customer = z.infer<typeof customerSchema>
 export type CustomerListResult = z.infer<typeof customerListResultSchema>
 
 export type CustomerListOptions = {
+  all?: boolean
   customerType?: string
   direction?: 'asc' | 'desc'
   marketScope?: string
@@ -198,6 +199,7 @@ async function readJson<TSchema extends z.ZodTypeAny>(response: Response, schema
 
 export async function listCustomers(options: CustomerListOptions = {}): Promise<CustomerListResult> {
   const params = new URLSearchParams()
+  if (options.all) params.set('all', '1')
   if (options.customerType) params.set('type', options.customerType)
   if (options.marketScope) params.set('marketScope', options.marketScope)
   if (options.q) params.set('q', options.q)

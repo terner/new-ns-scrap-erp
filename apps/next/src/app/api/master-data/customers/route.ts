@@ -22,8 +22,9 @@ const sortColumns = {
 
 function parseListParams(request: Request) {
   const url = new URL(request.url)
+  const all = url.searchParams.get('all') === '1'
   const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1)
-  const pageSize = Math.min(100, Math.max(10, Number(url.searchParams.get('pageSize') ?? '25') || 25))
+  const pageSize = all ? 10000 : Math.min(100, Math.max(10, Number(url.searchParams.get('pageSize') ?? '25') || 25))
   const q = url.searchParams.get('q')?.trim() ?? ''
   const customerType = url.searchParams.get('type')?.trim() ?? ''
   const marketScope = url.searchParams.get('marketScope')?.trim() ?? ''
@@ -31,7 +32,7 @@ function parseListParams(request: Request) {
   const direction = url.searchParams.get('direction') === 'desc' ? 'desc' : 'asc'
   const sortColumn = sortColumns[sort as keyof typeof sortColumns] ?? sortColumns.code
 
-  return { customerType, direction, marketScope, page, pageSize, q, sortColumn }
+  return { all, customerType, direction, marketScope, page, pageSize, q, sortColumn }
 }
 
 function customerSearchWhere(q: string, customerType: string, marketScope: string): Prisma.customersWhereInput {
@@ -104,13 +105,13 @@ async function assertEmailDomainCanReceiveMail(email: string | null) {
 
 export async function GET(request: Request) {
   try {
-    const { customerType, direction, marketScope, page, pageSize, q, sortColumn } = parseListParams(request)
+    const { all, customerType, direction, marketScope, page, pageSize, q, sortColumn } = parseListParams(request)
     const where = customerSearchWhere(q, customerType, marketScope)
     const [customers, total] = await Promise.all([
       prisma.customers.findMany({
         orderBy: [{ [sortColumn]: direction }, { id: 'asc' }],
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: all ? undefined : (page - 1) * pageSize,
+        take: all ? pageSize : pageSize,
         where,
       }),
       prisma.customers.count({ where }),
@@ -118,10 +119,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       rows: customers.map(mapPrismaCustomer),
-      page,
+      page: all ? 1 : page,
       pageSize,
       total,
-      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      totalPages: all ? 1 : Math.max(1, Math.ceil(total / pageSize)),
     })
   } catch (caught) {
     return NextResponse.json({ error: caught instanceof Error ? caught.message : 'โหลดข้อมูลลูกค้าไม่ได้' }, { status: 500 })

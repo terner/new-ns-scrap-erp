@@ -201,6 +201,27 @@ For every new or changed form/API field, define validation before saving data:
 - Do not rely on HTML input types alone. Use Zod or the module's existing schema layer as the source of truth.
 - Keep validation practical for Thai business data: allow Thai text where appropriate, but reject control characters, obviously invalid punctuation, malformed identifiers, and negative values where not allowed.
 
+## Master Data List Pattern
+
+For small/medium master data screens, prefer loading the master list once and doing table UX in the frontend:
+- search in frontend
+- filter in frontend
+- sort in frontend
+- count in frontend
+- pagination in frontend
+
+This applies to master/reference data such as customers, suppliers, products, branches, warehouses, currencies, channels, payment methods, machines, and production lines while row counts remain practical for a browser payload.
+
+Keep DB/server-side filtering and pagination for:
+- transaction lists
+- stock ledger
+- audit/activity logs
+- reports
+- very large master tables
+- permission/branch-scope filtering that must not be trusted to the browser
+
+Export may still call a server API that queries the database with the current search/filter/sort so the exported file matches the visible intent without depending on the current page slice.
+
 ## Testing and Validation
 
 For migration/refactor work, include validation proportional to risk:

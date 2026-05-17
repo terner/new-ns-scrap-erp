@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   customerFormSchema,
   exportCustomers,
@@ -97,6 +97,22 @@ function uniqueValues<T>(values: T[]) {
   return Array.from(new Set(values))
 }
 
+function compareCustomers(left: Customer, right: Customer, key: SortKey, direction: 'asc' | 'desc') {
+  const multiplier = direction === 'asc' ? 1 : -1
+  const leftValue = left[key]
+  const rightValue = right[key]
+
+  if (typeof leftValue === 'number' || typeof rightValue === 'number') {
+    return (((leftValue as number | null) ?? -Infinity) - ((rightValue as number | null) ?? -Infinity)) * multiplier
+  }
+
+  if (typeof leftValue === 'boolean' || typeof rightValue === 'boolean') {
+    return (Number(leftValue ?? false) - Number(rightValue ?? false)) * multiplier
+  }
+
+  return String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'th', { numeric: true }) * multiplier
+}
+
 export function CustomersPageClient() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [districts, setDistricts] = useState<ThaiDistrict[]>([])
@@ -115,32 +131,45 @@ export function CustomersPageClient() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [sortKey, setSortKey] = useState<SortKey>('code')
   const [subdistricts, setSubdistricts] = useState<ThaiSubdistrict[]>([])
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
 
   const loadData = useCallback(async () => {
     setError(null)
     setIsLoading(true)
     try {
       const result = await listCustomers({
-        customerType: customerTypeFilter,
-        direction: sortDirection,
-        marketScope: marketScopeFilter,
-        page,
-        pageSize,
-        q: search,
-        sort: sortKey,
+        all: true,
       })
       setCustomers(result.rows)
-      setPage(result.page)
-      setTotal(result.total)
-      setTotalPages(result.totalPages)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลลูกค้าไม่ได้')
     } finally {
       setIsLoading(false)
     }
-  }, [customerTypeFilter, marketScopeFilter, page, pageSize, search, sortDirection, sortKey])
+  }, [])
+
+  const filteredSortedCustomers = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const rows = customers.filter((customer) => {
+      if (customerTypeFilter && customer.type !== customerTypeFilter) return false
+      if (marketScopeFilter && customer.marketScope !== marketScopeFilter) return false
+      if (!query) return true
+
+      return Object.values(customer).some((value) => String(value ?? '').toLowerCase().includes(query))
+    })
+
+    return [...rows].sort((left, right) => compareCustomers(left, right, sortKey, sortDirection))
+  }, [customerTypeFilter, customers, marketScopeFilter, search, sortDirection, sortKey])
+
+  const total = filteredSortedCustomers.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedCustomers = filteredSortedCustomers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, totalPages])
 
   async function loadAddressData() {
     if (provinces.length && districts.length && subdistricts.length) {
@@ -158,11 +187,7 @@ export function CustomersPageClient() {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadData()
-    }, 250)
-
-    return () => window.clearTimeout(timer)
+    void loadData()
   }, [loadData])
 
   async function openCreateForm() {
@@ -316,7 +341,7 @@ export function CustomersPageClient() {
       </div>
 
       {!isLoading ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-4 py-3 text-sm text-slate-600 shadow">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-sm text-slate-600">
           <div>
             พบทั้งหมด <span className="font-semibold text-slate-900">{total.toLocaleString('th-TH')}</span> รายการ
           </div>
@@ -346,14 +371,14 @@ export function CustomersPageClient() {
               ก่อนหน้า
             </button>
             <span className="px-1">
-              หน้า {page.toLocaleString('th-TH')} / {totalPages.toLocaleString('th-TH')}
+              หน้า {currentPage.toLocaleString('th-TH')} / {totalPages.toLocaleString('th-TH')}
             </span>
             <button
               className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
               disabled={page >= totalPages || isLoading}
               type="button"
               onClick={() => {
-                setPage(Math.min(totalPages, page + 1))
+                setPage(Math.min(totalPages, currentPage + 1))
               }}
             >
               ถัดไป
@@ -404,7 +429,7 @@ export function CustomersPageClient() {
               </tr>
             </thead>
             <tbody>
-              {customers.map((customer) => (
+              {paginatedCustomers.map((customer) => (
                 <tr
                   key={customer.id}
                   className="cursor-pointer border-t hover:bg-slate-50"
@@ -455,7 +480,7 @@ export function CustomersPageClient() {
                   </td>
                 </tr>
               ))}
-              {customers.length === 0 ? (
+              {paginatedCustomers.length === 0 ? (
                 <tr>
                   <td className="p-4 text-center text-sm text-slate-500" colSpan={13}>ไม่พบข้อมูลที่ค้นหา</td>
                 </tr>

@@ -18,7 +18,7 @@
 
 | Route | Label | Status |
 |---|---|---|
-| `/master-data/customers` | ลูกค้า | Baseline Done |
+| `/master-data/customers` | ลูกค้า | Enhanced CRUD/export/validation Done |
 | `/master-data/salespersons` | พนักงานขาย (Sales) | Batch 1 Done |
 | `/master-data/suppliers` | ผู้ขาย | Batch 3 Done |
 | `/master-data/products` | สินค้า | Batch 3 Done |
@@ -71,7 +71,22 @@
 - Next 16, React 19, Prisma 7, `@prisma/adapter-pg`, Supabase client, TypeScript and Tailwind are installed.
 - Prisma schema has been introspected from `dev-target`.
 - `Customer UI -> Next API Route -> Prisma -> Supabase Postgres` is the current data path.
-- `/master-data/customers` has a real Next page, client table/search/sort, add/edit modal baseline, structured Thai address dropdowns, and API routes.
+- `/master-data/customers` has a real Next page, client-side table search/sort/filter/pagination/count, add/edit modal, structured Thai address form, API routes, and Excel-compatible export.
+- Customer form/API contract now includes:
+  - customer type constrained to `บุคคล` or `นิติบุคคล`
+  - separate `market_scope` for `ในประเทศ` / `ต่างประเทศ`
+  - individual-customer person fields: `name_title`, `first_name`, `last_name`
+  - contact person fields: `contact_title`, `contact_first_name`, `contact_last_name`
+  - syntax validation for email, phone, tax ID, postcode, person names, business names, address text, and numeric credit fields
+- Customer table UX updates:
+  - master-list search/filter/sort/count/pagination run in the frontend after one list load
+  - row click opens detail/edit; the old select/checkbox column was removed
+  - result count and pagination controls are shown together above the table
+  - customer export uses `/api/master-data/customers/export` and asks the database for all rows matching the current search/filter/sort, not just the visible page slice
+- Thai address form now follows the postcode-first pattern: postcode filters/auto-fills province, district, and subdistrict where possible.
+- Added project-level validation guidance:
+  - `AGENTS.md` now requires syntax validation for every new/changed form/API field.
+  - `.agents/skills/ns-scrap-erp-input-validation/SKILL.md` documents validation and Thai address form patterns.
 - Batch 1 pages now have real Next routes, shared master-data list/form UI, API routes, Prisma/dev-target reads, add/edit baseline, search/sort, and active/inactive where the source table supports it:
   - `/master-data/salespersons`
   - `/master-data/currencies`
@@ -103,7 +118,9 @@
   - `apps/next/src/lib/server/simple-master-tables.ts`
 - Added `apps/next/eslint.config.mjs` so `npm run lint` works with ESLint 9 and ignores generated Prisma output.
 - Thai address reference tables exist in `dev-target`: provinces 77, districts 928, subdistricts 7,436.
-- Auth/role/RLS remains intentionally bypassed for this UI/data-wiring phase.
+- Next login now uses Supabase Auth and protected routes through Next `proxy.ts`; admin-only access is enforced before pages/API except login/health.
+- Local development login prefill can be supplied through `DEV_LOGIN_IDENTIFIER` and `DEV_LOGIN_PASSWORD`; these are intentionally dev-only and not production public env vars.
+- Auth/role/RLS remains incomplete for the final permission model. Current app gating is admin-only and should be replaced with full role/permission mapping before UAT.
 - Import pages remain out of scope and were not ported in Batch 1 or Batch 2.
 
 ## Latest Validation
@@ -137,11 +154,19 @@
 | 2026-05-17 | Supabase `db push` for table rename migration | Passed | Renamed tables only; no row deletion or truncation |
 | 2026-05-17 | Live DB row count check after table rename | Passed | `director_employees=3`, `production_machines=4`, `production_lines=3`, `payment_methods=6`, `overseas_remittance_purposes=6` |
 | 2026-05-17 | Batch 4 renamed-table API smoke on `127.0.0.1:3001` | Passed | All 5 API routes returned HTTP 200 with expected row counts after dev server restart |
+| 2026-05-17 | Supabase `db push` for customer classification/person fields | Passed | Additive columns/checks only; no row deletion/truncation |
+| 2026-05-17 | Customer form validation update: `npm run lint`, `npm run type-check`, `npm run build` | Passed | Includes person/contact required fields, syntax validation, postcode-first address form, and validation skill/rule updates |
+| 2026-05-17 | Customer pagination/result-count update: `npm run lint`, `npm run type-check` | Passed | Result count and pagination moved above customer table |
+| 2026-05-17 | Customer export API: `npm run lint`, `npm run type-check`, `npm run build` | Passed | Added `/api/master-data/customers/export`; Next route table includes export route |
+| 2026-05-17 | Login dev prefill + customer top pagination: `npm run lint`, `npm run type-check`, `npm run build` | Passed | Production build keeps dev login prefill disabled by `NODE_ENV === 'production'` |
+| 2026-05-17 | Customer frontend table UX switch: `npm run lint`, `npm run type-check`, `npm run build` | Passed | Customer master now loads list once; search/filter/sort/count/pagination run in frontend; export remains DB-backed by current query intent |
 
 ## Open Decisions
 
 - Confirm whether `/master-data/warehouses` should remain a standalone Next route or be folded visually into `/master-data/branches` while preserving the sidebar route.
-- Apply and verify the target-table migration in `dev-target`, then regenerate Prisma from the live schema if needed.
 - Decide whether `directors` should remain setup-only for now or become tied to director loan / advance flows in a later finance batch.
 - Decide final code strategy for all master keys after customer running-number pattern is validated across supplier/product/account codes.
 - Confirm whether combined `/master-data/channels` should stay as one UI over `purchase_channels` + `sales_channels`, or split visually later while preserving the current sidebar route.
+- Decide whether small static/reference option lists such as person title prefixes should remain code constants with DB seed/reference rows, or become fully DB-driven cached config later.
+- Decide whether/when to introduce Upstash Redis for master/reference-data cache and rate limiting; not implemented yet.
+- Hosting/runtime migration discussion is intentionally not recorded as a decision yet. Current deploy target remains the Next app path already configured for Vercel.
