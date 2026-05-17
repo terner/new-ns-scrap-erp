@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-let client: ReturnType<typeof createClient> | null = null
+let client: SupabaseClient | null = null
 
 export function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,7 +11,7 @@ export function getSupabaseClient() {
     return null
   }
 
-  client ??= createClient(supabaseUrl, supabaseAnonKey, {
+  client ??= createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,

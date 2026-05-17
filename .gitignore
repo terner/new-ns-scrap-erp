@@ -29,3 +29,4 @@ reports/skills/global-skills-index.json
 # Local agent/tool settings
 .claude/
 .agents/skills.disabled/
+.vercel
