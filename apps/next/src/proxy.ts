@@ -63,6 +63,12 @@ export async function proxy(request: NextRequest) {
     return pathname.startsWith('/api/') ? jsonError('กรุณาเข้าสู่ระบบ', 401) : loginRedirect(request)
   }
 
+  const { data: isAppAdmin, error: appAdminError } = await supabase.rpc('is_app_admin')
+
+  if (!appAdminError && isAppAdmin === true) {
+    return response
+  }
+
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('role, active')

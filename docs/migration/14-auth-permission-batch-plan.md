@@ -34,6 +34,8 @@
 - Server auth context helper exists at `apps/next/src/lib/server/auth-context.ts`.
 - `/api/auth/me` exists as a protected route to return current auth/app user, roles, and permission codes.
 - Admin Supabase Auth user has been linked into `app_users` through `scripts/seed-app-admin.mjs`; the script reads `APP_ADMIN_EMAIL` or `DEV_LOGIN_IDENTIFIER` and does not store passwords.
+- App auth SQL helper functions exist in `dev-target`: `current_app_user_id`, `current_app_role_codes`, `current_app_permission_codes`, `is_app_admin`, and `has_app_permission`.
+- Next `proxy.ts` now checks `is_app_admin()` first, then falls back to legacy `user_profiles` admin guard during transition.
 - RLS/permission model is not final; current gating is a temporary admin-only bridge before UAT.
 
 ## Legacy Findings
@@ -299,3 +301,4 @@ Validation:
 | 2026-05-18 | B2 target schema migration: Supabase `db push --dry-run`, `db push`, row-count verification, `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Applied additive `app_*` auth/permission tables to `dev-target`; counts: app_users 0, app_roles 7, app_permissions 27, app_role_permissions 132, app_user_roles 0, app_user_branch_access 0; Prisma schema/client regenerated; legacy `public.users`, `user_profiles`, `roles`, and `roles_config` remain untouched |
 | 2026-05-18 | Server auth context helper: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added server helper for Supabase user, `app_users`, roles, permissions, legacy profile fallback, and protected `/api/auth/me`; build route table includes `/api/auth/me` |
 | 2026-05-18 | Admin app user seed: `node --check scripts/seed-app-admin.mjs`, `APP_ADMIN_EMAIL=... npm run seed:app-admin`, row-count verification | Passed | Linked current admin Auth user to `app_users`; counts after seed: app_users 1, app_user_roles 1, admin_assignments 1 |
+| 2026-05-18 | App auth SQL helpers + proxy primary app guard: Supabase `db push --dry-run`, `db push`, function verification, `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added security-definer helper functions and updated proxy to check `is_app_admin()` before legacy profile fallback |
