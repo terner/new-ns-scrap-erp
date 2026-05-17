@@ -24,6 +24,11 @@
 - Logout exists in the top auth status component.
 - Password visibility toggle exists on the login password field.
 - Full reset-password flow is not implemented yet.
+- Forgot/reset password routes have been added in Next as the first B1 implementation slice:
+  - `/forgot-password`
+  - `/reset-password`
+  - `/login` links to forgot password
+  - `proxy.ts` treats forgot/reset routes as public so Supabase recovery links can load
 - Username login is not implemented yet. Current UI accepts Email / Username, but non-email identifiers are rejected with a message.
 - Full user/role/permission schema is not implemented yet.
 - RLS/permission model is not final; current gating is a temporary admin-only bridge before UAT.
@@ -51,6 +56,21 @@ Important risks:
 - `public.users.password` exists in the legacy model and must not be used in the target app.
 - Existing `roles_config.permissions` is JSONB and should be used as migration/reference input, not as final permission storage.
 - `user_profiles_user_id_fkey` was not cleanly restored into `dev-target` because legacy auth users were not migrated. This is acceptable until auth migration is designed.
+
+Legacy row counts from the audit snapshot:
+- `public.users`: 29
+- `public.user_profiles`: 17
+- `public.roles`: 14
+- `public.roles_config`: 7
+
+Current Prisma introspection already contains:
+- `auth_users` mapped to `auth.users`
+- `public_users` mapped to `public.users`
+- `user_profiles`
+- `roles`
+- `roles_config`
+
+These models are available for read/audit, but target implementation should add new normalized tables rather than expanding legacy password-bearing structures.
 
 ### Legacy UI Role Baseline
 
@@ -270,3 +290,5 @@ Validation:
 | Date | Command / Check | Result | Notes |
 |---|---|---|---|
 | 2026-05-18 | Legacy source audit pass | In progress | Reviewed Vue users/roles fixture and legacy DB auth-adjacent tables/functions from dump |
+| 2026-05-18 | Prisma/schema audit pass | In progress | Confirmed Prisma has `auth_users`, `public_users`, `user_profiles`, `roles`, and `roles_config`; audit snapshot counts users 29, user_profiles 17, roles 14, roles_config 7 |
+| 2026-05-18 | B1 reset-password implementation slice: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added forgot/reset password pages, password syntax validation, login link, and public proxy paths; build route table includes `/forgot-password` and `/reset-password` |

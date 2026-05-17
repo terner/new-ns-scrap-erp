@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isEmailIdentifier, loginSchema } from '@/lib/auth'
 import { getSupabaseClient } from '@/lib/supabase'
@@ -123,6 +124,12 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
               </button>
             </span>
           </label>
+
+          <div className="text-right">
+            <Link className="text-sm font-medium text-blue-700 hover:underline" href="/forgot-password">
+              ลืมรหัสผ่าน?
+            </Link>
+          </div>
 
           {error ? <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 
