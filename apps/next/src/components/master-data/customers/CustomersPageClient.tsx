@@ -17,7 +17,7 @@ const emptyCustomerForm: CustomerFormValues = {
   id: undefined,
   code: null,
   name: '',
-  type: null,
+  type: 'นิติบุคคล',
   taxId: null,
   phone: null,
   email: null,
@@ -34,6 +34,7 @@ const emptyCustomerForm: CustomerFormValues = {
   contact: null,
   creditTerm: null,
   creditLimit: null,
+  marketScope: 'ในประเทศ',
   salesId: null,
   notes: null,
   active: true,
@@ -61,6 +62,7 @@ function customerToForm(customer: Customer): CustomerFormValues {
     contact: customer.contact,
     creditTerm: customer.creditTerm,
     creditLimit: customer.creditLimit,
+    marketScope: customer.marketScope,
     salesId: customer.salesId,
     notes: customer.notes,
     active: customer.active,
@@ -83,6 +85,8 @@ export function CustomersPageClient() {
   const [formOpen, setFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [customerTypeFilter, setCustomerTypeFilter] = useState('')
+  const [marketScopeFilter, setMarketScopeFilter] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [provinces, setProvinces] = useState<ThaiProvince[]>([])
@@ -99,7 +103,9 @@ export function CustomersPageClient() {
     setIsLoading(true)
     try {
       const result = await listCustomers({
+        customerType: customerTypeFilter,
         direction: sortDirection,
+        marketScope: marketScopeFilter,
         page,
         pageSize,
         q: search,
@@ -114,7 +120,7 @@ export function CustomersPageClient() {
     } finally {
       setIsLoading(false)
     }
-  }, [page, pageSize, search, sortDirection, sortKey])
+  }, [customerTypeFilter, marketScopeFilter, page, pageSize, search, sortDirection, sortKey])
 
   async function loadAddressData() {
     if (provinces.length && districts.length && subdistricts.length) {
@@ -214,7 +220,7 @@ export function CustomersPageClient() {
 
       <div className="rounded-xl bg-white p-3 shadow">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="w-full md:max-w-md">
+          <div className="grid w-full gap-2 md:max-w-3xl md:grid-cols-[minmax(0,1fr)_180px_180px]">
             <input
               className="w-full rounded-lg border px-3 py-2 text-sm"
               onChange={(event) => {
@@ -225,6 +231,32 @@ export function CustomersPageClient() {
               type="search"
               value={search}
             />
+            <select
+              aria-label="กรองประเภทลูกค้า"
+              className="rounded-lg border px-3 py-2 text-sm"
+              value={customerTypeFilter}
+              onChange={(event) => {
+                setPage(1)
+                setCustomerTypeFilter(event.target.value)
+              }}
+            >
+              <option value="">ทุกประเภท</option>
+              <option value="บุคคล">บุคคล</option>
+              <option value="นิติบุคคล">นิติบุคคล</option>
+            </select>
+            <select
+              aria-label="กรองในประเทศหรือต่างประเทศ"
+              className="rounded-lg border px-3 py-2 text-sm"
+              value={marketScopeFilter}
+              onChange={(event) => {
+                setPage(1)
+                setMarketScopeFilter(event.target.value)
+              }}
+            >
+              <option value="">ทุกตลาด</option>
+              <option value="ในประเทศ">ในประเทศ</option>
+              <option value="ต่างประเทศ">ต่างประเทศ</option>
+            </select>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white" type="button">
@@ -438,13 +470,15 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
         <section>
           <h4 className="mb-3 text-sm font-bold text-slate-700">ข้อมูลบริษัท</h4>
           <div className="grid gap-4 md:grid-cols-4">
-            <TextField className="md:col-span-2" error={errors.name} label="ชื่อบริษัท" value={form.name} onChange={(value) => update('name', value)} />
-            <SelectField label="ประเภท" value={form.type ?? ''} onChange={(value) => update('type', value || null)}>
-              <option value="">ไม่ระบุ</option>
-              <option value="นิติบุคคล">นิติบุคคล</option>
+            <SelectField error={errors.type} label="ประเภทลูกค้า" value={form.type} onChange={(value) => update('type', value as CustomerFormValues['type'])}>
               <option value="บุคคล">บุคคล</option>
+              <option value="นิติบุคคล">นิติบุคคล</option>
+            </SelectField>
+            <SelectField label="ประเทศ/ตลาด" value={form.marketScope} onChange={(value) => update('marketScope', value as CustomerFormValues['marketScope'])}>
+              <option value="ในประเทศ">ในประเทศ</option>
               <option value="ต่างประเทศ">ต่างประเทศ</option>
             </SelectField>
+            <TextField className="md:col-span-2" error={errors.name} label={form.type === 'บุคคล' ? 'ชื่อลูกค้า' : 'ชื่อบริษัท'} value={form.name} onChange={(value) => update('name', value)} />
             <TextField label="เลขผู้เสียภาษี" value={form.taxId ?? ''} onChange={(value) => update('taxId', value || null)} />
             <TextField label="เครดิตเทอม (วัน)" type="number" value={form.creditTerm ?? ''} onChange={(value) => update('creditTerm', value === '' ? null : Number(value))} />
             <TextField label="วงเงินเครดิต" type="number" value={form.creditLimit ?? ''} onChange={(value) => update('creditLimit', value === '' ? null : Number(value))} />
@@ -538,12 +572,13 @@ function TextField({ className = '', error, label, readOnly = false, type = 'tex
 type SelectFieldProps = {
   children: React.ReactNode
   disabled?: boolean
+  error?: string
   label: string
   value: string
   onChange: (value: string) => void
 }
 
-function SelectField({ children, disabled = false, label, value, onChange }: SelectFieldProps) {
+function SelectField({ children, disabled = false, error, label, value, onChange }: SelectFieldProps) {
   return (
     <label className="block text-sm font-medium">
       {label}
@@ -555,6 +590,7 @@ function SelectField({ children, disabled = false, label, value, onChange }: Sel
       >
         {children}
       </select>
+      {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}
     </label>
   )
 }

@@ -708,6 +708,7 @@ model customers {
   address_province    String?
   address_postal_code String?
   address_country     String?         @default("ไทย")
+  market_scope        String          @default("ในประเทศ")
   po_sells            po_sells[]
   receipts            receipts[]
   sales_bills         sales_bills[]
@@ -715,6 +716,9 @@ model customers {
   trading_deals       trading_deals[]
 
   @@index([name], map: "idx_customers_name")
+  @@index([active], map: "idx_customers_active")
+  @@index([market_scope], map: "idx_customers_market_scope")
+  @@index([type], map: "idx_customers_type")
   @@schema("public")
 }
 

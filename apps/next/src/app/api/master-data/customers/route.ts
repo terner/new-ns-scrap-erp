@@ -24,18 +24,29 @@ function parseListParams(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1)
   const pageSize = Math.min(100, Math.max(10, Number(url.searchParams.get('pageSize') ?? '25') || 25))
   const q = url.searchParams.get('q')?.trim() ?? ''
+  const customerType = url.searchParams.get('type')?.trim() ?? ''
+  const marketScope = url.searchParams.get('marketScope')?.trim() ?? ''
   const sort = url.searchParams.get('sort') ?? 'code'
   const direction = url.searchParams.get('direction') === 'desc' ? 'desc' : 'asc'
   const sortColumn = sortColumns[sort as keyof typeof sortColumns] ?? sortColumns.code
 
-  return { direction, page, pageSize, q, sortColumn }
+  return { customerType, direction, marketScope, page, pageSize, q, sortColumn }
 }
 
-function customerSearchWhere(q: string): Prisma.customersWhereInput {
-  if (!q) return {}
+function customerSearchWhere(q: string, customerType: string, marketScope: string): Prisma.customersWhereInput {
+  const where: Prisma.customersWhereInput = {}
 
-  return {
-    OR: [
+  if (customerType) {
+    where.type = customerType
+  }
+
+  if (marketScope) {
+    where.market_scope = marketScope
+  }
+
+  if (!q) return where
+
+  where.OR = [
       { id: { contains: q, mode: 'insensitive' } },
       { code: { contains: q, mode: 'insensitive' } },
       { name: { contains: q, mode: 'insensitive' } },
@@ -47,8 +58,9 @@ function customerSearchWhere(q: string): Prisma.customersWhereInput {
       { contact: { contains: q, mode: 'insensitive' } },
       { sales_id: { contains: q, mode: 'insensitive' } },
       { notes: { contains: q, mode: 'insensitive' } },
-    ],
-  }
+    ]
+
+  return where
 }
 
 async function getNextCustomerCode() {
@@ -73,8 +85,8 @@ async function getNextCustomerCode() {
 
 export async function GET(request: Request) {
   try {
-    const { direction, page, pageSize, q, sortColumn } = parseListParams(request)
-    const where = customerSearchWhere(q)
+    const { customerType, direction, marketScope, page, pageSize, q, sortColumn } = parseListParams(request)
+    const where = customerSearchWhere(q, customerType, marketScope)
     const [customers, total] = await Promise.all([
       prisma.customers.findMany({
         orderBy: [{ [sortColumn]: direction }, { id: 'asc' }],

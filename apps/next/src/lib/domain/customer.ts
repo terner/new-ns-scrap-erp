@@ -6,6 +6,7 @@ type PrismaCustomer = {
   code: string | null
   name: string
   type: string | null
+  market_scope: string
   tax_id: string | null
   phone: string | null
   email: string | null
@@ -34,7 +35,8 @@ export function mapPrismaCustomer(row: PrismaCustomer): Customer {
     id: row.id,
     code: row.code ?? row.id,
     name: row.name,
-    type: row.type,
+    type: row.type === 'บุคคล' ? 'บุคคล' : 'นิติบุคคล',
+    marketScope: row.market_scope === 'ต่างประเทศ' ? 'ต่างประเทศ' : 'ในประเทศ',
     taxId: row.tax_id,
     phone: row.phone,
     email: row.email,
@@ -83,7 +85,8 @@ export function toCustomerWriteInput(values: CustomerFormValues) {
     id: parsed.id || code,
     code,
     name: parsed.name,
-    type: parsed.type || null,
+    type: parsed.type,
+    market_scope: parsed.marketScope,
     tax_id: parsed.taxId || null,
     phone: parsed.phone || null,
     email: parsed.email || null,

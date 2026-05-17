@@ -31,8 +31,6 @@ export function AppShell({ children }: AppShellProps) {
         </div>
 
         <AppNavigation onNavigate={() => setSidebarOpen(false)} />
-
-        <div className="border-t border-slate-700 p-3 text-center text-[10px] text-slate-500">v1.0 NS Scrap ERP</div>
       </aside>
 
       {sidebarOpen ? <button aria-label="ปิดเมนู" className="fixed inset-0 z-30 bg-black/40 lg:hidden" type="button" onClick={() => setSidebarOpen(false)} /> : null}

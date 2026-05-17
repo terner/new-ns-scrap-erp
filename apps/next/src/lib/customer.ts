@@ -4,7 +4,8 @@ export const customerSchema = z.object({
   id: z.string().min(1),
   code: z.string().min(1),
   name: z.string().min(1),
-  type: z.string().nullable().default(null),
+  type: z.enum(['บุคคล', 'นิติบุคคล']).default('นิติบุคคล'),
+  marketScope: z.enum(['ในประเทศ', 'ต่างประเทศ']).default('ในประเทศ'),
   taxId: z.string().nullable().default(null),
   phone: z.string().nullable().default(null),
   email: z.string().nullable().default(null),
@@ -40,7 +41,9 @@ export type Customer = z.infer<typeof customerSchema>
 export type CustomerListResult = z.infer<typeof customerListResultSchema>
 
 export type CustomerListOptions = {
+  customerType?: string
   direction?: 'asc' | 'desc'
+  marketScope?: string
   page?: number
   pageSize?: number
   q?: string
@@ -51,7 +54,8 @@ export const customerFormSchema = z.object({
   id: z.string().trim().optional(),
   code: z.string().trim().optional().nullable().default(null),
   name: z.string().trim().min(1, 'กรอกชื่อลูกค้า'),
-  type: z.string().trim().nullable().default(null),
+  type: z.enum(['บุคคล', 'นิติบุคคล'], { required_error: 'เลือกประเภทลูกค้า' }),
+  marketScope: z.enum(['ในประเทศ', 'ต่างประเทศ']).default('ในประเทศ'),
   taxId: z.string().trim().nullable().default(null),
   phone: z.string().trim().nullable().default(null),
   email: z.string().trim().email('รูปแบบอีเมลไม่ถูกต้อง').or(z.literal('')).nullable().default(null),
@@ -87,6 +91,8 @@ async function readJson<TSchema extends z.ZodTypeAny>(response: Response, schema
 
 export async function listCustomers(options: CustomerListOptions = {}): Promise<CustomerListResult> {
   const params = new URLSearchParams()
+  if (options.customerType) params.set('type', options.customerType)
+  if (options.marketScope) params.set('marketScope', options.marketScope)
   if (options.q) params.set('q', options.q)
   if (options.sort) params.set('sort', options.sort)
   if (options.direction) params.set('direction', options.direction)
