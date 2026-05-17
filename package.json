@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "apps/next"
+  ],
   "scripts": {
     "dev": "npm --prefix apps/next run dev",
     "build": "npm --prefix apps/next run build",
