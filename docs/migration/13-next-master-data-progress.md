@@ -88,7 +88,7 @@
   - row click opens detail/edit; the old select/checkbox column was removed
   - result count and pagination controls are shown together above the table
   - customer export uses `/api/master-data/customers/export` and asks the database for all rows matching the current search/filter/sort, not just the visible page slice
-  - customer delete/soft-delete table action was removed; status changes must go through the edit form, and the dedicated `/api/master-data/customers/[id]` status endpoint was removed from the current route table
+  - customer delete/soft-delete table action was removed; active status can be changed from the edit form or the status-column toggle through `/api/master-data/customers/[id]/status`
 - Supplier table UX now follows the same customer-style master pattern:
   - master-list search/filter/sort/count/pagination run in the frontend after one list load
   - row click opens detail/edit; no row select column is used
@@ -175,7 +175,7 @@
 | 2026-05-17 | Supplier standardization: `npm run lint`, `npm run type-check`, `npm run build` | Passed | Supplier master follows customer-style form/list/export pattern; supplier classification migration applied to dev-target |
 | 2026-05-18 | Reset checkpoint validation after returning to `d6e8b29`: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Current git baseline excludes later sidebar/shadcn/Tailwind v4 experiment commits |
 | 2026-05-18 | Active toggle UI update: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next` | Passed | Customer, supplier, and shared master-data forms use toggle switch for active status |
-| 2026-05-18 | Customer delete action/API removal: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Removed customer table delete action and `/api/master-data/customers/[id]`; build route table now only has customer list/save and export routes |
+| 2026-05-18 | Customer delete action/API cleanup: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Removed customer table delete action; active status is handled by a dedicated `/api/master-data/customers/[id]/status` endpoint and toggle UI |
 
 ## Open Decisions
 

@@ -432,7 +432,6 @@ export function SuppliersPageClient() {
                 <th className="p-2 text-right"><button className="font-semibold" type="button" onClick={() => setSort('creditLimit')}>วงเงินเครดิต{sortLabel('creditLimit')}</button></th>
                 <th className="p-2 text-center"><button className="font-semibold" type="button" onClick={() => setSort('active')}>สถานะ{sortLabel('active')}</button></th>
                 <th className="p-2 text-center">แก้ไข</th>
-                <th className="p-2 text-center">ลบ</th>
               </tr>
             </thead>
             <tbody>
@@ -460,7 +459,9 @@ export function SuppliersPageClient() {
                   <td className="p-2">{displayValue(supplier.address)}</td>
                   <td className="p-2 text-right">{supplier.creditTerm ?? '-'}</td>
                   <td className="p-2 text-right">{formatMoney(supplier.creditLimit)}</td>
-                  <td className={`p-2 text-center ${supplier.active ? 'text-emerald-700' : 'text-slate-500'}`}>✓ {supplier.active ? 'ใช้งาน' : 'ปิด'}</td>
+                  <td className="p-2 text-center">
+                    <ActiveToggle checked={supplier.active} label={supplier.active ? 'ใช้งาน' : 'ปิด'} onChange={() => void handleToggleActive(supplier)} />
+                  </td>
                   <td className="p-2 text-center">
                     <button
                       className="text-blue-600"
@@ -473,23 +474,11 @@ export function SuppliersPageClient() {
                       แก้ไข
                     </button>
                   </td>
-                  <td className="p-2 text-center">
-                    <button
-                      className="text-red-600"
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        void handleToggleActive(supplier)
-                      }}
-                    >
-                      ลบ
-                    </button>
-                  </td>
                 </tr>
               ))}
               {paginatedSuppliers.length === 0 ? (
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={13}>ไม่พบข้อมูลที่ค้นหา</td>
+                  <td className="p-4 text-center text-sm text-slate-500" colSpan={12}>ไม่พบข้อมูลที่ค้นหา</td>
                 </tr>
               ) : null}
             </tbody>

@@ -199,7 +199,12 @@ Do not commit:
 - service role keys
 - `reports/db_audit/full_dump.sql`
 - `reports/db_audit/public_app_dump.sql`
+- `reports/` local audit artifacts unless a sanitized file is explicitly approved
 - raw production exports
+
+Cleanup note:
+- Keep local `reports/` artifacts for now because they may still be useful for audit/migration reference.
+- Delete or archive `reports/` during a later project cleanup pass after confirming no remaining migration/debug task needs those files.
 
 ## Current Import Prep Status
 

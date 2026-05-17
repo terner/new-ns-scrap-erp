@@ -245,3 +245,13 @@ export async function saveCustomer(values: CustomerFormValues): Promise<Customer
 
   return readJson(response, customerSchema)
 }
+
+export async function setCustomerActive(customerId: string, active: boolean): Promise<Customer> {
+  const response = await fetch(`/api/master-data/customers/${encodeURIComponent(customerId)}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active }),
+  })
+
+  return readJson(response, customerSchema)
+}

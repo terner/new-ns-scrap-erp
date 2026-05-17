@@ -243,7 +243,6 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                   </th>
                 ))}
                 <th className="p-2 text-center">แก้ไข</th>
-                <th className="p-2 text-center">ลบ</th>
               </tr>
             </thead>
             <tbody>
@@ -254,17 +253,16 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                     <td key={column.key} className={`p-2 text-${column.align ?? 'left'} ${column.key === 'code' ? 'font-mono text-xs' : ''}`}>
                       {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
                       {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
-                      {column.format === 'status' ? <span className={record.active ? 'text-emerald-700' : 'text-slate-500'}>✓ {displayValue(record[column.key])}</span> : null}
+                      {column.format === 'status' ? <ActiveToggle checked={record.active} label={record.active ? 'ใช้งาน' : 'ปิด'} onChange={() => void handleToggleActive(record)} /> : null}
                       {!column.format ? displayValue(record[column.key] as string | number | boolean | null) : null}
                     </td>
                   ))}
                   <td className="p-2 text-center"><button className="text-blue-600" type="button" onClick={() => openEditForm(record)}>แก้ไข</button></td>
-                  <td className="p-2 text-center"><button className="text-red-600" type="button" onClick={() => handleToggleActive(record)}>ลบ</button></td>
                 </tr>
               ))}
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={config.columns.length + 3}>{config.emptyMessage}</td>
+                  <td className="p-4 text-center text-sm text-slate-500" colSpan={config.columns.length + 2}>{config.emptyMessage}</td>
                 </tr>
               ) : null}
             </tbody>

@@ -6,6 +6,7 @@ import {
   exportCustomers,
   listCustomers,
   saveCustomer,
+  setCustomerActive,
   type Customer,
   type CustomerFormValues,
 } from '@/lib/customer'
@@ -227,6 +228,16 @@ export function CustomersPageClient() {
     }
   }
 
+  async function handleToggleActive(customer: Customer) {
+    setError(null)
+    try {
+      await setCustomerActive(customer.id, !customer.active)
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'อัปเดตสถานะลูกค้าไม่ได้')
+    }
+  }
+
   async function handleExport() {
     setError(null)
     setIsExporting(true)
@@ -442,7 +453,9 @@ export function CustomersPageClient() {
                   <td className="p-2">{displayValue(customer.address)}</td>
                   <td className="p-2 text-right">{customer.creditTerm ?? '-'}</td>
                   <td className="p-2 text-right">{formatMoney(customer.creditLimit)}</td>
-                  <td className={`p-2 text-center ${customer.active ? 'text-emerald-700' : 'text-slate-500'}`}>✓ {customer.active ? 'ใช้งาน' : 'ปิด'}</td>
+                  <td className="p-2 text-center">
+                    <ActiveToggle checked={customer.active} label={customer.active ? 'ใช้งาน' : 'ปิด'} onChange={() => void handleToggleActive(customer)} />
+                  </td>
                   <td className="p-2 text-center">
                     <button
                       className="text-blue-600"
