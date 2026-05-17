@@ -14,8 +14,9 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const title = pageTitleForPath(pathname)
+  const isAuthPage = pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
 
-  if (pathname === '/login') {
+  if (isAuthPage) {
     return <div className="min-h-screen bg-slate-100 text-slate-900">{children}</div>
   }
 

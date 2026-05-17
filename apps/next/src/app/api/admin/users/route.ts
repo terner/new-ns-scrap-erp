@@ -49,6 +49,11 @@ export async function GET() {
       roles: roles.map((role) => ({
         active: role.active,
         branchScope: role.branch_scope,
+        canEditOpeningBalance: role.can_edit_opening_balance,
+        canSeeCash: role.can_see_cash,
+        canSeeCost: role.can_see_cost,
+        canSeeFinancials: role.can_see_financials,
+        canSeeProfit: role.can_see_profit,
         code: role.code,
         description: role.description,
         id: role.id,
