@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   customerFormSchema,
+  exportCustomers,
   listCustomers,
   saveCustomer,
   setCustomerActive,
@@ -101,6 +102,7 @@ export function CustomersPageClient() {
   const [districts, setDistricts] = useState<ThaiDistrict[]>([])
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [customerTypeFilter, setCustomerTypeFilter] = useState('')
@@ -210,6 +212,32 @@ export function CustomersPageClient() {
     }
   }
 
+  async function handleExport() {
+    setError(null)
+    setIsExporting(true)
+    try {
+      const { blob, filename } = await exportCustomers({
+        customerType: customerTypeFilter,
+        direction: sortDirection,
+        marketScope: marketScopeFilter,
+        q: search,
+        sort: sortKey,
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Export Excel ไม่สำเร็จ')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   function setSort(key: SortKey) {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
@@ -277,8 +305,8 @@ export function CustomersPageClient() {
             </select>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white" type="button">
-              📊 Export Excel
+            <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
+              {isExporting ? 'กำลัง Export...' : '📊 Export Excel'}
             </button>
             <button className="rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={() => void openCreateForm()}>
               + เพิ่มรายการ

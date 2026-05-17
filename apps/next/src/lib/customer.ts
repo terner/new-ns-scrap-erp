@@ -211,6 +211,29 @@ export async function listCustomers(options: CustomerListOptions = {}): Promise<
   return readJson(response, customerListResultSchema)
 }
 
+export async function exportCustomers(options: CustomerListOptions = {}): Promise<{ blob: Blob; filename: string }> {
+  const params = new URLSearchParams()
+  if (options.customerType) params.set('type', options.customerType)
+  if (options.marketScope) params.set('marketScope', options.marketScope)
+  if (options.q) params.set('q', options.q)
+  if (options.sort) params.set('sort', options.sort)
+  if (options.direction) params.set('direction', options.direction)
+
+  const query = params.toString()
+  const response = await fetch(`/api/master-data/customers/export${query ? `?${query}` : ''}`, { cache: 'no-store' })
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null)
+    throw new Error(payload?.error ?? 'Export Excel ไม่สำเร็จ')
+  }
+
+  const disposition = response.headers.get('content-disposition') ?? ''
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? `customers_${new Date().toISOString().slice(0, 10)}.xls`
+  return {
+    blob: await response.blob(),
+    filename,
+  }
+}
+
 export async function saveCustomer(values: CustomerFormValues): Promise<Customer> {
   const response = await fetch('/api/master-data/customers', {
     method: 'POST',
