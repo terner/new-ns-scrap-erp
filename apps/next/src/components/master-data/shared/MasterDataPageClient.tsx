@@ -13,6 +13,7 @@ import {
   type MasterDataRecord,
 } from '@/lib/master-data'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
+import { formatPhoneDisplay } from '@/lib/format'
 
 type SortKey = keyof MasterDataRecord
 
@@ -21,14 +22,6 @@ type MasterDataPageClientProps = {
 }
 
 const pageSizeOptions = [10, 25, 50, 100]
-
-function formatPhoneDisplay(value: string | null) {
-  if (!value) return null
-  const digits = value.replace(/\D/g, '')
-  if (digits.length === 10 && digits.startsWith('0')) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
-  if (digits.length === 9 && digits.startsWith('0')) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`
-  return value
-}
 
 function recordToForm(record: MasterDataRecord): MasterDataFormValues {
   return {

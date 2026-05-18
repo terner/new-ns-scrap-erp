@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { mapPrismaSupplier } from '@/lib/domain/supplier'
+import { formatPhoneDisplay } from '@/lib/format'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
+import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Supplier } from '@/lib/supplier'
 import type { Prisma } from '../../../../../../generated/prisma/client'
 
@@ -107,6 +109,7 @@ function formatCellValue(supplier: Supplier, key: keyof Supplier) {
   if (value === null || value === undefined || value === '') return ''
   if (typeof value === 'boolean') return value ? 'ใช้งาน' : 'ปิด'
   if (typeof value === 'number') return value
+  if (key === 'phone') return formatPhoneDisplay(value) ?? ''
   return String(value)
 }
 
@@ -132,6 +135,7 @@ function buildWorkbook(suppliers: Supplier[], total: number, filters: { supplier
 
   summarySheet['!cols'] = [{ wch: 24 }, { wch: 28 }]
   supplierSheet['!cols'] = supplierColumns.map((column) => ({ wch: Math.max(10, Math.round(column.width / 8)) }))
+  applyWorksheetTableLayout(supplierSheet, supplierColumns.length, dataRows.length + 1)
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'สรุป')
   XLSX.utils.book_append_sheet(workbook, supplierSheet, 'ผู้ขาย')
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer

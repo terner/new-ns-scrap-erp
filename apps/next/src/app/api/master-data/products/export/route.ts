@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { mapPrismaProduct } from '@/lib/domain/product'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
+import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Product } from '@/lib/product'
 import type { Prisma } from '../../../../../../generated/prisma/client'
 
@@ -112,6 +113,7 @@ function buildWorkbook(products: Product[], total: number, filters: { active: st
 
   summarySheet['!cols'] = [{ wch: 24 }, { wch: 28 }]
   productSheet['!cols'] = productColumns.map((column) => ({ wch: Math.max(10, Math.round(column.width / 8)) }))
+  applyWorksheetTableLayout(productSheet, productColumns.length, dataRows.length + 1)
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'สรุป')
   XLSX.utils.book_append_sheet(workbook, productSheet, 'สินค้า')
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer
