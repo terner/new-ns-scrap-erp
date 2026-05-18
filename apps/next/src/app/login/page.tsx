@@ -7,12 +7,12 @@ export const metadata: Metadata = {
 }
 
 export default function LoginPage() {
-  const devLogin = process.env.NODE_ENV === 'production'
-    ? undefined
-    : {
-        identifier: process.env.DEV_LOGIN_IDENTIFIER ?? '',
-        password: process.env.DEV_LOGIN_PASSWORD ?? '',
+  const devLogin = process.env.NEXT_PUBLIC_ENABLE_TEST_LOGIN_PREFILL === '1' || process.env.NODE_ENV !== 'production'
+    ? {
+        identifier: process.env.NEXT_PUBLIC_TEST_LOGIN_IDENTIFIER ?? process.env.DEV_LOGIN_IDENTIFIER ?? '',
+        password: process.env.NEXT_PUBLIC_TEST_LOGIN_PASSWORD ?? process.env.DEV_LOGIN_PASSWORD ?? '',
       }
+    : undefined
 
   return (
     <Suspense>

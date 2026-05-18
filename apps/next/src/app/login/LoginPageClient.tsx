@@ -109,7 +109,7 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
 
         {devLogin?.identifier || devLogin?.password ? (
           <div className="mb-4 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-            เติมบัญชีทดสอบจาก local dev env แล้ว
+            เติมบัญชีทดสอบแล้ว
           </div>
         ) : null}
 
