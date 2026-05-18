@@ -259,7 +259,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
         <span><strong>{title}</strong>{mode === 'purchase' ? ' — รับซื้อเศษโลหะเข้าคลัง' : ' baseline อ่านข้อมูลจริงจาก DB'}</span>
-        {mode === 'purchase' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</button> : null}
       </div>
 
       <div className="space-y-2 rounded-xl bg-white p-3 shadow">
