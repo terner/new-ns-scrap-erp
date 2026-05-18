@@ -608,11 +608,25 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### F4: Cash Position
 
-- [ ] API `/api/finance/cash-position`
-- [ ] Page `/finance/cash-position`
-- [ ] aggregate cash/bank balances
-- [ ] upcoming receivable/payable summary
-- [ ] account group cards
+- [x] API `/api/finance/cash-position`
+- [x] Page `/finance/cash-position`
+- [x] aggregate cash/bank balances
+- [x] upcoming receivable/payable summary
+- [x] account group cards
+
+#### Execution Log
+
+- Task: F4 Cash Position aggregation baseline.
+- Legacy refs: `old-apps/vue/src/views/finance/CashPositionView.vue`.
+- Files changed: `apps/next/src/app/api/finance/cash-position/route.ts`, `apps/next/src/app/finance/cash-position/page.tsx`, `apps/next/src/components/finance/CashPositionPageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker.
+- DB/API changes: added `GET /api/finance/cash-position`; no schema migration; reads `accounts`, `bank_statement`, `sales_bills`, `receipts`, `purchase_bills`, `payments`.
+- Buttons/actions checked: read-only page with refresh on load; no mutation buttons.
+- Modal/form checked: none in F4.
+- Validation added: account balance aggregation and AR/AP exposure buckets.
+- Playwright smoke: desktop `1440x900` and mobile `390x844` loaded `/finance/cash-position`; `GET /api/finance/cash-position` returned `200`; no console warnings/errors.
+- Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`.
+- Result: validated; OpenAPI remains valid with existing skeleton warnings.
+- Commit: pending.
 
 ### F5: Supplier Advance
 

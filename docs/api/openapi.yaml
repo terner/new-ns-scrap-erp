@@ -456,6 +456,21 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance/cash-position:
+    get:
+      tags: [Finance]
+      operationId: readFinanceCashPosition
+      summary: Read cash position, account balances, and AR/AP exposure
+      responses:
+        "200":
+          description: Cash position aggregation payload.
+          content:
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/master-data/{resource}:
     get:
       tags: [Master Data]
