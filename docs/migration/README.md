@@ -7,14 +7,18 @@
 - ย้ายข้อมูลเดิมอย่างมีลำดับและตรวจสอบย้อนกลับได้
 
 เอกสารอ้างอิงหลัก:
-- [SRS.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/SRS.md)
-- [NS_Scrap_ERP_System_Requirements.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/NS_Scrap_ERP_System_Requirements.md)
+- [00-doc-index.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/00-doc-index.md)
+- [00-current-work.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/00-current-work.md)
+- [REQUIREMENTS_TARGET_SYSTEM.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/REQUIREMENTS_TARGET_SYSTEM.md)
+- [REQUIREMENTS_LEGACY_PROTOTYPE.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/REQUIREMENTS_LEGACY_PROTOTYPE.md)
 - [reports/db_audit/schema.sql](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/reports/db_audit/schema.sql)
 - [reports/db_audit/tables.tsv](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/reports/db_audit/tables.tsv)
 - [docs/notes/2026-05-16-project-decisions.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/notes/2026-05-16-project-decisions.md)
 
 ## Document Set
 
+0. [00-doc-index.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/00-doc-index.md)
+0. [00-current-work.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/00-current-work.md)
 1. [01-current-state.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/01-current-state.md)
 2. [02-master-plan.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/02-master-plan.md)
 3. [03-target-architecture.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/03-target-architecture.md)
@@ -33,6 +37,8 @@
 
 ## Recommended Order
 
+0. อ่าน `00-doc-index` เพื่อรู้ว่าเอกสารไหนเป็น canonical source
+0. อ่าน `00-current-work` เพื่อรู้สถานะล่าสุดและ next task
 1. อ่าน `01-current-state`
 2. ยืนยัน scope และ phase ใน `02-master-plan`
 3. ใช้ `03-target-architecture` ตัดสินโครงสร้าง code และ DB เป้าหมาย

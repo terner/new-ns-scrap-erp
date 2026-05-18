@@ -19,7 +19,9 @@ MOC สำหรับชุดเอกสาร `docs/migration/` ใช้ค
 ## Start Here
 
 - [[docs/migration/README|Migration README]] - ภาพรวมชุดเอกสาร, เป้าหมาย และลำดับอ่าน
-- [[SRS]] - requirements กลางที่ใช้ยืนยัน scope
+- [[docs/migration/00-doc-index|Documentation Index]] - canonical document map
+- [[docs/migration/00-current-work|Current Work]] - latest status and next batch
+- [[REQUIREMENTS_TARGET_SYSTEM|Target Requirements]] - requirements กลางที่ใช้ยืนยัน scope
 - [[AGENTS]] - rules สำหรับ agent, database, environment และ git safety
 - [[2026-05-16-project-decisions|Project Decisions]] - decision log ล่าสุดของโปรเจกต์
 

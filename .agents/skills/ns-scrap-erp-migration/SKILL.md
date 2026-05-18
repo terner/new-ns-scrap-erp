@@ -11,7 +11,7 @@ This is a project-level trigger shortcut. Do not duplicate project rules here.
 
 1. Read `AGENTS.md` first. It is the central source of truth for project rules.
 2. Read the required docs listed in `AGENTS.md` for the task type.
-3. Use `SRS.md` for requirements and target scope.
+3. Use `REQUIREMENTS_TARGET_SYSTEM.md` for requirements and target scope.
 4. Use `docs/migration/` for migration planning, schema mapping, reconciliation, rollout, and environment status.
 5. Use `.mcp.json` only to understand project-level MCP routing; never place secrets there.
 

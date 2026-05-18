@@ -18,7 +18,7 @@ created: 2026-05-16
 
 ## Primary References
 
-- [[SRS]] - business scope, roles, functional requirements, NFR และ target stack
+- [[REQUIREMENTS_TARGET_SYSTEM|Target Requirements]] - business scope, roles, functional requirements, NFR และ target stack
 - [[AGENTS]] - architecture direction, database rules, environment rules และ code organization rules
 - [[03-target-architecture]] - target application/data/API architecture
 - [[10-environment-status]] - Supabase projects, MCP routing, env policy และ sensitive data rules
@@ -27,6 +27,9 @@ created: 2026-05-16
 ## Application Architecture
 
 Target stack:
+- Current active implementation/deploy target: Next.js app in `apps/next/`
+- Legacy/audited source references: `old-apps/legacy/` and `old-apps/vue/`
+- Original target architecture notes below still describe the earlier Vue/Vite rehabilitation direction and should be reconciled into the target requirements as the Next implementation stabilizes.
 - Vue 3
 - Vite
 - TypeScript
@@ -39,7 +42,7 @@ Target stack:
 - Supabase Auth / Postgres / Storage
 - IndexedDB / Dexie เฉพาะกรณี offline หรือ local cache ที่จำเป็น
 
-Target source layout:
+Historical Vue target source layout:
 
 ```text
 old-apps/vue/src/
@@ -95,7 +98,7 @@ Auth direction:
 - ทดสอบ Auth และ RLS ใน Supabase `dev-target` ไม่ใช้ plain local Postgres
 
 เอกสารหลัก:
-- [[SRS#4. Users and Roles]]
+- [[REQUIREMENTS_TARGET_SYSTEM#4. Users and Roles]]
 - [[03-target-architecture#Data Architecture Direction]]
 - [[09-implementation-tasklist#Phase 3: Security and Access Model]]
 

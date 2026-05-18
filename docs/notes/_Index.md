@@ -13,11 +13,13 @@ created: 2026-05-16
 
 # NS Scrap ERP Index
 
-หน้าเริ่มต้นของ vault สำหรับงาน rehabilitate และ refactor ระบบ NS Scrap ERP เดิม โดยยึดหลักว่า `old-apps/legacy/` เป็น archived source สำหรับ copy เฉพาะ logic/module ที่จำเป็นมาปรับใน `old-apps/vue/`
+หน้าเริ่มต้นของ vault สำหรับงาน rehabilitate และ refactor ระบบ NS Scrap ERP เดิม โดยยึดหลักว่า `old-apps/legacy/` เป็น archived source และ `apps/next/` เป็น active app/deploy target ปัจจุบัน
 
 ## Core Notes
 
-- [[SRS]] - requirements กลาง, scope, role, module, tech stack และ phasing
+- [[REQUIREMENTS_TARGET_SYSTEM|Target Requirements]] - requirements กลาง, scope, role, module, tech stack และ phasing
+- [[docs/migration/00-doc-index|Documentation Index]] - สารบัญกลางและ canonical source ของเอกสาร
+- [[docs/migration/00-current-work|Current Work]] - สถานะล่าสุดและ next task
 - [[AGENTS]] - agent rules, safety rules, environment rules และ migration priority
 - [[2026-05-16-project-decisions|Project Decisions]] - decision log ของโปรเจกต์
 - [[Current Module Status]] - สถานะล่าสุดของ Vue modules ที่ย้ายเข้า `old-apps/vue/`
@@ -35,11 +37,11 @@ created: 2026-05-16
 ## Current Working Direction
 
 - Refactor ระบบเดิมแบบเป็นขั้น ไม่ rewrite ทั้งหมด
-- ใช้ Vue 3, Vite, TypeScript, Vue Router, Pinia, TanStack Query, Tailwind CSS, Zod, VueUse และ Supabase
+- active implementation/deploy target ปัจจุบันคือ Next.js ใน `apps/next/`; legacy/Vue baseline อยู่ใต้ `old-apps/` เพื่ออ้างอิงเท่านั้น
 - ใช้ Supabase `dev-target` สำหรับ development, Auth, RLS และ schema migration testing
 - ใช้ `legacy-prod-source` เป็น read-only migration source เท่านั้น
 - ห้ามแตะ secrets, production dumps หรือ `.env.local` เว้นแต่ได้รับคำสั่งชัดเจน
-- module ที่เริ่ม CRUD แล้วคือ Branches, Warehouses และ Customers; module อื่นยังเป็น read-only pilot
+- สถานะปัจจุบันให้ดู `docs/migration/00-current-work.md` และ tracker เฉพาะหมวด
 
 ## Phase Focus
 

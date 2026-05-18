@@ -7,6 +7,10 @@ Legacy ERP rehabilitation project.
 - Active Next.js app: `apps/next/`
 - Local-only Vue/Vite baseline: `old-apps/vue/`
 - Local-only legacy source: `old-apps/legacy/`
+- Target requirements: `REQUIREMENTS_TARGET_SYSTEM.md`
+- Legacy/prototype requirements: `REQUIREMENTS_LEGACY_PROTOTYPE.md`
+- Documentation index: `docs/migration/00-doc-index.md`
+- Current work status: `docs/migration/00-current-work.md`
 
 The Next.js app is the active development and Vercel deployment target. The Vue/Vite app and original legacy app are kept locally under `old-apps/` as audited source/reference material and are ignored by git.
 
@@ -34,7 +38,7 @@ Install dependencies:
 npm install
 ```
 
-Run the Vue/Vite shell:
+Run the active Next.js app:
 
 ```bash
 npm run dev
@@ -75,8 +79,8 @@ Copy `.env.example` to `.env.local` and fill the dev Supabase values. Do not use
 Required frontend values:
 
 ```env
-VITE_SUPABASE_URL=https://fhglqymcdmrgbsbadnwr.supabase.co
-VITE_SUPABASE_ANON_KEY=replace-with-dev-anon-key
+NEXT_PUBLIC_SUPABASE_URL=https://fhglqymcdmrgbsbadnwr.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=replace-with-dev-anon-key
 ```
 
 Required database value for dev-target import/testing:
@@ -107,19 +111,14 @@ project.
 
 Copy only the needed legacy functions or modules from `old-apps/legacy/` or audited Vue baseline code from `old-apps/vue/` into the active app structure, then refactor them into service/query/schema/component boundaries. The active app must not route to or import archived legacy runtime.
 
-## Current Vue Modules
+## Documentation Map
 
-Master data modules currently available:
+Start with:
 
-- `/master-data/branches` - CRUD/form mutation pilot
-- `/master-data/warehouses` - CRUD/FK form mutation pilot
-- `/master-data/customers` - CRUD/form mutation pilot
-- `/master-data/suppliers` - read-only pilot
-- `/master-data/salespersons` - read-only pilot
-- `/master-data/products` - read-only pilot
-- `/master-data/accounts` - read-only pilot
-- `/master-data/currencies` - read-only pilot
-- `/master-data/expense-categories` - read-only pilot
-- `/master-data/channels` - read-only pilot
+- `docs/migration/00-doc-index.md` - canonical documentation map
+- `docs/migration/00-current-work.md` - latest work status and next batch
+- `REQUIREMENTS_TARGET_SYSTEM.md` - target/new system requirements
+- `REQUIREMENTS_LEGACY_PROTOTYPE.md` - legacy/prototype reference
+- `docs/migration/17-next-remaining-modules-progress.md` - remaining module batch/task tracker
 
-Detailed module status is tracked in `docs/notes/Current Module Status.md`.
+Detailed historical module notes may still exist under `docs/notes/`, but current execution status should be tracked in `docs/migration/00-current-work.md` and the relevant migration tracker.

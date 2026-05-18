@@ -5,7 +5,9 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 ## Required Reading
 
 Before doing substantial work, read:
-- `SRS.md`
+- `docs/migration/00-current-work.md`
+- `docs/migration/00-doc-index.md`
+- `REQUIREMENTS_TARGET_SYSTEM.md`
 - `docs/migration/README.md`
 - `docs/migration/09-implementation-tasklist.md`
 - `docs/migration/10-environment-status.md`
@@ -25,7 +27,7 @@ Keep these in project-level files:
 - project-level skills: `.agents/skills/`
 - MCP project routing: `.mcp.json`
 - migration plans: `docs/migration/`
-- requirements and architecture docs: `SRS.md`
+- requirements and architecture docs: `REQUIREMENTS_TARGET_SYSTEM.md`
 - non-secret env templates: `.env.example`
 - git ignore rules: `.gitignore`
 
@@ -71,6 +73,11 @@ Do not treat this as a greenfield rewrite unless explicitly instructed.
 Use Thai for user-facing explanations unless the user explicitly requests another language.
 
 ## Architecture Direction
+
+Current active implementation/deploy target:
+- Next.js app under `apps/next/`
+
+Historical/target rehabilitation notes below still describe the earlier Vue/Vite direction and remain useful for legacy comparison, but active implementation work in this repo currently happens in `apps/next/` unless explicitly redirected.
 
 Target stack:
 - Vue 3

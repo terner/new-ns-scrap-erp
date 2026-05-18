@@ -4,6 +4,7 @@
 > **Version:** 1.0 Prototype  
 > **Tech Stack:** Vue 3 SPA (Single Page Application), Supabase (Backend + Auth), localStorage + IndexedDB (Offline-first), Tailwind CSS, Chart.js, SheetJS (XLSX Export)  
 > **Deployment:** Single HTML file (`index.html` ~3.3MB) + `export-button.js` (25KB) — เปิดด้วย browser ได้ทันที
+> **Canonical Role:** Legacy/prototype requirements reference. This file replaces the older filename `NS_Scrap_ERP_System_Requirements.md`.
 
 ---
 

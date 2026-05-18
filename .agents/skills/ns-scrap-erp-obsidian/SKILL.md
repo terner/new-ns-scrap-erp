@@ -11,7 +11,7 @@ This is a project-level trigger shortcut. Do not duplicate project rules here.
 
 1. Read `AGENTS.md` first. It is the central source of truth for project rules.
 2. Read `docs/notes/_Index.md` to understand the vault navigation.
-3. Keep canonical requirements in `SRS.md`.
+3. Keep canonical requirements in `REQUIREMENTS_TARGET_SYSTEM.md`.
 4. Keep migration details in `docs/migration/`.
 5. Keep navigation, summaries, maps, and decision logs in `docs/notes/`.
 6. Use path-qualified wikilinks when duplicate filenames exist, for example `[[docs/migration/README|Migration README]]`.

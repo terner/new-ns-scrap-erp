@@ -4,6 +4,7 @@
 > Version: 1.1  
 > Status: Draft for system rehabilitation and refactor planning  
 > Project Type: Web-based ERP for scrap metal trading and factory operations
+> Canonical Role: Target system requirements. This file replaces the older filename `SRS.md`.
 
 ---
 

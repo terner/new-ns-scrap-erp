@@ -12,7 +12,7 @@ This project-level skill consolidates the useful parts of click-path audit, brow
 Read first:
 
 - `AGENTS.md`
-- `SRS.md` when the audit relates to requirements or business behavior
+- `REQUIREMENTS_TARGET_SYSTEM.md` when the audit relates to requirements or business behavior
 - `docs/migration/09-implementation-tasklist.md` when the audit affects phase readiness
 - `docs/migration/10-environment-status.md` when the audit touches Supabase, MCP, deployment, or environment assumptions
 
