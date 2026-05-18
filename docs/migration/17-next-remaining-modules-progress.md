@@ -454,7 +454,7 @@ Priority: สูง เพราะเป็นฐานของ purchase, sale
 - [x] API smoke 200
 - [x] docs update
 - [x] type/lint/build
-- [ ] commit/push
+- [x] commit/push
 
 Execution notes:
 
@@ -464,6 +464,7 @@ Execution notes:
 - Write form smoke: `/stock/status-convert?new=1`, `/stock/convert?new=1`, `/stock/adjust?new=1`, `/stock/customer-return?new=1` rendered form title, fields, `ยกเลิก`, and `บันทึก`; no submit was performed.
 - OpenAPI lint: `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200` passed validity with existing skeleton-level warnings outside stock hardening scope.
 - Validation: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, and `npm run build --workspace @ns-scrap-erp/next` passed.
+- Commit: `42ce82b feat: add stock module baselines` pushed to `main`.
 
 ## Batch F: Finance and Debt
 

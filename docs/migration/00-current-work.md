@@ -146,7 +146,7 @@ Validation:
 
 ## Batch S Stock Status
 
-Status: in progress, commit/push pending.
+Status: completed and pushed in checkpoint `42ce82b`.
 
 Implemented in this checkpoint:
 
@@ -163,17 +163,16 @@ Verification already run:
 - Write form smoke: `/stock/status-convert?new=1`, `/stock/convert?new=1`, `/stock/adjust?new=1`, and `/stock/customer-return?new=1` rendered title, fields, cancel, and save controls; no submit was performed.
 - `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200` passed validity with existing skeleton warnings outside the stock batch.
 
-Still required before checkpoint close:
-
-- Restore/avoid generated `apps/next/next-env.d.ts` churn before commit.
-- Commit and push the stock batch.
-
 Final local validation:
 
 - `git diff --check` passed.
 - `npm run type-check --workspace @ns-scrap-erp/next` passed.
 - `npm run lint --workspace @ns-scrap-erp/next` passed.
 - `npm run build --workspace @ns-scrap-erp/next` passed.
+
+Commit:
+
+- `42ce82b feat: add stock module baselines` pushed to `main`.
 
 Known carry-over from Batch S:
 
