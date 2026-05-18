@@ -5,17 +5,17 @@
 Date: 2026-05-18  
 Active app: `apps/next`  
 Primary remote: `new-origin`  
-Last pushed checkpoint before this doc refactor: `3ad5501 docs: add sitemap openapi preflight tasks`
+Last pushed checkpoint: `14df0a5 docs: define sub agent operating rules`
 
 ## Current Batch
 
-`Batch DOC0: Documentation Standardization`
+`Batch DOC1: Session Handoff and Operating Rules`
 
 Goal:
 
-- Rename ambiguous requirements files.
-- Add a standard documentation entrypoint.
-- Make future sessions easier to resume without searching many trackers manually.
+- Make documentation updates resumable if the session closes at any time.
+- Require checkpoint notes with next task, blockers, validation, and partial work.
+- Clarify that after documenting a checkpoint, the agent should identify the next task and continue unless paused.
 
 ## File Naming Changes
 
@@ -26,6 +26,12 @@ Goal:
 
 ## Latest Completed Implementation Checkpoints
 
+- `14df0a5 docs: define sub agent operating rules`
+  - Added sub agent use/close rules to `AGENTS.md`
+  - Added operating model to this current work document
+- `fa08cb1 docs: standardize requirements and doc index`
+  - Renamed ambiguous requirements files
+  - Added `00-doc-index.md` and this current work document
 - `12fda4b feat: complete production report baseline`
   - Production pages/APIsครบแบบ read/report baseline
 - `2d08f0d feat: add production category baseline`
@@ -34,6 +40,29 @@ Goal:
   - Added Batch PRE for sitemap/OpenAPI before next major module
 
 ## Next Required Batch
+
+`Batch TW4: Tailwind v4 Migration`
+
+Status:
+
+- Started but interrupted before completion.
+- `npm install -D tailwindcss@latest @tailwindcss/postcss@latest --workspace @ns-scrap-erp/next` completed enough to modify:
+  - `apps/next/package.json`
+  - root `package-lock.json`
+- Not yet completed:
+  - migrate `apps/next/postcss.config.cjs` from `tailwindcss` plugin to `@tailwindcss/postcss`
+  - migrate `apps/next/src/app/globals.css` from `@tailwind` directives to Tailwind v4 CSS import/theme style
+  - decide whether to keep or remove `apps/next/tailwind.config.ts`
+  - reconcile root `package.json` still listing Tailwind v3 for old Vue tooling
+  - run validation
+
+Required validation before commit:
+
+- `npm ls tailwindcss @tailwindcss/postcss --workspace @ns-scrap-erp/next`
+- `npm run lint --workspace @ns-scrap-erp/next`
+- `npm run build --workspace @ns-scrap-erp/next`
+
+After TW4:
 
 `Batch PRE: System Map and API Contract Baseline`
 
@@ -47,16 +76,17 @@ Tasks:
 
 ## Current Priority Queue
 
-1. Batch DOC0: Documentation Standardization
-2. Batch PRE: System Map and API Contract Baseline
-3. Batch S: Stock
-4. Batch F: Finance and Debt
-5. Batch T: Tracking 360
-6. Batch D: Dual Costing / Trading / PO
-7. Batch FF: Foreign Finance
-8. Batch A: Finance / Accounting
-9. Batch M: Main Dashboards and Operational Control
-10. Batch SYS: System and Cleanup
+1. Batch DOC1: Session Handoff and Operating Rules
+2. Batch TW4: Tailwind v4 Migration
+3. Batch PRE: System Map and API Contract Baseline
+4. Batch S: Stock
+5. Batch F: Finance and Debt
+6. Batch T: Tracking 360
+7. Batch D: Dual Costing / Trading / PO
+8. Batch FF: Foreign Finance
+9. Batch A: Finance / Accounting
+10. Batch M: Main Dashboards and Operational Control
+11. Batch SYS: System and Cleanup
 
 ## Operating Model
 
@@ -78,6 +108,17 @@ Use sub agents only for bounded parallel work:
 - isolated docs or page/API implementation with clear file ownership
 
 Close sub agents when their task is integrated, no longer needed, blocked, overlapping, or after a batch checkpoint leaves them with no remaining work. Do not leave reminder agents open unless the user explicitly requested one for the active task list.
+
+## Handoff Checklist
+
+At every checkpoint, update docs as if a new session will start from only the repository:
+
+1. Current batch/task/page
+2. Exact partial work and files touched
+3. Commands already run and result
+4. Validation still required
+5. Next concrete task
+6. Whether to continue immediately or pause for discussion
 
 ## Known Carry-over Work
 
