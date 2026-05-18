@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { mapPrismaSupplier } from '@/lib/domain/supplier'
-import { formatPhoneDisplay } from '@/lib/format'
+import { formatAccountNoDisplay, formatPhoneDisplay } from '@/lib/format'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
@@ -116,6 +116,7 @@ function formatCellValue(supplier: Supplier, key: keyof Supplier) {
   if (typeof value === 'boolean') return value ? 'ใช้งาน' : 'ปิด'
   if (typeof value === 'number') return value
   if (key === 'phone') return formatPhoneDisplay(value) ?? ''
+  if (key === 'accountNo') return formatAccountNoDisplay(value) ?? ''
   return String(value)
 }
 

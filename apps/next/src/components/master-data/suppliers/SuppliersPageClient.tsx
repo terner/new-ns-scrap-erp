@@ -12,7 +12,7 @@ import {
 } from '@/lib/supplier'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { getErrorMessage } from '@/lib/api-client'
-import { formatPhoneDisplay, sanitizeAccountNoInput, sanitizePhoneInput } from '@/lib/format'
+import { formatAccountNoDisplay, formatPhoneDisplay, sanitizeAccountNoInput, sanitizePhoneInput } from '@/lib/format'
 import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
 import { listThaiDistricts, listThaiProvinces, listThaiSubdistricts, type ThaiDistrict, type ThaiProvince, type ThaiSubdistrict } from '@/lib/thai-address'
 
@@ -488,7 +488,7 @@ export function SuppliersPageClient() {
                   <td className="p-2">{displayValue(supplier.type)}</td>
                   <td className="p-2">{displayValue(formatPhoneDisplay(supplier.phone))}</td>
                   <td className="p-2">{displayValue(supplier.bankName)}</td>
-                  <td className="p-2 font-mono text-xs">{displayValue(supplier.accountNo)}</td>
+                  <td className="p-2 font-mono text-xs">{displayValue(formatAccountNoDisplay(supplier.accountNo))}</td>
                   <td className="p-2">{displayValue(supplier.salesName)}</td>
                   <td className="p-2">{displayValue(supplier.address)}</td>
                   <td className="p-2 text-right">{supplier.creditTerm ?? '-'}</td>

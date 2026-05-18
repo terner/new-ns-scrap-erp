@@ -6,6 +6,22 @@ export function formatPhoneDisplay(value: string | null | undefined) {
   return value
 }
 
+export function formatAccountNoDisplay(value: string | null | undefined) {
+  if (!value) return null
+
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((part) => {
+      if (part.includes('-')) return part
+
+      const digits = part.replace(/\D/g, '')
+      if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 4)}-${digits.slice(4, 9)}-${digits.slice(9)}`
+      return part
+    })
+    .join(' ')
+}
+
 export function sanitizePhoneInput(value: string) {
   let digitCount = 0
   let output = ''
