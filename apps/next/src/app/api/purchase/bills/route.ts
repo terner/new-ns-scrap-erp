@@ -20,6 +20,18 @@ type PurchaseBillRow = Prisma.purchase_billsGetPayload<{
   }
 }>
 
+type BillQuery = {
+  dateFrom?: string
+  dateTo?: string
+  filterMode?: string
+  filterSource?: string
+  page: number
+  pageSize: number
+  search?: string
+  sortDirection: Prisma.SortOrder
+  sortKey: string
+}
+
 function billJson(row: PurchaseBillRow) {
   return {
     branchId: row.branch_id ?? '',
@@ -104,19 +116,104 @@ async function optionsPayload() {
   }
 }
 
-async function rowsPayload() {
-  const rows = await prisma.purchase_bills.findMany({
-    include: {
-      branches: true,
-      purchase_channels: true,
-      suppliers: true,
-      warehouses: true,
-    },
-    orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
-    take: 5000,
-  })
+function parseBillQuery(url: URL, includePaging = true): BillQuery {
+  const page = Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1)
+  const pageSize = includePaging ? Math.min(100, Math.max(10, Number(url.searchParams.get('pageSize') ?? 50) || 50)) : 10000
+  const sortDirection = url.searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
 
-  return rows.map(billJson)
+  return {
+    dateFrom: url.searchParams.get('dateFrom') || undefined,
+    dateTo: url.searchParams.get('dateTo') || undefined,
+    filterMode: url.searchParams.get('filterMode') || undefined,
+    filterSource: url.searchParams.get('filterSource') || undefined,
+    page,
+    pageSize,
+    search: url.searchParams.get('search')?.trim() || undefined,
+    sortDirection,
+    sortKey: url.searchParams.get('sortKey') || 'date',
+  }
+}
+
+function billWhere(query: BillQuery): Prisma.purchase_billsWhereInput {
+  const where: Prisma.purchase_billsWhereInput = {}
+
+  if (query.dateFrom || query.dateTo) {
+    where.date = {
+      ...(query.dateFrom ? { gte: normalizeDate(query.dateFrom) } : {}),
+      ...(query.dateTo ? { lte: normalizeDate(query.dateTo) } : {}),
+    }
+  }
+  if (query.filterMode) where.transaction_mode = query.filterMode
+  if (query.filterSource) where.purchase_source = query.filterSource
+  if (query.search) {
+    where.OR = [
+      { doc_no: { contains: query.search, mode: 'insensitive' } },
+      { ref_no: { contains: query.search, mode: 'insensitive' } },
+      { suppliers: { is: { name: { contains: query.search, mode: 'insensitive' } } } },
+      { branches: { is: { name: { contains: query.search, mode: 'insensitive' } } } },
+      { warehouses: { is: { name: { contains: query.search, mode: 'insensitive' } } } },
+    ]
+  }
+
+  return where
+}
+
+function billOrderBy(query: BillQuery): Prisma.purchase_billsOrderByWithRelationInput[] {
+  const direction = query.sortDirection
+  const primary: Prisma.purchase_billsOrderByWithRelationInput = (() => {
+    switch (query.sortKey) {
+      case 'docNo':
+        return { doc_no: direction }
+      case 'refNo':
+        return { ref_no: direction }
+      case 'name':
+        return { supplier_id: direction }
+      case 'outstanding':
+        return { payable_balance: direction }
+      case 'status':
+        return { status: direction }
+      case 'totalAmount':
+        return { total_amount: direction }
+      case 'transactionMode':
+        return { transaction_mode: direction }
+      case 'warehouse':
+        return { branch_id: direction }
+      case 'date':
+      default:
+        return { date: direction }
+    }
+  })()
+
+  return [primary, { doc_no: direction }]
+}
+
+async function rowsPayload(query: BillQuery, includePaging = true) {
+  const where = billWhere(query)
+  const [rows, totalRows, totals] = await Promise.all([
+    prisma.purchase_bills.findMany({
+      include: {
+        branches: true,
+        purchase_channels: true,
+        suppliers: true,
+        warehouses: true,
+      },
+      orderBy: billOrderBy(query),
+      skip: includePaging ? (query.page - 1) * query.pageSize : 0,
+      take: includePaging ? query.pageSize : 10000,
+      where,
+    }),
+    prisma.purchase_bills.count({ where }),
+    prisma.purchase_bills.aggregate({
+      _sum: { total_amount: true },
+      where,
+    }),
+  ])
+
+  return {
+    rows: rows.map(billJson),
+    totalAmount: toNumber(totals._sum.total_amount),
+    totalRows,
+  }
 }
 
 function buildWorkbook(rows: ReturnType<typeof billJson>[]) {
@@ -160,10 +257,11 @@ export async function GET(request: Request) {
     requirePermission(context, 'finance.cash.view')
 
     const url = new URL(request.url)
-    const rows = await rowsPayload()
+    const query = parseBillQuery(url, url.searchParams.get('format') !== 'xlsx')
+    const payload = await rowsPayload(query, url.searchParams.get('format') !== 'xlsx')
 
     if (url.searchParams.get('format') === 'xlsx') {
-      const body = buildWorkbook(rows)
+      const body = buildWorkbook(payload.rows)
       const filename = `purchase_bills_${new Date().toISOString().slice(0, 10)}.xlsx`
 
       return new NextResponse(new Uint8Array(body), {
@@ -175,7 +273,9 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      rows,
+      rows: payload.rows,
+      totalAmount: payload.totalAmount,
+      totalRows: payload.totalRows,
       ...await optionsPayload(),
     })
   } catch (caught) {

@@ -155,6 +155,7 @@ Status: Read baseline done on 2026-05-18.
 Tasks:
 - Done: added read-only Next pages and APIs for purchase and sales bills.
 - Done: pages read real `purchase_bills` and `sales_bills` data with supplier/customer, branch, warehouse, channel, totals, paid/received, and balances.
+- Done: converted transaction list loading from frontend filtering over all rows to server-side pagination/filter/sort/count/sum for `/purchase/bills` and `/sales/bills`; default page size is 50 rows to handle monthly bill volume.
 - Deferred by design: create/edit/post/void and line refactor, because they affect stock ledger, AP/AR, FIFO/COGS, and profit permissions.
 - Follow-up: split header/line behavior carefully and preserve existing business flow.
 - Follow-up: define reconciliation for bill count, totals, paid/received amounts, stock movements, and linked ledger rows.
@@ -163,6 +164,7 @@ Validation:
 - Passed: `npm run type-check --workspace @ns-scrap-erp/next`
 - Passed: `npm run lint --workspace @ns-scrap-erp/next`
 - Passed: `npm run build`
+- Passed: server-side transaction list update validation with `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, and `npm run build --workspace @ns-scrap-erp/next`
 - Build confirmed routes generated:
   - `/purchase/bills`
   - `/sales/bills`

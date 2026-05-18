@@ -72,7 +72,15 @@ type PurchasePayload = {
   rows: BillRow[]
   salespersons: Option[]
   suppliers: Option[]
+  totalAmount?: number
+  totalRows?: number
   warehouses: Option[]
+}
+
+type TransactionPayload = {
+  rows: Array<BillRow | StockIssueRow>
+  totalAmount?: number
+  totalRows?: number
 }
 
 type TransactionBillsPageClientProps = {
@@ -134,21 +142,39 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [isSaving, setIsSaving] = useState(false)
   const [options, setOptions] = useState<Omit<PurchasePayload, 'rows'>>({ branches: [], channels: [], poBuys: [], products: [], salespersons: [], suppliers: [], warehouses: [] })
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(50)
   const [rows, setRows] = useState<Array<BillRow | StockIssueRow>>([])
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [totalAmount, setTotalAmount] = useState(0)
+  const [totalRows, setTotalRows] = useState(0)
   const apiPath = mode === 'purchase' ? '/api/purchase/bills' : mode === 'sales' ? '/api/sales/bills' : '/api/sales/stock-issue'
+  const requestPath = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      sortDirection,
+      sortKey,
+    })
+    if (search.trim()) params.set('search', search.trim())
+    if (dateFrom) params.set('dateFrom', dateFrom)
+    if (dateTo) params.set('dateTo', dateTo)
+    if (mode === 'purchase' && filterMode) params.set('filterMode', filterMode)
+    if (mode === 'purchase' && filterSource) params.set('filterSource', filterSource)
+    return `${apiPath}?${params.toString()}`
+  }, [apiPath, dateFrom, dateTo, filterMode, filterSource, mode, page, pageSize, search, sortDirection, sortKey])
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
       if (mode === 'purchase') {
-        const payload = await dailyFetchJson<PurchasePayload>(apiPath)
+        const payload = await dailyFetchJson<PurchasePayload>(requestPath)
         setRows(payload.rows)
+        setTotalAmount(payload.totalAmount ?? 0)
+        setTotalRows(payload.totalRows ?? payload.rows.length)
         setOptions({
           branches: payload.branches,
           channels: payload.channels,
@@ -159,51 +185,30 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           warehouses: payload.warehouses,
         })
       } else {
-        const payload = await dailyFetchJson<{ rows: Array<BillRow | StockIssueRow> }>(apiPath)
+        const payload = await dailyFetchJson<TransactionPayload>(requestPath)
         setRows(payload.rows)
+        setTotalAmount(payload.totalAmount ?? 0)
+        setTotalRows(payload.totalRows ?? payload.rows.length)
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้')
     } finally {
       setIsLoading(false)
     }
-  }, [apiPath, mode])
+  }, [mode, requestPath])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
 
-  const filteredRows = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return rows.filter((row) => {
-      const name = 'supplierName' in row ? row.supplierName : 'customerName' in row ? row.customerName : ''
-      if (dateFrom && row.date < dateFrom) return false
-      if (dateTo && row.date > dateTo) return false
-      if (mode === 'purchase' && filterMode && 'transactionMode' in row && row.transactionMode !== filterMode) return false
-      if (mode === 'purchase' && filterSource && 'purchaseSource' in row && row.purchaseSource !== filterSource) return false
-      return !query || `${row.docNo} ${'refNo' in row ? row.refNo ?? '' : ''} ${name ?? ''} ${row.branchName ?? ''} ${row.warehouseName ?? ''}`.toLowerCase().includes(query)
-    })
-  }, [dateFrom, dateTo, filterMode, filterSource, mode, rows, search])
-
-  const sortedRows = useMemo(() => {
-    return [...filteredRows].sort((a, b) => {
-      const left = sortValue(a, sortKey, mode)
-      const right = sortValue(b, sortKey, mode)
-      const result = typeof left === 'number' && typeof right === 'number'
-        ? left - right
-        : String(left).localeCompare(String(right), 'th')
-      return sortDirection === 'asc' ? result : -result
-    })
-  }, [filteredRows, mode, sortDirection, sortKey])
-
   useEffect(() => {
     setPage(1)
   }, [dateFrom, dateTo, filterMode, filterSource, pageSize, search, sortDirection, sortKey])
 
-  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const paginatedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const total = filteredRows.reduce((sum, row) => sum + (isStockIssueRow(row) ? row.totalEstAmount : row.totalAmount ?? 0), 0)
+  const pageRows = rows
+  const total = totalAmount
   const title = mode === 'purchase' ? 'บิลรับซื้อ' : mode === 'sales' ? 'บิลขาย' : 'เบิกออกรอบิล'
   const activeBranches = options.branches.filter((option) => option.active !== false)
   const activeChannels = options.channels.filter((option) => option.active !== false)
@@ -317,7 +322,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     setIsExporting(true)
     setError(null)
     try {
-      const response = await fetch('/api/purchase/bills?format=xlsx', { cache: 'no-store' })
+      const params = new URLSearchParams({ format: 'xlsx', sortDirection, sortKey })
+      if (search.trim()) params.set('search', search.trim())
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
+      if (filterMode) params.set('filterMode', filterMode)
+      if (filterSource) params.set('filterSource', filterSource)
+      const response = await fetch(`/api/purchase/bills?${params.toString()}`, { cache: 'no-store' })
       if (!response.ok) throw new Error('Export Excel ไม่สำเร็จ')
       const blob = await response.blob()
       const disposition = response.headers.get('content-disposition') ?? ''
@@ -349,7 +360,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <span className="text-slate-400">→</span>
           <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
           {(search || dateFrom || dateTo || filterMode || filterSource) ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง Filter</button> : null}
-          {mode === 'purchase' ? <button className="ml-auto rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : `📥 Export Excel (${filteredRows.length})`}</button> : null}
+          {mode === 'purchase' ? <button className="ml-auto rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : `📥 Export Excel (${totalRows})`}</button> : null}
           {mode === 'purchase' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</button> : null}
         </div>
         {mode === 'purchase' ? (
@@ -364,13 +375,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             <Segment value="SPOT_BUY" current={filterSource} label="📦 SPOT BUY" onClick={setFilterSource} />
             <Segment value="PO_RECEIPT" current={filterSource} label="📋 PO_RECEIPT" onClick={setFilterSource} />
             <Segment value="MIXED" current={filterSource} label="🔀 ผสม" onClick={setFilterSource} />
-            <span className="ml-auto text-xs text-slate-500">📊 พบ <b className="text-slate-700">{filteredRows.length.toLocaleString('th-TH')}</b> บิล</span>
+            <span className="ml-auto text-xs text-slate-500">📊 พบ <b className="text-slate-700">{totalRows.toLocaleString('th-TH')}</b> บิล</span>
           </div>
         ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{filteredRows.length}</span> รายการ · รวม <span className="font-semibold text-blue-700">{formatMoney(total)}</span></div>
+        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ · รวม <span className="font-semibold text-blue-700">{formatMoney(total)}</span></div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             aria-label="จำนวนรายการต่อหน้า"
@@ -406,7 +417,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           </thead>
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={mode === 'purchase' ? 10 : mode === 'stock-issue' ? 7 : 8}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && paginatedRows.map((row) => (
+            {!isLoading && pageRows.map((row) => (
               <tr key={row.id} className="border-t hover:bg-slate-50">
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
                 {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 font-mono text-xs text-slate-600">{row.refNo || '-'}</td> : null}
@@ -420,7 +431,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-right text-red-700">{formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)}</td> : null}
               </tr>
             ))}
-            {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={mode === 'purchase' ? 10 : mode === 'stock-issue' ? 7 : 8}>ยังไม่มีรายการ</td></tr> : null}
+            {!isLoading && totalRows === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={mode === 'purchase' ? 10 : mode === 'stock-issue' ? 7 : 8}>ยังไม่มีรายการ</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -617,31 +628,6 @@ function SortHeader({ activeKey, align, direction, label, onSort, sortKey }: { a
       </button>
     </th>
   )
-}
-
-function sortValue(row: BillRow | StockIssueRow, key: SortKey, mode: TransactionBillsPageClientProps['mode']) {
-  switch (key) {
-    case 'date':
-      return row.date
-    case 'docNo':
-      return row.docNo
-    case 'itemCount':
-      return row.itemCount
-    case 'name':
-      return 'supplierName' in row ? row.supplierName ?? '' : row.customerName ?? ''
-    case 'outstanding':
-      return isStockIssueRow(row) ? 0 : mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0
-    case 'refNo':
-      return 'refNo' in row ? row.refNo ?? '' : ''
-    case 'status':
-      return row.status
-    case 'totalAmount':
-      return isStockIssueRow(row) ? row.totalEstAmount : row.totalAmount ?? 0
-    case 'transactionMode':
-      return 'transactionMode' in row ? row.transactionMode ?? '' : ''
-    case 'warehouse':
-      return formatBranchWarehouse(row)
-  }
 }
 
 function formatBranchWarehouse(row: BillRow | StockIssueRow) {
