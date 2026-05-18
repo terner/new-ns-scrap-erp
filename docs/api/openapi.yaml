@@ -1,0 +1,754 @@
+openapi: 3.1.0
+info:
+  title: NS Scrap ERP Next API
+  version: 0.1.0
+  description: >
+    Baseline API catalog for the active Next.js app. This file records current
+    route handlers first; detailed request and response schemas should be added
+    as each module batch hardens its contract.
+servers:
+  - url: http://localhost:3000
+    description: Local Next.js development server
+  - url: https://new-ns-scrap-erp.vercel.app
+    description: Current Vercel deployment, if available
+security:
+  - SupabaseSession: []
+tags:
+  - name: Admin
+  - name: Auth
+  - name: Daily
+  - name: Finance
+  - name: Health
+  - name: Master Data
+  - name: PO Reports
+  - name: Production
+  - name: Purchase
+  - name: Sales
+  - name: Stock
+  - name: Tracking
+  - name: Trading
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Return application health status
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Return current authenticated app user context
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/admin/company-profile:
+    get:
+      tags: [Admin]
+      summary: Read company profile used for print/header data
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      tags: [Admin]
+      summary: Update company profile
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/auth-events:
+    get:
+      tags: [Admin]
+      summary: List authentication and activity audit events
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/transaction-ledger:
+    get:
+      tags: [Admin]
+      summary: List transaction ledger entries
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, xlsx]
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: List app users, roles, permissions, and branch access data
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Admin]
+      summary: Create an app user shell and role/profile assignment
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/users/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update an app user profile, role, or permission settings
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/users/{id}/status:
+    patch:
+      tags: [Admin]
+      summary: Activate or deactivate an app user
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/users/{id}/invite:
+    post:
+      tags: [Admin]
+      summary: Send or resend an auth invitation for an app user
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/daily/payment-approval:
+    get:
+      tags: [Daily]
+      summary: List payment approval queue baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/daily/expenses:
+    get:
+      tags: [Daily]
+      summary: List expenses
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Daily]
+      summary: Create an expense and related bank statement row when applicable
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/daily/transfers:
+    get:
+      tags: [Daily]
+      summary: List account transfers
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Daily]
+      summary: Create a transfer and deterministic bank statement rows
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/daily/petty-advances:
+    get:
+      tags: [Daily]
+      summary: List petty advances and director loans
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Daily]
+      summary: Create a petty advance or director loan
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/daily/petty-advances/returns:
+    post:
+      tags: [Daily]
+      summary: Record a petty advance return
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/daily/bill-swap-history:
+    get:
+      tags: [Daily]
+      summary: List supplier swap history for bills
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/finance/ap:
+    get:
+      tags: [Finance]
+      summary: List AP aging and supplier payable baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/master-data/{resource}:
+    get:
+      tags: [Master Data]
+      summary: List a generic master data resource
+      description: Covers branches, warehouses, accounts, bank-names, salespersons, currencies, expense-categories, channels, product-types, product-units, directors, machines, production-lines, beneficiaries, payment-methods, and remittance-purposes.
+      parameters:
+        - $ref: "#/components/parameters/MasterResource"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Master Data]
+      summary: Create a generic master data resource row
+      parameters:
+        - $ref: "#/components/parameters/MasterResource"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/master-data/{resource}/{id}:
+    patch:
+      tags: [Master Data]
+      summary: Update a generic master data resource row
+      parameters:
+        - $ref: "#/components/parameters/MasterResource"
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/master-data/customers:
+    get:
+      tags: [Master Data]
+      summary: List customers
+      parameters:
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Master Data]
+      summary: Create customer
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/master-data/customers/export:
+    get:
+      tags: [Master Data]
+      summary: Export customers as spreadsheet
+      responses:
+        "200":
+          description: XLSX file response
+
+  /api/master-data/customers/{id}/status:
+    patch:
+      tags: [Master Data]
+      summary: Toggle customer active status
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/master-data/suppliers:
+    get:
+      tags: [Master Data]
+      summary: List suppliers
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Master Data]
+      summary: Create supplier
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/master-data/suppliers/export:
+    get:
+      tags: [Master Data]
+      summary: Export suppliers as spreadsheet
+      responses:
+        "200":
+          description: XLSX file response
+
+  /api/master-data/suppliers/{id}:
+    patch:
+      tags: [Master Data]
+      summary: Update supplier
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/master-data/products:
+    get:
+      tags: [Master Data]
+      summary: List products
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Master Data]
+      summary: Create product
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/master-data/products/export:
+    get:
+      tags: [Master Data]
+      summary: Export products as spreadsheet
+      responses:
+        "200":
+          description: XLSX file response
+
+  /api/master-data/products/{id}:
+    patch:
+      tags: [Master Data]
+      summary: Update product
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/master-data/thai-address:
+    get:
+      tags: [Master Data]
+      summary: Search Thai address reference data
+      parameters:
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/production/orders:
+    get:
+      tags: [Production]
+      summary: List production orders read baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/production/output-categories:
+    get:
+      tags: [Production]
+      summary: List production output categories
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Production]
+      summary: Create production output category
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/production/output-categories/{id}:
+    patch:
+      tags: [Production]
+      summary: Update production output category
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/production/dashboard:
+    get:
+      tags: [Production]
+      summary: Read production dashboard baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/production/report:
+    get:
+      tags: [Production]
+      summary: Read production yield report baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/production/wip-report:
+    get:
+      tags: [Production]
+      summary: Read WIP report baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/production/production-cost-report:
+    get:
+      tags: [Production]
+      summary: Read production cost report baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/production/yield-loss-report:
+    get:
+      tags: [Production]
+      summary: Read yield/loss report baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/production/machine-utilization:
+    get:
+      tags: [Production]
+      summary: Read machine utilization report baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/purchase/bills:
+    get:
+      tags: [Purchase]
+      summary: List purchase bills
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Purchase]
+      summary: Create purchase bill baseline
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    patch:
+      tags: [Purchase]
+      summary: Update purchase bill baseline
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/purchase/payments:
+    get:
+      tags: [Purchase]
+      summary: List supplier payments
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Purchase]
+      summary: Create supplier payment
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/purchase/receipt-vouchers:
+    get:
+      tags: [Purchase]
+      summary: List receipt vouchers
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/purchase/po-buy:
+    get:
+      tags: [Purchase]
+      summary: List PO buy read baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/sales/bills:
+    get:
+      tags: [Sales]
+      summary: List sales bills read baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/sales/stock-issue:
+    get:
+      tags: [Sales]
+      summary: List stock issue read baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/sales/receipts:
+    get:
+      tags: [Sales]
+      summary: List customer receipts
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Sales]
+      summary: Create customer receipt
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/stock/ledger:
+    get:
+      tags: [Stock]
+      summary: List stock ledger rows
+      parameters:
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/stock/transfer:
+    get:
+      tags: [Stock]
+      summary: List stock transfers
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Stock]
+      summary: Create stock transfer baseline
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/tracking/supplier:
+    get:
+      tags: [Tracking]
+      summary: Read supplier tracking baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/trading/matching:
+    get:
+      tags: [Trading]
+      summary: Read trading matching baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+  /api/po-reports/outstanding:
+    get:
+      tags: [PO Reports]
+      summary: Read PO buy/sell outstanding baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+
+components:
+  securitySchemes:
+    SupabaseSession:
+      type: apiKey
+      in: cookie
+      name: sb-access-token
+      description: Supabase Auth session cookie or equivalent authenticated request context.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 10000
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+    MasterResource:
+      name: resource
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+          - accounts
+          - bank-names
+          - beneficiaries
+          - branches
+          - channels
+          - currencies
+          - directors
+          - expense-categories
+          - machines
+          - payment-methods
+          - product-types
+          - product-units
+          - production-lines
+          - remittance-purposes
+          - salespersons
+          - warehouses
+  requestBodies:
+    JsonBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+  responses:
+    Ok:
+      description: Successful response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiObject"
+    ListOk:
+      description: Successful list response
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              - $ref: "#/components/schemas/ApiObject"
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or invalid Supabase session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Authenticated user lacks the required permission
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    ApiObject:
+      type: object
+      additionalProperties: true
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      additionalProperties: true

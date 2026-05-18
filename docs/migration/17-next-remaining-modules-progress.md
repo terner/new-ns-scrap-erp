@@ -146,47 +146,77 @@
 
 #### PRE0.1 Route Inventory
 
-- [ ] สร้าง `docs/migration/18-next-system-sitemap.md`
-- [ ] ดึง route จาก `apps/next/src/lib/navigation.ts`
-- [ ] ดึง page/API ที่มีจริงจาก `apps/next/src/app`
-- [ ] map route -> section -> status
+- [x] สร้าง `docs/migration/18-next-system-sitemap.md`
+- [x] ดึง route จาก `apps/next/src/lib/navigation.ts`
+- [x] ดึง page/API ที่มีจริงจาก `apps/next/src/app`
+- [x] map route -> section -> status
 
 #### PRE0.2 Page Metadata
 
-- [ ] บันทึก status ต่อหน้า: `done`, `read baseline`, `partial write`, `missing`, `deferred`
-- [ ] บันทึก API ที่ผูกกับหน้า
-- [ ] บันทึก DB/table หลัก
+- [x] บันทึก status ต่อหน้า: `done`, `read baseline`, `partial write`, `missing`, `deferred`
+- [x] บันทึก API ที่ผูกกับหน้า
+- [x] บันทึก DB/table หลัก
 - [ ] บันทึก buttons/actions/modal/export ที่มีหรือยังขาด
-- [ ] บันทึก permission ที่ใช้
+- [x] บันทึก permission ที่ใช้
 
 #### PRE0.3 Sitemap QA
 
-- [ ] ตรวจ route ที่อยู่ใน navigation แต่ยังไม่มี page จริง
-- [ ] ตรวจ page ที่มีจริงแต่ไม่มี navigation item
-- [ ] ตรวจ API ที่มีจริงแต่ยังไม่มี sitemap mapping
-- [ ] commit/push sitemap baseline
+- [x] ตรวจ route ที่อยู่ใน navigation แต่ยังไม่มี page จริง
+- [x] ตรวจ page ที่มีจริงแต่ไม่มี navigation item
+- [x] ตรวจ API ที่มีจริงแต่ยังไม่มี sitemap mapping
+- [x] commit sitemap baseline
+- [ ] push sitemap baseline
+
+#### Execution Log
+
+- Task: PRE0 system sitemap baseline.
+- Legacy refs: none; this is a Next route/API inventory from the active app.
+- Files changed: `docs/migration/18-next-system-sitemap.md`, `docs/migration/17-next-remaining-modules-progress.md`.
+- DB/API changes: docs-only; no runtime API changes.
+- Buttons/actions checked: deferred to each module/page batch; this PRE pass records route/page/API/permission coverage first.
+- Modal/form checked: deferred to each module/page batch.
+- Validation added: sitemap maintenance rule documented in `18-next-system-sitemap.md`.
+- Playwright smoke: not run; docs-only baseline with no UI/runtime changes.
+- Commands: `git diff --check` passed.
+- Result: route inventory baseline created; `/stock/balance` confirmed placeholder and remains the next Batch S target.
+- Commit: this checkpoint (`docs: add system map api baseline`).
 
 ### PRE1: OpenAPI Skeleton
 
 #### PRE1.1 Spec Foundation
 
-- [ ] สร้าง `docs/api/openapi.yaml`
-- [ ] กำหนด OpenAPI version, title, version, server placeholders
-- [ ] กำหนด security scheme สำหรับ Supabase/session auth โดยไม่ใส่ secret
-- [ ] กำหนด tags ตามหมวด: Master Data, Daily, Production, Stock, Finance, Tracking, Admin
+- [x] สร้าง `docs/api/openapi.yaml`
+- [x] กำหนด OpenAPI version, title, version, server placeholders
+- [x] กำหนด security scheme สำหรับ Supabase/session auth โดยไม่ใส่ secret
+- [x] กำหนด tags ตามหมวด: Master Data, Daily, Production, Stock, Finance, Tracking, Admin
 
 #### PRE1.2 Existing API Catalog
 
-- [ ] ใส่ API ที่มีจริงตอนนี้แบบ skeleton ก่อน
-- [ ] ใส่ path, method, tag, summary, auth requirement
-- [ ] ใส่ common error response schema
-- [ ] ยังไม่ต้องละเอียดทุก field ถ้า endpoint ซับซ้อน
+- [x] ใส่ API ที่มีจริงตอนนี้แบบ skeleton ก่อน
+- [x] ใส่ path, method, tag, summary, auth requirement
+- [x] ใส่ common error response schema
+- [x] ยังไม่ต้องละเอียดทุก field ถ้า endpoint ซับซ้อน
 
 #### PRE1.3 OpenAPI Maintenance Rule
 
-- [ ] เพิ่ม note ใน tracker ว่า API ใหม่ทุกตัวต้องอัปเดต OpenAPI ใน batch เดียวกัน
-- [ ] เพิ่ม sitemap/OpenAPI check เข้า QA checklist ของแต่ละ page batch
-- [ ] commit/push OpenAPI baseline
+- [x] เพิ่ม note ใน tracker ว่า API ใหม่ทุกตัวต้องอัปเดต OpenAPI ใน batch เดียวกัน
+- [x] เพิ่ม sitemap/OpenAPI check เข้า QA checklist ของแต่ละ page batch
+- [x] commit OpenAPI baseline
+- [ ] push OpenAPI baseline
+
+#### Execution Log
+
+- Task: PRE1 OpenAPI skeleton and existing API catalog baseline.
+- Legacy refs: none; this is a Next route handler inventory from `apps/next/src/app/api`.
+- Files changed: `docs/api/openapi.yaml`, `docs/migration/17-next-remaining-modules-progress.md`.
+- DB/API changes: docs-only; no runtime API changes.
+- Buttons/actions checked: not applicable.
+- Modal/form checked: not applicable.
+- Validation added: common auth/error/list response components and broad route skeletons.
+- Playwright smoke: not run; docs-only baseline with no UI/runtime changes.
+- Commands: `git diff --check` passed; `npx --yes @redocly/cli lint docs/api/openapi.yaml` validated the OpenAPI file with skeleton-level warnings.
+- Result: OpenAPI skeleton created for current endpoint groups; detailed request/response schemas, `operationId`, tag descriptions, and full 4XX responses remain per-module hardening work.
+- Commit: this checkpoint (`docs: add system map api baseline`).
 
 ## Batch S: Stock
 

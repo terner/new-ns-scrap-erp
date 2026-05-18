@@ -1,0 +1,261 @@
+# 18 Next System Sitemap
+
+## Purpose
+
+This document is the route, page, API, and permission baseline for the active Next.js app under `apps/next/`.
+
+Use it before every new module batch:
+
+- update this file when a navigation route, page, or API route is added or changed
+- keep `docs/api/openapi.yaml` in the same batch when an API contract changes
+- do not count catch-all placeholder pages as completed module pages
+
+## Baseline
+
+Date: 2026-05-18
+
+Sources:
+
+- Navigation: `apps/next/src/lib/navigation.ts`
+- Pages: `apps/next/src/app/**/page.tsx`
+- APIs: `apps/next/src/app/api/**/route.ts`
+- Permission mapping: `permissionForPath()` in `apps/next/src/lib/navigation.ts`
+
+Status terms:
+
+- `done`: real page/API baseline exists for the current migration phase
+- `read baseline`: DB-connected read surface exists, write flow is deferred
+- `partial write`: at least one write flow exists, but full business side effects are not complete
+- `placeholder`: route resolves through `[...slug]` scaffold only
+- `missing`: no real page/API or no known mapping
+- `deferred`: intentionally postponed until a later module batch
+
+## Route Coverage Summary
+
+| Area | Navigation routes | Real pages | Placeholder routes | API coverage |
+|---|---:|---:|---:|---|
+| Main | 11 | 0 | 11 | none |
+| Tracking | 3 | 1 | 2 | supplier only |
+| Daily | 13 | 13 | 0 | partial |
+| Production | 8 | 8 | 0 | read baseline plus output category write |
+| Dual Costing | 7 | 1 | 6 | PO buy only |
+| Finance and Debt | 6 | 1 | 5 | AP only |
+| Foreign Finance | 6 | 0 | 6 | none |
+| Stock | 6 | 1 | 5 | ledger only |
+| Trading | 2 | 1 | 1 | matching only |
+| PO Reports | 1 | 1 | 0 | outstanding only |
+| Reports | 1 | 0 | 1 | none |
+| Finance / Accounting | 18 | 0 | 18 | none |
+| Master Data | 18 | 18 | 0 | broad master-data coverage |
+| Admin | 6 | 4 | 2 | company, users, audit, transaction ledger |
+
+## Route Inventory
+
+### Main
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/owner-daily` | Owner Daily Control | placeholder | missing | TBD | none yet |
+| `/anomaly-detector` | ตรวจจับความผิดปกติ | placeholder | missing | TBD | none yet |
+| `/daily-report` | Daily Report | placeholder | missing | TBD | none yet |
+| `/dashboard` | Dashboard | placeholder | missing | TBD | none yet |
+| `/profit-cost-analysis` | Profit & Cost Analysis | placeholder | missing | TBD | none yet |
+| `/pending-sales` | รายการรอขาย | placeholder | missing | TBD | none yet |
+| `/sales-plan` | วางแผนการขาย (LME) | placeholder | missing | TBD | none yet |
+| `/sales-commission` | Sales Tracking Dashboard | placeholder | missing | TBD | none yet |
+| `/cash-flow-calendar` | Cash Flow Calendar | placeholder | missing | TBD | none yet |
+| `/business-calendar` | Business Calendar | placeholder | missing | TBD | none yet |
+| `/cash-others-summary` | Cash & Others Summary | placeholder | missing | TBD | none yet |
+
+### Tracking
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/tracking/customer` | Customer Tracking | placeholder | missing | TBD | `reports.reports.view` |
+| `/tracking/supplier` | Supplier Tracking | read baseline | `GET /api/tracking/supplier` | `suppliers`, `purchase_bills`, `payments` | `reports.reports.view` |
+| `/tracking/product` | Product Tracking | placeholder | missing | TBD | `reports.reports.view` |
+
+### Daily
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/purchase/bills` | บิลรับซื้อ | partial write | `GET/POST/PATCH /api/purchase/bills` | `purchase_bills`, `suppliers`, `products`, `stock_ledger` | `finance.cash.view` |
+| `/purchase/bills/[id]` | Purchase bill detail/edit | partial write | `PATCH /api/purchase/bills` | `purchase_bills`, `stock_ledger` | `finance.cash.view` |
+| `/sales/bills` | บิลขาย | read baseline | `GET /api/sales/bills` | `sales_bills`, `customers` | `finance.cash.view` |
+| `/sales/stock-issue` | เบิกออกรอบิล | read baseline | `GET /api/sales/stock-issue` | `stock_issues` | `finance.cash.view` |
+| `/daily/payment-approval` | อนุมัติโอนเงิน | read baseline | `GET /api/daily/payment-approval` | payments/approval source TBD | `finance.cash.view` |
+| `/purchase/payments` | จ่ายเงิน Supplier | partial write | `GET/POST /api/purchase/payments` | `payments`, `purchase_bills`, `accounts` | `finance.cash.view` |
+| `/purchase/receipt-vouchers` | ใบสำคัญรับเงิน | read baseline | `GET /api/purchase/receipt-vouchers` | `receipt_vouchers` | `finance.cash.view` |
+| `/sales/receipts` | รับเงิน Customer | partial write | `GET/POST /api/sales/receipts` | `receipts`, `sales_bills`, `accounts` | `finance.cash.view` |
+| `/daily/transfer` | โอนเงินระหว่างบัญชี | partial write | `GET/POST /api/daily/transfers` | `bank_statement`, `accounts` | `finance.cash.view` |
+| `/daily/expense` | ค่าใช้จ่าย | partial write | `GET/POST /api/daily/expenses` | `expenses`, `bank_statement` | `finance.cash.view` |
+| `/daily/petty-advance` | เงินสำรองจ่าย / กู้กรรมการ | partial write | `GET/POST /api/daily/petty-advances`, `POST /api/daily/petty-advances/returns` | `petty_advances`, `bank_statement` | `finance.cash.view` |
+| `/daily/expense-dashboard` | Dashboard ค่าใช้จ่าย | done | uses expense/daily data internally | `expenses` | `finance.cash.view` |
+| `/stock/transfer` | โอนสินค้าระหว่างสาขา | partial write | `GET/POST /api/stock/transfer` | `stock_ledger` | `stock.ledger.view` |
+| `/daily/bill-swap-history` | ประวัติเปลี่ยน Supplier ในบิล | read baseline | `GET /api/daily/bill-swap-history` | `bill_swap_history` | `finance.cash.view` |
+
+### Production
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/production/orders` | ใบสั่งผลิต | read baseline | `GET /api/production/orders` | `production_orders` | `production.operations.view` |
+| `/production/output-categories` | หมวดหมู่ผลผลิต | partial write | `GET/POST /api/production/output-categories`, `PATCH /api/production/output-categories/{id}` | `production_output_categories` | `production.operations.view` |
+| `/production/dashboard` | Production Dashboard | read baseline | `GET /api/production/dashboard` | production aggregate tables | `production.operations.view` |
+| `/production/wip-report` | WIP คงเหลือ | read baseline | `GET /api/production/wip-report` | `production_inputs`, `production_outputs`, `stock_ledger` | `production.operations.view` |
+| `/production/report` | รายงานการผลิต / Yield | read baseline | `GET /api/production/report` | production aggregate tables | `production.operations.view` |
+| `/production/production-cost-report` | Production Cost Report | read baseline | `GET /api/production/production-cost-report` | `process_costs`, production tables | `production.operations.view` |
+| `/production/yield-loss-report` | Yield/Loss + Abnormal | read baseline | `GET /api/production/yield-loss-report` | production aggregate tables | `production.operations.view` |
+| `/production/machine-utilization` | Machine Utilization | read baseline | `GET /api/production/machine-utilization` | `production_machines`, production tables | `production.operations.view` |
+
+### Dual Costing
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/purchase/po-buy` | PO Buy | read baseline | `GET /api/purchase/po-buy` | `po_buys` | `finance.cash.view` |
+| `/sales/po-sell` | PO Sell | placeholder | missing | `po_sells` expected | `finance.cash.view` |
+| `/dual-costing/cost-pool` | Cost Pool | placeholder | missing | TBD | none yet |
+| `/dual-costing/cost-allocator` | Cost Allocator | placeholder | missing | TBD | none yet |
+| `/dual-costing/match-log` | Match Log | placeholder | missing | TBD | none yet |
+| `/dual-costing/deal-margin` | Deal Margin Report | placeholder | missing | TBD | none yet |
+| `/dual-costing/compare-margin` | Compare Deal vs Stock | placeholder | missing | TBD | none yet |
+
+### Finance And Debt
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/finance/ar` | ลูกหนี้ (AR) | placeholder | missing | `sales_bills`, `receipts` expected | `finance.cash.view` |
+| `/finance/ap` | เจ้าหนี้ (AP) | read baseline | `GET /api/finance/ap` | `purchase_bills`, `payments` | `finance.cash.view` |
+| `/finance/bank` | Cash / Bank Statement | placeholder | missing | `bank_statement`, `accounts` expected | `finance.cash.view` |
+| `/finance/cash-position` | Cash Position | placeholder | missing | `accounts`, `bank_statement` expected | `finance.cash.view` |
+| `/finance/supplier-advance` | จ่ายล่วงหน้า Supplier | placeholder | missing | TBD | `finance.cash.view` |
+| `/finance/customer-advance` | รับล่วงหน้าจาก Customer | placeholder | missing | TBD | `finance.cash.view` |
+
+### Foreign Finance
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/finance/foreign/intl-transfer` | โอนเงินต่างประเทศ | placeholder | missing | TBD | `finance.cash.view` |
+| `/finance/foreign/overseas-receipt` | รับเงินจากต่างประเทศ | placeholder | missing | TBD | `finance.cash.view` |
+| `/finance/foreign/fx-rate` | FX Rate Management | placeholder | missing | TBD | `finance.cash.view` |
+| `/finance/foreign/fcd-ledger` | FCD Ledger | placeholder | missing | TBD | `finance.cash.view` |
+| `/finance/foreign/fx-gain-loss-report` | FX Gain/Loss Report | placeholder | missing | TBD | `finance.cash.view` |
+| `/finance/foreign/bank-reconciliation` | Bank Reconciliation | placeholder | missing | TBD | `finance.cash.view` |
+
+### Stock
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/stock/balance` | สต๊อกคงเหลือ | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
+| `/stock/ledger` | Stock Ledger | read baseline | `GET /api/stock/ledger` | `stock_ledger` | `stock.ledger.view` |
+| `/stock/status-convert` | ปรับสถานะสินค้า | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
+| `/stock/convert` | Grade Adjustment | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
+| `/stock/adjust` | นับสต๊อก / Stock Count Adjust | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
+| `/stock/customer-return` | Customer Return / ของคืน | placeholder | missing | `stock_ledger`, returns table TBD | `stock.ledger.view` |
+
+### Trading And PO Reports
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/trading/dashboard` | Trading Dashboard | placeholder | missing | `trading_deals` expected | `finance.cash.view` |
+| `/trading/matching` | Trading Matching | read baseline | `GET /api/trading/matching` | `purchase_bills`, `sales_bills`, `trading_deals` | `finance.cash.view` |
+| `/po-reports/outstanding` | PO ซื้อ/ขาย คงเหลือ | read baseline | `GET /api/po-reports/outstanding` | `po_buys`, `po_sells` | `reports.reports.view` |
+
+### Reports
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/reports` | รายงานทั้งหมด | placeholder | missing | TBD | `reports.reports.view` |
+
+### Finance / Accounting
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/finance-accounting/financial-dashboard` | Financial Dashboard | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/cash-flow-analysis` | Cash Flow Analysis | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/cf-forecast-calendar` | CF Forecast Calendar | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/working-capital` | Working Capital Analysis | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/stock-finance` | Stock Finance Analysis | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/profit-leak` | Profit Leak Dashboard | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/tax-vat-wht` | Tax / VAT / WHT | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/pl-statement` | งบกำไรขาดทุน (P&L) | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/balance-sheet` | งบดุล | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/cash-flow-statement` | งบกระแสเงินสด | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/asset-register` | Fixed Assets / ทรัพย์สิน | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/depreciation` | ค่าเสื่อมราคา | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/asset-disposal` | จำหน่ายทรัพย์สิน | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/loan-contracts` | Loan / Leasing / BSL | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/loan-dashboard` | Loan Dashboard | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/equity-maint` | Equity / ทุนจดทะเบียน | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/opening-balance` | Opening Balance / ตั้งต้นยอด | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/historical-data` | ข้อมูลย้อนหลัง ม.ค.-เม.ย. 2026 | placeholder | missing | TBD | `finance.financials.view` |
+
+### Master Data
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/master-data/customers` | ลูกค้า | done | `GET/POST /api/master-data/customers`, `GET /export`, `PATCH /{id}/status` | `customers` | `master.customers.view` |
+| `/master-data/salespersons` | พนักงานขาย | done | `GET/POST /api/master-data/salespersons`, `PATCH /{id}` | `salespersons` | `master.reference.view` |
+| `/master-data/suppliers` | ผู้ขาย | done | `GET/POST /api/master-data/suppliers`, `GET /export`, `PATCH /{id}` | `suppliers` | `master.suppliers.view` |
+| `/master-data/products` | สินค้า | done | `GET/POST /api/master-data/products`, `GET /export`, `PATCH /{id}` | `products` | `master.products.view` |
+| `/master-data/product-types` | ประเภทสินค้า | done | `GET/POST /api/master-data/product-types`, `PATCH /{id}` | `product_types` | `master.reference.view` |
+| `/master-data/product-units` | หน่วยสินค้า | done | `GET/POST /api/master-data/product-units`, `PATCH /{id}` | `product_units` | `master.reference.view` |
+| `/master-data/branches` | สาขา / คลัง | done | `GET/POST /api/master-data/branches`, `PATCH /{id}` | `branches` | `master.reference.view` |
+| `/master-data/warehouses` | Warehouses child page | done | `GET/POST /api/master-data/warehouses`, `PATCH /{id}` | `warehouses` | `master.reference.view` |
+| `/master-data/accounts` | บัญชีเงิน | done | `GET/POST /api/master-data/accounts`, `PATCH /{id}` | `accounts` | `master.reference.view` |
+| `/master-data/bank-names` | ชื่อธนาคาร | done | `GET/POST /api/master-data/bank-names`, `PATCH /{id}` | `bank_names` | `master.reference.view` |
+| `/master-data/channels` | ช่องทางซื้อ/ขาย | done | `GET/POST /api/master-data/channels`, `PATCH /{id}` | `channels` | `master.reference.view` |
+| `/master-data/expense-categories` | หมวดค่าใช้จ่าย | done | `GET/POST /api/master-data/expense-categories`, `PATCH /{id}` | `expense_categories` | `master.reference.view` |
+| `/master-data/directors` | กรรมการ/พนักงาน | done | `GET/POST /api/master-data/directors`, `PATCH /{id}` | `directors` | `master.reference.view` |
+| `/master-data/machines` | เครื่องจักร | done | `GET/POST /api/master-data/machines`, `PATCH /{id}` | `production_machines` | `master.reference.view` |
+| `/master-data/production-lines` | Production Line | done | `GET/POST /api/master-data/production-lines`, `PATCH /{id}` | `production_lines` | `master.reference.view` |
+| `/master-data/currencies` | สกุลเงิน | done | `GET/POST /api/master-data/currencies`, `PATCH /{id}` | `currencies` | `master.reference.view` |
+| `/master-data/beneficiaries` | ผู้รับเงินต่างประเทศ | done | `GET/POST /api/master-data/beneficiaries`, `PATCH /{id}` | `beneficiaries` | `master.reference.view` |
+| `/master-data/payment-methods` | วิธีจ่าย/รับเงิน | done | `GET/POST /api/master-data/payment-methods`, `PATCH /{id}` | `payment_methods` | `master.reference.view` |
+| `/master-data/remittance-purposes` | วัตถุประสงค์โอน | done | `GET/POST /api/master-data/remittance-purposes`, `PATCH /{id}` | `remittance_purposes` | `master.reference.view` |
+| `/api/master-data/thai-address` | Thai address lookup | API only | `GET /api/master-data/thai-address` | Thai address reference source | none yet |
+
+### Admin
+
+| Route | Label | Page status | APIs | Primary tables | Permission |
+|---|---|---|---|---|---|
+| `/admin/company-profile` | ข้อมูลบริษัท | done | `GET/PUT /api/admin/company-profile` | `company_profile` | `system.settings.manage` |
+| `/admin/change-password` | เปลี่ยน Password ของฉัน | placeholder | Supabase Auth client flow expected | `auth.users` | none yet |
+| `/admin/transaction-ledger` | Transaction Ledger | read baseline | `GET /api/admin/transaction-ledger` | transaction ledger / `bank_statement` source | `finance.cash.view` |
+| `/admin/migration-tools` | Backup / Restore | placeholder | missing | TBD | `system.backup.manage` |
+| `/admin/audit` | Audit & Activity Log | read baseline | `GET /api/admin/auth-events` | `auth_audit_events` | `system.audit.view` |
+| `/admin/users-permissions` | Users & Permissions | partial write | `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}`, `PATCH /status`, `POST /invite` | `auth.users`, `app_users`, role/permission tables | `system.users.manage` |
+
+## Page Without Navigation Item
+
+| Page | Status | Note |
+|---|---|---|
+| `/login` | done | Auth entry, intentionally not in sidebar |
+| `/forgot-password` | done | Supabase Auth reset request flow |
+| `/reset-password` | done | Supabase Auth password update flow |
+| `/sitemap` | done | Developer/checklist route, not a business module |
+| `/master-data/warehouses` | done | Real page and API exist, but the current sidebar groups warehouses under `/master-data/branches` |
+| `/` | done | Root app route |
+
+## API Catalog Summary
+
+See `docs/api/openapi.yaml` for the current API skeleton. The OpenAPI file intentionally records path, method, auth requirement, and broad response shape first; detailed schemas should be added in the same batch that hardens each module contract.
+
+Current API groups:
+
+- Admin: company profile, audit/auth events, transaction ledger, user management
+- Auth: current user context
+- Daily: payments approvals, expenses, transfers, petty advances, bill swap history
+- Master Data: customers, suppliers, products, lookup masters, Thai address lookup
+- Production: orders, dashboard, reports, output categories
+- Purchase/Sales: purchase bills, payments, receipt vouchers, sales bills, stock issue, receipts
+- Stock: ledger, transfer
+- Tracking/Trading/PO Reports: supplier tracking, trading matching, PO outstanding
+- Health: simple runtime health endpoint
+
+## Gaps Before Batch S
+
+- `/stock/balance` is still a placeholder and needs first-class page/API work in `Batch S1`.
+- `/stock/ledger` has a read baseline but still needs query/pagination/running-balance polish in `Batch S2`.
+- Stock status convert, grade convert, adjust, and customer return remain placeholders.
+- Main dashboard/reporting and finance-accounting routes are mostly placeholder coverage only.
+- Several write flows are intentionally partial and still need side-effect reconciliation before production use.

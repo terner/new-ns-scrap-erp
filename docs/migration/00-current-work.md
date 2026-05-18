@@ -6,16 +6,17 @@ Date: 2026-05-18
 Active app: `apps/next`  
 Primary remote: `new-origin`  
 Last pushed checkpoint: current agent rules checkpoint (`docs: split agent rules into focused docs`)
+Local checkpoint pending push: `docs: add system map api baseline`
 
 ## Current Batch
 
-`Batch DOC2: Agent Rules Refactor`
+`Batch PRE: System Map and API Contract Baseline`
 
 Goal:
 
-- Keep `AGENTS.md` short, high-signal, and fast to read.
-- Move detailed rule sections into `docs/agent-rules/`.
-- Preserve hard rules in `AGENTS.md` so safety-critical constraints remain visible.
+- Create a route/page/API status baseline before the next module batch.
+- Add a first OpenAPI skeleton for existing Next API route handlers.
+- Make sitemap/OpenAPI updates part of the ongoing page-batch QA checklist.
 
 ## File Naming Changes
 
@@ -56,11 +57,11 @@ Goal:
 
 Tasks:
 
-1. Create `docs/migration/18-next-system-sitemap.md`
-2. Inventory navigation routes vs real pages/APIs
-3. Create `docs/api/openapi.yaml` skeleton
-4. Add current API catalog baseline
-5. Commit/push before `Batch S: Stock`
+1. Create `docs/migration/18-next-system-sitemap.md` - done locally
+2. Inventory navigation routes vs real pages/APIs - done locally
+3. Create `docs/api/openapi.yaml` skeleton - done locally
+4. Add current API catalog baseline - done locally
+5. Validate, commit, and push before `Batch S: Stock`
 
 ## Tailwind v4 Migration Status
 
@@ -102,7 +103,7 @@ Runtime note:
 
 ## Agent Rules Refactor Status
 
-Status: completed locally, pending commit/push.
+Status: completed and pushed in checkpoint `55c81c7`.
 
 Changes:
 
@@ -110,10 +111,28 @@ Changes:
 - Detailed rules moved to `docs/agent-rules/`.
 - `docs/migration/00-doc-index.md` now lists the agent rule documents.
 
-Validation required before commit:
+Validation passed in its own checkpoint.
 
-- `git diff --check`
-- review `AGENTS.md` to ensure hard rules remain visible
+## System Map and API Contract Baseline Status
+
+Status: implemented and committed locally, pending push.
+
+Changes:
+
+- Added `docs/migration/18-next-system-sitemap.md`.
+- Added `docs/api/openapi.yaml`.
+- Updated `docs/migration/17-next-remaining-modules-progress.md` with PRE0/PRE1 execution logs.
+
+Current findings:
+
+- `/stock/balance` is still a placeholder and is the first concrete page target for `Batch S`.
+- `/stock/ledger` has a read baseline but still needs query/pagination/running-balance polish.
+- Most main dashboard/reporting and finance-accounting routes remain placeholder coverage.
+
+Validation:
+
+- `git diff --check` passed.
+- `npx --yes @redocly/cli lint docs/api/openapi.yaml` passed validity check with skeleton-level warnings for missing `operationId`, tag descriptions, and some 4XX responses.
 
 ## Current Priority Queue
 

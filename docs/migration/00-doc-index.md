@@ -26,6 +26,8 @@
 | Current work status | `docs/migration/00-current-work.md` | สรุป batch ปัจจุบัน, next task, blockers |
 | Migration document map | `docs/migration/README.md` | รายการ docs migration ทั้งชุด |
 | Remaining module plan | `docs/migration/17-next-remaining-modules-progress.md` | batch/task tree, Playwright rule, OpenAPI/sitemap preflight |
+| Next sitemap/API map | `docs/migration/18-next-system-sitemap.md` | route/page/API/permission status baseline for active Next app |
+| OpenAPI baseline | `docs/api/openapi.yaml` | skeleton API contract catalog for current Next route handlers |
 | Environment status | `docs/migration/10-environment-status.md` | Supabase/Vercel/MCP/env |
 | Master data | `docs/migration/13-next-master-data-progress.md` | Next master-data tracker |
 | Auth/permission | `docs/migration/14-auth-permission-batch-plan.md` | login, users, roles, permissions |
@@ -78,10 +80,11 @@
 | `15-next-daily-transactions-progress.md` | daily transaction progress |
 | `16-next-production-progress.md` | production progress |
 | `17-next-remaining-modules-progress.md` | remaining module batch/task tree |
+| `18-next-system-sitemap.md` | Next route/page/API/permission status map |
 
 ## Planned Documents
 
-ยังต้องสร้างใน Batch PRE:
+Batch PRE created:
 
 - `docs/migration/18-next-system-sitemap.md`
 - `docs/api/openapi.yaml`
