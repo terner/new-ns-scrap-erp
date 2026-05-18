@@ -147,6 +147,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     phone: optionalPhone,
     note: optionalGeneralText('หมายเหตุ', 500),
     symbol: optionalGeneralText('สัญลักษณ์', 20),
+    rateToThb: nonNegativeNumber('อัตราเทียบบาท'),
     parentId: optionalCode('รหัสหมวดแม่'),
     channelType: optionalGeneralText('ประเภทช่องทาง', 80),
     bankName: optionalBusinessText('ธนาคาร', 120),
@@ -189,6 +190,7 @@ export type MasterDataPageConfig = {
   entityName: string
   fields: MasterDataField[]
   columns: MasterDataColumn[]
+  supportsActive?: boolean
 }
 
 export const emptyMasterDataForm: MasterDataFormValues = {

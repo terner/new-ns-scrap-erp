@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/server/prisma'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, normalizeCode, parseMasterDataForm } from '@/lib/server/master-data'
 
 export const runtime = 'nodejs'
@@ -39,15 +40,22 @@ async function getNextCode() {
 
 export async function GET() {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.reference.view')
+
     const rows = await prisma.expense_categories.findMany({ orderBy: { name: 'asc' } })
     return masterDataListJson(rows.map(mapExpenseCategory))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'โหลดข้อมูลหมวดค่าใช้จ่ายไม่ได้', 500)
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.reference.manage')
+
     const values = parseMasterDataForm(await request.json())
     const id = normalizeCode(values.code, values.id || await getNextCode())
     const row = await prisma.expense_categories.upsert({
@@ -57,6 +65,7 @@ export async function POST(request: Request) {
     })
     return masterDataJson(mapExpenseCategory(row))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'บันทึกข้อมูลหมวดค่าใช้จ่ายไม่ได้')
   }
 }

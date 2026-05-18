@@ -1,10 +1,14 @@
+import { z } from 'zod'
 import { prisma } from '@/lib/server/prisma'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, normalizeCode, parseMasterDataForm } from '@/lib/server/master-data'
 
 export const runtime = 'nodejs'
 
 type PurchaseChannel = Awaited<ReturnType<typeof prisma.purchase_channels.findMany>>[number]
 type SalesChannel = Awaited<ReturnType<typeof prisma.sales_channels.findMany>>[number]
+
+const channelTypeSchema = z.enum(['purchase', 'sales'])
 
 function mapChannel(row: PurchaseChannel | SalesChannel, channelType: 'purchase' | 'sales') {
   return {
@@ -45,20 +49,27 @@ async function getNextCode(channelType: 'purchase' | 'sales') {
 
 export async function GET() {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.reference.view')
+
     const [purchaseRows, salesRows] = await Promise.all([
       prisma.purchase_channels.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }] }),
       prisma.sales_channels.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }] }),
     ])
     return masterDataListJson([...purchaseRows.map((row) => mapChannel(row, 'purchase')), ...salesRows.map((row) => mapChannel(row, 'sales'))])
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'โหลดข้อมูลช่องทางไม่ได้', 500)
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.reference.manage')
+
     const values = parseMasterDataForm(await request.json())
-    const channelType = values.channelType === 'sales' ? 'sales' : 'purchase'
+    const channelType = channelTypeSchema.parse(values.channelType)
     const rawId = values.id?.replace(/^(purchase|sales):/, '')
     const code = normalizeCode(values.code, rawId || await getNextCode(channelType))
 
@@ -78,6 +89,7 @@ export async function POST(request: Request) {
     })
     return masterDataJson(mapChannel(row, 'purchase'))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'บันทึกข้อมูลช่องทางไม่ได้')
   }
 }

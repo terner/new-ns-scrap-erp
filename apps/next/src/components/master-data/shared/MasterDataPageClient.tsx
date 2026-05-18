@@ -238,6 +238,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
             <MasterDataForm
               config={config}
               isSaving={isSaving}
+              supportsActive={config.supportsActive !== false}
               record={selectedRecord}
               onCancel={() => {
                 setFormOpen(false)
@@ -343,11 +344,12 @@ type MasterDataFormProps = {
   config: MasterDataPageConfig
   isSaving: boolean
   record: MasterDataRecord | null
+  supportsActive: boolean
   onCancel: () => void
   onSubmit: (values: MasterDataFormValues) => Promise<void>
 }
 
-function MasterDataForm({ config, isSaving, record, onCancel, onSubmit }: MasterDataFormProps) {
+function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, onSubmit }: MasterDataFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<MasterDataFormValues>(() => (record ? recordToForm(record) : emptyMasterDataForm))
 
@@ -376,7 +378,7 @@ function MasterDataForm({ config, isSaving, record, onCancel, onSubmit }: Master
     <form className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-bold text-slate-900">{form.id ? `แก้ไข${config.entityName}` : config.createLabel}</h3>
-        <ActiveToggle checked={form.active} onChange={(checked) => update('active', checked)} />
+        {supportsActive ? <ActiveToggle checked={form.active} onChange={(checked) => update('active', checked)} /> : null}
       </div>
 
       <div className="grid max-h-[76vh] gap-4 overflow-y-auto px-5 py-5 md:grid-cols-3">

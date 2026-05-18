@@ -66,7 +66,7 @@
 | 4 | `directors`, `machines`, `production-lines`, `beneficiaries`, `payment-methods`, `remittance-purposes` | simple master ที่เหลือและ lookup ต่างประเทศ/การเงิน | Done - DB-backed after target migration |
 | B | `products` | ยกระดับสินค้าเป็น specialized customer-style master page | Done |
 | C1 | `branches`, `warehouses`, `accounts` | ยกระดับข้อมูลองค์กร/คลัง/บัญชีให้ใช้ shared customer-style list pattern และ API guard | Done |
-| C2 | `salespersons`, `channels`, `expense-categories`, `currencies` | harden reference masters ที่เหลือในกลุ่ม sales/reference | Planned |
+| C2 | `salespersons`, `channels`, `expense-categories`, `currencies` | harden reference masters ที่เหลือในกลุ่ม sales/reference | Done |
 | C3 | `directors`, `machines`, `production-lines`, `beneficiaries`, `payment-methods`, `remittance-purposes` | harden production/foreign/setup masters ที่เหลือ | Planned |
 
 ## Remaining Customer-Style Hardening Plan
@@ -150,11 +150,18 @@ Batch C2: Sales/reference masters
 - `/master-data/currencies`
 
 Tasks:
-- Keep these lightweight unless a field set requires specialized handling.
-- Ensure shared UI follows the customer-style list pattern.
-- Add field syntax validation and required-field validation.
-- Add route-level API permission guards.
-- Decide/export only where useful; document if skipped because the reference list is small.
+- Done: kept these pages on the shared master UI because current field sets are small reference/setup data.
+- Done: shared UI already follows the customer-style list pattern after C1.
+- Done: added route-level API permission guards:
+  - GET requires `master.reference.view`
+  - POST/PATCH requires `master.reference.manage`
+- Done: added stricter validation for C2 fields through shared schema and route checks:
+  - email/phone syntax for salespersons
+  - non-negative commission/base salary/rate values
+  - channel type must be `purchase` or `sales`
+  - currency code must be 3 uppercase English letters such as `THB`
+- Done: currencies are marked as not supporting active state in the shared UI because the current DB table/API does not persist active/inactive.
+- Decision: skipped `.xlsx` export for C2 for now because these are small reference lists. Add export later only if UAT asks for it.
 
 Batch C3: Production / foreign / setup masters
 - `/master-data/directors`
@@ -302,6 +309,7 @@ Continuation rule:
 | 2026-05-18 | Customer delete action/API cleanup: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Removed customer table delete action; active status is handled by a dedicated `/api/master-data/customers/[id]/status` endpoint and toggle UI |
 | 2026-05-18 | Batch B products specialized page: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build`, unauthenticated route smoke on `127.0.0.1:3002` | Passed | Added specialized `/master-data/products` page, product schema/domain client, product-specific API validation, active toggle, frontend search/filter/sort/count/pagination, and `/api/master-data/products/export`; unauth smoke returned page 307 to login and API/export 401 |
 | 2026-05-18 | Batch C1 organization/finance setup hardening: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Shared master UI now has frontend count/pagination above the table, row-click edit, no dummy checkbox/export action; branches/warehouses/accounts API routes now enforce `master.reference.view/manage`; shared schema validates C1 code/name/contact/account/numeric fields more strictly |
+| 2026-05-18 | Batch C2 sales/reference hardening: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Salespersons/channels/expense-categories/currencies API routes now enforce `master.reference.view/manage`; channels validate `purchase/sales`, currencies validate 3-letter code, shared schema validates non-negative rates, and currencies no longer show active toggle in the form |
 
 ## Open Decisions
 

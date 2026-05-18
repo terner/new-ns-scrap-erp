@@ -32,6 +32,7 @@ export const currenciesPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่มสกุลเงิน',
   entityName: 'สกุลเงิน',
   emptyMessage: 'ไม่พบข้อมูลสกุลเงิน',
+  supportsActive: false,
   fields: [
     { key: 'code', label: 'รหัสสกุลเงิน', required: true },
     { key: 'name', label: 'ชื่อสกุลเงิน', required: true },
