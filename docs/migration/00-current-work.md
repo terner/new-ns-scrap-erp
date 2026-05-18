@@ -58,6 +58,27 @@ Tasks:
 9. Batch M: Main Dashboards and Operational Control
 10. Batch SYS: System and Cleanup
 
+## Operating Model
+
+Before each module batch:
+
+1. Read the module overview and legacy source touchpoints.
+2. Break the module into page-level tasks.
+3. For each page, document the expected fields, buttons, modals, APIs, DB tables, validation, pagination/sort/export, and Playwright checks.
+4. Implement in reviewable slices.
+5. Update the relevant tracker before moving to the next slice.
+6. Commit/push after each meaningful checkpoint.
+
+Use sub agents only for bounded parallel work:
+
+- legacy flow search
+- route/API inventory
+- independent page audit
+- Playwright smoke verification
+- isolated docs or page/API implementation with clear file ownership
+
+Close sub agents when their task is integrated, no longer needed, blocked, overlapping, or after a batch checkpoint leaves them with no remaining work. Do not leave reminder agents open unless the user explicitly requested one for the active task list.
+
 ## Known Carry-over Work
 
 - `reports/` is untracked/local and must not be committed unless explicitly approved.
@@ -93,4 +114,3 @@ Latest full app validation passed before DOC0:
 - `npm run build --workspace @ns-scrap-erp/next`
 
 DOC0 is documentation-only. Run markdown/link checks manually with `rg` before commit.
-
