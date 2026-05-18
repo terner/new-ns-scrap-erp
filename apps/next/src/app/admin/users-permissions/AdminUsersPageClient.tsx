@@ -50,6 +50,27 @@ type AdminUsersPayload = {
 }
 
 type TabKey = 'users' | 'roles'
+type AdminUser = AdminUsersPayload['users'][number]
+
+type UserFormState = {
+  active: boolean
+  branchIds: string[]
+  displayName: string
+  email: string
+  mustChangePassword: boolean
+  roleIds: string[]
+  username: string
+}
+
+const emptyUserForm: UserFormState = {
+  active: true,
+  branchIds: [],
+  displayName: '',
+  email: '',
+  mustChangePassword: false,
+  roleIds: [],
+  username: '',
+}
 
 function statusText(active: boolean) {
   return active ? 'ใช้งาน' : 'ปิด'
@@ -77,41 +98,34 @@ export function AdminUsersPageClient() {
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<TabKey>('users')
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [form, setForm] = useState<UserFormState>(emptyUserForm)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function loadData() {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/admin/users', { cache: 'no-store' })
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'โหลดข้อมูลผู้ใช้ไม่ได้')
+      }
+
+      setData(payload as AdminUsersPayload)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลผู้ใช้ไม่ได้')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let mounted = true
-
-    async function loadData() {
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch('/api/admin/users', { cache: 'no-store' })
-        const payload = await response.json().catch(() => null)
-
-        if (!response.ok) {
-          throw new Error(payload?.error ?? 'โหลดข้อมูลผู้ใช้ไม่ได้')
-        }
-
-        if (mounted) {
-          setData(payload as AdminUsersPayload)
-        }
-      } catch (caught) {
-        if (mounted) {
-          setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลผู้ใช้ไม่ได้')
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
     void loadData()
-
-    return () => {
-      mounted = false
-    }
   }, [])
 
   const filteredUsers = useMemo(() => {
@@ -172,6 +186,84 @@ export function AdminUsersPageClient() {
     }
   }
 
+  function openAddUser() {
+    setEditingUser(null)
+    setForm({
+      ...emptyUserForm,
+      roleIds: data?.roles.find((role) => role.code === 'warehouse')?.id ? [data.roles.find((role) => role.code === 'warehouse')!.id] : [],
+    })
+    setFormError(null)
+    setFormOpen(true)
+  }
+
+  function openEditUser(user: AdminUser) {
+    setEditingUser(user)
+    setForm({
+      active: user.active,
+      branchIds: user.branchIds,
+      displayName: user.displayName ?? '',
+      email: user.email ?? '',
+      mustChangePassword: user.mustChangePassword,
+      roleIds: user.roles.map((role) => role.id),
+      username: user.username,
+    })
+    setFormError(null)
+    setFormOpen(true)
+  }
+
+  function toggleFormArray(key: 'branchIds' | 'roleIds', value: string) {
+    setForm((current) => ({
+      ...current,
+      [key]: current[key].includes(value)
+        ? current[key].filter((item) => item !== value)
+        : [...current[key], value],
+    }))
+  }
+
+  async function saveUser(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setFormError(null)
+
+    if (!form.username.trim() || !form.displayName.trim() || !form.email.trim()) {
+      setFormError('กรอก Username, ชื่อ และ Email')
+      return
+    }
+
+    if (!form.email.includes('@')) {
+      setFormError('รูปแบบอีเมลไม่ถูกต้อง')
+      return
+    }
+
+    if (form.roleIds.length === 0) {
+      setFormError('เลือก role อย่างน้อย 1 รายการ')
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      const response = await fetch(editingUser ? `/api/admin/users/${encodeURIComponent(editingUser.id)}` : '/api/admin/users', {
+        method: editingUser ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'บันทึกผู้ใช้ไม่ได้')
+      }
+
+      setFormOpen(false)
+      setEditingUser(null)
+      setForm(emptyUserForm)
+      await loadData()
+    } catch (caught) {
+      setFormError(caught instanceof Error ? caught.message : 'บันทึกผู้ใช้ไม่ได้')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <section className="space-y-4">
       <div className="rounded-xl border bg-white p-4 shadow">
@@ -180,15 +272,87 @@ export function AdminUsersPageClient() {
             <h2 className="text-xl font-bold text-slate-900">Users & Permissions</h2>
             <p className="text-sm text-slate-500">ผู้ใช้ {data?.users.length ?? 0} รายการ · Roles {data?.roles.length ?? 0} รายการ</p>
           </div>
-          <input
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 md:max-w-xs"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="ค้นหา"
-            type="search"
-            value={search}
-          />
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <input
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 md:w-72"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="ค้นหา"
+              type="search"
+              value={search}
+            />
+            <button className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={!data} type="button" onClick={openAddUser}>
+              เพิ่มผู้ใช้
+            </button>
+          </div>
         </div>
       </div>
+
+      {formOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+          <form className="mt-10 w-full max-w-2xl overflow-hidden rounded-lg border bg-white shadow-xl" onSubmit={saveUser}>
+            <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+              <h3 className="text-lg font-bold text-slate-900">{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้'}</h3>
+              <ActiveToggle checked={form.active} onChange={(checked) => setForm((current) => ({ ...current, active: checked }))} />
+            </div>
+
+            <div className="grid gap-4 px-5 py-5 md:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">
+                Username *
+                <input className="mt-1 w-full rounded border px-3 py-2" value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Email *
+                <input className="mt-1 w-full rounded border px-3 py-2" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+              </label>
+              <label className="md:col-span-2 text-sm font-medium text-slate-700">
+                ชื่อผู้ใช้ *
+                <input className="mt-1 w-full rounded border px-3 py-2" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
+              </label>
+
+              <fieldset className="rounded border p-3">
+                <legend className="px-1 text-sm font-bold text-slate-700">Roles *</legend>
+                <div className="mt-2 grid gap-2">
+                  {data?.roles.filter((role) => role.active).map((role) => (
+                    <label key={role.id} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input checked={form.roleIds.includes(role.id)} type="checkbox" onChange={() => toggleFormArray('roleIds', role.id)} />
+                      <span>{role.name}</span>
+                      <span className="font-mono text-xs text-slate-400">{role.code}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="rounded border p-3">
+                <legend className="px-1 text-sm font-bold text-slate-700">สาขาที่เข้าถึง</legend>
+                <div className="mt-2 grid gap-2">
+                  {data?.branches.map((branch) => (
+                    <label key={branch.id} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input checked={form.branchIds.includes(branch.id)} type="checkbox" onChange={() => toggleFormArray('branchIds', branch.id)} />
+                      <span>{branch.name}</span>
+                      <span className="font-mono text-xs text-slate-400">{branch.code}</span>
+                    </label>
+                  ))}
+                  {data?.branches.length === 0 ? <span className="text-sm text-slate-500">ยังไม่มีสาขาที่เปิดใช้งาน</span> : null}
+                </div>
+              </fieldset>
+
+              <label className="md:col-span-2 flex items-center gap-2 text-sm text-slate-700">
+                <input checked={form.mustChangePassword} type="checkbox" onChange={(event) => setForm((current) => ({ ...current, mustChangePassword: event.target.checked }))} />
+                บังคับเปลี่ยน password หลังเข้าสู่ระบบ
+              </label>
+
+              {formError ? <p className="md:col-span-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p> : null}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-4">
+              <button className="rounded px-4 py-2 text-sm text-slate-600" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+              <button className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={isSaving} type="submit">
+                {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border bg-white shadow">
         <div className="flex border-b">
@@ -223,6 +387,7 @@ export function AdminUsersPageClient() {
                   <th className="p-2 text-left">สาขา</th>
                   <th className="p-2 text-center">สถานะ</th>
                   <th className="p-2 text-left">Login ล่าสุด</th>
+                  <th className="p-2 text-center">แก้ไข</th>
                 </tr>
               </thead>
               <tbody>
@@ -239,11 +404,16 @@ export function AdminUsersPageClient() {
                       </span>
                     </td>
                     <td className="p-2 text-slate-600">{formatDate(user.lastLoginAt)}</td>
+                    <td className="p-2 text-center">
+                      <button className="text-blue-700 hover:underline" type="button" onClick={() => openEditUser(user)}>
+                        แก้ไข
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td className="p-4 text-center text-sm text-slate-500" colSpan={7}>ไม่พบผู้ใช้</td>
+                    <td className="p-4 text-center text-sm text-slate-500" colSpan={8}>ไม่พบผู้ใช้</td>
                   </tr>
                 ) : null}
               </tbody>

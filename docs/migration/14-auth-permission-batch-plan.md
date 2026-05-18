@@ -34,7 +34,9 @@
 - Server auth context helper exists at `apps/next/src/lib/server/auth-context.ts`.
 - `/api/auth/me` exists as a protected route to return current auth/app user, roles, and permission codes.
 - `/api/admin/users` exists as the first user-management API slice and requires `system.users.manage`.
-- `/admin/users-permissions` exists as a read-only Next page over real `app_users`, `app_roles`, and active branches.
+- `/api/admin/users` also supports creating `app_users` with role and branch assignments; it does not create or store passwords.
+- `/api/admin/users/[id]` supports editing app user profile, role assignments, branch access, active status, and must-change-password flag.
+- `/admin/users-permissions` exists as a Next page over real `app_users`, `app_roles`, and active branches, with create/edit modal flow.
 - User active/inactive can be changed from `/admin/users-permissions` through `/api/admin/users/[id]/status`; self-deactivation is blocked.
 - Admin Supabase Auth user has been linked into `app_users` through `scripts/seed-app-admin.mjs`; the script reads `APP_ADMIN_EMAIL` or `DEV_LOGIN_IDENTIFIER` and does not store passwords.
 - App auth SQL helper functions exist in `dev-target`: `current_app_user_id`, `current_app_role_codes`, `current_app_permission_codes`, `is_app_admin`, and `has_app_permission`.
@@ -310,3 +312,4 @@ Validation:
 | 2026-05-18 | B3 user-management API first slice: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added protected `/api/admin/users` for app users, roles, and active branches; route requires `system.users.manage` |
 | 2026-05-18 | B3 read-only users/permissions page: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added `/admin/users-permissions` read-only page and kept forgot/reset password pages outside the app shell |
 | 2026-05-18 | B3 user status toggle: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added `/api/admin/users/[id]/status` and active toggle in user table; self-deactivation returns 400 |
+| 2026-05-18 | B3 user create/edit flow: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added protected create/edit app user APIs and `/admin/users-permissions` modal form for username, email, display name, roles, branch access, active status, and must-change-password flag; no password storage or admin-set password |

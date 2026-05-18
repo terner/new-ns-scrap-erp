@@ -5,6 +5,10 @@ import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
 
+const routeParamsSchema = z.object({
+  id: z.string().uuid(),
+})
+
 const adminUserFormSchema = z.object({
   active: z.boolean().default(true),
   branchIds: z.array(z.string().min(1)).default([]),
@@ -18,8 +22,8 @@ const adminUserFormSchema = z.object({
     .regex(/^[A-Za-z0-9._-]+$/, 'Username ใช้ได้เฉพาะอังกฤษ ตัวเลข จุด ขีดกลาง และ underscore'),
 })
 
-function toIso(value: Date | null) {
-  return value ? value.toISOString() : null
+type AdminUserRouteProps = {
+  params: Promise<unknown>
 }
 
 async function assertUserRefs(roleIds: string[], branchIds: string[]) {
@@ -45,98 +49,22 @@ async function assertUserRefs(roleIds: string[], branchIds: string[]) {
   }
 }
 
-export async function GET() {
+export async function PATCH(request: Request, { params }: AdminUserRouteProps) {
   try {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'system.users.manage')
 
-    const [users, roles, branches] = await Promise.all([
-      prisma.app_users.findMany({
-        include: {
-          app_user_branch_access: {
-            include: {
-              branches: true,
-            },
-          },
-          app_user_roles: {
-            include: {
-              app_roles: true,
-            },
-          },
-        },
-        orderBy: [{ active: 'desc' }, { username: 'asc' }],
-      }),
-      prisma.app_roles.findMany({
-        orderBy: [{ is_system: 'desc' }, { name: 'asc' }],
-      }),
-      prisma.branches.findMany({
-        orderBy: [{ code: 'asc' }, { name: 'asc' }],
-        where: {
-          active: true,
-        },
-      }),
-    ])
-
-    return NextResponse.json({
-      branches: branches.map((branch) => ({
-        code: branch.code,
-        id: branch.id,
-        name: branch.name,
-      })),
-      roles: roles.map((role) => ({
-        active: role.active,
-        branchScope: role.branch_scope,
-        canEditOpeningBalance: role.can_edit_opening_balance,
-        canSeeCash: role.can_see_cash,
-        canSeeCost: role.can_see_cost,
-        canSeeFinancials: role.can_see_financials,
-        canSeeProfit: role.can_see_profit,
-        code: role.code,
-        description: role.description,
-        id: role.id,
-        isSystem: role.is_system,
-        name: role.name,
-      })),
-      users: users.map((user) => ({
-        active: user.active,
-        authUserId: user.auth_user_id,
-        branchIds: user.app_user_branch_access.map((branch) => branch.branch_id),
-        branches: user.app_user_branch_access.map((branch) => ({
-          code: branch.branches.code,
-          id: branch.branch_id,
-          name: branch.branches.name,
-        })),
-        createdAt: toIso(user.created_at),
-        displayName: user.display_name,
-        email: user.email,
-        id: user.id,
-        lastLoginAt: toIso(user.last_login_at),
-        mustChangePassword: user.must_change_password,
-        roles: user.app_user_roles.map((userRole) => ({
-          branchScope: userRole.app_roles.branch_scope,
-          code: userRole.app_roles.code,
-          id: userRole.role_id,
-          name: userRole.app_roles.name,
-        })),
-        updatedAt: toIso(user.updated_at),
-        username: user.username,
-      })),
-    })
-  } catch (caught) {
-    return authContextErrorResponse(caught)
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const context = await getCurrentAuthContext()
-    requirePermission(context, 'system.users.manage')
-
+    const { id } = routeParamsSchema.parse(await params)
     const values = adminUserFormSchema.parse(await request.json())
     await assertUserRefs(values.roleIds, values.branchIds)
 
+    if (context.appUser?.id === id && values.active === false) {
+      return NextResponse.json({ error: 'ไม่สามารถปิดบัญชีของตัวเองได้' }, { status: 400 })
+    }
+
     const existing = await prisma.app_users.findFirst({
       where: {
+        id: { not: id },
         OR: [
           { username: { equals: values.username, mode: 'insensitive' } },
           { email: { equals: values.email, mode: 'insensitive' } },
@@ -149,41 +77,43 @@ export async function POST(request: Request) {
     }
 
     const actor = context.appUser?.username ?? context.authUser.email ?? 'system'
-    const user = await prisma.$transaction(async (tx) => {
-      const created = await tx.app_users.create({
+
+    await prisma.$transaction(async (tx) => {
+      await tx.app_users.update({
         data: {
           active: values.active,
-          created_by: actor,
           display_name: values.displayName,
           email: values.email,
           must_change_password: values.mustChangePassword,
           updated_by: actor,
           username: values.username,
         },
+        where: { id },
       })
 
+      await tx.app_user_roles.deleteMany({ where: { user_id: id } })
       await tx.app_user_roles.createMany({
         data: values.roleIds.map((roleId) => ({
           created_by: actor,
           role_id: roleId,
-          user_id: created.id,
+          user_id: id,
         })),
       })
+
+      await tx.app_user_branch_access.deleteMany({ where: { user_id: id } })
 
       if (values.branchIds.length) {
         await tx.app_user_branch_access.createMany({
           data: values.branchIds.map((branchId) => ({
             branch_id: branchId,
             created_by: actor,
-            user_id: created.id,
+            user_id: id,
           })),
         })
       }
-
-      return created
     })
 
-    return NextResponse.json({ id: user.id }, { status: 201 })
+    return NextResponse.json({ id })
   } catch (caught) {
     return authContextErrorResponse(caught)
   }
