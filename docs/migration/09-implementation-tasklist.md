@@ -372,7 +372,7 @@ Tracker: [16-next-production-progress.md](/Users/watcharathatsrithanesiganon/Doc
 - [x] Batch P1: เพิ่ม target DB/API สำหรับ `production_output_categories` แบบ additive และ seed จาก legacy
 - [x] Batch P2: port `/production/orders` read baseline พร้อม API และ server-side pagination/filter/sort
 - [ ] Batch P3: port production output write flow ให้ใช้ category จาก DB และเขียน `production_outputs`/`stock_ledger`
-- [ ] Batch P4: port production dashboard/report/cost/yield/machine utilization read baseline
+- [x] Batch P4: port production dashboard/report/cost/yield/machine utilization read baseline
 
 ## Phase 7: Testing and Reconciliation
 

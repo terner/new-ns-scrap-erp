@@ -1,0 +1,25 @@
+import { NextResponse } from 'next/server'
+import { apiErrorResponse } from '@/lib/server/api-error'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { loadProductionMetrics, summarizeProductionMetrics } from '@/lib/server/production-reports'
+
+export const runtime = 'nodejs'
+
+export async function GET(request: Request) {
+  try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'production.operations.view')
+    const url = new URL(request.url)
+    const rows = await loadProductionMetrics({
+      branchId: url.searchParams.get('branchId') || undefined,
+      dateFrom: url.searchParams.get('dateFrom') || undefined,
+      dateTo: url.searchParams.get('dateTo') || undefined,
+      machineId: url.searchParams.get('machineId') || undefined,
+      status: url.searchParams.get('status') || undefined,
+    })
+    return NextResponse.json({ rows, summary: summarizeProductionMetrics(rows) })
+  } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'โหลดรายงานการผลิตไม่ได้', 500)
+  }
+}

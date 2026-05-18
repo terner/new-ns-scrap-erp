@@ -187,12 +187,25 @@ Scope:
 - `/production/machine-utilization`
 - `/production/wip-report`
 
+Status: Done read baseline on 2026-05-18.
+
 Tasks:
 
-- [ ] Port DB-connected read dashboards/reports from legacy.
-- [ ] Aggregate from `production_orders`, `production_inputs`, `production_outputs`, `stock_ledger`, machines, and production lines.
-- [ ] Add filters by date, branch, machine, production line, category, and product where relevant.
-- [ ] Add XLSX export only after read totals reconcile.
+- [x] Port DB-connected read dashboards/reports from legacy.
+- [x] Add additive legacy report fields on `production_orders`:
+  - `machine_id`, `production_line_id`, `production_type`, `shift`, supervisor/operator names, planned qty, normal loss percent, cost allocation method, and production warehouse fields.
+- [x] Add additive `process_costs` target table for production cost report and future process-cost write flow.
+- [x] Add shared production report helper for input/output/loss/WIP/yield/cost calculations.
+- [x] Add pages and APIs:
+  - `/production/dashboard` + `/api/production/dashboard`
+  - `/production/wip-report` + `/api/production/wip-report`
+  - `/production/report` + `/api/production/report`
+  - `/production/production-cost-report` + `/api/production/production-cost-report`
+  - `/production/yield-loss-report` + `/api/production/yield-loss-report`
+  - `/production/machine-utilization` + `/api/production/machine-utilization`
+- [x] Add date filters on report pages.
+- [x] Add CSV export buttons on report pages where legacy had export: production report, cost report, yield/loss report.
+- [x] Keep report/dashboard pages read-only; no stock/cost mutation is performed in this batch.
 
 ## Open Decisions
 
@@ -206,6 +219,14 @@ Tasks:
 
 - Legacy flow inventory and output category finding documented.
 - Batch P1 and P2 implemented locally.
+- Batch P4 report/dashboard read baseline implemented locally.
 - Dev-target DB has `production_output_categories` with 4 legacy values.
 - Next has `/production/output-categories`, `/api/production/output-categories`, `/production/orders`, and `/api/production/orders`.
+- Next now has every production menu page from legacy as a DB-connected read baseline:
+  - `/production/dashboard`
+  - `/production/wip-report`
+  - `/production/report`
+  - `/production/production-cost-report`
+  - `/production/yield-loss-report`
+  - `/production/machine-utilization`
 - Next already has production-related master data pages for machines and production lines.
