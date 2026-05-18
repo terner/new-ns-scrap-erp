@@ -580,7 +580,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: desktop `/finance/ap` loaded with `GET /api/finance/ap` 200, search/filter narrowed rows, detail modal opened, export endpoint returned `.xlsx` 200; mobile 390x844 loaded with API 200 and no new console warning/error.
 - Commands: `git diff --check`; `npm run type-check --workspace @ns-scrap-erp/next`; `npm run lint --workspace @ns-scrap-erp/next`; `npm run build --workspace @ns-scrap-erp/next`; `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`.
 - Result: F2 AP polish validated. OpenAPI remains valid with existing skeleton warnings outside hardened finance endpoints.
-- Commit: this checkpoint.
+- Commit: `1331a79 feat: polish finance ap baseline` pushed to `main`.
 
 ### F3: Bank Statement
 

@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: finance AR baseline (`4e239fd feat: add finance ar baseline`)
+Last pushed checkpoint: finance AP polish (`1331a79 feat: polish finance ap baseline`)
 
 ## Current Batch
 
@@ -188,7 +188,7 @@ Current scope:
 
 - F0 maps the legacy/Vue finance-debt pages and target DB tables before implementation.
 - F1 AR read/report baseline is implemented, validated, and pushed.
-- F2 AP polish is implemented and validated in the current checkpoint.
+- F2 AP polish is implemented, validated, and pushed.
 - Money-moving writes remain out of scope until reconciliation and allocation rules are clear.
 
 Initial F0 findings:
@@ -200,10 +200,9 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Commit/push F2 AP polish.
-2. Continue immediately to F3 Bank Statement.
-3. Add `/api/finance/bank` and `/finance/bank` read/reconciliation baseline.
-4. Run validation/browser smoke, commit/push, then continue to F4 Cash Position.
+1. Continue immediately to F3 Bank Statement.
+2. Add `/api/finance/bank` and `/finance/bank` read/reconciliation baseline.
+3. Run validation/browser smoke, commit/push, then continue to F4 Cash Position.
 
 ## Operating Model
 
