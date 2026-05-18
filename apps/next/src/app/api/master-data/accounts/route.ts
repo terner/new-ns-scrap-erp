@@ -45,6 +45,22 @@ async function getNextCode() {
   return nextSequentialCode(last?.code, 'ACC')
 }
 
+async function assertActiveBankName(bankName: string | null) {
+  if (!bankName) return
+
+  const bank = await prisma.bank_names.findFirst({
+    select: { id: true },
+    where: {
+      active: true,
+      name: bankName,
+    },
+  })
+
+  if (!bank) {
+    throw new Error('ชื่อธนาคารที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')
+  }
+}
+
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
@@ -66,6 +82,7 @@ export async function POST(request: Request) {
     const values = parseMasterDataForm(await request.json())
     const code = normalizeCode(values.code, values.id || await getNextCode())
     const accountType = accountTypeSchema.parse(values.type || 'bank')
+    await assertActiveBankName(values.bankName)
     const row = await prisma.accounts.upsert({
       where: { id: values.id || code },
       create: {

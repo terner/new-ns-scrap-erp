@@ -88,7 +88,14 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
               return (
                 <div key={item.href}>
                   <div className={`flex border-l-4 transition hover:bg-slate-800 ${active ? 'border-blue-500 bg-slate-800 text-white' : 'border-transparent text-slate-300'}`}>
-                    <Link className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left" href={item.href} onClick={onNavigate}>
+                    <Link
+                      className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left"
+                      href={item.href}
+                      onClick={() => {
+                        if (item.children?.length) toggleMenu(item.href)
+                        onNavigate?.()
+                      }}
+                    >
                       <span className="w-5 text-center">{item.icon}</span>
                       <span className="truncate">{item.label}</span>
                     </Link>

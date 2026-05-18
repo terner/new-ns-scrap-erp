@@ -197,7 +197,15 @@ export const navigationItems: NavigationItem[] = [
     ],
   },
   { href: '/master-data/branches', icon: '🏢', label: 'สาขา / คลัง', section: 'master-data' },
-  { href: '/master-data/accounts', icon: '💳', label: 'บัญชีเงิน', section: 'master-data' },
+  {
+    href: '/master-data/accounts',
+    icon: '💳',
+    label: 'บัญชีเงิน',
+    section: 'master-data',
+    children: [
+      { href: '/master-data/bank-names', icon: '🏦', label: 'ชื่อธนาคาร', section: 'master-data' },
+    ],
+  },
   { href: '/master-data/channels', icon: '🔀', label: 'ช่องทางซื้อ/ขาย', section: 'master-data' },
   { href: '/master-data/expense-categories', icon: '📂', label: 'หมวดค่าใช้จ่าย', section: 'master-data' },
   { href: '/master-data/directors', icon: '🧑‍💼', label: 'กรรมการ/พนักงาน', section: 'master-data' },

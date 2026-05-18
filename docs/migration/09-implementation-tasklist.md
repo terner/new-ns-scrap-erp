@@ -281,6 +281,7 @@ Reporting rule:
 - [x] แยก field ธนาคาร/เลขบัญชีในกลุ่มข้อมูลหลักที่ยังเป็นบัญชีธนาคารก้อนเดียว: directors และ payment methods ใช้ `bank_name` + `account_no` แบบ additive migration; suppliers/accounts/beneficiaries ใช้ field แยกอยู่แล้ว
 - [x] ปรับสินค้าให้ไม่ใช้ข้อมูล `metal_group`, `item_status`, `grade`, `std_price`, `std_cost` ใน Next flow แล้ว: เอาออกจาก form/table/filter/API write/export โดยยังไม่ drop column เพื่อไม่ให้ข้อมูลเก่าหาย
 - [x] เพิ่ม master ย่อยใต้สินค้า: `/master-data/product-types` และ `/master-data/product-units`; หน้า Products ใช้ dropdown จาก DB สำหรับประเภทสินค้าและหน่วยสินค้า โดย seed หน่วย `กิโลกรัม (กก.)`, `ลัง` และประเภท `อิเล็กทรอนิกส์`
+- [x] เพิ่ม master ย่อยใต้บัญชีเงิน: `/master-data/bank-names`; หน้า Accounts ใช้ dropdown ชื่อธนาคารจาก DB และ API validate ว่าชื่อธนาคารต้อง active
 - [x] เปลี่ยน active/inactive form control เป็น toggle ใน customer, supplier, และ shared master-data forms
 - [x] reset branch กลับ checkpoint `d6e8b29` หลังทดลอง sidebar/shadcn design; Tailwind v4/shadcn sidebar ไม่อยู่ใน baseline ปัจจุบัน
 - [x] ทำ product page ให้เป็น specialized page แบบ customer/supplier

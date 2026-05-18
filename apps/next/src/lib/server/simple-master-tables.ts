@@ -11,7 +11,7 @@ import {
   updateMasterDataStatusSchema,
 } from '@/lib/server/master-data'
 
-type SimpleMasterKind = 'directors' | 'machines' | 'productionLines' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes'
+type SimpleMasterKind = 'bankNames' | 'directors' | 'machines' | 'productionLines' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes'
 
 type Delegate = {
   findMany: (args?: unknown) => Promise<unknown[]>
@@ -59,6 +59,28 @@ function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMaster
 }
 
 const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
+  bankNames: {
+    delegate: () => prisma.bank_names as Delegate,
+    prefix: 'BANK-',
+    orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    map: (row) => {
+      const record = asRecord(row)
+      return {
+        id: record.id,
+        code: record.code,
+        name: record.name,
+        active: record.active,
+        createdAt: toIso(record.created_at as Date | null),
+        updatedAt: toIso(record.updated_at as Date | null),
+      }
+    },
+    data: (values, id, code) => ({
+      id,
+      code,
+      name: values.name,
+      active: values.active,
+    }),
+  },
   directors: {
     delegate: () => prisma.director_employees as Delegate,
     prefix: 'D',

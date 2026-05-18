@@ -139,6 +139,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [records, setRecords] = useState<MasterDataRecord[]>([])
+  const [fieldOptions, setFieldOptions] = useState<Partial<Record<keyof MasterDataFormValues, Array<{ label: string; value: string }>>>>({})
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
@@ -150,14 +151,32 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
     setError(null)
     setIsLoading(true)
     try {
-      const rows = await listMasterDataRecords(config.apiPath)
+      const optionFields = config.fields.filter((field) => field.optionsApiPath)
+      const [rows, optionResults] = await Promise.all([
+        listMasterDataRecords(config.apiPath),
+        Promise.all(optionFields.map(async (field) => ({
+          key: field.key,
+          rows: await listMasterDataRecords(field.optionsApiPath as string),
+        }))),
+      ])
       setRecords(rows)
+      setFieldOptions(Object.fromEntries(optionResults.map((result) => [
+        result.key,
+        result.rows
+          .filter((row) => row.active)
+          .map((row) => ({ label: row.name, value: row.name })),
+      ])))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : `โหลดข้อมูล${config.entityName}ไม่ได้`)
     } finally {
       setIsLoading(false)
     }
-  }, [config.apiPath, config.entityName])
+  }, [config.apiPath, config.entityName, config.fields])
+
+  const resolvedConfig = useMemo(() => ({
+    ...config,
+    fields: config.fields.map((field) => fieldOptions[field.key] ? { ...field, options: fieldOptions[field.key] } : field),
+  }), [config, fieldOptions])
 
   useEffect(() => {
     void loadData()
@@ -274,7 +293,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
           <div className="w-full max-w-4xl">
             <MasterDataForm
-              config={config}
+              config={resolvedConfig}
               isSaving={isSaving}
               supportsActive={config.supportsActive !== false}
               record={selectedRecord}

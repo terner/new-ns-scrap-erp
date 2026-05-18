@@ -327,6 +327,7 @@ Continuation rule:
 | 2026-05-18 | Bank account split + product field cleanup: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Product form/table/API/export no longer uses metal group, item status, grade, standard price, or standard cost; master bank account fields validate account number syntax |
 | 2026-05-18 | Additive product type/unit master migrations on `dev-target` | Passed | Created `product_units` with 2 seed rows and `product_types` with 12 rows including `อิเล็กทรอนิกส์`; no product rows changed or deleted |
 | 2026-05-18 | Product type/unit submenu integration: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Sidebar supports collapsible product submenu; product type/unit routes are included in the Next build |
+| 2026-05-18 | Bank names submenu integration: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Created `bank_names` in `dev-target` with 2 valid seed rows; `/master-data/bank-names` and API routes are included in the Next build |
 
 ## Open Decisions
 
@@ -343,6 +344,8 @@ Continuation rule:
   - `/master-data/product-types` for product type options, seeded with `อิเล็กทรอนิกส์` plus distinct existing product types from `products.type`.
   - `/master-data/product-units` for product unit options, seeded with `กิโลกรัม (กก.)` and `ลัง`.
   - Product add/edit uses dropdowns from these DB-backed masters and the API validates selected product type/unit against active rows.
+- Account master now has DB-backed child setup page `/master-data/bank-names` under the account menu. Account add/edit loads bank names as a dropdown from `/api/master-data/bank-names`; the account API validates that selected bank names are active rows before save.
+- Sidebar parent menu rows with children now toggle their submenu when clicked, while still navigating to the parent page.
 - Confirm whether combined `/master-data/channels` should stay as one UI over `purchase_channels` + `sales_channels`, or split visually later while preserving the current sidebar route.
 - Decide whether small static/reference option lists such as person title prefixes should remain code constants with DB seed/reference rows, or become fully DB-driven cached config later.
 - Decide whether/when to introduce Upstash Redis for master/reference-data cache and rate limiting; not implemented yet.

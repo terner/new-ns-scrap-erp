@@ -202,6 +202,7 @@ export type MasterDataFieldType = 'text' | 'number' | 'select'
 export type MasterDataField = {
   key: keyof MasterDataFormValues
   label: string
+  optionsApiPath?: string
   type?: MasterDataFieldType
   options?: Array<{ label: string; value: string }>
   required?: boolean
