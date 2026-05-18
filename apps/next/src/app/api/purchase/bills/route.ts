@@ -32,6 +32,11 @@ type BillQuery = {
   sortKey: string
 }
 
+function branchBillCode(branchCode: string | null | undefined) {
+  const digits = String(branchCode ?? '').replace(/\D/g, '')
+  return digits ? digits.padStart(2, '0').slice(-2) : null
+}
+
 function billJson(row: PurchaseBillRow) {
   return {
     branchId: row.branch_id ?? '',
@@ -90,22 +95,26 @@ function isDocNoConflict(caught: unknown) {
   return caught.meta.target.includes('doc_no')
 }
 
-async function nextPurchaseBillDocNo(tx: Prisma.TransactionClient, date: string) {
+async function nextPurchaseBillDocNo(tx: Prisma.TransactionClient, date: string, branchCode: string) {
   const compactDate = date.slice(2, 4) + date.slice(5, 7)
-  const startsWith = `PB${compactDate}-`
-  const last = await tx.purchase_bills.findFirst({
-    orderBy: { doc_no: 'desc' },
-    select: { doc_no: true },
-    where: { doc_no: { startsWith } },
-  })
-  const lastNumber = Number(String(last?.doc_no ?? '').slice(startsWith.length))
-  const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1
+  const startsWith = `PB${branchCode}${compactDate}-`
+  const rows = await tx.$queryRaw<Array<{ doc_no: string }>>`
+    select doc_no
+    from public.purchase_bills
+    where doc_no like ${`PB${compactDate}-%`}
+       or doc_no like ${`PB__${compactDate}-%`}
+  `
+  const lastNumber = rows.reduce((max, row) => {
+    const running = Number(row.doc_no.split('-').at(-1))
+    return Number.isFinite(running) && running > max ? running : max
+  }, 0)
+  const nextNumber = lastNumber + 1
   return `${startsWith}${String(nextNumber).padStart(4, '0')}`
 }
 
 async function optionsPayload() {
   const [branches, channels, poBuys, products, salespersons, suppliers, warehouses] = await Promise.all([
-    prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true } }),
+    prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.purchase_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true } }),
     prisma.po_buys.findMany({
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
@@ -330,6 +339,12 @@ export async function POST(request: Request) {
     if (values.warehouseId && !warehouse) return NextResponse.json({ code: 'BAD_REQUEST', error: 'คลังไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (values.channelId && !channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (values.salesId && !salesperson) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เซลที่ดูแลไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (values.branchId && warehouse?.branch_id && warehouse.branch_id !== values.branchId) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาและคลังไม่ตรงกัน' }, { status: 400 })
+
+    const effectiveBranchId = values.branchId ?? warehouse?.branch_id ?? null
+    const effectiveBranch = branch ?? (effectiveBranchId ? await prisma.branches.findFirst({ where: { active: true, id: effectiveBranchId } }) : null)
+    const effectiveBranchCode = branchBillCode(effectiveBranch?.code)
+    if (!effectiveBranch || !effectiveBranchCode) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เลือกสาขาที่มีรหัสสาขา 01 หรือ 02 ก่อนบันทึกบิล' }, { status: 400 })
 
     const poBuyById = new Map(poBuys.map((po) => [po.id, po]))
     const missingPoBuy = poBuyIds.find((poBuyId) => !poBuyById.has(poBuyId))
@@ -367,11 +382,11 @@ export async function POST(request: Request) {
         bill = await prisma.$transaction(async (tx) => {
           await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('purchase_bills.doc_no'))`
           const id = `PB-${randomUUID()}`
-          const docNo = await nextPurchaseBillDocNo(tx, values.date)
+          const docNo = await nextPurchaseBillDocNo(tx, values.date, effectiveBranchCode)
 
           return tx.purchase_bills.create({
             data: {
-              branch_id: values.branchId,
+              branch_id: effectiveBranch.id,
               channel_id: values.channelId,
               contact_phone: values.contactPhone,
               created_by: actor,

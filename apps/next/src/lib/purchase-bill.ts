@@ -53,7 +53,7 @@ export const purchaseBillItemSchema = z.object({
 })
 
 export const purchaseBillFormSchema = z.object({
-  branchId: optionalSafeId('สาขา'),
+  branchId: z.string().trim().min(1, 'เลือกสาขา'),
   channelId: optionalSafeId('ช่องทาง'),
   contactPhone: optionalPhone('เบอร์โทร'),
   date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD'),

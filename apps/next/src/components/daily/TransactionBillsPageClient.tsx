@@ -106,7 +106,7 @@ const blankItem = (): PurchaseBillFormValues['items'][number] => ({
 })
 
 const initialPurchaseForm = (): PurchaseBillFormValues => ({
-  branchId: null,
+  branchId: '',
   channelId: null,
   contactPhone: null,
   date: todayDateInput(),
@@ -481,10 +481,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
                 <div className="grid gap-3 md:grid-cols-3">
                 <Field error={fieldErrors.date} label="วันที่ *"><input className="w-full rounded border px-3 py-2" type="date" value={form.date} onChange={(event) => updateForm('date', event.target.value)} /></Field>
-                <Field label="เลขที่บิล"><div className="rounded border bg-slate-100 px-3 py-2 font-mono font-bold text-slate-500">ระบบจะออกเลขให้ตอนบันทึก</div></Field>
+                <Field label="เลขที่บิล"><div className="rounded border bg-slate-100 px-3 py-2 font-mono font-bold text-slate-500">ระบบจะออกเลขให้ตอนบันทึก เช่น PB012605-0001</div></Field>
                 <Field error={fieldErrors.refNo} label="เลขที่อ้างอิง (บิล Supplier)"><input className="w-full rounded border px-3 py-2 font-mono" placeholder="เช่น INV-12345" value={form.refNo ?? ''} onChange={(event) => updateForm('refNo', event.target.value || null)} /></Field>
                 <SelectField className="md:col-span-3" error={fieldErrors.supplierId} label="ผู้ขาย *" options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
-                <SelectField error={fieldErrors.branchId} label="สาขา" options={activeBranches} value={form.branchId ?? ''} onChange={(value) => updateForm('branchId', value || null)} />
+                <SelectField error={fieldErrors.branchId} label="สาขา *" options={activeBranches} value={form.branchId} onChange={(value) => updateForm('branchId', value)} />
                 <SelectField error={fieldErrors.warehouseId} label="คลัง" options={activeWarehouses} value={form.warehouseId ?? ''} onChange={(value) => updateForm('warehouseId', value || null)} />
                 <SelectField error={fieldErrors.channelId} label="ช่องทางซื้อ" options={activeChannels} value={form.channelId ?? ''} onChange={(value) => updateForm('channelId', value || null)} />
                 <Field error={fieldErrors.licensePlate} label="ทะเบียนรถ"><input className="w-full rounded border px-3 py-2 uppercase" placeholder="เช่น 1กข-1234 / 70-1234" value={form.licensePlate ?? ''} onChange={(event) => updateForm('licensePlate', event.target.value.toUpperCase() || null)} /></Field>
