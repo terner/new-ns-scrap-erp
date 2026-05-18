@@ -454,6 +454,9 @@ type FormFieldProps = {
 }
 
 function FormField({ error, field, value, onChange }: FormFieldProps) {
+  const isEmailField = field.key === 'email'
+  const inputType = field.type === 'number' ? 'number' : isEmailField ? 'email' : 'text'
+
   if (field.type === 'select') {
     return (
       <label className="block text-sm font-medium">
@@ -480,9 +483,13 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
         aria-invalid={Boolean(error)}
         aria-required={field.required}
         className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none focus:border-slate-700 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-        type={field.type === 'number' ? 'number' : 'text'}
+        inputMode={isEmailField ? 'email' : undefined}
+        type={inputType}
         value={String(value ?? '')}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          const nextValue = isEmailField ? event.target.value.replace(/[^\x20-\x7E]/g, '') : event.target.value
+          onChange(nextValue)
+        }}
       />
       {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}
     </label>
