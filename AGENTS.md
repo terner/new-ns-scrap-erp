@@ -2,9 +2,22 @@
 
 This project is an existing NS Scrap ERP system that must be rehabilitated and refactored, not rewritten blindly.
 
+## Must Follow
+
+- Use Thai for user-facing explanations unless the user explicitly requests another language.
+- Active implementation/deploy target is the Next.js app under `apps/next/`.
+- Treat `old-apps/legacy/` and `old-apps/vue/` as source material only. Do not route to, import, or execute them from the active app.
+- Use `dev-target` Supabase for development and schema work. Do not develop directly against `legacy-prod-source`.
+- Never commit secrets, production dumps, raw sensitive exports, or `.env.local`.
+- Do not store user passwords in application tables. Use `auth.users` as the authentication source of truth.
+- Do not use destructive git commands or revert user changes unless explicitly requested.
+- Update docs at every meaningful checkpoint as if the session can close at any time.
+- Use a sub agent by default for Playwright/browser QA work; the main agent still defines scope and integrates findings.
+- Split large refactors into reviewable batches with one clear module, transform, or behavior change per batch.
+
 ## Required Reading
 
-Before doing substantial work, read:
+Before substantial work, read:
 - `docs/migration/00-current-work.md`
 - `docs/migration/00-doc-index.md`
 - `REQUIREMENTS_TARGET_SYSTEM.md`
@@ -17,322 +30,50 @@ For database or migration work, also read:
 - `docs/migration/04-master-data-definition.md`
 - `docs/migration/05-schema-mapping.md`
 - `docs/migration/07-reconciliation-plan.md`
+- `docs/agent-rules/database.md`
 
-## Project-Level Configuration Rule
+## Detailed Rule Files
 
-Project-specific knowledge and configuration should live in this repository, not in global user configuration.
+Read only the relevant detailed rule files for the task:
 
-Keep these in project-level files:
-- agent rules: `AGENTS.md`
-- project-level skills: `.agents/skills/`
-- MCP project routing: `.mcp.json`
-- migration plans: `docs/migration/`
-- requirements and architecture docs: `REQUIREMENTS_TARGET_SYSTEM.md`
-- non-secret env templates: `.env.example`
-- git ignore rules: `.gitignore`
+- Project config, MCP, skills, secrets: `docs/agent-rules/configuration.md`
+- Database and Supabase environments: `docs/agent-rules/database.md`
+- Active app, legacy source, migration priority, code organization: `docs/agent-rules/development.md`
+- Forms, API payloads, syntax validation, master data list pattern: `docs/agent-rules/validation.md`
+- Testing, browser QA, Playwright expectations: `docs/agent-rules/testing.md`
+- Sub agent usage and close rules: `docs/agent-rules/sub-agents.md`
+- Resumable checkpoint docs: `docs/agent-rules/session-handoff.md`
+- Git and communication: `docs/agent-rules/git-communication.md`
 
-Do not put this project's MCP routing in global Codex config unless explicitly requested. Global MCP entries can cause other projects or future sessions to connect to the wrong project or vault.
+## Project Goal
 
-Project-level MCP entries in `.mcp.json`:
-- `supabase`: dev-target Supabase project
-- `supabase-prod-source`: legacy production source, read-only
-- `obsidian`: Obsidian vault scoped to this repository path
-
-Project-level skills live in `.agents/skills/`. Project-specific shortcut skills must point back to `AGENTS.md` and the canonical docs instead of duplicating project rules.
-
-Current project-level skills:
-- `ns-scrap-erp-migration`: shortcut for DB, migration, Supabase Auth/RLS, and phase planning tasks
-- `ns-scrap-erp-input-validation`: shortcut for required/syntax validation on forms, API payloads, and database-backed write flows
-- `ns-scrap-erp-obsidian`: shortcut for project notes, MOCs, decision logs, and Obsidian navigation
-- `ns-scrap-erp-quality-audit`: shortcut for click-path audit, browser QA, accessibility, workspace surface audit, and final verification
-- `codebase-migrate`: batch-oriented migration/refactor workflow; use local reviewable batches unless external Composio tooling is explicitly configured
-- `webapp-testing`: Playwright-oriented local web app testing workflow for archived legacy source checks, Vue/Vite routes, screenshots, console logs, and browser behavior
-- `vue-best-practices`: Vue 3 best practices for `.vue`, Vue Router, Pinia, and Vite work
-- `vue-vite-project-setup`: project-specific Vue/Vite setup workflow that keeps legacy source archived separately while building the new Vue app
-- `vue-vitest-testing`: project-specific Vue/Vitest testing workflow for components, stores, services, schemas, and migration-critical logic
-- `pinia`: Pinia store patterns for Vue client/app state
-- `supabase`: official Supabase agent skill for Database, Auth, RLS, Storage, CLI, MCP, migrations, and security tasks
-- `supabase-postgres-best-practices`: official Supabase Postgres performance, schema, indexing, and RLS guidance
-
-Keep these out of git and only in local/private storage:
-- `.env.local`
-- OAuth tokens
-- database passwords
-- service role keys
-- production dumps
-- raw sensitive exports
-
-## Primary Goal
-
-The main requirement is to improve the existing system so that both code and database structure are correct, maintainable, and traceable while preserving the current business flow as much as possible.
+Improve the existing system so both code and database structure are correct, maintainable, and traceable while preserving current business flow as much as practical.
 
 Do not treat this as a greenfield rewrite unless explicitly instructed.
 
-## Language
+## Current Environment Shortlist
 
-Use Thai for user-facing explanations unless the user explicitly requests another language.
+- Active app: `apps/next/`
+- Dev/target Supabase: `fhglqymcdmrgbsbadnwr`
+- Legacy production/source Supabase: `mqsgptraslgpyzbpndlg` read-only
+- Staging/UAT: not created yet
+- New production: not created yet
+- Project MCP config: `.mcp.json`
+- Project skills: `.agents/skills/`
+- Current work handoff: `docs/migration/00-current-work.md`
 
-## Architecture Direction
+## Validation Baseline
 
-Current active implementation/deploy target:
-- Next.js app under `apps/next/`
+For meaningful code changes, run validation proportional to risk. For the active Next app, prefer:
 
-Historical/target rehabilitation notes below still describe the earlier Vue/Vite direction and remain useful for legacy comparison, but active implementation work in this repo currently happens in `apps/next/` unless explicitly redirected.
-
-Target stack:
-- Vue 3
-- Vite
-- TypeScript
-- Vue Router
-- Pinia
-- TanStack Query
-- Tailwind CSS
-- Zod
-- VueUse
-- Supabase Auth / Postgres / Storage
-- IndexedDB / Dexie only where offline or local cache is required
-
-## Legacy Source Rules
-
-- The old application is archived locally under `old-apps/legacy/`; this path is ignored by git.
-- The audited Vue/Vite baseline lives locally under `old-apps/vue/`; this path is ignored by git.
-- The active deploy target currently lives under `apps/next/`.
-- Do not route to, import, or execute `old-apps/legacy/` from the active app.
-- Use `old-apps/legacy/` and `old-apps/vue/` only as source material: copy the necessary function/module into the active app, then refactor it into the new structure.
-- Preserve the existing UI appearance and business flow where possible while implementing it in the new app.
-- Refactor by module and by risk, not by wholesale replacement.
-- Large refactors must be split into reviewable batches with one clear module, transform, or behavior change per batch.
-
-## Sub Agent Operating Rules
-
-Use sub agents only for bounded work that can run in parallel without blocking the main implementation path.
-
-Good sub agent tasks:
-- Legacy/source investigation, such as finding where a menu, flow, field, or calculation is used in `old-apps/legacy/`.
-- Independent codebase questions, such as listing all routes/APIs affected by one module.
-- Parallel page audits after a batch is implemented, such as checking buttons, modals, validation, pagination, export, and empty/error states.
-- Verification side work while the main agent continues implementation, such as Playwright smoke paths, route inventory, or API response checks.
-- Bounded implementation with disjoint file ownership, such as one worker handling only docs while another handles one isolated page or API.
-
-Use a sub agent by default for Playwright work:
-- browser reconnaissance through Playwright MCP
-- click-path smoke checks
-- screenshot/accessibility snapshot review
-- console/network error inspection
-- responsive viewport checks
-
-The main agent remains responsible for defining the exact Playwright task, continuing non-overlapping implementation work, integrating findings, updating docs, and deciding whether code changes are required.
-
-Do not use sub agents for:
-- The immediate blocking task on the critical path.
-- Broad unclear requests like "finish everything" without a page/module/task boundary.
-- Database schema changes unless the write scope and target environment are explicit.
-- Git reset/revert, secret handling, production data changes, or destructive operations.
-- Work that overlaps with another active agent's file ownership.
-
-Before starting a sub agent:
-- Define the exact question or deliverable.
-- Define read/write ownership. For code changes, specify files or module boundaries.
-- State that it must not revert or overwrite other agents' or user changes.
-- Ask for concise output: findings, changed files, validation run, and blockers.
-
-Close a sub agent when:
-- Its assigned task is complete and the result has been integrated or recorded.
-- The result is no longer needed because the main plan changed.
-- It is idle, blocked, or waiting on information the main agent can resolve faster.
-- Its work would start overlapping with the main agent or another agent.
-- A batch checkpoint is committed/pushed and there is no remaining task for that agent.
-
-Long-running reminder agents are allowed only when the user explicitly asks for them. They must be closed when the current task list is complete or when the work pauses for discussion.
-
-## Session Handoff Rules
-
-Work as if the session can close at any time.
-
-For every meaningful checkpoint, update the relevant documentation before or immediately after code changes:
-- `docs/migration/00-current-work.md` for current status, next task, blockers, partial/incomplete work, and latest validation.
-- The module tracker for the active batch, such as `13-next-master-data-progress.md`, `15-next-daily-transactions-progress.md`, `16-next-production-progress.md`, or `17-next-remaining-modules-progress.md`.
-- `docs/migration/00-doc-index.md` only when adding, renaming, or changing the canonical role of documents.
-- `REQUIREMENTS_TARGET_SYSTEM.md` when a confirmed behavior changes target requirements.
-
-Checkpoint notes must be written so a new session can continue without relying on chat history:
-- current branch/remote when relevant
-- exact active batch/task/page
-- files changed or expected write areas
-- commands already run and their result
-- incomplete work and why it is incomplete
-- next concrete task to execute
-- validation still required before commit/push
-
-After documenting a checkpoint, actively identify the next task from `00-current-work.md` and the relevant tracker. Continue with that task unless the user pauses, redirects, or asks to discuss first.
-
-## Migration Priority
-
-Work must generally follow this order:
-1. Project structure and development foundation
-2. Security, users, roles, permissions
-3. Master data
-4. Key basic data
-5. Core transactions
-6. Inventory and stock logic
-7. Finance and operational controls
-8. Advanced modules
-9. Reporting and cutover
-
-Do not start heavy transaction migration before master data and key basic data are defined and validated.
-
-## Database Rules
-
-- The current database dump is a baseline and migration source, not the final target model.
-- Prefer relational structure over transaction-critical `jsonb`.
-- Split transaction headers and lines.
-- Use real foreign keys where practical.
-- Keep ledger-style tables traceable and preferably append-only.
-- Use `auth.users` as the authentication source of truth.
-- Do not store user passwords in application tables.
-- Normalize roles and permissions instead of duplicating permission models.
-- Define reconciliation queries for any migrated financial, stock, or transaction data.
-
-## Sensitive Data Rules
-
-Never commit secrets or sensitive database dumps.
-
-Do not commit:
-- database passwords
-- Supabase service role keys
-- private access tokens
-- production `.env` files
-- `reports/db_audit/full_dump.sql`
-- raw data exports that contain customer, supplier, user, auth, payment, or financial data
-
-If generated audit files are needed for local analysis, keep them local unless the user explicitly approves committing sanitized versions.
-
-## Database Environment Rules
-
-Use a separate Supabase dev/target project for development, auth testing, RLS testing, and frontend integration.
-
-The customer's old production Supabase should be treated as a legacy source system only.
-
-Environment naming:
-- `dev-target`: `fhglqymcdmrgbsbadnwr`
-- `legacy-prod-source`: `mqsgptraslgpyzbpndlg`
-- `staging-uat`: not created yet
-- `new-prod`: not created yet
-
-Account boundary:
-- `dev-target`, `legacy-prod-source`, and future `staging-uat` should be separate Supabase account/project contexts where practical.
-- Do not assume access tokens, Auth users, API keys, Storage buckets, or project settings are shared.
-
-Rules:
-- For Supabase access, try the project-level MCP server first (`supabase` for `dev-target`, `supabase-prod-source` for read-only legacy source) before falling back to Supabase CLI, `psql`, or direct connection strings.
-- If MCP is not visible or not authenticated, report that explicitly and only use CLI/`psql` as a fallback with the target project verified first.
-- Do not develop directly against `legacy-prod-source`.
-- Do not run destructive operations against `legacy-prod-source` unless the user explicitly asks for it and the command scope is clear.
-- Use legacy production DB credentials only for read-only audit, dump, and migration-source work.
-- Apply schema changes to `dev-target` first.
-- Test Supabase Auth and RLS in `dev-target`, not in plain local Postgres.
-- Use future `staging-uat` for customer/user testing before any production cutover.
-- Final production target is open: either validated migration back into the customer's old environment or a new production Supabase project.
-
-## Code Organization Rules
-
-When creating the Vue/Vite structure, use:
-
-```text
-src/
-  router/
-  views/
-  components/
-  stores/
-  composables/
-  services/
-  queries/
-  schemas/
-  lib/
+```bash
+npm run lint --workspace @ns-scrap-erp/next
+npm run type-check --workspace @ns-scrap-erp/next
+npm run build --workspace @ns-scrap-erp/next
 ```
 
-Layer responsibilities:
-- views: page composition
-- components: reusable UI
-- stores: client/app state only; do not store server cache or direct database access here
-- queries/services: data access and mutations
-- schemas: validation
-- lib: pure utilities
+For docs-only changes, at minimum run:
 
-Business logic should not be embedded in templates.
-
-## Input Validation Rules
-
-For every new or changed form/API field, define validation before saving data:
-- Required fields must be explicit in the shared schema and shown in the UI.
-- Validate syntax for every input field, not just presence. Examples: email syntax, phone number shape, tax ID length/digits, numeric ranges, date format/order, enum membership, text length, and allowed characters for names/codes.
-- Validate on both client-side form submission and server/API boundaries. Client validation is for UX; server validation is authoritative.
-- For constrained fields, filter invalid characters while typing/pasting in addition to submit validation. Email inputs must strip/prevent non-ASCII characters. Phone inputs must strip/prevent letters and unsupported symbols, allowing only digits, spaces, dashes, parentheses, dots, and leading plus. Phone inputs must enforce 9-15 digits; do not allow more than 15 digits to remain in the field.
-- Display Thai phone numbers in readable form where possible: 10-digit mobile numbers as `085-555-5555` and 9-digit local numbers as `02-555-5555`.
-- Show field-level error messages in the form for all validation failures.
-- Do not rely on HTML input types alone. Use Zod or the module's existing schema layer as the source of truth.
-- Keep validation practical for Thai business data: allow Thai text where appropriate, but reject control characters, obviously invalid punctuation, malformed identifiers, and negative values where not allowed.
-
-## Master Data List Pattern
-
-For small/medium master data screens, prefer loading the master list once and doing table UX in the frontend:
-- search in frontend
-- filter in frontend
-- sort in frontend
-- count in frontend
-- pagination in frontend
-
-This applies to master/reference data such as customers, suppliers, products, branches, warehouses, currencies, channels, payment methods, machines, and production lines while row counts remain practical for a browser payload.
-
-Keep DB/server-side filtering and pagination for:
-- transaction lists
-- stock ledger
-- audit/activity logs
-- reports
-- very large master tables
-- permission/branch-scope filtering that must not be trusted to the browser
-
-Export may still call a server API that queries the database with the current search/filter/sort so the exported file matches the visible intent without depending on the current page slice.
-
-## Testing and Validation
-
-For migration/refactor work, include validation proportional to risk:
-- schema validation for master data
-- permission logic tests
-- row count comparison
-- orphan FK checks
-- transaction total reconciliation
-- stock balance reconciliation
-- smoke tests for login and core flows
-
-Use `ns-scrap-erp-quality-audit` for substantial UI, state, workflow, or release-readiness checks.
-Use `ns-scrap-erp-migration` batch guidance for large legacy-to-Vue, DB, schema, or repeated code transformations.
-
-For click-path work, verify:
-- the touchpoint label and user expectation
-- the handler call order
-- state reads, writes, resets, and side effects
-- async ordering and race conditions
-- whether final UI state matches the action intent
-
-For browser QA, verify:
-- console and network failures
-- desktop and mobile viewport behavior
-- login, protected routes, logout, and core navigation
-- valid and invalid form submissions
-- accessibility basics: keyboard access, focus visibility, labels, and modal focus behavior
-
-## Git Rules
-
-- Do not revert user changes unless explicitly requested.
-- Do not use destructive git commands unless explicitly requested.
-- Keep commits focused by phase or module.
-- Do not commit local tool settings such as `.claude/settings.local.json` unless the user explicitly wants it.
-
-## Communication Rules
-
-When explaining work:
-- Be direct and concise.
-- Explain tradeoffs clearly.
-- Surface risk early.
-- State whether a change affects legacy behavior, database structure, or migration assumptions.
+```bash
+git diff --check
+```

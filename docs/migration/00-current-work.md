@@ -5,17 +5,17 @@
 Date: 2026-05-18  
 Active app: `apps/next`  
 Primary remote: `new-origin`  
-Last pushed checkpoint: current MCP tooling checkpoint (`chore: add playwright mcp config`)
+Last pushed checkpoint: current agent rules checkpoint (`docs: split agent rules into focused docs`)
 
 ## Current Batch
 
-`Batch MCP: Browser QA Tooling`
+`Batch DOC2: Agent Rules Refactor`
 
 Goal:
 
-- Add project-level Playwright MCP without replacing existing Supabase/Obsidian MCP config.
-- Keep browser QA tooling discoverable in environment docs.
-- Require Codex restart before expecting the new MCP tools in runtime.
+- Keep `AGENTS.md` short, high-signal, and fast to read.
+- Move detailed rule sections into `docs/agent-rules/`.
+- Preserve hard rules in `AGENTS.md` so safety-critical constraints remain visible.
 
 ## File Naming Changes
 
@@ -26,6 +26,11 @@ Goal:
 
 ## Latest Completed Implementation Checkpoints
 
+- `cf7df95 docs: prefer sub agents for playwright qa`
+  - Documented that Playwright QA should use sub agents by default
+- `285eef6 chore: add playwright mcp config`
+  - Added project-level Playwright MCP config
+  - Documented Playwright MCP environment status
 - `3805587 chore: upgrade next app to tailwind v4`
   - Upgraded active Next app to Tailwind CSS v4
   - Validated lint, type-check, build, and Tailwind package resolution
@@ -78,7 +83,7 @@ Validation passed:
 
 ## Playwright MCP Status
 
-Status: configured locally, pending commit/push.
+Status: configured and pushed.
 
 Changes:
 
@@ -94,6 +99,21 @@ Validation passed:
 Runtime note:
 
 - Restart Codex before expecting `/mcp` or MCP resources/tools to show the new `playwright` server.
+
+## Agent Rules Refactor Status
+
+Status: completed locally, pending commit/push.
+
+Changes:
+
+- `AGENTS.md` is now a short entrypoint with hard rules, required reading, rule links, environment shortlist, and validation baseline.
+- Detailed rules moved to `docs/agent-rules/`.
+- `docs/migration/00-doc-index.md` now lists the agent rule documents.
+
+Validation required before commit:
+
+- `git diff --check`
+- review `AGENTS.md` to ensure hard rules remain visible
 
 ## Current Priority Queue
 

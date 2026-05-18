@@ -12,13 +12,15 @@
 2. `docs/migration/00-current-work.md` - สถานะล่าสุดและ next task
 3. `REQUIREMENTS_TARGET_SYSTEM.md` - requirements ของระบบเป้าหมาย
 4. `docs/migration/17-next-remaining-modules-progress.md` - tracker งานที่เหลือทั้งหมด
-5. Tracker เฉพาะเรื่องที่เกี่ยวข้องกับงานนั้น
+5. `docs/agent-rules/README.md` - index ของ rule รายละเอียดเฉพาะงาน
+6. Tracker เฉพาะเรื่องที่เกี่ยวข้องกับงานนั้น
 
 ## Canonical Sources
 
 | Topic | Canonical Document | Notes |
 |---|---|---|
-| Agent/project rules | `AGENTS.md` | ต้องตามก่อน skill/doc อื่น |
+| Agent/project rules | `AGENTS.md` | hard rules และ entrypoint; ต้องตามก่อน skill/doc อื่น |
+| Detailed agent rules | `docs/agent-rules/README.md` | rule เฉพาะเรื่อง เช่น DB, validation, testing, sub agents |
 | Target requirements | `REQUIREMENTS_TARGET_SYSTEM.md` | แทนชื่อเดิม `SRS.md`; ใช้เป็น SRS ของระบบใหม่/เป้าหมาย |
 | Legacy/prototype requirements | `REQUIREMENTS_LEGACY_PROTOTYPE.md` | แทนชื่อเดิม `NS_Scrap_ERP_System_Requirements.md`; ใช้อ้างอิงระบบเก่า |
 | Current work status | `docs/migration/00-current-work.md` | สรุป batch ปัจจุบัน, next task, blockers |
@@ -40,6 +42,20 @@
   - เอกสารระบบเก่า/prototype
   - ใช้อ้างอิง behavior, menus, roles, offline/local behavior เดิม
   - ไม่ใช่ source of truth ของ target architecture
+
+## Agent Rule Documents
+
+| File | Use For |
+|---|---|
+| `docs/agent-rules/README.md` | index rule รายละเอียด |
+| `docs/agent-rules/configuration.md` | project config, MCP, skills, secrets |
+| `docs/agent-rules/database.md` | DB design, Supabase environments, migration safety |
+| `docs/agent-rules/development.md` | active app, legacy source, migration priority |
+| `docs/agent-rules/validation.md` | form/API syntax validation, master data list pattern |
+| `docs/agent-rules/testing.md` | test/QA, Playwright, click-path checks |
+| `docs/agent-rules/sub-agents.md` | sub agent usage and close rules |
+| `docs/agent-rules/session-handoff.md` | resumable checkpoint documentation |
+| `docs/agent-rules/git-communication.md` | git and communication rules |
 
 ## Migration Trackers
 
@@ -79,4 +95,3 @@
 - Tracker เฉพาะหมวดใช้รูปแบบ:
   - `NN-next-<module>-progress.md`
 - เอกสารที่เป็นสถานะปัจจุบันต้องมีคำว่า `current` และอัปเดตบ่อยได้
-
