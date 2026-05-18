@@ -613,6 +613,7 @@ model bank_names {
   id         String   @id
   code       String   @unique
   name       String   @unique
+  symbol     String?
   active     Boolean  @default(true)
   created_at DateTime @default(now()) @db.Timestamptz(6)
   updated_at DateTime @default(now()) @db.Timestamptz(6)
@@ -699,6 +700,10 @@ model customers {
   code                String?
   name                String
   tax_id              String?
+  contact             String?
+  contact_title       String?
+  contact_first_name  String?
+  contact_last_name   String?
   phone               String?
   email               String?
   address             String?
@@ -712,7 +717,6 @@ model customers {
   sales_id            String?
   updated_by          String?
   version             Int?            @default(1)
-  contact             String?
   type                String?
   credit_limit        Decimal?        @db.Decimal
   address_no          String?
@@ -728,9 +732,6 @@ model customers {
   name_title          String?
   first_name          String?
   last_name           String?
-  contact_title       String?
-  contact_first_name  String?
-  contact_last_name   String?
   po_sells            po_sells[]
   receipts            receipts[]
   sales_bills         sales_bills[]
@@ -1675,15 +1676,11 @@ model suppliers {
   updated_by          String?
   version             Int?             @default(1)
   type                String?
-  contact             String?
   credit_limit        Decimal?         @db.Decimal
   market_scope        String           @default("ในประเทศ")
   name_title          String?
   first_name          String?
   last_name           String?
-  contact_title       String?
-  contact_first_name  String?
-  contact_last_name   String?
   address_no          String?
   address_moo         String?
   address_village     String?

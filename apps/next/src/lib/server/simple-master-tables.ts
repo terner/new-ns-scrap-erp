@@ -61,7 +61,7 @@ function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMaster
 const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   bankNames: {
     delegate: () => prisma.bank_names as Delegate,
-    prefix: 'BANK-',
+    prefix: '',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
     map: (row) => {
       const record = asRecord(row)
@@ -69,6 +69,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         id: record.id,
         code: record.code,
         name: record.name,
+        symbol: record.symbol,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -78,6 +79,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       id,
       code,
       name: values.name,
+      symbol: values.symbol || null,
       active: values.active,
     }),
   },
@@ -235,8 +237,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         code: record.code,
         name: record.name,
         type: record.type,
-        bankName: record.bank_name,
-        accountNo: record.account_no,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -247,8 +247,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       code,
       name: values.name,
       type: values.type || null,
-      bank_name: values.bankName || null,
-      account_no: values.accountNo || null,
       active: values.active,
     }),
   },

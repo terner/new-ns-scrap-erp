@@ -12,7 +12,6 @@ export const runtime = 'nodejs'
 const sortColumns = {
   active: 'active',
   code: 'code',
-  contact: 'contact',
   creditLimit: 'credit_limit',
   creditTerm: 'credit_term',
   email: 'email',
@@ -65,7 +64,6 @@ function supplierSearchWhere(q: string, supplierType: string, marketScope: strin
     { phone: { contains: q, mode: 'insensitive' } },
     { email: { contains: q, mode: 'insensitive' } },
     { address: { contains: q, mode: 'insensitive' } },
-    { contact: { contains: q, mode: 'insensitive' } },
     { bank_name: { contains: q, mode: 'insensitive' } },
     { bank_account: { contains: q, mode: 'insensitive' } },
     { bank_account_name: { contains: q, mode: 'insensitive' } },

@@ -23,10 +23,6 @@ type PrismaSupplier = {
   address_province: string | null
   address_postal_code: string | null
   address_country: string | null
-  contact: string | null
-  contact_title: string | null
-  contact_first_name: string | null
-  contact_last_name: string | null
   bank_name: string | null
   bank_account: string | null
   bank_account_name: string | null
@@ -65,10 +61,6 @@ export function mapPrismaSupplier(row: PrismaSupplier): Supplier {
     addressProvince: row.address_province,
     addressPostalCode: row.address_postal_code,
     addressCountry: row.address_country,
-    contact: row.contact,
-    contactTitle: row.contact_title,
-    contactFirstName: row.contact_first_name,
-    contactLastName: row.contact_last_name,
     bankName: row.bank_name,
     accountNo: row.bank_account,
     bankAccount: row.bank_account_name,
@@ -105,7 +97,6 @@ export function toSupplierWriteInput(values: SupplierFormValues) {
   const parsed = supplierFormSchema.parse(values)
   const code = parsed.code?.toUpperCase() || parsed.id || ''
   const personName = [parsed.nameTitle, parsed.firstName, parsed.lastName].map((part) => part?.trim()).filter(Boolean).join(' ')
-  const contactName = [parsed.contactTitle, parsed.contactFirstName, parsed.contactLastName].map((part) => part?.trim()).filter(Boolean).join(' ')
   const name = parsed.type === 'บุคคล' ? personName : parsed.name
 
   return {
@@ -130,10 +121,6 @@ export function toSupplierWriteInput(values: SupplierFormValues) {
     address_province: parsed.addressProvince || null,
     address_postal_code: parsed.addressPostalCode || null,
     address_country: parsed.addressCountry || 'ไทย',
-    contact: contactName || parsed.contact || null,
-    contact_title: parsed.contactTitle || null,
-    contact_first_name: parsed.contactFirstName || null,
-    contact_last_name: parsed.contactLastName || null,
     bank_name: parsed.bankName || null,
     bank_account: parsed.accountNo || null,
     bank_account_name: parsed.bankAccount || null,

@@ -16,7 +16,7 @@ import { formatPhoneDisplay, sanitizeAccountNoInput, sanitizePhoneInput } from '
 import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
 import { listThaiDistricts, listThaiProvinces, listThaiSubdistricts, type ThaiDistrict, type ThaiProvince, type ThaiSubdistrict } from '@/lib/thai-address'
 
-type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'phone' | 'email' | 'salesName' | 'contact' | 'creditTerm' | 'creditLimit' | 'active'
+type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'phone' | 'email' | 'salesName' | 'creditTerm' | 'creditLimit' | 'active'
 
 const emptySupplierForm: SupplierFormValues = {
   id: undefined,
@@ -39,10 +39,6 @@ const emptySupplierForm: SupplierFormValues = {
   addressProvince: null,
   addressPostalCode: null,
   addressCountry: 'ไทย',
-  contact: null,
-  contactTitle: null,
-  contactFirstName: null,
-  contactLastName: null,
   creditTerm: null,
   creditLimit: null,
   bankName: null,
@@ -80,10 +76,6 @@ function supplierToForm(supplier: Supplier): SupplierFormValues {
     addressProvince: supplier.addressProvince,
     addressPostalCode: supplier.addressPostalCode,
     addressCountry: supplier.addressCountry ?? 'ไทย',
-    contact: supplier.contact,
-    contactTitle: supplier.contactTitle,
-    contactFirstName: supplier.contactFirstName,
-    contactLastName: supplier.contactLastName,
     creditTerm: supplier.creditTerm,
     creditLimit: supplier.creditLimit,
     bankName: supplier.bankName,
@@ -469,7 +461,6 @@ export function SuppliersPageClient() {
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('phone')}>โทร{sortLabel('phone')}</button></th>
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('email')}>อีเมล{sortLabel('email')}</button></th>
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('salesName')}>ผู้ดูแล{sortLabel('salesName')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('contact')}>ผู้ติดต่อ{sortLabel('contact')}</button></th>
                 <th className="min-w-[220px] p-2 text-left">ที่อยู่</th>
                 <th className="p-2 text-right"><button className="font-semibold" type="button" onClick={() => setSort('creditTerm')}>Term (วัน){sortLabel('creditTerm')}</button></th>
                 <th className="p-2 text-right"><button className="font-semibold" type="button" onClick={() => setSort('creditLimit')}>วงเงินเครดิต{sortLabel('creditLimit')}</button></th>
@@ -499,7 +490,6 @@ export function SuppliersPageClient() {
                   <td className="p-2">{displayValue(formatPhoneDisplay(supplier.phone))}</td>
                   <td className="p-2">{displayValue(supplier.email)}</td>
                   <td className="p-2">{displayValue(supplier.salesName)}</td>
-                  <td className="p-2">{displayValue(supplier.contact)}</td>
                   <td className="p-2">{displayValue(supplier.address)}</td>
                   <td className="p-2 text-right">{supplier.creditTerm ?? '-'}</td>
                   <td className="p-2 text-right">{formatMoney(supplier.creditLimit)}</td>
@@ -527,7 +517,7 @@ export function SuppliersPageClient() {
               ))}
               {paginatedSuppliers.length === 0 ? (
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={13}>ไม่พบข้อมูลที่ค้นหา</td>
+                  <td className="p-4 text-center text-sm text-slate-500" colSpan={12}>ไม่พบข้อมูลที่ค้นหา</td>
                 </tr>
               ) : null}
             </tbody>
@@ -670,14 +660,8 @@ function SupplierForm({ supplier, districts, isSaving, provinces, salespersons, 
         </section>
 
         <section>
-          <h4 className="mb-3 text-sm font-bold text-slate-700">ข้อมูลติดต่อ</h4>
+          <h4 className="mb-3 text-sm font-bold text-slate-700">ช่องทางติดต่อ</h4>
           <div className="grid gap-4 md:grid-cols-4">
-            <SelectField error={errors.contactTitle} label="คำนำหน้าผู้ติดต่อ" value={form.contactTitle ?? ''} onChange={(value) => update('contactTitle', value || null)}>
-              <option value="">เลือกคำนำหน้า</option>
-              {personTitleOptions.map((title) => <option key={title} value={title}>{title}</option>)}
-            </SelectField>
-            <TextField error={errors.contactFirstName} label="ชื่อผู้ติดต่อ" value={form.contactFirstName ?? ''} onChange={(value) => update('contactFirstName', value || null)} />
-            <TextField error={errors.contactLastName} label="นามสกุลผู้ติดต่อ" value={form.contactLastName ?? ''} onChange={(value) => update('contactLastName', value || null)} />
             <TextField error={errors.phone} label="โทรศัพท์" value={form.phone ?? ''} onChange={(value) => update('phone', value)} />
             <TextField error={errors.email} label="อีเมล" type="email" value={form.email ?? ''} onChange={(value) => update('email', value || null)} />
           </div>

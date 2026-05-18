@@ -1,11 +1,8 @@
-import { z } from 'zod'
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { errorJson, masterDataJson, masterDataListJson, normalizeCode, parseMasterDataForm, toIso, toNumber } from '@/lib/server/master-data'
+import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, normalizeCode, parseMasterDataForm, toIso, toNumber } from '@/lib/server/master-data'
 
 export const runtime = 'nodejs'
-
-const currencyCodeSchema = z.string().trim().regex(/^[A-Z]{3}$/, 'รหัสสกุลเงินต้องเป็นตัวอักษรอังกฤษ 3 ตัว เช่น THB')
 
 function mapCurrency(row: Awaited<ReturnType<typeof prisma.currencies.findMany>>[number]) {
   return {
@@ -36,6 +33,16 @@ function mapCurrency(row: Awaited<ReturnType<typeof prisma.currencies.findMany>>
   }
 }
 
+async function getNextCurrencyCode() {
+  const rows = await prisma.currencies.findMany({
+    orderBy: { code: 'desc' },
+    select: { code: true },
+    take: 20,
+  })
+  const lastNumericCode = rows.find((row) => /^\d+$/.test(row.code))?.code
+  return nextSequentialCode(lastNumericCode, '', 3)
+}
+
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
@@ -55,11 +62,11 @@ export async function POST(request: Request) {
     requirePermission(context, 'master.reference.manage')
 
     const values = parseMasterDataForm(await request.json())
-    const code = currencyCodeSchema.parse(normalizeCode(values.code, values.id || ''))
+    const code = normalizeCode(values.code, values.id || await getNextCurrencyCode())
     const row = await prisma.currencies.upsert({
       where: { code: values.id || code },
       create: { code, name: values.name, symbol: values.symbol || null, rate_to_thb: values.rateToThb },
-      update: { name: values.name, symbol: values.symbol || null, rate_to_thb: values.rateToThb },
+      update: { code, name: values.name, symbol: values.symbol || null, rate_to_thb: values.rateToThb },
     })
     return masterDataJson(mapCurrency(row))
   } catch (caught) {

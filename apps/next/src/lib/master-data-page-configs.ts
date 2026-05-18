@@ -32,7 +32,7 @@ export const currenciesPageConfig: MasterDataPageConfig = {
   emptyMessage: 'ไม่พบข้อมูลสกุลเงิน',
   supportsActive: false,
   fields: [
-    { key: 'code', label: 'รหัสสกุลเงิน', required: true },
+    { key: 'code', label: 'รหัส', required: true },
     { key: 'name', label: 'ชื่อสกุลเงิน', required: true },
     { key: 'symbol', label: 'สัญลักษณ์' },
     { key: 'rateToThb', label: 'อัตราเทียบบาท', type: 'number' },
@@ -154,12 +154,14 @@ export const bankNamesPageConfig: MasterDataPageConfig = {
   entityName: 'ชื่อธนาคาร',
   emptyMessage: 'ไม่พบข้อมูลชื่อธนาคาร',
   fields: [
-    { key: 'code', label: 'รหัสธนาคาร', required: true },
+    { key: 'code', label: 'รหัส', required: true },
     { key: 'name', label: 'ชื่อธนาคาร', required: true },
+    { key: 'symbol', label: 'สัญลักษณ์' },
   ],
   columns: [
     { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อธนาคาร' },
+    { key: 'symbol', label: 'สัญลักษณ์', align: 'center' },
     statusColumn,
   ],
 }
@@ -174,13 +176,12 @@ export const suppliersPageConfig: MasterDataPageConfig = {
     { key: 'name', label: 'ชื่อผู้ขาย', required: true },
     { key: 'type', label: 'ประเภท' },
     { key: 'taxId', label: 'เลขผู้เสียภาษี' },
-    { key: 'contact', label: 'ผู้ติดต่อ' },
     { key: 'phone', label: 'โทรศัพท์' },
     { key: 'email', label: 'อีเมล' },
     { key: 'branchId', label: 'รหัสสาขา' },
     { key: 'creditTerm', label: 'เครดิตเทอม (วัน)', type: 'number' },
     { key: 'creditLimit', label: 'วงเงินเครดิต', type: 'number' },
-    { key: 'bankName', label: 'ธนาคาร' },
+    { key: 'bankName', label: 'ธนาคาร', type: 'select', optionsApiPath: '/api/master-data/bank-names' },
     { key: 'accountNo', label: 'เลขบัญชี' },
     { key: 'address', label: 'ที่อยู่' },
     { key: 'note', label: 'หมายเหตุ' },
@@ -260,7 +261,7 @@ export const directorsPageConfig: MasterDataPageConfig = {
     { key: 'name', label: 'ชื่อ', required: true },
     { key: 'type', label: 'ประเภท', type: 'select', options: [{ label: 'กรรมการ', value: 'กรรมการ' }, { label: 'พนักงาน', value: 'พนักงาน' }, { label: 'อื่นๆ', value: 'อื่นๆ' }] },
     { key: 'phone', label: 'โทรศัพท์' },
-    { key: 'bankName', label: 'ธนาคาร' },
+    { key: 'bankName', label: 'ธนาคาร', type: 'select', optionsApiPath: '/api/master-data/bank-names' },
     { key: 'accountNo', label: 'เลขบัญชี' },
   ],
   columns: [
@@ -353,14 +354,10 @@ export const paymentMethodsPageConfig: MasterDataPageConfig = {
   fields: [
     { key: 'name', label: 'ชื่อ', required: true },
     { key: 'type', label: 'ประเภท', type: 'select', options: [{ label: 'Cash', value: 'Cash' }, { label: 'Bank Transfer', value: 'Bank Transfer' }, { label: 'Cheque', value: 'Cheque' }, { label: 'PromptPay', value: 'PromptPay' }, { label: 'Credit Card', value: 'Credit Card' }, { label: 'QR Payment', value: 'QR Payment' }, { label: 'International Transfer', value: 'International Transfer' }, { label: 'FCD Transfer', value: 'FCD Transfer' }, { label: 'Offset / Netting', value: 'Offset / Netting' }, { label: 'Other', value: 'Other' }] },
-    { key: 'bankName', label: 'ธนาคาร' },
-    { key: 'accountNo', label: 'เลขบัญชี' },
   ],
   columns: [
     { key: 'name', label: 'ชื่อ' },
     { key: 'type', label: 'ประเภท' },
-    { key: 'bankName', label: 'ธนาคาร' },
-    { key: 'accountNo', label: 'เลขบัญชี' },
     statusColumn,
   ],
 }

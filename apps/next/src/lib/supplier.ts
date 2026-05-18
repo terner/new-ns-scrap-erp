@@ -104,10 +104,6 @@ export const supplierSchema = z.object({
   addressProvince: z.string().nullable().default(null),
   addressPostalCode: z.string().nullable().default(null),
   addressCountry: z.string().nullable().default(null),
-  contact: z.string().nullable().default(null),
-  contactTitle: z.string().nullable().default(null),
-  contactFirstName: z.string().nullable().default(null),
-  contactLastName: z.string().nullable().default(null),
   bankName: z.string().nullable().default(null),
   accountNo: z.string().nullable().default(null),
   bankAccount: z.string().nullable().default(null),
@@ -168,10 +164,6 @@ export const supplierFormSchema = z.object({
   addressProvince: optionalGeneralText('จังหวัด', 120),
   addressPostalCode: optionalPostalCodeSchema,
   addressCountry: z.preprocess(blankToNull, z.string().trim().max(80, 'ประเทศยาวเกินไป').regex(personNamePattern, 'ประเทศมีรูปแบบไม่ถูกต้อง').nullable().default('ไทย')),
-  contact: optionalGeneralText('ผู้ติดต่อ'),
-  contactTitle: optionalPersonName('คำนำหน้าผู้ติดต่อ'),
-  contactFirstName: optionalPersonName('ชื่อผู้ติดต่อ'),
-  contactLastName: optionalPersonName('นามสกุลผู้ติดต่อ'),
   bankName: optionalGeneralText('ธนาคาร', 120),
   accountNo: optionalAccountNoSchema,
   bankAccount: optionalGeneralText('ชื่อบัญชี', 160),
@@ -190,10 +182,6 @@ export const supplierFormSchema = z.object({
   } else if (!values.name) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบริษัท', path: ['name'] })
   }
-
-  if (!values.contactTitle) context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกคำนำหน้าผู้ติดต่อ', path: ['contactTitle'] })
-  if (!values.contactFirstName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อผู้ติดต่อ', path: ['contactFirstName'] })
-  if (!values.contactLastName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกนามสกุลผู้ติดต่อ', path: ['contactLastName'] })
 })
 
 export type SupplierFormValues = z.infer<typeof supplierFormSchema>
