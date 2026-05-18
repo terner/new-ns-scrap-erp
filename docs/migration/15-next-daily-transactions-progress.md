@@ -17,7 +17,7 @@
 
 | Route | Legacy Component | Current Next Status | Target Notes |
 |---|---|---|---|
-| `/purchase/bills` | purchase bill flow | Batch D Read Baseline Done | Purchase transaction read surface; create/post follow-up |
+| `/purchase/bills` | purchase bill flow | Batch D+ Partial Create Done | Purchase transaction list/filter/export and create modal writes header + items JSON; stock/FIFO posting still follow-up |
 | `/sales/bills` | sales bill flow | Batch D Read Baseline Done | Sales transaction read surface; create/post/FIFO follow-up |
 | `/sales/stock-issue` | pending sale / issue flow | Batch E Read Baseline Done | Pending sale / stock issue read surface; post/convert follow-up |
 | `/daily/payment-approval` | `view-paymentApproval` | Batch B Done | Approval workbench over AP and expenses |
@@ -168,6 +168,28 @@ Validation:
   - `/sales/bills`
   - `/api/purchase/bills`
   - `/api/sales/bills`
+
+### Batch D+ Follow-up: Purchase Bill Create Modal
+
+Scope:
+- `/purchase/bills`
+- `/api/purchase/bills`
+
+Status:
+- Restored purchase filter bar with search, date range, transaction mode, and source filters.
+- Restored `+ บิลรับซื้อใหม่` action and added a Next modal for creating purchase bills.
+- Added item rows inside the modal with `+ เพิ่มรายการ`, product selection, quantity, price, and discount.
+- Added Zod syntax validation for purchase bill create payload through `purchaseBillFormSchema`.
+- Added XLSX export for purchase bills.
+
+Important boundary:
+- Current create path writes `purchase_bills` header + `items` JSON and AP balance fields only.
+- It intentionally does not write `stock_ledger`, WAC/FIFO, AP payment links, or posting/void side effects yet. Those need a separate reconciliation-backed transaction batch.
+
+Validation:
+- Passed: `npm run type-check --workspace @ns-scrap-erp/next`
+- Passed: `npm run lint --workspace @ns-scrap-erp/next`
+- Passed: `npm run build --workspace @ns-scrap-erp/next`
 
 ### Batch E: Pending Sale / Stock Issue
 

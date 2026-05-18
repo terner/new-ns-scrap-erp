@@ -18,7 +18,7 @@ export function currentActor(context: { appUser: { username: string } | null; au
   return context.appUser?.username ?? context.authUser.email ?? '-'
 }
 
-export async function nextDailyDocNo(table: 'expenses' | 'payments' | 'petty_advances' | 'receipts' | 'transfers', prefix: string, date: string) {
+export async function nextDailyDocNo(table: 'expenses' | 'payments' | 'petty_advances' | 'purchase_bills' | 'receipts' | 'sales_bills' | 'transfers', prefix: string, date: string) {
   const compactDate = date.slice(2, 4) + date.slice(5, 7)
   const startsWith = `${prefix}${compactDate}-`
   const model = prisma[table] as unknown as {
