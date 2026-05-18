@@ -20,10 +20,10 @@
 | `/purchase/bills` | purchase bill flow | Placeholder | Batch D: purchase transaction header/lines; requires stock/AP reconciliation |
 | `/sales/bills` | sales bill flow | Placeholder | Batch D/E: sales transaction header/lines; requires FIFO/profit permission |
 | `/sales/stock-issue` | pending sale / issue flow | Placeholder | Batch E: stock issue before sales invoice |
-| `/daily/payment-approval` | `view-paymentApproval` | Placeholder | Batch B: approval workbench over AP and expenses |
-| `/purchase/payments` | supplier payment flow | Placeholder | Batch B: payments + bank statement |
-| `/purchase/receipt-vouchers` | receipt voucher flow | Placeholder | Batch B: purchase receipt voucher/print surface |
-| `/sales/receipts` | customer receipt flow | Placeholder | Batch B: receipts + bank statement |
+| `/daily/payment-approval` | `view-paymentApproval` | Batch B Done | Approval workbench over AP and expenses |
+| `/purchase/payments` | supplier payment flow | Batch B Done | Supplier payments + bank statement |
+| `/purchase/receipt-vouchers` | receipt voucher flow | Batch B Done | Purchase receipt voucher read surface |
+| `/sales/receipts` | customer receipt flow | Batch B Done | Customer receipts + bank statement |
 | `/daily/transfer` | `view-transfer` | Batch A Done | Transfer CRUD + two-sided bank statement |
 | `/daily/expense` | `view-expense` | Batch A Done | Expense voucher list/form + VAT/WHT + payment status baseline |
 | `/daily/petty-advance` | `view-pettyAdvance` | Batch A Done | Petty cash/director advance baseline |
@@ -91,15 +91,31 @@ Scope:
 - `/purchase/receipt-vouchers`
 - `/sales/receipts`
 
+Status: Done baseline on 2026-05-18.
+
 Tasks:
-- Build approval queue from unpaid purchase bills and pending expense vouchers.
-- Add payment/receipt pages using existing `payments`, `receipts`, `purchase_bills`, `sales_bills`, `suppliers`, `customers`, and `accounts`.
-- Write bank statement rows deterministically where money actually moves.
-- Keep print/export surfaces as follow-up unless legacy flow requires them for UAT.
+- Done: built payment approval queue from unpaid purchase bills and pending expense vouchers.
+- Done: added supplier payment page/API using `payments`, `purchase_bills`, `suppliers`, and `accounts`.
+- Done: added customer receipt page/API using `receipts`, `sales_bills`, `customers`, and `accounts`.
+- Done: supplier payment writes deterministic `BS-PMT-*` bank statement row.
+- Done: customer receipt writes deterministic `BS-RCP-*` bank statement row.
+- Done: added receipt voucher read page/API using `receipt_vouchers`.
+- Follow-up: approval persistence/printing is still a baseline read queue, not a full cashier approval document workflow yet.
 
 Validation:
-- AP/AR paid amount and remaining balance aggregate checks.
-- Bank statement totals by ref type.
+- Passed: `npm run type-check --workspace @ns-scrap-erp/next`
+- Passed: `npm run lint --workspace @ns-scrap-erp/next`
+- Passed: `npm run build`
+- Build confirmed routes generated:
+  - `/daily/payment-approval`
+  - `/purchase/payments`
+  - `/purchase/receipt-vouchers`
+  - `/sales/receipts`
+  - `/api/daily/payment-approval`
+  - `/api/purchase/payments`
+  - `/api/purchase/receipt-vouchers`
+  - `/api/sales/receipts`
+- Pending: AP/AR aggregate reconciliation after authenticated smoke data entry.
 
 ### Batch C: Stock Transfer and Daily Audit
 
@@ -136,8 +152,10 @@ Tasks:
 
 - Current git checkpoint before daily work: `65a42bc fix: simplify payment and remittance masters`.
 - Planning checkpoint: `3b32499 docs: plan next daily transactions`.
-- Batch A implementation checkpoint pending commit after this doc update.
+- Batch A implementation checkpoint: `24ab600 feat: add daily cash expense baseline`.
+- Batch B implementation checkpoint pending commit after this doc update.
 - Next daily Batch A routes now have real Next pages and API routes.
+- Next daily Batch B payment/receipt routes now have baseline pages and API routes.
 - Legacy daily UI/reference exists under:
   - `old-apps/legacy/index.html`
   - `old-apps/vue/src/views/daily/`
@@ -157,3 +175,4 @@ Tasks:
 - Whether daily write permissions should use one temporary `finance.cash.manage` permission or split into transfer/expense/payment-specific permissions.
 - Whether delete actions in legacy should become cancel/void actions in Next for financial traceability. Batch A currently avoids destructive delete actions.
 - Petty advance `spent` is currently `0` in Next baseline until expense-to-advance allocation is wired.
+- Payment approval persistence/print sheet is not fully ported yet; current Batch B is an actionable queue/read surface plus payment/receipt write APIs.

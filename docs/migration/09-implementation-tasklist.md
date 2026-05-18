@@ -347,7 +347,7 @@ Reporting rule:
 
 - [ ] Next daily transaction tracker: [15-next-daily-transactions-progress.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/15-next-daily-transactions-progress.md)
 - [x] Batch A: `/daily/transfer`, `/daily/expense`, `/daily/petty-advance`, `/daily/expense-dashboard`
-- [ ] Batch B: `/daily/payment-approval`, `/purchase/payments`, `/purchase/receipt-vouchers`, `/sales/receipts`
+- [x] Batch B: `/daily/payment-approval`, `/purchase/payments`, `/purchase/receipt-vouchers`, `/sales/receipts`
 - [ ] Batch C: `/stock/transfer`, `/daily/bill-swap-history`
 - [ ] Batch D/E: `/purchase/bills`, `/sales/bills`, `/sales/stock-issue`
 - [ ] design supplier payment allocations

@@ -94,6 +94,40 @@ export const pettyAdvanceReturnFormSchema = z.object({
 
 export type PettyAdvanceReturnFormValues = z.infer<typeof pettyAdvanceReturnFormSchema>
 
+export const supplierPaymentFormSchema = z.object({
+  id: optionalSafeId('รหัสรายการ'),
+  docNo: optionalDocNo,
+  date: requiredDate,
+  billId: optionalSafeId('บิลซื้อ'),
+  supplierId: z.string().trim().min(1, 'เลือกผู้ขาย'),
+  accountId: z.string().trim().min(1, 'เลือกบัญชีจ่าย'),
+  amount: positiveMoney('ยอดจ่าย'),
+  withholdingTax: money('ภาษีหัก ณ ที่จ่าย').default(0),
+  discount: money('ส่วนลด').default(0),
+  fee: money('ค่าธรรมเนียม').default(0),
+  method: optionalBusinessText('วิธีจ่าย', 80),
+  notes: optionalGeneralText('หมายเหตุ', 500),
+})
+
+export type SupplierPaymentFormValues = z.infer<typeof supplierPaymentFormSchema>
+
+export const customerReceiptFormSchema = z.object({
+  id: optionalSafeId('รหัสรายการ'),
+  docNo: optionalDocNo,
+  date: requiredDate,
+  billId: optionalSafeId('บิลขาย'),
+  customerId: z.string().trim().min(1, 'เลือกลูกค้า'),
+  accountId: z.string().trim().min(1, 'เลือกบัญชีรับเงิน'),
+  amount: positiveMoney('ยอดรับ'),
+  withholdingTax: money('ภาษีหัก ณ ที่จ่าย').default(0),
+  discount: money('ส่วนลด').default(0),
+  fee: money('ค่าธรรมเนียม').default(0),
+  method: optionalBusinessText('วิธีรับเงิน', 80),
+  notes: optionalGeneralText('หมายเหตุ', 500),
+})
+
+export type CustomerReceiptFormValues = z.infer<typeof customerReceiptFormSchema>
+
 export type DailyAccountOption = {
   active: boolean
   code: string | null
