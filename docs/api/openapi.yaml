@@ -253,6 +253,78 @@ paths:
         "200":
           $ref: "#/components/responses/ListOk"
 
+  /api/finance/ar:
+    get:
+      tags: [Finance]
+      operationId: listFinanceAr
+      summary: List AR aging and customer receivable baseline
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: sortKey
+          in: query
+          schema:
+            type: string
+            enum: [date, docNo, dueDate, receivableBalance, customerName, aging]
+        - name: sortDirection
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [xlsx]
+      responses:
+        "200":
+          description: AR aging payload or xlsx export when `format=xlsx`.
+          content:
+            application/json:
+              schema:
+                type: object
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/master-data/{resource}:
     get:
       tags: [Master Data]

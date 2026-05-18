@@ -540,13 +540,27 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### F1: AR
 
-- [ ] API `/api/finance/ar`
-- [ ] Page `/finance/ar`
-- [ ] read from `sales_bills` + `receipts`
-- [ ] aging buckets
-- [ ] filters: customer/date/status/branch
-- [ ] row detail modal
-- [ ] export `.xlsx`
+- [x] API `/api/finance/ar`
+- [x] Page `/finance/ar`
+- [x] read from `sales_bills` + `receipts`
+- [x] aging buckets
+- [x] filters: customer/date/status/branch
+- [x] row detail modal
+- [x] export `.xlsx`
+
+#### Execution Log
+
+- Task: F1 AR read/report baseline.
+- Legacy refs: `old-apps/vue/src/views/finance/ArView.vue`, `old-apps/vue/src/views/sales/CustomerReceiptsView.vue`.
+- Files changed: `apps/next/src/app/api/finance/ar/route.ts`, `apps/next/src/app/finance/ar/page.tsx`, `apps/next/src/components/finance/AccountsReceivablePageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker.
+- DB/API changes: added `GET /api/finance/ar`; no schema migration; reads `sales_bills`, `receipts`, `customers`, `branches`, `sales_channels`.
+- Buttons/actions checked: summary/detail tabs, filters, sort buttons, pagination, export `.xlsx`, row detail open/close.
+- Modal/form checked: row detail modal only; no write form in F1.
+- Validation added: server query parsing, pagination bounds, AR aging buckets, OpenAPI parameters.
+- Playwright smoke: desktop `/finance/ar` loaded with `GET /api/finance/ar` 200, search/filter narrowed rows, detail modal opened/closed, export endpoint returned `.xlsx` 200; mobile 390x844 loaded with API 200 and no new console warning/error.
+- Commands: `git diff --check`; `npm run type-check --workspace @ns-scrap-erp/next`; `npm run lint --workspace @ns-scrap-erp/next`; `npm run build --workspace @ns-scrap-erp/next`; `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`.
+- Result: F1 AR read/report baseline validated. OpenAPI remains valid with existing skeleton warnings outside this endpoint.
+- Commit: this checkpoint.
 
 ### F2: AP Polish
 

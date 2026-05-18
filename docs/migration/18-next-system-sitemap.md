@@ -123,7 +123,7 @@ Status terms:
 
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
-| `/finance/ar` | ลูกหนี้ (AR) | placeholder | missing | `sales_bills`, `receipts` expected | `finance.cash.view` |
+| `/finance/ar` | ลูกหนี้ (AR) | read baseline | `GET /api/finance/ar` | `sales_bills`, `receipts`, `customers`, `branches` | `finance.cash.view` |
 | `/finance/ap` | เจ้าหนี้ (AP) | read baseline | `GET /api/finance/ap` | `purchase_bills`, `payments` | `finance.cash.view` |
 | `/finance/bank` | Cash / Bank Statement | placeholder | missing | `bank_statement`, `accounts` expected | `finance.cash.view` |
 | `/finance/cash-position` | Cash Position | placeholder | missing | `accounts`, `bank_statement` expected | `finance.cash.view` |

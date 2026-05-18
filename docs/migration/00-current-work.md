@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: batch continuation rule (`a2fd1ba docs: require batch continuation`)
+Last pushed checkpoint: finance debt overview (`a5ec099 docs: start finance debt batch`)
 
 ## Current Batch
 
@@ -187,7 +187,7 @@ Status: active batch started after checkpoint `a2fd1ba`.
 Current scope:
 
 - F0 maps the legacy/Vue finance-debt pages and target DB tables before implementation.
-- F1 starts with AR because `/finance/ar` is still a placeholder while AP already has a read baseline.
+- F1 AR read/report baseline is implemented and validated in the current checkpoint.
 - Money-moving writes remain out of scope until reconciliation and allocation rules are clear.
 
 Initial F0 findings:
@@ -199,10 +199,10 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Finish and commit F0 docs checkpoint.
-2. Implement F1 `/api/finance/ar` and `/finance/ar`.
-3. Update OpenAPI and sitemap for AR in the same batch.
-4. Run type-check, lint, build, browser/API smoke, then commit/push and continue to F2.
+1. Commit/push F1 AR after this docs update.
+2. Continue immediately to F2 AP polish.
+3. Add AP filters/sort/pagination/export/detail modal using the AR baseline as the finance-page pattern.
+4. Run validation/browser smoke, commit/push, then continue to F3 Bank Statement.
 
 ## Operating Model
 

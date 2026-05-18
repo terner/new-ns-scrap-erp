@@ -3,6 +3,7 @@ node_modules/
 dist/
 .vite/
 .next/
+.playwright-mcp/
 *.tsbuildinfo
 supabase/.temp/
 old-apps/
