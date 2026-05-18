@@ -12,6 +12,7 @@ type AppNavigationProps = {
 export function AppNavigation({ onNavigate }: AppNavigationProps) {
   const pathname = usePathname()
   const [authContext, setAuthContext] = useState<{ isAdmin: boolean; permissions: string[] } | null>(null)
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let mounted = true
@@ -43,8 +44,32 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
 
   const visibleItems = useMemo(() => {
     if (!authContext) return navigationItems
-    return navigationItems.filter((item) => canAccessPath(item.href, authContext))
+    return navigationItems
+      .map((item) => ({
+        ...item,
+        children: item.children?.filter((child) => canAccessPath(child.href, authContext)),
+      }))
+      .filter((item) => canAccessPath(item.href, authContext) || Boolean(item.children?.length))
   }, [authContext])
+
+  useEffect(() => {
+    const activeParent = navigationItems.find((item) => item.children?.some((child) => child.href === pathname))
+    if (!activeParent) return
+
+    setExpandedMenus((current) => new Set(current).add(activeParent.href))
+  }, [pathname])
+
+  function toggleMenu(href: string) {
+    setExpandedMenus((current) => {
+      const next = new Set(current)
+      if (next.has(href)) {
+        next.delete(href)
+      } else {
+        next.add(href)
+      }
+      return next
+    })
+  }
 
   return (
     <nav className="flex-1 overflow-y-auto py-3 text-sm" aria-label="Main navigation">
@@ -56,20 +81,51 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
           <div key={section.key}>
             <div className="px-4 pb-1 pt-4 text-xs uppercase tracking-wider text-slate-500">{section.label}</div>
             {items.map((item) => {
-              const active = pathname === item.href
+              const childActive = item.children?.some((child) => child.href === pathname) ?? false
+              const active = pathname === item.href || childActive
+              const expanded = expandedMenus.has(item.href)
 
               return (
-                <Link
-                  key={item.href}
-                  className={`flex w-full items-center gap-3 border-l-4 px-4 py-2 text-left transition hover:bg-slate-800 ${
-                    active ? 'border-blue-500 bg-slate-800 text-white' : 'border-transparent text-slate-300'
-                  }`}
-                  href={item.href}
-                  onClick={onNavigate}
-                >
-                  <span className="w-5 text-center">{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
+                <div key={item.href}>
+                  <div className={`flex border-l-4 transition hover:bg-slate-800 ${active ? 'border-blue-500 bg-slate-800 text-white' : 'border-transparent text-slate-300'}`}>
+                    <Link className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left" href={item.href} onClick={onNavigate}>
+                      <span className="w-5 text-center">{item.icon}</span>
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                    {item.children?.length ? (
+                      <button
+                        aria-expanded={expanded}
+                        aria-label={`${expanded ? 'ยุบ' : 'ขยาย'}เมนู ${item.label}`}
+                        className="px-3 text-xs text-slate-400 hover:text-white"
+                        type="button"
+                        onClick={() => toggleMenu(item.href)}
+                      >
+                        {expanded ? '▾' : '▸'}
+                      </button>
+                    ) : null}
+                  </div>
+                  {item.children?.length && expanded ? (
+                    <div className="bg-slate-950/30 py-1">
+                      {item.children.map((child) => {
+                        const childIsActive = pathname === child.href
+
+                        return (
+                          <Link
+                            key={child.href}
+                            className={`flex items-center gap-3 border-l-4 py-2 pl-11 pr-4 text-left transition hover:bg-slate-800 ${
+                              childIsActive ? 'border-blue-400 bg-slate-800 text-white' : 'border-transparent text-slate-400'
+                            }`}
+                            href={child.href}
+                            onClick={onNavigate}
+                          >
+                            <span className="w-5 text-center">{child.icon}</span>
+                            <span className="truncate">{child.label}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               )
             })}
           </div>

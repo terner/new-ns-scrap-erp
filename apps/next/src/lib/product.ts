@@ -66,7 +66,7 @@ export const productFormSchema = z.object({
       .max(40, 'หน่วยยาวเกินไป')
       .regex(productTextPattern, 'หน่วยมีรูปแบบไม่ถูกต้อง')
       .nullable()
-      .default('kg'),
+      .default('กก.'),
   ),
   targetMarginPct: z.preprocess(
     blankToNull,

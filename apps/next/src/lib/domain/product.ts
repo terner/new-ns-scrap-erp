@@ -36,7 +36,7 @@ export function toProductWriteInput(values: ProductFormValues) {
     code,
     name: parsed.name,
     type: parsed.type || null,
-    unit: parsed.unit || 'kg',
+    unit: parsed.unit || 'กก.',
     target_margin_pct: parsed.targetMarginPct,
     active: parsed.active,
   }

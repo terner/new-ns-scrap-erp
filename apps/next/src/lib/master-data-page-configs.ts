@@ -201,6 +201,40 @@ export const productsPageConfig: MasterDataPageConfig = {
   ],
 }
 
+export const productUnitsPageConfig: MasterDataPageConfig = {
+  apiPath: '/api/master-data/product-units',
+  createLabel: 'เพิ่มหน่วยสินค้า',
+  entityName: 'หน่วยสินค้า',
+  emptyMessage: 'ไม่พบข้อมูลหน่วยสินค้า',
+  fields: [
+    { key: 'code', label: 'รหัสหน่วย', required: true },
+    { key: 'name', label: 'ชื่อหน่วย', required: true },
+    { key: 'symbol', label: 'ตัวย่อ' },
+  ],
+  columns: [
+    { key: 'code', label: 'รหัส' },
+    { key: 'name', label: 'ชื่อหน่วย' },
+    { key: 'symbol', label: 'ตัวย่อ', align: 'center' },
+    statusColumn,
+  ],
+}
+
+export const productTypesPageConfig: MasterDataPageConfig = {
+  apiPath: '/api/master-data/product-types',
+  createLabel: 'เพิ่มประเภทสินค้า',
+  entityName: 'ประเภทสินค้า',
+  emptyMessage: 'ไม่พบข้อมูลประเภทสินค้า',
+  fields: [
+    { key: 'code', label: 'รหัสประเภท', required: true },
+    { key: 'name', label: 'ชื่อประเภท', required: true },
+  ],
+  columns: [
+    { key: 'code', label: 'รหัส' },
+    { key: 'name', label: 'ชื่อประเภท' },
+    statusColumn,
+  ],
+}
+
 export const directorsPageConfig: MasterDataPageConfig = {
   apiPath: '/api/master-data/directors',
   createLabel: 'เพิ่มกรรมการ/พนักงาน',

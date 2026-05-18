@@ -11,7 +11,7 @@ import {
   updateMasterDataStatusSchema,
 } from '@/lib/server/master-data'
 
-type SimpleMasterKind = 'directors' | 'machines' | 'productionLines' | 'paymentMethods' | 'remittancePurposes'
+type SimpleMasterKind = 'directors' | 'machines' | 'productionLines' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes'
 
 type Delegate = {
   findMany: (args?: unknown) => Promise<unknown[]>
@@ -153,6 +153,52 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       name: values.name,
       branch_id: values.branchId || null,
       responsible_person: values.responsiblePerson || null,
+      active: values.active,
+    }),
+  },
+  productUnits: {
+    delegate: () => prisma.product_units as Delegate,
+    prefix: 'U',
+    orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    map: (row) => {
+      const record = asRecord(row)
+      return {
+        id: record.id,
+        code: record.code,
+        name: record.name,
+        symbol: record.symbol,
+        active: record.active,
+        createdAt: toIso(record.created_at as Date | null),
+        updatedAt: toIso(record.updated_at as Date | null),
+      }
+    },
+    data: (values, id, code) => ({
+      id,
+      code,
+      name: values.name,
+      symbol: values.symbol || null,
+      active: values.active,
+    }),
+  },
+  productTypes: {
+    delegate: () => prisma.product_types as Delegate,
+    prefix: 'PT-',
+    orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    map: (row) => {
+      const record = asRecord(row)
+      return {
+        id: record.id,
+        code: record.code,
+        name: record.name,
+        active: record.active,
+        createdAt: toIso(record.created_at as Date | null),
+        updatedAt: toIso(record.updated_at as Date | null),
+      }
+    },
+    data: (values, id, code) => ({
+      id,
+      code,
+      name: values.name,
       active: values.active,
     }),
   },

@@ -1247,6 +1247,31 @@ model products {
   @@schema("public")
 }
 
+model product_units {
+  id         String   @id
+  code       String   @unique
+  name       String
+  symbol     String?
+  active     Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([active])
+  @@schema("public")
+}
+
+model product_types {
+  id         String   @id
+  code       String   @unique
+  name       String   @unique
+  active     Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([active])
+  @@schema("public")
+}
+
 model purchase_bills {
   id                      String             @id
   doc_no                  String

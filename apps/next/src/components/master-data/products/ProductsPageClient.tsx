@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { getErrorMessage } from '@/lib/api-client'
+import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
 import {
   exportProducts,
   listProducts,
@@ -21,7 +22,7 @@ const emptyProductForm: ProductFormValues = {
   name: '',
   active: true,
   type: null,
-  unit: 'kg',
+  unit: 'กก.',
   targetMarginPct: null,
 }
 
@@ -32,7 +33,7 @@ function productToForm(product: Product): ProductFormValues {
     name: product.name,
     active: product.active,
     type: product.type,
-    unit: product.unit ?? 'kg',
+    unit: product.unit ?? 'กก.',
     targetMarginPct: product.targetMarginPct,
   }
 }
@@ -77,6 +78,8 @@ export function ProductsPageClient() {
   const [pageSize, setPageSize] = useState(25)
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<string>>(new Set())
   const [productTypeFilter, setProductTypeFilter] = useState('')
+  const [productTypes, setProductTypes] = useState<MasterDataRecord[]>([])
+  const [productUnits, setProductUnits] = useState<MasterDataRecord[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [search, setSearch] = useState('')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -87,8 +90,14 @@ export function ProductsPageClient() {
     setError(null)
     setIsLoading(true)
     try {
-      const result = await listProducts({ all: true })
+      const [result, typeRows, unitRows] = await Promise.all([
+        listProducts({ all: true }),
+        listMasterDataRecords('/api/master-data/product-types'),
+        listMasterDataRecords('/api/master-data/product-units'),
+      ])
       setProducts(result.rows)
+      setProductTypes(typeRows.filter((type) => type.active))
+      setProductUnits(unitRows.filter((unit) => unit.active))
     } catch (caught) {
       setError(getErrorMessage(caught, 'โหลดข้อมูลสินค้าไม่ได้'))
     } finally {
@@ -100,7 +109,11 @@ export function ProductsPageClient() {
     void loadData()
   }, [loadData])
 
-  const productTypes = useMemo(() => uniqueText(products.map((product) => product.type)), [products])
+  const productTypeOptions = useMemo(() => {
+    const activeTypeNames = productTypes.map((type) => type.name)
+    const existingTypeNames = uniqueText(products.map((product) => product.type))
+    return Array.from(new Set([...activeTypeNames, ...existingTypeNames])).sort((a, b) => a.localeCompare(b, 'th', { numeric: true }))
+  }, [productTypes, products])
 
   const filteredSortedProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -257,7 +270,7 @@ export function ProductsPageClient() {
               }}
             >
               <option value="">ทุกประเภท</option>
-              {productTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+              {productTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
             <select
               aria-label="กรองสถานะใช้งาน"
@@ -326,7 +339,8 @@ export function ProductsPageClient() {
             <ProductForm
               isSaving={isSaving}
               product={selectedProduct}
-              productTypes={productTypes}
+              productTypes={productTypeOptions}
+              productUnits={productUnits}
               onCancel={() => {
                 setFormOpen(false)
                 setSelectedProduct(null)
@@ -412,11 +426,12 @@ type ProductFormProps = {
   isSaving: boolean
   product: Product | null
   productTypes: string[]
+  productUnits: MasterDataRecord[]
   onCancel: () => void
   onSubmit: (values: ProductFormValues) => Promise<void>
 }
 
-function ProductForm({ isSaving, product, productTypes, onCancel, onSubmit }: ProductFormProps) {
+function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, onSubmit }: ProductFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<ProductFormValues>(() => (product ? productToForm(product) : emptyProductForm))
 
@@ -454,13 +469,20 @@ function ProductForm({ isSaving, product, productTypes, onCancel, onSubmit }: Pr
           <div className="grid gap-4 md:grid-cols-4">
             <TextField error={errors.code} label="รหัสสินค้า *" readOnly={Boolean(form.id)} value={form.code} onChange={(value) => update('code', value)} />
             <TextField className="md:col-span-2" error={errors.name} label="ชื่อสินค้า *" value={form.name} onChange={(value) => update('name', value)} />
-            <TextField error={errors.type} label="ประเภทสินค้า" list="product-type-options" value={form.type ?? ''} onChange={(value) => update('type', value || null)} />
-            <TextField error={errors.unit} label="หน่วย" value={form.unit ?? ''} onChange={(value) => update('unit', value || null)} />
+            <SelectField error={errors.type} label="ประเภทสินค้า" value={form.type ?? ''} onChange={(value) => update('type', value || null)}>
+              <option value="">เลือกประเภทสินค้า</option>
+              {productTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            </SelectField>
+            <SelectField error={errors.unit} label="หน่วย" value={form.unit ?? ''} onChange={(value) => update('unit', value || null)}>
+              <option value="">เลือกหน่วย</option>
+              {productUnits.map((unit) => {
+                const value = unit.symbol || unit.name
+                const label = unit.symbol && unit.symbol !== unit.name ? `${unit.name} (${unit.symbol})` : unit.name
+                return <option key={unit.id} value={value}>{label}</option>
+              })}
+            </SelectField>
             <TextField error={errors.targetMarginPct} label="Target Margin %" type="number" value={form.targetMarginPct ?? ''} onChange={(value) => update('targetMarginPct', value === '' ? null : Number(value))} />
           </div>
-          <datalist id="product-type-options">
-            {productTypes.map((type) => <option key={type} value={type} />)}
-          </datalist>
         </section>
       </div>
 
@@ -473,6 +495,30 @@ function ProductForm({ isSaving, product, productTypes, onCancel, onSubmit }: Pr
         </button>
       </div>
     </form>
+  )
+}
+
+type SelectFieldProps = {
+  children: React.ReactNode
+  error?: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+}
+
+function SelectField({ children, error, label, value, onChange }: SelectFieldProps) {
+  return (
+    <label className="block text-sm font-medium">
+      {label}
+      <select
+        className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {children}
+      </select>
+      {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}
+    </label>
   )
 }
 

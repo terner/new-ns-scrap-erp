@@ -325,6 +325,8 @@ Continuation rule:
 | 2026-05-18 | Supplier salesperson owner/filter + salespersons table cleanup: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Supplier form/table/export now supports salesperson owner filter using existing `sales_id`/`sales_rep`; salespersons table hides commission/base salary columns without deleting data |
 | 2026-05-18 | Additive bank account field split migration on `dev-target` | Passed | Added `bank_name`/`account_no` to `director_employees` and `payment_methods`; backfilled 3 director account rows from old `bank_account`; no rows or old columns deleted |
 | 2026-05-18 | Bank account split + product field cleanup: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Product form/table/API/export no longer uses metal group, item status, grade, standard price, or standard cost; master bank account fields validate account number syntax |
+| 2026-05-18 | Additive product type/unit master migrations on `dev-target` | Passed | Created `product_units` with 2 seed rows and `product_types` with 12 rows including `อิเล็กทรอนิกส์`; no product rows changed or deleted |
+| 2026-05-18 | Product type/unit submenu integration: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Sidebar supports collapsible product submenu; product type/unit routes are included in the Next build |
 
 ## Open Decisions
 
@@ -337,6 +339,10 @@ Continuation rule:
 - Bank account fields in master data are split where the target table supports account detail: accounts, suppliers, overseas beneficiaries, director employees, and payment methods. The old `director_employees.bank_account` column is retained for compatibility; UI uses `bank_name` + `account_no`.
 - The Next branch master config currently does not expose a "สำนักงานใหญ่" field/column.
 - Product master no longer uses `metal_group`, `item_status`, `grade`, `std_price`, or `std_cost` in the Next UI/API/export flow. The columns are retained for now to avoid destructive data loss, but create/update payloads no longer write them and `.xlsx` export no longer includes them.
+- Product master now has DB-backed child setup pages under the product menu:
+  - `/master-data/product-types` for product type options, seeded with `อิเล็กทรอนิกส์` plus distinct existing product types from `products.type`.
+  - `/master-data/product-units` for product unit options, seeded with `กิโลกรัม (กก.)` and `ลัง`.
+  - Product add/edit uses dropdowns from these DB-backed masters and the API validates selected product type/unit against active rows.
 - Confirm whether combined `/master-data/channels` should stay as one UI over `purchase_channels` + `sales_channels`, or split visually later while preserving the current sidebar route.
 - Decide whether small static/reference option lists such as person title prefixes should remain code constants with DB seed/reference rows, or become fully DB-driven cached config later.
 - Decide whether/when to introduce Upstash Redis for master/reference-data cache and rate limiting; not implemented yet.

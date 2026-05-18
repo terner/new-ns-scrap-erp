@@ -15,6 +15,7 @@ export type NavigationSectionKey =
   | 'admin'
 
 export type NavigationItem = {
+  children?: NavigationItem[]
   href: string
   icon: string
   label: string
@@ -185,7 +186,16 @@ export const navigationItems: NavigationItem[] = [
   { href: '/master-data/customers', icon: '👥', label: 'ลูกค้า', section: 'master-data' },
   { href: '/master-data/salespersons', icon: '👨‍💼', label: 'พนักงานขาย (Sales)', section: 'master-data' },
   { href: '/master-data/suppliers', icon: '🏭', label: 'ผู้ขาย', section: 'master-data' },
-  { href: '/master-data/products', icon: '🔩', label: 'สินค้า', section: 'master-data' },
+  {
+    href: '/master-data/products',
+    icon: '🔩',
+    label: 'สินค้า',
+    section: 'master-data',
+    children: [
+      { href: '/master-data/product-types', icon: '🏷️', label: 'ประเภทสินค้า', section: 'master-data' },
+      { href: '/master-data/product-units', icon: '⚖️', label: 'หน่วยสินค้า', section: 'master-data' },
+    ],
+  },
   { href: '/master-data/branches', icon: '🏢', label: 'สาขา / คลัง', section: 'master-data' },
   { href: '/master-data/accounts', icon: '💳', label: 'บัญชีเงิน', section: 'master-data' },
   { href: '/master-data/channels', icon: '🔀', label: 'ช่องทางซื้อ/ขาย', section: 'master-data' },
@@ -208,5 +218,11 @@ export const navigationItems: NavigationItem[] = [
 export function pageTitleForPath(pathname: string) {
   if (pathname === '/login') return 'เข้าสู่ระบบ'
 
-  return navigationItems.find((item) => item.href === pathname)?.label ?? 'NS Scrap ERP'
+  for (const item of navigationItems) {
+    if (item.href === pathname) return item.label
+    const child = item.children?.find((entry) => entry.href === pathname)
+    if (child) return child.label
+  }
+
+  return 'NS Scrap ERP'
 }

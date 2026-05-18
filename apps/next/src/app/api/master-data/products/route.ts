@@ -52,6 +52,41 @@ function productSearchWhere(q: string, filters: { active: string; productType: s
   return where
 }
 
+async function assertActiveProductType(name: string | null) {
+  if (!name) return
+
+  const productType = await prisma.product_types.findFirst({
+    select: { id: true },
+    where: {
+      active: true,
+      name,
+    },
+  })
+
+  if (!productType) {
+    throw new Error('ประเภทสินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')
+  }
+}
+
+async function assertActiveProductUnit(unit: string | null) {
+  if (!unit) return
+
+  const productUnit = await prisma.product_units.findFirst({
+    select: { id: true },
+    where: {
+      active: true,
+      OR: [
+        { name: unit },
+        { symbol: unit },
+      ],
+    },
+  })
+
+  if (!productUnit) {
+    throw new Error('หน่วยสินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
@@ -86,6 +121,10 @@ export async function POST(request: Request) {
   try {
     const context = await getCurrentAuthContext()
     const values = productFormSchema.parse(await request.json())
+    await Promise.all([
+      assertActiveProductType(values.type),
+      assertActiveProductUnit(values.unit),
+    ])
     const payload = toProductWriteInput(values)
 
     const existing = await prisma.products.findUnique({ where: { id: payload.id } })
