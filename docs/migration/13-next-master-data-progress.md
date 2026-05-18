@@ -329,6 +329,7 @@ Continuation rule:
 | 2026-05-18 | Product type/unit submenu integration: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Sidebar supports collapsible product submenu; product type/unit routes are included in the Next build |
 | 2026-05-18 | Bank names submenu integration: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Created `bank_names` in `dev-target` with 2 valid seed rows; `/master-data/bank-names` and API routes are included in the Next build |
 | 2026-05-18 | Supplier contact removal + finance reference cleanup in `dev-target`: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Dropped supplier contact columns after backup of 1,841 rows; normalized bank/currency code+symbol data; cleared payment method bank/account values; verified supplier contact columns no longer exist |
+| 2026-05-18 | Branch HQ row removal in `dev-target` | Passed | Removed `public.branches` row `BR001/HQ/สำนักงานใหญ่`; backed up the branch row plus 15 referencing rows to `maintenance.branch_hq_removal_backup_20260518`; cleared nullable `branch_id` references in accounts, expenses, purchase bills, stock ledger, and warehouses |
 
 ## Open Decisions
 
@@ -339,7 +340,7 @@ Continuation rule:
 - Supplier owner field now uses existing `suppliers.sales_id`/`sales_rep`: `/master-data/suppliers` has a salesperson dropdown in the form, a salesperson filter above the table, salesperson column/sort, and `.xlsx` export respects the salesperson filter. No destructive DB migration was needed.
 - `/master-data/salespersons` table hides commission percent and base salary columns to keep the list compact; the fields and existing DB data are not deleted.
 - Bank account fields in master data are split where the target table supports account detail: accounts, suppliers, overseas beneficiaries, director employees, and payment methods. The old `director_employees.bank_account` column is retained for compatibility; UI uses `bank_name` + `account_no`.
-- The Next branch master config currently does not expose a "สำนักงานใหญ่" field/column.
+- Branch master no longer contains the old HQ row `BR001/HQ/สำนักงานใหญ่`; references that pointed to it were nulled after backup because all affected `branch_id` columns are nullable.
 - Product master no longer uses `metal_group`, `item_status`, `grade`, `std_price`, or `std_cost` in the Next UI/API/export flow. The columns are retained for now to avoid destructive data loss, but create/update payloads no longer write them and `.xlsx` export no longer includes them.
 - Product master now has DB-backed child setup pages under the product menu:
   - `/master-data/product-types` for product type options, seeded with `อิเล็กทรอนิกส์` plus distinct existing product types from `products.type`.
