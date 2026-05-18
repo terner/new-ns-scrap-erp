@@ -196,8 +196,6 @@ export const navigationItems: NavigationItem[] = [
   { href: '/master-data/beneficiaries', icon: '🌏', label: 'ผู้รับเงินต่างประเทศ', section: 'master-data' },
   { href: '/master-data/payment-methods', icon: '🪪', label: 'วิธีจ่าย/รับเงิน', section: 'master-data' },
   { href: '/master-data/remittance-purposes', icon: '🎯', label: 'วัตถุประสงค์โอน', section: 'master-data' },
-  { href: '/master-data/import', icon: '📥', label: 'Import Master จาก Excel', section: 'master-data' },
-  { href: '/master-data/import-transactions', icon: '📑', label: 'Import บิลซื้อ/บิลขาย', section: 'master-data' },
   { href: '/admin/company-profile', icon: '🏢', label: 'ข้อมูลบริษัท (สำหรับใบพิมพ์)', section: 'admin' },
   { href: '/admin/change-password', icon: '🔒', label: 'เปลี่ยน Password ของฉัน', section: 'admin' },
   { href: '/admin/transaction-ledger', icon: '📒', label: 'Transaction Ledger (เช็คเงินเข้า-ออก)', section: 'admin' },

@@ -39,8 +39,8 @@
 
 | Route | Label | Reason |
 |---|---|---|
-| `/master-data/import` | Import Master จาก Excel | ทำหลัง master CRUD baseline นิ่ง |
-| `/master-data/import-transactions` | Import บิลซื้อ/บิลขาย | ทำหลัง transaction import design |
+| `/master-data/import` | Import Master จาก Excel | Not ported; removed from Next navigation until import design is approved |
+| `/master-data/import-transactions` | Import บิลซื้อ/บิลขาย | Not ported; removed from Next navigation until transaction import design is approved |
 
 ## Standard Work per Page
 
