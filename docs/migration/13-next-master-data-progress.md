@@ -332,6 +332,7 @@ Continuation rule:
 | 2026-05-18 | Branch HQ row removal in `dev-target` | Passed | Removed `public.branches` row `BR001/HQ/สำนักงานใหญ่`; backed up the branch row plus 15 referencing rows to `maintenance.branch_hq_removal_backup_20260518`; cleared nullable `branch_id` references in accounts, expenses, purchase bills, stock ledger, and warehouses |
 | 2026-05-18 | Supplier email removal + receiving account columns in `dev-target`: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Dropped `public.suppliers.email` after creating `maintenance.supplier_email_backup_20260518`; supplier table/form/export now use receiving bank/account fields instead of email |
 | 2026-05-18 | Supplier bank account split + Thai commercial bank seed in `dev-target` | Passed | Split bank names out of supplier account numbers for 1,927 rows; backup stored in `maintenance.supplier_bank_account_split_backup_20260518`; seeded 14 bank names including TTB, Krungsri, Thai Credit, UOB, ICBC, and Standard Chartered |
+| 2026-05-18 | Payment method and remittance purpose simplification: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build` | Passed | `payment_methods` and `overseas_remittance_purposes` now keep only `id/code/name/active/timestamps`; old type/docs data backed up in maintenance schema |
 
 ## Open Decisions
 
@@ -354,7 +355,7 @@ Continuation rule:
 - Supplier receiving account display uses separated `bank_name` and formatted `bank_account`; account-number input allows only digits, spaces, and dashes and validates before save.
 - Director employee bank data has been cleaned so `bank_name` and `account_no` are separate fields; director phone display follows the shared Thai phone formatter.
 - Bank name and currency masters now use running-number-style `code` values with separate `symbol` values. `bank_names` includes `กสิกรไทย/KBANK`, `ไทยพาณิชย์/SCB`, and `กรุงไทย/KTB`; `currencies` stores `001-006` codes with symbols `THB/USD/CNY/EUR/JPY/SGD`.
-- Payment method master is treated as a method/type list only. Bank name and account number are no longer exposed through its UI/API, and existing bank/account values in `payment_methods` were cleared in dev-target.
+- Payment method and remittance purpose masters are plain lookup lists. Their UI/API expose only code, name, and active status; old payment method type and remittance required document values were backed up before dropping the columns.
 - Sidebar parent menu rows with children now toggle their submenu when clicked, while still navigating to the parent page.
 - Confirm whether combined `/master-data/channels` should stay as one UI over `purchase_channels` + `sales_channels`, or split visually later while preserving the current sidebar route.
 - Decide whether small static/reference option lists such as person title prefixes should remain code constants with DB seed/reference rows, or become fully DB-driven cached config later.

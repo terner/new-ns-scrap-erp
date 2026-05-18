@@ -33,7 +33,6 @@ const asRecord = (row: unknown) => row as Record<string, unknown>
 const directorTypeSchema = z.enum(['กรรมการ', 'พนักงาน', 'อื่นๆ']).nullable()
 const machineTypeSchema = z.enum(['Sorting', 'Cutting', 'Baling', 'Crushing', 'Melting', 'Other']).nullable()
 const maintenanceStatusSchema = z.enum(['Normal', 'Maintenance', 'Breakdown']).nullable()
-const paymentMethodTypeSchema = z.enum(['Cash', 'Bank Transfer', 'Cheque', 'PromptPay', 'Credit Card', 'QR Payment', 'International Transfer', 'FCD Transfer', 'Offset / Netting', 'Other']).nullable()
 
 type SimpleMasterValues = ReturnType<typeof parseMasterDataForm>
 
@@ -49,10 +48,6 @@ function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMaster
   if (kind === 'machines') {
     machineTypeSchema.parse(values.type)
     maintenanceStatusSchema.parse(values.maintenanceStatus)
-  }
-
-  if (kind === 'paymentMethods') {
-    paymentMethodTypeSchema.parse(values.type)
   }
 
   return values
@@ -236,7 +231,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         id: record.id,
         code: record.code,
         name: record.name,
-        type: record.type,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -246,7 +240,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       id,
       code,
       name: values.name,
-      type: values.type || null,
       active: values.active,
     }),
   },
@@ -260,7 +253,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         id: record.id,
         code: record.code,
         name: record.name,
-        requiredDoc: record.required_doc,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -270,7 +262,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       id,
       code,
       name: values.name,
-      required_doc: values.requiredDoc || null,
       active: values.active,
     }),
   },

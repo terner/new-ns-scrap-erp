@@ -353,12 +353,12 @@ export const paymentMethodsPageConfig: MasterDataPageConfig = {
   entityName: 'วิธีจ่าย/รับเงิน',
   emptyMessage: 'ไม่พบข้อมูลวิธีจ่าย/รับเงิน',
   fields: [
+    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อ', required: true },
-    { key: 'type', label: 'ประเภท', type: 'select', options: [{ label: 'Cash', value: 'Cash' }, { label: 'Bank Transfer', value: 'Bank Transfer' }, { label: 'Cheque', value: 'Cheque' }, { label: 'PromptPay', value: 'PromptPay' }, { label: 'Credit Card', value: 'Credit Card' }, { label: 'QR Payment', value: 'QR Payment' }, { label: 'International Transfer', value: 'International Transfer' }, { label: 'FCD Transfer', value: 'FCD Transfer' }, { label: 'Offset / Netting', value: 'Offset / Netting' }, { label: 'Other', value: 'Other' }] },
   ],
   columns: [
+    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อ' },
-    { key: 'type', label: 'ประเภท' },
     statusColumn,
   ],
 }
@@ -371,12 +371,10 @@ export const remittancePurposesPageConfig: MasterDataPageConfig = {
   fields: [
     { key: 'code', label: 'รหัส', required: true },
     { key: 'name', label: 'ชื่อวัตถุประสงค์', required: true },
-    { key: 'requiredDoc', label: 'เอกสารที่ต้องใช้' },
   ],
   columns: [
     { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อ' },
-    { key: 'requiredDoc', label: 'เอกสารที่ต้องใช้' },
     statusColumn,
   ],
 }
