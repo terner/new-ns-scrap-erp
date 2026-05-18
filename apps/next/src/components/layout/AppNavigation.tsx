@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { navigationItems, navigationSections } from '@/lib/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { canAccessPath, navigationItems, navigationSections } from '@/lib/navigation'
 
 type AppNavigationProps = {
   onNavigate?: () => void
@@ -10,11 +11,45 @@ type AppNavigationProps = {
 
 export function AppNavigation({ onNavigate }: AppNavigationProps) {
   const pathname = usePathname()
+  const [authContext, setAuthContext] = useState<{ isAdmin: boolean; permissions: string[] } | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadAuthContext() {
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store' })
+        const payload = await response.json().catch(() => null)
+
+        if (mounted && response.ok) {
+          setAuthContext({
+            isAdmin: payload?.isAdmin === true,
+            permissions: Array.isArray(payload?.permissions) ? payload.permissions : [],
+          })
+        }
+      } catch {
+        if (mounted) {
+          setAuthContext({ isAdmin: false, permissions: [] })
+        }
+      }
+    }
+
+    void loadAuthContext()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const visibleItems = useMemo(() => {
+    if (!authContext) return navigationItems
+    return navigationItems.filter((item) => canAccessPath(item.href, authContext))
+  }, [authContext])
 
   return (
     <nav className="flex-1 overflow-y-auto py-3 text-sm" aria-label="Main navigation">
       {navigationSections.map((section) => {
-        const items = navigationItems.filter((item) => item.section === section.key)
+        const items = visibleItems.filter((item) => item.section === section.key)
         if (!items.length) return null
 
         return (

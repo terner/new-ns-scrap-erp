@@ -43,7 +43,8 @@
 - User active/inactive can be changed from `/admin/users-permissions` through `/api/admin/users/[id]/status`; self-deactivation is blocked.
 - Admin Supabase Auth user has been linked into `app_users` through `scripts/seed-app-admin.mjs`; the script reads `APP_ADMIN_EMAIL` or `DEV_LOGIN_IDENTIFIER` and does not store passwords.
 - App auth SQL helper functions exist in `dev-target`: `current_app_user_id`, `current_app_role_codes`, `current_app_permission_codes`, `is_app_admin`, and `has_app_permission`.
-- Next `proxy.ts` now checks `is_app_admin()` first, then falls back to legacy `user_profiles` admin guard during transition.
+- Next `proxy.ts` now checks normalized app permissions by path, allows active app users on non-mapped paths, and falls back to legacy `user_profiles` admin/owner guard during transition.
+- Sidebar navigation now fetches `/api/auth/me` and hides menu items that require permissions the current user does not have.
 - `lookup_app_login_email(identifier)` exists for pre-auth username/email lookup and is granted to `anon`/`authenticated`; it returns email only for active `app_users`.
 - RLS/permission model is not final; current gating is a temporary admin-only bridge before UAT.
 
@@ -317,3 +318,4 @@ Validation:
 | 2026-05-18 | B3 user status toggle: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added `/api/admin/users/[id]/status` and active toggle in user table; self-deactivation returns 400 |
 | 2026-05-18 | B3 user create/edit flow: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added protected create/edit app user APIs and `/admin/users-permissions` modal form for username, email, display name, roles, branch access, active status, and must-change-password flag; no password storage or admin-set password |
 | 2026-05-18 | B3 invite/reset user action: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added trusted-server Supabase admin helper, `/api/admin/users/[id]/invite`, user-table Invite/Reset action, and `.env.example` placeholders for Next Supabase env/service-role key; no secrets committed |
+| 2026-05-18 | B4 permission-aware navigation/proxy: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added path-to-permission mapping, sidebar filtering from `/api/auth/me`, and proxy enforcement through `has_app_permission`; legacy admin/owner fallback remains during transition |

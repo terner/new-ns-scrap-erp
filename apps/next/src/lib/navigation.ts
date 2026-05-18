@@ -21,6 +21,65 @@ export type NavigationItem = {
   section: NavigationSectionKey
 }
 
+const exactPathPermissions: Record<string, string> = {
+  '/admin/audit': 'system.audit.view',
+  '/admin/migration-tools': 'system.backup.manage',
+  '/admin/user-activity': 'system.audit.view',
+  '/admin/users-permissions': 'system.users.manage',
+  '/api/admin/users': 'system.users.manage',
+  '/api/master-data/customers': 'master.customers.view',
+  '/api/master-data/customers/export': 'master.customers.export',
+  '/api/master-data/products': 'master.products.view',
+  '/api/master-data/suppliers': 'master.suppliers.view',
+  '/api/master-data/suppliers/export': 'master.suppliers.export',
+  '/master-data/customers': 'master.customers.view',
+  '/master-data/products': 'master.products.view',
+  '/master-data/suppliers': 'master.suppliers.view',
+}
+
+const prefixPathPermissions: Array<[string, string]> = [
+  ['/api/master-data/customers/', 'master.customers.update'],
+  ['/api/master-data/products/', 'master.products.update'],
+  ['/api/master-data/suppliers/', 'master.suppliers.update'],
+  ['/api/master-data/', 'master.reference.view'],
+  ['/finance-accounting/', 'finance.financials.view'],
+  ['/finance/', 'finance.cash.view'],
+  ['/master-data/', 'master.reference.view'],
+  ['/po-reports/', 'reports.reports.view'],
+  ['/production/', 'production.operations.view'],
+  ['/reports', 'reports.reports.view'],
+  ['/stock/', 'stock.ledger.view'],
+]
+
+export function permissionForPath(pathname: string) {
+  const normalizedPath = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname
+  const exactPermission = exactPathPermissions[normalizedPath]
+
+  if (exactPermission) {
+    return exactPermission
+  }
+
+  if (normalizedPath.startsWith('/api/master-data/customers/') && normalizedPath.endsWith('/status')) {
+    return 'master.customers.status'
+  }
+
+  if (normalizedPath.startsWith('/api/master-data/products/') && normalizedPath.endsWith('/status')) {
+    return 'master.products.status'
+  }
+
+  if (normalizedPath.startsWith('/api/master-data/suppliers/') && normalizedPath.endsWith('/status')) {
+    return 'master.suppliers.status'
+  }
+
+  return prefixPathPermissions.find(([prefix]) => normalizedPath === prefix.slice(0, -1) || normalizedPath.startsWith(prefix))?.[1] ?? null
+}
+
+export function canAccessPath(pathname: string, context: { isAdmin?: boolean; permissions?: string[] }) {
+  const requiredPermission = permissionForPath(pathname)
+
+  return !requiredPermission || context.isAdmin === true || (context.permissions ?? []).includes(requiredPermission)
+}
+
 export const navigationSections: Array<{ key: NavigationSectionKey; label: string }> = [
   { key: 'main', label: 'หน้าหลัก' },
   { key: 'tracking', label: 'Tracking 360°' },

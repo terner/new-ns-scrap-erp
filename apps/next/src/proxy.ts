@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { permissionForPath } from '@/lib/navigation'
 
 const publicPaths = new Set(['/login', '/forgot-password', '/reset-password', '/api/health'])
 
@@ -63,10 +64,27 @@ export async function proxy(request: NextRequest) {
     return pathname.startsWith('/api/') ? jsonError('กรุณาเข้าสู่ระบบ', 401) : loginRedirect(request)
   }
 
+  const requiredPermission = permissionForPath(pathname)
   const { data: isAppAdmin, error: appAdminError } = await supabase.rpc('is_app_admin')
 
   if (!appAdminError && isAppAdmin === true) {
     return response
+  }
+
+  if (requiredPermission) {
+    const { data: hasPermission, error: permissionError } = await supabase.rpc('has_app_permission', {
+      _permission_code: requiredPermission,
+    })
+
+    if (!permissionError && hasPermission === true) {
+      return response
+    }
+  } else {
+    const { data: appUserId, error: appUserError } = await supabase.rpc('current_app_user_id')
+
+    if (!appUserError && appUserId) {
+      return response
+    }
   }
 
   const { data: profile } = await supabase
@@ -78,8 +96,9 @@ export async function proxy(request: NextRequest) {
   const role = String(profile?.role ?? metadataRole(user)).toLowerCase()
   const isActive = profile?.active !== false
 
-  if (role !== 'admin' || !isActive) {
-    return pathname.startsWith('/api/') ? jsonError('ต้องใช้สิทธิ์ admin', 403) : NextResponse.redirect(new URL('/login', request.url))
+  if ((role !== 'admin' && role !== 'owner') || !isActive) {
+    const message = requiredPermission ? 'ไม่มีสิทธิ์ใช้งานส่วนนี้' : 'ต้องใช้บัญชีที่เปิดใช้งาน'
+    return pathname.startsWith('/api/') ? jsonError(message, 403) : NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response
