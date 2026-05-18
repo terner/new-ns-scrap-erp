@@ -39,6 +39,10 @@
 - `/api/admin/users/[id]/invite` supports admin-triggered invite/reset email:
   - users without `auth_user_id`: sends Supabase Auth invite with service-role key on trusted server
   - users with `auth_user_id`: sends Supabase reset-password email
+  - email redirect correctness depends on Supabase Dashboard > Authentication > URL Configuration and Email Templates:
+    - `Site URL`: `https://new-ns-scrap-erp.vercel.app`
+    - Redirect URLs: include `https://new-ns-scrap-erp.vercel.app/**` and local dev URLs such as `http://localhost:3000/**`
+    - Invite/reset templates should use `{{ .RedirectTo }}` when the code supplies `redirectTo`; otherwise Supabase may fall back to the wrong `{{ .SiteURL }}`
 - `/admin/users-permissions` exists as a Next page over real `app_users`, `app_roles`, and active branches, with create/edit modal flow.
 - User active/inactive can be changed from `/admin/users-permissions` through `/api/admin/users/[id]/status`; self-deactivation is blocked.
 - Admin Supabase Auth user has been linked into `app_users` through `scripts/seed-app-admin.mjs`; the script reads `APP_ADMIN_EMAIL` or `DEV_LOGIN_IDENTIFIER` and does not store passwords.

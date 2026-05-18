@@ -268,7 +268,15 @@ Current Next status as of 2026-05-17:
 - `/admin/users-permissions` supports user create/edit/status/invite/reset actions without storing passwords in app tables.
 - `/admin/audit` reads auth/user-management audit events for users with `system.audit.view`, with group/search/actor/target/event-type filters, server pagination, and detail metadata modal.
 - Functional Next pages now use normalized client/server error handling for implemented pages (`customers`, `suppliers`, `products`, `/admin/users-permissions`, `/admin/audit`): API errors return a consistent `{ code, error, fieldErrors }` shape where applicable, Zod validation returns field errors, DB/internal errors are sanitized, and the UI maps auth/permission/conflict/network/invalid-response cases to Thai user-facing messages.
-- Local development login prefill is supported through `DEV_LOGIN_IDENTIFIER` / `DEV_LOGIN_PASSWORD`; do not set real credentials in committed files or production public env.
+- Login prefill is supported for test-only convenience:
+  - local dev uses `DEV_LOGIN_IDENTIFIER` / `DEV_LOGIN_PASSWORD`
+  - Vercel production can temporarily enable test prefill through `NEXT_PUBLIC_ENABLE_TEST_LOGIN_PREFILL=1`, `NEXT_PUBLIC_TEST_LOGIN_IDENTIFIER`, and `NEXT_PUBLIC_TEST_LOGIN_PASSWORD`
+  - `NEXT_PUBLIC_*` values are visible to anyone visiting the site; remove these env vars before real UAT or production use, and never commit real credentials to git
+- Supabase Auth email URL checklist:
+  - Supabase Dashboard > Authentication > URL Configuration > `Site URL` should be `https://new-ns-scrap-erp.vercel.app`
+  - add redirect allow-list entries for `https://new-ns-scrap-erp.vercel.app/**` and local dev such as `http://localhost:3000/**`
+  - check Authentication > Email Templates for Invite user, Reset password, and Confirm signup; if code passes `redirectTo`, templates that should honor it must use `{{ .RedirectTo }}` rather than hardcoding `{{ .SiteURL }}`
+  - `/api/admin/users/[id]/invite` sends reset links to `${window.location.origin}/reset-password` from the browser action; wrong email URLs usually mean Supabase Site URL, Redirect URLs, or email template variables are stale
 - Import pages are intentionally excluded from the current master CRUD baseline batch.
 - Project-level validation rules now require syntax validation for every new/changed form/API field. The detailed checklist lives in `.agents/skills/ns-scrap-erp-input-validation/SKILL.md`.
 
