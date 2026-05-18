@@ -65,7 +65,9 @@
 | 3 | `suppliers`, `products` | field เยอะและใช้ต่อ transaction | Done |
 | 4 | `directors`, `machines`, `production-lines`, `beneficiaries`, `payment-methods`, `remittance-purposes` | simple master ที่เหลือและ lookup ต่างประเทศ/การเงิน | Done - DB-backed after target migration |
 | B | `products` | ยกระดับสินค้าเป็น specialized customer-style master page | Done |
-| C | remaining master hardening | ยกระดับ master ที่เหลือให้ใช้ UX/API/validation pattern เดียวกันตามความเหมาะสม | Planned |
+| C1 | `branches`, `warehouses`, `accounts` | ยกระดับข้อมูลองค์กร/คลัง/บัญชีให้ใช้ shared customer-style list pattern และ API guard | Done |
+| C2 | `salespersons`, `channels`, `expense-categories`, `currencies` | harden reference masters ที่เหลือในกลุ่ม sales/reference | Planned |
+| C3 | `directors`, `machines`, `production-lines`, `beneficiaries`, `payment-methods`, `remittance-purposes` | harden production/foreign/setup masters ที่เหลือ | Planned |
 
 ## Remaining Customer-Style Hardening Plan
 
@@ -131,13 +133,15 @@ Batch C1: Organization / finance setup
 - `/master-data/accounts`
 
 Tasks:
-- Review whether each page should stay on shared master UI or needs a specialized page.
-- Ensure frontend search/sort/count/pagination behavior is consistent.
-- Ensure row click opens edit modal and no select column exists without a real batch action.
-- Ensure active toggle works in table/form where supported.
-- Add syntax validation for account code/name/bank/account fields and branch/warehouse fields.
-- Add route-level API permission guards.
-- Decide whether `.xlsx` export is useful for branches, warehouses, and accounts; add it where useful and document skipped exports.
+- Done: kept C1 on the shared master UI because the current fields are simple and do not need a page-specific component yet.
+- Done: shared master UI now loads rows once and handles search/sort/count/pagination in the frontend.
+- Done: row click opens detail/edit modal; the old select checkbox column was removed because there is no real batch action.
+- Done: active toggle works in the table and form where the table supports active state.
+- Done: shared form schema now validates branch/warehouse/account code/name/phone/address/bank/account/currency/numeric fields more strictly before save.
+- Done: C1 API routes now enforce route-level permissions:
+  - GET requires `master.reference.view`
+  - POST/PATCH requires `master.reference.manage`
+- Decision: skipped `.xlsx` export for C1 for now because these are small setup/reference lists and the current user-facing export requirement is on customer/supplier/product. Add C1 export later only if UAT asks for it.
 
 Batch C2: Sales/reference masters
 - `/master-data/salespersons`
@@ -297,6 +301,7 @@ Continuation rule:
 | 2026-05-18 | Active toggle UI update: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next` | Passed | Customer, supplier, and shared master-data forms use toggle switch for active status |
 | 2026-05-18 | Customer delete action/API cleanup: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Removed customer table delete action; active status is handled by a dedicated `/api/master-data/customers/[id]/status` endpoint and toggle UI |
 | 2026-05-18 | Batch B products specialized page: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build`, unauthenticated route smoke on `127.0.0.1:3002` | Passed | Added specialized `/master-data/products` page, product schema/domain client, product-specific API validation, active toggle, frontend search/filter/sort/count/pagination, and `/api/master-data/products/export`; unauth smoke returned page 307 to login and API/export 401 |
+| 2026-05-18 | Batch C1 organization/finance setup hardening: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Shared master UI now has frontend count/pagination above the table, row-click edit, no dummy checkbox/export action; branches/warehouses/accounts API routes now enforce `master.reference.view/manage`; shared schema validates C1 code/name/contact/account/numeric fields more strictly |
 
 ## Open Decisions
 

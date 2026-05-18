@@ -1,4 +1,6 @@
+import { z } from 'zod'
 import { prisma } from '@/lib/server/prisma'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, normalizeCode, parseMasterDataForm, toIso, toNumber } from '@/lib/server/master-data'
 
 export const runtime = 'nodejs'
@@ -6,6 +8,8 @@ export const runtime = 'nodejs'
 type AccountRow = Awaited<ReturnType<typeof prisma.accounts.findMany>>[number] & {
   branches?: { name: string } | null
 }
+
+const accountTypeSchema = z.enum(['cash', 'bank', 'other'])
 
 function mapAccount(row: AccountRow) {
   return {
@@ -43,24 +47,32 @@ async function getNextCode() {
 
 export async function GET() {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.reference.view')
+
     const rows = await prisma.accounts.findMany({ include: { branches: true }, orderBy: [{ code: 'asc' }, { name: 'asc' }] })
     return masterDataListJson(rows.map(mapAccount))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'โหลดข้อมูลบัญชีเงินไม่ได้', 500)
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.reference.manage')
+
     const values = parseMasterDataForm(await request.json())
     const code = normalizeCode(values.code, values.id || await getNextCode())
+    const accountType = accountTypeSchema.parse(values.type || 'bank')
     const row = await prisma.accounts.upsert({
       where: { id: values.id || code },
       create: {
         id: values.id || code,
         code,
         name: values.name,
-        type: values.type || 'bank',
+        type: accountType,
         bank_name: values.bankName || null,
         bank: values.bankName || null,
         account_no: values.accountNo || null,
@@ -73,7 +85,7 @@ export async function POST(request: Request) {
       update: {
         code,
         name: values.name,
-        type: values.type || 'bank',
+        type: accountType,
         bank_name: values.bankName || null,
         bank: values.bankName || null,
         account_no: values.accountNo || null,
@@ -87,6 +99,7 @@ export async function POST(request: Request) {
     })
     return masterDataJson(mapAccount(row))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'บันทึกข้อมูลบัญชีเงินไม่ได้')
   }
 }

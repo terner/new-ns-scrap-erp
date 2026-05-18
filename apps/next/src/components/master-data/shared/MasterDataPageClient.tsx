@@ -20,6 +20,8 @@ type MasterDataPageClientProps = {
   config: MasterDataPageConfig
 }
 
+const pageSizeOptions = [10, 25, 50, 100]
+
 function recordToForm(record: MasterDataRecord): MasterDataFormValues {
   return {
     id: record.id,
@@ -99,6 +101,8 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [records, setRecords] = useState<MasterDataRecord[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
   const [selectedRecord, setSelectedRecord] = useState<MasterDataRecord | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -131,6 +135,18 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
 
     return [...rows].sort((left, right) => compareRecords(left, right, sortKey, sortDirection))
   }, [records, search, sortDirection, sortKey])
+
+  const total = filteredRecords.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredRecords.slice(start, start + pageSize)
+  }, [currentPage, filteredRecords, pageSize])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   function openCreateForm() {
     setSelectedRecord(null)
@@ -170,11 +186,13 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
   function setSort(key: SortKey) {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+      setPage(1)
       return
     }
 
     setSortKey(key)
     setSortDirection('asc')
+    setPage(1)
   }
 
   function sortLabel(key: SortKey) {
@@ -194,13 +212,19 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
       <div className="rounded-lg bg-white p-4 shadow">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="w-full md:max-w-md">
-            <input className="w-full rounded-lg border px-3 py-2 text-sm" onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหา..." type="search" value={search} />
+            <input
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPage(1)
+              }}
+              placeholder="ค้นหา..."
+              type="search"
+              value={search}
+            />
             {config.description ? <div className="mt-2 text-xs text-slate-500">{config.description}</div> : null}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white" type="button">
-              📊 Export Excel
-            </button>
             <button className="rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={openCreateForm}>
               + {config.createLabel}
             </button>
@@ -228,45 +252,87 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
       {isLoading ? <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
 
       {!isLoading ? (
-        <div className="overflow-x-auto rounded-lg bg-white shadow">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="w-10 p-2 text-left">
-                  <input className="h-4 w-4 rounded border-slate-300" type="checkbox" />
-                </th>
-                {config.columns.map((column) => (
-                  <th key={column.key} className={`min-w-32 p-2 text-${column.align ?? 'left'}`}>
-                    <button className="font-semibold" type="button" onClick={() => setSort(column.key)}>
-                      {column.label}{sortLabel(column.key)}
-                    </button>
-                  </th>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div>พบทั้งหมด <span className="font-semibold text-slate-900">{total}</span> รายการ</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label="จำนวนรายการต่อหน้า"
+                className="rounded border border-slate-300 px-2 py-1"
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value))
+                  setPage(1)
+                }}
+              >
+                {pageSizeOptions.map((size) => (
+                  <option key={size} value={size}>{size} / หน้า</option>
                 ))}
-                <th className="p-2 text-center">แก้ไข</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRecords.map((record) => (
-                <tr key={record.id} className="border-t">
-                  <td className="p-2"><input className="h-4 w-4 rounded border-slate-300" type="checkbox" /></td>
-                  {config.columns.map((column) => (
-                    <td key={column.key} className={`p-2 text-${column.align ?? 'left'} ${column.key === 'code' ? 'font-mono text-xs' : ''}`}>
-                      {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
-                      {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
-                      {column.format === 'status' ? <ActiveToggle checked={record.active} label={record.active ? 'ใช้งาน' : 'ปิด'} onChange={() => void handleToggleActive(record)} /> : null}
-                      {!column.format ? displayValue(record[column.key] as string | number | boolean | null) : null}
-                    </td>
-                  ))}
-                  <td className="p-2 text-center"><button className="text-blue-600" type="button" onClick={() => openEditForm(record)}>แก้ไข</button></td>
-                </tr>
-              ))}
-              {filteredRecords.length === 0 ? (
+              </select>
+              <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+              <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+              <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg bg-white shadow">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100">
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={config.columns.length + 2}>{config.emptyMessage}</td>
+                  {config.columns.map((column) => (
+                    <th key={column.key} className={`min-w-32 p-2 text-${column.align ?? 'left'}`}>
+                      <button className="font-semibold" type="button" onClick={() => setSort(column.key)}>
+                        {column.label}{sortLabel(column.key)}
+                      </button>
+                    </th>
+                  ))}
+                  <th className="p-2 text-center">แก้ไข</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedRecords.map((record) => (
+                  <tr
+                    key={record.id}
+                    className="cursor-pointer border-t hover:bg-slate-50 focus-within:bg-slate-50"
+                    tabIndex={0}
+                    onClick={() => openEditForm(record)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        openEditForm(record)
+                      }
+                    }}
+                  >
+                    {config.columns.map((column) => (
+                      <td key={column.key} className={`p-2 text-${column.align ?? 'left'} ${column.key === 'code' ? 'font-mono text-xs' : ''}`}>
+                        {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
+                        {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
+                        {column.format === 'status' ? <ActiveToggle checked={record.active} label={record.active ? 'ใช้งาน' : 'ปิด'} onChange={() => void handleToggleActive(record)} /> : null}
+                        {!column.format ? displayValue(record[column.key] as string | number | boolean | null) : null}
+                      </td>
+                    ))}
+                    <td className="p-2 text-center">
+                      <button
+                        className="text-blue-600"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openEditForm(record)
+                        }}
+                      >
+                        แก้ไข
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredRecords.length === 0 ? (
+                  <tr>
+                    <td className="p-4 text-center text-sm text-slate-500" colSpan={config.columns.length + 1}>{config.emptyMessage}</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
     </section>

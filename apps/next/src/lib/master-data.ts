@@ -2,6 +2,48 @@ import { z } from 'zod'
 
 const nullableString = z.string().nullable().default(null)
 const nullableNumber = z.number().nullable().default(null)
+const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
+const codePattern = /^[A-Za-z0-9_-]+$/
+const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
+const businessTextPattern = /^[\p{L}\p{M}\p{N}\s.&,()/'"+#%-]+$/u
+const phonePattern = /^\+?[0-9][0-9\s().-]{7,24}$/
+
+const optionalCode = (label: string) => z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .max(60, `${label}ยาวเกินไป`)
+    .regex(codePattern, `${label}ใช้ได้เฉพาะอังกฤษ ตัวเลข ขีดกลาง และ underscore`)
+    .nullable()
+    .default(null),
+)
+
+const optionalBusinessText = (label: string, maxLength = 160) => z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .max(maxLength, `${label}ยาวเกินไป`)
+    .regex(businessTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`)
+    .nullable()
+    .default(null),
+)
+
+const optionalGeneralText = (label: string, maxLength = 255) => z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .max(maxLength, `${label}ยาวเกินไป`)
+    .regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`)
+    .nullable()
+    .default(null),
+)
+
+const optionalPhone = z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .regex(phonePattern, 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง')
+    .nullable()
+    .default(null),
+)
+
+const nonNegativeNumber = (label: string) => z.number({ invalid_type_error: `${label}ต้องเป็นตัวเลข` }).min(0, `${label}ต้องไม่ติดลบ`).nullable().default(null)
 
 export const masterDataRecordSchema = z.object({
   id: z.string().min(1),
@@ -99,9 +141,25 @@ export const masterDataFormSchema = masterDataRecordSchema
   })
   .extend({
     id: z.string().trim().optional(),
-    code: z.string().trim().nullable().default(null),
-    name: z.string().trim().min(1, 'กรอกชื่อรายการ'),
-    email: z.string().trim().email('รูปแบบอีเมลไม่ถูกต้อง').or(z.literal('')).nullable().default(null),
+    code: optionalCode('รหัส'),
+    name: z.string().trim().min(1, 'กรอกชื่อรายการ').max(180, 'ชื่อรายการยาวเกินไป').regex(businessTextPattern, 'ชื่อรายการมีรูปแบบไม่ถูกต้อง'),
+    email: z.preprocess(blankToNull, z.string().trim().email('รูปแบบอีเมลไม่ถูกต้อง').regex(/^[\x20-\x7E]+$/, 'อีเมลต้องใช้ตัวอักษรอังกฤษ ตัวเลข หรือสัญลักษณ์มาตรฐาน').nullable().default(null)),
+    phone: optionalPhone,
+    note: optionalGeneralText('หมายเหตุ', 500),
+    symbol: optionalGeneralText('สัญลักษณ์', 20),
+    parentId: optionalCode('รหัสหมวดแม่'),
+    channelType: optionalGeneralText('ประเภทช่องทาง', 80),
+    bankName: optionalBusinessText('ธนาคาร', 120),
+    accountNo: optionalGeneralText('เลขบัญชี', 80),
+    currency: optionalCode('สกุลเงิน'),
+    openingBalance: nonNegativeNumber('ยอดยกมา'),
+    odLimit: nonNegativeNumber('วงเงิน OD'),
+    branchId: optionalCode('รหัสสาขา'),
+    address: optionalGeneralText('ที่อยู่', 500),
+    commissionPct: z.number().min(0, 'ค่าคอมมิชชันต้องไม่ติดลบ').max(100, 'ค่าคอมมิชชันต้องไม่เกิน 100%').nullable().default(null),
+    baseSalary: nonNegativeNumber('เงินเดือนฐาน'),
+    accountCurrency: optionalCode('สกุลเงินบัญชี'),
+    bankAccount: optionalGeneralText('บัญชีธนาคาร', 160),
   })
 
 export type MasterDataFormValues = z.infer<typeof masterDataFormSchema>
