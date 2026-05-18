@@ -64,11 +64,125 @@
 | 2 | `branches`, `warehouses`, `accounts` | ข้อมูลองค์กร/บัญชีและ FK พื้นฐาน | Done |
 | 3 | `suppliers`, `products` | field เยอะและใช้ต่อ transaction | Done |
 | 4 | `directors`, `machines`, `production-lines`, `beneficiaries`, `payment-methods`, `remittance-purposes` | simple master ที่เหลือและ lookup ต่างประเทศ/การเงิน | Done - DB-backed after target migration |
+| B | `products` | ยกระดับสินค้าเป็น specialized customer-style master page | Planned |
+| C | remaining master hardening | ยกระดับ master ที่เหลือให้ใช้ UX/API/validation pattern เดียวกันตามความเหมาะสม | Planned |
+
+## Remaining Customer-Style Hardening Plan
+
+Batch A is intentionally skipped for this Next master-data track. In older docs, Batch A refers to Vue clone visual audit work and is not part of the remaining Next master-data hardening.
+
+### Batch B: Products Specialized Page
+
+Goal:
+- Make `/master-data/products` follow the same practical master-data UX pattern as `customers` and `suppliers`.
+- Keep the existing DB data safe. Any DB/schema change must be additive only.
+
+Tasks:
+- Replace the generic shared products page with a specialized products client.
+- Load product rows once, then run search/filter/sort/count/pagination in the frontend for normal master-data use.
+- Put result count and pagination controls together above the table.
+- Let row click open detail/edit modal; do not add a select column unless there is a real batch action.
+- Add product filters where useful:
+  - product type
+  - metal group
+  - item status: `RM`, `WIP`, `FG`
+  - active/inactive
+- Add a product form with clear fields:
+  - code
+  - name
+  - type
+  - unit
+  - metal group
+  - item status
+  - grade
+  - standard price
+  - standard cost
+  - active
+- Validate syntax for every changed input:
+  - code format
+  - name/grade/unit text
+  - item status option
+  - non-negative numeric price/cost where applicable
+- Keep active/inactive as a toggle in both table and form.
+- Add `.xlsx` export for products if the current schema has enough fields to make the export useful.
+- Add or verify route-level API permission guards:
+  - `master.products.view`
+  - `master.products.create`
+  - `master.products.update`
+  - `master.products.status`
+  - `master.products.export` if export is added.
+- Update docs after implementation and record validation.
+
+Validation before closing Batch B:
+- `npm run lint --workspace @ns-scrap-erp/next`
+- `npm run type-check --workspace @ns-scrap-erp/next`
+- `npm run build`
+- API/page smoke for `/master-data/products` and product API routes.
+
+### Batch C: Remaining Master Hardening
+
+Goal:
+- Bring the remaining master-data pages up to the same operating pattern where it makes sense, without overbuilding small reference screens.
+- Keep work reviewable by splitting Batch C into smaller sub-batches and pushing checkpoints after validation.
+
+Batch C1: Organization / finance setup
+- `/master-data/branches`
+- `/master-data/warehouses`
+- `/master-data/accounts`
+
+Tasks:
+- Review whether each page should stay on shared master UI or needs a specialized page.
+- Ensure frontend search/sort/count/pagination behavior is consistent.
+- Ensure row click opens edit modal and no select column exists without a real batch action.
+- Ensure active toggle works in table/form where supported.
+- Add syntax validation for account code/name/bank/account fields and branch/warehouse fields.
+- Add route-level API permission guards.
+- Decide whether `.xlsx` export is useful for branches, warehouses, and accounts; add it where useful and document skipped exports.
+
+Batch C2: Sales/reference masters
+- `/master-data/salespersons`
+- `/master-data/channels`
+- `/master-data/expense-categories`
+- `/master-data/currencies`
+
+Tasks:
+- Keep these lightweight unless a field set requires specialized handling.
+- Ensure shared UI follows the customer-style list pattern.
+- Add field syntax validation and required-field validation.
+- Add route-level API permission guards.
+- Decide/export only where useful; document if skipped because the reference list is small.
+
+Batch C3: Production / foreign / setup masters
+- `/master-data/directors`
+- `/master-data/machines`
+- `/master-data/production-lines`
+- `/master-data/beneficiaries`
+- `/master-data/payment-methods`
+- `/master-data/remittance-purposes`
+
+Tasks:
+- Treat `machines` and `production-lines` as production-critical masters.
+- Verify production-related fields such as branch, active state, code/name, and line/machine metadata are clear.
+- Keep `directors` setup-only until finance/director advance flows define stronger requirements.
+- Ensure foreign-payment lookup screens have validation for names/codes/currency-like fields where present.
+- Add route-level API permission guards.
+- Decide/export only where useful; document skipped exports.
+
+Validation before closing each Batch C sub-batch:
+- `npm run lint --workspace @ns-scrap-erp/next`
+- `npm run type-check --workspace @ns-scrap-erp/next`
+- `npm run build`
+- API/page smoke for the touched routes.
+
+Continuation rule:
+- After this plan is committed, work should continue in order: Batch B, then C1, C2, C3.
+- Do not pause for confirmation between sub-batches unless a schema change could delete/overwrite data, a route must be removed, or a UX decision would change a business flow.
+- Update this tracker and `09-implementation-tasklist.md` after every batch or sub-batch.
 
 ## Current Status as of 2026-05-18
 
-- Current git checkpoint is `d6e8b29 feat: standardize supplier master form`.
-- The branch was reset back to `d6e8b29` after the sidebar/shadcn design experiment. Those later design commits are not part of the current working baseline.
+- Current git checkpoint is `07d1355 docs: update auth permission status`.
+- The branch was reset back to a pre-shadcn baseline earlier after the sidebar/shadcn design experiment. Those experimental design commits are not part of the current working baseline.
 - Tailwind remains v3 (`tailwindcss ^3.4.17`). Tailwind v4 migration and shadcn component adoption are not current active changes.
 - The current layout is the pre-shadcn Next shell with the simple dark sidebar/topbar.
 
@@ -130,9 +244,9 @@
   - `apps/next/src/lib/server/simple-master-tables.ts`
 - Added `apps/next/eslint.config.mjs` so `npm run lint` works with ESLint 9 and ignores generated Prisma output.
 - Thai address reference tables exist in `dev-target`: provinces 77, districts 928, subdistricts 7,436.
-- Next login now uses Supabase Auth and protected routes through Next `proxy.ts`; admin-only access is enforced before pages/API except login/health.
+- Next login now uses Supabase Auth and protected routes through Next `proxy.ts`; normalized app permission checks are enforced for mapped paths, with legacy admin/owner fallback during transition.
 - Local development login prefill can be supplied through `DEV_LOGIN_IDENTIFIER` and `DEV_LOGIN_PASSWORD`; these are intentionally dev-only and not production public env vars.
-- Auth/role/RLS remains incomplete for the final permission model. Current app gating is admin-only and should be replaced with full role/permission mapping before UAT.
+- Auth/role/RLS remains incomplete for final UAT because full table-level RLS rollout and branch-scope enforcement are still pending.
 - Import pages remain out of scope and were not ported in Batch 1 or Batch 2.
 
 ## Latest Validation
