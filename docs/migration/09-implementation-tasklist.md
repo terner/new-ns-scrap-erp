@@ -419,9 +419,11 @@ Tracker: [16-next-production-progress.md](/Users/watcharathatsrithanesiganon/Doc
 
 ## Immediate Next Tasks
 
-1. ออกแบบ role/permission read model ถัดจาก admin-only login gate ปัจจุบัน
-2. ทำ browser smoke test รอบใหม่: login, redirect เมื่อยังไม่ login, sidebar หลัง login, logout, customer CRUD/export
-3. เพิ่ม automated smoke test สำหรับ master-data routes/API ทุกหน้า
-4. เดิน master data CRUD hardening ต่อ: suppliers/products/branches/warehouses/accounts ให้มี validation/export pattern เทียบกับ customer
-5. ตัดสินใจ small reference data strategy: code constants + DB seed/cache หรือ DB-driven config
-6. ทำ hosting/runtime cost review แยกต่างหากภายหลัง; ยังไม่บันทึกเป็น decision ในรอบนี้
+Tracker หลักสำหรับงานที่เหลือทั้งหมด: [17-next-remaining-modules-progress.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/17-next-remaining-modules-progress.md)
+
+1. เริ่ม `Batch S: Stock` ตาม task ย่อยใน tracker ใหม่
+2. ใช้ legacy explorer ก่อนเริ่มแต่ละ page เพื่อเช็ก field/button/modal/action จากระบบเก่า
+3. ใช้ QA checker หลังจบแต่ละ batch ย่อยเพื่อเช็กปุ่ม/modal/filter/export/page/API
+4. อัปเดต tracker หลังจบ batch ย่อยทุกครั้ง
+5. รัน type-check/lint/build แล้ว commit/push ทุก checkpoint
+6. งานเก่าค้างยังต้องตามใน tracker: production write flow, purchase void/PO reconciliation, sales write/FIFO, stock transfer void/cost, payment approval persistence, branch-scope permission, automated smoke tests

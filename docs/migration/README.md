@@ -29,6 +29,7 @@
 12. [14-auth-permission-batch-plan.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/14-auth-permission-batch-plan.md)
 13. [15-next-daily-transactions-progress.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/15-next-daily-transactions-progress.md)
 14. [16-next-production-progress.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/16-next-production-progress.md)
+15. [17-next-remaining-modules-progress.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/17-next-remaining-modules-progress.md)
 
 ## Recommended Order
 
@@ -46,3 +47,4 @@
 12. ใช้ `14-auth-permission-batch-plan` ติดตาม login, reset password, users, roles, permissions, API guards และ RLS
 13. ใช้ `15-next-daily-transactions-progress` ติดตามการ port กลุ่มรายการประจำวันใน Next พร้อม API/DB/permission/reconciliation
 14. ใช้ `16-next-production-progress` ติดตามการ port กลุ่มผลิตจาก legacy รวม production orders, inputs, outputs, output categories, stock ledger, cost/yield reports และ reconciliation
+15. ใช้ `17-next-remaining-modules-progress` ติดตามงานที่เหลือทุกหมวด พร้อม batch ย่อย, task ย่อย, action/modal checklist, validation และ checkpoint rule
