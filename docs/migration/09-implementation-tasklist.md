@@ -349,7 +349,7 @@ Reporting rule:
 - [x] Batch A: `/daily/transfer`, `/daily/expense`, `/daily/petty-advance`, `/daily/expense-dashboard`
 - [x] Batch B: `/daily/payment-approval`, `/purchase/payments`, `/purchase/receipt-vouchers`, `/sales/receipts`
 - [x] Batch C: `/stock/transfer`, `/daily/bill-swap-history`
-- [ ] Batch D/E: `/purchase/bills`, `/sales/bills`, `/sales/stock-issue`
+- [x] Batch D/E read baseline: `/purchase/bills`, `/sales/bills`, `/sales/stock-issue`
 - [ ] design supplier payment allocations
 - [ ] design customer receipt allocations
 - [ ] define WHT/VAT fields

@@ -17,9 +17,9 @@
 
 | Route | Legacy Component | Current Next Status | Target Notes |
 |---|---|---|---|
-| `/purchase/bills` | purchase bill flow | Placeholder | Batch D: purchase transaction header/lines; requires stock/AP reconciliation |
-| `/sales/bills` | sales bill flow | Placeholder | Batch D/E: sales transaction header/lines; requires FIFO/profit permission |
-| `/sales/stock-issue` | pending sale / issue flow | Placeholder | Batch E: stock issue before sales invoice |
+| `/purchase/bills` | purchase bill flow | Batch D Read Baseline Done | Purchase transaction read surface; create/post follow-up |
+| `/sales/bills` | sales bill flow | Batch D Read Baseline Done | Sales transaction read surface; create/post/FIFO follow-up |
+| `/sales/stock-issue` | pending sale / issue flow | Batch E Read Baseline Done | Pending sale / stock issue read surface; post/convert follow-up |
 | `/daily/payment-approval` | `view-paymentApproval` | Batch B Done | Approval workbench over AP and expenses |
 | `/purchase/payments` | supplier payment flow | Batch B Done | Supplier payments + bank statement |
 | `/purchase/receipt-vouchers` | receipt voucher flow | Batch B Done | Purchase receipt voucher read surface |
@@ -150,19 +150,42 @@ Scope:
 - `/purchase/bills`
 - `/sales/bills`
 
+Status: Read baseline done on 2026-05-18.
+
 Tasks:
-- Do not start heavy bill rewrite until Batch A/B are stable.
-- Split header/line behavior carefully and preserve existing business flow.
-- Define reconciliation for bill count, totals, paid/received amounts, stock movements, and linked ledger rows.
+- Done: added read-only Next pages and APIs for purchase and sales bills.
+- Done: pages read real `purchase_bills` and `sales_bills` data with supplier/customer, branch, warehouse, channel, totals, paid/received, and balances.
+- Deferred by design: create/edit/post/void and line refactor, because they affect stock ledger, AP/AR, FIFO/COGS, and profit permissions.
+- Follow-up: split header/line behavior carefully and preserve existing business flow.
+- Follow-up: define reconciliation for bill count, totals, paid/received amounts, stock movements, and linked ledger rows.
+
+Validation:
+- Passed: `npm run type-check --workspace @ns-scrap-erp/next`
+- Passed: `npm run lint --workspace @ns-scrap-erp/next`
+- Passed: `npm run build`
+- Build confirmed routes generated:
+  - `/purchase/bills`
+  - `/sales/bills`
+  - `/api/purchase/bills`
+  - `/api/sales/bills`
 
 ### Batch E: Pending Sale / Stock Issue
 
 Scope:
 - `/sales/stock-issue`
 
+Status: Read baseline done on 2026-05-18.
+
 Tasks:
-- Implement after stock transfer and sales bill assumptions are stable.
-- Reconcile issued stock against later sales invoice links.
+- Done: added read-only Next page/API for `stock_issues`.
+- Deferred by design: create/post/convert-to-bill flow until sales bill and stock ledger write rules are reconciled.
+- Follow-up: reconcile issued stock against later sales invoice links.
+
+Validation:
+- Passed with Batch D validation above.
+- Build confirmed routes generated:
+  - `/sales/stock-issue`
+  - `/api/sales/stock-issue`
 
 ## Current Status as of 2026-05-18
 
@@ -171,9 +194,12 @@ Tasks:
 - Batch A implementation checkpoint: `24ab600 feat: add daily cash expense baseline`.
 - Batch B implementation checkpoint: `64bcde3 feat: add daily payment receipt baseline`.
 - Batch C implementation checkpoint pending commit after this doc update.
+- Batch C implementation checkpoint: `32ff488 feat: add daily stock transfer audit baseline`.
+- Batch D/E read baseline checkpoint pending commit after this doc update.
 - Next daily Batch A routes now have real Next pages and API routes.
 - Next daily Batch B payment/receipt routes now have baseline pages and API routes.
 - Next daily Batch C stock transfer/audit routes now have baseline pages and API routes.
+- Next daily Batch D/E transaction read routes now have baseline pages and API routes.
 - Legacy daily UI/reference exists under:
   - `old-apps/legacy/index.html`
   - `old-apps/vue/src/views/daily/`
@@ -195,3 +221,4 @@ Tasks:
 - Petty advance `spent` is currently `0` in Next baseline until expense-to-advance allocation is wired.
 - Payment approval persistence/print sheet is not fully ported yet; current Batch B is an actionable queue/read surface plus payment/receipt write APIs.
 - Stock transfer uses `stock_ledger` directly; no separate header table has been created yet.
+- Purchase/sales bill pages are intentionally read baseline only. Write/post behavior is deferred until transaction reconciliation and line-table design are explicit.
