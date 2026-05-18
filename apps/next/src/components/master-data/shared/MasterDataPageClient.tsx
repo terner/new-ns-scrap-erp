@@ -22,6 +22,14 @@ type MasterDataPageClientProps = {
 
 const pageSizeOptions = [10, 25, 50, 100]
 
+function formatPhoneDisplay(value: string | null) {
+  if (!value) return null
+  const digits = value.replace(/\D/g, '')
+  if (digits.length === 10 && digits.startsWith('0')) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+  if (digits.length === 9 && digits.startsWith('0')) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`
+  return value
+}
+
 function recordToForm(record: MasterDataRecord): MasterDataFormValues {
   return {
     id: record.id,
@@ -29,7 +37,7 @@ function recordToForm(record: MasterDataRecord): MasterDataFormValues {
     name: record.name,
     active: record.active,
     type: record.type,
-    phone: record.phone,
+    phone: formatPhoneDisplay(record.phone),
     email: record.email,
     note: record.note,
     symbol: record.symbol,
@@ -72,6 +80,11 @@ function displayValue(value: string | number | boolean | null) {
   if (value === null || value === '') return '-'
   if (typeof value === 'boolean') return value ? 'ใช้งาน' : 'ปิด'
   return value
+}
+
+function displayRecordValue(record: MasterDataRecord, key: keyof MasterDataRecord) {
+  if (key === 'phone') return displayValue(formatPhoneDisplay(record.phone))
+  return displayValue(record[key] as string | number | boolean | null)
 }
 
 function formatNumber(value: number | null, fractionDigits = 2) {
@@ -341,7 +354,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                         {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
                         {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
                         {column.format === 'status' ? <ActiveToggle checked={record.active} label={record.active ? 'ใช้งาน' : 'ปิด'} onChange={() => void handleToggleActive(record)} /> : null}
-                        {!column.format ? displayValue(record[column.key] as string | number | boolean | null) : null}
+                        {!column.format ? displayRecordValue(record, column.key) : null}
                       </td>
                     ))}
                     <td className="p-2 text-center">
@@ -455,6 +468,7 @@ type FormFieldProps = {
 
 function FormField({ error, field, value, onChange }: FormFieldProps) {
   const isEmailField = field.key === 'email'
+  const isPhoneField = field.key === 'phone'
   const inputType = field.type === 'number' ? 'number' : isEmailField ? 'email' : 'text'
 
   if (field.type === 'select') {
@@ -483,11 +497,15 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
         aria-invalid={Boolean(error)}
         aria-required={field.required}
         className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none focus:border-slate-700 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-        inputMode={isEmailField ? 'email' : undefined}
+        inputMode={isEmailField ? 'email' : isPhoneField ? 'tel' : undefined}
         type={inputType}
         value={String(value ?? '')}
         onChange={(event) => {
-          const nextValue = isEmailField ? event.target.value.replace(/[^\x20-\x7E]/g, '') : event.target.value
+          const nextValue = isEmailField
+            ? event.target.value.replace(/[^\x20-\x7E]/g, '')
+            : isPhoneField
+              ? event.target.value.replace(/[^0-9+\s().-]/g, '')
+              : event.target.value
           onChange(nextValue)
         }}
       />
