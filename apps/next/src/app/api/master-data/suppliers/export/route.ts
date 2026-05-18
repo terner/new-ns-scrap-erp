@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { mapPrismaSupplier } from '@/lib/domain/supplier'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 import type { Supplier } from '@/lib/supplier'
 import type { Prisma } from '../../../../../../generated/prisma/client'
@@ -138,6 +139,9 @@ function buildWorkbook(suppliers: Supplier[], total: number, filters: { supplier
 
 export async function GET(request: Request) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.suppliers.export')
+
     const { supplierType, direction, marketScope, q, sortColumn } = parseExportParams(request)
     const where = supplierSearchWhere(q, supplierType, marketScope)
     const [rows, total] = await Promise.all([
@@ -161,6 +165,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return NextResponse.json({ error: caught instanceof Error ? caught.message : 'Export Excel ไม่สำเร็จ' }, { status: 500 })
   }
 }

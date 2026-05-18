@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { mapPrismaCustomer } from '@/lib/domain/customer'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
@@ -17,6 +18,9 @@ type CustomerStatusRouteProps = {
 
 export async function PATCH(request: Request, { params }: CustomerStatusRouteProps) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.customers.status')
+
     const { id } = await params
     const values = updateCustomerStatusSchema.parse(await request.json())
 
@@ -31,6 +35,7 @@ export async function PATCH(request: Request, { params }: CustomerStatusRoutePro
 
     return NextResponse.json(mapPrismaCustomer(customer))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return NextResponse.json({ error: caught instanceof Error ? caught.message : 'อัปเดตสถานะลูกค้าไม่ได้' }, { status: 400 })
   }
 }

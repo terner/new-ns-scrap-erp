@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { mapPrismaSupplier } from '@/lib/domain/supplier'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
@@ -17,6 +18,9 @@ type SupplierRouteProps = {
 
 export async function PATCH(request: Request, { params }: SupplierRouteProps) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.suppliers.status')
+
     const { id } = await params
     const body = await request.json()
     const values = updateSupplierStatusSchema.parse(body)
@@ -33,6 +37,7 @@ export async function PATCH(request: Request, { params }: SupplierRouteProps) {
 
     return NextResponse.json(mapPrismaSupplier(supplier))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return NextResponse.json({ error: caught instanceof Error ? caught.message : 'อัปเดตสถานะผู้ขายไม่ได้' }, { status: 400 })
   }
 }

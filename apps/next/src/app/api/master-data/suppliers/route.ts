@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { resolveMx } from 'node:dns/promises'
 import { supplierFormSchema } from '@/lib/supplier'
 import { mapPrismaSupplier, toSupplierWriteInput } from '@/lib/domain/supplier'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 import type { Prisma } from '../../../../../generated/prisma/client'
 
@@ -108,6 +109,9 @@ async function assertEmailDomainCanReceiveMail(email: string | null) {
 
 export async function GET(request: Request) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.suppliers.view')
+
     const { all, direction, marketScope, page, pageSize, q, sortColumn, supplierType } = parseListParams(request)
     const where = supplierSearchWhere(q, supplierType, marketScope)
     const [suppliers, total] = await Promise.all([
@@ -129,12 +133,16 @@ export async function GET(request: Request) {
       totalPages: all ? 1 : Math.max(1, Math.ceil(total / pageSize)),
     })
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return NextResponse.json({ error: caught instanceof Error ? caught.message : 'โหลดข้อมูลผู้ขายไม่ได้' }, { status: 500 })
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.suppliers.create')
+
     const body = await request.json()
     const values = supplierFormSchema.parse(body)
     await assertEmailDomainCanReceiveMail(values.email)
@@ -152,6 +160,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(mapPrismaSupplier(supplier))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return NextResponse.json({ error: caught instanceof Error ? caught.message : 'บันทึกข้อมูลผู้ขายไม่ได้' }, { status: 400 })
   }
 }

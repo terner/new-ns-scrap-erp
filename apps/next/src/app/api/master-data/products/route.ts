@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/server/prisma'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, masterDataListJson, normalizeCode, parseMasterDataForm, toIso, toNumber } from '@/lib/server/master-data'
 
 export const runtime = 'nodejs'
@@ -23,15 +24,22 @@ function mapProduct(row: Awaited<ReturnType<typeof prisma.products.findMany>>[nu
 
 export async function GET() {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.products.view')
+
     const rows = await prisma.products.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }] })
     return masterDataListJson(rows.map(mapProduct))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'โหลดข้อมูลสินค้าไม่ได้', 500)
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'master.products.create')
+
     const values = parseMasterDataForm(await request.json())
     const code = normalizeCode(values.code, values.id || '')
     const row = await prisma.products.upsert({
@@ -64,6 +72,7 @@ export async function POST(request: Request) {
     })
     return masterDataJson(mapProduct(row))
   } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'บันทึกข้อมูลสินค้าไม่ได้')
   }
 }

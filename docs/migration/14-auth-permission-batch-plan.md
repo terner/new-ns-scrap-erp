@@ -51,6 +51,7 @@
   - user create/edit/status/invite/reset actions write best-effort audit events
   - `/api/admin/auth-events` and `/admin/audit` expose recent audit events to users with `system.audit.view`
   - `app_set_updated_at()` has fixed `search_path = public`
+- Master-data route-level API guards now enforce normalized permissions directly for customer, supplier, and product view/create/status/export actions, in addition to proxy path checks.
 - RLS/permission model is not final; current app gating now uses normalized permissions for mapped paths, but table-level RLS rollout still needs table-by-table UAT.
 - Supabase advisors still report many legacy/base tables with policies but RLS disabled; those are not changed in this auth batch because enabling them globally could break legacy-compatible flows and needs a table-by-table UAT plan.
 
@@ -326,3 +327,4 @@ Validation:
 | 2026-05-18 | B3 invite/reset user action: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added trusted-server Supabase admin helper, `/api/admin/users/[id]/invite`, user-table Invite/Reset action, and `.env.example` placeholders for Next Supabase env/service-role key; no secrets committed |
 | 2026-05-18 | B4 permission-aware navigation/proxy: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added path-to-permission mapping, sidebar filtering from `/api/auth/me`, and proxy enforcement through `has_app_permission`; legacy admin/owner fallback remains during transition |
 | 2026-05-18 | B5 audit schema/hardening: Supabase `db push --dry-run`, `db push`, table/RLS verification query, advisors filtered for `app_`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed with legacy caveat | Added `app_auth_events`, RLS select policy for `system.audit.view`, user-management audit writes, `/api/admin/auth-events`, `/admin/audit`, and hardened `app_set_updated_at`; advisors no longer show app-schema warning, but still report legacy tables/functions outside this batch |
+| 2026-05-18 | B4/B5 route-level permission guards for key master APIs: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Added direct `requirePermission` checks to customer, supplier, and product list/create/status/export API handlers; proxy remains a second layer |
