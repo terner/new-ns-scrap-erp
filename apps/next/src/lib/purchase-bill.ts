@@ -3,6 +3,7 @@ import { z } from 'zod'
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
 const docNoPattern = /^[A-Za-z0-9_-]+$/
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
+const phonePattern = /^[0-9+\s().-]+$/
 
 const optionalDocNo = (label: string) => z.preprocess(
   blankToNull,
@@ -19,35 +20,73 @@ const optionalGeneralText = (label: string, maxLength = 500) => z.preprocess(
   z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
 )
 
+const optionalPhone = (label: string) => z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .regex(phonePattern, `${label}ใช้ได้เฉพาะตัวเลข + ช่องว่าง วงเล็บ จุด และขีด`)
+    .refine((value) => {
+      const digits = value.replace(/\D/g, '')
+      return digits.length >= 9 && digits.length <= 15
+    }, `${label}ต้องมีตัวเลข 9-15 หลัก`)
+    .nullable()
+    .default(null),
+)
+
 const money = (label: string) => z.coerce.number({ invalid_type_error: `${label}ต้องเป็นตัวเลข` }).finite(`${label}ต้องเป็นตัวเลข`).min(0, `${label}ต้องไม่ติดลบ`)
 const positiveMoney = (label: string) => money(label).gt(0, `${label}ต้องมากกว่า 0`)
 
 export const purchaseBillItemSchema = z.object({
+  deductWeight: money('น้ำหนักหัก').default(0),
   discount: money('ส่วนลด').default(0),
+  displayName: optionalGeneralText('ชื่อแสดงในบิล', 120),
+  grossWeight: money('น้ำหนักรวม').default(0),
   lotNo: optionalGeneralText('Lot', 80),
   note: optionalGeneralText('หมายเหตุรายการ', 200),
+  poBuyId: optionalSafeId('PO Buy'),
   price: money('ราคา').default(0),
   productId: z.string().trim().min(1, 'เลือกสินค้า'),
   qty: positiveMoney('จำนวน/น้ำหนัก'),
+  salesPrice: money('ราคาหน้าใบ').default(0),
+}).refine((value) => !value.grossWeight || value.grossWeight >= value.deductWeight, {
+  message: 'น้ำหนักหักต้องไม่เกินน้ำหนักรวม',
+  path: ['deductWeight'],
 })
 
 export const purchaseBillFormSchema = z.object({
   branchId: optionalSafeId('สาขา'),
   channelId: optionalSafeId('ช่องทาง'),
+  contactPhone: optionalPhone('เบอร์โทร'),
   date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD'),
+  discountTotal: money('ส่วนลดท้ายบิล').default(0),
   docNo: optionalDocNo('เลขที่บิล'),
   hasVat: z.boolean().default(false),
   items: z.array(purchaseBillItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
+  licensePlate: optionalGeneralText('ทะเบียนรถ', 40),
+  note: optionalGeneralText('หมายเหตุ', 500),
   notes: optionalGeneralText('หมายเหตุ', 500),
+  poBuyId: optionalSafeId('Quick Load PO'),
   purchaseSource: z.enum(['SPOT_BUY', 'PO_RECEIPT', 'MIXED']).default('SPOT_BUY'),
   refNo: optionalDocNo('เลขที่อ้างอิง'),
+  salesId: optionalSafeId('เซลที่ดูแล'),
   supplierId: z.string().trim().min(1, 'เลือกผู้ขาย'),
   transactionMode: z.enum(['STOCK', 'TRADING']).default('STOCK'),
+  vatInvoiceDate: z.preprocess(
+    blankToNull,
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ใบกำกับภาษีต้องเป็นรูปแบบ YYYY-MM-DD').nullable().default(null),
+  ),
+  vatInvoiceNo: optionalDocNo('เลขที่ใบกำกับภาษี'),
+  vatInvoiceReceived: z.boolean().default(false),
   vatType: z.enum(['NONE', 'EXCLUDE', 'INCLUDE']).default('NONE'),
   warehouseId: optionalSafeId('คลัง'),
 }).refine((value) => value.transactionMode !== 'STOCK' || Boolean(value.warehouseId), {
   message: 'เลือกคลังเมื่อเป็นบิล STOCK',
   path: ['warehouseId'],
+}).refine((value) => !value.vatInvoiceReceived || Boolean(value.vatInvoiceNo), {
+  message: 'กรอกเลขที่ใบกำกับภาษีเมื่อระบุว่าได้รับแล้ว',
+  path: ['vatInvoiceNo'],
+}).refine((value) => !value.vatInvoiceReceived || Boolean(value.vatInvoiceDate), {
+  message: 'กรอกวันที่ใบกำกับภาษีเมื่อระบุว่าได้รับแล้ว',
+  path: ['vatInvoiceDate'],
 })
 
 export type PurchaseBillFormValues = z.infer<typeof purchaseBillFormSchema>

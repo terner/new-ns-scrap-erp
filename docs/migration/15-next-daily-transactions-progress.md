@@ -181,6 +181,17 @@ Status:
 - Added item rows inside the modal with `+ เพิ่มรายการ`, product selection, quantity, price, and discount.
 - Added Zod syntax validation for purchase bill create payload through `purchaseBillFormSchema`.
 - Added XLSX export for purchase bills.
+- Follow-up update: expanded the Next purchase bill modal to mirror legacy card structure before later trimming:
+  - `1. ประเภทบิล`: STOCK/TRADING, trading info, mixed Spot + PO note, Quick Load PO selector.
+  - `2. ข้อมูลบิล`: doc no, supplier ref no, date, supplier, branch, warehouse, purchase channel, license plate, contact phone, salesperson, source, VAT mode.
+  - `3. รายการสินค้า`: product, display name, per-line PO, gross weight, tare/deduct weight, net weight, price, salesperson display price, discount, line amount.
+  - `4. VAT & ยอดรวม`: VAT toggle, bill-level discount, total weight, subtotal, after-discount, VAT, grand total.
+  - VAT invoice tracking: received flag, VAT invoice no, VAT invoice date.
+  - Notes card.
+- Follow-up update: `/api/purchase/bills` now accepts and stores legacy-compatible header fields on `purchase_bills` and line fields inside `items` JSON:
+  - `po_buy_id`, `license_plate`, `contact_phone`, `sales_id`, `discount_total`, `vat_invoice_received`, `vat_invoice_no`, `vat_invoice_date`, `note`
+  - item `displayName`, `poBuyId`, `grossWeight`, `deductWeight`, `qty` as net weight, `salesPrice`
+- Follow-up update: options payload now includes active/open PO buys and active salespersons for the create modal.
 
 Important boundary:
 - Current create path writes `purchase_bills` header + `items` JSON and AP balance fields only.

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
+import { sanitizePhoneInput } from '@/lib/format'
 import { purchaseBillFormSchema, type PurchaseBillFormValues } from '@/lib/purchase-bill'
 
 type BillRow = {
@@ -57,15 +58,19 @@ type Option = {
   branch_id?: string | null
   code?: string | null
   id: string
+  label?: string | null
   name: string
+  supplier_id?: string | null
   unit?: string | null
 }
 
 type PurchasePayload = {
   branches: Option[]
   channels: Option[]
+  poBuys: Option[]
   products: Option[]
   rows: BillRow[]
+  salespersons: Option[]
   suppliers: Option[]
   warehouses: Option[]
 }
@@ -74,27 +79,41 @@ type TransactionBillsPageClientProps = {
   mode: 'purchase' | 'sales' | 'stock-issue'
 }
 
-const blankItem = () => ({
+const blankItem = (): PurchaseBillFormValues['items'][number] => ({
+  deductWeight: 0,
   discount: 0,
+  displayName: null,
+  grossWeight: 0,
   lotNo: null,
   note: null,
+  poBuyId: null,
   price: 0,
   productId: '',
   qty: 0,
+  salesPrice: 0,
 })
 
 const initialPurchaseForm = (): PurchaseBillFormValues => ({
   branchId: null,
   channelId: null,
+  contactPhone: null,
   date: todayDateInput(),
+  discountTotal: 0,
   docNo: null,
   hasVat: false,
   items: [blankItem()],
+  licensePlate: null,
+  note: null,
   notes: null,
+  poBuyId: null,
   purchaseSource: 'SPOT_BUY',
   refNo: null,
+  salesId: null,
   supplierId: '',
   transactionMode: 'STOCK',
+  vatInvoiceDate: null,
+  vatInvoiceNo: null,
+  vatInvoiceReceived: false,
   vatType: 'NONE',
   warehouseId: null,
 })
@@ -110,7 +129,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [isExporting, setIsExporting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [options, setOptions] = useState<Omit<PurchasePayload, 'rows'>>({ branches: [], channels: [], products: [], suppliers: [], warehouses: [] })
+  const [options, setOptions] = useState<Omit<PurchasePayload, 'rows'>>({ branches: [], channels: [], poBuys: [], products: [], salespersons: [], suppliers: [], warehouses: [] })
   const [rows, setRows] = useState<Array<BillRow | StockIssueRow>>([])
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -126,7 +145,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         setOptions({
           branches: payload.branches,
           channels: payload.channels,
+          poBuys: payload.poBuys,
           products: payload.products,
+          salespersons: payload.salespersons,
           suppliers: payload.suppliers,
           warehouses: payload.warehouses,
         })
@@ -161,12 +182,16 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const title = mode === 'purchase' ? 'บิลรับซื้อ' : mode === 'sales' ? 'บิลขาย' : 'เบิกออกรอบิล'
   const activeBranches = options.branches.filter((option) => option.active !== false)
   const activeChannels = options.channels.filter((option) => option.active !== false)
+  const activePoBuys = options.poBuys.filter((option) => option.active !== false && (!form.supplierId || option.supplier_id === form.supplierId))
   const activeProducts = options.products.filter((option) => option.active !== false)
+  const activeSalespersons = options.salespersons.filter((option) => option.active !== false)
   const activeSuppliers = options.suppliers.filter((option) => option.active !== false)
   const activeWarehouses = options.warehouses.filter((option) => option.active !== false && (!form.branchId || option.branch_id === form.branchId))
   const formSubtotal = form.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - item.discount), 0)
-  const formVat = !form.hasVat || form.vatType === 'NONE' ? 0 : form.vatType === 'INCLUDE' ? formSubtotal * 7 / 107 : formSubtotal * 0.07
-  const formTotal = form.hasVat && form.vatType === 'EXCLUDE' ? formSubtotal + formVat : formSubtotal
+  const formTotalWeight = form.items.reduce((sum, item) => sum + item.qty, 0)
+  const formAfterDiscount = Math.max(0, formSubtotal - form.discountTotal)
+  const formVat = !form.hasVat || form.vatType === 'NONE' ? 0 : form.vatType === 'INCLUDE' ? formAfterDiscount * 7 / 107 : formAfterDiscount * 0.07
+  const formTotal = form.hasVat && form.vatType === 'EXCLUDE' ? formAfterDiscount + formVat : formAfterDiscount
 
   function clearFilters() {
     setSearch('')
@@ -189,6 +214,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       [key]: value,
       ...(key === 'branchId' ? { warehouseId: null } : {}),
       ...(key === 'hasVat' && value === false ? { vatType: 'NONE' } : {}),
+      ...(key === 'vatInvoiceReceived' && value === false ? { vatInvoiceDate: null, vatInvoiceNo: null } : {}),
     }))
     setFieldErrors((current) => ({ ...current, [key]: '' }))
   }
@@ -199,6 +225,29 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item),
     }))
     setFieldErrors({})
+  }
+
+  function updateItemWeights(index: number, key: 'deductWeight' | 'grossWeight', value: number) {
+    setForm((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+        const next = { ...item, [key]: value }
+        return { ...next, qty: Math.max(0, next.grossWeight - next.deductWeight) }
+      }),
+    }))
+    setFieldErrors({})
+  }
+
+  function applyQuickPo(value: string) {
+    updateForm('poBuyId', value || null)
+    if (!value) return
+
+    setForm((current) => ({
+      ...current,
+      items: current.items.map((item, index) => index === 0 ? { ...item, poBuyId: value } : item),
+      purchaseSource: current.purchaseSource === 'SPOT_BUY' ? 'PO_RECEIPT' : current.purchaseSource,
+    }))
   }
 
   function removeItem(index: number) {
@@ -341,53 +390,157 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6 text-sm">
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h4 className="mb-3 font-bold text-slate-700">1. ประเภทบิล</h4>
+                <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="amber">1</StepBadge>ประเภทบิล</h4>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <RadioCard active={form.transactionMode === 'STOCK'} label="📦 STOCK" note="ซื้อเข้าสต๊อก · เลือกคลัง" onClick={() => updateForm('transactionMode', 'STOCK')} />
-                  <RadioCard active={form.transactionMode === 'TRADING'} label="🔄 TRADING" note="ซื้อขายผ่านมือ · ไม่บังคับคลัง" onClick={() => updateForm('transactionMode', 'TRADING')} />
+                  <RadioCard active={form.transactionMode === 'STOCK'} label="📦 STOCK" note="ซื้อเข้าสต๊อก · เข้า Stock + คำนวณ WAC ภายหลัง" onClick={() => updateForm('transactionMode', 'STOCK')} />
+                  <RadioCard active={form.transactionMode === 'TRADING'} label="🔄 TRADING" note="ซื้อขายผ่านมือ · ไม่เข้า Stock ไม่กระทบ WAC" onClick={() => updateForm('transactionMode', 'TRADING')} />
+                </div>
+                {form.transactionMode === 'TRADING' ? (
+                  <div className="mt-3 rounded border border-purple-200 bg-purple-50 p-2 text-xs text-purple-700">รายการ Trading ไม่เข้า Stock และจะใช้สำหรับจับคู่ขายใน Trading Matching ภายหลัง</div>
+                ) : null}
+                <div className="mt-3 rounded-lg border-2 border-indigo-200 bg-indigo-50 p-3 text-xs text-slate-700">
+                  <div className="font-bold text-indigo-700">ผสม Spot + ตัด PO ในบิลเดียวได้</div>
+                  <div className="mt-1">เลือก PO ที่หัวบิลเพื่อช่วย set รายการแรก หรือเลือก PO แยกรายการในตารางด้านล่างได้ เว้นว่าง = Spot Buy</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="whitespace-nowrap text-slate-600">Quick Load PO:</span>
+                    <select className="min-w-[240px] flex-1 rounded border px-2 py-1" value={form.poBuyId ?? ''} onChange={(event) => applyQuickPo(event.target.value)}>
+                      <option value="">-- ไม่ใช้ Quick Load --</option>
+                      {activePoBuys.map((po) => <option key={po.id} value={po.id}>{po.label ?? po.name}</option>)}
+                    </select>
+                    <span className="text-slate-500">เลือกแล้วจะผูก PO ให้รายการแรกก่อน</span>
+                  </div>
+                  {fieldErrors.poBuyId ? <div className="mt-1 text-xs text-red-600">{fieldErrors.poBuyId}</div> : null}
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
+                <div className="grid gap-3 md:grid-cols-3">
                 <Field error={fieldErrors.date} label="วันที่ *"><input className="w-full rounded border px-3 py-2" type="date" value={form.date} onChange={(event) => updateForm('date', event.target.value)} /></Field>
-                <Field error={fieldErrors.docNo} label="เลขที่บิล"><input className="w-full rounded border px-3 py-2 font-mono" value={form.docNo ?? ''} onChange={(event) => updateForm('docNo', event.target.value || null)} /></Field>
-                <Field error={fieldErrors.refNo} label="เลขที่อ้างอิง"><input className="w-full rounded border px-3 py-2 font-mono" value={form.refNo ?? ''} onChange={(event) => updateForm('refNo', event.target.value || null)} /></Field>
-                <SelectField error={fieldErrors.supplierId} label="ผู้ขาย *" options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
+                <Field error={fieldErrors.docNo} label="เลขที่บิล"><input className="w-full rounded border bg-slate-50 px-3 py-2 font-mono font-bold text-blue-700" placeholder="Auto ถ้าว่าง" value={form.docNo ?? ''} onChange={(event) => updateForm('docNo', event.target.value || null)} /></Field>
+                <Field error={fieldErrors.refNo} label="เลขที่อ้างอิง (บิล Supplier)"><input className="w-full rounded border px-3 py-2 font-mono" placeholder="เช่น INV-12345" value={form.refNo ?? ''} onChange={(event) => updateForm('refNo', event.target.value || null)} /></Field>
+                <SelectField className="md:col-span-3" error={fieldErrors.supplierId} label="ผู้ขาย *" options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
                 <SelectField error={fieldErrors.branchId} label="สาขา" options={activeBranches} value={form.branchId ?? ''} onChange={(value) => updateForm('branchId', value || null)} />
                 <SelectField error={fieldErrors.warehouseId} label="คลัง" options={activeWarehouses} value={form.warehouseId ?? ''} onChange={(value) => updateForm('warehouseId', value || null)} />
                 <SelectField error={fieldErrors.channelId} label="ช่องทางซื้อ" options={activeChannels} value={form.channelId ?? ''} onChange={(value) => updateForm('channelId', value || null)} />
+                <Field error={fieldErrors.licensePlate} label="ทะเบียนรถ"><input className="w-full rounded border px-3 py-2 uppercase" placeholder="เช่น 1กข-1234 / 70-1234" value={form.licensePlate ?? ''} onChange={(event) => updateForm('licensePlate', event.target.value.toUpperCase() || null)} /></Field>
+                <Field error={fieldErrors.contactPhone} label="เบอร์โทร"><input className="w-full rounded border px-3 py-2" inputMode="tel" placeholder="085-555-5555" value={form.contactPhone ?? ''} onChange={(event) => updateForm('contactPhone', sanitizePhoneInput(event.target.value) || null)} /></Field>
+                <SelectField error={fieldErrors.salesId} label="เซลที่ดูแล" options={activeSalespersons} placeholder="ลูกค้าบริษัท / ไม่มีเซล" value={form.salesId ?? ''} onChange={(value) => updateForm('salesId', value || null)} />
                 <Field label="ที่มา"><select className="w-full rounded border px-3 py-2" value={form.purchaseSource} onChange={(event) => updateForm('purchaseSource', event.target.value as PurchaseBillFormValues['purchaseSource'])}><option value="SPOT_BUY">SPOT BUY</option><option value="PO_RECEIPT">PO RECEIPT</option><option value="MIXED">MIXED</option></select></Field>
                 <Field label="VAT"><select className="w-full rounded border px-3 py-2" value={form.vatType} onChange={(event) => updateForm('vatType', event.target.value as PurchaseBillFormValues['vatType'])}><option value="NONE">No VAT</option><option value="EXCLUDE">VAT 7% แยกนอก</option><option value="INCLUDE">VAT รวมใน</option></select></Field>
                 <label className="flex items-center gap-2 pt-6 text-sm text-slate-700"><input checked={form.hasVat} className="size-4" type="checkbox" onChange={(event) => updateForm('hasVat', event.target.checked)} /> มี VAT</label>
-                <Field className="md:col-span-3" error={fieldErrors.notes} label="หมายเหตุ"><textarea className="w-full rounded border px-3 py-2" rows={2} value={form.notes ?? ''} onChange={(event) => updateForm('notes', event.target.value || null)} /></Field>
+                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
-                  <h4 className="font-bold text-slate-700">2. รายการสินค้า</h4>
+                  <h4 className="flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="emerald">3</StepBadge>รายการสินค้า ({form.items.length})</h4>
                   <button className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, blankItem()] }))}>+ เพิ่มรายการ</button>
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
-                <div className="space-y-2">
-                  {form.items.map((item, index) => (
-                    <div key={index} className="grid gap-2 rounded-lg bg-slate-50 p-3 md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
-                      <select className="rounded border px-2 py-2" value={item.productId} onChange={(event) => updateItem(index, 'productId', event.target.value)}>
-                        <option value="">เลือกสินค้า</option>
-                        {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.code ? `${product.code} — ` : ''}{product.name}{product.unit ? ` (${product.unit})` : ''}</option>)}
-                      </select>
-                      <input className="rounded border px-2 py-2 text-right" min="0" placeholder="จำนวน/กก." type="number" value={item.qty || ''} onChange={(event) => updateItem(index, 'qty', Number(event.target.value || 0))} />
-                      <input className="rounded border px-2 py-2 text-right" min="0" placeholder="ราคา" type="number" value={item.price || ''} onChange={(event) => updateItem(index, 'price', Number(event.target.value || 0))} />
-                      <input className="rounded border px-2 py-2 text-right" min="0" placeholder="ส่วนลด" type="number" value={item.discount || ''} onChange={(event) => updateItem(index, 'discount', Number(event.target.value || 0))} />
-                      <button className="rounded px-3 py-2 text-red-600 hover:bg-red-50 disabled:opacity-40" disabled={form.items.length <= 1} type="button" onClick={() => removeItem(index)}>ลบ</button>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full min-w-[1120px] text-sm">
+                    <thead className="bg-slate-100">
+                      <tr>
+                        <th className="p-2 text-left">สินค้า *</th>
+                        <th className="w-40 p-2 text-left text-indigo-700">PO</th>
+                        <th className="w-28 p-2 text-right">Gross</th>
+                        <th className="w-28 p-2 text-right text-amber-700">หัก</th>
+                        <th className="w-28 p-2 text-right text-emerald-700">สุทธิ</th>
+                        <th className="w-28 p-2 text-right">ราคา/กก.</th>
+                        {form.salesId ? <th className="w-28 p-2 text-right text-purple-700">ราคาหน้าใบ</th> : null}
+                        <th className="w-28 p-2 text-right">ส่วนลด</th>
+                        <th className="w-32 p-2 text-right">ยอดรวม</th>
+                        <th className="w-16 p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.items.map((item, index) => (
+                        <tr key={index} className="border-t align-top hover:bg-blue-50/30">
+                          <td className="p-2">
+                            <select className="w-full rounded border px-2 py-2" value={item.productId} onChange={(event) => updateItem(index, 'productId', event.target.value)}>
+                              <option value="">เลือกสินค้า</option>
+                              {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.code ? `${product.code} — ` : ''}{product.name}{product.unit ? ` (${product.unit})` : ''}</option>)}
+                            </select>
+                            <input className="mt-1.5 w-full rounded border bg-yellow-50 px-2 py-1 text-xs" placeholder="ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)" value={item.displayName ?? ''} onChange={(event) => updateItem(index, 'displayName', event.target.value || null)} />
+                          </td>
+                          <td className="p-2">
+                            <select className="w-full rounded border bg-blue-50 px-2 py-2 text-xs" value={item.poBuyId ?? ''} onChange={(event) => updateItem(index, 'poBuyId', event.target.value || null)}>
+                              <option value="">Spot Buy</option>
+                              {activePoBuys.map((po) => <option key={po.id} value={po.id}>{po.label ?? po.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="p-2"><input className="w-full rounded border bg-slate-50 px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.grossWeight || ''} onChange={(event) => updateItemWeights(index, 'grossWeight', Number(event.target.value || 0))} /></td>
+                          <td className="p-2"><input className="w-full rounded border bg-amber-50 px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateItemWeights(index, 'deductWeight', Number(event.target.value || 0))} /></td>
+                          <td className="p-2"><input className="w-full rounded border bg-emerald-50 px-2 py-2 text-right font-mono font-bold text-emerald-700" min="0" step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateItem(index, 'qty', Number(event.target.value || 0))} /></td>
+                          <td className="p-2"><input className="w-full rounded border px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.price || ''} onChange={(event) => updateItem(index, 'price', Number(event.target.value || 0))} /></td>
+                          {form.salesId ? <td className="p-2"><input className="w-full rounded border bg-purple-50 px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.salesPrice || ''} onChange={(event) => updateItem(index, 'salesPrice', Number(event.target.value || 0))} /></td> : null}
+                          <td className="p-2"><input className="w-full rounded border px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.discount || ''} onChange={(event) => updateItem(index, 'discount', Number(event.target.value || 0))} /></td>
+                          <td className="p-2 text-right font-mono font-bold text-blue-700">{formatMoney(Math.max(0, item.qty * item.price - item.discount))}</td>
+                          <td className="p-2"><button className="rounded px-3 py-2 text-red-600 hover:bg-red-50 disabled:opacity-40" disabled={form.items.length <= 1} type="button" onClick={() => removeItem(index)}>ลบ</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="border-t bg-emerald-50 font-bold">
+                      <tr>
+                        <td className="p-2 text-right" colSpan={2}>รวม</td>
+                        <td className="p-2 text-right font-mono">{formatMoney(form.items.reduce((sum, item) => sum + item.grossWeight, 0))}</td>
+                        <td className="p-2 text-right font-mono text-amber-700">{formatMoney(form.items.reduce((sum, item) => sum + item.deductWeight, 0))}</td>
+                        <td className="p-2 text-right font-mono text-emerald-700">{formatMoney(formTotalWeight)}</td>
+                        <td></td>
+                        {form.salesId ? <td></td> : null}
+                        <td></td>
+                        <td className="p-2 text-right font-mono text-blue-700">{formatMoney(formSubtotal)}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {form.salesId ? <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-700">เซลที่ดูแลบิลนี้: <b>{activeSalespersons.find((sales) => sales.id === form.salesId)?.name ?? '-'}</b></div> : null}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="purple">4</StepBadge>VAT & ยอดรวม</h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                      <input checked={form.hasVat} className="size-5" type="checkbox" onChange={(event) => updateForm('hasVat', event.target.checked)} />
+                      <span className="font-bold text-slate-700">มี VAT 7%</span>
+                    </label>
+                    <Field error={fieldErrors.discountTotal} label="ส่วนลดท้ายบิล (บาท)"><input className="w-full rounded border px-3 py-2 text-right font-mono" min="0" step="0.01" type="number" value={form.discountTotal || ''} onChange={(event) => updateForm('discountTotal', Number(event.target.value || 0))} /></Field>
+                  </div>
+                  <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+                    <div className="mb-2 flex justify-between rounded border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ซื้อ</span><span className="font-mono">{formatMoney(formTotalWeight)} กก.</span></div>
+                    <SummaryLine label="ยอดรวมรายการ" value={formatMoney(formSubtotal)} />
+                    {form.discountTotal > 0 ? <SummaryLine label="หักส่วนลด" tone="red" value={`-${formatMoney(form.discountTotal)}`} /> : null}
+                    <SummaryLine label="หลังส่วนลด" value={formatMoney(formAfterDiscount)} />
+                    {form.hasVat ? <SummaryLine label="VAT 7%" value={formatMoney(formVat)} /> : null}
+                    <div className="mt-2 flex justify-between border-t-2 border-blue-400 pt-2 text-lg font-bold"><span>ยอดสุทธิ</span><span className="font-mono text-blue-700">{formatMoney(formTotal)}</span></div>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-xl bg-white p-4 text-right shadow-sm">
-                <div className="text-sm text-slate-600">Subtotal: <b>{formatMoney(formSubtotal)}</b></div>
-                <div className="text-sm text-slate-600">VAT: <b>{formatMoney(formVat)}</b></div>
-                <div className="text-xl font-bold text-blue-700">รวมสุทธิ {formatMoney(formTotal)}</div>
+              {form.hasVat ? (
+                <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+                  <label className="mb-2 flex cursor-pointer items-center gap-2">
+                    <input checked={form.vatInvoiceReceived} className="size-5" type="checkbox" onChange={(event) => updateForm('vatInvoiceReceived', event.target.checked)} />
+                    <span className="font-bold text-amber-700">ได้รับใบกำกับภาษีตัวจริงแล้ว</span>
+                  </label>
+                  {form.vatInvoiceReceived ? (
+                    <div className="mt-2 grid gap-3 md:grid-cols-2">
+                      <Field error={fieldErrors.vatInvoiceNo} label="เลขที่ใบกำกับภาษี"><input className="w-full rounded border px-3 py-2 font-mono" placeholder="เช่น TI-001" value={form.vatInvoiceNo ?? ''} onChange={(event) => updateForm('vatInvoiceNo', event.target.value || null)} /></Field>
+                      <Field error={fieldErrors.vatInvoiceDate} label="วันที่ใบกำกับภาษี"><input className="w-full rounded border px-3 py-2" type="date" value={form.vatInvoiceDate ?? ''} onChange={(event) => updateForm('vatInvoiceDate', event.target.value || null)} /></Field>
+                    </div>
+                  ) : <div className="mt-1 text-xs text-amber-700">ยังไม่ได้รับใบกำกับภาษีตัวจริง ต้องติดตามเพื่อใช้เครดิต VAT ซื้อ</div>}
+                </div>
+              ) : null}
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <Field error={fieldErrors.note ?? fieldErrors.notes} label="หมายเหตุ"><textarea className="w-full rounded border px-3 py-2" rows={2} value={form.note ?? form.notes ?? ''} onChange={(event) => {
+                  const value = event.target.value || null
+                  updateForm('note', value)
+                  updateForm('notes', value)
+                }} /></Field>
               </div>
             </div>
             <div className="flex justify-end gap-2 rounded-b-2xl border-t bg-white p-4">
@@ -410,14 +563,33 @@ function Field({ children, className, error, label }: { children: ReactNode; cla
   return <label className={className}><span className="mb-1 block text-xs font-bold text-slate-700">{label}</span>{children}{error ? <span className="mt-1 block text-xs text-red-600">{error}</span> : null}</label>
 }
 
-function SelectField({ error, label, onChange, options, value }: { error?: string; label: string; onChange: (value: string) => void; options: Option[]; value: string }) {
+function SelectField({ className, error, label, onChange, options, placeholder = 'เลือก', value }: { className?: string; error?: string; label: string; onChange: (value: string) => void; options: Option[]; placeholder?: string; value: string }) {
   return (
-    <Field error={error} label={label}>
+    <Field className={className} error={error} label={label}>
       <select className="w-full rounded border px-3 py-2" value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">เลือก</option>
-        {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+        <option value="">{placeholder}</option>
+        {options.map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} — ` : ''}{option.name}</option>)}
       </select>
     </Field>
+  )
+}
+
+function StepBadge({ children, tone }: { children: ReactNode; tone: 'amber' | 'blue' | 'emerald' | 'purple' }) {
+  const className = {
+    amber: 'bg-amber-100 text-amber-700',
+    blue: 'bg-blue-100 text-blue-700',
+    emerald: 'bg-emerald-100 text-emerald-700',
+    purple: 'bg-purple-100 text-purple-700',
+  }[tone]
+  return <span className={`flex size-6 items-center justify-center rounded-full text-xs ${className}`}>{children}</span>
+}
+
+function SummaryLine({ label, tone, value }: { label: string; tone?: 'red'; value: string }) {
+  return (
+    <div className="flex justify-between border-t border-blue-200 py-1 text-sm">
+      <span className="text-slate-600">{label}</span>
+      <span className={`font-mono ${tone === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{value}</span>
+    </div>
   )
 }
 

@@ -26,17 +26,23 @@ function billJson(row: PurchaseBillRow) {
     branchName: row.branches?.name ?? '-',
     channelId: row.channel_id ?? '',
     channelName: row.purchase_channels?.name ?? '-',
+    contactPhone: row.contact_phone ?? '',
     createdAt: row.created_at?.toISOString() ?? '',
     createdBy: row.created_by ?? '-',
     date: toDateOnly(row.date),
+    discountTotal: toNumber(row.discount_total ?? row.discount),
     docNo: row.doc_no,
     hasVat: row.has_vat ?? false,
     id: row.id,
     itemCount: Array.isArray(row.items) ? row.items.length : 0,
+    licensePlate: row.license_plate ?? '',
+    note: row.note ?? row.notes ?? '',
     paidAmount: toNumber(row.paid_amount),
     payableBalance: toNumber(row.payable_balance),
+    poBuyId: row.po_buy_id ?? '',
     purchaseSource: row.purchase_source ?? 'SPOT_BUY',
     refNo: row.ref_no ?? '',
+    salesId: row.sales_id ?? '',
     status: row.status ?? 'open',
     supplierId: row.supplier_id ?? '',
     supplierName: row.suppliers?.name ?? row.supplier_id ?? '-',
@@ -45,6 +51,7 @@ function billJson(row: PurchaseBillRow) {
     updatedAt: row.updated_at?.toISOString() ?? '',
     updatedBy: row.updated_by ?? '',
     vatInvoiceNo: row.vat_invoice_no ?? '',
+    vatInvoiceDate: row.vat_invoice_date ? toDateOnly(row.vat_invoice_date) : '',
     vatInvoiceReceived: row.vat_invoice_received ?? false,
     warehouseId: row.warehouse_id ?? '',
     warehouseName: row.warehouses?.name ?? '-',
@@ -53,26 +60,48 @@ function billJson(row: PurchaseBillRow) {
 
 function calculateTotals(values: PurchaseBillFormValues) {
   const subtotal = values.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - item.discount), 0)
+  const afterDiscount = Math.max(0, subtotal - values.discountTotal)
   const vatAmount = !values.hasVat || values.vatType === 'NONE'
     ? 0
     : values.vatType === 'INCLUDE'
-      ? subtotal * 7 / 107
-      : subtotal * 0.07
-  const totalAmount = values.hasVat && values.vatType === 'EXCLUDE' ? subtotal + vatAmount : subtotal
+      ? afterDiscount * 7 / 107
+      : afterDiscount * 0.07
+  const totalAmount = values.hasVat && values.vatType === 'EXCLUDE' ? afterDiscount + vatAmount : afterDiscount
 
-  return { subtotal, totalAmount, vatAmount }
+  return { afterDiscount, subtotal, totalAmount, vatAmount }
 }
 
 async function optionsPayload() {
-  const [branches, channels, products, suppliers, warehouses] = await Promise.all([
+  const [branches, channels, poBuys, products, salespersons, suppliers, warehouses] = await Promise.all([
     prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true } }),
     prisma.purchase_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true } }),
+    prisma.po_buys.findMany({
+      orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
+      select: { doc_no: true, id: true, remaining_amount: true, status: true, supplier_id: true },
+      take: 500,
+      where: { status: { notIn: ['closed', 'Closed', 'cancelled', 'Cancelled'] } },
+    }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
+    prisma.salespersons.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.suppliers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true } }),
     prisma.warehouses.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, branch_id: true, id: true, name: true } }),
   ])
 
-  return { branches, channels, products, suppliers, warehouses }
+  return {
+    branches,
+    channels,
+    poBuys: poBuys.map((po) => ({
+      active: !['closed', 'Closed', 'cancelled', 'Cancelled'].includes(po.status ?? ''),
+      id: po.id,
+      label: `${po.doc_no}${po.remaining_amount ? ` · คงเหลือ ${toNumber(po.remaining_amount).toLocaleString('th-TH')}` : ''}`,
+      name: po.doc_no,
+      supplier_id: po.supplier_id,
+    })),
+    products,
+    salespersons,
+    suppliers,
+    warehouses,
+  }
 }
 
 async function rowsPayload() {
@@ -100,7 +129,11 @@ function buildWorkbook(rows: ReturnType<typeof billJson>[]) {
     'คลัง': row.warehouseName,
     'ประเภท': row.transactionMode,
     'ที่มา': row.purchaseSource,
+    'ทะเบียนรถ': row.licensePlate,
+    'เบอร์โทร': row.contactPhone,
+    'เซลที่ดูแล': row.salesId,
     'จำนวนรายการ': row.itemCount,
+    'ส่วนลดท้ายบิล': row.discountTotal,
     'ยอดรวม': row.totalAmount,
     'ชำระแล้ว': row.paidAmount,
     'ค้างจ่าย': row.payableBalance,
@@ -113,10 +146,10 @@ function buildWorkbook(rows: ReturnType<typeof billJson>[]) {
   const sheet = XLSX.utils.json_to_sheet(dataRows)
   sheet['!cols'] = [
     { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 28 }, { wch: 18 }, { wch: 18 },
-    { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
-    { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
+    { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
   ]
-  applyWorksheetTableLayout(sheet, 16, dataRows.length + 1)
+  applyWorksheetTableLayout(sheet, 20, dataRows.length + 1)
   XLSX.utils.book_append_sheet(workbook, sheet, 'บิลรับซื้อ')
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer
 }
@@ -162,18 +195,27 @@ export async function POST(request: Request) {
     const actor = currentActor(context)
     const totals = calculateTotals(values)
 
-    const [supplier, branch, warehouse, channel, products] = await Promise.all([
+    const productIds = [...new Set(values.items.map((item) => item.productId))]
+    const poBuyIds = [...new Set([values.poBuyId, ...values.items.map((item) => item.poBuyId)].filter(Boolean) as string[])]
+    const [supplier, branch, warehouse, channel, salesperson, poBuys, products] = await Promise.all([
       prisma.suppliers.findFirst({ where: { active: true, id: values.supplierId } }),
       values.branchId ? prisma.branches.findFirst({ where: { active: true, id: values.branchId } }) : Promise.resolve(null),
       values.warehouseId ? prisma.warehouses.findFirst({ where: { active: true, id: values.warehouseId } }) : Promise.resolve(null),
       values.channelId ? prisma.purchase_channels.findFirst({ where: { active: true, id: values.channelId } }) : Promise.resolve(null),
-      prisma.products.findMany({ where: { active: true, id: { in: values.items.map((item) => item.productId) } } }),
+      values.salesId ? prisma.salespersons.findFirst({ where: { active: true, id: values.salesId } }) : Promise.resolve(null),
+      poBuyIds.length ? prisma.po_buys.findMany({ where: { id: { in: poBuyIds } } }) : Promise.resolve([]),
+      prisma.products.findMany({ where: { active: true, id: { in: productIds } } }),
     ])
 
     if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ผู้ขายไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (values.branchId && !branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (values.warehouseId && !warehouse) return NextResponse.json({ code: 'BAD_REQUEST', error: 'คลังไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (values.channelId && !channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (values.salesId && !salesperson) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เซลที่ดูแลไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+
+    const poBuyById = new Map(poBuys.map((po) => [po.id, po]))
+    const missingPoBuy = poBuyIds.find((poBuyId) => !poBuyById.has(poBuyId))
+    if (missingPoBuy) return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy ที่เลือกไม่ถูกต้อง' }, { status: 400 })
 
     const productById = new Map(products.map((product) => [product.id, product]))
     const missingProduct = values.items.find((item) => !productById.has(item.productId))
@@ -184,14 +226,19 @@ export async function POST(request: Request) {
       const amount = Math.max(0, item.qty * item.price - item.discount)
       return {
         amount,
+        deductWeight: item.deductWeight,
         discount: item.discount,
+        displayName: item.displayName,
+        grossWeight: item.grossWeight,
         lotNo: item.lotNo,
         note: item.note,
+        poBuyId: item.poBuyId,
         price: item.price,
         productCode: product?.code ?? '',
         productId: item.productId,
         productName: product?.name ?? item.productId,
         qty: item.qty,
+        salesPrice: item.salesPrice,
         unit: product?.unit ?? 'กก.',
       }
     })
@@ -200,17 +247,24 @@ export async function POST(request: Request) {
       data: {
         branch_id: values.branchId,
         channel_id: values.channelId,
+        contact_phone: values.contactPhone,
         created_by: actor,
         date: normalizeDate(values.date),
+        discount: values.discountTotal,
+        discount_total: values.discountTotal,
         doc_no: docNo,
         has_vat: values.hasVat,
         id,
         items,
+        license_plate: values.licensePlate,
+        note: values.note ?? values.notes,
         notes: values.notes,
         paid_amount: 0,
         payable_balance: totals.totalAmount,
+        po_buy_id: values.poBuyId,
         purchase_source: values.purchaseSource,
         ref_no: values.refNo,
+        sales_id: values.salesId,
         status: 'open',
         subtotal: totals.subtotal,
         supplier_id: values.supplierId,
@@ -219,6 +273,10 @@ export async function POST(request: Request) {
         updated_at: new Date(),
         updated_by: actor,
         vat_amount: totals.vatAmount,
+        vat_invoice_date: values.vatInvoiceDate ? normalizeDate(values.vatInvoiceDate) : null,
+        vat_invoice_no: values.vatInvoiceNo,
+        vat_invoice_received: values.vatInvoiceReceived,
+        vat_invoice_received_at: values.vatInvoiceReceived ? new Date() : null,
         vat_type: values.vatType,
         warehouse_id: values.warehouseId,
       },
