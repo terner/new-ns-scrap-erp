@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { recordAuthAuditEvent } from '@/lib/server/auth-audit'
 import { authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 
@@ -181,6 +182,19 @@ export async function POST(request: Request) {
       }
 
       return created
+    })
+
+    await recordAuthAuditEvent({
+      context,
+      eventType: 'app_user.created',
+      metadata: {
+        active: user.active,
+        branchCount: values.branchIds.length,
+        roleCount: values.roleIds.length,
+        username: user.username,
+      },
+      request,
+      targetAppUserId: user.id,
     })
 
     return NextResponse.json({ id: user.id }, { status: 201 })

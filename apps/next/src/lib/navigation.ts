@@ -26,6 +26,7 @@ const exactPathPermissions: Record<string, string> = {
   '/admin/migration-tools': 'system.backup.manage',
   '/admin/user-activity': 'system.audit.view',
   '/admin/users-permissions': 'system.users.manage',
+  '/api/admin/auth-events': 'system.audit.view',
   '/api/admin/users': 'system.users.manage',
   '/api/master-data/customers': 'master.customers.view',
   '/api/master-data/customers/export': 'master.customers.export',

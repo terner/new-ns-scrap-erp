@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { recordAuthAuditEvent } from '@/lib/server/auth-audit'
 import { authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 import { getSupabaseAdminClient, getSupabasePublicServerClient } from '@/lib/server/supabase-admin'
@@ -73,6 +74,16 @@ export async function POST(request: Request, { params }: AdminUserInviteRoutePro
         return NextResponse.json({ error: error.message }, { status: 502 })
       }
 
+      await recordAuthAuditEvent({
+        context,
+        eventType: 'app_user.reset_sent',
+        metadata: {
+          username: appUser.username,
+        },
+        request,
+        targetAppUserId: appUser.id,
+      })
+
       return NextResponse.json({ mode: 'reset', sent: true })
     }
 
@@ -103,6 +114,17 @@ export async function POST(request: Request, { params }: AdminUserInviteRoutePro
         where: { id: appUser.id },
       })
     }
+
+    await recordAuthAuditEvent({
+      context,
+      eventType: 'app_user.invite_sent',
+      metadata: {
+        linkedAuthUser: Boolean(data.user?.id),
+        username: appUser.username,
+      },
+      request,
+      targetAppUserId: appUser.id,
+    })
 
     return NextResponse.json({ mode: 'invite', sent: true })
   } catch (caught) {

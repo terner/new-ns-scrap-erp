@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { recordAuthAuditEvent } from '@/lib/server/auth-audit'
 import { authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 
@@ -111,6 +112,19 @@ export async function PATCH(request: Request, { params }: AdminUserRouteProps) {
           })),
         })
       }
+    })
+
+    await recordAuthAuditEvent({
+      context,
+      eventType: 'app_user.updated',
+      metadata: {
+        active: values.active,
+        branchCount: values.branchIds.length,
+        roleCount: values.roleIds.length,
+        username: values.username,
+      },
+      request,
+      targetAppUserId: id,
     })
 
     return NextResponse.json({ id })
