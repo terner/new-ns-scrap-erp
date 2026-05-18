@@ -2,6 +2,10 @@ import { z } from 'zod'
 import { prisma } from '@/lib/server/prisma'
 import { getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import {
+  productionOutputCategoryCodeSchema,
+  productionOutputStockEffectSchema,
+} from '@/lib/production-output-categories'
+import {
   masterDataJson,
   masterDataListJson,
   nextSequentialCode,
@@ -11,7 +15,7 @@ import {
   updateMasterDataStatusSchema,
 } from '@/lib/server/master-data'
 
-type SimpleMasterKind = 'bankNames' | 'directors' | 'machines' | 'productionLines' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes'
+type SimpleMasterKind = 'bankNames' | 'directors' | 'machines' | 'productionLines' | 'productionOutputCategories' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes'
 
 type Delegate = {
   findMany: (args?: unknown) => Promise<unknown[]>
@@ -48,6 +52,11 @@ function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMaster
   if (kind === 'machines') {
     machineTypeSchema.parse(values.type)
     maintenanceStatusSchema.parse(values.maintenanceStatus)
+  }
+
+  if (kind === 'productionOutputCategories') {
+    productionOutputCategoryCodeSchema.parse(values.code)
+    productionOutputStockEffectSchema.nullable().parse(values.stockEffect)
   }
 
   return values
@@ -172,6 +181,35 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       name: values.name,
       branch_id: values.branchId || null,
       responsible_person: values.responsiblePerson || null,
+      active: values.active,
+    }),
+  },
+  productionOutputCategories: {
+    delegate: () => prisma.production_output_categories as Delegate,
+    prefix: 'POC',
+    orderBy: [{ sort_order: 'asc' }, { code: 'asc' }],
+    map: (row) => {
+      const record = asRecord(row)
+      return {
+        id: record.id,
+        code: record.code,
+        name: record.name_th,
+        stockEffect: record.stock_effect,
+        availableForSale: record.available_for_sale,
+        sortOrder: toNumber(record.sort_order as number | null),
+        active: record.active,
+        createdAt: toIso(record.created_at as Date | null),
+        updatedAt: toIso(record.updated_at as Date | null),
+      }
+    },
+    data: (values, id, code) => ({
+      id,
+      code,
+      name_th: values.name,
+      name_en: null,
+      stock_effect: values.stockEffect || 'stock_in',
+      available_for_sale: values.availableForSale,
+      sort_order: values.sortOrder ?? 0,
       active: values.active,
     }),
   },

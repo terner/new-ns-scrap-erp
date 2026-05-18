@@ -35,8 +35,11 @@ function recordToForm(record: MasterDataRecord): MasterDataFormValues {
     note: record.note,
     symbol: record.symbol,
     rateToThb: record.rateToThb,
+    sortOrder: record.sortOrder,
     parentId: record.parentId,
     channelType: record.channelType,
+    stockEffect: record.stockEffect,
+    availableForSale: record.availableForSale,
     bankName: record.bankName,
     accountNo: record.accountNo,
     currency: record.currency,
@@ -452,7 +455,11 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
             field={field}
             value={form[field.key]}
             onChange={(value) => {
-              const normalized = field.type === 'number' ? (value === '' ? null : Number(value)) : value || null
+              const normalized = field.key === 'availableForSale'
+                ? value === 'true'
+                : field.type === 'number'
+                  ? (value === '' ? null : Number(value))
+                  : value || null
               update(field.key, normalized as never)
             }}
           />

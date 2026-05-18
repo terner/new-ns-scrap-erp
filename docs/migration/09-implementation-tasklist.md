@@ -362,6 +362,18 @@ Reporting rule:
 - [ ] map stock ledger movement types
 - [ ] define lot/grade/status behavior
 
+### 6.5 Production Prep
+
+Tracker: [16-next-production-progress.md](/Users/watcharathatsrithanesiganon/Documents/GitHub/ns-scrap-erp/docs/migration/16-next-production-progress.md)
+
+- [x] ตรวจ legacy flow ของ production orders, inputs, outputs, reports, cost, yield/loss, และ machine utilization เบื้องต้น
+- [x] ระบุว่า `หมวดหมู่การผลิต` ใน legacy เป็น enum-like field บน production output ไม่ใช่ DB table เดิม
+- [x] ระบุ legacy output category codes: `FG`, `RM`, `CUSTOMER_RETURN`, `LOSS`
+- [x] Batch P1: เพิ่ม target DB/API สำหรับ `production_output_categories` แบบ additive และ seed จาก legacy
+- [x] Batch P2: port `/production/orders` read baseline พร้อม API และ server-side pagination/filter/sort
+- [ ] Batch P3: port production output write flow ให้ใช้ category จาก DB และเขียน `production_outputs`/`stock_ledger`
+- [ ] Batch P4: port production dashboard/report/cost/yield/machine utilization read baseline
+
 ## Phase 7: Testing and Reconciliation
 
 ### 7.1 Automated Tests
@@ -369,6 +381,7 @@ Reporting rule:
 - [ ] unit tests for validation schemas
 - [x] project validation rule documented in `AGENTS.md`
 - [x] project input-validation skill added at `.agents/skills/ns-scrap-erp-input-validation/SKILL.md`
+- [ ] tests for production output category API and invalid category validation
 - [ ] unit tests for permission logic
 - [ ] tests for master data service functions
 - [ ] E2E smoke test for login

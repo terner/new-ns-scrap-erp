@@ -16,17 +16,31 @@ type BillRow = {
   createdBy?: string
   customerName?: string
   date: string
+  discountTotal?: number
   docNo: string
   grossProfit?: number
   hasVat?: boolean
   id: string
+  items?: Array<Partial<PurchaseBillFormValues['items'][number]> & {
+    amount?: number
+    netAmount?: number
+    netWeight?: number
+    productCode?: string
+    productName?: string
+    unit?: string
+  }>
   itemCount: number
+  contactPhone?: string
+  licensePlate?: string
+  note?: string
   paidAmount?: number
   payableBalance?: number
   purchaseSource?: string
   receivableBalance?: number
   receivedAmount?: number
   refNo?: string
+  poBuyId?: string
+  salesId?: string
   status: string
   supplierId?: string
   supplierName?: string
@@ -35,6 +49,7 @@ type BillRow = {
   updatedAt?: string
   updatedBy?: string
   vatInvoiceNo?: string
+  vatInvoiceDate?: string
   vatInvoiceReceived?: boolean
   warehouseId?: string
   warehouseName?: string
@@ -88,7 +103,7 @@ type TransactionBillsPageClientProps = {
   mode: 'purchase' | 'sales' | 'stock-issue'
 }
 
-type SortKey = 'date' | 'docNo' | 'itemCount' | 'name' | 'outstanding' | 'refNo' | 'status' | 'totalAmount' | 'transactionMode' | 'warehouse'
+type SortKey = 'createdBy' | 'date' | 'docNo' | 'itemCount' | 'name' | 'outstanding' | 'refNo' | 'status' | 'totalAmount' | 'transactionMode' | 'warehouse'
 type SortDirection = 'asc' | 'desc'
 
 const blankItem = (): PurchaseBillFormValues['items'][number] => ({
@@ -138,6 +153,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [filterMode, setFilterMode] = useState('')
   const [filterSource, setFilterSource] = useState('')
   const [form, setForm] = useState<PurchaseBillFormValues>(initialPurchaseForm())
+  const [editingBillId, setEditingBillId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -247,7 +263,56 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   }
 
   function openPurchaseForm() {
+    setEditingBillId(null)
     setForm(initialPurchaseForm())
+    setFieldErrors({})
+    setError(null)
+    setShowForm(true)
+  }
+
+  function purchaseFormFromRow(row: BillRow): PurchaseBillFormValues {
+    const items = (row.items?.length ? row.items : [blankItem()]).map((item) => ({
+      deductWeight: Number(item.deductWeight ?? 0),
+      discount: Number(item.discount ?? 0),
+      displayName: item.displayName ?? null,
+      grossWeight: Number(item.grossWeight ?? item.qty ?? ('netWeight' in item ? item.netWeight : 0) ?? 0),
+      lotNo: item.lotNo ?? null,
+      note: item.note ?? null,
+      poBuyId: item.poBuyId ?? null,
+      price: Number(item.price ?? 0),
+      productId: String(item.productId ?? ''),
+      qty: Number(item.qty ?? ('netWeight' in item ? item.netWeight : 0) ?? 0),
+      salesPrice: Number(item.salesPrice ?? 0),
+    }))
+
+    return {
+      branchId: row.branchId ?? '',
+      channelId: row.channelId || null,
+      contactPhone: row.contactPhone || null,
+      date: row.date,
+      discountTotal: row.discountTotal ?? 0,
+      hasVat: row.hasVat ?? false,
+      items,
+      licensePlate: row.licensePlate || null,
+      note: row.note || null,
+      notes: row.note || null,
+      poBuyId: row.poBuyId || null,
+      purchaseSource: (row.purchaseSource === 'PO_RECEIPT' || row.purchaseSource === 'MIXED') ? row.purchaseSource : 'SPOT_BUY',
+      refNo: row.refNo || null,
+      salesId: row.salesId || null,
+      supplierId: row.supplierId ?? '',
+      transactionMode: row.transactionMode === 'TRADING' ? 'TRADING' : 'STOCK',
+      vatInvoiceDate: row.vatInvoiceDate || null,
+      vatInvoiceNo: row.vatInvoiceNo || null,
+      vatInvoiceReceived: row.vatInvoiceReceived ?? false,
+      vatType: row.hasVat ? 'EXCLUDE' : 'NONE',
+      warehouseId: row.warehouseId || null,
+    }
+  }
+
+  function openEditPurchaseForm(row: BillRow) {
+    setEditingBillId(row.id)
+    setForm(purchaseFormFromRow(row))
     setFieldErrors({})
     setError(null)
     setShowForm(true)
@@ -312,9 +377,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     setError(null)
     try {
       await dailyFetchJson('/api/purchase/bills', {
-        body: JSON.stringify(parsed.data),
-        method: 'POST',
+        body: JSON.stringify(editingBillId ? { ...parsed.data, id: editingBillId } : parsed.data),
+        method: editingBillId ? 'PATCH' : 'POST',
       })
+      setEditingBillId(null)
       setShowForm(false)
       await loadData()
     } catch (caught) {
@@ -412,6 +478,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} />
               {mode === 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่อ้างอิง" sortKey="refNo" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} />
+              {mode === 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="ผู้กรอก" sortKey="createdBy" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} sortKey="name" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" sortKey="warehouse" onSort={changeSort} />
               {mode === 'purchase' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" sortKey="transactionMode" onSort={changeSort} /> : null}
@@ -419,15 +486,17 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" sortKey="itemCount" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดรวม" sortKey="totalAmount" onSort={changeSort} />
               {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ค้างชำระ" sortKey="outstanding" onSort={changeSort} /> : null}
+              {mode === 'purchase' ? <th className="p-2 text-right">จัดการ</th> : null}
             </tr>
           </thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={mode === 'purchase' ? 10 : mode === 'stock-issue' ? 7 : 8}>กำลังโหลดข้อมูล</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={mode === 'purchase' ? 12 : mode === 'stock-issue' ? 7 : 8}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && pageRows.map((row) => (
               <tr key={row.id} className={`border-t hover:bg-slate-50 ${mode === 'purchase' && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
                 {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 font-mono text-xs text-slate-600">{row.refNo || '-'}</td> : null}
                 <td className="p-2">{row.date}</td>
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-xs text-slate-700">{row.createdBy || '-'}</td> : null}
                 <td className="p-2">{'supplierName' in row ? row.supplierName : row.customerName}</td>
                 <td className="p-2">{formatBranchWarehouse(row)}</td>
                 {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{row.transactionMode ?? '-'}</span></td> : null}
@@ -435,9 +504,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <td className="p-2 text-right">{row.itemCount}</td>
                 <td className="p-2 text-right font-semibold">{formatMoney(isStockIssueRow(row) ? row.totalEstAmount : row.totalAmount ?? 0)}</td>
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-right text-red-700">{formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)}</td> : null}
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-right"><button className="rounded border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}>แก้ไข</button></td> : null}
               </tr>
             ))}
-            {!isLoading && totalRows === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={mode === 'purchase' ? 10 : mode === 'stock-issue' ? 7 : 8}>ยังไม่มีรายการ</td></tr> : null}
+            {!isLoading && totalRows === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={mode === 'purchase' ? 12 : mode === 'stock-issue' ? 7 : 8}>ยังไม่มีรายการ</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -447,8 +517,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <div className="mx-auto my-4 flex max-h-[94vh] max-w-5xl flex-col rounded-2xl bg-white shadow-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
               <div>
-                <h3 className="text-xl font-bold">📥 สร้างบิลรับซื้อใหม่</h3>
-                <p className="mt-1 text-xs opacity-80">บันทึก header และรายการสินค้าในบิลรับซื้อ</p>
+                <h3 className="text-xl font-bold">📥 {editingBillId ? 'แก้ไขบิลรับซื้อ' : 'สร้างบิลรับซื้อใหม่'}</h3>
+                <p className="mt-1 text-xs opacity-80">{editingBillId ? 'แก้ไขได้แม้มีการชำระแล้ว ระบบจะคำนวณยอดค้างและ stock ledger ใหม่' : 'บันทึก header และรายการสินค้าในบิลรับซื้อ'}</p>
               </div>
               <button className="text-3xl leading-none text-white/80 hover:text-white" type="button" onClick={() => setShowForm(false)}>&times;</button>
             </div>
@@ -481,7 +551,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
                 <div className="grid gap-3 md:grid-cols-3">
                 <Field error={fieldErrors.date} label="วันที่ *"><input className="w-full rounded border px-3 py-2" type="date" value={form.date} onChange={(event) => updateForm('date', event.target.value)} /></Field>
-                <Field label="เลขที่บิล"><div className="rounded border bg-slate-100 px-3 py-2 font-mono font-bold text-slate-500">ระบบจะออกเลขให้ตอนบันทึก เช่น PB012605-0001</div></Field>
+                <Field label="เลขที่บิล"><div className="rounded border bg-slate-100 px-3 py-2 font-mono font-bold text-slate-500">{editingBillId ? rows.find((row) => !isStockIssueRow(row) && row.id === editingBillId)?.docNo ?? 'เลขเดิม' : 'ระบบจะออกเลขให้ตอนบันทึก เช่น PB012605-0001'}</div></Field>
                 <Field error={fieldErrors.refNo} label="เลขที่อ้างอิง (บิล Supplier)"><input className="w-full rounded border px-3 py-2 font-mono" placeholder="เช่น INV-12345" value={form.refNo ?? ''} onChange={(event) => updateForm('refNo', event.target.value || null)} /></Field>
                 <SelectField className="md:col-span-3" error={fieldErrors.supplierId} label="ผู้ขาย *" options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
                 <SelectField error={fieldErrors.branchId} label="สาขา *" options={activeBranches} value={form.branchId} onChange={(value) => updateForm('branchId', value)} />
@@ -609,7 +679,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             </div>
             <div className="flex justify-end gap-2 rounded-b-2xl border-t bg-white p-4">
               <button className="rounded-lg border px-4 py-2 text-sm hover:bg-slate-50" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
-              <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกบิลรับซื้อ'}</button>
+              <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : editingBillId ? 'บันทึกการแก้ไข' : 'บันทึกบิลรับซื้อ'}</button>
             </div>
           </div>
         </div>

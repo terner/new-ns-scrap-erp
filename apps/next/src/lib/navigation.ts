@@ -48,7 +48,13 @@ const prefixPathPermissions: Array<[string, string]> = [
   ['/api/master-data/products/', 'master.products.update'],
   ['/api/master-data/suppliers/', 'master.suppliers.update'],
   ['/api/daily/', 'finance.cash.view'],
+  ['/api/finance/', 'finance.cash.view'],
   ['/api/master-data/', 'master.reference.view'],
+  ['/api/po-reports/', 'reports.reports.view'],
+  ['/api/production/', 'production.operations.view'],
+  ['/api/stock/', 'stock.ledger.view'],
+  ['/api/tracking/', 'reports.reports.view'],
+  ['/api/trading/', 'finance.cash.view'],
   ['/daily/', 'finance.cash.view'],
   ['/finance-accounting/', 'finance.financials.view'],
   ['/finance/', 'finance.cash.view'],
@@ -59,6 +65,8 @@ const prefixPathPermissions: Array<[string, string]> = [
   ['/reports', 'reports.reports.view'],
   ['/sales/', 'finance.cash.view'],
   ['/stock/', 'stock.ledger.view'],
+  ['/tracking/', 'reports.reports.view'],
+  ['/trading/', 'finance.cash.view'],
 ]
 
 export function permissionForPath(pathname: string) {
@@ -136,6 +144,7 @@ export const navigationItems: NavigationItem[] = [
   { href: '/stock/transfer', icon: '🚚', label: 'โอนสินค้าระหว่างสาขา', section: 'daily' },
   { href: '/daily/bill-swap-history', icon: '🔄', label: 'ประวัติเปลี่ยน Supplier ในบิล', section: 'daily' },
   { href: '/production/orders', icon: '🏭', label: 'ใบสั่งผลิต', section: 'production' },
+  { href: '/production/output-categories', icon: '🏷️', label: 'หมวดหมู่ผลผลิต', section: 'production' },
   { href: '/production/dashboard', icon: '📊', label: 'Production Dashboard', section: 'production' },
   { href: '/production/wip-report', icon: '⏳', label: 'WIP คงเหลือ', section: 'production' },
   { href: '/production/report', icon: '📐', label: 'รายงานการผลิต / Yield', section: 'production' },

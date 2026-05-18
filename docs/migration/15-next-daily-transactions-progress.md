@@ -30,6 +30,12 @@
 | `/daily/expense-dashboard` | `view-expenseDashboard` | Batch A Done | Read-only dashboard from expenses |
 | `/stock/transfer` | stock transfer flow | Batch C Done | Inventory movement via `stock_ledger` |
 | `/daily/bill-swap-history` | `view-billSwapHistory` | Batch C Done | Read-only bill supplier-change audit |
+| `/finance/ap` | `view-ap` | Batch F Read Baseline Done | AP aging from purchase bills and supplier payments |
+| `/stock/ledger` | `view-stockLedger` | Batch F Read Baseline Done | Stock movement inspection, default PB view |
+| `/trading/matching` | `view-tradingMatching` | Batch F Read Baseline Done | Trading PB/SB and deal matching read surface |
+| `/purchase/po-buy` | `view-poBuy` | Batch G Read Baseline Done | PO Buy source for purchase bill PO receipt |
+| `/po-reports/outstanding` | `view-poOutstanding` | Batch G Read Baseline Done | Outstanding PO Buy/Sell with costing-only exclusion |
+| `/tracking/supplier` | `view-supplierTracking` | Batch H Read Baseline Done | Supplier 360 from purchase bills and supplier payments |
 
 ## Batch Plan
 
@@ -198,11 +204,14 @@ Status:
 - Follow-up update: purchase bill document number format now includes branch code. Branch codes are normalized as `01 = สมุทรสาคร` and `02 = นครสวรรค์`, so examples look like `PB012605-3074`. The running number continues from the highest purchase bill running number in that month, including both old `PB2605-####` and new `PB012605-####`/`PB022605-####` formats.
 - Follow-up update: added additive unique indexes for `purchase_bills.doc_no` and `sales_bills.doc_no`. Migration fails fast if duplicate document numbers already exist; it does not delete or merge data. Dev-target purchase bills were reconciled on 2026-05-18 by backing up all current rows, setting all current purchase bills to `BR002/WH002` (สมุทรสาคร), and renumbering them to unique `PB012605-0001` through `PB012605-0409`; unique indexes were then applied successfully.
 - Follow-up update: purchase bill table rows now open `/purchase/bills/[id]` detail page. Detail page reads `supplier_id` as the FK and displays supplier name from master data relation `suppliers.name`; transaction rows should keep FK/id and not store ad hoc supplier display text as the source of truth.
+- Follow-up update: purchase bills can now be edited from the `/purchase/bills` table even when supplier payments already exist. This intentionally differs from the old legacy lock rule. Edit keeps existing `payments` untouched, recomputes `paid_amount`, `payable_balance`, and `status` from payment rows, and regenerates `stock_ledger.ref_type = PB` for `STOCK` bills only.
 
 Important boundary:
-- Current create path writes `purchase_bills` header + `items` JSON and AP balance fields only.
-- It intentionally does not write `stock_ledger`, WAC/FIFO, AP payment links, or posting/void side effects yet. Those need a separate reconciliation-backed transaction batch.
-- Detail page is currently read-only with an edit placeholder. Full edit/PATCH must be a separate batch because changing an existing bill can affect AP balance, stock ledger, WAC/FIFO, and audit history.
+- Current create/edit path writes `purchase_bills` header + `items` JSON, AP balance fields, and `stock_ledger` rows for `STOCK` bills.
+- `TRADING` remains a PB document but does not create stock ledger.
+- Purchase bill document remains editable after supplier payments exist by current business decision. Existing payment rows are preserved and AP balance/status is recomputed from current payment totals.
+- Existing supplier payments are not rewritten by purchase-bill edit. If totals change after payment, AP balance is recalculated from current payment rows.
+- Full void/reversal and PO remaining-qty reconciliation still need a separate transaction batch.
 
 Validation:
 - Passed: `npm run type-check --workspace @ns-scrap-erp/next`
@@ -218,6 +227,90 @@ Status: Read baseline done on 2026-05-18.
 
 Tasks:
 - Done: added read-only Next page/API for `stock_issues`.
+
+### Batch F: Purchase Bill Linked Flow Surfaces
+
+Scope:
+- `/finance/ap`
+- `/stock/ledger`
+- `/trading/matching`
+
+Status: Read baseline done on 2026-05-18.
+
+Tasks:
+- Done: added AP aging page/API from legacy `view-ap` behavior using `purchase_bills` + `payments`.
+- Done: AP API computes live paid amount from supplier payments instead of trusting stale `paid_amount` only.
+- Done: added Stock Ledger page/API from legacy `view-stockLedger` read surface, defaulting the UI to `refType = PB` so purchase-bill movements are visible first.
+- Done: added Trading Matching page/API from legacy `view-tradingMatching` read surface using `purchase_bills.transaction_mode = TRADING`, `sales_bills.transaction_mode = TRADING`, and `trading_deals`.
+- Done: added route/API permission mapping for `/api/finance/*`, `/api/stock/*`, `/api/trading/*`, `/finance/*`, `/stock/*`, and `/trading/*`.
+
+Important boundary:
+- These three pages are DB-connected read surfaces first. They intentionally do not create approval records, stock reversals, trading deals, or edit existing bills yet.
+- Purchase bill create now posts `stock_ledger.ref_type = PB` only for `transaction_mode = STOCK`; `TRADING` remains a PB document but does not create stock ledger.
+
+Validation:
+- Passed: `npm run type-check --workspace @ns-scrap-erp/next`
+- Passed: `npm run lint --workspace @ns-scrap-erp/next`
+- Passed: `npm run build --workspace @ns-scrap-erp/next`
+- Build confirmed routes generated:
+  - `/finance/ap`
+  - `/stock/ledger`
+  - `/trading/matching`
+  - `/api/finance/ap`
+  - `/api/stock/ledger`
+  - `/api/trading/matching`
+
+### Batch G: PO Buy and Outstanding Flow Surfaces
+
+Scope:
+- `/purchase/po-buy`
+- `/po-reports/outstanding`
+
+Status: Read baseline done on 2026-05-18.
+
+Tasks:
+- Done: added PO Buy page/API from legacy `view-poBuy` read surface using real `po_buys`, suppliers, and product lookups.
+- Done: PO Buy page separates delivery PO from costing-only PO via `require_delivery`.
+- Done: added PO Outstanding page/API from legacy `view-poOutstanding` read surface using `po_buys` and `po_sells`.
+- Done: PO Outstanding excludes `require_delivery = false` rows, matching legacy behavior where costing-only PO does not enter outstanding delivery tracking.
+- Done: added permission mapping for `/api/po-reports/*`.
+
+Important boundary:
+- These pages are DB-connected read surfaces first. Create/edit/toggle between Delivery and Costing-only still needs a separate write batch with validation, audit, and purchase-bill cut reconciliation.
+
+Validation:
+- Passed: `npm run type-check --workspace @ns-scrap-erp/next`
+- Passed: `npm run lint --workspace @ns-scrap-erp/next`
+- Passed: `npm run build --workspace @ns-scrap-erp/next`
+- Build confirmed routes generated:
+  - `/purchase/po-buy`
+  - `/po-reports/outstanding`
+  - `/api/purchase/po-buy`
+  - `/api/po-reports/outstanding`
+
+### Batch H: Supplier Tracking Surface
+
+Scope:
+- `/tracking/supplier`
+
+Status: Read baseline done on 2026-05-18.
+
+Tasks:
+- Done: added Supplier Tracking page/API from legacy `view-supplierTracking`.
+- Done: API reads real `suppliers`, `purchase_bills`, and `payments`.
+- Done: supports year/month query, monthly purchase trend, supplier totals, paid amount, payable balance, average buy price, and bill/payment counts.
+- Done: added route/API permission mapping for `/tracking/*` and `/api/tracking/*`.
+
+Important boundary:
+- This is a DB-connected read surface. It does not yet include detail drilldown/export XLSX or product breakdown modal from legacy.
+
+Validation:
+- Passed: `npm run type-check --workspace @ns-scrap-erp/next`
+- Passed: `npm run lint --workspace @ns-scrap-erp/next`
+- Passed: `npm run build --workspace @ns-scrap-erp/next`
+- Build confirmed routes generated:
+  - `/tracking/supplier`
+  - `/api/tracking/supplier`
 - Deferred by design: create/post/convert-to-bill flow until sales bill and stock ledger write rules are reconciled.
 - Follow-up: reconcile issued stock against later sales invoice links.
 
@@ -240,6 +333,8 @@ Validation:
 - Next daily Batch B payment/receipt routes now have baseline pages and API routes.
 - Next daily Batch C stock transfer/audit routes now have baseline pages and API routes.
 - Next daily Batch D/E transaction read routes now have baseline pages and API routes.
+- Purchase bill create/edit flow now writes header + JSON items, generates branch/month document numbers at save time, recalculates AP status from payments, and writes stock ledger only for `STOCK` bills.
+- Purchase bill linked read surfaces now exist for AP aging, stock ledger, trading matching, PO buy, outstanding PO, and supplier tracking.
 - Legacy daily UI/reference exists under:
   - `old-apps/legacy/index.html`
   - `old-apps/vue/src/views/daily/`
@@ -261,4 +356,5 @@ Validation:
 - Petty advance `spent` is currently `0` in Next baseline until expense-to-advance allocation is wired.
 - Payment approval persistence/print sheet is not fully ported yet; current Batch B is an actionable queue/read surface plus payment/receipt write APIs.
 - Stock transfer uses `stock_ledger` directly; no separate header table has been created yet.
-- Purchase/sales bill pages are intentionally read baseline only. Write/post behavior is deferred until transaction reconciliation and line-table design are explicit.
+- Sales bill page remains read baseline. Purchase bill create/edit is active baseline but full void/reversal, PO remaining-qty reconciliation, and header/line table refactor are still pending.
+- Whether purchase bill edit after payment should stay unrestricted in UAT, or require audit/re-approval for finance control.

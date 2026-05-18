@@ -51,6 +51,7 @@ function billJson(row: PurchaseBillRow) {
     docNo: row.doc_no,
     hasVat: row.has_vat ?? false,
     id: row.id,
+    items: Array.isArray(row.items) ? row.items : [],
     itemCount: Array.isArray(row.items) ? row.items.length : 0,
     licensePlate: row.license_plate ?? '',
     note: row.note ?? row.notes ?? '',
@@ -195,6 +196,8 @@ function billOrderBy(query: BillQuery): Prisma.purchase_billsOrderByWithRelation
         return { doc_no: direction }
       case 'refNo':
         return { ref_no: direction }
+      case 'createdBy':
+        return { created_by: direction }
       case 'name':
         return { supplier_id: direction }
       case 'outstanding':
@@ -384,7 +387,7 @@ export async function POST(request: Request) {
           const id = `PB-${randomUUID()}`
           const docNo = await nextPurchaseBillDocNo(tx, values.date, effectiveBranchCode)
 
-          return tx.purchase_bills.create({
+          const createdBill = await tx.purchase_bills.create({
             data: {
               branch_id: effectiveBranch.id,
               channel_id: values.channelId,
@@ -423,6 +426,34 @@ export async function POST(request: Request) {
             },
             select: { doc_no: true, id: true },
           })
+
+          if (values.transactionMode === 'STOCK') {
+            await tx.stock_ledger.createMany({
+              data: items.map((item) => ({
+                branch_id: effectiveBranch.id,
+                created_by: actor,
+                date: normalizeDate(values.date),
+                id: `SL-PB-${randomUUID()}`,
+                lot_no: item.lotNo,
+                movement_type: 'รับซื้อเข้า',
+                note: item.note,
+                notes: values.note ?? values.notes,
+                product_id: item.productId,
+                purchase_channel_id: values.channelId,
+                qty_in: item.qty,
+                qty_out: 0,
+                ref_id: createdBill.id,
+                ref_no: createdBill.doc_no,
+                ref_type: 'PB',
+                unit_cost: item.price,
+                value_in: item.amount,
+                value_out: 0,
+                warehouse_id: values.warehouseId,
+              })),
+            })
+          }
+
+          return createdBill
         })
         break
       } catch (caught) {
@@ -436,5 +467,157 @@ export async function POST(request: Request) {
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'บันทึกบิลรับซื้อไม่ได้', 400)
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'finance.cash.view')
+
+    const raw = await request.json()
+    const id = typeof raw?.id === 'string' ? raw.id.trim() : ''
+    if (!id) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ไม่พบบิลที่ต้องการแก้ไข' }, { status: 400 })
+
+    const values = purchaseBillFormSchema.parse(raw)
+    const actor = currentActor(context)
+    const totals = calculateTotals(values)
+
+    const productIds = [...new Set(values.items.map((item) => item.productId))]
+    const poBuyIds = [...new Set([values.poBuyId, ...values.items.map((item) => item.poBuyId)].filter(Boolean) as string[])]
+    const [existingBill, supplier, branch, warehouse, channel, salesperson, poBuys, products, payments] = await Promise.all([
+      prisma.purchase_bills.findUnique({ where: { id } }),
+      prisma.suppliers.findFirst({ where: { active: true, id: values.supplierId } }),
+      values.branchId ? prisma.branches.findFirst({ where: { active: true, id: values.branchId } }) : Promise.resolve(null),
+      values.warehouseId ? prisma.warehouses.findFirst({ where: { active: true, id: values.warehouseId } }) : Promise.resolve(null),
+      values.channelId ? prisma.purchase_channels.findFirst({ where: { active: true, id: values.channelId } }) : Promise.resolve(null),
+      values.salesId ? prisma.salespersons.findFirst({ where: { active: true, id: values.salesId } }) : Promise.resolve(null),
+      poBuyIds.length ? prisma.po_buys.findMany({ where: { id: { in: poBuyIds } } }) : Promise.resolve([]),
+      prisma.products.findMany({ where: { active: true, id: { in: productIds } } }),
+      prisma.payments.findMany({
+        select: { amount: true, discount: true, status: true, withholding_tax: true },
+        where: { bill_id: id, NOT: { status: 'cancelled' } },
+      }),
+    ])
+
+    if (!existingBill) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบบิลรับซื้อ' }, { status: 404 })
+    if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ผู้ขายไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (values.branchId && !branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (values.warehouseId && !warehouse) return NextResponse.json({ code: 'BAD_REQUEST', error: 'คลังไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (values.channelId && !channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (values.salesId && !salesperson) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เซลที่ดูแลไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (values.branchId && warehouse?.branch_id && warehouse.branch_id !== values.branchId) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาและคลังไม่ตรงกัน' }, { status: 400 })
+
+    const effectiveBranchId = values.branchId ?? warehouse?.branch_id ?? null
+    const effectiveBranch = branch ?? (effectiveBranchId ? await prisma.branches.findFirst({ where: { active: true, id: effectiveBranchId } }) : null)
+    if (!effectiveBranch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เลือกสาขาก่อนบันทึกบิล' }, { status: 400 })
+
+    const poBuyById = new Map(poBuys.map((po) => [po.id, po]))
+    const missingPoBuy = poBuyIds.find((poBuyId) => !poBuyById.has(poBuyId))
+    if (missingPoBuy) return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy ที่เลือกไม่ถูกต้อง' }, { status: 400 })
+
+    const productById = new Map(products.map((product) => [product.id, product]))
+    const missingProduct = values.items.find((item) => !productById.has(item.productId))
+    if (missingProduct) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+
+    const items = values.items.map((item) => {
+      const product = productById.get(item.productId)
+      const amount = Math.max(0, item.qty * item.price - item.discount)
+      return {
+        amount,
+        deductWeight: item.deductWeight,
+        discount: item.discount,
+        displayName: item.displayName,
+        grossWeight: item.grossWeight,
+        lotNo: item.lotNo,
+        note: item.note,
+        poBuyId: item.poBuyId,
+        price: item.price,
+        productCode: product?.code ?? '',
+        productId: item.productId,
+        productName: product?.name ?? item.productId,
+        qty: item.qty,
+        salesPrice: item.salesPrice,
+        unit: product?.unit ?? 'กก.',
+      }
+    })
+
+    const paidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
+    const payableBalance = Math.max(0, totals.totalAmount - paidAmount)
+    const status = paidAmount <= 0 ? 'open' : payableBalance <= 0.01 ? 'paid' : 'partial'
+
+    const updatedBill = await prisma.$transaction(async (tx) => {
+      const bill = await tx.purchase_bills.update({
+        data: {
+          branch_id: effectiveBranch.id,
+          channel_id: values.channelId,
+          contact_phone: values.contactPhone,
+          date: normalizeDate(values.date),
+          discount: values.discountTotal,
+          discount_total: values.discountTotal,
+          has_vat: values.hasVat,
+          items,
+          license_plate: values.licensePlate,
+          note: values.note ?? values.notes,
+          notes: values.notes,
+          paid_amount: paidAmount,
+          payable_balance: payableBalance,
+          po_buy_id: values.poBuyId,
+          purchase_source: values.purchaseSource,
+          ref_no: values.refNo,
+          sales_id: values.salesId,
+          status,
+          subtotal: totals.subtotal,
+          supplier_id: values.supplierId,
+          total_amount: totals.totalAmount,
+          transaction_mode: values.transactionMode,
+          updated_at: new Date(),
+          updated_by: actor,
+          vat_amount: totals.vatAmount,
+          vat_invoice_date: values.vatInvoiceDate ? normalizeDate(values.vatInvoiceDate) : null,
+          vat_invoice_no: values.vatInvoiceNo,
+          vat_invoice_received: values.vatInvoiceReceived,
+          vat_invoice_received_at: values.vatInvoiceReceived ? new Date() : null,
+          vat_type: values.vatType,
+          warehouse_id: values.warehouseId,
+        },
+        select: { doc_no: true, id: true },
+        where: { id },
+      })
+
+      await tx.stock_ledger.deleteMany({ where: { ref_id: id, ref_type: 'PB' } })
+      if (values.transactionMode === 'STOCK') {
+        await tx.stock_ledger.createMany({
+          data: items.map((item) => ({
+            branch_id: effectiveBranch.id,
+            created_by: actor,
+            date: normalizeDate(values.date),
+            id: `SL-PB-${randomUUID()}`,
+            lot_no: item.lotNo,
+            movement_type: 'รับซื้อเข้า',
+            note: item.note,
+            notes: values.note ?? values.notes,
+            product_id: item.productId,
+            purchase_channel_id: values.channelId,
+            qty_in: item.qty,
+            qty_out: 0,
+            ref_id: id,
+            ref_no: existingBill.doc_no,
+            ref_type: 'PB',
+            unit_cost: item.price,
+            value_in: item.amount,
+            value_out: 0,
+            warehouse_id: values.warehouseId,
+          })),
+        })
+      }
+
+      return bill
+    })
+
+    return NextResponse.json({ docNo: updatedBill.doc_no, id: updatedBill.id, paidAmount, payableBalance, status })
+  } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'แก้ไขบิลรับซื้อไม่ได้', 400)
   }
 }
