@@ -1,6 +1,5 @@
-import { MasterDataPageClient } from '@/components/master-data/shared/MasterDataPageClient'
-import { productsPageConfig } from '@/lib/master-data-page-configs'
+import { ProductsPageClient } from '@/components/master-data/products/ProductsPageClient'
 
 export default function ProductsPage() {
-  return <MasterDataPageClient config={productsPageConfig} />
+  return <ProductsPageClient />
 }

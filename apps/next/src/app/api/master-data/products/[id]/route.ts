@@ -1,20 +1,38 @@
-import { prisma } from '@/lib/server/prisma'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { mapPrismaProduct } from '@/lib/domain/product'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { errorJson, masterDataJson, type MasterDataRouteProps, updateMasterDataStatusSchema, toIso, toNumber } from '@/lib/server/master-data'
+import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
 
-export async function PATCH(request: Request, { params }: MasterDataRouteProps) {
+const routeParamsSchema = z.object({
+  id: z.string().min(1),
+})
+
+const updateProductStatusSchema = z.object({
+  active: z.boolean(),
+})
+
+type ProductRouteProps = {
+  params: Promise<unknown>
+}
+
+export async function PATCH(request: Request, { params }: ProductRouteProps) {
   try {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'master.products.status')
 
-    const { id } = await params
-    const values = updateMasterDataStatusSchema.parse(await request.json())
-    const row = await prisma.products.update({ where: { id }, data: { active: values.active } })
-    return masterDataJson({ id: row.id, code: row.code, name: row.name, active: row.active ?? true, type: row.type, unit: row.unit, metalGroup: row.metal_group, itemStatus: row.item_status, grade: row.grade, stdPrice: toNumber(row.std_price), stdCost: toNumber(row.std_cost), createdAt: toIso(row.created_at), updatedAt: toIso(row.updated_at) })
+    const { id } = routeParamsSchema.parse(await params)
+    const values = updateProductStatusSchema.parse(await request.json())
+    const product = await prisma.products.update({
+      data: { active: values.active },
+      where: { id },
+    })
+
+    return NextResponse.json(mapPrismaProduct(product))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
-    return errorJson(caught, 'อัปเดตสถานะสินค้าไม่ได้')
+    return NextResponse.json({ error: caught instanceof Error ? caught.message : 'อัปเดตสถานะสินค้าไม่ได้' }, { status: 400 })
   }
 }

@@ -64,7 +64,7 @@
 | 2 | `branches`, `warehouses`, `accounts` | ข้อมูลองค์กร/บัญชีและ FK พื้นฐาน | Done |
 | 3 | `suppliers`, `products` | field เยอะและใช้ต่อ transaction | Done |
 | 4 | `directors`, `machines`, `production-lines`, `beneficiaries`, `payment-methods`, `remittance-purposes` | simple master ที่เหลือและ lookup ต่างประเทศ/การเงิน | Done - DB-backed after target migration |
-| B | `products` | ยกระดับสินค้าเป็น specialized customer-style master page | Planned |
+| B | `products` | ยกระดับสินค้าเป็น specialized customer-style master page | Done |
 | C | remaining master hardening | ยกระดับ master ที่เหลือให้ใช้ UX/API/validation pattern เดียวกันตามความเหมาะสม | Planned |
 
 ## Remaining Customer-Style Hardening Plan
@@ -223,7 +223,13 @@ Continuation rule:
   - `/master-data/warehouses`
   - `/master-data/accounts`
 - Batch 3 baseline routes exist:
-  - `/master-data/products` still uses the shared master-data list/form UI and generic API baseline.
+  - `/master-data/products` has been upgraded from the shared generic page to a specialized customer-style products page.
+  - Product list UX now loads once and runs search/filter/sort/count/pagination in the frontend.
+  - Product filters cover type, metal group, item status `RM/WIP/FG`, and active state.
+  - Product row click opens the edit modal; no select column is used.
+  - Product form includes code, name, type, unit, metal group, item status, grade, standard price, standard cost, target margin %, and active toggle.
+  - Product form/API now use product-specific Zod validation instead of the generic master-data schema.
+  - Product export uses `/api/master-data/products/export` and generates a real `.xlsx` workbook with summary and product sheets.
   - `/master-data/suppliers` has been upgraded to the customer-style specialized page with frontend search/filter/sort/count/pagination, structured Thai address form, add/edit modal, syntax validation, active toggle, and `.xlsx` export.
 - Batch 4 pages now have real Next routes, shared master-data list/form UI, API routes, add/edit baseline, search/sort, and active/inactive:
   - `/master-data/beneficiaries` uses real Prisma/dev-target table `overseas_recipients`.
@@ -290,6 +296,7 @@ Continuation rule:
 | 2026-05-18 | Reset checkpoint validation after returning to `d6e8b29`: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Current git baseline excludes later sidebar/shadcn/Tailwind v4 experiment commits |
 | 2026-05-18 | Active toggle UI update: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next` | Passed | Customer, supplier, and shared master-data forms use toggle switch for active status |
 | 2026-05-18 | Customer delete action/API cleanup: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build` | Passed | Removed customer table delete action; active status is handled by a dedicated `/api/master-data/customers/[id]/status` endpoint and toggle UI |
+| 2026-05-18 | Batch B products specialized page: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build`, unauthenticated route smoke on `127.0.0.1:3002` | Passed | Added specialized `/master-data/products` page, product schema/domain client, product-specific API validation, active toggle, frontend search/filter/sort/count/pagination, and `/api/master-data/products/export`; unauth smoke returned page 307 to login and API/export 401 |
 
 ## Open Decisions
 
