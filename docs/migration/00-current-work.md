@@ -2,20 +2,20 @@
 
 ## Current Status
 
-Date: 2026-05-18  
-Active app: `apps/next`  
-Primary remote: `new-origin`  
-Last pushed checkpoint: system map/API baseline (`docs: add system map api baseline`)
+Date: 2026-05-19
+Active app: `apps/next`
+Primary remote: `new-origin`
+Last pushed checkpoint: system map/API baseline (`docs: mark system map baseline pushed`)
 
 ## Current Batch
 
-`Batch PRE: System Map and API Contract Baseline`
+`Batch S: Stock`
 
 Goal:
 
-- Create a route/page/API status baseline before the next module batch.
-- Add a first OpenAPI skeleton for existing Next API route handlers.
-- Make sitemap/OpenAPI updates part of the ongoing page-batch QA checklist.
+- Port stock routes from placeholder/read-only surfaces into Next page/API baselines.
+- Use `stock_ledger` as the shared source of truth for stock balance and movement history.
+- Add traceable write baselines for status convert, grade convert, stock count adjustment, and customer return.
 
 ## File Naming Changes
 
@@ -52,15 +52,15 @@ Goal:
 
 ## Next Required Batch
 
-`Batch PRE: System Map and API Contract Baseline`
+`Batch S: Stock`
 
 Tasks:
 
-1. Create `docs/migration/18-next-system-sitemap.md` - done locally
-2. Inventory navigation routes vs real pages/APIs - done locally
-3. Create `docs/api/openapi.yaml` skeleton - done locally
-4. Add current API catalog baseline - done locally
-5. Validate, commit, and push before `Batch S: Stock`
+1. S0 legacy inventory and DB mapping - implemented locally
+2. S1 Stock Balance page/API - implemented locally
+3. S2 Stock Ledger polish - implemented locally, row detail modal still follow-up
+4. S3-S6 stock write baselines - implemented locally
+5. Validation/build/browser QA/commit/push still required
 
 ## Tailwind v4 Migration Status
 
@@ -135,15 +135,52 @@ Validation:
 
 ## Current Priority Queue
 
-1. Batch PRE: System Map and API Contract Baseline
-2. Batch S: Stock
-3. Batch F: Finance and Debt
-4. Batch T: Tracking 360
-5. Batch D: Dual Costing / Trading / PO
-6. Batch FF: Foreign Finance
-7. Batch A: Finance / Accounting
-8. Batch M: Main Dashboards and Operational Control
-9. Batch SYS: System and Cleanup
+1. Batch S: Stock
+2. Batch F: Finance and Debt
+3. Batch T: Tracking 360
+4. Batch D: Dual Costing / Trading / PO
+5. Batch FF: Foreign Finance
+6. Batch A: Finance / Accounting
+7. Batch M: Main Dashboards and Operational Control
+8. Batch SYS: System and Cleanup
+
+## Batch S Stock Status
+
+Status: in progress, commit/push pending.
+
+Implemented in this checkpoint:
+
+- Added stock balance, status convert, grade convert, stock count adjust, and customer return API/page baselines.
+- Hardened stock OpenAPI contract for touched stock endpoints with operation IDs, real query parameters, request schemas, and stock response schemas.
+- Adjusted stock write forms to support direct `?new=1` URLs for form smoke testing and resumable links.
+- Ran authenticated browser/API smoke with the provided dev user; credentials were used only in the browser session and were not stored in docs or code.
+
+Verification already run:
+
+- Desktop browser smoke: all six stock pages returned HTTP 200 with no login/error state.
+- Mobile browser smoke at 390x844: stock read pages and write forms rendered without visible errors.
+- Authenticated API smoke: all six stock APIs returned HTTP 200.
+- Write form smoke: `/stock/status-convert?new=1`, `/stock/convert?new=1`, `/stock/adjust?new=1`, and `/stock/customer-return?new=1` rendered title, fields, cancel, and save controls; no submit was performed.
+- `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200` passed validity with existing skeleton warnings outside the stock batch.
+
+Still required before checkpoint close:
+
+- Restore/avoid generated `apps/next/next-env.d.ts` churn before commit.
+- Commit and push the stock batch.
+
+Final local validation:
+
+- `git diff --check` passed.
+- `npm run type-check --workspace @ns-scrap-erp/next` passed.
+- `npm run lint --workspace @ns-scrap-erp/next` passed.
+- `npm run build --workspace @ns-scrap-erp/next` passed.
+
+Known carry-over from Batch S:
+
+- Stock ledger row detail modal remains a follow-up.
+- Field-level validation messages on stock write forms remain a follow-up; server-side Zod validation is active.
+- Reconciliation query/report for grade convert and count adjust remains a follow-up.
+- Void/reversal and final WAC/cost-source policy remain broader stock hardening work.
 
 ## Operating Model
 

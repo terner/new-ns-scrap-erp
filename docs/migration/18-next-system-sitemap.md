@@ -41,7 +41,7 @@ Status terms:
 | Dual Costing | 7 | 1 | 6 | PO buy only |
 | Finance and Debt | 6 | 1 | 5 | AP only |
 | Foreign Finance | 6 | 0 | 6 | none |
-| Stock | 6 | 1 | 5 | ledger only |
+| Stock | 6 | 6 | 0 | balance, ledger, status convert, grade convert, adjust, customer return |
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
 | Reports | 1 | 0 | 1 | none |
@@ -145,12 +145,12 @@ Status terms:
 
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
-| `/stock/balance` | สต๊อกคงเหลือ | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
+| `/stock/balance` | สต๊อกคงเหลือ | read baseline | `GET /api/stock/balance` | `stock_ledger`, `products`, `branches`, `warehouses` | `stock.ledger.view` |
 | `/stock/ledger` | Stock Ledger | read baseline | `GET /api/stock/ledger` | `stock_ledger` | `stock.ledger.view` |
-| `/stock/status-convert` | ปรับสถานะสินค้า | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
-| `/stock/convert` | Grade Adjustment | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
-| `/stock/adjust` | นับสต๊อก / Stock Count Adjust | placeholder | missing | `stock_ledger` expected | `stock.ledger.view` |
-| `/stock/customer-return` | Customer Return / ของคืน | placeholder | missing | `stock_ledger`, returns table TBD | `stock.ledger.view` |
+| `/stock/status-convert` | ปรับสถานะสินค้า | partial write | `GET/POST /api/stock/status-convert` | `stock_ledger` | `stock.ledger.view` |
+| `/stock/convert` | Grade Adjustment | partial write | `GET/POST /api/stock/convert` | `stock_ledger`, `grade_adjustments` | `stock.ledger.view` |
+| `/stock/adjust` | นับสต๊อก / Stock Count Adjust | partial write | `GET/POST /api/stock/adjust` | `stock_ledger`, `stock_adjustments` | `stock.ledger.view` |
+| `/stock/customer-return` | Customer Return / ของคืน | partial write | `GET/POST /api/stock/customer-return` | `stock_ledger` | `stock.ledger.view` |
 
 ### Trading And PO Reports
 
@@ -254,8 +254,7 @@ Current API groups:
 
 ## Gaps Before Batch S
 
-- `/stock/balance` is still a placeholder and needs first-class page/API work in `Batch S1`.
-- `/stock/ledger` has a read baseline but still needs query/pagination/running-balance polish in `Batch S2`.
-- Stock status convert, grade convert, adjust, and customer return remain placeholders.
+- Stock pages now have first Next page/API baselines.
+- Stock write flows are traceable through `stock_ledger`, but production-grade void/reversal, branch-scope enforcement, and cost-source/WAC policy hardening remain follow-up work.
 - Main dashboard/reporting and finance-accounting routes are mostly placeholder coverage only.
 - Several write flows are intentionally partial and still need side-effect reconciliation before production use.

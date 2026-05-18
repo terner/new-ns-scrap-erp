@@ -224,125 +224,175 @@ Priority: สูง เพราะเป็นฐานของ purchase, sale
 
 ### S0: Legacy Inventory and DB Mapping
 
-- [ ] สำรวจ legacy pages:
+- [x] สำรวจ legacy pages:
   - `/stock/balance`
   - `/stock/ledger`
   - `/stock/status-convert`
   - `/stock/convert`
   - `/stock/adjust`
   - `/stock/customer-return`
-- [ ] สรุป field/filter/button/modal/action ต่อหน้า
-- [ ] map DB tables/columns ที่มีใน dev-target
-- [ ] ระบุ movement types/ref types ที่ใช้จริง
-- [ ] ระบุจุดที่ต้องเขียน stock ledger
-- [ ] สรุปภาพรวม flow ทั้งหมวดก่อนเริ่ม S1
-- [ ] สรุป dependency/page order ของ Stock
+- [x] สรุป field/filter/button/modal/action ต่อหน้า
+- [x] map DB tables/columns ที่มีใน dev-target
+- [x] ระบุ movement types/ref types ที่ใช้จริง
+- [x] ระบุจุดที่ต้องเขียน stock ledger
+- [x] สรุปภาพรวม flow ทั้งหมวดก่อนเริ่ม S1
+- [x] สรุป dependency/page order ของ Stock
+
+#### S0 Module Overview
+
+- Legacy refs:
+  - `old-apps/vue/src/views/stock/StockBalanceView.vue`
+  - `old-apps/vue/src/views/stock/StockLedgerView.vue`
+  - `old-apps/vue/src/views/stock/StockAdjustView.vue`
+  - `old-apps/vue/src/views/stock/GradeStatusConvertView.vue`
+  - `old-apps/vue/src/views/stockGaps/StatusConvertView.vue`
+  - `old-apps/vue/src/views/stockGaps/CustomerReturnView.vue`
+- Shared flow summary:
+  - `stock_ledger` is the source of truth for balance and movement history.
+  - Stock Balance aggregates ledger rows by product, branch, warehouse, lot, status/output category, and available flag.
+  - Status convert and grade convert create paired out/in ledger movements.
+  - Stock count adjustment creates one ledger movement with qty only and value = 0, keeping value impact as note/audit data.
+  - Customer return creates stock-in with `not_available_for_sale` and send-back creates stock-out.
+- Shared DB/table mapping:
+  - `stock_ledger`: all movement and balance source.
+  - `stock_adjustments`: stock count adjustment header/audit row.
+  - `grade_adjustments`: grade/product conversion audit row.
+  - `products`, `branches`, `warehouses`, `customers`: lookup/display and form options.
+  - Existing related transaction sources: `purchase_bills`, `sales_bills`, `stock_issues`, `production_*`.
+- Movement/ref mapping:
+  - `PB`: purchase bill stock in.
+  - `SB`: sales bill stock out.
+  - `ST`: stock transfer out/in.
+  - `SC`: status convert out/in.
+  - `GA`: grade/product convert out/in.
+  - `ADJ`: stock count loss/gain.
+  - `CR`: customer return in/send-back out.
+- Side effects/reconciliation:
+  - All new stock writes must leave traceable `ref_id`, `ref_no`, and `ref_type`.
+  - Paired flows (`SC`, `GA`, `ST`) must balance source out and target in by ref.
+  - `ADJ` intentionally changes qty but keeps ledger value zero until accounting policy is confirmed.
+  - Customer-return stock is separated from saleable stock with `not_available_for_sale`.
+- Page implementation order:
+  - S1 Stock Balance, S2 Stock Ledger, S3 Status Convert, S4 Grade Adjustment, S5 Stock Count Adjust, S6 Customer Return, S7 QA.
+- Risks/open decisions:
+  - WAC/cost-source policy for transfer, conversion, sale, and production is still a follow-up hardening decision.
+  - Void/reversal is not implemented for new stock writes in this batch.
+  - Branch-scope enforcement still depends on the broader auth/permission follow-up.
+  - Header/line relational redesign is still pending for purchase/sales; stock APIs currently work with existing ledger source.
 
 ### S1: Stock Balance
 
+#### S0.1 Stock API Contract Hardening
+
+- [x] เพิ่ม `operationId` ให้ stock endpoints ที่แตะใน batch นี้
+- [x] เพิ่ม query parameters จริงของ `/api/stock/ledger` และ `/api/stock/balance`
+- [x] เพิ่ม request schemas ของ write flows: status convert, convert, adjust, customer return
+- [x] เพิ่ม stock response schemas สำหรับ balance, ledger, operation list, และ write result
+- [x] lint OpenAPI หลังจบ batch
+
 #### S1.1 Legacy/API
 
-- [ ] ตรวจ legacy field/filter/button/modal/action ของ Stock Balance
-- [ ] API `/api/stock/balance`
-- [ ] backend aggregation จาก `stock_ledger`
-- [ ] define query params: product, branch, warehouse, status/category/lot/date
+- [x] ตรวจ legacy field/filter/button/modal/action ของ Stock Balance
+- [x] API `/api/stock/balance`
+- [x] backend aggregation จาก `stock_ledger`
+- [x] define query params: product, branch, warehouse, status/category/lot/date
 
 #### S1.2 UI
 
-- [ ] Page `/stock/balance`
-- [ ] filter bar
-- [ ] table: product, branch, warehouse, qty, value, avg cost, available/not available
-- [ ] summary cards
+- [x] Page `/stock/balance`
+- [x] filter bar
+- [x] table: product, branch, warehouse, qty, value, avg cost, available/not available
+- [x] summary cards
 
 #### S1.3 Actions/Modal/Export
 
-- [ ] action buttons: refresh/export/detail
-- [ ] detail modal: movement drilldown
-- [ ] export `.xlsx`
+- [x] action buttons: refresh/export/detail
+- [x] detail modal: balance row detail
+- [x] export `.xlsx`
 
 #### S1.4 QA
 
-- [ ] API smoke
-- [ ] browser smoke
+- [x] API smoke
+- [x] browser smoke
 - [ ] docs/type/lint/build/commit/push
 
 ### S2: Stock Ledger Polish
 
 #### S2.1 Legacy/API
 
-- [ ] ตรวจ legacy stock ledger field/action
-- [ ] เพิ่ม query params/ref type/product/date/branch/warehouse
-- [ ] pagination backend
-- [ ] ตรวจ running balance calculation
+- [x] ตรวจ legacy stock ledger field/action
+- [x] เพิ่ม query params/ref type/product/date/branch/warehouse
+- [x] pagination backend
+- [x] ตรวจ running balance calculation
 
 #### S2.2 UI
 
-- [ ] ปรับ `/stock/ledger`
-- [ ] filter bar
-- [ ] sort/pagination
-- [ ] summary cards
+- [x] ปรับ `/stock/ledger`
+- [x] filter bar
+- [x] sort/pagination
+- [x] summary cards
 
 #### S2.3 Actions/Modal/Export
 
 - [ ] row detail modal
-- [ ] export `.xlsx`
-- [ ] refresh button
+- [x] export `.xlsx`
+- [x] refresh button
 
 #### S2.4 QA
 
-- [ ] API smoke
-- [ ] browser smoke
+- [x] API smoke
+- [x] browser smoke
 - [ ] docs/type/lint/build/commit/push
 
 ### S3: Status Convert
 
 #### S3.1 Legacy/API/DB
 
-- [ ] ตรวจ legacy status convert flow
-- [ ] API `/api/stock/status-convert`
-- [ ] schema/table decision ถ้าต้องมี header table
-- [ ] stock ledger movement mapping
+- [x] ตรวจ legacy status convert flow
+- [x] API `/api/stock/status-convert`
+- [x] schema/table decision ถ้าต้องมี header table
+- [x] stock ledger movement mapping
 
 #### S3.2 UI
 
-- [ ] Page `/stock/status-convert`
-- [ ] list/filter/sort/pagination
-- [ ] summary cards
+- [x] Page `/stock/status-convert`
+- [x] list/filter baseline
+- [x] summary cards
 
 #### S3.3 Modal/Form/Validation
 
-- [ ] modal/form ปรับสถานะ RM/WIP/FG
-- [ ] validate product, branch, warehouse, qty, status from/to, reason
+- [x] modal/form ปรับสถานะ RM/WIP/FG
+- [x] validate product, branch, warehouse, qty, status from/to, reason
 - [ ] field-level validation errors
 
 #### S3.4 Write/Reconcile/QA
 
-- [ ] write stock ledger แบบ traceable
-- [ ] reconciliation: qty out/in ต้อง balance
+- [x] write stock ledger แบบ traceable
+- [x] reconciliation: qty out/in ต้อง balance by ref design
 - [ ] docs/type/lint/build/commit/push
 
 ### S4: Grade Adjustment / Convert
 
 #### S4.1 Legacy/API/DB
 
-- [ ] ตรวจ legacy grade adjustment/convert flow
-- [ ] API `/api/stock/convert`
-- [ ] cost rule documented ก่อน write
-- [ ] stock ledger out/in mapping
+- [x] ตรวจ legacy grade adjustment/convert flow
+- [x] API `/api/stock/convert`
+- [x] cost rule documented ก่อน write
+- [x] stock ledger out/in mapping
 
 #### S4.2 UI
 
-- [ ] Page `/stock/convert`
-- [ ] list/filter/sort/pagination
+- [x] Page `/stock/convert`
+- [x] list/filter baseline
 
 #### S4.3 Modal/Form/Validation
 
-- [ ] modal/form ปรับเกรด/แปลงสินค้า
-- [ ] validate source/destination product, qty, lot, reason
+- [x] modal/form ปรับเกรด/แปลงสินค้า
+- [x] validate source/destination product, qty, lot, reason
 
 #### S4.4 Write/Reconcile/QA
 
-- [ ] stock ledger out/in
+- [x] stock ledger out/in
 - [ ] reconciliation query
 - [ ] docs/type/lint/build/commit/push
 
@@ -350,25 +400,25 @@ Priority: สูง เพราะเป็นฐานของ purchase, sale
 
 #### S5.1 Legacy/API/DB
 
-- [ ] ตรวจ legacy stock adjust flow
-- [ ] API `/api/stock/adjust`
-- [ ] header/detail table decision
-- [ ] adjustment movement mapping
+- [x] ตรวจ legacy stock adjust flow
+- [x] API `/api/stock/adjust`
+- [x] header/detail table decision
+- [x] adjustment movement mapping
 
 #### S5.2 UI
 
-- [ ] Page `/stock/adjust`
-- [ ] list/filter/sort/pagination
+- [x] Page `/stock/adjust`
+- [x] list/filter baseline
 
 #### S5.3 Modal/Form/Validation
 
-- [ ] modal/form นับสต๊อก/ปรับยอด
-- [ ] validate counted qty, system qty, adjustment reason
-- [ ] require audit note
+- [x] modal/form นับสต๊อก/ปรับยอด
+- [x] validate counted qty, system qty, adjustment reason
+- [x] require audit note
 
 #### S5.4 Write/Reconcile/QA
 
-- [ ] write adjustment movement
+- [x] write adjustment movement
 - [ ] reconciliation query
 - [ ] docs/type/lint/build/commit/push
 
@@ -376,35 +426,44 @@ Priority: สูง เพราะเป็นฐานของ purchase, sale
 
 #### S6.1 Legacy/API/DB
 
-- [ ] ตรวจ legacy customer return flow
-- [ ] API `/api/stock/customer-return`
-- [ ] source sale/customer link rule
-- [ ] not-available-for-sale rule
+- [x] ตรวจ legacy customer return flow
+- [x] API `/api/stock/customer-return`
+- [x] source sale/customer link rule baseline
+- [x] not-available-for-sale rule
 
 #### S6.2 UI
 
-- [ ] Page `/stock/customer-return`
-- [ ] list/filter/sort/pagination
+- [x] Page `/stock/customer-return`
+- [x] list/filter baseline
 
 #### S6.3 Modal/Form/Validation
 
-- [ ] modal/form รับคืนลูกค้า
-- [ ] validate customer, product, qty, reason, warehouse
+- [x] modal/form รับคืนลูกค้า
+- [x] validate customer, product, qty, reason, warehouse
 
 #### S6.4 Write/Reconcile/QA
 
-- [ ] stock ledger with `not_available_for_sale` where applicable
-- [ ] link to sales/customer if source exists
+- [x] stock ledger with `not_available_for_sale` where applicable
+- [x] link to customer if source exists
 - [ ] docs/type/lint/build/commit/push
 
 ### S7: Stock QA Batch
 
-- [ ] QA checker ตรวจทุก stock page
-- [ ] Browser smoke desktop/mobile
-- [ ] API smoke 200
-- [ ] docs update
-- [ ] type/lint/build
+- [x] QA checker ตรวจทุก stock page
+- [x] Browser smoke desktop/mobile
+- [x] API smoke 200
+- [x] docs update
+- [x] type/lint/build
 - [ ] commit/push
+
+Execution notes:
+
+- Desktop browser smoke: `/stock/balance`, `/stock/ledger`, `/stock/status-convert`, `/stock/convert`, `/stock/adjust`, `/stock/customer-return` returned HTTP 200 after login and did not show login/error states.
+- Mobile browser smoke at 390x844: read pages and write forms loaded without visible error states.
+- Authenticated API smoke: `/api/stock/balance`, `/api/stock/ledger`, `/api/stock/status-convert`, `/api/stock/convert`, `/api/stock/adjust`, `/api/stock/customer-return` returned HTTP 200.
+- Write form smoke: `/stock/status-convert?new=1`, `/stock/convert?new=1`, `/stock/adjust?new=1`, `/stock/customer-return?new=1` rendered form title, fields, `ยกเลิก`, and `บันทึก`; no submit was performed.
+- OpenAPI lint: `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200` passed validity with existing skeleton-level warnings outside stock hardening scope.
+- Validation: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, and `npm run build --workspace @ns-scrap-erp/next` passed.
 
 ## Batch F: Finance and Debt
 

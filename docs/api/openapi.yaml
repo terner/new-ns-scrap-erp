@@ -600,12 +600,64 @@ paths:
   /api/stock/ledger:
     get:
       tags: [Stock]
+      operationId: listStockLedger
       summary: List stock ledger rows
       parameters:
-        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/StockQ"
+        - $ref: "#/components/parameters/StockProductId"
+        - $ref: "#/components/parameters/StockBranchId"
+        - $ref: "#/components/parameters/StockWarehouseId"
+        - $ref: "#/components/parameters/StockStatus"
+        - $ref: "#/components/parameters/StockLotNo"
+        - $ref: "#/components/parameters/StockFrom"
+        - $ref: "#/components/parameters/StockTo"
+        - $ref: "#/components/parameters/StockRefType"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Format"
       responses:
         "200":
-          $ref: "#/components/responses/ListOk"
+          description: Stock ledger rows with pagination and summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockLedgerResponse"
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/stock/balance:
+    get:
+      tags: [Stock]
+      operationId: getStockBalance
+      summary: Read stock balance aggregated from stock ledger
+      parameters:
+        - $ref: "#/components/parameters/StockQ"
+        - $ref: "#/components/parameters/StockProductId"
+        - $ref: "#/components/parameters/StockBranchId"
+        - $ref: "#/components/parameters/StockWarehouseId"
+        - $ref: "#/components/parameters/StockStatus"
+        - $ref: "#/components/parameters/StockLotNo"
+        - $ref: "#/components/parameters/StockAsOf"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Format"
+      responses:
+        "200":
+          description: Aggregated stock balance grouped by product, branch, warehouse, status, and lot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockBalanceResponse"
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/stock/transfer:
     get:
@@ -622,6 +674,134 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+
+  /api/stock/status-convert:
+    get:
+      tags: [Stock]
+      operationId: listStockStatusConverts
+      summary: List stock status convert history
+      responses:
+        "200":
+          description: Status convert rows and stock reference options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockOperationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Stock]
+      operationId: createStockStatusConvert
+      summary: Convert product stock status between RM, WIP, and FG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusConvertRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/StockWriteOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/stock/convert:
+    get:
+      tags: [Stock]
+      operationId: listStockConverts
+      summary: List grade/product conversion history
+      responses:
+        "200":
+          description: Product conversion rows and stock reference options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockOperationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Stock]
+      operationId: createStockConvert
+      summary: Convert stock from one product/grade to another
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockConvertRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/StockWriteOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/stock/adjust:
+    get:
+      tags: [Stock]
+      operationId: listStockAdjustments
+      summary: List stock count adjustments
+      responses:
+        "200":
+          description: Stock count adjustment rows and stock reference options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockOperationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Stock]
+      operationId: createStockAdjustment
+      summary: Create stock count adjustment and ledger movement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockAdjustRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/StockWriteOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/stock/customer-return:
+    get:
+      tags: [Stock]
+      operationId: listCustomerReturnStock
+      summary: List customer return stock
+      responses:
+        "200":
+          description: Customer return stock rows and stock reference options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockOperationListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Stock]
+      operationId: createCustomerReturnStockMovement
+      summary: Receive or send back customer return stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerReturnRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/StockWriteOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/tracking/supplier:
     get:
@@ -670,6 +850,84 @@ components:
         maximum: 10000
     Search:
       name: search
+      in: query
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 10
+        maximum: 500
+        default: 50
+    Format:
+      name: format
+      in: query
+      schema:
+        type: string
+        enum: [json, xlsx]
+        default: json
+    StockAsOf:
+      name: asOf
+      in: query
+      schema:
+        type: string
+        format: date
+    StockBranchId:
+      name: branchId
+      in: query
+      schema:
+        type: string
+    StockFrom:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date
+    StockLotNo:
+      name: lotNo
+      in: query
+      schema:
+        type: string
+        maxLength: 80
+    StockProductId:
+      name: productId
+      in: query
+      schema:
+        type: string
+    StockQ:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 120
+    StockRefType:
+      name: refType
+      in: query
+      schema:
+        type: string
+        maxLength: 20
+    StockStatus:
+      name: status
+      in: query
+      schema:
+        $ref: "#/components/schemas/StockStatus"
+    StockTo:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date
+    StockWarehouseId:
+      name: warehouseId
       in: query
       schema:
         type: string
@@ -740,10 +998,42 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    StockWriteOk:
+      description: Stock write completed and traceable ledger rows were created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/StockWriteResponse"
   schemas:
     ApiObject:
       type: object
       additionalProperties: true
+    CustomerReturnRequest:
+      allOf:
+        - $ref: "#/components/schemas/StockBaseWriteRequest"
+        - type: object
+          required: [action, branchId, date, productId, qty, reason, unitCost, warehouseId]
+          properties:
+            action:
+              type: string
+              enum: [receive, send_back]
+              default: receive
+            customerId:
+              type: [string, "null"]
+            deliveryRefNo:
+              $ref: "#/components/schemas/OptionalDocNo"
+            qty:
+              type: number
+              exclusiveMinimum: 0
+            reason:
+              type: string
+              minLength: 2
+              maxLength: 240
+            returnRowKey:
+              type: [string, "null"]
+            unitCost:
+              type: number
+              minimum: 0
     Error:
       type: object
       properties:
@@ -752,3 +1042,244 @@ components:
         message:
           type: string
       additionalProperties: true
+    OptionalDocNo:
+      type: [string, "null"]
+      maxLength: 40
+      pattern: "^[A-Za-z0-9_-]+$"
+    StockAdjustRequest:
+      allOf:
+        - $ref: "#/components/schemas/StockBaseWriteRequest"
+        - type: object
+          required: [branchId, countedQty, date, productId, reason, systemQty, warehouseId]
+          properties:
+            countedQty:
+              type: number
+              minimum: 0
+            reason:
+              type: string
+              minLength: 3
+              maxLength: 240
+            remark:
+              type: [string, "null"]
+              maxLength: 500
+            systemQty:
+              type: number
+              minimum: 0
+    StockBalanceResponse:
+      type: object
+      required: [byStatus, page, pageSize, rows, summary, total]
+      properties:
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              count:
+                type: integer
+              qty:
+                type: number
+              status:
+                $ref: "#/components/schemas/StockStatus"
+              value:
+                type: number
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockBalanceRow"
+        summary:
+          type: object
+          additionalProperties: true
+        total:
+          type: integer
+    StockBalanceRow:
+      type: object
+      properties:
+        avgCost:
+          type: number
+        branchId:
+          type: [string, "null"]
+        branchName:
+          type: [string, "null"]
+        lastMovementDate:
+          type: [string, "null"]
+        lotNo:
+          type: [string, "null"]
+        notAvailableForSale:
+          type: boolean
+        productCode:
+          type: [string, "null"]
+        productId:
+          type: string
+        productName:
+          type: [string, "null"]
+        qty:
+          type: number
+        status:
+          $ref: "#/components/schemas/StockStatus"
+        value:
+          type: number
+        warehouseId:
+          type: [string, "null"]
+        warehouseName:
+          type: [string, "null"]
+    StockBaseWriteRequest:
+      type: object
+      required: [branchId, date, productId, warehouseId]
+      properties:
+        branchId:
+          type: string
+          minLength: 1
+        date:
+          type: string
+          format: date
+        docNo:
+          $ref: "#/components/schemas/OptionalDocNo"
+        lotNo:
+          type: [string, "null"]
+          maxLength: 80
+        notes:
+          type: [string, "null"]
+          maxLength: 500
+        productId:
+          type: string
+          minLength: 1
+        warehouseId:
+          type: string
+          minLength: 1
+    StockConvertRequest:
+      type: object
+      required: [branchId, date, sourceProductId, sourceQty, targetProductId, targetQty, warehouseId]
+      properties:
+        branchId:
+          type: string
+          minLength: 1
+        date:
+          type: string
+          format: date
+        docNo:
+          $ref: "#/components/schemas/OptionalDocNo"
+        lotNo:
+          type: [string, "null"]
+          maxLength: 80
+        notes:
+          type: [string, "null"]
+          maxLength: 500
+        reason:
+          type: [string, "null"]
+          maxLength: 240
+        sourceProductId:
+          type: string
+          minLength: 1
+        sourceQty:
+          type: number
+          exclusiveMinimum: 0
+        targetLotNo:
+          type: [string, "null"]
+          maxLength: 80
+        targetProductId:
+          type: string
+          minLength: 1
+        targetQty:
+          type: number
+          exclusiveMinimum: 0
+        warehouseId:
+          type: string
+          minLength: 1
+    StockLedgerResponse:
+      type: object
+      required: [page, pageSize, rows, total]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        summary:
+          type: object
+          additionalProperties: true
+        total:
+          type: integer
+    StockOption:
+      type: object
+      required: [id, name]
+      properties:
+        active:
+          type: [boolean, "null"]
+        branchId:
+          type: [string, "null"]
+        code:
+          type: [string, "null"]
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: [string, "null"]
+    StockOperationListResponse:
+      type: object
+      required: [reference, rows]
+      properties:
+        reference:
+          type: object
+          required: [branches, products, warehouses]
+          properties:
+            branches:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+            customers:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+            products:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+            warehouses:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    StockStatus:
+      type: string
+      enum: [RM, WIP, FG]
+    StockWriteResponse:
+      type: object
+      required: [ok]
+      properties:
+        id:
+          type: string
+        ok:
+          type: boolean
+        refId:
+          type: string
+        refNo:
+          type: string
+    StatusConvertRequest:
+      allOf:
+        - $ref: "#/components/schemas/StockBaseWriteRequest"
+        - type: object
+          required: [fromStatus, qty, toStatus]
+          properties:
+            fromStatus:
+              $ref: "#/components/schemas/StockStatus"
+            qty:
+              type: number
+              exclusiveMinimum: 0
+            reason:
+              type: [string, "null"]
+              maxLength: 240
+            toStatus:
+              $ref: "#/components/schemas/StockStatus"
