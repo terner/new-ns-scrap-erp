@@ -13,7 +13,7 @@ import {
   type MasterDataRecord,
 } from '@/lib/master-data'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
-import { formatPhoneDisplay } from '@/lib/format'
+import { formatPhoneDisplay, sanitizePhoneInput } from '@/lib/format'
 
 type SortKey = keyof MasterDataRecord
 
@@ -497,7 +497,7 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
           const nextValue = isEmailField
             ? event.target.value.replace(/[^\x20-\x7E]/g, '')
             : isPhoneField
-              ? event.target.value.replace(/[^0-9+\s().-]/g, '')
+              ? sanitizePhoneInput(event.target.value)
               : event.target.value
           onChange(nextValue)
         }}

@@ -39,6 +39,10 @@ const optionalPhone = z.preprocess(
   blankToNull,
   z.string().trim()
     .regex(phonePattern, 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง')
+    .refine((value) => {
+      const digits = value.replace(/\D/g, '')
+      return digits.length >= 9 && digits.length <= 15
+    }, 'เบอร์โทรศัพท์ต้องมีตัวเลข 9-15 หลัก')
     .nullable()
     .default(null),
 )

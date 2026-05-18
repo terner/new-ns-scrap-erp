@@ -22,7 +22,7 @@ Follow `AGENTS.md` first. This skill expands the project rule that every new or 
 - Names: allow Thai/English letters, spaces, dots, hyphens, and apostrophes where appropriate; reject numbers and random symbols for person names.
 - Company/business names: allow Thai/English letters, numbers, spaces, and common business punctuation; reject control characters.
 - Email: validate email syntax and ASCII-safe address format; email inputs must also prevent or strip non-ASCII characters during typing/paste so Thai or other Unicode characters cannot remain in the field before submit. Use server-side domain/MX checks when the user wants real domain validation.
-- Phone: validate phone shape and digit count; phone inputs must also prevent or strip letters and unsupported symbols during typing/paste, allowing only digits, spaces, dashes, parentheses, dots, and leading plus. When displaying Thai phone numbers, format readable 10-digit mobile numbers as `085-555-5555` and 9-digit local numbers as `02-555-5555` where possible.
+- Phone: validate phone shape and digit count; phone inputs must also prevent or strip letters and unsupported symbols during typing/paste, allowing only digits, spaces, dashes, parentheses, dots, and leading plus. Phone inputs must enforce 9-15 digits and must not allow more than 15 digits to remain in the field. When displaying Thai phone numbers, format readable 10-digit mobile numbers as `085-555-5555` and 9-digit local numbers as `02-555-5555` where possible.
 - Tax ID: validate expected digit length before saving.
 - Codes/IDs: validate allowed characters and length; prefer stable machine-safe characters.
 - Numbers/money/percentages: validate min/max, integer vs decimal, and reject negative values unless the business rule allows them.

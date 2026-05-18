@@ -11,7 +11,7 @@ import {
   type SupplierFormValues,
 } from '@/lib/supplier'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
-import { formatPhoneDisplay } from '@/lib/format'
+import { formatPhoneDisplay, sanitizePhoneInput } from '@/lib/format'
 import { listThaiDistricts, listThaiProvinces, listThaiSubdistricts, type ThaiDistrict, type ThaiProvince, type ThaiSubdistrict } from '@/lib/thai-address'
 
 type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'phone' | 'email' | 'contact' | 'creditTerm' | 'creditLimit' | 'active'
@@ -715,7 +715,7 @@ function TextField({ className = '', error, label, readOnly = false, type = 'tex
           const nextValue = isEmailField
             ? event.target.value.replace(/[^\x20-\x7E]/g, '')
             : isPhoneField
-              ? event.target.value.replace(/[^0-9+\s().-]/g, '')
+              ? sanitizePhoneInput(event.target.value)
               : event.target.value
           onChange(nextValue)
         }}

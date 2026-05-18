@@ -5,3 +5,18 @@ export function formatPhoneDisplay(value: string | null | undefined) {
   if (digits.length === 9 && digits.startsWith('0')) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`
   return value
 }
+
+export function sanitizePhoneInput(value: string) {
+  let digitCount = 0
+  let output = ''
+
+  for (const char of value.replace(/[^0-9+\s().-]/g, '')) {
+    if (/\d/.test(char)) {
+      if (digitCount >= 15) continue
+      digitCount += 1
+    }
+    output += char
+  }
+
+  return output
+}
