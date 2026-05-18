@@ -521,6 +521,8 @@ model accounts {
   expenses                                      expenses[]
   loan_payments                                 loan_payments[]
   payments                                      payments[]
+  petty_advance_returns                         petty_advance_returns[]
+  petty_advances                                petty_advances[]
   receipts                                      receipts[]
   transfers_transfers_from_account_idToaccounts transfers[]      @relation("transfers_from_account_idToaccounts")
   transfers_transfers_to_account_idToaccounts   transfers[]      @relation("transfers_to_account_idToaccounts")
@@ -1082,6 +1084,54 @@ model payments {
   @@index([bill_id], map: "idx_pmt_bill")
   @@index([date(sort: Desc)], map: "idx_pmt_date")
   @@index([supplier_id], map: "idx_pmt_supplier")
+  @@schema("public")
+}
+
+model petty_advance_returns {
+  id             String          @id
+  advance_id     String
+  date           DateTime        @db.Date
+  amount         Decimal         @default(0) @db.Decimal
+  account_id     String?
+  notes          String?
+  created_by     String?
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  updated_by     String?
+  updated_at     DateTime        @default(now()) @db.Timestamptz(6)
+  version        Int             @default(1)
+  accounts       accounts?       @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  petty_advances petty_advances  @relation(fields: [advance_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([account_id], map: "idx_petty_advance_returns_account")
+  @@index([advance_id], map: "idx_petty_advance_returns_advance")
+  @@index([date(sort: Desc)], map: "idx_petty_advance_returns_date")
+  @@schema("public")
+}
+
+model petty_advances {
+  id                    String                  @id
+  doc_no                String                  @unique
+  date                  DateTime                @db.Date
+  type                  String                  @default("DIRECTOR_LOAN")
+  recipient_name        String
+  amount                Decimal                 @default(0) @db.Decimal
+  account_id            String?
+  status                String                  @default("active")
+  notes                 String?
+  returned_amount       Decimal                 @default(0) @db.Decimal
+  closed_at             DateTime?               @db.Timestamptz(6)
+  created_by            String?
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_by            String?
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  version               Int                     @default(1)
+  accounts              accounts?               @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  petty_advance_returns petty_advance_returns[]
+
+  @@index([account_id], map: "idx_petty_advances_account")
+  @@index([date(sort: Desc)], map: "idx_petty_advances_date")
+  @@index([status], map: "idx_petty_advances_status")
+  @@index([type], map: "idx_petty_advances_type")
   @@schema("public")
 }
 

@@ -24,10 +24,10 @@
 | `/purchase/payments` | supplier payment flow | Placeholder | Batch B: payments + bank statement |
 | `/purchase/receipt-vouchers` | receipt voucher flow | Placeholder | Batch B: purchase receipt voucher/print surface |
 | `/sales/receipts` | customer receipt flow | Placeholder | Batch B: receipts + bank statement |
-| `/daily/transfer` | `view-transfer` | Placeholder | Batch A: transfer CRUD + two-sided bank statement |
-| `/daily/expense` | `view-expense` | Placeholder | Batch A: expense voucher list/form + VAT/WHT + payment status baseline |
-| `/daily/petty-advance` | `view-pettyAdvance` | Placeholder | Batch A: petty cash/director advance baseline |
-| `/daily/expense-dashboard` | `view-expenseDashboard` | Placeholder | Batch A2: read-only dashboard from expenses |
+| `/daily/transfer` | `view-transfer` | Batch A Done | Transfer CRUD + two-sided bank statement |
+| `/daily/expense` | `view-expense` | Batch A Done | Expense voucher list/form + VAT/WHT + payment status baseline |
+| `/daily/petty-advance` | `view-pettyAdvance` | Batch A Done | Petty cash/director advance baseline |
+| `/daily/expense-dashboard` | `view-expenseDashboard` | Batch A Done | Read-only dashboard from expenses |
 | `/stock/transfer` | stock transfer flow | Placeholder | Batch C: inventory movement with branch/warehouse reconciliation |
 | `/daily/bill-swap-history` | `view-billSwapHistory` | Placeholder | Batch C: read-only bill supplier-change audit |
 
@@ -41,26 +41,47 @@ Scope:
 - `/daily/petty-advance`
 - `/daily/expense-dashboard`
 
+Status: Done baseline on 2026-05-18.
+
 Tasks:
-- Add real Next pages and client components.
-- Add API routes under `/api/daily/...`.
-- Use existing `transfers`, `bank_statement`, `expenses`, `expense_categories`, `accounts`, and related target tables where available.
-- Create missing target tables only if required for petty advance, using additive migrations only.
-- Preserve legacy side effects:
+- Done: added real Next pages and client components:
+  - `/daily/transfer`
+  - `/daily/expense`
+  - `/daily/petty-advance`
+  - `/daily/expense-dashboard`
+- Done: added API routes:
+  - `/api/daily/transfers`
+  - `/api/daily/expenses`
+  - `/api/daily/petty-advances`
+  - `/api/daily/petty-advances/returns`
+- Done: used existing DB tables for `transfers`, `bank_statement`, `expenses`, `expense_categories`, and `accounts`.
+- Done: added missing target tables with additive migration only:
+  - `petty_advances`
+  - `petty_advance_returns`
+- Done: preserved key legacy side effects:
   - transfer writes two deterministic `bank_statement` rows
-  - expense voucher keeps VAT/WHT/net pay fields traceable
-  - petty advance tracks amount, spent, returned, remaining
-- Add frontend search/filter/sort/pagination/count for normal page use.
-- Add server-side validation for all writes.
-- Add permission guard using `finance.cash.view`/future write permissions during transition.
+  - paid expense writes deterministic `BS-EXP-*` bank statement row
+  - petty advance writes `PADV` money-out bank statement row
+  - petty advance return writes `PRET` money-in bank statement row
+- Done: added frontend search/filter/sort/count for normal page use.
+- Done: added server-side Zod validation for all new write APIs.
+- Done: added route permission mapping for `/daily/*` and `/api/daily/*` using `finance.cash.view` during transition.
 
 Validation:
-- `npm run prisma:generate --workspace @ns-scrap-erp/next` if Prisma schema changes
-- `npm run type-check --workspace @ns-scrap-erp/next`
-- `npm run lint --workspace @ns-scrap-erp/next`
-- `npm run build`
-- API/page smoke for touched routes
-- DB spot check for bank statement rows created by transfer
+- Passed: `npm run prisma:generate --workspace @ns-scrap-erp/next`
+- Passed: `npm run type-check --workspace @ns-scrap-erp/next`
+- Passed: `npm run lint --workspace @ns-scrap-erp/next`
+- Passed: `npm run build`
+- Build confirmed routes generated:
+  - `/daily/transfer`
+  - `/daily/expense`
+  - `/daily/petty-advance`
+  - `/daily/expense-dashboard`
+  - `/api/daily/transfers`
+  - `/api/daily/expenses`
+  - `/api/daily/petty-advances`
+  - `/api/daily/petty-advances/returns`
+- Pending: authenticated browser/API smoke against Vercel/local session.
 
 ### Batch B: Payment / Receipt Operations
 
@@ -114,7 +135,9 @@ Tasks:
 ## Current Status as of 2026-05-18
 
 - Current git checkpoint before daily work: `65a42bc fix: simplify payment and remittance masters`.
-- Next daily routes still resolve through placeholder catch-all.
+- Planning checkpoint: `3b32499 docs: plan next daily transactions`.
+- Batch A implementation checkpoint pending commit after this doc update.
+- Next daily Batch A routes now have real Next pages and API routes.
 - Legacy daily UI/reference exists under:
   - `old-apps/legacy/index.html`
   - `old-apps/vue/src/views/daily/`
@@ -125,10 +148,12 @@ Tasks:
   - `payments`
   - `receipts`
   - `bill_swap_history`
-- Petty advance target table/model still needs confirmation before implementation.
+- Petty advance target tables added in `dev-target` and migration file:
+  - `supabase/migrations/20260518052409_create_petty_advance_tables.sql`
+  - Prisma models: `petty_advances`, `petty_advance_returns`
 
 ## Open Decisions
 
-- Final naming for petty advance table: likely `petty_advances` plus optional return/allocation table if legacy behavior cannot fit existing expense/payment tables.
 - Whether daily write permissions should use one temporary `finance.cash.manage` permission or split into transfer/expense/payment-specific permissions.
-- Whether delete actions in legacy should become cancel/void actions in Next for financial traceability.
+- Whether delete actions in legacy should become cancel/void actions in Next for financial traceability. Batch A currently avoids destructive delete actions.
+- Petty advance `spent` is currently `0` in Next baseline until expense-to-advance allocation is wired.

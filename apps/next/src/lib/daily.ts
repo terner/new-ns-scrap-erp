@@ -1,0 +1,129 @@
+import { z } from 'zod'
+
+const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
+const businessTextPattern = /^[\p{L}\p{M}\p{N}\s.&,()/'"+#%:-]+$/u
+const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
+const docNoPattern = /^[A-Za-z0-9_-]+$/
+
+const optionalDocNo = z.preprocess(
+  blankToNull,
+  z.string().trim().max(40, 'เลขที่เอกสารยาวเกินไป').regex(docNoPattern, 'เลขที่เอกสารใช้ได้เฉพาะอังกฤษ ตัวเลข ขีดกลาง และ underscore').nullable().default(null),
+)
+
+const optionalBusinessText = (label: string, maxLength = 180) => z.preprocess(
+  blankToNull,
+  z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(businessTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
+)
+
+const optionalGeneralText = (label: string, maxLength = 500) => z.preprocess(
+  blankToNull,
+  z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
+)
+
+const optionalSafeId = (label: string) => z.preprocess(
+  blankToNull,
+  z.string().trim().max(80, `${label}ยาวเกินไป`).regex(/^[A-Za-z0-9_.:-]+$/, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
+)
+
+const requiredDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD')
+const money = (label: string) => z.coerce.number({ invalid_type_error: `${label}ต้องเป็นตัวเลข` }).finite(`${label}ต้องเป็นตัวเลข`).min(0, `${label}ต้องไม่ติดลบ`)
+const positiveMoney = (label: string) => money(label).gt(0, `${label}ต้องมากกว่า 0`)
+
+export const transferFormSchema = z.object({
+  id: optionalSafeId('รหัสรายการ'),
+  docNo: optionalDocNo,
+  date: requiredDate,
+  fromAccountId: z.string().trim().min(1, 'เลือกบัญชีต้นทาง'),
+  toAccountId: z.string().trim().min(1, 'เลือกบัญชีปลายทาง'),
+  amount: positiveMoney('จำนวนเงิน'),
+  fee: money('ค่าธรรมเนียม').default(0),
+  byPerson: optionalBusinessText('ผู้ทำรายการ', 160),
+  notes: optionalGeneralText('หมายเหตุ', 500),
+}).refine((value) => value.fromAccountId !== value.toAccountId, {
+  message: 'บัญชีต้นทางและปลายทางต้องไม่ซ้ำกัน',
+  path: ['toAccountId'],
+})
+
+export type TransferFormValues = z.infer<typeof transferFormSchema>
+
+export const expenseFormSchema = z.object({
+  id: optionalSafeId('รหัสรายการ'),
+  docNo: optionalDocNo,
+  date: requiredDate,
+  dueDate: z.preprocess(blankToNull, requiredDate.nullable().default(null)),
+  refDocNo: optionalDocNo,
+  categoryId: optionalSafeId('หมวดค่าใช้จ่าย'),
+  payee: z.string().trim().min(1, 'กรอกผู้รับเงิน').max(180, 'ผู้รับเงินยาวเกินไป').regex(businessTextPattern, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
+  description: optionalGeneralText('รายละเอียด', 500),
+  amount: positiveMoney('ยอดก่อน VAT'),
+  vat: money('VAT').default(0),
+  wht: money('WHT').default(0),
+  accountId: optionalSafeId('บัญชีจ่าย'),
+  branchId: optionalSafeId('สาขา'),
+  taxInvoiceNo: optionalDocNo,
+  paidStatus: z.enum(['pending', 'paid']).default('pending'),
+  notes: optionalGeneralText('หมายเหตุ', 500),
+}).refine((value) => value.paidStatus !== 'paid' || Boolean(value.accountId), {
+  message: 'เลือกบัญชีจ่ายเมื่อสถานะเป็นจ่ายแล้ว',
+  path: ['accountId'],
+})
+
+export type ExpenseFormValues = z.infer<typeof expenseFormSchema>
+
+export const pettyAdvanceFormSchema = z.object({
+  id: optionalSafeId('รหัสรายการ'),
+  docNo: optionalDocNo,
+  date: requiredDate,
+  type: z.enum(['DIRECTOR_LOAN', 'PETTY_CASH'], { errorMap: () => ({ message: 'ประเภทไม่ถูกต้อง' }) }),
+  recipientName: z.string().trim().min(1, 'กรอกผู้รับเงิน').max(180, 'ผู้รับเงินยาวเกินไป').regex(businessTextPattern, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
+  amount: positiveMoney('จำนวนเงิน'),
+  accountId: z.string().trim().min(1, 'เลือกบัญชีจ่ายออก'),
+  status: z.enum(['active', 'closed', 'cancelled']).default('active'),
+  notes: optionalGeneralText('หมายเหตุ', 500),
+})
+
+export type PettyAdvanceFormValues = z.infer<typeof pettyAdvanceFormSchema>
+
+export const pettyAdvanceReturnFormSchema = z.object({
+  advanceId: z.string().trim().min(1, 'ไม่พบรายการเงินสำรอง'),
+  date: requiredDate,
+  amount: positiveMoney('จำนวนเงินคืน'),
+  accountId: z.string().trim().min(1, 'เลือกบัญชีรับคืน'),
+  notes: optionalGeneralText('หมายเหตุ', 500),
+})
+
+export type PettyAdvanceReturnFormValues = z.infer<typeof pettyAdvanceReturnFormSchema>
+
+export type DailyAccountOption = {
+  active: boolean
+  code: string | null
+  id: string
+  name: string
+  type: string
+}
+
+export async function dailyFetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  })
+  const payload = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'โหลดหรือบันทึกข้อมูลไม่สำเร็จ')
+  }
+
+  return payload as T
+}
+
+export function formatMoney(value: number | null | undefined) {
+  return (value ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+}
+
+export function todayDateInput() {
+  return new Date().toISOString().slice(0, 10)
+}

@@ -45,13 +45,17 @@ const prefixPathPermissions: Array<[string, string]> = [
   ['/api/master-data/customers/', 'master.customers.update'],
   ['/api/master-data/products/', 'master.products.update'],
   ['/api/master-data/suppliers/', 'master.suppliers.update'],
+  ['/api/daily/', 'finance.cash.view'],
   ['/api/master-data/', 'master.reference.view'],
+  ['/daily/', 'finance.cash.view'],
   ['/finance-accounting/', 'finance.financials.view'],
   ['/finance/', 'finance.cash.view'],
   ['/master-data/', 'master.reference.view'],
   ['/po-reports/', 'reports.reports.view'],
   ['/production/', 'production.operations.view'],
+  ['/purchase/', 'finance.cash.view'],
   ['/reports', 'reports.reports.view'],
+  ['/sales/', 'finance.cash.view'],
   ['/stock/', 'stock.ledger.view'],
 ]
 
