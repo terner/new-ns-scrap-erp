@@ -68,7 +68,6 @@ export const channelsPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่มช่องทาง',
   entityName: 'ช่องทางซื้อ/ขาย',
   emptyMessage: 'ไม่พบข้อมูลช่องทางซื้อ/ขาย',
-  description: 'รวม purchase_channels และ sales_channels ในหน้าจอเดียว โดยเก็บชนิดช่องทางไว้ในฟิลด์ประเภท',
   fields: [
     { key: 'channelType', label: 'ประเภทช่องทาง', type: 'select', required: true, options: [{ label: 'ซื้อ', value: 'purchase' }, { label: 'ขาย', value: 'sales' }] },
     { key: 'code', label: 'รหัส' },
