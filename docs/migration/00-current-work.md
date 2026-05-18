@@ -5,8 +5,7 @@
 Date: 2026-05-18  
 Active app: `apps/next`  
 Primary remote: `new-origin`  
-Last pushed checkpoint: current agent rules checkpoint (`docs: split agent rules into focused docs`)
-Local checkpoint pending push: `docs: add system map api baseline`
+Last pushed checkpoint: system map/API baseline (`docs: add system map api baseline`)
 
 ## Current Batch
 
@@ -115,7 +114,7 @@ Validation passed in its own checkpoint.
 
 ## System Map and API Contract Baseline Status
 
-Status: implemented and committed locally, pending push.
+Status: completed and pushed in checkpoint `5ad3ab2`.
 
 Changes:
 

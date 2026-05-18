@@ -165,7 +165,7 @@
 - [x] ตรวจ page ที่มีจริงแต่ไม่มี navigation item
 - [x] ตรวจ API ที่มีจริงแต่ยังไม่มี sitemap mapping
 - [x] commit sitemap baseline
-- [ ] push sitemap baseline
+- [x] push sitemap baseline
 
 #### Execution Log
 
@@ -202,7 +202,7 @@
 - [x] เพิ่ม note ใน tracker ว่า API ใหม่ทุกตัวต้องอัปเดต OpenAPI ใน batch เดียวกัน
 - [x] เพิ่ม sitemap/OpenAPI check เข้า QA checklist ของแต่ละ page batch
 - [x] commit OpenAPI baseline
-- [ ] push OpenAPI baseline
+- [x] push OpenAPI baseline
 
 #### Execution Log
 
