@@ -146,7 +146,19 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
                 onClick={() => setShowPassword((current) => !current)}
                 type="button"
               >
-                {showPassword ? '◉' : '◎'}
+                {showPassword ? (
+                  <svg aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M17.94 17.94A10.9 10.9 0 0 1 12 20c-5 0-9.27-3.11-11-7.5a11.8 11.8 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A10.8 10.8 0 0 1 12 4c5 0 9.27 3.11 11 7.5a11.8 11.8 0 0 1-2.9 4.26" />
+                    <path d="M14.12 14.12a3 3 0 0 1-4.24-4.24" />
+                    <path d="M1 1l22 22" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
               </button>
             </span>
           </label>
@@ -166,13 +178,6 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
           >
             {isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
           </button>
-
-          <details className="mt-2 text-xs text-slate-500">
-            <summary className="cursor-pointer hover:text-slate-700">ข้อมูลระบบ login</summary>
-            <div className="mt-2 rounded border bg-slate-50 p-2 text-xs leading-relaxed">
-              ระบบใหม่ใช้ Supabase Auth เป็นเป้าหมาย รองรับ email หรือ username ที่ผูกกับ app user และไม่ใช้รหัสผ่านจาก application table เดิม
-            </div>
-          </details>
         </form>
       </div>
     </section>
