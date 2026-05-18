@@ -1,6 +1,12 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-scrap-ink: #172033;
+  --color-scrap-muted: #64748b;
+  --color-scrap-line: #d9e2ec;
+  --color-scrap-panel: #f8fafc;
+  --color-scrap-accent: #0f766e;
+}
 
 :root {
   color: #172033;

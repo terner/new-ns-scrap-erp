@@ -5,17 +5,17 @@
 Date: 2026-05-18  
 Active app: `apps/next`  
 Primary remote: `new-origin`  
-Last pushed checkpoint: `14df0a5 docs: define sub agent operating rules`
+Last pushed checkpoint: current TW4 checkpoint (`chore: upgrade next app to tailwind v4`)
 
 ## Current Batch
 
-`Batch DOC1: Session Handoff and Operating Rules`
+`Batch TW4: Tailwind v4 Migration`
 
 Goal:
 
-- Make documentation updates resumable if the session closes at any time.
-- Require checkpoint notes with next task, blockers, validation, and partial work.
-- Clarify that after documenting a checkpoint, the agent should identify the next task and continue unless paused.
+- Upgrade the active Next.js app from Tailwind CSS v3 to v4.
+- Keep legacy/root Vue Tailwind v3 tooling untouched for now.
+- Validate active Next app build after migration.
 
 ## File Naming Changes
 
@@ -26,6 +26,9 @@ Goal:
 
 ## Latest Completed Implementation Checkpoints
 
+- `e900c6f docs: require resumable session handoffs`
+  - Added resumable session handoff rules to `AGENTS.md`
+  - Recorded TW4 as the next active batch after an interrupted install
 - `14df0a5 docs: define sub agent operating rules`
   - Added sub agent use/close rules to `AGENTS.md`
   - Added operating model to this current work document
@@ -41,29 +44,6 @@ Goal:
 
 ## Next Required Batch
 
-`Batch TW4: Tailwind v4 Migration`
-
-Status:
-
-- Started but interrupted before completion.
-- `npm install -D tailwindcss@latest @tailwindcss/postcss@latest --workspace @ns-scrap-erp/next` completed enough to modify:
-  - `apps/next/package.json`
-  - root `package-lock.json`
-- Not yet completed:
-  - migrate `apps/next/postcss.config.cjs` from `tailwindcss` plugin to `@tailwindcss/postcss`
-  - migrate `apps/next/src/app/globals.css` from `@tailwind` directives to Tailwind v4 CSS import/theme style
-  - decide whether to keep or remove `apps/next/tailwind.config.ts`
-  - reconcile root `package.json` still listing Tailwind v3 for old Vue tooling
-  - run validation
-
-Required validation before commit:
-
-- `npm ls tailwindcss @tailwindcss/postcss --workspace @ns-scrap-erp/next`
-- `npm run lint --workspace @ns-scrap-erp/next`
-- `npm run build --workspace @ns-scrap-erp/next`
-
-After TW4:
-
 `Batch PRE: System Map and API Contract Baseline`
 
 Tasks:
@@ -74,19 +54,36 @@ Tasks:
 4. Add current API catalog baseline
 5. Commit/push before `Batch S: Stock`
 
+## Tailwind v4 Migration Status
+
+Status: completed and pushed in the TW4 checkpoint.
+
+Changes:
+
+- `apps/next` now uses `tailwindcss@4.3.0` and `@tailwindcss/postcss@4.3.0`.
+- `apps/next/postcss.config.cjs` now uses the Tailwind v4 PostCSS plugin.
+- `apps/next/src/app/globals.css` now uses `@import "tailwindcss";` and CSS-first `@theme` tokens.
+- Removed `apps/next/tailwind.config.ts`; active app theme tokens now live in CSS.
+- Root `package.json` still keeps Tailwind v3 for old Vue tooling; this is intentional until old Vue tooling is removed or upgraded.
+
+Validation passed:
+
+- `npm ls tailwindcss @tailwindcss/postcss --workspace @ns-scrap-erp/next`
+- `npm run lint --workspace @ns-scrap-erp/next`
+- `npm run type-check --workspace @ns-scrap-erp/next`
+- `npm run build --workspace @ns-scrap-erp/next`
+
 ## Current Priority Queue
 
-1. Batch DOC1: Session Handoff and Operating Rules
-2. Batch TW4: Tailwind v4 Migration
-3. Batch PRE: System Map and API Contract Baseline
-4. Batch S: Stock
-5. Batch F: Finance and Debt
-6. Batch T: Tracking 360
-7. Batch D: Dual Costing / Trading / PO
-8. Batch FF: Foreign Finance
-9. Batch A: Finance / Accounting
-10. Batch M: Main Dashboards and Operational Control
-11. Batch SYS: System and Cleanup
+1. Batch PRE: System Map and API Contract Baseline
+2. Batch S: Stock
+3. Batch F: Finance and Debt
+4. Batch T: Tracking 360
+5. Batch D: Dual Costing / Trading / PO
+6. Batch FF: Foreign Finance
+7. Batch A: Finance / Accounting
+8. Batch M: Main Dashboards and Operational Control
+9. Batch SYS: System and Cleanup
 
 ## Operating Model
 
@@ -148,10 +145,12 @@ At every checkpoint, update docs as if a new session will start from only the re
 
 ## Validation Baseline
 
-Latest full app validation passed before DOC0:
+Latest full app validation passed during TW4:
 
 - `npm run type-check --workspace @ns-scrap-erp/next`
 - `npm run lint --workspace @ns-scrap-erp/next`
 - `npm run build --workspace @ns-scrap-erp/next`
 
-DOC0 is documentation-only. Run markdown/link checks manually with `rg` before commit.
+Tailwind dependency check:
+
+- `npm ls tailwindcss @tailwindcss/postcss --workspace @ns-scrap-erp/next`
