@@ -604,7 +604,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: desktop `/finance/bank` loaded with `GET /api/finance/bank` 200, detail modal opened, export endpoint returned `.xlsx` 200; mobile 390x844 loaded with API 200 and no new console warning/error.
 - Commands: `git diff --check`; `npm run type-check --workspace @ns-scrap-erp/next`; `npm run lint --workspace @ns-scrap-erp/next`; `npm run build --workspace @ns-scrap-erp/next`; `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`.
 - Result: F3 Bank Statement read/reconciliation baseline validated. OpenAPI remains valid with existing skeleton warnings outside hardened finance endpoints.
-- Commit: this checkpoint.
+- Commit: `a48d655 feat: add finance bank statement baseline` pushed to `main`.
 
 ### F4: Cash Position
 
