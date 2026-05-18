@@ -218,7 +218,6 @@ export const directorsPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่มกรรมการ/พนักงาน',
   entityName: 'กรรมการ/พนักงาน',
   emptyMessage: 'ไม่พบข้อมูลกรรมการ/พนักงาน',
-  description: 'ใช้ target table ใน dev database แล้ว; legacy เดิมมีเฉพาะ local/frontend data',
   fields: [
     { key: 'code', label: 'รหัส', required: true },
     { key: 'name', label: 'ชื่อ', required: true },
@@ -241,7 +240,6 @@ export const machinesPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่มเครื่องจักร',
   entityName: 'เครื่องจักร',
   emptyMessage: 'ไม่พบข้อมูลเครื่องจักร',
-  description: 'ใช้ target table ใน dev database แล้ว; production flow เดิมอ้างอิงเครื่องจักรจาก local/frontend data',
   fields: [
     { key: 'code', label: 'รหัสเครื่องจักร', required: true },
     { key: 'name', label: 'ชื่อเครื่องจักร', required: true },
@@ -269,7 +267,6 @@ export const productionLinesPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่ม Production Line',
   entityName: 'Production Line',
   emptyMessage: 'ไม่พบข้อมูล Production Line',
-  description: 'ใช้ target table ใน dev database แล้ว; production flow เดิมอ้างอิง line จาก local/frontend data',
   fields: [
     { key: 'code', label: 'รหัส Line', required: true },
     { key: 'name', label: 'ชื่อ Line', required: true },
@@ -314,7 +311,6 @@ export const paymentMethodsPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่มวิธีจ่าย/รับเงิน',
   entityName: 'วิธีจ่าย/รับเงิน',
   emptyMessage: 'ไม่พบข้อมูลวิธีจ่าย/รับเงิน',
-  description: 'ใช้ target table ใน dev database แล้ว; legacy เดิมมีเฉพาะ local/frontend data',
   fields: [
     { key: 'name', label: 'ชื่อ', required: true },
     { key: 'type', label: 'ประเภท', type: 'select', options: [{ label: 'Cash', value: 'Cash' }, { label: 'Bank Transfer', value: 'Bank Transfer' }, { label: 'Cheque', value: 'Cheque' }, { label: 'PromptPay', value: 'PromptPay' }, { label: 'Credit Card', value: 'Credit Card' }, { label: 'QR Payment', value: 'QR Payment' }, { label: 'International Transfer', value: 'International Transfer' }, { label: 'FCD Transfer', value: 'FCD Transfer' }, { label: 'Offset / Netting', value: 'Offset / Netting' }, { label: 'Other', value: 'Other' }] },
@@ -331,7 +327,6 @@ export const remittancePurposesPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่มวัตถุประสงค์โอน',
   entityName: 'วัตถุประสงค์โอน',
   emptyMessage: 'ไม่พบข้อมูลวัตถุประสงค์โอน',
-  description: 'ใช้ target table ใน dev database แล้ว; legacy เดิมมีเฉพาะ local/frontend data',
   fields: [
     { key: 'code', label: 'รหัส', required: true },
     { key: 'name', label: 'ชื่อวัตถุประสงค์', required: true },
