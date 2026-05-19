@@ -140,6 +140,45 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/pending-sales:
+    get:
+      tags: [Reports]
+      operationId: readPendingSales
+      summary: Read Pending Sales baseline from PO Sell, PO Buy, purchase pool, stock, LME reference, and product/customer sources
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/sales-plan:
+    get:
+      tags: [Reports]
+      operationId: readSalesPlan
+      summary: Read Sales Plan design baseline from stock, pending-sales, and LME reference sources without enabling planning writes
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/sales-commission:
+    get:
+      tags: [Reports]
+      operationId: readSalesCommission
+      summary: Read Sales Tracking and commission baseline from purchase bills, suppliers, and salespersons
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/company-profile:
     get:
       tags: [Admin]

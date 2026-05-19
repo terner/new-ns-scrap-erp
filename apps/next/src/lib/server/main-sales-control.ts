@@ -1,0 +1,515 @@
+import type { Prisma } from '../../../generated/prisma/client'
+import { toDateOnly, toNumber } from '@/lib/server/daily'
+import { prisma } from '@/lib/server/prisma'
+
+type JsonItem = Prisma.JsonObject
+
+type ProductRef = {
+  code: string
+  id: string
+  itemStatus: string
+  metalGroup: string
+  name: string
+  wac: number
+}
+
+type PendingProductRow = {
+  avgPriceAll: number
+  diffPctLme: number
+  diffPctWac: number
+  gainVsLme: number
+  gainVsWac: number
+  lmeBuyPercent: number
+  lmeTarget: number
+  metalGroup: string
+  poCount: number
+  productCode: string
+  productId: string
+  productName: string
+  remainQty: number
+  remainValue: number
+  soldQty: number
+  soldValue: number
+  wac: number
+}
+
+function jsonNumber(value: unknown) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(/,/g, ''))
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  if (value && typeof value === 'object' && 'toNumber' in value && typeof value.toNumber === 'function') return value.toNumber()
+  return 0
+}
+
+function isJsonItem(value: unknown): value is JsonItem {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function itemQty(item: JsonItem) {
+  return jsonNumber(item.qty ?? item.quantity ?? item.netWeight ?? item.weight)
+}
+
+function itemRemainingQty(item: JsonItem) {
+  return jsonNumber(item.remainingQty ?? item.remaining_qty ?? item.remaining ?? itemQty(item))
+}
+
+function itemUnitPrice(item: JsonItem) {
+  return jsonNumber(item.unitPrice ?? item.price ?? item.itemPrice)
+}
+
+function itemAmount(item: JsonItem) {
+  const amount = jsonNumber(item.totalAmount ?? item.totalRevenue ?? item.amount ?? item.total)
+  if (amount) return amount
+  return itemQty(item) * itemUnitPrice(item)
+}
+
+function itemProductId(item: JsonItem) {
+  return String(item.productId ?? item.product_id ?? item.id ?? '').trim()
+}
+
+function itemProductName(item: JsonItem) {
+  return String(item.productName ?? item.displayName ?? item.name ?? item.productCode ?? item.code ?? '').trim()
+}
+
+function itemProductCode(item: JsonItem) {
+  return String(item.productCode ?? item.code ?? '').trim()
+}
+
+function productKey(product: ProductRef) {
+  return [product.id, product.code, product.name].map((value) => value.trim().toLowerCase()).filter(Boolean)
+}
+
+function lookupProduct(item: JsonItem, productsByKey: Map<string, ProductRef>) {
+  return [
+    item.productId,
+    item.product_id,
+    item.id,
+    item.productCode,
+    item.code,
+    item.productName,
+    item.displayName,
+    item.name,
+  ].map((value) => String(value ?? '').trim().toLowerCase()).filter(Boolean).map((key) => productsByKey.get(key)).find(Boolean)
+}
+
+function lmeConfig() {
+  return {
+    fxRate: 36,
+    kgPerContainer: 25000,
+    lmeAluminumUSD: 2400,
+    lmeBrassUSD: 7000,
+    lmeCopperUSD: 9000,
+    updatedAt: '2026-05-19T00:00:00',
+    updatedBy: 'read-baseline',
+  }
+}
+
+function lmeBaseFor(metalGroup: string) {
+  const group = metalGroup.toLowerCase()
+  if (group.includes('ทองแดง') || group.includes('copper')) return lmeConfig().lmeCopperUSD
+  if (group.includes('ทองเหลือง') || group.includes('brass')) return lmeConfig().lmeBrassUSD
+  if (group.includes('อลูมิ') || group.includes('aluminum')) return lmeConfig().lmeAluminumUSD
+  return 0
+}
+
+function lmeBuyPercentFor(metalGroup: string) {
+  const group = metalGroup.toLowerCase()
+  if (group.includes('ทองแดง') || group.includes('copper')) return 88
+  if (group.includes('ทองเหลือง') || group.includes('brass')) return 82
+  if (group.includes('อลูมิ') || group.includes('aluminum')) return 76
+  return 0
+}
+
+function lmeTarget(metalGroup: string) {
+  const config = lmeConfig()
+  const base = lmeBaseFor(metalGroup)
+  const pct = lmeBuyPercentFor(metalGroup)
+  return base > 0 && pct > 0 ? (base / 1000) * config.fxRate * (pct / 100) : 0
+}
+
+function activeStatus(status?: string | null) {
+  return !['cancelled', 'void', 'reversed'].includes((status ?? '').toLowerCase())
+}
+
+async function productsContext() {
+  const products = await prisma.products.findMany({
+    orderBy: [{ code: 'asc' }],
+    select: { code: true, id: true, item_status: true, metal_group: true, name: true, std_cost: true },
+    where: { active: { not: false } },
+  })
+  const refs = products.map((product) => ({
+    code: product.code,
+    id: product.id,
+    itemStatus: product.item_status ?? 'RM',
+    metalGroup: product.metal_group ?? '',
+    name: product.name,
+    wac: toNumber(product.std_cost),
+  }))
+  const byKey = new Map<string, ProductRef>()
+  refs.forEach((product) => productKey(product).forEach((key) => byKey.set(key, product)))
+  return { byKey, refs }
+}
+
+function poSellItems(row: { items: unknown; product_id: string | null; qty: unknown; remaining_qty: unknown; unit_price: unknown }, productsByKey: Map<string, ProductRef>) {
+  if (Array.isArray(row.items) && row.items.length) {
+    return row.items.filter(isJsonItem).map((item) => {
+      const product = lookupProduct(item, productsByKey)
+      const qty = itemQty(item)
+      const remainingQty = itemRemainingQty(item)
+      const unitPrice = itemUnitPrice(item) || (qty > 0 ? itemAmount(item) / qty : 0)
+      return {
+        product,
+        productCode: product?.code ?? itemProductCode(item),
+        productId: product?.id ?? (itemProductId(item) || itemProductName(item)),
+        productName: product?.name ?? (itemProductName(item) || 'ไม่ระบุสินค้า'),
+        qty,
+        remainingQty,
+        unitPrice,
+      }
+    })
+  }
+  const product = row.product_id ? productsByKey.get(row.product_id.trim().toLowerCase()) : undefined
+  return [{
+    product,
+    productCode: product?.code ?? '',
+    productId: product?.id ?? row.product_id ?? 'ไม่ระบุสินค้า',
+    productName: product?.name ?? row.product_id ?? 'ไม่ระบุสินค้า',
+    qty: jsonNumber(row.qty),
+    remainingQty: jsonNumber(row.remaining_qty ?? row.qty),
+    unitPrice: jsonNumber(row.unit_price),
+  }]
+}
+
+export async function buildPendingSales() {
+  const { byKey, refs } = await productsContext()
+  const [poSells, poBuys, stockRows, customers, tradingDeals, purchaseBills] = await Promise.all([
+    prisma.po_sells.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
+    prisma.po_buys.findMany({ orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000 }),
+    prisma.stock_ledger.findMany({ orderBy: [{ date: 'desc' }], take: 50000 }),
+    prisma.customers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true } }),
+    prisma.trading_deals.findMany({ orderBy: [{ date: 'desc' }], take: 10000, where: { NOT: { status: { in: ['Cancelled', 'cancelled'] } } } }),
+    prisma.purchase_bills.findMany({ orderBy: [{ date: 'desc' }], take: 10000, where: { NOT: { status: 'cancelled' } } }),
+  ])
+
+  const productAgg = new Map<string, PendingProductRow>()
+  const details: Array<{ customerId: string; customerName: string; date: string; deliveryDate: string; docNo: string; id: string; itemPrice: number; itemQty: number; matched: number; productId: string; remaining: number; remainValue: number }> = []
+  const ensureAgg = (values: { product?: ProductRef; productCode: string; productId: string; productName: string }) => {
+    const product = values.product
+    const key = product?.id ?? values.productId
+    const metalGroup = product?.metalGroup ?? ''
+    if (!productAgg.has(key)) {
+      productAgg.set(key, {
+        avgPriceAll: 0,
+        diffPctLme: 0,
+        diffPctWac: 0,
+        gainVsLme: 0,
+        gainVsWac: 0,
+        lmeBuyPercent: lmeBuyPercentFor(metalGroup),
+        lmeTarget: lmeTarget(metalGroup),
+        metalGroup,
+        poCount: 0,
+        productCode: product?.code ?? values.productCode,
+        productId: key,
+        productName: product?.name ?? values.productName,
+        remainQty: 0,
+        remainValue: 0,
+        soldQty: 0,
+        soldValue: 0,
+        wac: product?.wac ?? 0,
+      })
+    }
+    return productAgg.get(key)!
+  }
+
+  poSells.filter((po) => activeStatus(po.status)).forEach((po) => {
+    poSellItems(po, byKey).forEach((item) => {
+      const qty = item.qty
+      const remaining = Math.max(0, item.remainingQty)
+      const sold = Math.max(0, qty - remaining)
+      const row = ensureAgg(item)
+      row.poCount += 1
+      row.remainQty += remaining
+      row.soldQty += sold
+      row.remainValue += remaining * item.unitPrice
+      row.soldValue += sold * item.unitPrice
+      details.push({
+        customerId: po.customer_id ?? '',
+        customerName: po.customers?.name ?? po.customer_id ?? '-',
+        date: toDateOnly(po.date),
+        deliveryDate: toDateOnly(po.delivery_date ?? po.expected_delivery),
+        docNo: po.doc_no,
+        id: `${po.id}:${item.productId}`,
+        itemPrice: item.unitPrice,
+        itemQty: qty,
+        matched: sold,
+        productId: row.productId,
+        remaining,
+        remainValue: remaining * item.unitPrice,
+      })
+    })
+  })
+
+  const productRows = Array.from(productAgg.values()).map((row) => {
+    const qty = row.remainQty + row.soldQty
+    const value = row.remainValue + row.soldValue
+    const avgPriceAll = qty > 0 ? value / qty : 0
+    const target = row.lmeTarget
+    return {
+      ...row,
+      avgPriceAll,
+      avgPriceRemain: row.remainQty > 0 ? row.remainValue / row.remainQty : avgPriceAll,
+      diffPctLme: target > 0 ? ((avgPriceAll - target) / target) * 100 : 0,
+      diffPctWac: row.wac > 0 ? ((avgPriceAll - row.wac) / row.wac) * 100 : 0,
+      gainVsLme: target > 0 ? (avgPriceAll - target) * row.remainQty : 0,
+      gainVsWac: (avgPriceAll - row.wac) * row.remainQty,
+    }
+  }).sort((left, right) => right.remainValue - left.remainValue)
+
+  const stockByProduct = new Map<string, { qty: number; value: number }>()
+  stockRows.forEach((stock) => {
+    if (!stock.product_id) return
+    const current = stockByProduct.get(stock.product_id) ?? { qty: 0, value: 0 }
+    current.qty += toNumber(stock.qty_in) - toNumber(stock.qty_out)
+    current.value += toNumber(stock.value_in) - toNumber(stock.value_out)
+    stockByProduct.set(stock.product_id, current)
+  })
+
+  const matchedByProduct = new Map<string, number>()
+  tradingDeals.forEach((deal) => {
+    if (!deal.product_id) return
+    matchedByProduct.set(deal.product_id, (matchedByProduct.get(deal.product_id) ?? 0) + toNumber(deal.matched_qty))
+  })
+
+  const spotByProduct = new Map<string, { amount: number; qty: number }>()
+  purchaseBills.forEach((bill) => {
+    if (!Array.isArray(bill.items)) return
+    bill.items.filter(isJsonItem).forEach((item) => {
+      const product = lookupProduct(item, byKey)
+      if (!product) return
+      const current = spotByProduct.get(product.id) ?? { amount: 0, qty: 0 }
+      current.qty += itemQty(item)
+      current.amount += itemAmount(item)
+      spotByProduct.set(product.id, current)
+    })
+  })
+
+  const poBuyByProduct = new Map<string, { amount: number; qty: number }>()
+  poBuys.filter((po) => activeStatus(po.status)).forEach((po) => {
+    const product = po.product_id ? byKey.get(po.product_id.trim().toLowerCase()) : undefined
+    if (!product) return
+    const qty = toNumber(po.remaining_qty ?? po.qty)
+    const amount = toNumber(po.remaining_amount) || qty * toNumber(po.unit_price)
+    const current = poBuyByProduct.get(product.id) ?? { amount: 0, qty: 0 }
+    current.qty += qty
+    current.amount += amount
+    poBuyByProduct.set(product.id, current)
+  })
+
+  const reconciliation = refs.map((product) => {
+    const stock = stockByProduct.get(product.id) ?? { qty: 0, value: 0 }
+    const spotRaw = spotByProduct.get(product.id) ?? { amount: 0, qty: 0 }
+    const matched = matchedByProduct.get(product.id) ?? 0
+    const spotQty = Math.max(0, spotRaw.qty - matched)
+    const spotAvgPrice = spotRaw.qty > 0 ? spotRaw.amount / spotRaw.qty : 0
+    const po = poBuyByProduct.get(product.id) ?? { amount: 0, qty: 0 }
+    return {
+      itemStatus: product.itemStatus,
+      metalGroup: product.metalGroup,
+      poAvgPrice: po.qty > 0 ? po.amount / po.qty : 0,
+      poOnOrderQty: po.qty,
+      poOnOrderValue: po.amount,
+      productCode: product.code,
+      productId: product.id,
+      productName: product.name,
+      spotAvgPrice,
+      spotInPoolQty: spotQty,
+      spotInPoolValue: spotQty * spotAvgPrice,
+      stockQty: stock.qty,
+      stockValue: stock.value,
+      stockWAC: stock.qty > 0 ? stock.value / stock.qty : product.wac,
+    }
+  }).filter((row) => row.poOnOrderQty > 0 || row.spotInPoolQty > 0 || row.stockQty !== 0)
+
+  const summary = {
+    avgRemainPrice: productRows.reduce((sum, row) => sum + row.remainValue, 0) / Math.max(1, productRows.reduce((sum, row) => sum + row.remainQty, 0)),
+    productCount: productRows.length,
+    totalGainVsLme: productRows.reduce((sum, row) => sum + row.gainVsLme, 0),
+    totalGainVsWac: productRows.reduce((sum, row) => sum + row.gainVsWac, 0),
+    totalRemainQty: productRows.reduce((sum, row) => sum + row.remainQty, 0),
+    totalRemainValue: productRows.reduce((sum, row) => sum + row.remainValue, 0),
+  }
+  const reconTotals = {
+    productCount: reconciliation.length,
+    totalPoOnOrderQty: reconciliation.reduce((sum, row) => sum + row.poOnOrderQty, 0),
+    totalPoOnOrderValue: reconciliation.reduce((sum, row) => sum + row.poOnOrderValue, 0),
+    totalSpotInPoolQty: reconciliation.reduce((sum, row) => sum + row.spotInPoolQty, 0),
+    totalSpotInPoolValue: reconciliation.reduce((sum, row) => sum + row.spotInPoolValue, 0),
+    totalStockQty: reconciliation.reduce((sum, row) => sum + row.stockQty, 0),
+    totalStockValue: reconciliation.reduce((sum, row) => sum + row.stockValue, 0),
+  }
+
+  return {
+    customers: customers.map((customer) => ({ active: customer.active ?? true, id: customer.id, name: customer.name })),
+    lmeConfig: lmeConfig(),
+    metalGroups: Array.from(new Set(refs.map((product) => product.metalGroup).filter(Boolean))).sort(),
+    productDetails: details,
+    productRows,
+    reconciliation,
+    reconTotals,
+    sourceState: {
+      basis: 'Pending Sales read/design baseline from PO Sell, PO Buy, purchase bills, trading deals, stock ledger, and product master.',
+      limitations: ['LME config, LME percent save, export, matching, and sales-plan locks are disabled until target schemas and audit rules are designed.'],
+      writeActionsEnabled: false,
+    },
+    summary,
+  }
+}
+
+export async function buildSalesPlan() {
+  const pending = await buildPendingSales()
+  const config = pending.lmeConfig
+  const remainRows = pending.reconciliation.map((row) => {
+    const lockedKg = 0
+    const remainingKg = Math.max(0, row.stockQty - lockedKg)
+    const base = lmeBaseFor(row.metalGroup)
+    const pct = lmeBuyPercentFor(row.metalGroup)
+    const bestPlanPrice = base > 0 && pct > 0 ? (base / 1000) * config.fxRate * (pct / 100) : 0
+    const projectedRevenue = remainingKg * bestPlanPrice
+    const value = remainingKg * row.stockWAC
+    const projectedProfit = projectedRevenue - value
+    const projectedMarginPct = projectedRevenue > 0 ? (projectedProfit / projectedRevenue) * 100 : 0
+    return {
+      bestPlanPct: pct,
+      bestPlanPrice,
+      code: row.productCode,
+      lockedKg,
+      metalGroup: row.metalGroup,
+      name: row.productName,
+      projectedMarginPct,
+      projectedProfit,
+      recommendation: remainingKg <= 0 ? 'ล็อกครบแล้ว' : bestPlanPrice > row.stockWAC * 1.05 ? 'ควรขาย (กำไรดี)' : bestPlanPrice >= row.stockWAC ? 'พอกำไร' : bestPlanPrice > 0 ? 'ขาดทุน - รอราคา' : 'ยังไม่มีแผนเสนอ',
+      remainingContainers: remainingKg / config.kgPerContainer,
+      remainingKg,
+      stock: row.stockQty,
+      value,
+      wac: row.stockWAC,
+    }
+  }).sort((left, right) => right.value - left.value)
+
+  return {
+    filters: {
+      channels: [{ id: 'export', name: 'ส่งออก' }, { id: 'domestic', name: 'ในประเทศ' }],
+      metalGroups: pending.metalGroups,
+      month: new Date().toISOString().slice(0, 7),
+    },
+    lmeConfig: config,
+    planRows: [],
+    productAnalysis: remainRows,
+    sourceState: {
+      basis: 'Sales Plan read/design baseline from current stock/pending sales and LME reference values.',
+      limitations: ['Add plan, remove plan, lock/unlock price, and export remain disabled until sales-plan persistence, stock reservation, permissions, and audit are designed.'],
+      writeActionsEnabled: false,
+    },
+    summary: {
+      avgPctLme: remainRows.length ? remainRows.reduce((sum, row) => sum + row.bestPlanPct, 0) / remainRows.length : 0,
+      lockedContainers: 0,
+      lockedCount: 0,
+      pendingCount: 0,
+      plansCount: 0,
+      stockRemainingKg: remainRows.reduce((sum, row) => sum + row.remainingKg, 0),
+      stockRemainingValue: remainRows.reduce((sum, row) => sum + row.value, 0),
+      totalContainers: 0,
+      totalKg: 0,
+      totalLockedProfit: 0,
+      totalProjectedProfit: remainRows.reduce((sum, row) => sum + row.projectedProfit, 0),
+    },
+  }
+}
+
+export async function buildSalesCommission() {
+  const periodFrom = new Date(`${new Date().toISOString().slice(0, 7)}-01T00:00:00.000Z`)
+  const periodTo = new Date()
+  const [salespersons, suppliers, purchaseBills] = await Promise.all([
+    prisma.salespersons.findMany({ orderBy: [{ name: 'asc' }], where: { active: { not: false } } }),
+    prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], where: { active: { not: false } } }),
+    prisma.purchase_bills.findMany({
+      include: { suppliers: true },
+      orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
+      take: 10000,
+      where: { date: { gte: periodFrom, lte: periodTo }, NOT: { status: 'cancelled' } },
+    }),
+  ])
+  const salesById = new Map(salespersons.map((sales) => [sales.id, sales]))
+  const supplierSalesById = new Map(suppliers.map((supplier) => [supplier.id, supplier.sales_id ?? '']))
+  const supplierCounts = new Map<string, Set<string>>()
+  suppliers.forEach((supplier) => {
+    const salesId = supplier.sales_id || '_UNASSIGNED_'
+    const set = supplierCounts.get(salesId) ?? new Set<string>()
+    set.add(supplier.id)
+    supplierCounts.set(salesId, set)
+  })
+  const summary = new Map<string, { billCount: number; id: string; name: string; phone: string; purchaseAmt: number; qty: number; supplierIds: Set<string> }>()
+  const ensure = (id: string) => {
+    if (!summary.has(id)) {
+      const sales = salesById.get(id)
+      summary.set(id, { billCount: 0, id, name: id === '_UNASSIGNED_' ? '(ไม่ได้กำหนด Sales)' : sales?.name ?? id, phone: sales?.phone ?? '', purchaseAmt: 0, qty: 0, supplierIds: supplierCounts.get(id) ?? new Set<string>() })
+    }
+    return summary.get(id)!
+  }
+  const billRows = purchaseBills.map((bill) => {
+    const salesId = bill.sales_id || (bill.supplier_id ? supplierSalesById.get(bill.supplier_id) : '') || '_UNASSIGNED_'
+    const qty = Array.isArray(bill.items) ? bill.items.filter(isJsonItem).reduce((sum, item) => sum + itemQty(item), 0) : 0
+    const row = ensure(salesId)
+    row.billCount += 1
+    row.purchaseAmt += toNumber(bill.total_amount)
+    row.qty += qty
+    if (bill.supplier_id) row.supplierIds.add(bill.supplier_id)
+    return {
+      amount: toNumber(bill.total_amount),
+      date: toDateOnly(bill.date),
+      docNo: bill.doc_no,
+      facePrice: 0,
+      id: bill.id,
+      price: qty > 0 ? toNumber(bill.total_amount) / qty : 0,
+      productName: Array.isArray(bill.items) ? bill.items.filter(isJsonItem).map(itemProductName).filter(Boolean).slice(0, 2).join(', ') : '-',
+      qty,
+      salesId,
+      status: bill.status ?? '',
+      supplierName: bill.suppliers?.name ?? bill.supplier_id ?? '-',
+    }
+  })
+  const threshold = 1000000
+  const salesRows = Array.from(summary.values()).map((row) => ({
+    avgPrice: row.qty > 0 ? row.purchaseAmt / row.qty : 0,
+    billCount: row.billCount,
+    code: salesById.get(row.id)?.code ?? (row.id === '_UNASSIGNED_' ? '-' : row.id),
+    commission: row.purchaseAmt >= threshold ? Math.floor(row.purchaseAmt / 500000) * 500 : 0,
+    eligible: row.purchaseAmt >= threshold,
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    progressPct: Math.min(100, Math.round((row.purchaseAmt / threshold) * 100)),
+    purchaseAmt: row.purchaseAmt,
+    qty: row.qty,
+    remainingToTarget: Math.max(0, threshold - row.purchaseAmt),
+    supplierCount: row.supplierIds.size,
+  })).sort((left, right) => right.purchaseAmt - left.purchaseAmt)
+  return {
+    billRows,
+    filters: { dateFrom: toDateOnly(periodFrom), dateTo: toDateOnly(periodTo), periods: ['today', 'week', 'month', 'quarter', 'year'] },
+    salesRows,
+    sourceState: {
+      basis: 'Sales Commission read/design baseline from purchase bills, salespersons, and supplier owner assignments.',
+      limitations: ['Period changes, CSV export, supplier assignment, bulk assignment, and persisted commission closing remain disabled until authorization and audit are designed.'],
+      writeActionsEnabled: false,
+    },
+    suppliers: suppliers.map((supplier) => ({ code: supplier.code ?? '', id: supplier.id, name: supplier.name, phone: supplier.phone ?? '', salesId: supplier.sales_id ?? '' })),
+    totals: {
+      bills: salesRows.reduce((sum, row) => sum + row.billCount, 0),
+      purchaseAmt: salesRows.reduce((sum, row) => sum + row.purchaseAmt, 0),
+      qty: salesRows.reduce((sum, row) => sum + row.qty, 0),
+    },
+  }
+}

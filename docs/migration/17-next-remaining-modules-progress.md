@@ -1596,9 +1596,23 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### M3: Pending Sales and Sales Plan
 
-- [ ] `/pending-sales`
-- [ ] `/sales-plan`
-- [ ] `/sales-commission`
+- [x] `/pending-sales`
+- [x] `/sales-plan`
+- [x] `/sales-commission`
+
+#### Execution Log
+
+- Task: M3 Pending Sales, Sales Plan, and Sales Commission read/design baselines.
+- Legacy refs: Vue `old-apps/vue/src/views/sales/PendingSalesView.vue`, `old-apps/vue/src/views/trackingDashboards/SalesPlanView.vue`, `old-apps/vue/src/views/trackingDashboards/SalesCommissionView.vue`; legacy `view-pendingSales`, `view-salesPlan`, and `view-salesCommission`.
+- Files changed: added shared server helper `main-sales-control.ts`, three `GET` APIs, three Next pages, shared M3 client component, permission mapping, sitemap, and OpenAPI docs.
+- DB/API changes: reads `po_sells`, `po_buys`, `purchase_bills`, `trading_deals`, `stock_ledger`, `products`, `customers`, `suppliers`, and `salespersons`. No schema change and no write side effects.
+- Buttons/actions checked: LME save, LME percent save, export, add/remove plan, lock/unlock, supplier assignment, and bulk assignment are disabled/deferred; sales card drilldown and pending-sales product drilldown are local read-only UI state.
+- Modal/form checked: Pending Sales preserves segmented status filters, customer filter, metal chips, product detail drill view, and Pool vs Stock sections. Sales Plan preserves month/filter shell, LME reference, plan table shell, recommendation table, and remaining stock table. Sales Commission preserves period/date filter shell, sales cards, drill view, and supplier assignment table.
+- Validation added: APIs are guarded with `reports.reports.view`; dedicated planning/assignment permissions remain later auth follow-up before writes.
+- Playwright smoke: unauth subagent confirmed all three pages redirect to login and all three APIs return `401`; login desktop/mobile has no overflow or related console/network failures. Authenticated smoke confirmed `/api/pending-sales`, `/api/sales-plan`, and `/api/sales-commission` return `200`; desktop and mobile render core legacy markers with no document overflow and no console errors.
+- Commands: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`. OpenAPI remains valid with the existing 114 warning baseline.
+- Result: implemented and validated locally.
+- Commit: pending.
 
 ### M4: Calendars
 

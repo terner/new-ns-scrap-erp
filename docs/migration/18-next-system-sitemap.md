@@ -61,9 +61,9 @@ Status terms:
 | `/daily-report` | Daily Report | read baseline | `GET /api/daily-report` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments`, `bank_statement`, `products` | `reports.reports.view` |
 | `/dashboard` | Dashboard | read baseline | `GET /api/dashboard` | `purchase_bills`, `sales_bills`, `expenses`, `accounts`, `bank_statement`, `stock_ledger`, `production_orders`, `trading_deals` | `reports.reports.view` |
 | `/profit-cost-analysis` | Profit & Cost Analysis | read baseline | `GET /api/profit-cost-analysis` | `purchase_bills`, `sales_bills`, `stock_ledger`, `products`, `suppliers`, `customers`, `branches`, `purchase_channels`, `sales_channels` | `reports.reports.view` |
-| `/pending-sales` | รายการรอขาย | placeholder | missing | TBD | none yet |
-| `/sales-plan` | วางแผนการขาย (LME) | placeholder | missing | TBD | none yet |
-| `/sales-commission` | Sales Tracking Dashboard | placeholder | missing | TBD | none yet |
+| `/pending-sales` | รายการรอขาย | read/design baseline | `GET /api/pending-sales` | `po_sells`, `po_buys`, `purchase_bills`, `trading_deals`, `stock_ledger`, `products`, `customers` | `reports.reports.view` |
+| `/sales-plan` | วางแผนการขาย (LME) | read/design baseline | `GET /api/sales-plan` | `stock_ledger`, `products`, derived pending sales/LME reference | `reports.reports.view` |
+| `/sales-commission` | Sales Tracking Dashboard | read/design baseline | `GET /api/sales-commission` | `purchase_bills`, `suppliers`, `salespersons` | `reports.reports.view` |
 | `/cash-flow-calendar` | Cash Flow Calendar | placeholder | missing | TBD | none yet |
 | `/business-calendar` | Business Calendar | placeholder | missing | TBD | none yet |
 | `/cash-others-summary` | Cash & Others Summary | placeholder | missing | TBD | none yet |
