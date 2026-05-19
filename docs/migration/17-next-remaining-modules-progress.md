@@ -1241,6 +1241,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/fx-gain-loss-report`; API returned 200; console had no errors; screenshots saved as `ff5-fx-gain-loss-desktop.png` and `ff5-fx-gain-loss-mobile.png`.
 - Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and browser smoke passed. OpenAPI still has the existing 113 skeleton warnings outside this endpoint.
 - Result: FX Gain/Loss route is no longer a placeholder and remains realized-only.
+- Commit: `ebc08d0 feat: add fx gain loss report baseline` pushed to `main`.
 
 ### FF6: Bank Reconciliation
 
