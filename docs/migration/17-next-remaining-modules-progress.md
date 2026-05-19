@@ -707,7 +707,8 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
   - `old-apps/vue/src/views/trackingDashboards/ProductTrackingView.vue`
 - Current Next state:
   - `/tracking/supplier` has a read baseline through `GET /api/tracking/supplier`.
-  - `/tracking/customer` and `/tracking/product` are still placeholder routes in the sitemap.
+  - `/tracking/customer` has a read baseline through `GET /api/tracking/customer`.
+  - `/tracking/product` is in progress as a read/report baseline through planned `GET /api/tracking/product`.
 - Shared source tables:
   - Customer tracking: `customers`, `sales_bills`, `receipts`, optionally `products`, `salespersons`, `branches`.
   - Supplier tracking: `suppliers`, `purchase_bills`, `payments`, optionally `products`, `branches`.
@@ -784,11 +785,26 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### T3: Product Tracking
 
-- [ ] API `/api/tracking/product`
-- [ ] Page `/tracking/product`
-- [ ] purchase/sales/stock/production trend
-- [ ] product detail modal
-- [ ] export
+- [x] API `/api/tracking/product`
+- [x] Page `/tracking/product`
+- [x] purchase/sales/stock trend from `products`, `purchase_bills.items`, `sales_bills.items`, `stock_ledger`
+- [ ] production trend - optional/deferred until production product mapping is confirmed
+- [ ] product detail modal - deferred until item JSON contract is normalized
+- [x] export `.xlsx`
+
+#### Execution Log
+
+- Task: T3 Product Tracking read/report baseline.
+- Legacy refs: `REQUIREMENTS_LEGACY_PROTOTYPE.md:327`, `old-apps/legacy/index.html:27890`, `old-apps/vue/src/views/trackingDashboards/ProductTrackingView.vue`.
+- Files changed: `apps/next/src/app/api/tracking/product/route.ts`, `apps/next/src/app/tracking/product/page.tsx`, `apps/next/src/components/tracking/ProductTrackingPageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker, current work handoff.
+- DB/API changes: no schema migration; added `GET /api/tracking/product` with JSON response and `.xlsx` export.
+- Buttons/actions checked: filters `year`, `month`, `q`, and export link; no write actions.
+- Modal/form checked: no mutation form; product detail modal deferred until item JSON contract is normalized.
+- Validation added: item JSON parsing tolerates `productId/product_id/code/name`, amount/qty/cost field variants, and keeps UUID/opaque IDs internal while showing code/name.
+- Playwright smoke: authenticated main Playwright session passed `/tracking/product` desktop and mobile, JSON API 200, XLSX API 200 with spreadsheet content type and `PK` signature. QA subagent unauthenticated fallback correctly hit login/401 guard and was not treated as product-page failure.
+- Commands: `git diff --check` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 120` passed validity with existing skeleton warnings.
+- Result: T3 Product Tracking read/report baseline implemented; production trend and product detail modal remain deferred.
+- Commit: this checkpoint.
 
 ### T4: Tracking QA Batch
 

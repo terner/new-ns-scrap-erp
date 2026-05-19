@@ -205,6 +205,7 @@ Current scope:
 - T0 inventory and DB mapping is documented and pushed.
 - T1 Customer Tracking read baseline is implemented, validated, and pushed.
 - T2 Supplier Tracking polish is implemented, validated, and pushed.
+- T3 Product Tracking read/report baseline is implemented and validation passed; commit/push is the next checkpoint.
 - Tracking routes must use active Next app only; legacy/Vue tracking views are source material.
 - Keep T1-T3 read/report baselines first; no write flows in tracking pages.
 - DB design preference clarified: use meaningful business-facing codes/running document numbers for user-visible references; keep UUID/opaque IDs internal only.
@@ -218,8 +219,8 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Continue to T3 Product Tracking read/report baseline.
-2. Add `/api/tracking/product`, `/tracking/product`, OpenAPI, sitemap, and tracker updates.
+1. Commit/push T3 Product Tracking read/report baseline.
+2. Continue to T4 Tracking QA Batch or the next Tracking 360 hardening slice.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model

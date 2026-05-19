@@ -375,7 +375,8 @@ paths:
           in: query
           schema:
             type: string
-            enum: [xlsx]
+            enum: [json, xlsx]
+            default: json
       responses:
         "200":
           description: AR aging payload or xlsx export when `format=xlsx`.
@@ -1201,6 +1202,56 @@ paths:
       responses:
         "200":
           description: Supplier tracking rows, product breakdown, monthly trend, summary, or xlsx export when `format=xlsx`.
+          content:
+            application/json:
+              schema:
+                type: object
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/tracking/product:
+    get:
+      tags: [Tracking]
+      operationId: readProductTracking
+      summary: Read product tracking baseline
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: string
+        - name: month
+          in: query
+          schema:
+            type: string
+        - name: productId
+          in: query
+          schema:
+            type: string
+        - name: metalGroup
+          in: query
+          schema:
+            type: string
+        - name: branchId
+          in: query
+          description: Optional branch filter when backing source rows expose a consistent branch reference.
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [xlsx]
+      responses:
+        "200":
+          description: Product tracking rows, purchase/sales/stock movement summary, monthly trend, or xlsx export when `format=xlsx`.
           content:
             application/json:
               schema:
