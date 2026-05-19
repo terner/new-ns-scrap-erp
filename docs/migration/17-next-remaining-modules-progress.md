@@ -1014,10 +1014,21 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### D6: Cost Allocator
 
-- [ ] API `/api/dual-costing/cost-allocator`
-- [ ] Page `/dual-costing/cost-allocator`
-- [ ] allocation simulation first
+- [x] API `/api/dual-costing/cost-allocator`
+- [x] Page `/dual-costing/cost-allocator`
+- [x] allocation simulation first
 - [ ] write only after reconciliation design
+
+#### Execution Log
+
+- Task: D6 Cost Allocator read-only simulation baseline.
+- Legacy refs: `old-apps/vue/src/views/dualCosting/CostAllocatorView.vue` and `old-apps/legacy/index.html:22820`; legacy visual baseline uses purple intro, step cards, product selector, PO Sell selector, allocation mode, preview table, and blue/emerald/red/purple result cards.
+- Files changed: `apps/next/src/app/api/dual-costing/cost-allocator/route.ts`, `apps/next/src/app/dual-costing/cost-allocator/page.tsx`, `apps/next/src/components/dual-costing/CostAllocatorPageClient.tsx`, `docs/api/openapi.yaml`, and migration tracker docs.
+- DB/API changes: added runtime `GET /api/dual-costing/cost-allocator` with `productId`, `poSellId`, and `mode`; combines available Cost Pool rows with open PO Sell lines and returns read-only simulation candidates. No schema migration.
+- Buttons/actions checked: source selector, product selector, PO Sell selector, allocation mode, cancel/reset, and preview are implemented. Confirm/write remains disabled/deferred because allocation logs and reversal rules are not locked.
+- Playwright smoke: subagent unauth smoke confirmed `/dual-costing/cost-allocator` redirects to `/login?redirect=%2Fdual-costing%2Fcost-allocator` and unauth API returns `401`. Authenticated main smoke confirmed purple intro band, source selector buttons, product selector, product Cost Pool summary, PO Sell selector section, no horizontal overflow on desktop/mobile, and no console errors. Dev-target currently has no active `/api/sales/po-sell` rows, so candidate preview was verified as contract-ready but cannot render a real preview row until a PO Sell exists for a product with available Cost Pool.
+- Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 130`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
+- Result: D6 Cost Allocator read-only simulation baseline implemented and validated; confirm/write remains deferred.
 
 ### D7: Match Log / Deal Margin / Compare Margin
 

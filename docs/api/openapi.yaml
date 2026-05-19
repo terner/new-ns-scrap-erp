@@ -1384,6 +1384,42 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/dual-costing/cost-allocator:
+    get:
+      tags: [Dual Costing]
+      operationId: readCostAllocator
+      summary: Read Cost Allocator simulation baseline
+      description: >
+        Read-only Cost Allocator contract for Batch D6. Returns product options,
+        open PO Sell rows, available Cost Pool lots, and simulated allocation
+        candidates by FIFO/LIFO/Cheap/Expensive mode. Confirm/write/reverse
+        actions are deferred until allocation logs and reconciliation rules are
+        locked.
+      parameters:
+        - $ref: "#/components/parameters/CostPoolProductId"
+        - name: poSellId
+          in: query
+          schema:
+            type: string
+          description: Derived PO Sell line id returned by this endpoint.
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [FIFO, LIFO, Cheap, Expensive, Manual]
+            default: FIFO
+      responses:
+        "200":
+          description: Cost Allocator read-only simulation model
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostAllocatorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/trading/dashboard:
     get:
       tags: [Trading]
@@ -2100,6 +2136,78 @@ components:
           type: number
         usedQty:
           type: number
+    CostAllocatorResponse:
+      type: object
+      required: [candidates, filters, pool, poSells, selectedPoSell, summary, writeDeferred]
+      properties:
+        candidates:
+          type: array
+          items:
+            type: object
+            required: [costPoolId, qtyToUse, totalCostUse]
+            properties:
+              costPoolId:
+                type: string
+              qtyToUse:
+                type: number
+              totalCostUse:
+                type: number
+            additionalProperties: true
+        filters:
+          type: object
+          required: [modes, products, sourceTypes]
+          properties:
+            modes:
+              type: array
+              items:
+                type: string
+            products:
+              type: array
+              items:
+                type: object
+                required: [id, name]
+                properties:
+                  code:
+                    type: string
+                  id:
+                    type: string
+                  metalGroup:
+                    type: string
+                  name:
+                    type: string
+            sourceTypes:
+              type: array
+              items:
+                type: string
+        pool:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        poSells:
+          type: array
+          items:
+            type: object
+            required: [docNo, id, remainingQty]
+            properties:
+              docNo:
+                type: string
+              id:
+                type: string
+              remainingQty:
+                type: number
+            additionalProperties: true
+        selectedPoSell:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        summary:
+          type: object
+          additionalProperties: true
+        writeDeferred:
+          type: boolean
+          const: true
     StockAdjustRequest:
       allOf:
         - $ref: "#/components/schemas/StockBaseWriteRequest"
