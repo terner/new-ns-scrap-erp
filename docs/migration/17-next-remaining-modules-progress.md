@@ -1990,7 +1990,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/stock/adjust` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/stock/adjust` returned 200. Note-only warning, five cards, toolbar, 13 table headings, usage box, and `?new=1` modal were exercised.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 50`.
 - Result: `/stock/adjust` now restores the legacy Stock Count Adjustment visual surface: amber/orange hero, note-only warning, five KPI cards, Quick Adjust toolbar with branch/type/date filters, disabled CSV placeholder, 13-column adjustment table, type/status badges, and bottom usage guidance. CSV/export and reverse remain deferred.
-- Commit: pending.
+- Commit: `a4ee59d` (`fix: restore stock adjust legacy ui parity`), pushed to `main`.
 
 ## Current Priority Queue
 
