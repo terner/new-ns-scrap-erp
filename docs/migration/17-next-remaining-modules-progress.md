@@ -677,7 +677,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - [x] QA checker ตรวจทุก finance page
 - [x] AP/AR/bank reconciliation smoke
 - [x] type/lint/build
-- [ ] commit/push
+- [x] commit/push
 
 #### Execution Log
 
@@ -824,7 +824,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: unauthenticated QA subagent confirmed login guards for all three tracking pages/APIs; authenticated main Playwright session confirmed Product Tracking page/export after the slow mover fix, and authenticated API checks confirmed customer/supplier/product JSON 200 plus XLSX 200 with `PK` signature.
 - Commands: `git diff --check` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 120` passed validity with existing skeleton warnings.
 - Result: Tracking 360 QA checkpoint passed after slow mover payload/UI correction. Carry-over: add `401` responses and detailed response schemas to OpenAPI, and expose product `productId`/`metalGroup`/`branchId` filters in UI if needed.
-- Commit: this checkpoint.
+- Commit: `6c7d605 fix: align product slow movers tracking` pushed to `main`.
 
 ## Batch D: Dual Costing / Trading / PO
 

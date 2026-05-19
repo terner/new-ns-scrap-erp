@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: product tracking baseline (`097a12c feat: add product tracking baseline`)
+Last pushed checkpoint: tracking qa slow movers fix (`6c7d605 fix: align product slow movers tracking`)
 
 ## Current Batch
 
@@ -206,7 +206,7 @@ Current scope:
 - T1 Customer Tracking read baseline is implemented, validated, and pushed.
 - T2 Supplier Tracking polish is implemented, validated, and pushed.
 - T3 Product Tracking read/report baseline is implemented, validated, and pushed.
-- T4 Tracking QA Batch passed after correcting Product Tracking slow movers; commit/push is the next checkpoint.
+- T4 Tracking QA Batch passed after correcting Product Tracking slow movers, and is pushed.
 - Tracking routes must use active Next app only; legacy/Vue tracking views are source material.
 - Keep T1-T3 read/report baselines first; no write flows in tracking pages.
 - DB design preference clarified: use meaningful business-facing codes/running document numbers for user-visible references; keep UUID/opaque IDs internal only.
@@ -220,9 +220,8 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Commit/push T4 Tracking QA Batch.
-2. Continue to Batch D0 Dual Costing / Trading / PO inventory, or consume the parallel `reports/d0-dual-costing-trading-inventory.md` report if another Codex session creates it.
-3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
+1. Continue to Batch D0 Dual Costing / Trading / PO inventory, or consume the parallel `reports/d0-dual-costing-trading-inventory.md` report if another Codex session creates it.
+2. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model
 
