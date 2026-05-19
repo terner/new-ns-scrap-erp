@@ -9,14 +9,19 @@ Last pushed checkpoint: M6 Main QA sweep (`1d4a28d fix: audit main dashboard bas
 
 ## Current Batch
 
-`Batch M: Main Dashboards and Operational Control`
+`Batch SYS: System and Cleanup`
 
 Goal:
 
-- Port main dashboard/control/reporting routes from placeholders into Next page/API baselines.
-- Start with read/report baselines before enabling planning, assignment, anomaly fix, export, or dashboard write actions.
-- Reuse existing purchase/sales/stock/finance/production/tracking/trading helper outputs where practical instead of re-querying inconsistently.
+- Finish remaining system/admin/report placeholders and then run a full navigation QA pass.
+- Implement self-service password change through Supabase Auth only; never store or migrate password values into application tables.
+- Keep migration/backup/reset tools as safe read/design baselines until destructive actions have explicit confirmation, audit, backup, RLS, and rollback design.
+- Build `/reports` as an index/search surface over active report routes before duplicating report-specific query logic.
 - During this and future clone batches, keep the legacy/Vue screen as the visual baseline first. Preserve cards, colors, banners, tables, button placement, labels, spacing, and compact density unless a documented deviation is approved. If Vue has been simplified or has known layout/column drift, use `old-apps/legacy/` as the stronger baseline before improving the data wiring.
+- Current docs slice: SYS0 System/Admin module overview is implemented locally. It maps `/admin/change-password`, `/admin/migration-tools`, `/reports`, admin polish, full-route QA order, permissions, and destructive-action safety constraints.
+
+## Previous Batch M Notes
+
 - Current docs slice: M0 Main Dashboards module overview is implemented, validated, and pushed. It maps all 11 remaining Main placeholder routes, their legacy/Vue visual baselines, shared data sources, write risks, and recommended implementation order.
 - Current implementation slice: M1 `/dashboard`, `/owner-daily`, and `/daily-report` read/report baselines is implemented, validated, and pushed.
 - Current implementation slice: M2 `/profit-cost-analysis` read/report baseline is implemented and validated locally. It preserves the legacy/Vue gradient hero, filter card, metal chips, KPI density, AP/AR row, Revenue/GP sections, Top Product/Top GP blocks, tabs, disabled export, and read-only product drill modal.

@@ -1671,10 +1671,41 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### SYS0: Module Overview
 
-- [ ] สำรวจ system/admin pages ที่เหลือ
-- [ ] map auth/permission/audit/migration-tool requirements
-- [ ] สรุป safety constraints สำหรับ destructive/admin actions
-- [ ] สรุป route cleanup/full QA strategy
+- [x] สำรวจ system/admin pages ที่เหลือ
+- [x] map auth/permission/audit/migration-tool requirements
+- [x] สรุป safety constraints สำหรับ destructive/admin actions
+- [x] สรุป route cleanup/full QA strategy
+
+#### SYS0 Module Overview
+
+- Scope: remaining System/Admin/Reports cleanup routes are `/admin/change-password`, `/admin/migration-tools`, `/reports`, plus polish/QA for `/admin/audit`, `/admin/users-permissions`, and full navigation route coverage.
+- Legacy/Vue refs:
+  - `/admin/change-password`: Vue `old-apps/vue/src/views/systemGaps/ChangePasswordView.vue`, legacy `view-changePassword`.
+  - `/admin/migration-tools`: Vue `old-apps/vue/src/views/admin/MigrationToolsView.vue`, legacy `view-backup`.
+  - `/reports`: Vue `old-apps/vue/src/views/systemGaps/ReportsView.vue`, legacy `view-reports`.
+  - Existing admin baselines: `/admin/company-profile`, `/admin/audit`, `/admin/transaction-ledger`, and `/admin/users-permissions`.
+- Current Next state:
+  - `/admin/change-password` is a placeholder. It has no dedicated permission in sitemap because every authenticated user should be able to change their own password; implementation should use Supabase Auth update password and never read/write legacy `public.users.password`.
+  - `/admin/migration-tools` is a placeholder with `system.backup.manage`; implementation must be safe/read-only first and must not perform reset, restore, cloud migration, destructive cleanup, or bulk writes without a separately approved design.
+  - `/reports` is a placeholder under `reports.reports.view`; implementation should be an index/search surface that links to existing report/read pages instead of duplicating each report's query logic.
+  - `/admin/audit` and `/admin/users-permissions` already have baselines, but still need filter/detail/export polish, role matrix polish, and branch-scope enforcement follow-up.
+- Visual baseline summary:
+  - Change Password must preserve the purple-to-pink hero, current-user info box, amber default-password warning, three password fields, show-password checkbox, inline success/error alert, full-width purple submit button, last-changed line, and password advice card.
+  - Migration Tools must preserve the purple-to-pink hero, storage status card, record count grid, Export Backup card, Restore preview shell, snapshot table, Supabase migration card, Reset Transactions card, Danger Zone, and backup guide card, but all destructive/write actions must be disabled or omitted until approved.
+  - Reports must preserve the date filter bar, report tab chips, compact tables, and export button placement; export can remain disabled/read-only until a per-report export contract is added.
+- Permissions and safety constraints:
+  - Keep `/admin/migration-tools` guarded by `system.backup.manage`.
+  - Keep `/reports` guarded by `reports.reports.view`.
+  - Add explicit `/admin/change-password` self-service access if needed, without requiring admin-only permissions.
+  - Do not store user passwords in application tables. Use `auth.users` / Supabase Auth as source of truth.
+  - Do not implement destructive migration/reset/restore actions in SYS2; surface them as disabled controls with clear deferred status unless a later batch designs confirmation, audit log, backups, RLS, and rollback behavior.
+- Recommended implementation order:
+  1. SYS1 `/admin/change-password`: real Supabase Auth self-service password update flow with validation and success/error states.
+  2. SYS2 `/admin/migration-tools`: safe read/design baseline preserving legacy backup UI while disabling destructive actions.
+  3. SYS4 `/reports`: report index/search baseline linking active report routes.
+  4. SYS3 `/admin/audit` and `/admin/users-permissions` polish after the missing pages are no longer placeholders.
+  5. SYS5 full route QA across navigation, placeholder inventory, guards, desktop/mobile smoke, validation, and final docs.
+- Push marker: pending SYS0 commit.
 
 ### SYS1: Change Password
 
