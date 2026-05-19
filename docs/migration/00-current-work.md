@@ -239,12 +239,13 @@ Initial FF0 findings:
 - FF1 adds historical `fx_rates`. There is still no dedicated `fcd_ledger` table, no confirmed `intl_transfers`/`overseas_receipts` tables, and no `bank_imports` table in the active Prisma schema.
 - FF4 FCD Ledger read baseline is implemented, validated, and pushed. It derives from FCD/foreign-currency accounts and bank statement rows without mutating bank rows.
 - FCD Ledger does not infer foreign movement from THB bank rows or current currency rates. Foreign movement stays zero unless future ITF/ORC source tables provide true foreign amounts; opening foreign balance comes from `accounts.opening_balance`.
+- FF5 FX Gain/Loss read baseline is implemented locally, validated, and ready for commit/push. It reads realized rows from `fx_gain_loss` only and does not auto-post.
 - User-facing refs should be `ITF*`, `ORC*`, `ref_no`, account code/account no, and currency symbol/code; do not expose UUID/ref_id as the primary display.
 
 Next concrete task:
 
-1. Start FF5 FX Gain/Loss read baseline from `fx_gain_loss`; no auto-post.
-2. Keep foreign transfer/receipt bank statement writes and bank import/match writes deferred until reconciliation, idempotency, and reversal rules are locked.
+1. Commit and push FF5 FX Gain/Loss read baseline.
+2. Start FF2/FF3 read/form baseline or FF6 bank reconciliation design baseline, while keeping money-moving writes deferred.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model

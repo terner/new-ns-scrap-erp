@@ -621,6 +621,41 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance/foreign/fx-gain-loss-report:
+    get:
+      tags: [Finance]
+      operationId: listForeignFxGainLossReport
+      summary: Read realized FX gain/loss report
+      description: Read-only report from `fx_gain_loss`; does not auto-post, reverse, or recalculate gain/loss rows.
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: currency
+          in: query
+          schema:
+            type: string
+        - name: refType
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Realized FX gain/loss rows, filters, summary, and schema-state notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxGainLossReportListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance/foreign/fx-rate:
     get:
       tags: [Finance]
@@ -2192,6 +2227,91 @@ components:
         thbOut:
           type: number
         type:
+          type: string
+      additionalProperties: true
+    FxGainLossReportListResponse:
+      type: object
+      required: [filters, rows, schemaState, summary]
+      properties:
+        filters:
+          type: object
+          required: [currencies, refTypes]
+          properties:
+            currencies:
+              type: array
+              items:
+                type: string
+            refTypes:
+              type: array
+              items:
+                type: string
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxGainLossReportRow"
+        schemaState:
+          type: object
+          properties:
+            realizedOnly:
+              type: boolean
+            referenceResolution:
+              type: string
+            sourceTable:
+              type: string
+            unrealizedSource:
+              type: string
+            writeBehavior:
+              type: string
+          additionalProperties: true
+        summary:
+          type: object
+          required: [net, rows, totalGain, totalLoss]
+          properties:
+            net:
+              type: number
+            rows:
+              type: integer
+            totalGain:
+              type: number
+            totalLoss:
+              type: number
+      additionalProperties: true
+    FxGainLossReportRow:
+      type: object
+      required: [currency, date, foreignAmount, fxGainLossAmount, gainLossType, id, originalFxRate, originalThbValue, reference, settlementFxRate, settlementThbValue, transactionType]
+      properties:
+        currency:
+          type: string
+        date:
+          type: string
+          format: date
+        foreignAmount:
+          type: number
+        fxGainLossAmount:
+          type: number
+        gainLossType:
+          type: string
+          enum: [gain, loss, neutral]
+        id:
+          type: string
+        notes:
+          type: string
+        originalFxRate:
+          type: number
+        originalThbValue:
+          type: number
+        reference:
+          type: string
+          description: Business reference from bank_statement.ref_no when resolvable; never expose opaque ref_id as the primary display.
+        referenceNo:
+          type: [string, "null"]
+        settlementFxRate:
+          type: number
+        settlementThbValue:
+          type: number
+        sourceRefId:
+          type: [string, "null"]
+        transactionType:
           type: string
       additionalProperties: true
     FxRateListResponse:

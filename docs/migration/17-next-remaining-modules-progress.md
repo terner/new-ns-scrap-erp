@@ -1225,9 +1225,22 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### FF5: FX Gain/Loss
 
-- [ ] API `/api/finance/foreign/fx-gain-loss-report`
-- [ ] Page `/finance/foreign/fx-gain-loss-report`
-- [ ] realized/unrealized baseline
+- [x] API `/api/finance/foreign/fx-gain-loss-report`
+- [x] Page `/finance/foreign/fx-gain-loss-report`
+- [x] realized baseline
+
+#### Execution Log
+
+- Task: FF5 FX Gain/Loss read baseline.
+- Files changed: `apps/next/src/app/api/finance/foreign/fx-gain-loss-report/route.ts`, `apps/next/src/app/finance/foreign/fx-gain-loss-report/page.tsx`, `apps/next/src/components/finance/foreign/FxGainLossReportPageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker, and current work handoff.
+- DB/API changes: added `GET /api/finance/foreign/fx-gain-loss-report` guarded by `finance.cash.view`; no new table and no writes.
+- Tables used: `fx_gain_loss` for realized rows and `bank_statement` only to resolve `ref_no` where `ref_type/ref_id` matches.
+- Read-only rule: no auto-post, no reversal, no bank statement mutation, no unrealized gain/loss derivation.
+- Legacy UI parity checked: blue info band, date filters, emerald/red/net cards, compact rounded white table, and empty state match the legacy/Vue FX Gain/Loss report.
+- Reference rule: UI displays resolved `bank_statement.ref_no` when available, otherwise `ref_type` or a non-opaque ref id; opaque `ref_id` is not used as the primary reference.
+- Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/fx-gain-loss-report`; API returned 200; console had no errors; screenshots saved as `ff5-fx-gain-loss-desktop.png` and `ff5-fx-gain-loss-mobile.png`.
+- Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and browser smoke passed. OpenAPI still has the existing 113 skeleton warnings outside this endpoint.
+- Result: FX Gain/Loss route is no longer a placeholder and remains realized-only.
 
 ### FF6: Bank Reconciliation
 
