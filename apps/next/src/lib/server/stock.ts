@@ -29,6 +29,7 @@ export function stockWhere(input: {
   branchId?: string | null
   from?: string | null
   lotNo?: string | null
+  movementType?: string | null
   productId?: string | null
   refType?: string | null
   status?: string | null
@@ -39,6 +40,7 @@ export function stockWhere(input: {
     ...(input.productId ? { product_id: input.productId } : {}),
     ...(input.branchId ? { branch_id: input.branchId } : {}),
     ...(input.warehouseId ? { warehouse_id: input.warehouseId } : {}),
+    ...(input.movementType ? { movement_type: input.movementType } : {}),
     ...(input.refType ? { ref_type: input.refType } : {}),
     ...(input.lotNo ? { lot_no: { contains: input.lotNo, mode: 'insensitive' } } : {}),
     ...(input.status ? { output_category: input.status } : {}),

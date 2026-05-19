@@ -2,24 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import type { StockOption } from '@/lib/stock'
 
 type StockLedgerPayload = {
+  movementTypes: string[]
   page: number
   pageSize: number
+  reference: { branches: StockOption[]; products: StockOption[]; warehouses: StockOption[] }
   rows: Array<{ branchName: string; counterpartyName: string; date: string; id: string; lotNo: string; movementType: string; notAvailableForSale: boolean; outputCategory: string; productCode: string; productId: string; productName: string; qtyIn: number; qtyOut: number; refNo: string; refType: string; runningBalanceByProduct: number; unitCost: number; valueIn: number; valueOut: number; warehouseName: string }>
-  summary: { count: number; pageCount: number; qtyIn: number; qtyOut: number; valueIn: number; valueOut: number }
+  summary: { count: number; negativeCount: number; pageCount: number; qtyIn: number; qtyOut: number; valueIn: number; valueOut: number }
   total: number
 }
 
 export function StockLedgerPageClient() {
   const [balanceMode, setBalanceMode] = useState<'product' | 'warehouse'>('product')
+  const [branchId, setBranchId] = useState('')
   const [data, setData] = useState<StockLedgerPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [filterRefType, setFilterRefType] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [movementType, setMovementType] = useState('')
   const [negativeOnly, setNegativeOnly] = useState(false)
   const [page, setPage] = useState(1)
+  const [productId, setProductId] = useState('')
   const [search, setSearch] = useState('')
   const [toDate, setToDate] = useState('')
 
@@ -28,8 +33,10 @@ export function StockLedgerPageClient() {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ balanceMode, page: String(page), pageSize: '80' })
-      if (filterRefType) params.set('refType', filterRefType)
+      if (branchId) params.set('branchId', branchId)
       if (fromDate) params.set('from', fromDate)
+      if (movementType) params.set('movementType', movementType)
+      if (productId) params.set('productId', productId)
       if (toDate) params.set('to', toDate)
       if (negativeOnly) params.set('negativeOnly', 'true')
       setData(await dailyFetchJson<StockLedgerPayload>(`/api/stock/ledger?${params.toString()}`))
@@ -38,11 +45,20 @@ export function StockLedgerPageClient() {
     } finally {
       setIsLoading(false)
     }
-  }, [balanceMode, filterRefType, fromDate, negativeOnly, page, toDate])
+  }, [balanceMode, branchId, fromDate, movementType, negativeOnly, page, productId, toDate])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => {
+    const savedMode = window.localStorage.getItem('ns_erp_sl_balance_mode')
+    if (savedMode === 'product' || savedMode === 'warehouse') setBalanceMode(savedMode)
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('ns_erp_sl_balance_mode', balanceMode)
+  }, [balanceMode])
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -51,8 +67,10 @@ export function StockLedgerPageClient() {
 
   function exportXlsx() {
     const params = new URLSearchParams({ balanceMode, format: 'xlsx', page: '1', pageSize: '500' })
-    if (filterRefType) params.set('refType', filterRefType)
+    if (branchId) params.set('branchId', branchId)
     if (fromDate) params.set('from', fromDate)
+    if (movementType) params.set('movementType', movementType)
+    if (productId) params.set('productId', productId)
     if (toDate) params.set('to', toDate)
     window.location.href = `/api/stock/ledger?${params.toString()}`
   }
@@ -60,60 +78,91 @@ export function StockLedgerPageClient() {
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? 80)))
 
   return (
-    <section className="space-y-4">
-      <div className="rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 p-5 text-white shadow">
-        <h1 className="text-2xl font-bold">Stock Ledger</h1>
-        <p className="mt-1 text-sm opacity-90">ตรวจ movement ทุกประเภทพร้อม running balance และ export สำหรับ reconciliation</p>
-      </div>
+    <section>
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Metric label="รายการ" value={`${data?.summary.count ?? 0}`} />
-        <Metric label="รับเข้า" value={formatMoney(data?.summary.qtyIn ?? 0)} />
-        <Metric label="จ่ายออก" value={formatMoney(data?.summary.qtyOut ?? 0)} />
-        <Metric label="มูลค่ารับเข้า" value={formatMoney(data?.summary.valueIn ?? 0)} />
-        <Metric label="มูลค่าจ่ายออก" value={formatMoney(data?.summary.valueOut ?? 0)} />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select className="min-w-[260px] max-w-md flex-1 rounded-lg border px-3 py-2 text-sm" value={productId} onChange={(event) => { setPage(1); setProductId(event.target.value) }}>
+          <option value="">🔍 พิมพ์รหัส/ชื่อสินค้า — เลือกดูสต๊อก...</option>
+          {(data?.reference.products ?? []).filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ${item.name}` : item.name}</option>)}
+        </select>
+        <select className="rounded-lg border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setPage(1); setBranchId(event.target.value) }}>
+          <option value="">🏢 ทุกสาขา</option>
+          {(data?.reference.branches ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <select className="rounded-lg border px-3 py-2 text-sm" value={movementType} onChange={(event) => { setPage(1); setMovementType(event.target.value) }}>
+          <option value="">⚙ ทุกประเภท</option>
+          {(data?.movementTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+        <input className="rounded-lg border px-3 py-2 text-sm" title="จากวันที่" type="date" value={fromDate} onChange={(event) => { setPage(1); setFromDate(event.target.value) }} />
+        <span className="text-slate-400">→</span>
+        <input className="rounded-lg border px-3 py-2 text-sm" title="ถึงวันที่" type="date" value={toDate} onChange={(event) => { setPage(1); setToDate(event.target.value) }} />
+        {productId || branchId || movementType || fromDate || toDate || negativeOnly ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={() => { setBranchId(''); setFromDate(''); setMovementType(''); setNegativeOnly(false); setPage(1); setProductId(''); setSearch(''); setToDate('') }}>✕ ล้าง</button> : null}
+        <div className="inline-flex overflow-hidden rounded-lg border border-slate-300 text-xs" title="โหมดคำนวณ Running Balance">
+          <button className={`px-3 py-2 font-bold ${balanceMode === 'product' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`} title="คำนวณยอดต่อสินค้าเท่านั้น (ตรงกับหน้า Stock Balance + Drilldown)" type="button" onClick={() => { setPage(1); setBalanceMode('product') }}>📦 ต่อสินค้า</button>
+          <button className={`border-l border-slate-300 px-3 py-2 font-bold ${balanceMode === 'warehouse' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`} title="คำนวณยอดต่อสินค้า × สาขา × คลัง" type="button" onClick={() => { setPage(1); setBalanceMode('warehouse') }}>🏢 ต่อคลัง</button>
+        </div>
+        <button className={negativeOnly ? 'flex items-center gap-1.5 rounded bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-md' : 'flex items-center gap-1.5 rounded bg-red-100 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-200'} type="button" onClick={() => { setPage(1); setNegativeOnly(!negativeOnly) }}>
+          <span>⚠ ติดลบ</span><span className={negativeOnly ? 'rounded bg-white px-1.5 py-0.5 text-[10px] text-red-700' : 'rounded bg-red-600 px-1.5 py-0.5 text-[10px] text-white'}>{data?.summary.negativeCount ?? 0}</span>
+        </button>
+        <button className="rounded bg-purple-100 px-3 py-2 text-xs font-bold text-purple-700 opacity-60" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ล้าง Dup</button>
+        <button className="rounded bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700 opacity-60" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🗑 ล้าง Orphan</button>
+        <button className="rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white" type="button" onClick={exportXlsx}>📥 .xlsx</button>
+        <span className="ml-auto rounded bg-slate-100 px-3 py-1.5 text-xs text-slate-500">📊 พบ <b>{rows.length}</b> รายการ</span>
       </div>
-      <div className="rounded-lg bg-white p-3 shadow">
+      {movementType ? (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span className="text-base">⚠</span>
+          <div><b>คุณกำลังกรองประเภท {movementType}</b> — ⚖️ <b>คงเหลือ</b> เป็นยอดสะสมจากทุกประเภท เพื่อให้ตรง ledger running balance</div>
+        </div>
+      ) : null}
+      <div className="mb-3 rounded-lg bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <select className="rounded-lg border px-3 py-2 text-sm" value={filterRefType} onChange={(event) => setFilterRefType(event.target.value)}>
-            <option value="">ทุก Ref Type</option>
-            <option value="PB">PB - บิลรับซื้อ</option>
-            <option value="SB">SB - บิลขาย</option>
-            <option value="ST">ST - โอนสินค้า</option>
-            <option value="SC">SC - ปรับสถานะ</option>
-            <option value="GA">GA - ปรับเกรด</option>
-            <option value="ADJ">ADJ - นับสต๊อก</option>
-            <option value="CR">CR - ของคืนลูกค้า</option>
-          </select>
-          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
           <input className="min-w-64 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="ค้นหาเลขเอกสาร / สินค้า / คู่ค้า / สาขา" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <div className="inline-flex overflow-hidden rounded-lg border text-xs">
-            <button className={balanceMode === 'product' ? 'bg-blue-600 px-3 py-2 font-bold text-white' : 'px-3 py-2 font-bold text-slate-600'} type="button" onClick={() => setBalanceMode('product')}>ต่อสินค้า</button>
-            <button className={balanceMode === 'warehouse' ? 'bg-blue-600 px-3 py-2 font-bold text-white' : 'border-l px-3 py-2 font-bold text-slate-600'} type="button" onClick={() => setBalanceMode('warehouse')}>ต่อคลัง</button>
-          </div>
-          <button className={negativeOnly ? 'rounded bg-red-600 px-3 py-2 text-xs font-bold text-white' : 'rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700'} type="button" onClick={() => setNegativeOnly(!negativeOnly)}>ติดลบ</button>
           <button className="rounded bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => void loadData()}>Refresh</button>
-          <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white" type="button" onClick={exportXlsx}>Export .xlsx</button>
+          <span className="text-xs text-slate-500">เข้า {formatMoney(data?.summary.qtyIn ?? 0)} / ออก {formatMoney(data?.summary.qtyOut ?? 0)}</span>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-lg bg-white shadow">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl bg-white shadow">
+        <table className="w-full min-w-[1200px] text-sm">
           <thead className="bg-slate-100">
-            <tr><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Ref</th><th className="p-2 text-left">Movement</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-left">คู่ค้า</th><th className="p-2 text-left">สาขา / คลัง</th><th className="p-2 text-left">Lot/Status</th><th className="p-2 text-right">เข้า</th><th className="p-2 text-right">ออก</th><th className="p-2 text-right">ราคา</th><th className="p-2 text-right">คงเหลือ</th></tr>
+            <tr>
+              <th className="w-[90px] whitespace-nowrap p-2 text-left">วันที่</th>
+              <th className="w-[120px] whitespace-nowrap p-2 text-left">เลขบิล</th>
+              <th className="min-w-[200px] p-2 text-left">ผู้ขาย / ผู้ซื้อ</th>
+              <th className="w-[130px] whitespace-nowrap p-2 text-left">ประเภท</th>
+              <th className="min-w-[180px] p-2 text-left">สินค้า</th>
+              <th className="w-[85px] p-2 text-right">เข้า</th>
+              <th className="w-[85px] p-2 text-right">ออก</th>
+              <th className="w-[110px] whitespace-nowrap bg-blue-100 p-2 text-right">⚖️ คงเหลือ</th>
+              <th className="w-[100px] p-2 text-right">ต้นทุน/น.</th>
+              <th className="w-[100px] p-2 text-right">มูลค่าเข้า</th>
+              <th className="w-[100px] p-2 text-right">มูลค่าออก</th>
+              <th className="w-[110px] whitespace-nowrap p-2 text-center">การจัดการ</th>
+            </tr>
           </thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && rows.map((row) => (
-              <tr key={row.id} className={row.runningBalanceByProduct < 0 ? 'border-t bg-red-50/70' : 'border-t hover:bg-slate-50'}>
-                <td className="p-2">{row.date}</td><td className="p-2 font-mono text-xs">{row.refType}:{row.refNo || '-'}</td><td className="p-2">{row.movementType}</td><td className="p-2">{row.productCode ? `${row.productCode} · ` : ''}{row.productName}</td><td className="p-2">{row.counterpartyName}</td><td className="p-2">{row.branchName} / {row.warehouseName}</td><td className="p-2 text-xs">{row.lotNo || '-'}<div>{row.outputCategory || '-'}</div></td><td className="p-2 text-right text-emerald-700">{formatMoney(row.qtyIn)}</td><td className="p-2 text-right text-red-700">{formatMoney(row.qtyOut)}</td><td className="p-2 text-right">{formatMoney(row.unitCost)}</td><td className="p-2 text-right font-semibold">{formatMoney(row.runningBalanceByProduct)}</td>
+              <tr key={row.id} className={row.runningBalanceByProduct < 0 ? 'border-t border-red-200 bg-red-50/60' : 'border-t hover:bg-slate-50'}>
+                <td className="whitespace-nowrap p-2">{row.date}</td>
+                <td className="whitespace-nowrap p-2"><span className="font-mono text-xs text-slate-500">{row.refNo || '-'}</span></td>
+                <td className="p-2"><Counterparty name={row.counterpartyName} refType={row.refType} /></td>
+                <td className="whitespace-nowrap p-2"><span className={`rounded px-2 py-0.5 text-xs font-medium ${row.qtyIn > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{row.movementType}</span></td>
+                <td className="p-2"><span className="font-medium">{row.productCode ? `${row.productCode} · ` : ''}{row.productName}</span>{row.lotNo && row.lotNo !== 'OPENING' ? <span className="ml-1 text-xs text-slate-400">[{row.lotNo}]</span> : null}</td>
+                <td className="p-2 text-right font-mono text-emerald-600">{row.qtyIn ? formatMoney(row.qtyIn) : '-'}</td>
+                <td className="p-2 text-right font-mono text-red-600">{row.qtyOut ? formatMoney(row.qtyOut) : '-'}</td>
+                <td className={`cursor-pointer p-2 text-right font-mono font-bold ${row.runningBalanceByProduct < 0 ? 'bg-red-100 text-red-700' : 'bg-blue-50/40 text-blue-700'}`} title="ยอดสะสม IN-OUT ทุกประเภท">{formatMoney(row.runningBalanceByProduct)}</td>
+                <td className="p-2 text-right font-mono text-slate-500">{formatMoney(row.unitCost)}</td>
+                <td className="p-2 text-right font-mono text-emerald-700">{row.valueIn ? formatMoney(row.valueIn) : '-'}</td>
+                <td className="p-2 text-right font-mono text-red-700">{row.valueOut ? formatMoney(row.valueOut) : '-'}</td>
+                <td className="p-2 text-center"><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500" disabled type="button">อ่าน</button></td>
               </tr>
             ))}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ไม่พบ Stock Movement ตามเงื่อนไข</td></tr> : null}
+            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>ยังไม่มี Stock Movement</td></tr> : null}
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between text-sm text-slate-600">
+      <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
         <span>หน้า {page} / {totalPages} · ทั้งหมด {data?.total ?? 0} รายการ</span>
         <div className="flex gap-2">
           <button className="rounded border px-3 py-1 disabled:opacity-40" disabled={page <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
@@ -124,6 +173,16 @@ export function StockLedgerPageClient() {
   )
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg bg-white p-3 shadow"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-lg font-bold text-slate-900">{value}</div></div>
+function Counterparty({ name, refType }: { name: string; refType: string }) {
+  if (name && name !== '-') {
+    const isSupplier = refType === 'PB' || refType === 'PB-CANCEL'
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${isSupplier ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{isSupplier ? 'ผู้ขาย' : 'ผู้ซื้อ'}</span>
+        <span className={`text-sm font-semibold ${isSupplier ? 'text-emerald-800' : 'text-blue-800'}`}>{name}</span>
+      </div>
+    )
+  }
+  const labelMap: Record<string, string> = { ADJ: 'นับสต๊อก', CR: 'รับคืนสินค้า', GA: 'ปรับเกรด', OB: 'ยอดยกมา', SC: 'แปลง Status', ST: 'โอนระหว่างสาขา' }
+  return <span className="text-xs italic text-slate-500">{labelMap[refType] ?? refType ?? '-'}</span>
 }

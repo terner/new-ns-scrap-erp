@@ -4,7 +4,7 @@ import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { buildStockWorkbook, stockWhere, xlsxResponse } from '@/lib/server/stock'
+import { buildStockWorkbook, stockReferenceData, stockWhere, xlsxResponse } from '@/lib/server/stock'
 import { stockQuerySchema } from '@/lib/stock'
 
 export const runtime = 'nodejs'
@@ -12,6 +12,10 @@ export const runtime = 'nodejs'
 const ledgerQuerySchema = stockQuerySchema.extend({
   balanceMode: z.enum(['product', 'warehouse']).default('product'),
   direction: z.enum(['asc', 'desc']).default('desc'),
+  movementType: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? null : value),
+    z.string().trim().max(80).nullable().default(null),
+  ),
   negativeOnly: z.coerce.boolean().default(false),
 })
 
@@ -26,7 +30,7 @@ export async function GET(request: Request) {
     const where = stockWhere(query)
     const orderBy = [{ date: query.direction }, { created_at: query.direction }, { id: query.direction }]
 
-    const [allRowsRaw, pageRowsRaw, total] = await Promise.all([
+    const [allRowsRaw, pageRowsRaw, reference, total] = await Promise.all([
       prisma.stock_ledger.findMany({
         include: { branches: true, products: true, warehouses: true },
         orderBy: [{ date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
@@ -39,6 +43,7 @@ export async function GET(request: Request) {
         take: query.pageSize,
         where,
       }),
+      stockReferenceData(),
       prisma.stock_ledger.count({ where }),
     ])
     const allRows = allRowsRaw as Array<(typeof allRowsRaw)[number] & { products?: { item_status?: string | null } | null }>
@@ -101,6 +106,7 @@ export async function GET(request: Request) {
         warehouseName: row.warehouses?.name ?? '-',
       }
     })
+    const negativeCount = Array.from(runningByRowId.values()).filter((value) => value < 0).length
     if (query.negativeOnly) payloadRows = payloadRows.filter((row) => row.runningBalanceByProduct < 0)
 
     if (query.format === 'xlsx') {
@@ -128,9 +134,11 @@ export async function GET(request: Request) {
     return NextResponse.json({
       page: query.page,
       pageSize: query.pageSize,
+      reference,
       rows: payloadRows,
       summary: {
         count: total,
+        negativeCount,
         pageCount: payloadRows.length,
         qtyIn: allRows.reduce((sum, row) => sum + toNumber(row.qty_in), 0),
         qtyOut: allRows.reduce((sum, row) => sum + toNumber(row.qty_out), 0),
@@ -138,6 +146,7 @@ export async function GET(request: Request) {
         valueOut: allRows.reduce((sum, row) => sum + toNumber(row.value_out), 0),
       },
       total,
+      movementTypes: Array.from(new Set(allRows.map((row) => row.movement_type).filter(Boolean))).sort(),
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)

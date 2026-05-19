@@ -1804,7 +1804,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
   3. `/finance/cash-position` - revised in UI parity checkpoint
   4. `/finance/bank` - revised in UI parity checkpoint
   5. `/stock/balance` - revised in UI parity checkpoint
-  6. `/stock/ledger`
+  6. `/stock/ledger` - revised in UI parity checkpoint
   7. `/stock/convert`
   8. `/stock/adjust`
   9. `/sales/po-sell`
@@ -1920,6 +1920,30 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/stock/balance` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/stock/balance` returned 200. Summary/detail toggle and selected-product inline panel were exercised. Subagent source audit confirmed the original mismatch and safe patch scope.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`.
 - Result: `/stock/balance` now restores the legacy visual surface: blue/cyan hero, five KPI cards, fixed RM/WIP/FG status cards, legacy Matrix/Detail segmented control, group/status/branch/product filters, selected-product inline panel, donut and Top group chart cards, metal-group matrix table with qty/value/footer, and detail table mode with legacy columns. Export remains `.xlsx` by active business-export rule.
+- Commit: this checkpoint.
+
+### UI-P6: `/stock/ledger` Legacy UI Parity Revision
+
+#### Execution Log
+
+- Task: revise Stock Ledger page to match legacy/Vue visual baseline.
+- Legacy refs:
+  - `old-apps/legacy/index.html:3088` duplicate/orphan stock ledger audit hooks and `old-apps/legacy/index.html:5009` / `old-apps/legacy/index.html:5264` destructive cleanup flows.
+  - `old-apps/vue/src/views/stock/StockLedgerView.vue:21` toolbar/action visual baseline and `old-apps/vue/src/views/stock/StockLedgerView.vue:49` legacy 12-column table baseline.
+- Files changed:
+  - `apps/next/src/components/purchase-flow/StockLedgerPageClient.tsx`
+  - `apps/next/src/app/api/stock/ledger/route.ts`
+  - `apps/next/src/lib/server/stock.ts`
+  - `docs/api/openapi.yaml`
+  - `docs/migration/17-next-remaining-modules-progress.md`
+  - `docs/migration/00-current-work.md`
+- DB/API changes: no schema change. `GET /api/stock/ledger` now returns stock reference options and movement types, accepts `movementType`, continues to support branch/product/date filters, and returns `summary.negativeCount` for the legacy negative-stock badge.
+- Buttons/actions checked: product/branch/movement/date filters, clear filters, balance-mode segmented control, negative-only badge/filter, active `.xlsx` export, disabled duplicate/orphan cleanup actions, pagination, and refresh.
+- Modal/form checked: legacy bill detail/timeline/grade-fix/move-branch actions were audited. Read-only bill/timeline modals are deferred; write actions remain disabled/deferred until permission, audit log, rollback, and stock-side-effect design are approved.
+- Validation added: OpenAPI stock ledger query contract updated with `movementType`, reference data, and movement type list.
+- Playwright smoke: authenticated main browser checked `/stock/ledger` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/stock/ledger` returned 200. Toolbar, 12 table headings, disabled cleanup buttons, and filter API calls for `movementType`, `branchId`, and `productId` were exercised.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 50`.
+- Result: `/stock/ledger` now restores the legacy toolbar-first dense ledger surface: product/branch/movement/date filters, balance-mode segmented control with persisted mode, negative-stock badge, disabled cleanup actions, active `.xlsx` export, and 12-column ledger table with counterparty/type/balance coloring. Read-only bill/timeline modals and write-side grade-fix/move-branch actions remain deferred.
 - Commit: this checkpoint.
 
 ## Current Priority Queue

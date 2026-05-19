@@ -60,6 +60,7 @@ Status date: 2026-05-19
 - Current parity slice: `/finance/cash-position` was revised after AR. It restores the legacy Cash Position dashboard cards, liquid composition donut, AR/AP bars, Top accounts list, colored summary cards, Net Cash strip, and account table columns/type badges.
 - Current parity slice: `/finance/bank` was revised after Cash Position. It restores the legacy Bank Statement hero, account/date controls, four KPI cards, two chart panels, opening-balance row, dark gradient statement table header, colored amount columns, and disabled duplicate-cleanup button while keeping export as active `.xlsx` behavior.
 - Current parity slice: `/stock/balance` was revised after Bank Statement. It restores the legacy Stock Balance hero, KPI/status cards, matrix/detail toggle, group/status/branch/product filters, selected-product inline panel, donut/top-group charts, metal-group matrix table, and detail table mode while keeping export as active `.xlsx` behavior.
+- Current parity slice: `/stock/ledger` was revised after Stock Balance. It restores the legacy dense toolbar-first layout, product/branch/movement/date filters, balance-mode segmented control, negative-stock badge, disabled cleanup actions, legacy 12-column ledger table, colored movement/counterparty/balance cells, and active `.xlsx` export. Read-only bill/timeline modals and write actions such as grade fix or branch move remain deferred until permission/audit/write design is approved.
 
 ## File Naming Changes
 

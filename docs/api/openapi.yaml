@@ -1703,6 +1703,7 @@ paths:
         - $ref: "#/components/parameters/StockLotNo"
         - $ref: "#/components/parameters/StockFrom"
         - $ref: "#/components/parameters/StockTo"
+        - $ref: "#/components/parameters/StockMovementType"
         - $ref: "#/components/parameters/StockRefType"
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
@@ -2539,6 +2540,13 @@ components:
       schema:
         type: string
         maxLength: 80
+    StockMovementType:
+      name: movementType
+      in: query
+      schema:
+        type: string
+        maxLength: 80
+      description: Filter stock ledger rows by `movement_type`.
     StockProductId:
       name: productId
       in: query
@@ -3494,12 +3502,32 @@ components:
           minLength: 1
     StockLedgerResponse:
       type: object
-      required: [page, pageSize, rows, total]
+      required: [movementTypes, page, pageSize, reference, rows, summary, total]
       properties:
+        movementTypes:
+          type: array
+          items:
+            type: string
         page:
           type: integer
         pageSize:
           type: integer
+        reference:
+          type: object
+          required: [branches, products, warehouses]
+          properties:
+            branches:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+            products:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+            warehouses:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
         rows:
           type: array
           items:
