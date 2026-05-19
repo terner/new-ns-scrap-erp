@@ -1311,11 +1311,62 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### A0: Module Overview
 
-- [ ] สำรวจ legacy finance/accounting pages ทั้งหมด
-- [ ] map shared data: purchase/sales, AP/AR, bank, stock value, tax, assets, loans, opening balances
-- [ ] สรุปว่าอะไรเป็น read/report baseline และอะไรต้องรอ GL/accounting design
-- [ ] สรุป report dependency และ page order
-- [ ] สรุป risk/open decisions
+- [x] สำรวจ legacy finance/accounting pages ทั้งหมด
+- [x] map shared data: purchase/sales, AP/AR, bank, stock value, tax, assets, loans, opening balances
+- [x] สรุปว่าอะไรเป็น read/report baseline และอะไรต้องรอ GL/accounting design
+- [x] สรุป report dependency และ page order
+- [x] สรุป risk/open decisions
+
+#### A0 Module Overview
+
+- Legacy/Vue refs:
+  - Vue routes: `old-apps/vue/src/router/index.ts:248` through `old-apps/vue/src/router/index.ts:351` map all 18 Finance / Accounting routes.
+  - Vue menu keys: `old-apps/vue/src/router/menu.ts:450` through `old-apps/vue/src/router/menu.ts:536`.
+  - Report views: `old-apps/vue/src/views/financeReports/FinancialDashboardView.vue`, `CashFlowAnalysisView.vue`, `CashFlowForecastView.vue`, `WorkingCapitalView.vue`, `StockFinanceView.vue`, `ProfitLeakView.vue`, `TaxVatView.vue`, `PlStatementView.vue`, `BalanceSheetView.vue`, and `CashFlowStatementView.vue`.
+  - Asset/loan/setup views: `old-apps/vue/src/views/systemGaps/AssetRegisterView.vue`, `DepreciationView.vue`, `AssetDisposalView.vue`, `LoanContractsView.vue`, `LoanDashboardView.vue`, `EquityMaintenanceView.vue`, `OpeningBalanceView.vue`, and `HistoricalDataView.vue`.
+- Active Next state:
+  - All 18 `/finance-accounting/*` routes are still catch-all placeholders in the active Next app.
+  - Sitemap currently marks the section as `18` navigation routes, `0` real pages, `18` placeholders, and no API coverage.
+  - All routes are currently under `finance.financials.view` in navigation.
+- Visual refs to preserve:
+  - Financial Dashboard: violet/purple gradient hero, empty 6-month P&L chart, Cash & Bank-only asset donut, cash need/inflow cards, finance section cards, P&L summary, balance sheet, and Cash Health Insights.
+  - Cash Flow Forecast Calendar: 30-day baseline with start/end cash, flat forecast graph, calendar grid, AR/AP insight tables, and two-decimal money formatting.
+  - Working Capital: 90-day period selector, CCC card, CCC breakdown bars, current/quick ratio gauges, stock turnover panel, KPI cards, analysis cards, and calculation table.
+  - P&L Statement: emerald gradient hero, period/month/year toolbar order, branch selector, quick range buttons, Net Profit waterfall, Stock vs Trading split cards, and P&L table.
+  - Asset Register: amber/orange gradient header, Template/Export/Add/CSV button order, NBV card, category panel, monthly depreciation card, filters, and compact Thai table headers.
+  - Loan Contracts: blue/cyan gradient header, Template/Add buttons, four summary cards, filters, and loan schedule/action table.
+- Active DB/table mapping:
+  - Available: `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `receipts`, `payments`, `expenses`, `stock_ledger`, `assets`, `depreciations`, `loans`, `loan_schedules`, `loan_payments`, `equity`, and singleton `opening_balance`.
+  - Partially available: VAT/WHT source fields exist on some sales/purchase/payment/receipt records, but there is no normalized tax ledger or statutory filing table in the active Prisma schema.
+  - Missing for true accounting statements: no confirmed GL journal header/line table, chart of accounts mapping, closing period table, retained earnings roll-forward, tax filing state, or dedicated historical import staging tables.
+- Read/report baseline candidates:
+  - A1 Financial Dashboard can be derived from existing AR/AP/cash/stock/assets/loans tables as a management dashboard, with clear source-state notes.
+  - A2 Cash Flow Analysis / Forecast can derive from `accounts`, `bank_statement`, `sales_bills.receivable_balance/due_date`, `purchase_bills.payable_balance/due_date`, `loan_schedules`, and known expense/payment rows.
+  - A3 Working Capital / Stock Finance can derive from AR/AP balances, stock value from `stock_ledger`, and cash/bank state.
+  - A6 Asset Register / Depreciation / Disposal can start as read baselines from `assets` and `depreciations`; depreciation run/reversal/disposal writes need a separate accounting-side-effect design.
+  - A7 Loan Contracts / Loan Dashboard can start as read baselines from `loans`, `loan_schedules`, and `loan_payments`.
+- Must defer until GL/accounting design:
+  - P&L, Balance Sheet, and Cash Flow Statement must be labeled management/read baselines if implemented before GL. Do not claim statutory financial statements without journal/COA/closing-period design.
+  - Do not auto-post depreciation, asset disposal gain/loss, loan interest accrual, tax payable, retained earnings, or opening balance entries into accounting ledgers until GL schema and idempotency rules exist.
+  - Do not mutate `opening_balance` or historical import state from report pages.
+  - Do not use UUIDs as user-facing accounting refs; prefer document numbers, account codes, asset codes, loan contract numbers, period labels, and branch names.
+- Recommended implementation order:
+  1. A6 Fixed Assets read baselines first: Asset Register, Depreciation, and Asset Disposal need NBV/accumulated depreciation clarity before Balance Sheet and dashboard aggregates.
+  2. A7 Loans / Equity / Opening / Historical read baselines next: loan outstanding, schedules, equity, and opening/historical balances feed statements and dashboards.
+  3. A5 Financial Statements as clearly labeled management/read baselines only, once asset/loan/equity source displays are visible. Do not claim statutory statements until GL/COA/closing-period design exists.
+  4. A4 Tax/VAT/WHT transaction-derived summary after purchase/sales/payment/receipt/expense field mapping is confirmed. Do not implement filing or tax-period state yet.
+  5. A2 Cash Flow Analysis + Forecast Calendar, because it reuses AR/AP/cash/loan schedule/tax due dependencies and tests date buckets.
+  6. A3 Working Capital + Stock Finance, because it depends on stable AR/AP/stock-value/cash calculations.
+  7. A1 Financial Dashboard last among page builds, because it aggregates all prior outputs. If implemented earlier, it must be a strictly read-only zero/management baseline.
+
+#### Execution Log
+
+- Task: A0 Finance / Accounting legacy inventory, active DB mapping, and implementation order.
+- Files changed: this tracker and current work handoff.
+- DB/API changes: docs-only; no schema/runtime change.
+- Validation added: none; this is a planning checkpoint.
+- Commands: `rg`/`sed` inventory of Vue routes, menu, visual audit notes, legacy files, active navigation, and Prisma models; subagents completed read-only legacy/UI and DB/API mapping; `git diff --check` pending before commit.
+- Result: A6 Fixed Assets read baseline is the next implementation slice unless the user explicitly wants dashboard first.
 
 ### A1: Financial Dashboard
 

@@ -9,13 +9,13 @@ Last pushed checkpoint: FF7 Foreign Finance QA checkpoint (`6b766ea docs: add fo
 
 ## Current Batch
 
-`Batch FF: Foreign Finance`
+`Batch A: Finance / Accounting`
 
 Goal:
 
-- Port foreign finance routes from placeholders into Next page/API baselines.
-- Start with FX/FCD/read reports before money-moving transfers or receipts.
-- Keep bank statement mutation, FX gain/loss posting, import/match writes, and reversal flows disabled until idempotency and reconciliation rules are clear.
+- Port finance-accounting routes from placeholders into Next page/API baselines.
+- Start with management dashboards and read/report baselines before GL/accounting writes.
+- Keep depreciation posting, asset disposal posting, loan interest accrual, tax filing, retained earnings, opening balance mutation, and statutory statement claims disabled until GL/COA/closing-period design is clear.
 - During this and future clone batches, keep the legacy/Vue screen as the visual baseline first. Preserve cards, colors, banners, tables, button placement, labels, and spacing unless a documented deviation is approved.
 
 ## File Naming Changes
@@ -244,10 +244,11 @@ Initial FF0 findings:
 - FF2/FF3 International Transfer and Overseas Receipt read/form baselines are implemented, validated, and pushed. They intentionally do not write `bank_statement`, post FX gain/loss, complete, approve, or reverse until dedicated transaction schemas and idempotency/reversal rules exist.
 - FF7 Foreign Finance QA checkpoint is implemented, validated, and pushed. All six foreign finance APIs returned 200 in browser smoke; type-check, lint, build, OpenAPI validity, and diff check passed. OpenAPI still has the existing 113 skeleton warnings outside this batch.
 - User-facing refs should be `ITF*`, `ORC*`, `ref_no`, account code/account no, and currency symbol/code; do not expose UUID/ref_id as the primary display.
+- A0 Finance / Accounting overview is implemented locally as a docs checkpoint. All 18 routes are still placeholders; active schema supports management baselines for cash, AR/AP, stock value, assets, loans, equity, and opening balance, but GL/statutory posting remains deferred. Recommended next slice is A6 Fixed Assets read baseline before dashboards/statements.
 
 Next concrete task:
 
-1. Start Batch A Finance / Accounting module overview and DB mapping.
+1. Validate, commit, and push A0 Finance / Accounting overview.
 2. Preserve legacy/Vue visual baseline first: colors, cards, panels, table density, button placement, and labels.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
