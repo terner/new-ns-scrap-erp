@@ -60,7 +60,7 @@ Status terms:
 | `/anomaly-detector` | ตรวจจับความผิดปกติ | placeholder | missing | TBD | none yet |
 | `/daily-report` | Daily Report | read baseline | `GET /api/daily-report` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments`, `bank_statement`, `products` | `reports.reports.view` |
 | `/dashboard` | Dashboard | read baseline | `GET /api/dashboard` | `purchase_bills`, `sales_bills`, `expenses`, `accounts`, `bank_statement`, `stock_ledger`, `production_orders`, `trading_deals` | `reports.reports.view` |
-| `/profit-cost-analysis` | Profit & Cost Analysis | placeholder | missing | TBD | none yet |
+| `/profit-cost-analysis` | Profit & Cost Analysis | read baseline | `GET /api/profit-cost-analysis` | `purchase_bills`, `sales_bills`, `stock_ledger`, `products`, `suppliers`, `customers`, `branches`, `purchase_channels`, `sales_channels` | `reports.reports.view` |
 | `/pending-sales` | รายการรอขาย | placeholder | missing | TBD | none yet |
 | `/sales-plan` | วางแผนการขาย (LME) | placeholder | missing | TBD | none yet |
 | `/sales-commission` | Sales Tracking Dashboard | placeholder | missing | TBD | none yet |

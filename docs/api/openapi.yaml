@@ -88,6 +88,58 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/profit-cost-analysis:
+    get:
+      tags: [Reports]
+      operationId: readProfitCostAnalysis
+      summary: Read Profit & Cost Analysis baseline from purchase, sales, COGS, stock, product, party, and channel sources
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: purchaseChannelId
+          in: query
+          schema:
+            type: string
+        - name: salesChannelId
+          in: query
+          schema:
+            type: string
+        - name: supplierId
+          in: query
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: metalGroup
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/company-profile:
     get:
       tags: [Admin]

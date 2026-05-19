@@ -35,6 +35,7 @@ const exactPathPermissions: Record<string, string> = {
   '/api/dashboard': 'reports.reports.view',
   '/api/daily-report': 'reports.reports.view',
   '/api/owner-daily': 'reports.reports.view',
+  '/api/profit-cost-analysis': 'reports.reports.view',
   '/api/master-data/customers': 'master.customers.view',
   '/api/master-data/customers/export': 'master.customers.export',
   '/api/master-data/products': 'master.products.view',
@@ -47,6 +48,7 @@ const exactPathPermissions: Record<string, string> = {
   '/master-data/products': 'master.products.view',
   '/master-data/suppliers': 'master.suppliers.view',
   '/owner-daily': 'reports.reports.view',
+  '/profit-cost-analysis': 'reports.reports.view',
 }
 
 const prefixPathPermissions: Array<[string, string]> = [

@@ -1577,8 +1577,22 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### M2: Profit and Cost
 
-- [ ] `/profit-cost-analysis`
-- [ ] source mapping: purchase/sales/COGS/production/trading
+- [x] `/profit-cost-analysis`
+- [x] source mapping: purchase/sales/COGS/stock/product/party/channel
+
+#### Execution Log
+
+- Task: M2 Profit & Cost Analysis read/report baseline.
+- Legacy refs: Vue `old-apps/vue/src/views/trackingDashboards/ProfitCostAnalysisView.vue`; legacy `old-apps/legacy/index.html` `view-profitCostAnalysis`; visual-audit note in `docs/migration/12-frontend-visual-audit-checklist.md`.
+- Files changed: added `apps/next/src/lib/server/profit-cost-analysis.ts`, `GET /api/profit-cost-analysis`, `/profit-cost-analysis` Next page, `ProfitCostAnalysisPageClient`, navigation permission mapping, OpenAPI, and sitemap docs.
+- DB/API changes: reads `purchase_bills`, `sales_bills`, `stock_ledger`, `products`, `suppliers`, `customers`, `branches`, `purchase_channels`, and `sales_channels`. No schema change and no write side effects.
+- Buttons/actions checked: legacy `Export CSV` is visible but disabled in this read baseline; posting, allocation, planning changes, and write actions remain disabled.
+- Modal/form checked: filters preserve date, branch, purchase/sales channel, supplier, customer, and metal group chip bar. Product row opens a read-only product drill modal.
+- Validation added: API is guarded with `reports.reports.view`; OpenAPI path added with query parameters and 401/403 responses. Dedicated cost/profit permission remains a later auth follow-up before final UAT.
+- Playwright smoke: unauth subagent confirmed `/profit-cost-analysis` redirects to `/login?redirect=%2Fprofit-cost-analysis`, unauth `/api/profit-cost-analysis` returns `401`, and login desktop/mobile has no overflow or console/network errors. Authenticated smoke confirmed `/api/profit-cost-analysis` returns `200`, desktop `1440x900` and mobile `390x844` have no document overflow, legacy markers are present, Export CSV is disabled, product drill modal opens/closes, and no console errors were reported after restarting the dev server.
+- Commands: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`. OpenAPI remains valid with the existing 114 warning baseline.
+- Result: implemented and validated locally.
+- Commit: pending.
 
 ### M3: Pending Sales and Sales Plan
 
