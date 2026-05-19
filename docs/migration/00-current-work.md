@@ -202,9 +202,11 @@ Status: active batch started after finance checkpoint `1c0b5c7`.
 
 Current scope:
 
-- T0 inventory and DB mapping is in progress.
+- T0 inventory and DB mapping is documented and pushed.
+- T1 Customer Tracking read baseline is in progress.
 - Tracking routes must use active Next app only; legacy/Vue tracking views are source material.
 - Keep T1-T3 read/report baselines first; no write flows in tracking pages.
+- DB design preference clarified: use meaningful business-facing codes/running document numbers for user-visible references; keep UUID/opaque IDs internal only.
 
 Initial F0 findings:
 
@@ -215,9 +217,9 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Commit/push T0 Tracking 360 inventory.
-2. Start T1 Customer Tracking read baseline.
-3. Keep each next slice small; avoid rerunning heavy validation unless code changed.
+1. Validate T1 Customer Tracking.
+2. Commit/push T1.
+3. Continue to T2 Supplier Tracking polish.
 
 ## Operating Model
 

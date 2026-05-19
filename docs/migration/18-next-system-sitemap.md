@@ -71,7 +71,7 @@ Status terms:
 
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
-| `/tracking/customer` | Customer Tracking | placeholder | missing | TBD | `reports.reports.view` |
+| `/tracking/customer` | Customer Tracking | read baseline | `GET /api/tracking/customer` | `customers`, `sales_bills`, `receipts` | `reports.reports.view` |
 | `/tracking/supplier` | Supplier Tracking | read baseline | `GET /api/tracking/supplier` | `suppliers`, `purchase_bills`, `payments` | `reports.reports.view` |
 | `/tracking/product` | Product Tracking | placeholder | missing | TBD | `reports.reports.view` |
 

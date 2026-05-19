@@ -1137,6 +1137,47 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/tracking/customer:
+    get:
+      tags: [Tracking]
+      operationId: readCustomerTracking
+      summary: Read customer tracking dashboard baseline
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: string
+        - name: month
+          in: query
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [xlsx]
+      responses:
+        "200":
+          description: Customer tracking rows, monthly trend, summary, or xlsx export when `format=xlsx`.
+          content:
+            application/json:
+              schema:
+                type: object
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/tracking/supplier:
     get:
       tags: [Tracking]

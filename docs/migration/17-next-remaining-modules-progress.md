@@ -739,11 +739,26 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### T1: Customer Tracking
 
-- [ ] API `/api/tracking/customer`
-- [ ] Page `/tracking/customer`
-- [ ] customer profile, sales, receipts, outstanding, product trend
-- [ ] filters: year/month/customer/salesperson
-- [ ] detail modal/export
+- [x] API `/api/tracking/customer`
+- [x] Page `/tracking/customer`
+- [x] customer profile, sales, receipts, outstanding
+- [x] filters: year/month/customer/search
+- [x] export
+- [ ] product trend/detail drilldown after item JSON contract is confirmed
+
+#### Execution Log
+
+- Task: T1 Customer Tracking read baseline.
+- Legacy refs: `old-apps/vue/src/views/trackingDashboards/CustomerTrackingView.vue`.
+- Files changed: `apps/next/src/app/api/tracking/customer/route.ts`, `apps/next/src/app/tracking/customer/page.tsx`, `apps/next/src/components/tracking/CustomerTrackingPageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker.
+- DB/API changes: added `GET /api/tracking/customer`; no schema migration; reads `customers`, `sales_bills`, `receipts`.
+- Buttons/actions checked: read-only filters and `.xlsx` export; no write actions.
+- Modal/form checked: no mutation form in T1; detail drilldown deferred until product-level item JSON contract is clearer.
+- Validation added: year/month/customer/search filters, monthly trend, sales/receipt/receivable/GP summary.
+- Playwright smoke: desktop `1440x900` and mobile `390x844` loaded `/tracking/customer`; `GET /api/tracking/customer?year=2026` returned `200`; `.xlsx` export returned `200`; no console warnings/errors.
+- Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 120`.
+- Result: validated; OpenAPI remains valid with existing skeleton warnings.
+- Commit: pending.
 
 ### T2: Supplier Tracking Polish
 
