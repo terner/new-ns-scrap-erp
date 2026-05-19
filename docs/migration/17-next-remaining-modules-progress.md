@@ -314,7 +314,7 @@ Priority: สูง เพราะเป็นฐานของ purchase, sale
 
 - [x] API smoke
 - [x] browser smoke
-- [ ] docs/type/lint/build/commit/push
+- [x] docs/type/lint/build/commit/push
 
 ### S2: Stock Ledger Polish
 
@@ -1803,7 +1803,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
   2. `/finance/ar` - revised in UI parity checkpoint
   3. `/finance/cash-position` - revised in UI parity checkpoint
   4. `/finance/bank` - revised in UI parity checkpoint
-  5. `/stock/balance`
+  5. `/stock/balance` - revised in UI parity checkpoint
   6. `/stock/ledger`
   7. `/stock/convert`
   8. `/stock/adjust`
@@ -1895,6 +1895,31 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/finance/bank` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/finance/bank` returned 200. Subagent source audit confirmed the original mismatch and safe patch scope, but its isolated browser session could not authenticate.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`.
 - Result: `/finance/bank` now restores the legacy visual surface: blue/indigo/purple Bank Statement hero, account/date/export/duplicate controls in the hero, four colored KPI cards, two chart panels, opening-balance row, legacy statement table columns/header/colors, and colored amount columns. Export remains `.xlsx` by active business-export rule.
+- Commit: this checkpoint.
+
+### UI-P5: `/stock/balance` Legacy UI Parity Revision
+
+#### Execution Log
+
+- Task: revise Stock Balance page to match legacy/Vue visual baseline.
+- Legacy refs:
+  - `old-apps/legacy/index.html:11049` Stock Balance data flow, WIP/status grouping, filters, selected-product panel, charts, matrix table, and detail table.
+  - `old-apps/legacy/index.html:11230` legacy Stock Balance hero, KPI/status cards, filters, and export control.
+  - `old-apps/vue/src/views/stock/StockBalanceView.vue:62` Vue Stock Balance visual clone baseline.
+- Files changed:
+  - `apps/next/src/components/stock/StockBalancePageClient.tsx`
+  - `apps/next/src/lib/server/stock.ts`
+  - `apps/next/src/lib/stock.ts`
+  - `docs/api/openapi.yaml`
+  - `docs/migration/17-next-remaining-modules-progress.md`
+  - `docs/migration/00-current-work.md`
+- DB/API changes: no schema change. `GET /api/stock/balance` now includes product metal group on balance rows and product reference options so the UI can restore legacy group filters, group charts, and matrix rows.
+- Buttons/actions checked: Matrix/Detail toggle, group/status/branch/product filters, clear selected product, warehouse/search/refresh controls, active `.xlsx` export, selected-product inline panel, row detail modal trigger.
+- Modal/form checked: existing row detail modal still opens from Detail; selected product now renders inline summary panel like legacy. No write form was added.
+- Validation added: OpenAPI stock balance description and stock row/option schema fields updated for metal-group data.
+- Playwright smoke: authenticated main browser checked `/stock/balance` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/stock/balance` returned 200. Summary/detail toggle and selected-product inline panel were exercised. Subagent source audit confirmed the original mismatch and safe patch scope.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`.
+- Result: `/stock/balance` now restores the legacy visual surface: blue/cyan hero, five KPI cards, fixed RM/WIP/FG status cards, legacy Matrix/Detail segmented control, group/status/branch/product filters, selected-product inline panel, donut and Top group chart cards, metal-group matrix table with qty/value/footer, and detail table mode with legacy columns. Export remains `.xlsx` by active business-export rule.
 - Commit: this checkpoint.
 
 ## Current Priority Queue

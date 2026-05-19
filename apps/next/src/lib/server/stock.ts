@@ -63,14 +63,14 @@ export async function stockReferenceData() {
   const [branches, warehouses, products, customers] = await Promise.all([
     prisma.branches.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.warehouses.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, branch_id: true, code: true, id: true, name: true } }),
-    prisma.products.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, item_status: true, name: true } }),
+    prisma.products.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, item_status: true, metal_group: true, name: true } }),
     prisma.customers.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
   ])
 
   return {
     branches: branches.map((row) => ({ active: row.active, code: row.code, id: row.id, name: row.name })),
     customers: customers.map((row) => ({ active: row.active, code: row.code, id: row.id, name: row.name })),
-    products: products.map((row) => ({ active: row.active, code: row.code, id: row.id, name: row.name, status: row.item_status })),
+    products: products.map((row) => ({ active: row.active, code: row.code, id: row.id, metalGroup: row.metal_group, name: row.name, status: row.item_status })),
     warehouses: warehouses.map((row) => ({ active: row.active, branchId: row.branch_id, code: row.code, id: row.id, name: row.name })),
   }
 }
@@ -101,6 +101,7 @@ export async function stockBalanceSnapshot(input: {
     notAvailable: boolean
     productCode: string
     productId: string
+    productMetalGroup: string
     productName: string
     qty: number
     status: string
@@ -129,6 +130,7 @@ export async function stockBalanceSnapshot(input: {
       notAvailable: row.not_available_for_sale === true,
       productCode: row.products?.code ?? '',
       productId: row.product_id ?? '',
+      productMetalGroup: row.products?.metal_group ?? 'อื่นๆ',
       productName: row.products?.name ?? row.product_id ?? '-',
       qty: 0,
       status: productStatus,
@@ -146,8 +148,8 @@ export async function stockBalanceSnapshot(input: {
   const query = input.q?.trim().toLowerCase()
   const rows = Array.from(grouped.values())
     .filter((row) => Math.abs(row.qty) > 0.000001 || Math.abs(row.value) > 0.000001)
-    .filter((row) => !query || `${row.productCode} ${row.productName} ${row.branchName} ${row.warehouseName} ${row.lotNo} ${row.status}`.toLowerCase().includes(query))
-    .sort((left, right) => left.productCode.localeCompare(right.productCode) || left.branchName.localeCompare(right.branchName) || left.warehouseName.localeCompare(right.warehouseName))
+    .filter((row) => !query || `${row.productCode} ${row.productName} ${row.productMetalGroup} ${row.branchName} ${row.warehouseName} ${row.lotNo} ${row.status}`.toLowerCase().includes(query))
+    .sort((left, right) => left.productMetalGroup.localeCompare(right.productMetalGroup) || left.productCode.localeCompare(right.productCode) || left.branchName.localeCompare(right.branchName) || left.warehouseName.localeCompare(right.warehouseName))
 
   const summary = rows.reduce((acc, row) => {
     acc.qty += row.qty

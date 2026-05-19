@@ -1739,7 +1739,7 @@ paths:
         - $ref: "#/components/parameters/Format"
       responses:
         "200":
-          description: Aggregated stock balance grouped by product, branch, warehouse, status, and lot
+          description: Aggregated stock balance grouped by product, metal group, branch, warehouse, status, and lot
           content:
             application/json:
               schema:
@@ -3415,6 +3415,8 @@ components:
           type: [string, "null"]
         productId:
           type: string
+        productMetalGroup:
+          type: string
         productName:
           type: [string, "null"]
         qty:
@@ -3520,6 +3522,8 @@ components:
           type: [string, "null"]
         id:
           type: string
+        metalGroup:
+          type: [string, "null"]
         name:
           type: string
         status:

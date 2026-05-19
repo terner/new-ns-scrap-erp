@@ -59,6 +59,7 @@ Status date: 2026-05-19
 - Current parity slice: `/finance/ar` was revised after AP. It restores the legacy AR pending-sale banner, blue/cyan/teal dashboard cards, aging bars, Top 5 customer card, Channel/Aging filters, and detail table layout/colors while keeping export as active `.xlsx` behavior.
 - Current parity slice: `/finance/cash-position` was revised after AR. It restores the legacy Cash Position dashboard cards, liquid composition donut, AR/AP bars, Top accounts list, colored summary cards, Net Cash strip, and account table columns/type badges.
 - Current parity slice: `/finance/bank` was revised after Cash Position. It restores the legacy Bank Statement hero, account/date controls, four KPI cards, two chart panels, opening-balance row, dark gradient statement table header, colored amount columns, and disabled duplicate-cleanup button while keeping export as active `.xlsx` behavior.
+- Current parity slice: `/stock/balance` was revised after Bank Statement. It restores the legacy Stock Balance hero, KPI/status cards, matrix/detail toggle, group/status/branch/product filters, selected-product inline panel, donut/top-group charts, metal-group matrix table, and detail table mode while keeping export as active `.xlsx` behavior.
 
 ## File Naming Changes
 
@@ -167,7 +168,7 @@ Changes:
 
 Current findings:
 
-- `/stock/balance` is still a placeholder and is the first concrete page target for `Batch S`.
+- `/stock/balance` has an active read baseline and has been revised in the post-SYS legacy UI parity pass.
 - `/stock/ledger` has a read baseline but still needs query/pagination/running-balance polish.
 - Most main dashboard/reporting and finance-accounting routes remain placeholder coverage.
 

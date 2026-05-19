@@ -117,6 +117,7 @@ export type StockOption = {
   branchId?: string | null
   code?: string | null
   id: string
+  metalGroup?: string | null
   name: string
   status?: string | null
 }
