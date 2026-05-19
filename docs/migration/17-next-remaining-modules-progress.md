@@ -1010,6 +1010,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: subagent unauth smoke confirmed `/dual-costing/cost-pool` redirects to `/login?redirect=%2Fdual-costing%2Fcost-pool` and unauth API returns `401`. Authenticated main smoke confirmed legacy-style amber warning band, blue/orange/purple cost cards, 5 summary cards, filters, table columns, export link, and detail modal; desktop/mobile had no page overflow and no console errors after duplicate derived lot refs were fixed.
 - Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 130`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
 - Result: D5 Cost Pool read-derived baseline implemented and validated; allocate/reverse/recalc/write behavior remains deferred.
+- Commit: `eb7603f feat: add cost pool read baseline` pushed to `main`.
 
 ### D6: Cost Allocator
 
