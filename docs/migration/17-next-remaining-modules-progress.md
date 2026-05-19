@@ -1260,6 +1260,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/bank-reconciliation`; API returned 200 for default and selected account requests; console had no errors; screenshots saved as `ff6-bank-reconciliation-desktop.png` and `ff6-bank-reconciliation-mobile.png`.
 - Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and browser smoke passed. OpenAPI still has the existing 113 skeleton warnings outside this endpoint.
 - Result: Bank Reconciliation route is no longer a placeholder, but matching remains a design/read baseline until import/match schema and RLS are designed.
+- Commit: `79b9b74 feat: add bank reconciliation design baseline` pushed to `main`.
 
 ### FF7: Foreign Finance QA Batch
 
