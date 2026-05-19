@@ -1415,11 +1415,22 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### A7: Loans / Equity / Opening / Historical
 
-- [ ] `/finance-accounting/loan-contracts`
-- [ ] `/finance-accounting/loan-dashboard`
-- [ ] `/finance-accounting/equity-maint`
-- [ ] `/finance-accounting/opening-balance`
-- [ ] `/finance-accounting/historical-data`
+- [x] `/finance-accounting/loan-contracts`
+- [x] `/finance-accounting/loan-dashboard`
+- [x] `/finance-accounting/equity-maint`
+- [x] `/finance-accounting/opening-balance`
+- [x] `/finance-accounting/historical-data`
+- [x] OpenAPI entries for the five read/design endpoints
+- [x] Browser QA and full validation
+
+#### Execution Log
+
+- Task: A7 Loans / Equity / Opening / Historical read baselines.
+- Files changed: added five Next pages, one shared loan/equity/opening/historical client component, and five read-only API routes under `/api/finance-accounting/*`.
+- DB/API changes: reads `loans`, `loan_schedules`, `loan_payments`, `equity`, `opening_balance`, `accounts`, `branches`, and `historical_monthly`; no schema change, no loan payment/schedule generation, no equity save, no opening balance apply/lock, and no historical clear/save/sync.
+- UI baseline: preserved legacy-first gradients, summary cards, filter/action order, tab chips, compact tables, and disabled write controls.
+- Validation: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI remains valid with existing catalog warnings.
+- Browser QA: subagent unauth sweep confirmed protected pages redirect to login and APIs return `401`; authenticated main Playwright smoke confirmed the five A7 APIs return `200`, Loan Contracts and Opening Balance render without desktop overflow, Opening Balance and Historical Data render without mobile overflow, and write controls are disabled. The main authenticated smoke also checked Loan Contracts disabled Template/Import/Add/Schedule actions, Opening Save/Push disabled, and Historical Clear/Save disabled.
 
 ### A8: Accounting QA Batch
 

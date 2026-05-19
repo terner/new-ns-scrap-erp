@@ -280,6 +280,61 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance-accounting/loan-contracts:
+    get:
+      tags: [Finance Accounting]
+      operationId: listFinanceAccountingLoanContracts
+      summary: List loan, leasing, and BSL contracts with read-only schedule/payment state
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/loan-dashboard:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingLoanDashboard
+      summary: Read loan outstanding, due, overdue, and debt-type dashboard
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/equity-maint:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingEquity
+      summary: Read equity and retained earnings maintenance baseline
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/opening-balance:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingOpeningBalance
+      summary: Read opening balance singleton and account opening balances
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/historical-data:
+    get:
+      tags: [Finance Accounting]
+      operationId: listFinanceAccountingHistoricalData
+      summary: List historical monthly baseline cells for pre-go-live periods
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance/ap:
     get:
       tags: [Finance]
