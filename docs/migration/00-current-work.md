@@ -16,6 +16,7 @@ Goal:
 - Port foreign finance routes from placeholders into Next page/API baselines.
 - Start with FX/FCD/read reports before money-moving transfers or receipts.
 - Keep bank statement mutation, FX gain/loss posting, import/match writes, and reversal flows disabled until idempotency and reconciliation rules are clear.
+- During this and future clone batches, keep the legacy/Vue screen as the visual baseline first. Preserve cards, colors, banners, tables, button placement, labels, and spacing unless a documented deviation is approved.
 
 ## File Naming Changes
 

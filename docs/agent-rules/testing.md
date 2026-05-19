@@ -26,6 +26,7 @@ For click-path work, verify:
 For browser QA, verify:
 - console and network failures
 - desktop and mobile viewport behavior
+- legacy/Vue UI parity for cloned screens, especially cards, colors, banners, tables, button placement, labels, and spacing
 - login, protected routes, logout, and core navigation
 - valid and invalid form submissions
 - accessibility basics: keyboard access, focus visibility, labels, and modal focus behavior
