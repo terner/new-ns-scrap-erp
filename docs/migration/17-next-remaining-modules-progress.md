@@ -2036,7 +2036,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `http://localhost:3100/trading/dashboard` on desktop 1365x900 and mobile 390x844; `/api/auth/me` and `/api/trading/dashboard?from=2026-05-01&to=2026-05-19` returned 200, no page-level horizontal overflow, no new console errors, and legacy hero/date filter/Trading Performance/AR-AP/KPI/trend/matching/top-product/purchase/sales/product surfaces were present. Subagent unauth smoke confirmed route redirects to login and unauth API returns 401.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 50`.
 - Result: `/trading/dashboard` restores the legacy visual surface: violet/fuchsia hero, date filter card, mega Trading Performance card, Trading AR/AP card, ten KPI cards, trend chart, matching donut, top product bars, Trading Purchases/Sales tables, and Trading by Product table. Write/matching actions remain deferred to the Trading Matching flow.
-- Commit: pending.
+- Commit: `8ea1bbc fix: restore stock operation legacy ui parity`.
 
 ## Current Priority Queue
 
@@ -2096,4 +2096,26 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/stock/status-convert` and `/stock/customer-return` at `http://localhost:3100` on desktop 1365x900 and mobile 390x844; both APIs returned 200, no page-level horizontal overflow, no new console warnings/errors, and legacy title/card/toolbar/table/action markers were present. Subagent unauth smoke confirmed both routes redirect to login, both APIs return 401, login desktop/mobile has no horizontal overflow, and no related console/page/network errors were reported.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`.
 - Result: `/stock/status-convert` and `/stock/customer-return` now restore the legacy compact stock operation visual surfaces while preserving existing write semantics. Send-back, CSV export, field-level validation, reverse/audit/rollback, product status mutation, and cost-policy hardening remain deferred.
+- Commit: `8ea1bbc fix: restore stock operation legacy ui parity`.
+
+### UI-DR: Daily Reports / รายงานประจำวัน Legacy UI Parity Revision
+
+#### Execution Log
+
+- Task: revise `/owner-daily`, `/daily-report`, and shared `/dashboard` report-card overlap toward the legacy/Vue visual baseline after Stock parity.
+- Legacy refs:
+  - `old-apps/legacy/index.html:34955` Owner Daily amber/orange/rose header, end-of-day gap card, today cash/AR/AP cards, Trading Pending, Pending Sale, actual activity, due tables, loan/expense/pending panels.
+  - `old-apps/legacy/index.html:46267` Daily Report amber/orange header, prev/next/today controls, two large KPI cards, group breakdown, bill tables, expense bars, cash movement, analytics dashboard, top tables, and print action.
+  - `old-apps/legacy/index.html:12358` shared Dashboard report cards and filter/data overlap; Vue clone refs are `old-apps/vue/src/views/trackingDashboards/OwnerDailyView.vue`, `DailyReportView.vue`, and `DashboardView.vue`.
+- Files changed:
+  - `apps/next/src/lib/server/main-dashboards.ts`
+  - `apps/next/src/components/main/MainDashboardsPageClient.tsx`
+  - `docs/migration/00-current-work.md`
+  - `docs/migration/17-next-remaining-modules-progress.md`
+- DB/API changes: no schema change. Shared dashboard helper adds read-only derived fields from existing tables: bank-statement cash movement by type/account, due-today AR/AP rows with due/overdue fields, owner daily loan/expense/FG/pending/trading metrics, daily report group breakdown, expense category summary, range KPI, top supplier/customer/product rows, salesperson purchase summary, and daily purchase-vs-sales trend.
+- Buttons/actions checked: Daily Report `← วันก่อน`, `วันถัดไป →`, `📍 วันนี้`, range buttons, and `🖨 Export PDF / Print` are UI/read-only controls; print calls browser print dialog only. Owner Daily Trading/Pending buttons remain disabled placeholders. No posting, matching, stock issue conversion, payment, receipt, approval, or fix action is enabled.
+- Validation added: `npm run lint --workspace @ns-scrap-erp/next` and `npm run type-check --workspace @ns-scrap-erp/next` passed after the first code patch.
+- Playwright smoke: authenticated main browser checked `/owner-daily`, `/daily-report`, and `/dashboard` at `http://localhost:3100` on desktop 1365x900 and mobile 390x844; all three APIs returned 200, no page-level horizontal overflow, no new console warnings/errors, and legacy title/card/table/action markers were present. Subagent unauth smoke confirmed all three protected routes redirect to login, all three APIs return 401, login desktop/mobile has no horizontal overflow, and no related console/page/network errors were reported.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`.
+- Result: `/owner-daily` and `/daily-report` now restore the legacy Daily Reports visual/data surface while preserving read-only behavior. Shared `/dashboard` report-card overlap remains compatible with the expanded helper fields. Posting, matching, stock issue conversion, payment, receipt, approval, anomaly fix, and server-side export/write actions remain deferred.
 - Commit: pending.

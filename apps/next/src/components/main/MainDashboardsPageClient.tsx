@@ -16,21 +16,41 @@ type MainPayload = {
     trend: { label: string; value: number }[]
   }
   dailyReport: {
-    cashMovement: { cashIn: number; cashOut: number; net: number }
+    analytics: {
+      bySalesperson: { amount: number; bills: number; id: string; name: string; qty: number; suppliers: number }[]
+      dailyTrend: { label: string; purchase: number; sales: number }[]
+      groupSummary: { amount: number; group: string; qty: number }[]
+      rangeKpi: Record<string, number>
+      topCustomers: { amount: number; bills: number; gp: number; gpPct: number; id: string; name: string; qty: number }[]
+      topProductsIn: { amount: number; code: string; group: string; id: string; name: string; qty: number }[]
+      topProductsOut: { amount: number; code: string; group: string; id: string; name: string; qty: number }[]
+      topSuppliers: { amount: number; bills: number; id: string; name: string; qty: number }[]
+    }
+    cashMovement: {
+      accounts: { cashIn: number; cashOut: number; name: string; type: string }[]
+      byType: { cashIn: number; cashOut: number; label: string }[]
+      cashIn: number
+      cashOut: number
+      net: number
+    }
+    expenseByCategory: { amount: number; count: number; name: string }[]
     expenseRows: { amount: number; category: string; docNo: string; payee: string }[]
+    groupBreakdown: { buyAmt: number; buyQty: number; group: string; products: { buyAmt: number; buyQty: number; productCode: string; productId: string; productName: string; sellAmt: number; sellQty: number }[]; sellAmt: number; sellQty: number }[]
     purchaseBills: { amount: number; docNo: string; name: string; qty: number }[]
     salesBills: { amount: number; docNo: string; name: string; qty: number }[]
     summary: Record<string, number>
   }
   filters: { date: string; from: string; to: string }
   ownerDaily: {
-    actualActivity: { cashIn: number; cashOut: number; net: number }
+    actualActivity: { cashIn: number; cashOut: number; expenseOut: number; fgQty: number; fgValue: number; net: number; paymentOut: number }
     cashPlan: { available: number; expectedIn: number; expectedOut: number; gap: number }
     due: {
-      ap: { amount: number; docNo: string; name: string }[]
-      ar: { amount: number; docNo: string; name: string }[]
+      ap: { amount: number; docNo: string; due: string; id: string; name: string }[]
+      ar: { amount: number; daysOverdue: number; docNo: string; due: string; id: string; name: string }[]
     }
-    pending: { pendingIssueCount: number; productionWip: number; tradingPending: number }
+    expensesToday: { amount: number; docNo: string; id: string; payee: string; title: string }[]
+    loanToday: { amount: number; contractNo: string; due: string; id: string; installmentNo: number }[]
+    pending: Record<string, number>
   }
   sourceState: { limitations: string[]; writeActionsEnabled: false }
 }
@@ -44,25 +64,33 @@ function today() {
 
 export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   const [date, setDate] = useState(today())
+  const [rangeFrom, setRangeFrom] = useState(today())
+  const [rangeMode, setRangeMode] = useState('today')
+  const [rangeTo, setRangeTo] = useState(today())
   const [data, setData] = useState<MainPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const endpoint = mode === 'dashboard' ? '/api/dashboard' : mode === 'owner-daily' ? '/api/owner-daily' : '/api/daily-report'
 
   useEffect(() => {
+    const params = new URLSearchParams({ date })
+    if (mode === 'daily-report') {
+      params.set('from', rangeFrom)
+      params.set('to', rangeTo)
+    }
     setError(null)
     setIsLoading(true)
-    dailyFetchJson<MainPayload>(`${endpoint}?date=${date}`)
+    dailyFetchJson<MainPayload>(`${endpoint}?${params.toString()}`)
       .then(setData)
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้'))
       .finally(() => setIsLoading(false))
-  }, [date, endpoint])
+  }, [date, endpoint, mode, rangeFrom, rangeTo])
 
   return (
     <section className="space-y-4">
       {mode === 'dashboard' ? <DashboardView data={data} /> : null}
       {mode === 'owner-daily' ? <OwnerDailyView data={data} /> : null}
-      {mode === 'daily-report' ? <DailyReportView data={data} date={date} setDate={setDate} /> : null}
+      {mode === 'daily-report' ? <DailyReportView data={data} date={date} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setDate={setDate} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
       <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
         <b>Main dashboard read baseline</b><span className="ml-2">{data?.sourceState.limitations[0] ?? 'ไม่มี write action ใน baseline นี้'}</span>
       </div>
@@ -119,43 +147,231 @@ function DashboardView({ data }: { data: MainPayload | null }) {
 
 function OwnerDailyView({ data }: { data: MainPayload | null }) {
   const plan = data?.ownerDaily.cashPlan
+  const pending = data?.ownerDaily.pending ?? {}
+  const actual = data?.ownerDaily.actualActivity
+  const gapPositive = (plan?.gap ?? 0) >= 0
   return (
     <>
-      <Hero subtitle="เปิดทุกเช้าเพื่อตรวจเงินสด รับเข้า จ่ายออก และรายการรอจัดการ" title="☀️ Owner Daily Control" tone="from-amber-500 via-orange-500 to-rose-500" />
-      <div className={`rounded-2xl p-6 text-white shadow-xl ${(plan?.gap ?? 0) >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-700' : 'bg-gradient-to-br from-red-500 to-rose-700'}`}>
-        <div className="text-sm opacity-80">เงินพอ/ขาด 7 วัน</div><div className="text-4xl font-bold">{money(plan?.gap)}</div>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 p-6 text-white shadow-xl">
+        <div className="absolute right-4 top-0 text-8xl leading-none opacity-10">☀️</div>
+        <div className="relative">
+          <h1 className="flex items-center gap-3 text-3xl font-bold"><span className="text-4xl">☀️</span>Owner Daily Control</h1>
+          <p className="mt-2 text-sm opacity-90">เปิดดูทุกเช้า · ตรวจสอบสถานะการเงินครบทุกมุมก่อนเริ่มวัน</p>
+        </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-3"><Metric label="เงินสดที่มี" value={money(plan?.available)} /><Metric label="คาดรับ 7 วัน" tone="emerald" value={money(plan?.expectedIn)} /><Metric label="คาดจ่าย 7 วัน" tone="red" value={money(plan?.expectedOut)} /></div>
-      {(data?.ownerDaily.pending.tradingPending || data?.ownerDaily.pending.pendingIssueCount) ? <Panel title="รายการที่ต้องตาม"><BarRows rows={[{ label: 'Trading Pending', value: data.ownerDaily.pending.tradingPending }, { label: 'Pending Issue', value: data.ownerDaily.pending.pendingIssueCount }]} /></Panel> : null}
-      <div className="grid gap-4 lg:grid-cols-2"><DueTable rows={data?.ownerDaily.due.ar ?? []} title="AR ที่ต้องตาม" /><DueTable rows={data?.ownerDaily.due.ap ?? []} title="AP ที่ต้องจ่าย" /></div>
-      <Section border="border-slate-500" title="Actual Activity">
-        <Metric label="รับเงินจริง" tone="emerald" value={money(data?.ownerDaily.actualActivity.cashIn)} />
-        <Metric label="จ่ายเงินจริง" tone="red" value={money(data?.ownerDaily.actualActivity.cashOut)} />
-        <Metric label="Net" value={money(data?.ownerDaily.actualActivity.net)} />
-      </Section>
+      <div className={`relative overflow-hidden rounded-2xl p-6 text-white shadow-xl ${gapPositive ? 'bg-gradient-to-br from-emerald-500 to-teal-700' : 'bg-gradient-to-br from-red-500 to-rose-700 ring-4 ring-red-200'}`}>
+        <div className="absolute right-3 top-2 text-7xl opacity-15">{gapPositive ? '✅' : '⚠️'}</div>
+        <div className="relative">
+          <div className="text-sm opacity-80">{gapPositive ? '✓ คาดการณ์เงินเหลือสิ้นวัน' : '⚠ คาดการณ์เงินขาด ต้องเตรียม!'}</div>
+          <div className="mt-1 font-mono text-5xl font-bold">{money(plan?.gap)}</div>
+          <div className="mt-2 text-sm opacity-90">= 💵 เงินสด {money(plan?.available)} + 📥 คาดเข้า {money(plan?.expectedIn)} − 📤 คาดออก {money(plan?.expectedOut)}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <LegacyKpi border="border-blue-500" label="💵 เงินสดในมือ" sub="รวม Cash + Bank" tone="blue" value={money(plan?.available)} />
+        <LegacyKpi border="border-emerald-500" label="📥 คาดรับวันนี้" sub={`${data?.ownerDaily.due.ar.length ?? 0} ลูกค้าครบกำหนด`} tone="emerald" value={`+${money(plan?.expectedIn)}`} />
+        <LegacyKpi border="border-red-500" label="📤 คาดจ่ายวันนี้" sub={`AP ${money(data?.ownerDaily.due.ap.reduce((sum, row) => sum + row.amount, 0))} · Loan ${money(data?.ownerDaily.loanToday.reduce((sum, row) => sum + row.amount, 0))} · Exp ${money(data?.ownerDaily.expensesToday.reduce((sum, row) => sum + row.amount, 0))}`} tone="red" value={`-${money(plan?.expectedOut)}`} />
+      </div>
+      {(pending.tradingPending ?? 0) > 0 ? <PendingBlock color="purple" cta="→ ไป Trading Matching" title="🔄 Trading Pending รับเงิน — จ่ายซื้อ Trading แล้ว แต่ยังไม่เปิดบิลขาย" cards={[['📋 บิลซื้อ Trading', String(pending.tradingPending)], ['💸 จ่ายไปแล้ว', money(pending.tradingPaidTotal)], ['✓ Match แล้ว', money(pending.tradingMatchedTotal)], ['⏳ Pending รับเงิน', money(pending.tradingPendingValue)]]} /> : null}
+      {(pending.pendingIssueCount ?? 0) > 0 ? <PendingBlock color="amber" cta="→ ดูทั้งหมด" title="📦 ต้นทุนรอเปิดบิล (Pending Sale) — เงินค้างใน Stock ที่เบิกออกไปแล้ว" cards={[['⏰ จำนวนใบ', `${pending.pendingIssueCount} ใบ`], ['⚖ น้ำหนักรวม', `${money(pending.pendingIssueQty)} กก.`], ['💰 ต้นทุน (เงินที่ค้างอยู่)', money(pending.pendingIssueCost)], ['📈 ยอดขายคาด', money(pending.pendingIssueEst)]]} /> : null}
+      <div className="rounded-2xl bg-white p-4 shadow-lg">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">📊 ที่เกิดขึ้นจริงวันนี้แล้ว</h3>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Tile tone="emerald" label="📥 รับเงินจริง" value={`+${money(actual?.cashIn)}`} />
+          <Tile tone="red" label="📤 จ่าย Supplier" value={`-${money(actual?.paymentOut)}`} />
+          <Tile tone="orange" label="💰 ค่าใช้จ่าย" value={`-${money(actual?.expenseOut)}`} />
+          <Tile tone="amber" label="📦 FG พร้อมขาย" sub={`${money(actual?.fgQty)} กก.`} value={money(actual?.fgValue)} />
+        </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2"><OwnerDueTable rows={data?.ownerDaily.due.ar ?? []} title="📥 ลูกหนี้ที่ควรเก็บวันนี้" type="ar" /><OwnerDueTable rows={data?.ownerDaily.due.ap ?? []} title="📤 เจ้าหนี้ที่ต้องจ่ายวันนี้" type="ap" /></div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <OwnerSmallTable rows={data?.ownerDaily.loanToday ?? []} title="🏦 ค่างวด/ดอกเบี้ยวันนี้" />
+        <OwnerSmallTable rows={(data?.ownerDaily.expensesToday ?? []).map((row) => ({ amount: row.amount, docNo: row.docNo, name: row.payee }))} title="💰 ค่าใช้จ่ายวันนี้" />
+        <Panel title="📋 รายการรอดำเนินการ">
+          <div className="space-y-3 text-sm">
+            <MiniLine label="📥 บิลซื้อ Draft" value={money(pending.pendingPurchaseCount)} />
+            <MiniLine label="📤 บิลขาย Draft" value={money(pending.pendingSalesCount)} />
+            <MiniLine label={`📦 FG พร้อมขาย (${money(pending.fgQty)} กก.)`} value={money(pending.fgValue)} />
+          </div>
+        </Panel>
+      </div>
     </>
   )
 }
 
-function DailyReportView({ data, date, setDate }: { data: MainPayload | null; date: string; setDate: (value: string) => void }) {
+function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, setRangeFrom, setRangeMode, setRangeTo }: { data: MainPayload | null; date: string; rangeFrom: string; rangeMode: string; rangeTo: string; setDate: (value: string) => void; setRangeFrom: (value: string) => void; setRangeMode: (value: string) => void; setRangeTo: (value: string) => void }) {
+  const [expandedGroup, setExpandedGroup] = useState('')
+  const summary = data?.dailyReport.summary ?? {}
+  const purchaseCount = data?.dailyReport.purchaseBills.length ?? 0
+  const salesCount = data?.dailyReport.salesBills.length ?? 0
+  const analytics = data?.dailyReport.analytics
+  const trendMax = Math.max(1, ...(analytics?.dailyTrend ?? []).flatMap((row) => [row.purchase, row.sales]))
+  const isToday = date === today()
+  function shiftDate(days: number) {
+    const next = new Date(`${date}T00:00:00`)
+    next.setDate(next.getDate() + days)
+    setDate(next.toISOString().slice(0, 10))
+  }
+  function applyRange(mode: string) {
+    setRangeMode(mode)
+    const end = new Date(`${today()}T00:00:00`)
+    const start = new Date(end)
+    if (mode === 'yesterday') {
+      start.setDate(end.getDate() - 1)
+      end.setDate(end.getDate() - 1)
+    } else if (mode === 'last7') start.setDate(end.getDate() - 6)
+    else if (mode === 'last30') start.setDate(end.getDate() - 29)
+    else if (mode === 'last90') start.setDate(end.getDate() - 89)
+    else if (mode === 'month') start.setDate(1)
+    setRangeFrom(start.toISOString().slice(0, 10))
+    setRangeTo(end.toISOString().slice(0, 10))
+  }
+  function printReport() {
+    window.print()
+  }
   return (
     <>
-      <div className="rounded-2xl bg-gradient-to-r from-orange-600 to-orange-500 p-5 text-white shadow-lg">
-        <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold">📰 Daily Report</h1><input className="rounded bg-white px-3 py-2 text-sm font-semibold text-orange-700" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
+      <div className="rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 p-5 text-white shadow-lg">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h1 className="text-3xl font-bold">📰 Daily Report</h1><p className="mt-1 text-sm opacity-90">รายงานสรุปประจำวัน — ทุกตัวเลขสำคัญในหน้าเดียว</p></div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="rounded bg-white/20 px-3 py-2 text-sm font-bold hover:bg-white/30" type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
+            <input className="rounded bg-white px-3 py-2 text-sm font-bold text-slate-900" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            <button className="rounded bg-white/20 px-3 py-2 text-sm font-bold hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-30" disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
+            <button className={isToday ? 'rounded bg-white px-4 py-2 text-sm font-bold text-amber-700' : 'rounded bg-yellow-300 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-yellow-200'} type="button" onClick={() => setDate(today())}>📍 วันนี้</button>
+          </div>
+        </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <BigCard label="รับซื้อประจำวัน" tone="from-blue-600 to-indigo-700" value={money(data?.dailyReport.summary.purchaseAmount)} sub={`${money(data?.dailyReport.summary.purchaseQty)} กก.`} />
-        <BigCard label="ขายประจำวัน" tone="from-emerald-600 to-teal-700" value={money(data?.dailyReport.summary.salesAmount)} sub={`${money(data?.dailyReport.summary.salesQty)} กก.`} />
+        <DailyBigCard count={purchaseCount} icon="📥" label="ยอดรับซื้อ" sub={`เฉลี่ย ${money((summary.purchaseAmount ?? 0) / Math.max(1, summary.purchaseQty ?? 0))} ฿/กก.`} tone="from-blue-600 to-indigo-700" value={money(summary.purchaseAmount)} weight={money(summary.purchaseQty)} />
+        <DailyBigCard count={salesCount} icon="📤" label="ยอดขาย" sub={`GP ${money(summary.salesAmount - (analytics?.rangeKpi.cogs ?? 0))} (${money(analytics?.rangeKpi.gpPct)}%)`} tone="from-emerald-600 to-teal-700" value={money(summary.salesAmount)} weight={money(summary.salesQty)} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-2"><BillTable rows={data?.dailyReport.purchaseBills ?? []} title="📋 บิลรับซื้อประจำวัน" tone="blue" /><BillTable rows={data?.dailyReport.salesBills ?? []} title="📋 บิลขายประจำวัน" tone="emerald" /></div>
-      <BillTable rows={(data?.dailyReport.expenseRows ?? []).map((row) => ({ amount: row.amount, docNo: row.docNo, name: `${row.category} · ${row.payee}`, qty: 0 }))} title="🧾 ค่าใช้จ่ายประจำวัน" tone="amber" />
-      <Section border="border-purple-500" title="Analytics Dashboard">
-        <Metric label="Cash In" tone="emerald" value={money(data?.dailyReport.cashMovement.cashIn)} />
-        <Metric label="Cash Out" tone="red" value={money(data?.dailyReport.cashMovement.cashOut)} />
-        <Metric label="Net Cash" value={money(data?.dailyReport.cashMovement.net)} />
-      </Section>
+      <GroupBreakdown groups={data?.dailyReport.groupBreakdown ?? []} expandedGroup={expandedGroup} setExpandedGroup={setExpandedGroup} />
+      <div className="grid gap-4 lg:grid-cols-2"><DailyBillTable rows={data?.dailyReport.purchaseBills ?? []} title={`📋 บิลรับซื้อประจำวัน (${purchaseCount})`} total={summary.purchaseAmount ?? 0} tone="blue" /><DailyBillTable rows={data?.dailyReport.salesBills ?? []} title={`📋 บิลขายประจำวัน (${salesCount})`} total={summary.salesAmount ?? 0} tone="emerald" /></div>
+      <ExpenseSummary rows={data?.dailyReport.expenseByCategory ?? []} total={summary.expenseAmount ?? 0} />
+      <CashMovement movement={data?.dailyReport.cashMovement} />
+      <div className="border-t-4 border-amber-300 pt-4">
+        <div className="mb-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 p-5 text-white shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><h2 className="text-2xl font-bold">📊 Analytics Dashboard</h2><p className="mt-1 text-xs opacity-90">รายงานสรุปแบบช่วงเวลา + Top 10/5 + Charts</p></div>
+            <div className="flex flex-wrap items-center gap-2">
+              {['today', 'yesterday', 'last7', 'last30', 'last90', 'month'].map((mode) => <button key={mode} className={rangeMode === mode ? 'rounded bg-white px-3 py-1.5 text-xs font-bold text-purple-700' : 'rounded bg-white/20 px-3 py-1.5 text-xs hover:bg-white/30'} type="button" onClick={() => applyRange(mode)}>{rangeLabel(mode)}</button>)}
+              <input className="rounded px-2 py-1 text-xs text-slate-900" type="date" value={rangeFrom} onChange={(event) => { setRangeMode('custom'); setRangeFrom(event.target.value) }} />
+              <span className="text-xs">→</span>
+              <input className="rounded px-2 py-1 text-xs text-slate-900" type="date" value={rangeTo} onChange={(event) => { setRangeMode('custom'); setRangeTo(event.target.value) }} />
+              <button className="rounded bg-white px-3 py-1.5 text-xs font-bold text-purple-700" type="button" onClick={printReport}>🖨 Export PDF / Print</button>
+            </div>
+          </div>
+        </div>
+        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+          <Metric label={`📥 ยอดซื้อ (${money(analytics?.rangeKpi.purchaseCount)} บิล)`} tone="blue" value={money(analytics?.rangeKpi.purchaseAmount)} />
+          <Metric label="⚖️ น้ำหนักรับซื้อ" tone="purple" value={money(analytics?.rangeKpi.purchaseQty)} />
+          <Metric label={`📤 ยอดขาย (${money(analytics?.rangeKpi.salesCount)} บิล)`} tone="emerald" value={money(analytics?.rangeKpi.salesAmount)} />
+          <Metric label="⚖️ น้ำหนักขาย" tone="cyan" value={money(analytics?.rangeKpi.salesQty)} />
+          <Metric label="💸 ค่าใช้จ่าย" tone="orange" value={money(analytics?.rangeKpi.expenseAmount)} />
+        </div>
+        <div className="mb-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl bg-white p-4 shadow-lg">
+            <h3 className="mb-2 font-bold text-slate-700">📈 ยอดซื้อ vs ขาย (รายวัน)</h3>
+            {(analytics?.dailyTrend ?? []).map((row) => <div key={row.label} className="mb-2 grid grid-cols-12 items-center gap-2 text-xs"><div className="col-span-3 font-mono">{row.label}</div><div className="col-span-4 rounded bg-blue-100"><div className="rounded bg-blue-500 p-1 text-right text-white" style={{ width: `${Math.max(10, row.purchase / trendMax * 100)}%` }}>{money(row.purchase)}</div></div><div className="col-span-5 rounded bg-emerald-100"><div className="rounded bg-emerald-500 p-1 text-right text-white" style={{ width: `${Math.max(10, row.sales / trendMax * 100)}%` }}>{money(row.sales)}</div></div></div>)}
+          </div>
+          <TopSimpleTable rows={analytics?.groupSummary ?? []} title="🥧 มูลค่าตามหมวดสินค้า" />
+        </div>
+        <div className="mb-4 grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="🥇 Top 10 ผู้ขาย (ยอดซื้อสูงสุด)" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="🥇 Top 10 ผู้ซื้อ (ยอดขายสูงสุด)" /></div>
+        <div className="mb-4 grid gap-4 lg:grid-cols-2"><ProductRank rows={analytics?.topProductsIn ?? []} title="📦 Top 5 สินค้ารับเข้า (ตามมูลค่า)" tone="indigo" /><ProductRank rows={analytics?.topProductsOut ?? []} title="📦 Top 5 สินค้าขายออก (ตามมูลค่า)" tone="teal" /></div>
+        <SalespersonTable rows={analytics?.bySalesperson ?? []} />
+      </div>
     </>
   )
+}
+
+function rangeLabel(mode: string) {
+  const labels: Record<string, string> = { last30: '30 วัน', last7: '7 วัน', last90: '90 วัน', month: 'เดือนนี้', today: 'วันนี้', yesterday: 'เมื่อวาน' }
+  return labels[mode] ?? mode
+}
+
+function LegacyKpi({ border, label, sub, tone, value }: { border: string; label: string; sub: string; tone: string; value: string }) {
+  const text = tone === 'blue' ? 'text-blue-700' : tone === 'emerald' ? 'text-emerald-700' : tone === 'red' ? 'text-red-700' : 'text-slate-700'
+  return <div className={`rounded-xl border-l-4 ${border} bg-gradient-to-br from-white to-slate-50 p-4 shadow-md`}><div className={`text-xs font-bold ${text}`}>{label}</div><div className={`mt-1 font-mono text-3xl font-bold ${text}`}>{value}</div><div className="mt-1 text-xs text-slate-500">{sub}</div></div>
+}
+
+function PendingBlock({ cards, color, cta, title }: { cards: [string, string][]; color: 'amber' | 'purple'; cta: string; title: string }) {
+  const gradient = color === 'purple' ? 'from-purple-50 to-pink-50' : 'from-amber-50 to-orange-50'
+  const border = color === 'purple' ? 'border-purple-500' : 'border-amber-500'
+  const text = color === 'purple' ? 'text-purple-700' : 'text-amber-700'
+  const button = color === 'purple' ? 'bg-purple-600' : 'bg-amber-600'
+  return (
+    <div className={`rounded-2xl border-l-4 ${border} bg-gradient-to-r ${gradient} p-4 shadow`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className={`text-sm font-bold ${text}`}>{title}</h3>
+        <button className={`rounded ${button} px-3 py-1.5 text-xs font-bold text-white opacity-60`} disabled type="button">{cta}</button>
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{cards.map(([label, value]) => <div key={label} className="rounded-lg border bg-white p-3"><div className={`text-xs ${text}`}>{label}</div><div className={`font-mono text-2xl font-bold ${text}`}>{value}</div></div>)}</div>
+    </div>
+  )
+}
+
+function Tile({ label, sub, tone, value }: { label: string; sub?: string; tone: string; value: string }) {
+  return <div className={`rounded-xl p-3 text-center ${toneClass(tone)}`}><div className="text-xs">{label}</div><div className="font-mono text-2xl font-bold">{value}</div>{sub ? <div className="text-xs text-slate-400">{sub}</div> : null}</div>
+}
+
+function MiniLine({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between rounded bg-slate-50 p-2"><span>{label}</span><span className="font-bold text-amber-700">{value}</span></div>
+}
+
+function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; daysOverdue?: number; docNo: string; due: string; name: string }>; title: string; type: 'ap' | 'ar' }) {
+  const header = type === 'ar' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+  return <div className="overflow-hidden rounded-xl bg-white shadow"><div className={`flex justify-between border-b p-3 font-bold ${header}`}><span>{title} ({rows.length})</span><span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span></div><div className="max-h-64 overflow-x-auto"><table className="w-full text-sm"><thead className="sticky top-0 bg-slate-100"><tr><th className="p-2 text-left">{type === 'ar' ? 'ลูกค้า' : 'Supplier'}</th><th className="p-2 text-left">บิล</th><th className="p-2 text-left">Due</th><th className="p-2 text-right">ค้าง</th>{type === 'ar' ? <th className="p-2 text-right">เกินวัน</th> : null}</tr></thead><tbody>{rows.map((row) => <tr key={row.docNo} className="border-t"><td className="p-2 text-xs">{row.name}</td><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2 text-xs">{row.due}</td><td className="p-2 text-right font-bold">{money(row.amount)}</td>{type === 'ar' ? <td className={row.daysOverdue ? 'p-2 text-right font-bold text-red-700' : 'p-2 text-right text-slate-400'}>{row.daysOverdue || '-'}</td> : null}</tr>)}{rows.length === 0 ? <tr><td className="py-4 text-center text-slate-400" colSpan={type === 'ar' ? 5 : 4}>{type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด ✓' : 'ไม่มี ✓'}</td></tr> : null}</tbody></table></div></div>
+}
+
+function OwnerSmallTable({ rows, title }: { rows: Array<{ amount: number; contractNo?: string; docNo?: string; installmentNo?: number; name?: string }>; title: string }) {
+  return <div className="overflow-hidden rounded-xl bg-white shadow"><div className="flex justify-between border-b bg-amber-50 p-3 font-bold text-amber-700"><span>{title} ({rows.length})</span><span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span></div><table className="w-full text-xs"><tbody>{rows.map((row, index) => <tr key={`${row.docNo ?? row.contractNo ?? index}`} className="border-t"><td className="p-2 font-mono">{row.docNo ?? row.contractNo}</td><td className="p-2">{row.name ?? row.installmentNo ?? '-'}</td><td className="p-2 text-right font-bold">{money(row.amount)}</td></tr>)}{rows.length === 0 ? <tr><td className="py-4 text-center text-slate-400" colSpan={3}>ไม่มี ✓</td></tr> : null}</tbody></table></div>
+}
+
+function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count: number; icon: string; label: string; sub: string; tone: string; value: string; weight: string }) {
+  return <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${tone} p-6 text-white shadow-xl`}><div className="absolute right-4 top-3 text-7xl opacity-15">{icon}</div><div className="relative"><div className="text-sm font-bold opacity-90">{icon} {label} ({count} บิล)</div><div className="mt-3 grid grid-cols-2 gap-6"><div><div className="text-xs opacity-80">น้ำหนัก</div><div className="font-mono text-4xl font-bold">{weight}</div><div className="text-xs opacity-80">กิโลกรัม</div></div><div><div className="text-xs opacity-80">ยอดเงิน</div><div className="font-mono text-4xl font-bold">{value}</div><div className="text-xs opacity-80">{sub}</div></div></div></div></div>
+}
+
+function GroupBreakdown({ expandedGroup, groups, setExpandedGroup }: { expandedGroup: string; groups: MainPayload['dailyReport']['groupBreakdown']; setExpandedGroup: (value: string) => void }) {
+  const max = Math.max(1, ...groups.map((row) => Math.max(row.buyAmt, row.sellAmt)))
+  return <div className="rounded-2xl bg-white p-5 shadow-lg"><h3 className="mb-3 font-bold text-slate-800">📊 หมวดสินค้า — ซื้อ vs ขาย <span className="text-xs font-normal text-slate-500">(กดที่หมวด → ดูรายละเอียดสินค้า)</span></h3>{groups.length === 0 ? <div className="py-10 text-center text-slate-400">ไม่มีรายการในวันนี้</div> : <div className="space-y-3">{groups.map((group) => <div key={group.group} className="overflow-hidden rounded-xl border"><button className="w-full p-3 text-left hover:bg-slate-50" type="button" onClick={() => setExpandedGroup(expandedGroup === group.group ? '' : group.group)}><div className="mb-2 flex items-center justify-between"><span className="font-bold text-slate-700">{expandedGroup === group.group ? '▼' : '▶'} {group.group} <span className="text-xs text-slate-400">({group.products.length} สินค้า)</span></span><span className="text-xs text-slate-500">รวม <b>{money(group.buyAmt + group.sellAmt)}</b> บาท</span></div><div className="grid grid-cols-2 gap-3 text-xs"><div><div className="mb-1 flex justify-between"><span className="text-blue-700">📥 ซื้อ</span><b>{money(group.buyQty)} กก. · {money(group.buyAmt)}</b></div><div className="h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${Math.min(100, group.buyAmt / max * 100)}%` }} /></div></div><div><div className="mb-1 flex justify-between"><span className="text-emerald-700">📤 ขาย</span><b>{money(group.sellQty)} กก. · {money(group.sellAmt)}</b></div><div className="h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500" style={{ width: `${Math.min(100, group.sellAmt / max * 100)}%` }} /></div></div></div></button>{expandedGroup === group.group ? <div className="overflow-x-auto border-t p-3"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-100"><tr><th className="p-2 text-left">Code</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">ซื้อ กก.</th><th className="p-2 text-right">ซื้อ</th><th className="p-2 text-right">ขาย กก.</th><th className="p-2 text-right">ขาย</th><th className="p-2 text-right">Spread/กก.</th></tr></thead><tbody>{group.products.map((row) => <tr key={row.productId} className="border-t"><td className="p-2 font-mono">{row.productCode}</td><td className="p-2">{row.productName}</td><td className="p-2 text-right">{money(row.buyQty)}</td><td className="p-2 text-right text-blue-700">{money(row.buyAmt)}</td><td className="p-2 text-right">{money(row.sellQty)}</td><td className="p-2 text-right text-emerald-700">{money(row.sellAmt)}</td><td className="p-2 text-right font-bold">{row.sellQty && row.buyQty ? money(row.sellAmt / row.sellQty - row.buyAmt / row.buyQty) : '-'}</td></tr>)}</tbody></table></div> : null}</div>)}</div>}</div>
+}
+
+function DailyBillTable({ rows, title, tone, total }: { rows: { amount: number; docNo: string; name: string; qty: number }[]; title: string; tone: 'blue' | 'emerald'; total: number }) {
+  const header = tone === 'blue' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+  const hover = tone === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
+  const amountColor = tone === 'blue' ? 'text-blue-700' : 'text-emerald-700'
+  return <div className="overflow-hidden rounded-2xl bg-white shadow-lg"><div className={`flex justify-between border-b p-3 ${header}`}><h3 className="font-bold">{title}</h3><span className="text-sm font-bold">{money(total)}</span></div><div className="max-h-[300px] overflow-x-auto"><table className="w-full text-sm"><thead className="sticky top-0 bg-slate-50"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">{tone === 'blue' ? 'Supplier' : 'Customer'}</th><th className="p-2 text-right">กก.</th><th className="p-2 text-right">ยอด</th></tr></thead><tbody>{rows.map((row) => <tr key={row.docNo} className={`border-t ${hover}`}><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2 text-xs">{row.name}</td><td className="p-2 text-right">{money(row.qty)}</td><td className={`p-2 text-right font-bold ${amountColor}`}>{money(row.amount)}</td></tr>)}{rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={4}>{tone === 'blue' ? 'ไม่มีบิลซื้อ' : 'ไม่มีบิลขาย'}</td></tr> : null}</tbody></table></div></div>
+}
+
+function ExpenseSummary({ rows, total }: { rows: { amount: number; count: number; name: string }[]; total: number }) {
+  const max = Math.max(1, ...rows.map((row) => row.amount))
+  return <div className="rounded-2xl bg-white p-5 shadow-lg"><div className="mb-3 flex justify-between"><h3 className="font-bold text-slate-800">💸 ค่าใช้จ่ายประจำวัน ({rows.reduce((sum, row) => sum + row.count, 0)} รายการ)</h3><span className="text-lg font-bold text-red-600">รวม {money(total)} บาท</span></div>{rows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีค่าใช้จ่ายวันนี้</div> : <div className="space-y-2">{rows.map((row) => <div key={row.name}><div className="mb-1 flex justify-between text-sm"><span className="font-medium">📂 {row.name} <span className="text-xs text-slate-400">({row.count} รายการ)</span></span><span className="font-mono font-bold text-red-600">{money(row.amount)}</span></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-gradient-to-r from-red-500 to-orange-500" style={{ width: `${Math.min(100, row.amount / max * 100)}%` }} /></div></div>)}</div>}</div>
+}
+
+function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cashMovement'] }) {
+  return <div className="rounded-2xl bg-white p-5 shadow-lg"><h3 className="mb-3 font-bold text-slate-800">💰 เงินหมุนประจำวัน</h3><div className="mb-4 grid gap-3 md:grid-cols-3"><Tile tone="emerald" label="📥 เงินเข้ารวม" value={money(movement?.cashIn)} /><Tile tone="red" label="📤 เงินออกรวม" value={money(movement?.cashOut)} /><Tile tone={(movement?.net ?? 0) >= 0 ? 'blue' : 'red'} label="📊 Net Cash" value={money(movement?.net)} /></div><div className="mb-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">{(movement?.byType ?? []).map((row) => <div key={row.label} className="rounded bg-slate-50 p-3"><div className="text-xs text-slate-600">{row.label}</div><div className="mt-1 flex justify-between"><span className="text-sm text-emerald-600">+{money(row.cashIn)}</span><span className="text-sm text-red-600">-{money(row.cashOut)}</span></div></div>)}</div><div className="overflow-x-auto"><table className="w-full border-t text-sm"><thead className="bg-slate-50"><tr><th className="p-2 text-left">บัญชี</th><th className="p-2 text-right">เข้า</th><th className="p-2 text-right">ออก</th><th className="p-2 text-right">Net</th></tr></thead><tbody>{(movement?.accounts ?? []).map((row) => <tr key={row.name} className="border-t"><td className="p-2"><b>{row.name}</b> <span className="text-xs text-slate-400">{row.type}</span></td><td className="p-2 text-right font-mono text-emerald-700">{row.cashIn > 0 ? money(row.cashIn) : '-'}</td><td className="p-2 text-right font-mono text-red-600">{row.cashOut > 0 ? money(row.cashOut) : '-'}</td><td className={(row.cashIn - row.cashOut) >= 0 ? 'p-2 text-right font-mono font-bold text-blue-700' : 'p-2 text-right font-mono font-bold text-rose-600'}>{money(row.cashIn - row.cashOut)}</td></tr>)}</tbody></table></div></div>
+}
+
+function TopSimpleTable({ rows, title }: { rows: { amount: number; group: string; qty: number }[]; title: string }) {
+  return <div className="rounded-2xl bg-white p-4 shadow-lg"><h3 className="mb-2 font-bold text-slate-700">{title}</h3><table className="w-full text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-1.5 text-left">หมวด</th><th className="p-1.5 text-right">กก.</th><th className="p-1.5 text-right">มูลค่า</th></tr></thead><tbody>{rows.map((row) => <tr key={row.group} className="border-t"><td className="p-1.5 font-medium">{row.group}</td><td className="p-1.5 text-right">{money(row.qty)}</td><td className="p-1.5 text-right font-bold text-indigo-700">{money(row.amount)}</td></tr>)}</tbody></table></div>
+}
+
+function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: { amount: number; bills: number; id: string; name: string; qty: number }[]; title: string }) {
+  const header = color === 'blue' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+  const hover = color === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
+  const text = color === 'blue' ? 'text-blue-700' : 'text-emerald-700'
+  return <div className="overflow-hidden rounded-2xl bg-white shadow-lg"><div className={`border-b p-3 ${header}`}><h3 className="font-bold">{title}</h3></div><table className="w-full text-sm"><tbody>{rows.map((row, index) => <tr key={row.id} className={`border-t ${hover}`}><td className={`p-2 font-bold ${text}`}>{index + 1}</td><td className="p-2 text-xs">{row.name}</td><td className="p-2 text-right text-xs">{row.bills}</td><td className="p-2 text-right text-xs">{money(row.qty)}</td><td className={`p-2 text-right font-bold ${text}`}>{money(row.amount)}</td></tr>)}</tbody></table></div>
+}
+
+function ProductRank({ rows, title, tone }: { rows: { amount: number; code: string; group: string; id: string; name: string; qty: number }[]; title: string; tone: 'indigo' | 'teal' }) {
+  const header = tone === 'indigo' ? 'bg-indigo-50 text-indigo-700' : 'bg-teal-50 text-teal-700'
+  const text = tone === 'indigo' ? 'text-indigo-700' : 'text-teal-700'
+  return <div className="overflow-hidden rounded-2xl bg-white shadow-lg"><div className={`border-b p-3 ${header}`}><h3 className="font-bold">{title}</h3></div><table className="w-full text-sm"><tbody>{rows.map((row, index) => <tr key={row.id} className="border-t"><td className={`p-2 font-bold ${text}`}>{index + 1}</td><td className="p-2 font-mono text-xs">{row.code}</td><td className="p-2 text-xs">{row.name}</td><td className="p-2 text-xs text-slate-500">{row.group}</td><td className="p-2 text-right text-xs">{money(row.qty)}</td><td className={`p-2 text-right font-bold ${text}`}>{money(row.amount)}</td></tr>)}</tbody></table></div>
+}
+
+function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id: string; name: string; qty: number; suppliers: number }[] }) {
+  return <div className="rounded-2xl bg-white p-4 shadow"><h3 className="mb-3 font-bold text-slate-700">🆕 ยอดซื้อแต่ละ Sale — จำนวน supplier/กก./ยอดซื้อ</h3><table className="w-full text-xs"><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="p-2">{row.name}</td><td className="p-2 text-right">{row.suppliers} supplier</td><td className="p-2 text-right">{money(row.qty)} กก.</td><td className="p-2 text-right font-bold text-blue-700">{money(row.amount)}</td><td className="p-2 text-right">{row.bills} บิล</td></tr>)}</tbody></table></div>
 }
 
 function money(value?: number) {
