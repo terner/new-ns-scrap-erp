@@ -88,6 +88,9 @@ export async function GET(request: Request) {
         totalAmount: total,
       }
     })
+      .filter((row) => !from || row.date >= from)
+      .filter((row) => !to || row.date <= to)
+      .filter((row) => !q || `${row.docNo} ${row.supplierName}`.toLowerCase().includes(q))
 
     const salesRows = salesBills.map((bill) => {
       const total = toNumber(bill.subtotal) || toNumber(bill.total_amount)
@@ -102,6 +105,9 @@ export async function GET(request: Request) {
         totalAmount: total,
       }
     })
+      .filter((row) => !from || row.date >= from)
+      .filter((row) => !to || row.date <= to)
+      .filter((row) => !q || `${row.docNo} ${row.customerName}`.toLowerCase().includes(q))
 
     const dealRows = deals.map((deal) => {
       const salesAmount = toNumber(deal.matched_sales_amount)
@@ -158,7 +164,7 @@ export async function GET(request: Request) {
       purchases: purchaseRows,
       sales: salesRows,
       summary: {
-        activeDeals: activeDeals.length,
+        activeDeals: dealRows.filter((deal) => !isCancelled(deal.status)).length,
         grossProfit: dealRows.filter((deal) => !isCancelled(deal.status)).reduce((sum, deal) => sum + deal.grossProfit, 0),
         purchaseRemaining: purchaseRows.reduce((sum, row) => sum + row.remainingAmount, 0),
         purchaseTotal: purchaseRows.reduce((sum, row) => sum + row.totalAmount, 0),

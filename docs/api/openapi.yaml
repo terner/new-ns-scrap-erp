@@ -969,6 +969,8 @@ paths:
         - $ref: "#/components/parameters/POSellQ"
         - $ref: "#/components/parameters/POSellStatus"
         - $ref: "#/components/parameters/POSellMatchStatus"
+        - $ref: "#/components/parameters/POSellFrom"
+        - $ref: "#/components/parameters/POSellTo"
         - $ref: "#/components/parameters/Format"
       responses:
         "200":
@@ -1406,7 +1408,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [FIFO, LIFO, Cheap, Expensive, Manual]
+            enum: [FIFO, LIFO, Cheap, Expensive]
             default: FIFO
       responses:
         "200":
@@ -1644,6 +1646,20 @@ components:
         type: string
         maxLength: 40
       description: Raw PO Sell status from `po_sells.status`; display normalization is read-only.
+    POSellFrom:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date
+      description: Inclusive PO Sell date lower bound.
+    POSellTo:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date
+      description: Inclusive PO Sell date upper bound.
     POBuyFrom:
       name: from
       in: query
@@ -1987,15 +2003,15 @@ components:
                 type: [string, "null"]
               matchStatus:
                 type: [string, "null"]
-              customer:
+              customerName:
                 type: [string, "null"]
-              salesChannel:
+              channelName:
                 type: [string, "null"]
-              branch:
+              branchName:
                 type: [string, "null"]
-              product:
+              productName:
                 type: [string, "null"]
-              relatedDealNo:
+              date:
                 type: [string, "null"]
             additionalProperties: true
         summary:

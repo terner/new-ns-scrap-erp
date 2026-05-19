@@ -157,7 +157,6 @@ export function CostAllocatorPageClient() {
                 <option value="LIFO">LIFO - ต้นทุนล่าสุดก่อน</option>
                 <option value="Cheap">Cheap First - ต้นทุนถูกก่อน</option>
                 <option value="Expensive">Expensive First - ต้นทุนแพงก่อน</option>
-                <option value="Manual">Manual - เลือกเอง (preview)</option>
               </select>
             </div>
           </div>

@@ -1074,9 +1074,20 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### D8: Dual Costing QA Batch
 
-- [ ] QA checker
-- [ ] type/lint/build
+- [x] QA checker
+- [x] type/lint/build
 - [ ] commit/push
+
+#### Execution Log
+
+- Task: D8 Dual Costing QA checkpoint across D1-D7 routes/APIs.
+- Scope checked: `/sales/po-sell`, `/purchase/po-buy`, `/trading/dashboard`, `/trading/matching`, `/dual-costing/cost-pool`, `/dual-costing/cost-allocator`, `/dual-costing/match-log`, `/dual-costing/deal-margin`, and `/dual-costing/compare-margin`.
+- QA fixes applied: added PO Sell `from`/`to` date filter support in API/UI/export/OpenAPI; aligned Trading Matching `q/from/to` filters across deals, purchase rows, sales rows, and summary; rebuilt Cost Pool status filter options after usage calculation; changed Cost Pool derived display refs to use business document refs instead of source UUIDs; removed unsupported Cost Allocator `Manual` mode from API/UI/OpenAPI; made Deal Margin `statusMatch` respect raw partial/full status text; limited Compare Margin stock side to trading/PO-linked sales bills; aligned PO Sell OpenAPI row names with runtime `customerName`/`channelName`/`branchName`/`productName`.
+- Playwright smoke: authenticated smoke across all 9 pages/APIs returned page/API `200`, no login fallback, no desktop/mobile overflow, and no console errors; export-capable endpoints returned XLSX with `PK` signature. Targeted post-fix smoke confirmed PO Sell has 2 date inputs, Cost Pool statuses include `Available`, `Fully Used`, and `Partially Used`, first Cost Pool id `CP-POB-POB-051-P145` does not expose a UUID, Cost Allocator modes are `FIFO/LIFO/Cheap/Expensive`, Trading Matching empty `q` filter returns zero rows and zero summary, and Compare Margin stock side now reads 23 trading/PO-linked sales bills.
+- Subagent QA: unauth subagent confirmed all 9 protected routes redirect to `/login?redirect=...` and all 9 APIs return `401`; UI/source subagent confirmed D5-D7 card/color baselines match the tracker and found missing PO Sell date filters, now fixed; API/contract subagent findings were fixed except permission granularity.
+- Carry-over: permission guard for trading/dual-costing still uses `finance.cash.view`; redesign as a dedicated trading/cost/profit permission slice instead of changing guards ad hoc in this QA batch.
+- Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 130`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
+- Result: D8 Dual Costing QA checkpoint passed with targeted contract/UI fixes; permission split remains a future auth batch.
 
 ## Batch FF: Foreign Finance
 

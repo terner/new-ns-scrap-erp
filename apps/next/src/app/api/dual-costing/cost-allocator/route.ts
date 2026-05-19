@@ -231,7 +231,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       candidates,
       filters: {
-        modes: ['FIFO', 'LIFO', 'Cheap', 'Expensive', 'Manual'],
+        modes: ['FIFO', 'LIFO', 'Cheap', 'Expensive'],
         products: productOptions,
         sourceTypes: ['po-sell', 'spot-sell'],
       },

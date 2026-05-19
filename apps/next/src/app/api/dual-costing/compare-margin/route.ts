@@ -35,6 +35,11 @@ export async function GET(request: Request) {
         take: 10000,
         where: {
           ...(from || to ? { date: dateWhere } : {}),
+          OR: [
+            { transaction_mode: 'TRADING' },
+            { po_sell_id: { not: null } },
+            { trading_from_purchase_id: { not: null } },
+          ],
           NOT: { status: { in: ['cancelled', 'Cancelled'] } },
         },
       }),
@@ -63,7 +68,7 @@ export async function GET(request: Request) {
       },
       notes: [
         'Deal side reads matched sales/purchase amounts from trading_deals.',
-        'Stock side reads sales_bills total_amount and cogs_amount/total_cost where available.',
+        'Stock side is limited to trading/PO-linked sales_bills and reads total_amount plus cogs_amount/total_cost where available.',
       ],
       stockTotals: {
         cost: stockCost,

@@ -85,16 +85,23 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url)
     const q = url.searchParams.get('q')?.trim().toLowerCase()
+    const from = url.searchParams.get('from')
+    const to = url.searchParams.get('to')
     const statusFilter = url.searchParams.get('status')
     const matchStatusFilter = url.searchParams.get('matchStatus')
     const activeStatusFilter = statusFilter && statusFilter !== 'all' ? statusFilter : null
     const activeMatchStatusFilter = matchStatusFilter && matchStatusFilter !== 'all' ? matchStatusFilter : null
+    const dateWhere = {
+      ...(from ? { gte: new Date(from) } : {}),
+      ...(to ? { lte: new Date(to) } : {}),
+    }
 
     const [poSells, branches, channels, products, salesBills, tradingDeals] = await Promise.all([
       prisma.po_sells.findMany({
         include: { customers: true },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 5000,
+        where: from || to ? { date: dateWhere } : undefined,
       }),
       prisma.branches.findMany({ select: { id: true, name: true } }),
       prisma.sales_channels.findMany({ select: { id: true, name: true } }),

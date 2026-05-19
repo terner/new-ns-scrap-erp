@@ -59,7 +59,11 @@ function xlsxResponse(body: Buffer, filename: string) {
   })
 }
 
-function statusMatch(qty: number, matchedQty: number): DealMarginRow['statusMatch'] {
+function statusMatch(qty: number, matchedQty: number, rawStatus?: string | null): DealMarginRow['statusMatch'] {
+  const normalizedStatus = rawStatus?.toLowerCase() ?? ''
+  if (normalizedStatus.includes('partial')) return 'Partial'
+  if (normalizedStatus.includes('none') || normalizedStatus.includes('unmatched')) return 'None'
+  if (normalizedStatus.includes('fully') || normalizedStatus.includes('complete')) return 'Fully'
   if (matchedQty <= 0) return 'None'
   if (qty > 0 && matchedQty >= qty - 0.001) return 'Fully'
   return 'Partial'
@@ -100,7 +104,7 @@ export async function GET(request: Request) {
         matchedCost,
         matchedQty,
         product: deal.products?.name ?? deal.product_id ?? '-',
-        statusMatch: statusMatch(matchedQty, matchedQty),
+        statusMatch: statusMatch(matchedQty, matchedQty, deal.status),
         totalRevenue,
         unitPrice,
       }

@@ -223,7 +223,7 @@ export async function GET(request: Request) {
         const qty = item.qty
         const unitCost = item.unitCost
         if (qty <= 0 || unitCost <= 0) return
-        const costPoolId = `CP-POB-${po.id}-${item.lineId}`
+        const costPoolId = `CP-POB-${po.doc_no}-${item.lineId}`
         sourceIdByPoolId.set(costPoolId, po.id)
         rows.push({
           availableQty: qty,
@@ -256,7 +256,7 @@ export async function GET(request: Request) {
         const unitCost = qty > 0 ? totalCost / qty : 0
         if (qty <= 0 || unitCost <= 0) return
         const product = item.productId ?? ''
-        const costPoolId = `CP-SPT-${bill.id}-${index}-${product || 'line'}`
+        const costPoolId = `CP-SPT-${bill.doc_no}-${index}-${product || 'line'}`
         sourceIdByPoolId.set(costPoolId, bill.id)
         rows.push({
           availableQty: qty,
@@ -288,7 +288,8 @@ export async function GET(request: Request) {
       const totalCost = toNumber(output.total_cost)
       const unitCost = qty > 0 ? totalCost / qty : 0
       if (qty <= 0 || unitCost <= 0) return
-      const costPoolId = `CP-PRD-${output.id}`
+      const sourceNo = output.production_orders?.doc_no ?? toDateOnly(output.date)
+      const costPoolId = `CP-PRD-${sourceNo}-${output.product_id ?? 'product'}`
       sourceIdByPoolId.set(costPoolId, output.id)
       rows.push({
         availableQty: qty,
@@ -303,7 +304,7 @@ export async function GET(request: Request) {
         qty,
         sourceId: output.id,
         sourceLineId: '',
-        sourceNo: output.production_orders?.doc_no ?? output.id,
+        sourceNo,
         sourceType: 'Production',
         status: 'Available',
         totalCost,
@@ -317,7 +318,8 @@ export async function GET(request: Request) {
       const totalCost = Math.max(0, toNumber(adjustment.value_diff))
       const unitCost = qty > 0 ? totalCost / qty : 0
       if (qty <= 0 || unitCost <= 0) return
-      const costPoolId = `CP-RGD-${adjustment.id}`
+      const sourceNo = adjustment.doc_no || toDateOnly(adjustment.date)
+      const costPoolId = `CP-RGD-${sourceNo}-${adjustment.product_id ?? 'product'}`
       sourceIdByPoolId.set(costPoolId, adjustment.id)
       rows.push({
         availableQty: qty,
@@ -332,7 +334,7 @@ export async function GET(request: Request) {
         qty,
         sourceId: adjustment.id,
         sourceLineId: '',
-        sourceNo: adjustment.doc_no,
+        sourceNo,
         sourceType: 'Regrade',
         status: 'Available',
         totalCost,
@@ -347,7 +349,8 @@ export async function GET(request: Request) {
       usedValueByPurchaseBillId.set(deal.purchase_bill_id, (usedValueByPurchaseBillId.get(deal.purchase_bill_id) ?? 0) + toNumber(deal.matched_purchase_amount))
     })
 
-    const withUsage = applyUsedValue(rows, usedValueByPurchaseBillId, sourceIdByPoolId)
+    const rowsWithUsage = applyUsedValue(rows, usedValueByPurchaseBillId, sourceIdByPoolId)
+    const withUsage = rowsWithUsage
       .filter((row) => !showAvailableOnly || row.availableQty > 0)
       .filter((row) => !costType || costType === 'all' || row.costType === costType)
       .filter((row) => !sourceType || sourceType === 'all' || row.sourceType === sourceType)
@@ -374,10 +377,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       filters: {
-        costTypes: Array.from(new Set(rows.map((row) => row.costType))).sort(),
-        products: Array.from(new Map(rows.filter((row) => row.productId).map((row) => [row.productId, { id: row.productId, name: row.productName }])).values()).sort((left, right) => left.name.localeCompare(right.name)),
-        sourceTypes: Array.from(new Set(rows.map((row) => row.sourceType))).sort(),
-        statuses: Array.from(new Set(rows.map((row) => row.status))).sort(),
+        costTypes: Array.from(new Set(rowsWithUsage.map((row) => row.costType))).sort(),
+        products: Array.from(new Map(rowsWithUsage.filter((row) => row.productId).map((row) => [row.productId, { id: row.productId, name: row.productName }])).values()).sort((left, right) => left.name.localeCompare(right.name)),
+        sourceTypes: Array.from(new Set(rowsWithUsage.map((row) => row.sourceType))).sort(),
+        statuses: Array.from(new Set(rowsWithUsage.map((row) => row.status))).sort(),
       },
       rows: filteredRows,
       summary: {

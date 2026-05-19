@@ -217,9 +217,11 @@ Current scope:
 - D7a Match Log read baseline is implemented, validated, and pushed. It reads `trading_deals` as current source because normalized allocation logs are not designed yet; reverse/write remains deferred.
 - D7b Deal Margin read baseline is implemented, validated, and pushed. It reads `trading_deals` matched sales/purchase amounts and preserves the legacy purple/pink gross margin card layout.
 - D7c Compare Margin read baseline is implemented, validated, and pushed. It compares deal-side `trading_deals` with stock-side `sales_bills` revenue/COGS and preserves the legacy blue/purple/emerald diff-card layout.
+- D8 Dual Costing QA checkpoint is implemented and validated locally. It fixed PO Sell date filters, Trading Matching filter scope, Cost Pool business-facing display refs/status options, Cost Allocator modes, Deal Margin match status, Compare Margin stock scope, and PO Sell OpenAPI row names. Commit/push is the next checkpoint step.
 - Tracking routes must use active Next app only; legacy/Vue tracking views are source material.
 - Keep T1-T3 read/report baselines first; no write flows in tracking pages.
 - DB design preference clarified: use meaningful business-facing codes/running document numbers for user-visible references; keep UUID/opaque IDs internal only.
+- Permission carry-over: trading/dual-costing currently uses `finance.cash.view`; split into dedicated trading/cost/profit permissions in a later auth batch instead of changing guards ad hoc.
 
 Initial F0 findings:
 
@@ -230,9 +232,10 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Run D8 Dual Costing QA batch across D1-D7 routes.
-2. Keep Cost Pool read-derived first; no allocation or cost mutation until reconciliation rules are locked.
-3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
+1. Commit and push D8 Dual Costing QA checkpoint.
+2. Start Batch FF0 Foreign Finance legacy inventory and DB mapping.
+3. Keep Cost Pool read-derived first; no allocation or cost mutation until reconciliation rules are locked.
+4. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model
 

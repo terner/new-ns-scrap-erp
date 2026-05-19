@@ -48,22 +48,31 @@ type PoSellPayload = {
 export function PoSellPageClient() {
   const [data, setData] = useState<PoSellPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fromDate, setFromDate] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [matchStatus, setMatchStatus] = useState('all')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
+  const [toDate, setToDate] = useState('')
+
+  const dateQuery = useMemo(() => {
+    const params = new URLSearchParams()
+    if (fromDate) params.set('from', fromDate)
+    if (toDate) params.set('to', toDate)
+    return params.toString()
+  }, [fromDate, toDate])
 
   const loadData = useCallback(async () => {
     setError(null)
     setIsLoading(true)
     try {
-      setData(await dailyFetchJson<PoSellPayload>('/api/sales/po-sell'))
+      setData(await dailyFetchJson<PoSellPayload>(`/api/sales/po-sell${dateQuery ? `?${dateQuery}` : ''}`))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลด PO Sell ไม่ได้')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [dateQuery])
 
   useEffect(() => {
     void loadData()
@@ -82,10 +91,12 @@ export function PoSellPageClient() {
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ format: 'xlsx' })
     if (search.trim()) params.set('q', search.trim())
+    if (fromDate) params.set('from', fromDate)
+    if (toDate) params.set('to', toDate)
     if (status !== 'all') params.set('status', status)
     if (matchStatus !== 'all') params.set('matchStatus', matchStatus)
     return `/api/sales/po-sell?${params.toString()}`
-  }, [matchStatus, search, status])
+  }, [fromDate, matchStatus, search, status, toDate])
 
   return (
     <section className="space-y-4">
@@ -117,6 +128,8 @@ export function PoSellPageClient() {
             <option value="all">ทุก Matching</option>
             {(data?.filters.matchStatuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
+          <input aria-label="จากวันที่" className="rounded-lg border px-3 py-2 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          <input aria-label="ถึงวันที่" className="rounded-lg border px-3 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
           <input className="min-w-64 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="ค้นหาเลขที่ PO / Customer / ช่องทาง / สาขา / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <a className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
         </div>
