@@ -1153,7 +1153,8 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Validation added: restored branch label, address textarea density, bank/footer placeholders, logo delete text, and legacy usage note wording while keeping current input sanitization and API validation.
 - Playwright smoke: authenticated main Playwright session passed `/admin/company-profile` at desktop `1365x900` and mobile `390x844`; `GET /api/admin/company-profile` returned `200`, no page-level overflow/console warnings/errors/failed requests were found, and legacy markers/buttons were visible. Unauthenticated QA subagent confirmed route redirects to `/login?redirect=%2Fadmin%2Fcompany-profile` and API returns `401` JSON (`กรุณาเข้าสู่ระบบ`).
 - Commands: `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `git diff --check` passed.
-- Result: UI-ADM1 Company Profile legacy UI parity revision validated locally and ready to commit/push.
+- Result: UI-ADM1 Company Profile legacy UI parity revision validated and pushed.
+- Commit: `bebef00 fix: restore company profile legacy ui parity` pushed to `main`.
 
 ### UI-D2: Cost Pool / Cost Allocator Legacy UI Parity Revision
 

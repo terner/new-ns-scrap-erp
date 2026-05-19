@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: UI-D2 Cost Pool / Cost Allocator legacy UI parity (`488f7fa fix: restore cost pool allocator legacy ui parity`)
+Last pushed checkpoint: UI-ADM1 Company Profile legacy UI parity (`bebef00 fix: restore company profile legacy ui parity`)
 
 ## Current Batch
 
@@ -72,7 +72,7 @@ Status date: 2026-05-19
 - Current parity slice: Batch D Group A was revised after Tracking 360 and pushed as `0c9df8e`. It restores the legacy PO Buy blue info banner, colored KPI cards, Top Supplier/outstanding panels, compact filter/status/purpose-tab layout, checkbox/action table shell, and Trading Matching fuchsia hero/action cluster, GP mega card, status donut, match-rate/monthly/top-pair panels, compact KPI row, two-tab layout, and unmatched split tables. All create/move/cancel/cleanup/pull/recalc/reverse/match actions remain disabled/read-only.
 - Added to post-SYS parity queue per user request: `/admin/company-profile` (`https://new-ns-scrap-erp.vercel.app/admin/company-profile`). It already exists in the system sitemap and visual audit checklist, but now must be rechecked under the same legacy-first rule after the current Batch D parity slices finish.
 - Current parity slice: Batch D Group B was revised after Group A and pushed as `488f7fa`. It restores the legacy Cost Pool warning copy/icons, compact filters, 12-column table, and Cost Allocator `①/②` step sequence, Auto Match button placement, Manual option shell, preview table, and disabled confirm-match surface. No allocation/match write behavior is enabled.
-- Current parity slice: `/admin/company-profile` is validated locally after Batch D Group B per user request; commit/push pending. It restores the legacy company-profile action row, separate receipt/delivery preview buttons, usage note wording, field labels/placeholders, logo delete label, and compact form density while preserving existing API validation and `system.settings.manage` write guard.
+- Current parity slice: `/admin/company-profile` was revised after Batch D Group B per user request and pushed as `bebef00`. It restores the legacy company-profile action row, separate receipt/delivery preview buttons, usage note wording, field labels/placeholders, logo delete label, and compact form density while preserving existing API validation and `system.settings.manage` write guard.
 
 ## File Naming Changes
 
