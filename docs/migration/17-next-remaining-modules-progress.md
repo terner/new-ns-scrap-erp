@@ -1112,6 +1112,27 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Result: D8 Dual Costing QA checkpoint passed with targeted contract/UI fixes; permission split remains a future auth batch.
 - Commit: `c91d814 fix: tighten dual costing qa findings` pushed to `main`.
 
+### UI-D1: PO Buy / Trading Matching Legacy UI Parity Revision
+
+- [x] `/purchase/po-buy` legacy info banner/KPI/top/outstanding/filter/purpose-tab/table shell parity
+- [x] `/trading/matching` legacy hero/action/summary/tabs/unmatched-table parity
+- [x] keep mutation/action controls disabled for write-risk boundaries
+- [ ] Cost Pool / Cost Allocator parity follow-up
+- [ ] Match Log / Deal Margin / Compare Margin parity follow-up
+
+#### Execution Log
+
+- Task: post-SYS Batch D Group A legacy UI parity revision.
+- Legacy refs: `old-apps/legacy/index.html:21903`, `old-apps/legacy/index.html:22008`, `old-apps/legacy/index.html:41280`, `old-apps/legacy/index.html:41309`, `old-apps/legacy/index.html:41425`.
+- Files changed: `apps/next/src/components/purchase-flow/PoBuyPageClient.tsx`, `apps/next/src/components/purchase-flow/TradingMatchingPageClient.tsx`, this tracker, current work handoff.
+- DB/API changes: no schema migration and no route-handler change; all new summary/top/monthly/unmatched visuals are derived client-side from existing read payloads.
+- Buttons/actions checked: PO Buy create/move/cancel shell buttons and Trading Matching duplicate cleanup/cloud pull/recalc/new match/reverse controls render disabled/read-only. Export links remain active existing `.xlsx` capability.
+- Modal/form checked: PO Buy detail modal and Trading deal detail modal remain read-only; no mutation form was added.
+- Validation added: PO Buy restores legacy blue info copy, six colored KPI cards, Top 5 Supplier, outstanding panel, status chips, purpose cards, checkbox/action table shell, and empty wording. Trading Matching restores fuchsia hero, disabled action cluster, GP mega card, status donut, match-rate/monthly/top-pair panels, compact KPI row, two legacy tabs, colored deal table, cancelled toggle, disabled Recalc/Reverse shell, and unmatched split tables.
+- Playwright smoke: authenticated main Playwright session passed `/purchase/po-buy` and `/trading/matching` at desktop `1365x900` and mobile `390x844`; tabs/purpose buttons switched correctly, JSON APIs returned `200`, XLSX exports returned `200` with spreadsheet content type and `PK` signature, disabled write-risk buttons remained disabled, and no page-level overflow/console errors/failed requests were found. Unauthenticated QA subagent confirmed route redirects to `/login?redirect=...` and APIs return `401` JSON.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `git diff --check` passed.
+- Result: UI-D1 PO Buy / Trading Matching legacy UI parity revision validated locally and ready to commit/push.
+
 ## Batch FF: Foreign Finance
 
 ### FF0: Module Overview
