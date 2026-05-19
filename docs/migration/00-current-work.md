@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: UI-P1 AP legacy UI parity (`fix: restore ap legacy ui parity`)
+Last pushed checkpoint: UI-P3 Cash Position legacy UI parity (`fix: restore cash position legacy ui parity`)
 
 ## Current Batch
 
@@ -58,6 +58,7 @@ Status date: 2026-05-19
 - Current parity slice: `/finance/ap` was revised first after SYS. It restores the legacy AP red header, mega payable/aging/top supplier cards, colored KPIs, aging cards, red tabs, summary/detail table layout, Channel/Aging filters, and full-filter detail footer total while keeping export as active `.xlsx` behavior.
 - Current parity slice: `/finance/ar` was revised after AP. It restores the legacy AR pending-sale banner, blue/cyan/teal dashboard cards, aging bars, Top 5 customer card, Channel/Aging filters, and detail table layout/colors while keeping export as active `.xlsx` behavior.
 - Current parity slice: `/finance/cash-position` was revised after AR. It restores the legacy Cash Position dashboard cards, liquid composition donut, AR/AP bars, Top accounts list, colored summary cards, Net Cash strip, and account table columns/type badges.
+- Current parity slice: `/finance/bank` was revised after Cash Position. It restores the legacy Bank Statement hero, account/date controls, four KPI cards, two chart panels, opening-balance row, dark gradient statement table header, colored amount columns, and disabled duplicate-cleanup button while keeping export as active `.xlsx` behavior.
 
 ## File Naming Changes
 

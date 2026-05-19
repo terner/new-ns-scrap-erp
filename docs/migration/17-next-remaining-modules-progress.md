@@ -1802,7 +1802,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
   1. `/finance/ap` - revised in UI parity checkpoint
   2. `/finance/ar` - revised in UI parity checkpoint
   3. `/finance/cash-position` - revised in UI parity checkpoint
-  4. `/finance/bank`
+  4. `/finance/bank` - revised in UI parity checkpoint
   5. `/stock/balance`
   6. `/stock/ledger`
   7. `/stock/convert`
@@ -1850,7 +1850,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Modal/form checked: existing AR detail modal still opens from bill number; no write form was added.
 - Validation added: OpenAPI AR query parameters updated for `channelId` and `bucket`.
 - Playwright smoke: authenticated main browser checked `/finance/ar` desktop 1440x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/finance/ar` returned 200. Subagent source audit confirmed the original mismatch and safe patch scope, but its isolated browser session could not authenticate.
-- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 50`.
 - Result: `/finance/ar` now restores the legacy AR visual surface: no extra hero header, pending-sale banner when applicable, blue/cyan/teal mega AR card, aging bar card, Top 5 customer card, legacy Customer/Channel/Aging filter row, and detail table columns/colors/order. Export remains `.xlsx` by active business-export rule.
 - Commit: this checkpoint.
 
@@ -1872,6 +1872,29 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/finance/cash-position` desktop 1440x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/finance/cash-position` returned 200. Subagent source audit confirmed original mismatch and safe patch scope, but its isolated browser session could not authenticate.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`.
 - Result: `/finance/cash-position` now restores the legacy visual surface: no extra hero header, mega Net Cash card, liquid composition donut, AR/AP bars, Top accounts bar list, colored cash/bank/FCD/OD/AR/AP cards, blue/indigo Net Cash strip, and legacy 8-column account table with type badges.
+- Commit: this checkpoint.
+
+### UI-P4: `/finance/bank` Legacy UI Parity Revision
+
+#### Execution Log
+
+- Task: revise Bank Statement page to match legacy/Vue visual baseline.
+- Legacy refs:
+  - `old-apps/legacy/index.html:10690` Bank Statement data flow, opening-balance row, duplicate cleanup behavior, and chart setup.
+  - `old-apps/legacy/index.html:10829` legacy hero, KPI cards, chart cards, and statement table visual baseline.
+  - `old-apps/vue/src/views/finance/BankStatementView.vue:58` Vue Bank Statement visual clone baseline.
+- Files changed:
+  - `apps/next/src/components/finance/BankStatementPageClient.tsx`
+  - `apps/next/src/app/api/finance/bank/route.ts`
+  - `docs/migration/17-next-remaining-modules-progress.md`
+  - `docs/migration/00-current-work.md`
+- DB/API changes: no schema change. `GET /api/finance/bank` now includes `openingBalance` on filter account options so the active UI can render the legacy opening-balance row for the selected account.
+- Buttons/actions checked: account/date controls in hero, active `.xlsx` export, disabled `ลบ Duplicate` destructive action, secondary search/ref/type filters, date sort, clear filters, pagination, and ref detail modal trigger.
+- Modal/form checked: existing Bank Statement detail modal still opens from reference number; no write form was added.
+- Validation added: none beyond typed API response field; destructive duplicate cleanup remains disabled until audit, backup, rollback, RLS, and API design are approved.
+- Playwright smoke: authenticated main browser checked `/finance/bank` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/finance/bank` returned 200. Subagent source audit confirmed the original mismatch and safe patch scope, but its isolated browser session could not authenticate.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`.
+- Result: `/finance/bank` now restores the legacy visual surface: blue/indigo/purple Bank Statement hero, account/date/export/duplicate controls in the hero, four colored KPI cards, two chart panels, opening-balance row, legacy statement table columns/header/colors, and colored amount columns. Export remains `.xlsx` by active business-export rule.
 - Commit: this checkpoint.
 
 ## Current Priority Queue

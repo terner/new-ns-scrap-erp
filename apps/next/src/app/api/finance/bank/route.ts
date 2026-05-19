@@ -188,6 +188,7 @@ export async function GET(request: Request) {
           currency: row.currency,
           id: row.id,
           name: row.name,
+          openingBalance: toNumber(row.opening_balance),
           type: row.type,
         })),
         refTypes,

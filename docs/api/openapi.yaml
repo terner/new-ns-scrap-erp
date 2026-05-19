@@ -906,7 +906,7 @@ paths:
             enum: [xlsx]
       responses:
         "200":
-          description: Bank statement payload or xlsx export when `format=xlsx`.
+          description: Bank statement payload, including account filter options with opening balances for the selected-account ledger view, or xlsx export when `format=xlsx`.
           content:
             application/json:
               schema:
