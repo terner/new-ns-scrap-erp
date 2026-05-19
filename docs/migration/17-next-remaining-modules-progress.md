@@ -1391,10 +1391,20 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### A5: Financial Statements
 
-- [ ] `/finance-accounting/pl-statement`
-- [ ] `/finance-accounting/balance-sheet`
-- [ ] `/finance-accounting/cash-flow-statement`
-- [ ] read baseline first; no GL posting until accounting design is clear
+- [x] `/finance-accounting/pl-statement`
+- [x] `/finance-accounting/balance-sheet`
+- [x] `/finance-accounting/cash-flow-statement`
+- [x] OpenAPI entries for the three management/read endpoints
+- [x] read baseline first; no GL posting until accounting design is clear
+
+#### Execution Log
+
+- Task: A5 Financial Statements management/read baselines.
+- Files changed: added three Next pages, one shared financial statements client component, one server derivation helper, and three read-only API routes under `/api/finance-accounting/*`.
+- DB/API changes: reads operational tables only: `sales_bills`, `expenses`, `depreciations`, `loan_payments`, `fx_gain_loss`, `accounts`, `bank_statement`, `purchase_bills`, `stock_ledger`, `assets`, `loans`, and `equity`; no schema change, no GL posting, no period close, no retained earnings roll-forward, and no cash-flow category writes.
+- UI baseline: preserved legacy-first emerald/blue/cyan gradients, management baseline notice, compact card/table density, filter/action order, Stock vs Trading split, balanced/off-by badge, direct-method cash flow sections, and drill modal affordance. Excel is shown disabled/read-only until export policy is implemented.
+- Validation: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI remains valid with existing catalog warnings.
+- Browser QA: subagent unauth sweep confirmed protected pages redirect to login and APIs return `401`; authenticated main Playwright smoke confirmed the three A5 APIs return `200`, pages render the legacy-colored management baseline UI, Excel buttons are disabled, and mobile width has no horizontal overflow.
 
 ### A6: Fixed Assets
 

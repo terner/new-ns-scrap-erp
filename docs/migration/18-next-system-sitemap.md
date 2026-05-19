@@ -46,7 +46,7 @@ Status terms:
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
 | Reports | 1 | 0 | 1 | none |
-| Finance / Accounting | 18 | 8 | 10 | asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, equity-maint, opening-balance, historical-data |
+| Finance / Accounting | 18 | 11 | 7 | pl-statement, balance-sheet, cash-flow-statement, asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, equity-maint, opening-balance, historical-data |
 | Master Data | 18 | 18 | 0 | broad master-data coverage |
 | Admin | 6 | 4 | 2 | company, users, audit, transaction ledger |
 
@@ -178,9 +178,9 @@ Status terms:
 | `/finance-accounting/stock-finance` | Stock Finance Analysis | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/profit-leak` | Profit Leak Dashboard | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/tax-vat-wht` | Tax / VAT / WHT | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/pl-statement` | งบกำไรขาดทุน (P&L) | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/balance-sheet` | งบดุล | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/cash-flow-statement` | งบกระแสเงินสด | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/pl-statement` | งบกำไรขาดทุน (P&L) | management/read baseline | `GET /api/finance-accounting/pl-statement` | `sales_bills`, `expenses`, `depreciations`, `loan_payments`, `fx_gain_loss` | `finance.financials.view` |
+| `/finance-accounting/balance-sheet` | งบดุล | management/read baseline | `GET /api/finance-accounting/balance-sheet` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `assets`, `loans`, `equity` | `finance.financials.view` |
+| `/finance-accounting/cash-flow-statement` | งบกระแสเงินสด | management/read baseline | `GET /api/finance-accounting/cash-flow-statement` | `bank_statement`, `accounts` | `finance.financials.view` |
 | `/finance-accounting/asset-register` | Fixed Assets / ทรัพย์สิน | read baseline | `GET /api/finance-accounting/asset-register` | `assets`, `depreciations`, `branches`, `suppliers` | `finance.financials.view` |
 | `/finance-accounting/depreciation` | ค่าเสื่อมราคา | read/design baseline | `GET /api/finance-accounting/depreciation` | `assets`, `depreciations` | `finance.financials.view` |
 | `/finance-accounting/asset-disposal` | จำหน่ายทรัพย์สิน | read/design baseline | `GET /api/finance-accounting/asset-disposal` | `assets`, `depreciations`; disposal table missing | `finance.financials.view` |

@@ -258,6 +258,39 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance-accounting/pl-statement:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingPlStatement
+      summary: Read management P&L baseline derived from operational transaction tables
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/balance-sheet:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingBalanceSheet
+      summary: Read management balance sheet baseline derived from cash, AR/AP, stock, asset, loan, and equity sources
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/cash-flow-statement:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingCashFlowStatement
+      summary: Read management direct-method cash flow baseline from bank statement rows
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance-accounting/depreciation:
     get:
       tags: [Finance Accounting]
