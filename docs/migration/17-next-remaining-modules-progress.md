@@ -1221,6 +1221,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/fcd-ledger`; API returned 200 for default and selected account requests; console had no errors; screenshots saved as `ff4-fcd-ledger-desktop.png` and `ff4-fcd-ledger-mobile.png`.
 - Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and browser smoke passed. OpenAPI still has the existing 113 skeleton warnings outside this endpoint.
 - Result: FCD Ledger route is no longer a placeholder, but it remains a conservative read baseline until foreign transfer/receipt source tables exist.
+- Commit: `7088964 feat: add fcd ledger read baseline` pushed to `main`.
 
 ### FF5: FX Gain/Loss
 

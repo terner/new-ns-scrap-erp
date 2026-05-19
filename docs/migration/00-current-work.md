@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: FF1 marker (`98a8cd8 docs: mark foreign fx rate pushed`)
+Last pushed checkpoint: FF4 FCD Ledger baseline (`7088964 feat: add fcd ledger read baseline`)
 
 ## Current Batch
 
@@ -237,14 +237,14 @@ Initial FF0 findings:
 - Active Next foreign finance routes started as placeholders: International Transfer, Overseas Receipt, FX Rate, FCD Ledger, FX Gain/Loss, and Bank Reconciliation. FF1 promotes FX Rate to a manage baseline.
 - Existing support tables are `accounts`, `bank_statement`, `currencies`, `fx_gain_loss`, `overseas_recipients`, and `overseas_remittance_purposes`.
 - FF1 adds historical `fx_rates`. There is still no dedicated `fcd_ledger` table, no confirmed `intl_transfers`/`overseas_receipts` tables, and no `bank_imports` table in the active Prisma schema.
-- FF4 FCD Ledger read baseline is implemented locally and ready for commit/push. It derives from FCD/foreign-currency accounts and bank statement rows without mutating bank rows.
+- FF4 FCD Ledger read baseline is implemented, validated, and pushed. It derives from FCD/foreign-currency accounts and bank statement rows without mutating bank rows.
 - FCD Ledger does not infer foreign movement from THB bank rows or current currency rates. Foreign movement stays zero unless future ITF/ORC source tables provide true foreign amounts; opening foreign balance comes from `accounts.opening_balance`.
 - User-facing refs should be `ITF*`, `ORC*`, `ref_no`, account code/account no, and currency symbol/code; do not expose UUID/ref_id as the primary display.
 
 Next concrete task:
 
-1. Commit and push FF4 FCD Ledger read baseline.
-2. Start FF5 FX Gain/Loss read baseline from `fx_gain_loss`; no auto-post.
+1. Start FF5 FX Gain/Loss read baseline from `fx_gain_loss`; no auto-post.
+2. Keep foreign transfer/receipt bank statement writes and bank import/match writes deferred until reconciliation, idempotency, and reversal rules are locked.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model
