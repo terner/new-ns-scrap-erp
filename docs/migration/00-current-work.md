@@ -240,12 +240,13 @@ Initial FF0 findings:
 - FF4 FCD Ledger read baseline is implemented, validated, and pushed. It derives from FCD/foreign-currency accounts and bank statement rows without mutating bank rows.
 - FCD Ledger does not infer foreign movement from THB bank rows or current currency rates. Foreign movement stays zero unless future ITF/ORC source tables provide true foreign amounts; opening foreign balance comes from `accounts.opening_balance`.
 - FF5 FX Gain/Loss read baseline is implemented, validated, and pushed. It reads realized rows from `fx_gain_loss` only and does not auto-post.
+- FF6 Bank Reconciliation read/design baseline is implemented locally and ready for validation/commit. It shows ERP bank rows and disables import/match writes until normalized import/match state exists.
 - User-facing refs should be `ITF*`, `ORC*`, `ref_no`, account code/account no, and currency symbol/code; do not expose UUID/ref_id as the primary display.
 
 Next concrete task:
 
-1. Start FF6 Bank Reconciliation design/read baseline, while keeping import/match writes deferred until the normalized model is clear.
-2. Keep FF2/FF3 foreign transfer/receipt money-moving writes deferred until idempotency and reversal rules are locked.
+1. Validate, commit, and push FF6 Bank Reconciliation read/design baseline.
+2. Start FF2/FF3 read/form baseline while keeping foreign transfer/receipt money-moving writes deferred until idempotency and reversal rules are locked.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model

@@ -1245,9 +1245,21 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### FF6: Bank Reconciliation
 
-- [ ] API `/api/finance/foreign/bank-reconciliation`
-- [ ] Page `/finance/foreign/bank-reconciliation`
-- [ ] statement matching baseline
+- [x] API `/api/finance/foreign/bank-reconciliation`
+- [x] Page `/finance/foreign/bank-reconciliation`
+- [x] statement matching design baseline
+
+#### Execution Log
+
+- Task: FF6 Bank Reconciliation read/design baseline.
+- Files changed: `apps/next/src/app/api/finance/foreign/bank-reconciliation/route.ts`, `apps/next/src/app/finance/foreign/bank-reconciliation/page.tsx`, `apps/next/src/components/finance/foreign/BankReconciliationPageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker, and current work handoff.
+- DB/API changes: added `GET /api/finance/foreign/bank-reconciliation` guarded by `finance.cash.view`; no new table and no writes.
+- Tables used: `accounts` for bank account options and `bank_statement` for ERP-side rows.
+- Read-only rule: import CSV, auto match, ignore, delete import, manual match, and reconciliation state writes are intentionally disabled until normalized `bank_imports`/match state schema exists.
+- Legacy UI parity checked: blue info band, account/date toolbar, Import/Auto Match controls, five stat cards, blue imported panel, emerald ERP panel, and compact tables match the legacy/Vue Bank Reconciliation baseline.
+- Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/bank-reconciliation`; API returned 200 for default and selected account requests; console had no errors; screenshots saved as `ff6-bank-reconciliation-desktop.png` and `ff6-bank-reconciliation-mobile.png`.
+- Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and browser smoke passed. OpenAPI still has the existing 113 skeleton warnings outside this endpoint.
+- Result: Bank Reconciliation route is no longer a placeholder, but matching remains a design/read baseline until import/match schema and RLS are designed.
 
 ### FF7: Foreign Finance QA Batch
 

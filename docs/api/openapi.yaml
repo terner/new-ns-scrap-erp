@@ -656,6 +656,38 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance/foreign/bank-reconciliation:
+    get:
+      tags: [Finance]
+      operationId: readForeignBankReconciliation
+      summary: Read bank reconciliation design baseline
+      description: Read-only baseline showing ERP bank statement rows and unavailable imported statement state. Does not import CSV, auto-match, ignore, delete, or mutate reconciliation state.
+      parameters:
+        - name: accountId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Bank reconciliation filters, imported placeholder rows, ERP rows, stats, and design state.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance/foreign/fx-rate:
     get:
       tags: [Finance]
