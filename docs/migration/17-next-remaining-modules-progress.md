@@ -1112,7 +1112,8 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
   - FX Gain/Loss: `old-apps/vue/src/views/finance/FxGainLossReportView.vue`, `old-apps/legacy/index.html:23932`.
   - Bank Reconciliation: `old-apps/vue/src/views/finance/BankReconciliationView.vue`, `old-apps/legacy/index.html:23984`.
 - Active Next state:
-  - All six foreign finance routes are still placeholder pages through the catch-all route; no `/api/finance/foreign/*` route handlers or OpenAPI paths exist yet.
+  - FF0 start state: all six foreign finance routes were placeholder pages through the catch-all route, with no `/api/finance/foreign/*` route handlers or OpenAPI paths yet.
+  - Current state after FF1-FF6: all six foreign finance routes have dedicated Next pages and OpenAPI-documented route handlers, with money-moving writes still deferred except FX Rate reference-data management.
   - Related baselines already exist: `/finance/bank` with `GET /api/finance/bank`, plus master data pages/APIs for accounts, currencies, beneficiaries, payment methods, and remittance purposes.
 - Current DB/table mapping:
   - `accounts`: cash/bank/OD/FCD account master with `currency`, `opening_balance`, `od_limit`, and relation to `bank_statement`.
@@ -1290,9 +1291,21 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### FF7: Foreign Finance QA Batch
 
-- [ ] QA checker
-- [ ] type/lint/build
-- [ ] commit/push
+- [x] QA checker
+- [x] type/lint/build
+- [x] commit/push
+
+#### Execution Log
+
+- Task: FF7 Foreign Finance QA checkpoint.
+- Files changed: this tracker, current work handoff, and sitemap notes only.
+- Routes checked: `/finance/foreign/fx-rate`, `/finance/foreign/intl-transfer`, `/finance/foreign/overseas-receipt`, `/finance/foreign/fcd-ledger`, `/finance/foreign/fx-gain-loss-report`, and `/finance/foreign/bank-reconciliation`.
+- API checks: browser fetch smoke returned 200 JSON for all six `/api/finance/foreign/*` endpoints.
+- Browser QA: subagent sweep passed FX Rate, FCD Ledger, and FX Gain/Loss with no console errors and expected legacy color/card/table layout; latest FF2/FF3/FF6 Playwright smokes already passed after implementation, and main sweep confirmed API 200 plus console error-free session for the foreign finance group.
+- Contract/permission check: all six route handlers are guarded by `finance.cash.view`; only FX Rate exposes POST/PATCH and it is reference-data management. ITF/ORC/FCD/FX Gain-Loss/Bank Reconciliation remain read-only or read/form-only.
+- Stale docs fixed: FF0 start-state wording now explicitly says the placeholder note was the start state, and sitemap notes no longer claim foreign finance beyond FX Rate is placeholder-only.
+- Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI still has the existing 113 skeleton warnings outside this batch.
+- Result: Foreign Finance route/API baselines are complete for FF1-FF6; money-moving writes, dedicated ITF/ORC schemas, import/match reconciliation schema, and more granular foreign finance permissions remain deferred.
 
 ## Batch A: Finance / Accounting
 

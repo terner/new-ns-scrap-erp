@@ -258,6 +258,6 @@ Current API groups:
 
 - Stock pages now have first Next page/API baselines.
 - Stock write flows are traceable through `stock_ledger`, but production-grade void/reversal, branch-scope enforcement, and cost-source/WAC policy hardening remain follow-up work.
-- Main dashboard/reporting, foreign finance beyond FX Rate, and finance-accounting routes are mostly placeholder coverage only.
+- Main dashboard/reporting and finance-accounting routes are mostly placeholder coverage only; Foreign Finance now has dedicated route/API baselines, with money-moving writes still deferred.
 - Several write flows are intentionally partial and still need side-effect reconciliation before production use.
 - `/sales/po-sell` D1 read baseline is implemented; write/cancel/match allocation flows remain deferred and user-facing identifiers should use `docNo`.
