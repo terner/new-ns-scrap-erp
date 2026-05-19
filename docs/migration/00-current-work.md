@@ -214,7 +214,7 @@ Current scope:
 - D4 Trading Matching read-only polish is implemented, validated, and pushed. Write/reverse/recalc actions remain deferred.
 - D5 Cost Pool read-derived baseline is implemented, validated, and pushed. UI keeps the legacy amber warning band, blue/orange/purple cost cards, summary cards, filters, export, table, and read-only detail modal; write allocation remains deferred.
 - D6 Cost Allocator read-only simulation baseline is implemented, validated, and pushed. UI keeps the legacy purple step-card flow; confirm/write remains disabled until allocation logs and reversal rules are designed.
-- D7a Match Log read baseline is in progress. It reads `trading_deals` as current source because normalized allocation logs are not designed yet; reverse/write remains deferred.
+- D7a Match Log read baseline is implemented, validated, and pushed. It reads `trading_deals` as current source because normalized allocation logs are not designed yet; reverse/write remains deferred.
 - Tracking routes must use active Next app only; legacy/Vue tracking views are source material.
 - Keep T1-T3 read/report baselines first; no write flows in tracking pages.
 - DB design preference clarified: use meaningful business-facing codes/running document numbers for user-visible references; keep UUID/opaque IDs internal only.
@@ -228,7 +228,7 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Finish D7a Match Log validation, commit, and push; then continue Deal Margin / Compare Margin read baselines.
+1. Continue Deal Margin / Compare Margin read baselines.
 2. Keep Cost Pool read-derived first; no allocation or cost mutation until reconciliation rules are locked.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
