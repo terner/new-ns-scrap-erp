@@ -1612,7 +1612,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: unauth subagent confirmed all three pages redirect to login and all three APIs return `401`; login desktop/mobile has no overflow or related console/network failures. Authenticated smoke confirmed `/api/pending-sales`, `/api/sales-plan`, and `/api/sales-commission` return `200`; desktop and mobile render core legacy markers with no document overflow and no console errors.
 - Commands: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`. OpenAPI remains valid with the existing 114 warning baseline.
 - Result: implemented and validated locally.
-- Commit: pending.
+- Commit: `81b4199` (`feat: add main sales control baselines`).
 
 ### M4: Calendars
 

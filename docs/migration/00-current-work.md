@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: M2 Profit & Cost Analysis read/report baseline (`814ba2c feat: add profit cost analysis baseline`)
+Last pushed checkpoint: M3 Main sales control read/design baselines (`81b4199 feat: add main sales control baselines`)
 
 ## Current Batch
 
