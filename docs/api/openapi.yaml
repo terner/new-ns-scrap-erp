@@ -590,6 +590,94 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance/foreign/fx-rate:
+    get:
+      tags: [Finance]
+      operationId: listForeignFxRates
+      summary: List historical FX rates for foreign finance workflows
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: fromCurrency
+          in: query
+          schema:
+            type: string
+        - name: toCurrency
+          in: query
+          schema:
+            type: string
+        - name: rateType
+          in: query
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false", all]
+      responses:
+        "200":
+          description: FX rate filters, latest active rates, history rows, and summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxRateListResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Finance]
+      operationId: upsertForeignFxRate
+      summary: Create or update an FX rate by date, currency pair, and rate type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FxRateWriteRequest"
+      responses:
+        "200":
+          description: Created or updated FX rate row.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxRateWriteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    patch:
+      tags: [Finance]
+      operationId: updateForeignFxRate
+      summary: Update an FX rate row by internal id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/FxRateWriteRequest"
+                - type: object
+                  required: [id]
+      responses:
+        "200":
+          description: Updated FX rate row.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FxRateWriteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/master-data/{resource}:
     get:
       tags: [Master Data]
@@ -1982,6 +2070,129 @@ components:
         message:
           type: string
       additionalProperties: true
+    FxRateListResponse:
+      type: object
+      required: [filters, latestRates, rows, summary]
+      properties:
+        filters:
+          type: object
+          required: [currencies, fromCurrencies, rateTypes, toCurrencies]
+          properties:
+            currencies:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            fromCurrencies:
+              type: array
+              items:
+                type: string
+            rateTypes:
+              type: array
+              items:
+                type: string
+            toCurrencies:
+              type: array
+              items:
+                type: string
+        latestRates:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxRateRow"
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/FxRateRow"
+        summary:
+          type: object
+          required: [activeRows, latestPairs, rows]
+          properties:
+            activeRows:
+              type: integer
+            latestPairs:
+              type: integer
+            rows:
+              type: integer
+      additionalProperties: true
+    FxRateRow:
+      type: object
+      required: [active, fromCurrency, id, rate, rateDate, rateType, toCurrency]
+      properties:
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        fromCurrency:
+          type: string
+          minLength: 3
+          maxLength: 6
+        id:
+          type: string
+          description: Internal FX rate id. UI should display currency pair/date/rate type instead of opaque ids.
+        note:
+          type: [string, "null"]
+        rate:
+          type: number
+          exclusiveMinimum: 0
+        rateDate:
+          type: string
+          format: date
+        rateType:
+          type: string
+        source:
+          type: [string, "null"]
+        toCurrency:
+          type: string
+          minLength: 3
+          maxLength: 6
+        updatedAt:
+          type: string
+          format: date-time
+      additionalProperties: true
+    FxRateWriteRequest:
+      type: object
+      required: [fromCurrency, rate, rateDate, rateType, toCurrency]
+      properties:
+        active:
+          type: boolean
+          default: true
+        fromCurrency:
+          type: string
+          minLength: 3
+          maxLength: 6
+          pattern: "^[A-Z0-9]{3,6}$"
+        id:
+          type: [string, "null"]
+          maxLength: 80
+        note:
+          type: [string, "null"]
+          maxLength: 500
+        rate:
+          type: number
+          exclusiveMinimum: 0
+        rateDate:
+          type: string
+          format: date
+        rateType:
+          type: string
+          maxLength: 60
+        source:
+          type: [string, "null"]
+          maxLength: 120
+        toCurrency:
+          type: string
+          minLength: 3
+          maxLength: 6
+          pattern: "^[A-Z0-9]{3,6}$"
+          default: THB
+      additionalProperties: false
+    FxRateWriteResponse:
+      type: object
+      required: [row]
+      properties:
+        row:
+          $ref: "#/components/schemas/FxRateRow"
     OptionalDocNo:
       type: [string, "null"]
       maxLength: 40

@@ -987,6 +987,28 @@ model loans {
   @@schema("public")
 }
 
+model fx_rates {
+  id            String    @id
+  rate_date     DateTime  @db.Date
+  from_currency String
+  to_currency   String    @default("THB")
+  rate_type     String    @default("BOT Rate")
+  rate          Decimal   @db.Decimal(18, 6)
+  source        String?
+  note          String?
+  active        Boolean   @default(true)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+  created_by    String?
+  updated_by    String?
+
+  @@unique([rate_date, from_currency, to_currency, rate_type], map: "fx_rates_unique_effective")
+  @@index([active], map: "fx_rates_active_idx")
+  @@index([rate_date(sort: Desc)], map: "fx_rates_date_idx")
+  @@index([from_currency, to_currency, rate_date(sort: Desc)], map: "fx_rates_pair_idx")
+  @@schema("public")
+}
+
 model opening_balance {
   id         String    @id @default("SINGLETON")
   data       Json?

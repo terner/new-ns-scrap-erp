@@ -1170,9 +1170,24 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### FF1: FX Rate
 
-- [ ] API `/api/finance/foreign/fx-rate`
-- [ ] Page `/finance/foreign/fx-rate`
-- [ ] CRUD/modal/validation
+- [x] API `/api/finance/foreign/fx-rate`
+- [x] Page `/finance/foreign/fx-rate`
+- [x] CRUD/modal/validation
+
+#### Execution Log
+
+- Task: FF1 FX Rate manage baseline.
+- Files changed: `supabase/migrations/20260519044755_create_fx_rates_table.sql`, `apps/next/prisma/schema.prisma`, `apps/next/src/lib/finance-foreign.ts`, `apps/next/src/app/api/finance/foreign/fx-rate/route.ts`, `apps/next/src/app/finance/foreign/fx-rate/page.tsx`, `apps/next/src/components/finance/foreign/FxRatePageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker, and current work handoff.
+- DB/API changes: added `fx_rates` historical rate table with business-readable ids like `FX-YYYYMMDD-USD-THB-BOT`; added `GET/POST/PATCH /api/finance/foreign/fx-rate` guarded by `finance.cash.view`.
+- Tables used: `fx_rates` for rate history and `currencies` for currency options/seed data.
+- Buttons/actions checked: add FX rate, edit existing row, cancel/close modal, save validation without submitting invalid data.
+- Modal/form checked: date, rate type, from/to currency, positive numeric rate, source, active flag, note, and client/server Zod validation.
+- Legacy UI parity checked: preserved blue info band, five white latest-rate cards, blue numeric rates, `FX Rate History` heading with add button, compact rounded white table, and compact modal layout.
+- Validation added: OpenAPI path and schemas for FX rate list/write payloads.
+- Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/fx-rate`; API returned 200 after dev server restart; modal validation displayed `Rate ต้องมากกว่า 0`; screenshots saved as `ff1-fx-rate-desktop.png` and `ff1-fx-rate-mobile-closed.png`.
+- Commands: `npm run prisma:generate --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, Prisma smoke query, and `git diff --check` passed. OpenAPI still has the existing 113 skeleton warnings outside this endpoint.
+- Supabase advisor: security advisor still reports existing environment-wide RLS/security-definer findings; no FF1-specific blocker was addressed in this batch.
+- Result: FX Rate route is no longer a placeholder; foreign finance money-moving writes remain deferred.
 
 ### FF2: International Transfer
 

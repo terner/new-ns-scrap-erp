@@ -41,7 +41,7 @@ Status terms:
 | Production | 8 | 8 | 0 | read baseline plus output category write |
 | Dual Costing | 7 | 1 | 6 | PO buy only |
 | Finance and Debt | 6 | 1 | 5 | AP only |
-| Foreign Finance | 6 | 0 | 6 | none |
+| Foreign Finance | 6 | 1 | 5 | fx-rate |
 | Stock | 6 | 6 | 0 | balance, ledger, status convert, grade convert, adjust, customer return |
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
@@ -137,7 +137,7 @@ Status terms:
 |---|---|---|---|---|---|
 | `/finance/foreign/intl-transfer` | โอนเงินต่างประเทศ | placeholder | missing | TBD | `finance.cash.view` |
 | `/finance/foreign/overseas-receipt` | รับเงินจากต่างประเทศ | placeholder | missing | TBD | `finance.cash.view` |
-| `/finance/foreign/fx-rate` | FX Rate Management | placeholder | missing | TBD | `finance.cash.view` |
+| `/finance/foreign/fx-rate` | FX Rate Management | manage baseline | `GET/POST/PATCH /api/finance/foreign/fx-rate` | `fx_rates`, `currencies` | `finance.cash.view` |
 | `/finance/foreign/fcd-ledger` | FCD Ledger | placeholder | missing | TBD | `finance.cash.view` |
 | `/finance/foreign/fx-gain-loss-report` | FX Gain/Loss Report | placeholder | missing | TBD | `finance.cash.view` |
 | `/finance/foreign/bank-reconciliation` | Bank Reconciliation | placeholder | missing | TBD | `finance.cash.view` |
@@ -249,7 +249,8 @@ Current API groups:
 - Master Data: customers, suppliers, products, lookup masters, Thai address lookup
 - Production: orders, dashboard, reports, output categories
 - Purchase/Sales: purchase bills, payments, receipt vouchers, sales bills, stock issue, receipts, PO Sell
-- Stock: ledger, transfer
+- Finance/Foreign Finance: AR, AP, bank statement, cash position, advances, FX rate management
+- Stock: ledger, transfer, balance, status convert, grade convert, count adjust, customer return
 - Tracking/Trading/PO Reports: supplier tracking, trading matching, PO outstanding
 - Health: simple runtime health endpoint
 
@@ -257,6 +258,6 @@ Current API groups:
 
 - Stock pages now have first Next page/API baselines.
 - Stock write flows are traceable through `stock_ledger`, but production-grade void/reversal, branch-scope enforcement, and cost-source/WAC policy hardening remain follow-up work.
-- Main dashboard/reporting and finance-accounting routes are mostly placeholder coverage only.
+- Main dashboard/reporting, foreign finance beyond FX Rate, and finance-accounting routes are mostly placeholder coverage only.
 - Several write flows are intentionally partial and still need side-effect reconciliation before production use.
 - `/sales/po-sell` D1 read baseline is implemented; write/cancel/match allocation flows remain deferred and user-facing identifiers should use `docNo`.
