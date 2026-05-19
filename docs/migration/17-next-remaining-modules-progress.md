@@ -830,10 +830,84 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### D0: Legacy Inventory and DB Mapping
 
-- [ ] สำรวจ PO Sell, Cost Pool, Cost Allocator, Match Log, Deal Margin, Compare Margin, Trading Dashboard
-- [ ] map `po_buys`, `po_sells`, `trading_deals`, cost pool source
-- [ ] สรุปภาพรวม dual costing/trading/PO ก่อนเริ่ม D1
-- [ ] สรุป dependency/page order
+- [x] สำรวจ PO Sell, Cost Pool, Cost Allocator, Match Log, Deal Margin, Compare Margin, Trading Dashboard
+- [x] map `po_buys`, `po_sells`, `trading_deals`, cost pool source
+- [x] สรุปภาพรวม dual costing/trading/PO ก่อนเริ่ม D1
+- [x] สรุป dependency/page order
+
+#### D0 Module Overview
+
+- Legacy/Vue refs:
+  - PO Buy: `old-apps/vue/src/views/purchase/PoBuyView.vue`, `old-apps/legacy/index.html:21577`.
+  - PO Sell: `old-apps/vue/src/views/sales/PoSellView.vue`, `old-apps/legacy/index.html:22171`.
+  - Cost Pool: `old-apps/vue/src/views/dualCosting/CostPoolView.vue`, `old-apps/legacy/index.html:22535`, source helper `old-apps/legacy/index.html:5950`.
+  - Cost Allocator: `old-apps/vue/src/views/dualCosting/CostAllocatorView.vue`, `old-apps/legacy/index.html:22694`.
+  - Match Log: `old-apps/vue/src/views/dualCosting/MatchLogView.vue`, `old-apps/legacy/index.html:22907`.
+  - Deal Margin / Compare Margin: `old-apps/vue/src/views/dualCosting/DealMarginView.vue`, `old-apps/vue/src/views/dualCosting/CompareMarginView.vue`, `old-apps/legacy/index.html:23082`, `old-apps/legacy/index.html:23213`.
+  - Trading Dashboard / Matching: `old-apps/vue/src/views/dualCosting/TradingDashboardView.vue`, `old-apps/vue/src/views/dualCosting/TradingMatchingView.vue`, `old-apps/legacy/index.html:40502`, `old-apps/legacy/index.html:40805`.
+- Visual refs:
+  - `reports/frontend-visual-audit/po-sell-final/results.json`.
+  - `reports/frontend-visual-audit/cost-allocator-final/results.json`.
+  - `reports/frontend-visual-audit/match-log-final/results.json`.
+  - Existing `poBuy`, `poSell`, `poOutstanding`, `costPool`, `dealMargin`, `compareMargin`, `tradingDashboard`, and `tradingMatching` desktop/mobile legacy/vue screenshots under `reports/frontend-visual-audit/`.
+- Current Next state:
+  - `/purchase/po-buy` and `GET /api/purchase/po-buy` exist as read baseline.
+  - `/po-reports/outstanding` and `GET /api/po-reports/outstanding` exist as read baseline.
+  - `/trading/matching` and `GET /api/trading/matching` exist as read baseline.
+  - `/sales/po-sell`, `/trading/dashboard`, `/dual-costing/cost-pool`, `/dual-costing/cost-allocator`, `/dual-costing/match-log`, `/dual-costing/deal-margin`, and `/dual-costing/compare-margin` remain missing/placeholder.
+- Shared DB/table mapping:
+  - `po_buys`: PO purchase/cost reservation source with `items` JSON plus fallback single-line fields; `doc_no` is indexed but not unique.
+  - `po_sells`: PO sell/deal target with `items` JSON plus fallback single-line fields; `doc_no` is indexed but not unique.
+  - `purchase_bills`: actual buy bills, `items` JSON, `po_buy_id`, `transaction_mode`, and unique `doc_no`.
+  - `sales_bills`: actual sell bills, `items` JSON, `po_sell_id`, `trading_from_purchase_id(s)`, COGS/GP fields, and unique `doc_no`.
+  - `trading_deals`: matched purchase/sales records with FK to purchase/sales bills, product, supplier, customer; `deal_no` is not unique.
+  - `stock_ledger`: movement source with `ref_type/ref_id/ref_no` and product/branch/warehouse FK only.
+  - Lookup tables: `products`, `customers`, `suppliers`, `branches`, `sales_channels`.
+- Shared flow summary:
+  - PO Buy can represent delivery PO or costing-only/opening pool; do not assume every PO Buy becomes stock receipt.
+  - PO Sell is the sales commitment target for deal costing; its match status depends on cost allocation/match logs.
+  - Cost Pool is read-derived from PO Buy, purchase bill lines, production outputs, grade adjustments, and active matches.
+  - Cost Allocator should be preview/simulation-first until the source formula and status transitions are confirmed.
+  - Trading Dashboard/Matching uses trading-mode purchase/sales bills plus `trading_deals`; write actions need stricter idempotency and reversal rules before implementation.
+- Buttons/actions/modal/export inventory:
+  - PO Buy: search/date/status/purpose filters, create/edit/cancel, move delivery/costing purpose, export.
+  - PO Sell: search/date/match status filters, create/edit/cancel, export.
+  - Cost Pool: product/cost type/source/status/sort/available-only filters; derived read table.
+  - Cost Allocator: source selector, allocation mode, auto match, manual qty adjust, confirm match.
+  - Match Log: search/match type/cost type/PO/status filters, reverse action.
+  - Deal Margin / Compare Margin: date/channel filters and export.
+  - Trading Matching: tabs, show cancelled, new match modal, reverse/recalc/cleanup/pull cloud in legacy.
+- Side effects and rules not to guess:
+  - Do not implement PO write/cancel/cut, cost allocation, match confirm, match reverse, duplicate cleanup, or trading deal recalc until reconciliation/idempotency rules are explicitly designed.
+  - Do not delete match history; reverse-style status changes are the legacy pattern.
+  - Preserve meaningful document numbers as user-facing identifiers; keep UUID/opaque ids internal.
+- Risks/open decisions:
+  - `items` JSON remains non-normalized and sparse for `po_buys`; target line-table design is still carry-over.
+  - `po_sells` has zero dev-target rows, so D1 must support empty state and not fake data.
+  - Status names vary across PO/bills/trading (`Open`, `Received`, `Cancelled`, `paid`, `partial`, `Completed`, etc.); normalize display carefully but preserve raw status in read baselines.
+  - `po_buys.doc_no`, `po_sells.doc_no`, and `trading_deals.deal_no` are not unique yet; write flows need running-number and uniqueness policy first.
+- Implementation order:
+  1. D1 PO Sell read baseline/API/page.
+  2. D2 PO Buy polish against legacy filters/export/detail while keeping writes disabled.
+  3. D3 Trading Dashboard read baseline.
+  4. D4 Trading Matching polish read-only first.
+  5. D5 Cost Pool read-derived baseline.
+  6. D6 Cost Allocator preview-only baseline.
+  7. D7 Match Log / Deal Margin / Compare Margin read/export baselines.
+
+#### Execution Log
+
+- Task: D0 Dual Costing / Trading / PO legacy inventory and DB mapping.
+- Legacy refs: see D0 module overview refs above.
+- Files changed: this tracker and current work handoff.
+- DB/API changes: docs-only; no schema or runtime changes.
+- Buttons/actions checked: inventoried per D0 module overview.
+- Modal/form checked: inventoried; write modals/actions deferred until rules are confirmed.
+- Validation added: none; docs-only checkpoint.
+- Playwright smoke: not run; docs-only inventory.
+- Commands: `git diff --check` passed.
+- Result: D0 module overview completed; D1 PO Sell read baseline is next.
+- Commit: this checkpoint.
 
 ### D1: PO Sell
 

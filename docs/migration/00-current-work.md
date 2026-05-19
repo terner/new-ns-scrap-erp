@@ -9,13 +9,13 @@ Last pushed checkpoint: tracking qa slow movers fix (`6c7d605 fix: align product
 
 ## Current Batch
 
-`Batch F: Finance and Debt`
+`Batch D: Dual Costing / Trading / PO`
 
 Goal:
 
-- Port finance/debt routes from placeholder/read-only surfaces into Next page/API baselines.
-- Use `sales_bills` + `receipts` for AR, `purchase_bills` + `payments` for AP, and `bank_statement` + `accounts` for cash/bank views.
-- Keep this batch read/reconciliation-first before adding new money-moving write flows.
+- Port dual costing, PO, and trading routes from placeholder/read-only surfaces into Next page/API baselines.
+- Use `po_buys`, `po_sells`, `purchase_bills`, `sales_bills`, `trading_deals`, and stock/cost sources as read/report baselines first.
+- Keep allocation/match/reverse/write flows disabled or deferred until reconciliation and idempotency rules are clear.
 
 ## File Naming Changes
 
@@ -207,6 +207,7 @@ Current scope:
 - T2 Supplier Tracking polish is implemented, validated, and pushed.
 - T3 Product Tracking read/report baseline is implemented, validated, and pushed.
 - T4 Tracking QA Batch passed after correcting Product Tracking slow movers, and is pushed.
+- D0 Dual Costing / Trading / PO legacy inventory and DB mapping is complete; docs checkpoint is next.
 - Tracking routes must use active Next app only; legacy/Vue tracking views are source material.
 - Keep T1-T3 read/report baselines first; no write flows in tracking pages.
 - DB design preference clarified: use meaningful business-facing codes/running document numbers for user-visible references; keep UUID/opaque IDs internal only.
@@ -220,8 +221,9 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Continue to Batch D0 Dual Costing / Trading / PO inventory, or consume the parallel `reports/d0-dual-costing-trading-inventory.md` report if another Codex session creates it.
-2. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
+1. Commit/push D0 Dual Costing / Trading / PO inventory.
+2. Continue to D1 PO Sell read baseline/API/page.
+3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model
 
