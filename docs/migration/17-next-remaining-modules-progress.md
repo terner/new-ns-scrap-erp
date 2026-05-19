@@ -342,7 +342,7 @@ Priority: สูง เพราะเป็นฐานของ purchase, sale
 
 - [x] API smoke
 - [x] browser smoke
-- [ ] docs/type/lint/build/commit/push
+- [x] docs/type/lint/build/commit/push
 
 #### S2 Follow-up Execution Log
 
@@ -354,7 +354,8 @@ Priority: สูง เพราะเป็นฐานของ purchase, sale
 - Modal/form checked: modal shows document reference, product/location, quantity/cost, value/status, note, and counterparty/source. It has no write inputs and no mutation action.
 - Playwright smoke: authenticated main Playwright session passed `/stock/ledger` at desktop `1365x900` and mobile `390x844`; `อ่าน` opened the read-only detail modal, modal markers rendered, there was no page-level overflow, and no console warnings/errors were found. Unauthenticated QA subagent confirmed route redirects to `/login?redirect=%2Fstock%2Fledger` and API returns `401` JSON (`กรุณาเข้าสู่ระบบ`).
 - Commands: `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `git diff --check` passed.
-- Result: Stock Ledger row detail modal follow-up validated locally and ready to commit/push.
+- Result: Stock Ledger row detail modal follow-up validated and pushed.
+- Commit: `181a2e5 feat: add stock ledger detail modal` pushed to `main`.
 
 ### S3: Status Convert
 
