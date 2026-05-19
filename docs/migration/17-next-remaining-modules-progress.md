@@ -1192,16 +1192,40 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### FF2: International Transfer
 
-- [ ] API `/api/finance/foreign/intl-transfer`
-- [ ] Page `/finance/foreign/intl-transfer`
-- [ ] modal/form, beneficiaries, accounts, remittance purposes
-- [ ] bank statement side effect only when rule clear
+- [x] API `/api/finance/foreign/intl-transfer`
+- [x] Page `/finance/foreign/intl-transfer`
+- [x] modal/form, beneficiaries, accounts, remittance purposes
+- [x] bank statement side effect deferred until rule clear
+
+#### Execution Log
+
+- Task: FF2 International Transfer read/form baseline.
+- Files changed: `apps/next/src/app/api/finance/foreign/intl-transfer/route.ts`, `apps/next/src/app/finance/foreign/intl-transfer/page.tsx`, `apps/next/src/components/finance/foreign/IntlTransferPageClient.tsx`, `apps/next/src/lib/finance-foreign.ts`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker, and current work handoff.
+- DB/API changes: added `GET /api/finance/foreign/intl-transfer` guarded by `finance.cash.view`; no new table and no writes.
+- Tables used: `accounts`, `overseas_recipients`, `overseas_remittance_purposes`, `currencies`, `fx_rates`, and read-only `bank_statement` rows with `ref_type = ITF` when present.
+- Read/form rule: save draft, submit to bank, complete, reverse, and bank-statement mutation are intentionally disabled until the dedicated `intl_transfers` schema, idempotency, approval, and reversal rules exist.
+- Legacy UI parity checked: purple info band, `+ โอนต่างประเทศใหม่` button, compact white rounded table without extra cards, 3xl modal, amber fee block, slate draft button, blue submit button, and legacy table columns/status placement.
+- Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/intl-transfer`; API returned 200; console had no errors; modal opened with legacy fields, amber fee block, and disabled write buttons; screenshots saved as `ff2-intl-transfer-desktop.png` and `ff2-intl-transfer-mobile.png`.
+- Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and browser smoke passed. OpenAPI still has the existing 113 skeleton warnings outside these endpoints.
+- Result: International Transfer route is no longer a placeholder, but remains read/form-only.
 
 ### FF3: Overseas Receipt
 
-- [ ] API `/api/finance/foreign/overseas-receipt`
-- [ ] Page `/finance/foreign/overseas-receipt`
-- [ ] modal/form and bank statement side effect
+- [x] API `/api/finance/foreign/overseas-receipt`
+- [x] Page `/finance/foreign/overseas-receipt`
+- [x] modal/form; bank statement and FX gain/loss side effects deferred
+
+#### Execution Log
+
+- Task: FF3 Overseas Receipt read/form baseline.
+- Files changed: `apps/next/src/app/api/finance/foreign/overseas-receipt/route.ts`, `apps/next/src/app/finance/foreign/overseas-receipt/page.tsx`, `apps/next/src/components/finance/foreign/OverseasReceiptPageClient.tsx`, `apps/next/src/lib/finance-foreign.ts`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker, and current work handoff.
+- DB/API changes: added `GET /api/finance/foreign/overseas-receipt` guarded by `finance.cash.view`; no new table and no writes.
+- Tables used: `customers`, active bank/FCD/OD/foreign-currency `accounts`, `sales_bills`, `currencies`, `fx_rates`, and read-only `bank_statement` rows with `ref_type IN (ORC, ORC-FEE)` when present.
+- Read/form rule: draft/save, approve receipt, reverse, bank statement mutation, and FX gain/loss posting are intentionally disabled until the dedicated `overseas_receipts` schema, posting idempotency, approval, and reversal rules exist.
+- Legacy UI parity checked: emerald info band, `+ รับเงินต่างประเทศใหม่` button, compact white rounded table without extra cards, 2xl modal, emerald THB values, amber fee values, FX G/L color placement, and blue `รับเงิน + เพิ่ม Bank/FCD` submit button.
+- Playwright smoke: desktop and mobile route render passed on `http://localhost:3100/finance/foreign/overseas-receipt`; API returned 200; console had no errors; modal opened with legacy fields, emerald THB values, amber fee values, and disabled write buttons; screenshots saved as `ff3-overseas-receipt-desktop.png` and `ff3-overseas-receipt-mobile.png`.
+- Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and browser smoke passed. OpenAPI still has the existing 113 skeleton warnings outside these endpoints.
+- Result: Overseas Receipt route is no longer a placeholder, but remains read/form-only.
 
 ### FF4: FCD Ledger
 

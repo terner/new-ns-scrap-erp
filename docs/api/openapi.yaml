@@ -688,6 +688,62 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance/foreign/intl-transfer:
+    get:
+      tags: [Finance]
+      operationId: listForeignIntlTransfer
+      summary: Read international transfer form baseline
+      description: Read/form baseline for ITF. Returns account, beneficiary, purpose, FX reference data, and posted ITF bank rows when present; does not submit to bank, complete, reverse, or mutate bank statements.
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: International transfer read/form baseline data.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance/foreign/overseas-receipt:
+    get:
+      tags: [Finance]
+      operationId: listForeignOverseasReceipt
+      summary: Read overseas receipt form baseline
+      description: Read/form baseline for ORC. Returns customer, bank/FCD account, sales bill, and FX reference data, plus posted ORC bank rows when present; does not approve receipt, post FX gain/loss, reverse, or mutate bank statements.
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Overseas receipt read/form baseline data.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance/foreign/fx-rate:
     get:
       tags: [Finance]
