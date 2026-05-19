@@ -71,6 +71,34 @@ function metadataText(metadata: unknown) {
   return JSON.stringify(metadata, null, 2)
 }
 
+function csvEscape(value: unknown) {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`
+}
+
+function exportAuditCsv(rows: AuditEvent[]) {
+  const header = ['เวลา', 'กลุ่ม', 'เหตุการณ์', 'event_type', 'ผู้ทำรายการ', 'เป้าหมาย', 'user_agent', 'metadata']
+  const body = rows.map((row) => [
+    row.createdAt,
+    eventGroup(row.eventType),
+    eventTitle(row.eventType),
+    row.eventType,
+    userLabel(row.actor),
+    userLabel(row.target),
+    row.userAgent ?? '',
+    metadataText(row.metadata),
+  ])
+  const csv = [header, ...body].map((line) => line.map(csvEscape).join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `audit_activity_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 function eventGroup(eventType: string) {
   if (eventType.includes('login') || eventType.includes('invite') || eventType.includes('reset')) return 'Auth'
   if (eventType.startsWith('app_user.')) return 'Users'
@@ -261,6 +289,7 @@ export function AuditLogPageClient() {
           </label>
           <div className="flex items-end gap-2 lg:col-span-3">
             <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={resetFilters}>ล้าง filter</button>
+            <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50" disabled={isLoading || data.rows.length === 0} type="button" onClick={() => exportAuditCsv(data.rows)}>Export CSV หน้านี้</button>
           </div>
         </div>
       </div>

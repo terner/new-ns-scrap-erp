@@ -223,6 +223,16 @@ export function AdminUsersPageClient() {
     return counts
   }, [data?.users])
 
+  const userSummary = useMemo(() => {
+    const users = data?.users ?? []
+    return {
+      active: users.filter((user) => user.active).length,
+      branchScoped: users.filter((user) => user.branches.length > 0).length,
+      pendingAuth: users.filter((user) => !user.authUserId).length,
+      mustChange: users.filter((user) => user.mustChangePassword).length,
+    }
+  }, [data?.users])
+
   async function updateUserStatus(userId: string, active: boolean) {
     const previousActive = data?.users.find((user) => user.id === userId)?.active
     setSavingUserId(userId)
@@ -381,6 +391,13 @@ export function AdminUsersPageClient() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ผู้ใช้ Active</div><div className="mt-1 text-2xl font-bold text-emerald-700">{userSummary.active}</div></div>
+        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">จำกัดสาขา</div><div className="mt-1 text-2xl font-bold text-blue-700">{userSummary.branchScoped}</div></div>
+        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ยังไม่ link Auth</div><div className="mt-1 text-2xl font-bold text-amber-700">{userSummary.pendingAuth}</div></div>
+        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ต้องเปลี่ยน Password</div><div className="mt-1 text-2xl font-bold text-purple-700">{userSummary.mustChange}</div></div>
       </div>
 
       {formOpen ? (

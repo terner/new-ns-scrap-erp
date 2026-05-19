@@ -1743,9 +1743,20 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### SYS3: Audit and Users Polish
 
-- [ ] Audit filters/detail/export
-- [ ] Users & permissions role matrix polish
+- [x] Audit filters/detail/export
+- [x] Users & permissions role matrix polish
 - [ ] branch-scope enforcement
+
+#### Execution Log
+
+- Task: SYS3 Audit and Users polish.
+- Files changed: `/admin/audit` client and `/admin/users-permissions` client.
+- Audit polish: existing server-backed filters and detail modal remain; added client-side CSV export for the currently loaded/filtered audit page. Export includes time, group, event title, event type, actor, target, user agent, and metadata. No API write side effect.
+- Users polish: added summary cards for active users, branch-scoped users, users pending Auth link, and users marked must-change-password; existing role matrix remains visible with branch scope, user counts, and key permission flags.
+- Branch-scope enforcement: still deferred to SYS5/auth hardening because it requires route/API-wide permission decisions, not a UI-only polish.
+- Browser QA: unauth subagent confirmed `/admin/audit` and `/admin/users-permissions` redirect to login with correct redirect params, login desktop/mobile has no page-level horizontal overflow, and no console/page/network errors were reported. Authenticated main Playwright smoke confirmed `/admin/audit` renders `Audit & Activity Log` plus `Export CSV หน้านี้`, `/admin/users-permissions` renders summary cards, desktop/mobile have no page-level horizontal overflow, and no admin page/request errors were reported.
+- Commands: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, and `git diff --check`.
+- Result: implemented and validated locally.
 
 ### SYS4: Reports Index
 
