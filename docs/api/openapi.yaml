@@ -1420,6 +1420,53 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/dual-costing/match-log:
+    get:
+      tags: [Dual Costing]
+      operationId: readMatchLog
+      summary: Read Match Log baseline
+      description: >
+        Read-only Match Log baseline for Batch D7a. Uses existing
+        `trading_deals` as the current source because a normalized allocation
+        log table is not present yet; reverse/write actions remain deferred.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: matchType
+          in: query
+          schema:
+            type: string
+            enum: [sales]
+        - name: costType
+          in: query
+          schema:
+            type: string
+            enum: [Purchase]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [approved, reversed]
+        - $ref: "#/components/parameters/Format"
+      responses:
+        "200":
+          description: Match Log rows as JSON or XLSX export
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/trading/dashboard:
     get:
       tags: [Trading]

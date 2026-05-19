@@ -1033,10 +1033,21 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### D7: Match Log / Deal Margin / Compare Margin
 
-- [ ] `/dual-costing/match-log`
+- [x] `/dual-costing/match-log`
 - [ ] `/dual-costing/deal-margin`
 - [ ] `/dual-costing/compare-margin`
 - [ ] read baseline, filters, detail, export
+
+#### Execution Log
+
+- Task: D7a Match Log read baseline.
+- Legacy refs: `old-apps/vue/src/views/dualCosting/MatchLogView.vue` and `old-apps/legacy/index.html:22993`; legacy visual baseline uses slate intro, 6 metric cards, filters, and a match table.
+- Files changed: `apps/next/src/app/api/dual-costing/match-log/route.ts`, `apps/next/src/app/dual-costing/match-log/page.tsx`, `apps/next/src/components/dual-costing/MatchLogPageClient.tsx`, `docs/api/openapi.yaml`, and migration tracker docs.
+- DB/API changes: added runtime `GET /api/dual-costing/match-log` with `q`, `matchType`, `costType`, `status`, and `format=xlsx`; reads `trading_deals` as the current read source because a normalized allocation log table does not exist yet. No schema migration.
+- Buttons/actions checked: filters and export are implemented. Reverse/write remains deferred; rows marked cancelled are displayed as `reversed` only for read baseline.
+- Playwright smoke: authenticated `/dual-costing/match-log` returned 26 rows, XLSX returned `200` with `PK` signature, desktop/mobile had no page overflow and no console errors. Subagent unauth smoke confirmed route redirects to `/login?redirect=%2Fdual-costing%2Fmatch-log` and unauth API returns `401`.
+- Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 130`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
+- Result: D7a Match Log read baseline implemented and validated; reverse/write remains deferred.
 
 ### D8: Dual Costing QA Batch
 
