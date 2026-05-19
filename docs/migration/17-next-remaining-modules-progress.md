@@ -1059,6 +1059,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated `/dual-costing/deal-margin` returned 25 rows, gross margin/top deals/match status cards rendered, XLSX returned `200` with `PK` signature, desktop/mobile had no page overflow and no console errors. Subagent unauth smoke confirmed route redirects to `/login?redirect=%2Fdual-costing%2Fdeal-margin` and unauth API returns `401`.
 - Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 130`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
 - Result: D7b Deal Margin read baseline implemented and validated.
+- Commit: `5875dec feat: add deal margin read baseline` pushed to `main`.
 
 ### D8: Dual Costing QA Batch
 
