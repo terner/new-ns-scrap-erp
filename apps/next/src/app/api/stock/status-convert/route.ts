@@ -41,6 +41,7 @@ export async function GET() {
         date: toDateOnly(row.date),
         id: row.ref_id ?? row.id,
         lotNo: row.lot_no ?? '',
+        note: row.notes ?? '',
         productCode: row.products?.code ?? '',
         productName: row.products?.name ?? '-',
         qty: toNumber(row.qty_out),
@@ -49,6 +50,7 @@ export async function GET() {
         statusTo: row.note ?? '',
         unitCost: toNumber(row.unit_cost),
         value: toNumber(row.value_out),
+        createdBy: row.created_by ?? '',
         warehouseName: row.warehouses?.name ?? '-',
       })),
     })

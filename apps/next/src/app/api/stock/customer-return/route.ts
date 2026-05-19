@@ -38,6 +38,7 @@ export async function GET() {
     })
     const customerById = new Map(customers.map((row) => [row.id, row]))
     const grouped = new Map<string, {
+      branchId: string
       branchName: string
       customerName: string
       id: string
@@ -50,11 +51,13 @@ export async function GET() {
       reason: string
       sentQty: number
       value: number
+      warehouseId: string
       warehouseName: string
     }>()
     for (const row of rows) {
       const key = `${row.product_id ?? ''}|${row.branch_id ?? ''}|${row.warehouse_id ?? ''}|${row.lot_no ?? ''}|${row.return_customer_id ?? ''}`
       const current = grouped.get(key) ?? {
+        branchId: row.branch_id ?? '',
         branchName: row.branches?.name ?? '-',
         customerName: row.return_customer_id ? customerById.get(row.return_customer_id)?.name ?? '-' : '-',
         id: key,
@@ -67,6 +70,7 @@ export async function GET() {
         reason: row.return_reason ?? row.notes ?? '',
         sentQty: 0,
         value: 0,
+        warehouseId: row.warehouse_id ?? '',
         warehouseName: row.warehouses?.name ?? '-',
       }
       current.qty += toNumber(row.qty_in) - toNumber(row.qty_out)

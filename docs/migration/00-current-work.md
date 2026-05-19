@@ -196,7 +196,7 @@ Validation:
 Post-SYS UI parity priority after the first 10 route audit now includes a dedicated Daily Reports / รายงานประจำวัน group:
 
 1. Finish Finance and Debt: `/finance/supplier-advance`, `/finance/customer-advance`
-2. Finish Stock parity: `/stock/status-convert`, `/stock/customer-return`
+2. Finish Stock parity: `/stock/status-convert`, `/stock/customer-return` (completed locally; commit/push pending)
 3. Daily Reports / รายงานประจำวัน: `/owner-daily`, `/daily-report`, with `/dashboard` checked where shared daily-report cards overlap
 4. Tracking 360
 5. Dual Costing / Trading / PO
@@ -237,6 +237,34 @@ Known carry-over from Batch S:
 - Field-level validation messages on stock write forms remain a follow-up; server-side Zod validation is active.
 - Reconciliation query/report for grade convert and count adjust remains a follow-up.
 - Void/reversal and final WAC/cost-source policy remain broader stock hardening work.
+
+## Post-SYS Stock UI Parity Slice
+
+Status: completed locally; commit/push pending.
+
+Current checkpoint:
+
+- `/stock/status-convert` is being revised back toward the legacy purple/pink compact surface: legacy title, usage tip, search placeholder, `+ ปรับสถานะใหม่` action, no summary cards, 10-column table, status-flow chips, reason/created-by columns, and legacy empty state.
+- `/stock/customer-return` is being revised back toward the legacy purple/pink compact surface: legacy title, 3 KPI cards, search + branch filter + disabled CSV control, 11-column table, return status/action cells, guidance box, and legacy empty state.
+- API changes are display/read-only additions only: status convert rows now expose `note` and `createdBy`; customer return rows now expose `branchId`/`warehouseId` for unambiguous UI filtering.
+- No POST/write semantics, stock policy, WAC policy, customer-return send-back semantics, schema migrations, or permission rules were changed in this slice.
+
+Validation:
+
+- `npm run lint --workspace @ns-scrap-erp/next` passed.
+- `npm run type-check --workspace @ns-scrap-erp/next` passed.
+- `npm run build --workspace @ns-scrap-erp/next` passed.
+- `git diff --check` passed.
+
+Browser QA:
+
+- Authenticated main Playwright checked `/stock/status-convert` and `/stock/customer-return` at `http://localhost:3100` on desktop 1365x900 and mobile 390x844; both APIs returned 200, no page-level horizontal overflow, no new console warnings/errors, and legacy markers/columns/cards/actions were present.
+- Subagent unauth smoke confirmed both routes redirect to login, both APIs return 401, login desktop/mobile has no horizontal overflow, and no related console/page/network errors were reported.
+
+Next:
+
+- Commit and push the stock parity slice.
+- Start Daily Reports / รายงานประจำวัน: `/owner-daily`, `/daily-report`, with `/dashboard` checked where shared daily-report cards overlap.
 
 ## Batch F Finance and Debt Status
 

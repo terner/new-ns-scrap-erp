@@ -2072,4 +2072,28 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/finance/supplier-advance` and `/finance/customer-advance` at `http://localhost:3100` on desktop 1365x900 and mobile 390x844; both APIs returned 200, no page-level horizontal overflow, no new console errors, and legacy banner/card/disabled CTA/Rate column/table/empty-state/export surfaces were present. Subagent unauth smoke confirmed both routes redirect to login and both APIs return 401.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`.
 - Result: `/finance/supplier-advance` and `/finance/customer-advance` now restore the legacy compact advance visual surface while preserving read-only Bank Statement baselines. Create, cancel, allocation, and dedicated advance table writes remain deferred.
+- Commit: `b1b3b53 fix: restore finance advance legacy ui parity`.
+
+### UI-STOCK2: `/stock/status-convert` and `/stock/customer-return` Legacy UI Parity Revision
+
+#### Execution Log
+
+- Task: revise Status Convert and Customer Return pages to match the legacy compact visual baseline after the first-10 post-SYS UI parity audit.
+- Legacy refs:
+  - `old-apps/legacy/index.html:48148` Status Convert purple/pink header, blue usage tip, search/action toolbar, 10-column table, status chips, empty state, and modal flow.
+  - `old-apps/legacy/index.html:39796` Customer Return purple/pink header, 3 KPI cards, search/branch/CSV toolbar, 11-column table, return status/action cells, empty state, and guidance block.
+  - `old-apps/vue/src/views/stockGaps/StatusConvertView.vue:185` and `old-apps/vue/src/views/stockGaps/CustomerReturnView.vue:96` Vue clone baselines.
+- Files changed:
+  - `apps/next/src/components/stock/StockOperationPageClient.tsx`
+  - `apps/next/src/app/api/stock/status-convert/route.ts`
+  - `apps/next/src/app/api/stock/customer-return/route.ts`
+  - `docs/migration/17-next-remaining-modules-progress.md`
+  - `docs/migration/00-current-work.md`
+- DB/API changes: no schema change. `GET /api/stock/status-convert` adds display-only `note` and `createdBy`; `GET /api/stock/customer-return` adds display-only `branchId` and `warehouseId` so the legacy branch filter does not compare by branch name.
+- Buttons/actions checked: Status Convert `+ ปรับสถานะใหม่`, Customer Return disabled `.CSV` placeholder, disabled `📤 ส่งคืน` placeholder, and legacy empty states. Real send-back/open export behavior remains deferred until audit/rollback/export contracts are designed.
+- Modal/form checked: existing Next write forms remain reachable through `?new=1`; this slice did not change POST semantics, stock policy, WAC policy, status movement mapping, customer-return send-back semantics, or permissions.
+- Validation added: UI/API display-only parity; OpenAPI stock operation list response already permits endpoint-specific row fields through `additionalProperties`.
+- Playwright smoke: authenticated main browser checked `/stock/status-convert` and `/stock/customer-return` at `http://localhost:3100` on desktop 1365x900 and mobile 390x844; both APIs returned 200, no page-level horizontal overflow, no new console warnings/errors, and legacy title/card/toolbar/table/action markers were present. Subagent unauth smoke confirmed both routes redirect to login, both APIs return 401, login desktop/mobile has no horizontal overflow, and no related console/page/network errors were reported.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`.
+- Result: `/stock/status-convert` and `/stock/customer-return` now restore the legacy compact stock operation visual surfaces while preserving existing write semantics. Send-back, CSV export, field-level validation, reverse/audit/rollback, product status mutation, and cost-policy hardening remain deferred.
 - Commit: pending.
