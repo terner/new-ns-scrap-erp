@@ -1136,15 +1136,24 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### UI-ADM1: Company Profile Legacy UI Parity Queue
 
-- [ ] `/admin/company-profile` parity recheck requested from production URL `https://new-ns-scrap-erp.vercel.app/admin/company-profile`
-- [ ] compare active Next page against `old-apps/legacy` and `old-apps/vue/src/views/admin/CompanyProfileView.vue`
-- [ ] keep existing settings writes guarded by `system.settings.manage`; do not add new write behavior without validation/audit review
+- [x] `/admin/company-profile` parity recheck requested from production URL `https://new-ns-scrap-erp.vercel.app/admin/company-profile`
+- [x] compare active Next page against `old-apps/legacy` and `old-apps/vue/src/views/admin/CompanyProfileView.vue`
+- [x] keep existing settings writes guarded by `system.settings.manage`; do not add new write behavior without validation/audit review
 
-#### Queue Note
+#### Execution Log
 
 - User requested adding this page to the active parity list after UI-D1 work started.
 - Existing references: sitemap already lists `/admin/company-profile` with `GET/PUT /api/admin/company-profile`; visual audit checklist already contains `companyProfile`.
-- Execution order: finish current Batch D Cost Pool / Cost Allocator parity slice first, then run Company Profile parity audit/patch before moving to the next broad module unless a blocker appears.
+- Task: recheck and revise Company Profile under legacy-first parity rule.
+- Legacy refs: `old-apps/legacy/index.html:44417`, `old-apps/vue/src/views/admin/CompanyProfileView.vue`.
+- Files changed: `apps/next/src/app/admin/company-profile/CompanyProfilePageClient.tsx`, this tracker, current work handoff.
+- DB/API changes: no schema migration and no route-handler change; existing `GET/PUT /api/admin/company-profile` and `system.settings.manage` guard remain unchanged.
+- Buttons/actions checked: restored legacy three-button action row: save, preview receipt, preview delivery. Preview buttons call the existing validated save path first and then show legacy no-sample-bill alerts; no new print/write endpoint was added.
+- Modal/form checked: no modal added. Removed the non-legacy live print preview card and refresh button from the visible surface.
+- Validation added: restored branch label, address textarea density, bank/footer placeholders, logo delete text, and legacy usage note wording while keeping current input sanitization and API validation.
+- Playwright smoke: authenticated main Playwright session passed `/admin/company-profile` at desktop `1365x900` and mobile `390x844`; `GET /api/admin/company-profile` returned `200`, no page-level overflow/console warnings/errors/failed requests were found, and legacy markers/buttons were visible. Unauthenticated QA subagent confirmed route redirects to `/login?redirect=%2Fadmin%2Fcompany-profile` and API returns `401` JSON (`กรุณาเข้าสู่ระบบ`).
+- Commands: `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `git diff --check` passed.
+- Result: UI-ADM1 Company Profile legacy UI parity revision validated locally and ready to commit/push.
 
 ### UI-D2: Cost Pool / Cost Allocator Legacy UI Parity Revision
 
@@ -1164,7 +1173,8 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Validation added: Cost Pool restores legacy `💰/⚠/≠` warning copy, compact filter row, and 12-column table ending at status. Cost Allocator restores legacy `①/②` step sequence, `Manual` option as read-only shell, Auto Match button placement, disabled manual qty inputs, and disabled `✓ ยืนยัน Match → สร้าง Match Log` button.
 - Playwright smoke: authenticated main Playwright session passed `/dual-costing/cost-pool` and `/dual-costing/cost-allocator` at desktop `1365x900` and mobile `390x844`; JSON APIs returned `200`, Cost Pool XLSX export returned `200` with spreadsheet content type and `PK` signature, and no page-level overflow/console errors/failed requests were found. Unauthenticated QA subagent confirmed route redirects to `/login?redirect=...` and APIs return `401` JSON.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `git diff --check` passed.
-- Result: UI-D2 Cost Pool / Cost Allocator legacy UI parity revision validated locally and ready to commit/push.
+- Result: UI-D2 Cost Pool / Cost Allocator legacy UI parity revision validated and pushed.
+- Commit: `488f7fa fix: restore cost pool allocator legacy ui parity` pushed to `main`.
 
 ## Batch FF: Foreign Finance
 
