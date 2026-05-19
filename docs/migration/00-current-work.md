@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: M4 Main calendar read/design baselines (`a2dad1e feat: add main calendar baselines`)
+Last pushed checkpoint: M5 Cash & Others / Anomaly read baselines (`ab82636 feat: add cash others anomaly baselines`)
 
 ## Current Batch
 
