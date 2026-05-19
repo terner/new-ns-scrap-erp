@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: FF2/FF3 foreign transfer/receipt form baselines (`7fc1a69 feat: add foreign transfer receipt form baselines`)
+Last pushed checkpoint: FF7 Foreign Finance QA checkpoint (`6b766ea docs: add foreign finance qa checkpoint`)
 
 ## Current Batch
 
@@ -242,13 +242,13 @@ Initial FF0 findings:
 - FF5 FX Gain/Loss read baseline is implemented, validated, and pushed. It reads realized rows from `fx_gain_loss` only and does not auto-post.
 - FF6 Bank Reconciliation read/design baseline is implemented, validated, and pushed. It shows ERP bank rows and disables import/match writes until normalized import/match state exists.
 - FF2/FF3 International Transfer and Overseas Receipt read/form baselines are implemented, validated, and pushed. They intentionally do not write `bank_statement`, post FX gain/loss, complete, approve, or reverse until dedicated transaction schemas and idempotency/reversal rules exist.
-- FF7 Foreign Finance QA checkpoint is implemented locally and ready for commit. All six foreign finance APIs returned 200 in browser smoke; type-check, lint, build, OpenAPI validity, and diff check passed. OpenAPI still has the existing 113 skeleton warnings outside this batch.
+- FF7 Foreign Finance QA checkpoint is implemented, validated, and pushed. All six foreign finance APIs returned 200 in browser smoke; type-check, lint, build, OpenAPI validity, and diff check passed. OpenAPI still has the existing 113 skeleton warnings outside this batch.
 - User-facing refs should be `ITF*`, `ORC*`, `ref_no`, account code/account no, and currency symbol/code; do not expose UUID/ref_id as the primary display.
 
 Next concrete task:
 
-1. Commit and push FF7 Foreign Finance QA checkpoint.
-2. Start the next batch after FF7 is pushed; preserve legacy/Vue visual baseline first: colors, cards, panels, table density, button placement, and labels.
+1. Start Batch A Finance / Accounting module overview and DB mapping.
+2. Preserve legacy/Vue visual baseline first: colors, cards, panels, table density, button placement, and labels.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model
