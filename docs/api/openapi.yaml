@@ -217,6 +217,44 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/cash-others-summary:
+    get:
+      tags: [Reports]
+      operationId: readCashOthersSummary
+      summary: Read Cash & Others Summary baseline from cash, AR/AP, stock, pending issue, trading, and expense sources
+      parameters:
+        - name: asOf
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/anomaly-detector:
+    get:
+      tags: [Reports]
+      operationId: readAnomalyDetector
+      summary: Run read-only anomaly scan across cash, stock, AR/AP, bill math, trading, daily, and master-data checks
+      parameters:
+        - name: asOf
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/company-profile:
     get:
       tags: [Admin]

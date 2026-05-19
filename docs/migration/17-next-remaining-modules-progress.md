@@ -1634,8 +1634,21 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### M5: Cash & Others / Anomaly
 
-- [ ] `/cash-others-summary`
-- [ ] `/anomaly-detector`
+- [x] `/cash-others-summary`
+- [x] `/anomaly-detector`
+
+#### Execution Log
+
+- Task: M5 Cash & Others Summary and Anomaly Detector read baselines.
+- Legacy refs: Vue `old-apps/vue/src/views/trackingDashboards/CashOthersSummaryView.vue` and `AnomalyDetectorView.vue`; legacy `view-cashOthersSummary` and `view-anomalyDetector`.
+- Files changed: added shared server helper `cash-others-anomaly.ts`, `GET /api/cash-others-summary`, `GET /api/anomaly-detector`, two Next pages, shared M5 client component, permission mapping, sitemap, and OpenAPI docs.
+- DB/API changes: Cash & Others reads `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `stock_issues`, `trading_deals`, and `expenses`. Anomaly Detector reads cash, stock, AR/AP, purchase/sales bill, customer/supplier, bank statement, and trading sources. No schema change and no write side effects.
+- UI baseline: Cash & Others preserves the blue info banner, blue/indigo grand total card, Pending Sale block, Trading Pending block, asset/debt donut cards, AR aging bars, and four compact colored tables. Anomaly Detector preserves the red/rose hero, severity cards, green empty-state pattern, grouped expandable anomaly cards, active-route fix links, and checklist panel.
+- Buttons/actions checked: export/allocation/reclass/posting/write actions remain disabled or omitted; anomaly fix actions are read-only links to active Next routes only.
+- Validation added: APIs are guarded with `reports.reports.view`; OpenAPI paths include `asOf` query and 401/403 responses.
+- Playwright smoke: unauth subagent confirmed both pages redirect to login, both APIs return `401`, and desktop/mobile login surfaces have no horizontal overflow or related console/network failures. Authenticated smoke confirmed both APIs return `200`, both pages render legacy markers, desktop/mobile have no page-level horizontal overflow, Cash & Others key blocks render with expected table-local horizontal scroll on mobile, and Anomaly Detector groups/details are visible by default with read-only active-route links.
+- Commands: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`. OpenAPI remains valid with the existing 114 warning baseline.
+- Result: implemented and validated locally.
 
 ### M6: Main QA Batch
 

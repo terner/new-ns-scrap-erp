@@ -57,7 +57,7 @@ Status terms:
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
 | `/owner-daily` | Owner Daily Control | read baseline | `GET /api/owner-daily` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `expenses`, `receipts`, `payments`, `stock_ledger`, `trading_deals`, `production_orders` | `reports.reports.view` |
-| `/anomaly-detector` | ตรวจจับความผิดปกติ | placeholder | missing | TBD | none yet |
+| `/anomaly-detector` | ตรวจจับความผิดปกติ | read baseline | `GET /api/anomaly-detector` | `accounts`, `bank_statement`, `stock_ledger`, `sales_bills`, `purchase_bills`, `customers`, `suppliers`, `trading_deals` | `reports.reports.view` |
 | `/daily-report` | Daily Report | read baseline | `GET /api/daily-report` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments`, `bank_statement`, `products` | `reports.reports.view` |
 | `/dashboard` | Dashboard | read baseline | `GET /api/dashboard` | `purchase_bills`, `sales_bills`, `expenses`, `accounts`, `bank_statement`, `stock_ledger`, `production_orders`, `trading_deals` | `reports.reports.view` |
 | `/profit-cost-analysis` | Profit & Cost Analysis | read baseline | `GET /api/profit-cost-analysis` | `purchase_bills`, `sales_bills`, `stock_ledger`, `products`, `suppliers`, `customers`, `branches`, `purchase_channels`, `sales_channels` | `reports.reports.view` |
@@ -66,7 +66,7 @@ Status terms:
 | `/sales-commission` | Sales Tracking Dashboard | read/design baseline | `GET /api/sales-commission` | `purchase_bills`, `suppliers`, `salespersons` | `reports.reports.view` |
 | `/cash-flow-calendar` | Cash Flow Calendar | read/design baseline | `GET /api/cash-flow-calendar` | `accounts`, `bank_statement` | `reports.reports.view` |
 | `/business-calendar` | Business Calendar | read/design baseline | `GET /api/business-calendar` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments` | `reports.reports.view` |
-| `/cash-others-summary` | Cash & Others Summary | placeholder | missing | TBD | none yet |
+| `/cash-others-summary` | Cash & Others Summary | read/design baseline | `GET /api/cash-others-summary` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `stock_issues`, `trading_deals`, `expenses` | `reports.reports.view` |
 
 ### Tracking
 
