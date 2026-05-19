@@ -19,6 +19,17 @@ type ExpensePayload = {
   rows: ExpenseRow[]
 }
 
+type ExpenseHeatmapRow = {
+  anomaly: 'high' | 'low' | null
+  avg: number
+  byMonth: Record<string, number>
+  deviation: number
+  id: string
+  latest: number
+  name: string
+  total: number
+}
+
 const emptyForm: ExpenseFormValues = {
   accountId: null,
   amount: 0,
@@ -51,6 +62,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [paidStatus, setPaidStatus] = useState('all')
+  const [periodMonths, setPeriodMonths] = useState(6)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -95,6 +107,81 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       topCategories: Array.from(byCategory, ([name, total]) => ({ name, total })).sort((left, right) => right.total - left.total).slice(0, 8),
     }
   }, [rows])
+
+  const dashboard = useMemo(() => {
+    const monthList = getRecentMonths(periodMonths)
+    const byCategory = new Map<string, ExpenseHeatmapRow>()
+
+    for (const category of categories.filter((item) => item.active !== false)) {
+      byCategory.set(category.id, {
+        anomaly: null,
+        avg: 0,
+        byMonth: Object.fromEntries(monthList.map((month) => [month, 0])),
+        deviation: 0,
+        id: category.id,
+        latest: 0,
+        name: category.name || category.id,
+        total: 0,
+      })
+    }
+
+    byCategory.set('_uncat', {
+      anomaly: null,
+      avg: 0,
+      byMonth: Object.fromEntries(monthList.map((month) => [month, 0])),
+      deviation: 0,
+      id: '_uncat',
+      latest: 0,
+      name: 'ไม่ระบุหมวด',
+      total: 0,
+    })
+
+    for (const row of rows) {
+      const month = row.date.slice(0, 7)
+      if (!monthList.includes(month)) continue
+      const key = row.categoryId && byCategory.has(row.categoryId) ? row.categoryId : '_uncat'
+      const target = byCategory.get(key)
+      if (!target) continue
+      const amount = row.amount + row.vat
+      target.byMonth[month] = (target.byMonth[month] ?? 0) + amount
+      target.total += amount
+    }
+
+    const heatmapRows = Array.from(byCategory.values())
+      .map((item) => {
+        const latest = item.byMonth[monthList[monthList.length - 1]] ?? 0
+        const avg = item.total / periodMonths
+        const deviation = avg > 0 ? ((latest - avg) / avg) * 100 : 0
+        const anomaly = avg > 0 && latest > Math.max(avg * 1.5, 5000) ? 'high' : avg > 0 && latest > 0 && latest < avg * 0.3 ? 'low' : null
+        return { ...item, anomaly, avg, deviation, latest }
+      })
+      .filter((item) => item.total > 0)
+      .sort((left, right) => right.total - left.total)
+
+    const grandByMonth = Object.fromEntries(monthList.map((month) => [month, 0]))
+    for (const item of heatmapRows) {
+      for (const month of monthList) {
+        grandByMonth[month] = (grandByMonth[month] ?? 0) + (item.byMonth[month] ?? 0)
+      }
+    }
+
+    const monthlyTotals = monthList.map((month) => grandByMonth[month] ?? 0)
+    const total = monthlyTotals.reduce((sum, value) => sum + value, 0)
+    const avg = monthlyTotals.length > 0 ? total / monthlyTotals.length : 0
+    const latest = monthlyTotals[monthlyTotals.length - 1] ?? 0
+    const vsAvg = avg > 0 ? ((latest - avg) / avg) * 100 : 0
+
+    return {
+      anomalies: heatmapRows.filter((item) => item.anomaly),
+      avg,
+      grandByMonth,
+      heatmapRows,
+      latest,
+      monthList,
+      total,
+      vsAvg,
+    }
+  }, [categories, periodMonths, rows])
 
   function openCreateForm() {
     setForm({ ...emptyForm, date: todayDateInput() })
@@ -161,18 +248,101 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       </div>
 
       {dashboardOnly ? (
-        <div className="rounded-lg bg-white p-4 shadow">
-          <div className="mb-3 font-bold text-slate-700">หมวดค่าใช้จ่ายเดือนนี้</div>
-          <div className="space-y-2">
-            {summary.topCategories.map((item) => (
-              <div key={item.name} className="flex items-center justify-between rounded border bg-slate-50 px-3 py-2 text-sm">
-                <span>{item.name}</span>
-                <span className="font-semibold text-blue-700">{formatMoney(item.total)}</span>
-              </div>
-            ))}
-            {!summary.topCategories.length ? <div className="py-6 text-center text-sm text-slate-500">ยังไม่มีข้อมูลเดือนนี้</div> : null}
+        <>
+          <div className="rounded-xl bg-gradient-to-r from-rose-700 to-orange-600 p-5 text-white shadow">
+            <h1 className="text-2xl font-bold">Dashboard ค่าใช้จ่าย</h1>
+            <p className="mt-1 text-sm opacity-90">สรุปแต่ละหมวดเทียบเดือนย้อนหลัง และตรวจหาความผิดปกติเทียบค่าเฉลี่ย</p>
           </div>
-        </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm shadow">
+            <span className="text-slate-600">ดูย้อนหลัง:</span>
+            {[3, 6, 12].map((months) => (
+              <button key={months} className={`rounded px-3 py-1.5 text-xs ${periodMonths === months ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => setPeriodMonths(months)}>
+                {months} เดือน
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-xl bg-white p-3 shadow"><div className="text-xs text-slate-500">รวม {periodMonths} เดือน</div><div className="text-2xl font-bold">{formatMoney(dashboard.total)}</div></div>
+            <div className="rounded-xl bg-blue-50 p-3 shadow"><div className="text-xs text-blue-700">เฉลี่ย/เดือน</div><div className="text-2xl font-bold text-blue-700">{formatMoney(dashboard.avg)}</div></div>
+            <div className="rounded-xl bg-amber-50 p-3 shadow"><div className="text-xs text-amber-700">เดือนนี้</div><div className="text-2xl font-bold text-amber-700">{formatMoney(dashboard.latest)}</div></div>
+            <div className={`rounded-xl p-3 shadow ${Math.abs(dashboard.vsAvg) > 20 ? dashboard.vsAvg > 0 ? 'bg-red-50' : 'bg-emerald-50' : 'bg-slate-50'}`}>
+              <div className={`text-xs ${dashboard.vsAvg > 20 ? 'text-red-700' : dashboard.vsAvg < -20 ? 'text-emerald-700' : 'text-slate-700'}`}>เทียบเฉลี่ย</div>
+              <div className={`text-2xl font-bold ${dashboard.vsAvg > 20 ? 'text-red-700' : dashboard.vsAvg < -20 ? 'text-emerald-700' : 'text-slate-700'}`}>{dashboard.vsAvg > 0 ? '+' : ''}{dashboard.vsAvg.toFixed(1)}%</div>
+            </div>
+          </div>
+
+          {dashboard.anomalies.length > 0 ? (
+            <div className="rounded-xl border-2 border-red-300 bg-gradient-to-r from-red-50 to-amber-50 p-4">
+              <h3 className="mb-2 font-bold text-red-700">ตรวจพบความผิดปกติ {dashboard.anomalies.length} หมวด</h3>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {dashboard.anomalies.map((item) => (
+                  <div key={item.id} className={`rounded border p-3 ${item.anomaly === 'high' ? 'border-red-300 bg-red-50' : 'border-amber-300 bg-amber-50'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className={`font-bold ${item.anomaly === 'high' ? 'text-red-700' : 'text-amber-700'}`}>{item.anomaly === 'high' ? 'สูงผิดปกติ' : 'ต่ำผิดปกติ'}: {item.name}</div>
+                        <div className="mt-1 text-xs text-slate-600">เดือนนี้: <b>{formatMoney(item.latest)}</b> · เฉลี่ย: <b>{formatMoney(item.avg)}</b></div>
+                      </div>
+                      <div className={`text-2xl font-bold ${item.anomaly === 'high' ? 'text-red-700' : 'text-amber-700'}`}>{item.deviation > 0 ? '+' : ''}{item.deviation.toFixed(0)}%</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">ไม่พบความผิดปกติ ค่าใช้จ่ายแต่ละหมวดอยู่ในช่วงค่าเฉลี่ย</div>
+          )}
+
+          <div className="overflow-x-auto rounded-xl bg-white shadow">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="sticky left-0 bg-slate-100 p-2 text-left">หมวด</th>
+                  {dashboard.monthList.map((month) => <th key={month} className="p-2 text-right">{formatMonthLabel(month)}</th>)}
+                  <th className="bg-blue-100 p-2 text-right">เฉลี่ย</th>
+                  <th className="bg-rose-100 p-2 text-right">รวม</th>
+                  <th className="p-2 text-center">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={dashboard.monthList.length + 4}>กำลังโหลดข้อมูล</td></tr> : null}
+                {!isLoading && dashboard.heatmapRows.map((item) => (
+                  <tr key={item.id} className="border-t hover:bg-slate-50">
+                    <td className="sticky left-0 bg-white p-2 font-medium">{item.name}</td>
+                    {dashboard.monthList.map((month) => {
+                      const value = item.byMonth[month] ?? 0
+                      const hot = item.avg > 0 && value > item.avg * 1.5
+                      const low = item.avg > 0 && value > 0 && value < item.avg * 0.5
+                      return <td key={month} className={`p-2 text-right ${hot ? 'bg-red-100 font-bold text-red-700' : low ? 'bg-emerald-50 text-emerald-700' : ''}`}>{value > 0 ? formatMoney(value) : '-'}</td>
+                    })}
+                    <td className="bg-blue-50 p-2 text-right text-blue-700">{formatMoney(item.avg)}</td>
+                    <td className="bg-rose-50 p-2 text-right font-bold text-rose-700">{formatMoney(item.total)}</td>
+                    <td className="p-2 text-center">
+                      {item.anomaly === 'high' ? <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">สูง</span> : item.anomaly === 'low' ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">ต่ำ</span> : <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">ปกติ</span>}
+                    </td>
+                  </tr>
+                ))}
+                {!isLoading && dashboard.heatmapRows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={dashboard.monthList.length + 4}>ยังไม่มีข้อมูลค่าใช้จ่าย</td></tr> : null}
+              </tbody>
+              {dashboard.heatmapRows.length > 0 ? (
+                <tfoot className="bg-slate-100 font-bold">
+                  <tr>
+                    <td className="sticky left-0 bg-slate-100 p-2">รวมทุกหมวด</td>
+                    {dashboard.monthList.map((month) => <td key={month} className="p-2 text-right">{formatMoney(dashboard.grandByMonth[month] ?? 0)}</td>)}
+                    <td className="p-2 text-right text-blue-700">{formatMoney(dashboard.avg)}</td>
+                    <td className="p-2 text-right text-rose-700">{formatMoney(dashboard.total)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              ) : null}
+            </table>
+          </div>
+
+          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <b>หมายเหตุ:</b> ความผิดปกติ = เดือนนี้มากกว่า 1.5 เท่าของค่าเฉลี่ยและเกิน 5,000 บาท หรือ น้อยกว่า 30% ของค่าเฉลี่ย
+          </div>
+        </>
       ) : (
         <>
           <div className="rounded-lg bg-white p-4 shadow">
@@ -272,6 +442,19 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 function SummaryCard({ label, note, tone, value }: { label: string; note?: string; tone?: 'amber' | 'emerald'; value: string }) {
   const className = tone === 'amber' ? 'bg-amber-50 text-amber-800' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-800' : 'bg-white text-slate-900'
   return <div className={`rounded-lg p-4 shadow ${className}`}><div className="text-xs opacity-80">{label}</div><div className="text-xl font-bold">{value}</div>{note ? <div className="mt-1 text-xs opacity-70">{note}</div> : null}</div>
+}
+
+function getRecentMonths(count: number) {
+  const current = new Date(`${todayDateInput().slice(0, 7)}-01T00:00:00`)
+  return Array.from({ length: count }, (_, index) => {
+    const month = new Date(current)
+    month.setMonth(current.getMonth() - (count - 1 - index))
+    return month.toISOString().slice(0, 7)
+  })
+}
+
+function formatMonthLabel(month: string) {
+  return new Intl.DateTimeFormat('th-TH', { month: 'short', year: '2-digit' }).format(new Date(`${month}-01T00:00:00`))
 }
 
 function TextField(props: { error?: string; label: string; onChange?: (value: string) => void; readOnly?: boolean; required?: boolean; type?: string; value: string }) {
