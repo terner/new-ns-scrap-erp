@@ -1467,6 +1467,47 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/dual-costing/deal-margin:
+    get:
+      tags: [Dual Costing]
+      operationId: readDealMargin
+      summary: Read Deal Margin baseline
+      description: >
+        Read-only Deal Margin baseline for Batch D7b using existing
+        `trading_deals` matched sales and purchase amounts.
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: channel
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Format"
+      responses:
+        "200":
+          description: Deal margin rows as JSON or XLSX export
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/trading/dashboard:
     get:
       tags: [Trading]
