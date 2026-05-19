@@ -2178,7 +2178,10 @@ paths:
       summary: Read Deal Margin baseline
       description: >
         Read-only Deal Margin baseline for Batch D7b using existing
-        `trading_deals` matched sales and purchase amounts.
+        `trading_deals` matched sales and purchase amounts. The row
+        `sellQty` field is the current deal-side matched sell quantity
+        from `trading_deals.matched_qty` until normalized PO Sell
+        allocation logs are designed.
       parameters:
         - name: from
           in: query

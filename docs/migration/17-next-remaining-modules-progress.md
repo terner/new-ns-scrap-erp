@@ -1161,7 +1161,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - [x] `/dual-costing/cost-pool` legacy warning copy/filter/table parity
 - [x] `/dual-costing/cost-allocator` legacy step order/action/preview parity
 - [x] keep confirm/match write control disabled
-- [ ] Match Log / Deal Margin / Compare Margin parity follow-up
+- [x] Match Log / Deal Margin / Compare Margin parity follow-up
 
 #### Execution Log
 
@@ -1176,6 +1176,25 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Commands: `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `git diff --check` passed.
 - Result: UI-D2 Cost Pool / Cost Allocator legacy UI parity revision validated and pushed.
 - Commit: `488f7fa fix: restore cost pool allocator legacy ui parity` pushed to `main`.
+
+### UI-D3: Match Log / Deal Margin / Compare Margin Legacy UI Parity Revision
+
+- [x] `/dual-costing/match-log` legacy info/filter/table/action-shell parity
+- [x] `/dual-costing/deal-margin` legacy donut/table/empty-state parity
+- [x] `/dual-costing/compare-margin` legacy first-screen card order parity
+- [ ] commit and push
+
+#### Execution Log
+
+- Task: post-SYS Batch D Group C legacy UI parity revision.
+- Legacy refs: `old-apps/legacy/index.html:22907`, `old-apps/legacy/index.html:23082`, `old-apps/legacy/index.html:23213`, `old-apps/vue/src/views/dualCosting/MatchLogView.vue`, and `old-apps/vue/src/views/dualCosting/CompareMarginView.vue`.
+- Files changed: `apps/next/src/components/dual-costing/MatchLogPageClient.tsx`, `apps/next/src/components/dual-costing/DealMarginPageClient.tsx`, `apps/next/src/components/dual-costing/CompareMarginPageClient.tsx`, `apps/next/src/app/api/dual-costing/deal-margin/route.ts`, `docs/api/openapi.yaml`, this tracker, and current work handoff.
+- DB/API changes: no schema migration and no mutation endpoint. Deal Margin now exposes `sellQty` as current deal-side `trading_deals.matched_qty` so the restored legacy `Sell Qty` column is populated; OpenAPI documents that this is a temporary read contract until normalized PO Sell allocation logs exist.
+- Buttons/actions checked: Match Log restores a disabled read-only `Reverse` action shell and local `ทุก PO Sell` filter from Target / Reference. Reverse/export remains API-filter based and does not mutate stock/cost pool.
+- Validation added: Match Log restores the `📋 Match Log` info box, visible-row summary cards, PO Sell filter shell, status/type badge labels, 14-column table, and disabled Reverse column. Deal Margin restores the donut SVG/legend, `PO Sell` table heading, `Sell Qty`, and `ยังไม่มี PO Sell` empty state. Compare Margin restores legacy first-screen order: info band, Deal/Stock cards, diff cards, with Next-only date filters/row stats reduced after the core legacy blocks.
+- Playwright smoke: authenticated main Playwright session passed `/dual-costing/match-log`, `/dual-costing/deal-margin`, and `/dual-costing/compare-margin` at desktop `1365x900` and mobile `390x844`; JSON APIs returned `200`, no page-level overflow/console warnings/errors/failed requests were found, and legacy markers were visible. Unauthenticated QA subagent confirmed all three routes redirect to `/login?redirect=...` and all three APIs return `401` JSON (`กรุณาเข้าสู่ระบบ`); browser console logged only expected 401 resource messages during unauth API probes.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next` passed; `npm run type-check --workspace @ns-scrap-erp/next` passed; `npm run build --workspace @ns-scrap-erp/next` passed; `git diff --check` passed.
+- Result: UI-D3 Match Log / Deal Margin / Compare Margin legacy UI parity revision validated locally and ready to commit/push.
 
 ## Batch FF: Foreign Finance
 

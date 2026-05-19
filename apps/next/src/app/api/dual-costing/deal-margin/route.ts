@@ -20,6 +20,7 @@ type DealMarginRow = {
   matchedCost: number
   matchedQty: number
   product: string
+  sellQty: number
   statusMatch: 'Fully' | 'None' | 'Partial'
   totalRevenue: number
   unitPrice: number
@@ -39,6 +40,7 @@ function buildWorkbook(rows: DealMarginRow[]) {
     MatchedQty: row.matchedQty,
     Product: row.product,
     Revenue: row.totalRevenue,
+    SellQty: row.sellQty,
     StatusMatch: row.statusMatch,
     UnitPrice: row.unitPrice,
   }))
@@ -104,6 +106,7 @@ export async function GET(request: Request) {
         matchedCost,
         matchedQty,
         product: deal.products?.name ?? deal.product_id ?? '-',
+        sellQty: matchedQty,
         statusMatch: statusMatch(matchedQty, matchedQty, deal.status),
         totalRevenue,
         unitPrice,
