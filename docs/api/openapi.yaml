@@ -2251,9 +2251,12 @@ paths:
       operationId: readTradingDashboard
       summary: Read trading dashboard baseline
       description: >
-        Read-only Trading Dashboard contract for Batch D3. Dashboard exposes
-        deal summaries, status breakdown, trend, top products, and recent deals
-        from `trading_deals`; write/matching actions stay in deferred flows.
+        Read-only Trading Dashboard contract for Batch D3 and the post-SYS UI
+        parity revision. Dashboard exposes legacy-style trading purchase/sales
+        totals, matched COGS, unmatched trading bills, AR/AP, daily trend,
+        product analysis, and deal summaries from `purchase_bills`,
+        `sales_bills`, and `trading_deals`; write/matching actions stay in
+        deferred flows.
       parameters:
         - $ref: "#/components/parameters/TradingDashboardQ"
         - $ref: "#/components/parameters/TradingDashboardStatus"
@@ -3072,11 +3075,35 @@ components:
       additionalProperties: true
     TradingDashboardResponse:
       type: object
-      required: [recentDeals, summary]
+      required: [productList, purchases, recentDeals, sales, summary, trend]
       properties:
         filters:
           type: object
           additionalProperties: true
+        productList:
+          type: array
+          items:
+            type: object
+            properties:
+              cost:
+                type: number
+              gp:
+                type: number
+              gpPct:
+                type: number
+              productId:
+                type: string
+              productName:
+                type: string
+              qty:
+                type: number
+              sales:
+                type: number
+            additionalProperties: true
+        purchases:
+          type: array
+          items:
+            $ref: "#/components/schemas/TradingDashboardBillRow"
         recentDeals:
           type: array
           items:
@@ -3102,8 +3129,37 @@ components:
           items:
             type: object
             additionalProperties: true
+        sales:
+          type: array
+          items:
+            $ref: "#/components/schemas/TradingDashboardBillRow"
         summary:
           type: object
+          properties:
+            completedDeals:
+              type: number
+            grossProfit:
+              type: number
+            grossProfitPct:
+              type: number
+            matchedCOGS:
+              type: number
+            matchedPurchaseAmount:
+              type: number
+            matchedSalesAmount:
+              type: number
+            tradingAP:
+              type: number
+            tradingAR:
+              type: number
+            unmatchedPurchaseBills:
+              type: number
+            unmatchedPurchasesAmount:
+              type: number
+            unmatchedSalesAmount:
+              type: number
+            unmatchedSalesBills:
+              type: number
           additionalProperties: true
         topProducts:
           type: array
@@ -3114,7 +3170,33 @@ components:
           type: array
           items:
             type: object
+            properties:
+              date:
+                type: string
+              purchase:
+                type: number
+              sales:
+                type: number
             additionalProperties: true
+      additionalProperties: true
+    TradingDashboardBillRow:
+      type: object
+      required: [date, docNo, id, matchedAmount, partyName, remainingAmount, totalAmount]
+      properties:
+        date:
+          type: string
+        docNo:
+          type: string
+        id:
+          type: string
+        matchedAmount:
+          type: number
+        partyName:
+          type: string
+        remainingAmount:
+          type: number
+        totalAmount:
+          type: number
       additionalProperties: true
     TradingMatchingResponse:
       type: object

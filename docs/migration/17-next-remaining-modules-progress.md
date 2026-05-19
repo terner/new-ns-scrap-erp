@@ -1808,7 +1808,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
   7. `/stock/convert` - revised in UI parity checkpoint
   8. `/stock/adjust` - revised in UI parity checkpoint
   9. `/sales/po-sell` - revised in UI parity checkpoint
-  10. `/trading/dashboard`
+  10. `/trading/dashboard` - revised in UI parity checkpoint
 - Batch priority after first 10: finish Finance and Debt (`/finance/supplier-advance`, `/finance/customer-advance`), Stock (`/stock/status-convert`, `/stock/customer-return`), Daily Reports (`/owner-daily`, `/daily-report`, with `/dashboard` checked only where shared legacy daily-report cards overlap), Tracking 360, then Dual Costing / Trading / PO routes.
 
 ### UI-P1: `/finance/ap` Legacy UI Parity Revision
@@ -2012,6 +2012,30 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/sales/po-sell` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/sales/po-sell` returned 200. Info banner, six cards, Top Customer/Outstanding panels, chips, disabled CTA, export, and 12 table headings were exercised.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 50`.
 - Result: `/sales/po-sell` now restores the legacy PO Sell visual surface: compact green info banner, six KPI cards, Top 5 Customer panel, PO outstanding panel, legacy search/date row, match-status chips, 12-column table, active `.xlsx` export, and disabled create/edit/cancel actions. PO Sell write/cancel modal behavior remains deferred.
+- Commit: `6a4dfa8` (`fix: restore po sell legacy ui parity`), pushed to `main`.
+
+### UI-P10: `/trading/dashboard` Legacy UI Parity Revision
+
+#### Execution Log
+
+- Task: revise Trading Dashboard page to match legacy/Vue visual baseline and close the first-10 post-SYS UI parity audit.
+- Legacy refs:
+  - `old-apps/legacy/index.html:40502` Trading Dashboard date defaults, trading purchase/sales/deal/product/trend calculations.
+  - `old-apps/legacy/index.html:40593` hero, date filter, mega Trading Performance card, AR/AP card, KPI cards, trend/donut/top product panels, and dashboard tables.
+  - `old-apps/vue/src/views/dualCosting/TradingDashboardView.vue:54` Vue visual clone for the same dashboard surface.
+- Files changed:
+  - `apps/next/src/app/api/trading/dashboard/route.ts`
+  - `apps/next/src/components/trading/TradingDashboardPageClient.tsx`
+  - `docs/api/openapi.yaml`
+  - `docs/migration/17-next-remaining-modules-progress.md`
+  - `docs/migration/00-current-work.md`
+- DB/API changes: no schema change. `GET /api/trading/dashboard` now remains read-only but also reads `purchase_bills` and `sales_bills` with `transaction_mode = 'TRADING'` plus `trading_deals`, using subtotal-before-VAT totals for Trading dashboard parity. It returns purchase rows, sales rows, product analysis, daily trend, matched COGS, unmatched sales/purchase, AR/AP, and completed deal totals.
+- Buttons/actions checked: legacy page has only date controls for this dashboard. Next now keeps From/To date controls and a refresh button; no Trading Matching write actions were added.
+- Modal/form checked: none in legacy dashboard; match/reverse/cleanup modals belong to Trading Matching and remain deferred.
+- Validation added: typed API response model and OpenAPI Trading Dashboard response fields updated for `purchases`, `sales`, `productList`, `trend`, and legacy summary fields.
+- Playwright smoke: authenticated main browser checked `http://localhost:3100/trading/dashboard` on desktop 1365x900 and mobile 390x844; `/api/auth/me` and `/api/trading/dashboard?from=2026-05-01&to=2026-05-19` returned 200, no page-level horizontal overflow, no new console errors, and legacy hero/date filter/Trading Performance/AR-AP/KPI/trend/matching/top-product/purchase/sales/product surfaces were present. Subagent unauth smoke confirmed route redirects to login and unauth API returns 401.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 50`.
+- Result: `/trading/dashboard` restores the legacy visual surface: violet/fuchsia hero, date filter card, mega Trading Performance card, Trading AR/AP card, ten KPI cards, trend chart, matching donut, top product bars, Trading Purchases/Sales tables, and Trading by Product table. Write/matching actions remain deferred to the Trading Matching flow.
 - Commit: pending.
 
 ## Current Priority Queue
