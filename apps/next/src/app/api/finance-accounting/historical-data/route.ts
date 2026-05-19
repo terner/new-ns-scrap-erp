@@ -6,6 +6,16 @@ import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
 
+function looksLikeUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function categoryLabel(categoryId: string | null, metricType: string | null) {
+  if (!categoryId) return 'ไม่ระบุหมวด'
+  if (looksLikeUuid(categoryId)) return `${metricType || 'historical'} / ไม่ระบุชื่อหมวด`
+  return categoryId
+}
+
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
@@ -30,6 +40,7 @@ export async function GET() {
       rows: rows.map((row) => ({
         amount: toNumber(row.amount),
         categoryId: row.category_id || '-',
+        categoryLabel: categoryLabel(row.category_id, row.metric_type),
         metricType: row.metric_type || '-',
         month: row.month || 0,
         note: row.note || '',

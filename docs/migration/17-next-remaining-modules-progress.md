@@ -1325,8 +1325,8 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
   - Report views: `old-apps/vue/src/views/financeReports/FinancialDashboardView.vue`, `CashFlowAnalysisView.vue`, `CashFlowForecastView.vue`, `WorkingCapitalView.vue`, `StockFinanceView.vue`, `ProfitLeakView.vue`, `TaxVatView.vue`, `PlStatementView.vue`, `BalanceSheetView.vue`, and `CashFlowStatementView.vue`.
   - Asset/loan/setup views: `old-apps/vue/src/views/systemGaps/AssetRegisterView.vue`, `DepreciationView.vue`, `AssetDisposalView.vue`, `LoanContractsView.vue`, `LoanDashboardView.vue`, `EquityMaintenanceView.vue`, `OpeningBalanceView.vue`, and `HistoricalDataView.vue`.
 - Active Next state:
-  - All 18 `/finance-accounting/*` routes are still catch-all placeholders in the active Next app.
-  - Sitemap currently marks the section as `18` navigation routes, `0` real pages, `18` placeholders, and no API coverage.
+  - A1-A7 are now implemented as 18/18 `/finance-accounting/*` read or read-design page/API baselines in the active Next app.
+  - Sitemap currently marks the section as `18` navigation routes, `18` real pages, `0` placeholders, and API coverage for every Finance / Accounting route.
   - All routes are currently under `finance.financials.view` in navigation.
 - Visual refs to preserve:
   - Financial Dashboard: violet/purple gradient hero, empty 6-month P&L chart, Cash & Bank-only asset donut, cash need/inflow cards, finance section cards, P&L summary, balance sheet, and Cash Health Insights.
@@ -1490,9 +1490,19 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### A8: Accounting QA Batch
 
-- [ ] QA checker
-- [ ] type/lint/build
+- [x] QA checker
+- [x] type/lint/build
 - [ ] commit/push
+
+#### Execution Log
+
+- Task: A8 Finance / Accounting QA checkpoint after A1-A7.
+- Coverage audit: static subagent confirmed all 18 Finance / Accounting navigation routes have matching Next pages, API routes, OpenAPI paths, and sitemap rows.
+- Browser QA: unauth subagent confirmed all 18 protected pages redirect to login and all 18 APIs return `401`; authenticated main Playwright sweep confirmed all 18 pages render, all 18 APIs return `200`, desktop/mobile widths have no horizontal overflow, and no console/request failures were reported.
+- Write-control audit: subagent confirmed APIs in scope expose only `GET` and UI actions for import/save/delete/reverse/run/disposal/apply/clear are disabled or read-only.
+- Fixes applied: removed stale Finance / Accounting placeholder notes from sitemap/progress docs, added `/api/finance-accounting/` to the central permission prefix map, added OpenAPI `401` responses for Finance Accounting endpoints, and changed Historical Data to display `categoryLabel` instead of using `categoryId` as the primary table label.
+- Validation: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`. OpenAPI remains valid with the existing warning baseline.
+- Targeted smoke after fixes: authenticated Playwright check on `/finance-accounting/historical-data` returned API `200`, no visible UUID, no desktop/mobile horizontal overflow, and no console/request failures.
 
 ## Batch M: Main Dashboards and Operational Control
 

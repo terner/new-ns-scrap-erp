@@ -50,6 +50,7 @@ const prefixPathPermissions: Array<[string, string]> = [
   ['/api/daily/', 'finance.cash.view'],
   ['/api/dual-costing/', 'finance.cash.view'],
   ['/api/finance/', 'finance.cash.view'],
+  ['/api/finance-accounting/', 'finance.financials.view'],
   ['/api/master-data/', 'master.reference.view'],
   ['/api/po-reports/', 'reports.reports.view'],
   ['/api/production/', 'production.operations.view'],

@@ -59,7 +59,7 @@ type OpeningPayload = {
 
 type HistoricalPayload = {
   months: { label: string; month: number; year: number }[]
-  rows: { amount: number; categoryId: string; metricType: string; month: number; refNo: string; year: number }[]
+  rows: { amount: number; categoryId: string; categoryLabel: string; metricType: string; month: number; refNo: string; year: number }[]
   summary: { cashflow: number; expense: number; pnl: number; total: number }
 }
 
@@ -269,12 +269,12 @@ function ReadField({ label, value }: { label: string; value: string }) {
 }
 
 function HistoricalRows({ isLoading, months, rows }: { isLoading: boolean; months: HistoricalPayload['months']; rows: HistoricalPayload['rows'] }) {
-  const categories = Array.from(new Set(rows.map((row) => row.categoryId))).sort()
+  const categories = Array.from(new Set(rows.map((row) => row.categoryLabel))).sort()
   if (isLoading) return <tr><td className="py-8 text-center text-slate-400" colSpan={months.length + 2}>กำลังโหลดข้อมูล</td></tr>
   if (categories.length === 0) return <tr><td className="py-8 text-center text-slate-400" colSpan={months.length + 2}>ยังไม่มีข้อมูลย้อนหลัง</td></tr>
   return categories.map((category) => {
-    const total = months.reduce((sum, month) => sum + (rows.find((row) => row.categoryId === category && row.month === month.month && row.year === month.year)?.amount ?? 0), 0)
-    return <tr key={category} className="border-t hover:bg-blue-50"><Td>{category}</Td>{months.map((month) => <Td key={month.label} align="right">{formatMoney(rows.find((row) => row.categoryId === category && row.month === month.month && row.year === month.year)?.amount)}</Td>)}<Td align="right" strong>{formatMoney(total)}</Td></tr>
+    const total = months.reduce((sum, month) => sum + (rows.find((row) => row.categoryLabel === category && row.month === month.month && row.year === month.year)?.amount ?? 0), 0)
+    return <tr key={category} className="border-t hover:bg-blue-50"><Td>{category}</Td>{months.map((month) => <Td key={month.label} align="right">{formatMoney(rows.find((row) => row.categoryLabel === category && row.month === month.month && row.year === month.year)?.amount)}</Td>)}<Td align="right" strong>{formatMoney(total)}</Td></tr>
   })
 }
 
