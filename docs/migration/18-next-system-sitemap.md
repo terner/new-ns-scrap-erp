@@ -46,7 +46,7 @@ Status terms:
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
 | Reports | 1 | 0 | 1 | none |
-| Finance / Accounting | 18 | 12 | 6 | tax-vat-wht, pl-statement, balance-sheet, cash-flow-statement, asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, equity-maint, opening-balance, historical-data |
+| Finance / Accounting | 18 | 14 | 4 | cash-flow-analysis, cf-forecast-calendar, tax-vat-wht, pl-statement, balance-sheet, cash-flow-statement, asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, equity-maint, opening-balance, historical-data |
 | Master Data | 18 | 18 | 0 | broad master-data coverage |
 | Admin | 6 | 4 | 2 | company, users, audit, transaction ledger |
 
@@ -172,8 +172,8 @@ Status terms:
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
 | `/finance-accounting/financial-dashboard` | Financial Dashboard | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/cash-flow-analysis` | Cash Flow Analysis | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/cf-forecast-calendar` | CF Forecast Calendar | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/cash-flow-analysis` | Cash Flow Analysis | read baseline | `GET /api/finance-accounting/cash-flow-analysis` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `receipts`, `payments`, `expenses`, `stock_ledger`, `loan_payments` | `finance.financials.view` |
+| `/finance-accounting/cf-forecast-calendar` | CF Forecast Calendar | read baseline | `GET /api/finance-accounting/cf-forecast-calendar` | `accounts`, `sales_bills`, `purchase_bills`, `expenses`, `loan_schedules`, `tax-vat-wht derived` | `finance.financials.view` |
 | `/finance-accounting/working-capital` | Working Capital Analysis | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/stock-finance` | Stock Finance Analysis | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/profit-leak` | Profit Leak Dashboard | placeholder | missing | TBD | `finance.financials.view` |

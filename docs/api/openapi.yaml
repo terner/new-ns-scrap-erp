@@ -280,6 +280,28 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance-accounting/cash-flow-analysis:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingCashFlowAnalysis
+      summary: Read cash flow planning analysis from operational cash, AR/AP, stock, and payment sources
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/cf-forecast-calendar:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingCfForecastCalendar
+      summary: Read daily cash flow forecast calendar from AR/AP, expense, loan, and tax due events
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance-accounting/balance-sheet:
     get:
       tags: [Finance Accounting]

@@ -1375,9 +1375,20 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### A2: Cash Flow Analysis and Forecast Calendar
 
-- [ ] `/finance-accounting/cash-flow-analysis`
-- [ ] `/finance-accounting/cf-forecast-calendar`
-- [ ] AP/AR/payment schedule source
+- [x] `/finance-accounting/cash-flow-analysis`
+- [x] `/finance-accounting/cf-forecast-calendar`
+- [x] AP/AR/payment schedule source
+- [x] OpenAPI entries for the two cash planning endpoints
+- [x] read baseline first; no forecast/payment/reclass writes
+
+#### Execution Log
+
+- Task: A2 Cash Flow Analysis + Forecast Calendar read baselines.
+- Files changed: added two Next pages, one shared cash-flow planning client component, one server derivation helper, and two read-only API routes under `/api/finance-accounting/*`.
+- DB/API changes: reads `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `receipts`, `payments`, `expenses`, `stock_ledger`, `loan_payments`, `loan_schedules`, and the transaction-derived Tax/VAT/WHT helper; no schema change, no forecast write, no payment/receipt creation, no reclass, no bank reconciliation, no tax filing, and no GL posting.
+- UI baseline: preserved legacy-first cyan/blue and sky/blue heroes, date/horizon toolbars, NP vs OCF bars, cash trap donut, Burn Rate/OD card, cash projection cards, insight cards, daily forecast graph, calendar grid, AR/AP insight tables, and day detail modal affordance.
+- Validation: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200` (valid with existing warnings), and `git diff --check`.
+- Browser QA: unauth subagent confirmed page redirects to login and API 401 for both endpoints on desktop/mobile with no login overflow. Authenticated smoke on `http://localhost:3100` confirmed both APIs return 200, desktop/mobile have no horizontal overflow, legacy-colored hero/card/table markers render, forecast calendar renders the day grid, and day detail modal opens.
 
 ### A3: Working Capital and Stock Finance
 
