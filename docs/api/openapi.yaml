@@ -896,10 +896,33 @@ paths:
   /api/purchase/po-buy:
     get:
       tags: [Purchase]
+      operationId: listPurchasePoBuy
       summary: List PO buy read baseline
+      description: >
+        Read-only PO Buy contract for Batch D2. User-facing rows expose `docNo`
+        and keep UUIDs internal; write/cancel/move flows are deferred.
+      parameters:
+        - $ref: "#/components/parameters/POBuyQ"
+        - $ref: "#/components/parameters/POBuyStatus"
+        - $ref: "#/components/parameters/POBuyPurpose"
+        - $ref: "#/components/parameters/POBuyFrom"
+        - $ref: "#/components/parameters/POBuyTo"
+        - $ref: "#/components/parameters/Format"
       responses:
         "200":
-          $ref: "#/components/responses/ListOk"
+          description: PO Buy rows as JSON or XLSX export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/POBuyListResponse"
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/sales/bills:
     get:
@@ -1377,6 +1400,42 @@ components:
         type: string
         maxLength: 40
       description: Raw PO Sell status from `po_sells.status`; display normalization is read-only.
+    POBuyFrom:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date
+      description: Inclusive PO Buy date lower bound.
+    POBuyPurpose:
+      name: purpose
+      in: query
+      schema:
+        type: string
+        enum: [all, delivery, costing]
+        default: all
+      description: Filters delivery PO rows versus costing-only pool rows.
+    POBuyQ:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 120
+      description: Search by `docNo`, supplier, product, status, or purpose.
+    POBuyStatus:
+      name: status
+      in: query
+      schema:
+        type: string
+        maxLength: 40
+      description: Raw PO Buy status from `po_buys.status`; display normalization is read-only.
+    POBuyTo:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date
+      description: Inclusive PO Buy date upper bound.
     StockAsOf:
       name: asOf
       in: query
@@ -1580,6 +1639,45 @@ components:
           type: object
           additionalProperties: true
         pagination:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    POBuyListResponse:
+      type: object
+      required: [rows]
+      properties:
+        filters:
+          type: object
+          additionalProperties: true
+        rows:
+          type: array
+          items:
+            type: object
+            required: [docNo]
+            properties:
+              docNo:
+                type: string
+                description: Business-facing PO Buy document number from `po_buys.doc_no`.
+              date:
+                type: string
+              expectedDelivery:
+                type: [string, "null"]
+              supplierName:
+                type: [string, "null"]
+              productName:
+                type: [string, "null"]
+              purposeLabel:
+                type: string
+                enum: [Delivery, Costing]
+              status:
+                type: [string, "null"]
+              items:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+            additionalProperties: true
+        summary:
           type: object
           additionalProperties: true
       additionalProperties: true

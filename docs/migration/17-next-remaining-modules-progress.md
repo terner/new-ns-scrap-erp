@@ -935,9 +935,22 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### D2: PO Buy Polish
 
-- [ ] ตรวจ `/purchase/po-buy` ที่มีแล้ว
-- [ ] เพิ่ม buttons/modal/export ให้ครบ legacy
-- [ ] write flow เฉพาะเมื่อ PO cut/reconciliation ชัด
+- [x] ตรวจ `/purchase/po-buy` ที่มีแล้ว
+- [x] เพิ่ม read-only filters/detail/export จาก legacy surface
+- [x] write flow เฉพาะเมื่อ PO cut/reconciliation ชัด
+
+#### Execution Log
+
+- Task: D2 PO Buy read-only polish.
+- Legacy refs: D0 PO Buy refs remain `old-apps/vue/src/views/purchase/PoBuyView.vue` and `old-apps/legacy/index.html:21577`; expected legacy surface includes search/date/status/purpose filters, export, detail/edit/cancel/move actions.
+- Files changed: `apps/next/src/app/api/purchase/po-buy/route.ts`, `apps/next/src/components/purchase-flow/PoBuyPageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/17-next-remaining-modules-progress.md`, `docs/migration/00-current-work.md`, `docs/migration/18-next-system-sitemap.md`.
+- DB/API changes: extended runtime `GET /api/purchase/po-buy` with `q`, `status`, `purpose`, `from`, `to`, and `format=json|xlsx`; no schema migration.
+- Buttons/actions checked: create/edit/cancel/move remain intentionally omitted because `po_buys.doc_no` uniqueness, running-number policy, and PO cut/reconciliation rules are not locked.
+- Modal/form checked: added read-only detail modal for header, delivery/purpose/status, and item lines; no write form.
+- Validation added: OpenAPI documents `docNo` as the user-facing document identifier; UUID/opaque ids remain internal.
+- Playwright smoke: authenticated `/purchase/po-buy` render passed on desktop/mobile; `GET /api/purchase/po-buy` returned `200` with 478 dev rows; XLSX export returned `200`, spreadsheet content type, and `PK` signature; detail modal opened on a PO row. Subagent unauth smoke confirmed route/API guards return login/`401`.
+- Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 130`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
+- Result: D2 PO Buy read-only polish implemented and validated; write/cancel/move remains deferred.
 
 ### D3: Trading Dashboard
 
