@@ -1967,7 +1967,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated main browser checked `/stock/convert` desktop 1365x900 and mobile 390x844; no page-level horizontal overflow, no console warnings/errors, `/api/auth/me` and `/api/stock/convert` returned 200. Hero CTA, seven cards, Source Type/Cost Status filters, 14 table headings, and `?new=1` modal sections/submit label were exercised.
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 50`.
 - Result: `/stock/convert` now restores the legacy Grade Adjustment visual surface: cyan/teal hero with `+ ปรับเกรดใหม่`, seven KPI cards, Source Type and Cost Status filters, 14-column table with red Source and green Target groups, disabled Confirm Cost/Reverse actions, and modal sections for Source, Target, and Loss/Yield/Cost Flow. Full cost allocation, manual lot selection, pending/partial cost, reverse, and cost P&L workflows remain deferred.
-- Commit: pending.
+- Commit: `5c572fc` (`fix: restore stock convert legacy ui parity`), pushed to `main`.
 
 ## Current Priority Queue
 
