@@ -931,7 +931,7 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Playwright smoke: authenticated `/sales/po-sell` render passed on desktop/mobile; `GET /api/sales/po-sell` returned `200` with zero dev rows; XLSX export returned `200`, spreadsheet content type, and `PK` signature. Subagent unauth smoke confirmed route/API guards return login/`401`.
 - Commands: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 130`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
 - Result: D1 PO Sell read baseline implemented and validated; dev-target `po_sells` currently has zero rows, so empty state is expected.
-- Commit: pending.
+- Commit: `5f2afc4 feat: add po sell read baseline` pushed to `main`.
 
 ### D2: PO Buy Polish
 

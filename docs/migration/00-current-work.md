@@ -208,7 +208,7 @@ Current scope:
 - T3 Product Tracking read/report baseline is implemented, validated, and pushed.
 - T4 Tracking QA Batch passed after correcting Product Tracking slow movers, and is pushed.
 - D0 Dual Costing / Trading / PO legacy inventory and DB mapping is complete and pushed.
-- D1 PO Sell read baseline is implemented and validated; commit/push pending.
+- D1 PO Sell read baseline is implemented, validated, and pushed.
 - Tracking routes must use active Next app only; legacy/Vue tracking views are source material.
 - Keep T1-T3 read/report baselines first; no write flows in tracking pages.
 - DB design preference clarified: use meaningful business-facing codes/running document numbers for user-visible references; keep UUID/opaque IDs internal only.
@@ -222,8 +222,8 @@ Initial F0 findings:
 
 Next concrete task:
 
-1. Commit/push D1 PO Sell read baseline after final diff check.
-2. Continue D2 PO Buy polish, keeping write flows deferred until PO cut/reconciliation rules are clear.
+1. Continue D2 PO Buy polish, keeping write flows deferred until PO cut/reconciliation rules are clear.
+2. Audit `/purchase/po-buy` against D0 PO Buy findings and current Next baseline before changing write behavior.
 3. Use sub agents by default for Playwright/browser QA, and split read-only scouting/contract review into parallel sub agents when work can be separated cleanly.
 
 ## Operating Model
