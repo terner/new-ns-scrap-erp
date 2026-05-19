@@ -5,7 +5,7 @@
 Date: 2026-05-19
 Active app: `apps/next`
 Primary remote: `new-origin`
-Last pushed checkpoint: legacy UI parity rule checkpoint (`b2258d6 docs: strengthen legacy ui parity rule`)
+Last pushed checkpoint: A6 Fixed Assets read baseline (`bda8d6f feat: add fixed assets accounting baselines`)
 
 ## Current Batch
 
@@ -17,8 +17,8 @@ Goal:
 - Start with management dashboards and read/report baselines before GL/accounting writes.
 - Keep depreciation posting, asset disposal posting, loan interest accrual, tax filing, retained earnings, opening balance mutation, and statutory statement claims disabled until GL/COA/closing-period design is clear.
 - During this and future clone batches, keep the legacy/Vue screen as the visual baseline first. Preserve cards, colors, banners, tables, button placement, labels, spacing, and compact density unless a documented deviation is approved. If Vue has been simplified or has known layout/column drift, use `old-apps/legacy/` as the stronger baseline before improving the data wiring.
-- Current implementation slice: A6 Fixed Assets read baseline (`asset-register`, `depreciation`, `asset-disposal`) is implemented and validated locally. Keep acquisition, depreciation posting/reverse, disposal status mutation, and GL posting disabled until accounting side effects are designed.
-- Next slice after commit/push: A7 Loans / Equity / Opening / Historical read baselines.
+- Current implementation slice: A7 Loans / Equity / Opening / Historical read baselines.
+- A6 Fixed Assets read baseline (`asset-register`, `depreciation`, `asset-disposal`) is implemented, validated, and pushed. Keep acquisition, depreciation posting/reverse, disposal status mutation, and GL posting disabled until accounting side effects are designed.
 
 ## File Naming Changes
 
