@@ -46,7 +46,7 @@ Status terms:
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
 | Reports | 1 | 0 | 1 | none |
-| Finance / Accounting | 18 | 14 | 4 | cash-flow-analysis, cf-forecast-calendar, tax-vat-wht, pl-statement, balance-sheet, cash-flow-statement, asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, equity-maint, opening-balance, historical-data |
+| Finance / Accounting | 18 | 17 | 1 | cash-flow-analysis, cf-forecast-calendar, working-capital, stock-finance, profit-leak, tax-vat-wht, pl-statement, balance-sheet, cash-flow-statement, asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, equity-maint, opening-balance, historical-data |
 | Master Data | 18 | 18 | 0 | broad master-data coverage |
 | Admin | 6 | 4 | 2 | company, users, audit, transaction ledger |
 
@@ -174,9 +174,9 @@ Status terms:
 | `/finance-accounting/financial-dashboard` | Financial Dashboard | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/cash-flow-analysis` | Cash Flow Analysis | read baseline | `GET /api/finance-accounting/cash-flow-analysis` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `receipts`, `payments`, `expenses`, `stock_ledger`, `loan_payments` | `finance.financials.view` |
 | `/finance-accounting/cf-forecast-calendar` | CF Forecast Calendar | read baseline | `GET /api/finance-accounting/cf-forecast-calendar` | `accounts`, `sales_bills`, `purchase_bills`, `expenses`, `loan_schedules`, `tax-vat-wht derived` | `finance.financials.view` |
-| `/finance-accounting/working-capital` | Working Capital Analysis | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/stock-finance` | Stock Finance Analysis | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/profit-leak` | Profit Leak Dashboard | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/working-capital` | Working Capital Analysis | read baseline | `GET /api/finance-accounting/working-capital` | `sales_bills`, `purchase_bills`, `stock_ledger`, `accounts`, `bank_statement`, `loan_schedules` | `finance.financials.view` |
+| `/finance-accounting/stock-finance` | Stock Finance Analysis | read baseline | `GET /api/finance-accounting/stock-finance` | `stock_ledger`, `products`, `branches`, `warehouses` | `finance.financials.view` |
+| `/finance-accounting/profit-leak` | Profit Leak Dashboard | read baseline | `GET /api/finance-accounting/profit-leak` | `sales_bills`, `purchase_bills`, `expenses`, `loan_payments`, `stock_ledger`, `production_outputs`, `fx_gain_loss`, `payments`, `receipts` | `finance.financials.view` |
 | `/finance-accounting/tax-vat-wht` | Tax / VAT / WHT | read/design baseline | `GET /api/finance-accounting/tax-vat-wht` | `sales_bills`, `purchase_bills`, `expenses`, `payments`, `receipts` | `finance.financials.view` |
 | `/finance-accounting/pl-statement` | งบกำไรขาดทุน (P&L) | management/read baseline | `GET /api/finance-accounting/pl-statement` | `sales_bills`, `expenses`, `depreciations`, `loan_payments`, `fx_gain_loss` | `finance.financials.view` |
 | `/finance-accounting/balance-sheet` | งบดุล | management/read baseline | `GET /api/finance-accounting/balance-sheet` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `assets`, `loans`, `equity` | `finance.financials.view` |

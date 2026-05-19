@@ -1392,8 +1392,20 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### A3: Working Capital and Stock Finance
 
-- [ ] `/finance-accounting/working-capital`
-- [ ] `/finance-accounting/stock-finance`
+- [x] `/finance-accounting/working-capital`
+- [x] `/finance-accounting/stock-finance`
+- [x] `/finance-accounting/profit-leak`
+- [x] OpenAPI entries for the three working-capital/stock/profit-leak endpoints
+- [x] read baseline first; no financing, stock adjustment, reclass, price update, or GL writes
+
+#### Execution Log
+
+- Task: A3 Working Capital + Stock Finance + Profit Leak read baselines.
+- Files changed: added three Next pages, one shared finance analysis client component, one server derivation helper, and three read-only API routes under `/api/finance-accounting/*`.
+- DB/API changes: reads AR/AP/cash/stock/loan/sales/purchase/expense/production/FX/payment/receipt operational sources; no schema change and no write side effects.
+- UI baseline: preserved legacy-first teal/cyan working-capital hero, amber/orange stock-finance hero, rose/red profit-leak hero, compact cards, gauges, donut charts, aging bars, KPI cards, and dense tables.
+- Validation: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200` (valid with existing warnings), and `git diff --check`.
+- Browser QA: unauth subagent confirmed all three pages redirect to login, all three APIs return 401, and desktop/mobile login has no horizontal overflow. Authenticated smoke on `http://localhost:3100` confirmed all three APIs return 200, legacy-colored hero/card/table markers render, desktop/mobile have no horizontal overflow on checked pages, and no console errors were reported.
 
 ### A4: Tax / VAT / WHT
 

@@ -302,6 +302,39 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance-accounting/working-capital:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingWorkingCapital
+      summary: Read working capital analysis from AR/AP, stock, cash, sales, purchase, and current loan sources
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/stock-finance:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingStockFinance
+      summary: Read stock finance analysis from stock ledger and product master data
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/profit-leak:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingProfitLeak
+      summary: Read profit leak dashboard from sales margin, expenses, stock loss, production loss, FX, interest, and bank fee sources
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance-accounting/balance-sheet:
     get:
       tags: [Finance Accounting]
