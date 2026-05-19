@@ -28,7 +28,7 @@ Historical target stack:
 - Do not route to, import, or execute `old-apps/legacy/` from the active app.
 - Use `old-apps/legacy/` and `old-apps/vue/` only as source material: copy the necessary function/module into the active app, then refactor it into the new structure.
 - Preserve the existing UI appearance and business flow where possible while implementing it in the new app.
-- For clone/migration batches, match the legacy/Vue visual surface first: cards, colors, banners, table density, button placement, labels, and spacing are part of the baseline. Do not redesign these surfaces unless the deviation is documented and approved.
+- For clone/migration batches, match the legacy/Vue visual surface first: cards, colors, banners, table density, button placement, labels, spacing, and compactness are part of the baseline. Do not redesign these surfaces unless the deviation is documented and approved. If the Vue clone has been simplified or has known column/layout drift, use `old-apps/legacy/` as the stronger baseline.
 - Refactor by module and by risk, not by wholesale replacement.
 - Large refactors must be split into reviewable batches with one clear module, transform, or behavior change per batch.
 
