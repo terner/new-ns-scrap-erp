@@ -1616,8 +1616,21 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### M4: Calendars
 
-- [ ] `/cash-flow-calendar`
-- [ ] `/business-calendar`
+- [x] `/cash-flow-calendar`
+- [x] `/business-calendar`
+
+#### Execution Log
+
+- Task: M4 Cash Flow Calendar and Business Calendar read/design baselines.
+- Legacy refs: Vue `old-apps/vue/src/views/trackingDashboards/CashFlowCalendarView.vue` and `BusinessCalendarView.vue`; legacy `view-cashFlowCalendar` and `view-businessCalendar`.
+- Files changed: added shared server helper `main-calendars.ts`, `GET /api/cash-flow-calendar`, `GET /api/business-calendar`, two Next pages, shared calendar client component, permission mapping, sitemap, and OpenAPI docs.
+- DB/API changes: Cash Flow Calendar reads `accounts` and `bank_statement`; Business Calendar reads `purchase_bills`, `sales_bills`, `expenses`, `receipts`, and `payments`. No schema change and no write side effects.
+- UI baseline: preserved Cash Flow blue info banner, month controls, 5 KPI cards, in/out chart, running balance chart, Sunday-first calendar grid, today/negative markers, legend, and read-only day drill modal. Preserved Business Calendar purple info banner, month controls, Combined/Purchase/Sales/Expense segmented modes, 7 KPI cards, buy/sell chart, cumulative GP chart, sticky dark combined table, weekend/today/empty row treatments, and mode-specific read-only tables.
+- Buttons/actions checked: legacy floating export/auto-sync/write shell remains excluded; month controls and drilldown/mode changes are local read-only UI state.
+- Validation added: APIs are guarded with `reports.reports.view`; OpenAPI paths include `month` query and 401/403 responses.
+- Playwright smoke: unauth subagent confirmed both calendar pages redirect to login and both APIs return `401`; login desktop/mobile has no overflow or related console/network failures. Authenticated smoke confirmed both APIs return `200`, desktop and mobile have no horizontal overflow, legacy markers render, Business mode switches to Purchase view, and Cash day drill modal opens via the read-only day selector.
+- Commands: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`. OpenAPI remains valid with the existing 114 warning baseline.
+- Result: implemented and validated locally.
 
 ### M5: Cash & Others / Anomaly
 

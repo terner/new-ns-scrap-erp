@@ -64,8 +64,8 @@ Status terms:
 | `/pending-sales` | รายการรอขาย | read/design baseline | `GET /api/pending-sales` | `po_sells`, `po_buys`, `purchase_bills`, `trading_deals`, `stock_ledger`, `products`, `customers` | `reports.reports.view` |
 | `/sales-plan` | วางแผนการขาย (LME) | read/design baseline | `GET /api/sales-plan` | `stock_ledger`, `products`, derived pending sales/LME reference | `reports.reports.view` |
 | `/sales-commission` | Sales Tracking Dashboard | read/design baseline | `GET /api/sales-commission` | `purchase_bills`, `suppliers`, `salespersons` | `reports.reports.view` |
-| `/cash-flow-calendar` | Cash Flow Calendar | placeholder | missing | TBD | none yet |
-| `/business-calendar` | Business Calendar | placeholder | missing | TBD | none yet |
+| `/cash-flow-calendar` | Cash Flow Calendar | read/design baseline | `GET /api/cash-flow-calendar` | `accounts`, `bank_statement` | `reports.reports.view` |
+| `/business-calendar` | Business Calendar | read/design baseline | `GET /api/business-calendar` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments` | `reports.reports.view` |
 | `/cash-others-summary` | Cash & Others Summary | placeholder | missing | TBD | none yet |
 
 ### Tracking
