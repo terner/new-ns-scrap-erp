@@ -1398,9 +1398,20 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 
 ### A6: Fixed Assets
 
-- [ ] `/finance-accounting/asset-register`
-- [ ] `/finance-accounting/depreciation`
-- [ ] `/finance-accounting/asset-disposal`
+- [x] `/finance-accounting/asset-register`
+- [x] `/finance-accounting/depreciation`
+- [x] `/finance-accounting/asset-disposal`
+- [x] OpenAPI entries for the three read/design endpoints
+- [x] Browser QA and full validation
+
+#### Execution Log
+
+- Task: A6 Fixed Assets read baseline.
+- Files changed: added three Next pages, one shared fixed-assets client component, and three read-only API routes under `/api/finance-accounting/*`.
+- DB/API changes: reads `assets` and `depreciations`; no schema change, no depreciation run/reversal write, no disposal write, and no GL posting.
+- UI baseline: preserved legacy-first headers, cards, filters, compact tables, color semantics, and disabled write controls for Asset Register, Depreciation, and Asset Disposal.
+- Validation: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI remains valid with existing catalog warnings.
+- Browser QA: subagent unauth sweep confirmed protected pages redirect to login and APIs return `401`; authenticated main Playwright smoke confirmed the three pages and APIs render/return `200`, desktop/mobile widths do not horizontally overflow, and write/import/run/disposal buttons are disabled. Only residual console error observed was the pre-existing `/favicon.ico` 500, not a touched A6 endpoint.
 
 ### A7: Loans / Equity / Opening / Historical
 

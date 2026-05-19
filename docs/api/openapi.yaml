@@ -19,6 +19,7 @@ tags:
   - name: Daily
   - name: Dual Costing
   - name: Finance
+  - name: Finance Accounting
   - name: Health
   - name: Master Data
   - name: PO Reports
@@ -245,6 +246,39 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/ListOk"
+
+  /api/finance-accounting/asset-register:
+    get:
+      tags: [Finance Accounting]
+      operationId: listFinanceAccountingAssetRegister
+      summary: List fixed asset register rows with NBV and depreciation summaries
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/depreciation:
+    get:
+      tags: [Finance Accounting]
+      operationId: listFinanceAccountingDepreciation
+      summary: List depreciation history and assets eligible for read-only run preview
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/finance-accounting/asset-disposal:
+    get:
+      tags: [Finance Accounting]
+      operationId: listFinanceAccountingAssetDisposal
+      summary: List asset disposal read-design state and active asset options
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/finance/ap:
     get:

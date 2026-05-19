@@ -46,7 +46,7 @@ Status terms:
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
 | Reports | 1 | 0 | 1 | none |
-| Finance / Accounting | 18 | 0 | 18 | none |
+| Finance / Accounting | 18 | 3 | 15 | asset-register, depreciation, asset-disposal |
 | Master Data | 18 | 18 | 0 | broad master-data coverage |
 | Admin | 6 | 4 | 2 | company, users, audit, transaction ledger |
 
@@ -181,9 +181,9 @@ Status terms:
 | `/finance-accounting/pl-statement` | งบกำไรขาดทุน (P&L) | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/balance-sheet` | งบดุล | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/cash-flow-statement` | งบกระแสเงินสด | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/asset-register` | Fixed Assets / ทรัพย์สิน | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/depreciation` | ค่าเสื่อมราคา | placeholder | missing | TBD | `finance.financials.view` |
-| `/finance-accounting/asset-disposal` | จำหน่ายทรัพย์สิน | placeholder | missing | TBD | `finance.financials.view` |
+| `/finance-accounting/asset-register` | Fixed Assets / ทรัพย์สิน | read baseline | `GET /api/finance-accounting/asset-register` | `assets`, `depreciations`, `branches`, `suppliers` | `finance.financials.view` |
+| `/finance-accounting/depreciation` | ค่าเสื่อมราคา | read/design baseline | `GET /api/finance-accounting/depreciation` | `assets`, `depreciations` | `finance.financials.view` |
+| `/finance-accounting/asset-disposal` | จำหน่ายทรัพย์สิน | read/design baseline | `GET /api/finance-accounting/asset-disposal` | `assets`, `depreciations`; disposal table missing | `finance.financials.view` |
 | `/finance-accounting/loan-contracts` | Loan / Leasing / BSL | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/loan-dashboard` | Loan Dashboard | placeholder | missing | TBD | `finance.financials.view` |
 | `/finance-accounting/equity-maint` | Equity / ทุนจดทะเบียน | placeholder | missing | TBD | `finance.financials.view` |
