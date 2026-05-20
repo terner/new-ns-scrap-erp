@@ -2,15 +2,18 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { canAccessPath, navigationItems, navigationSections } from '@/lib/navigation'
 
 type AppNavigationProps = {
   onNavigate?: () => void
 }
 
+const SIDEBAR_SCROLL_KEY = 'ns-scrap-erp-sidebar-scroll-top'
+
 export function AppNavigation({ onNavigate }: AppNavigationProps) {
   const pathname = usePathname()
+  const navRef = useRef<HTMLElement | null>(null)
   const [authContext, setAuthContext] = useState<{ isAdmin: boolean; permissions: string[] } | null>(null)
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
 
@@ -59,6 +62,37 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
     setExpandedMenus((current) => new Set(current).add(activeParent.href))
   }, [pathname])
 
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+
+    const frame = requestAnimationFrame(() => {
+      const savedScrollTop = Number(window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY))
+      if (Number.isFinite(savedScrollTop)) {
+        nav.scrollTop = savedScrollTop
+      }
+
+      const activeItem = nav.querySelector<HTMLElement>('[data-active-nav="true"]')
+      if (!activeItem) return
+
+      const navRect = nav.getBoundingClientRect()
+      const activeRect = activeItem.getBoundingClientRect()
+      const isVisible = activeRect.top >= navRect.top && activeRect.bottom <= navRect.bottom
+      if (!isVisible) {
+        activeItem.scrollIntoView({ block: 'nearest' })
+        window.sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop))
+      }
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [expandedMenus, pathname, visibleItems])
+
+  function rememberSidebarScroll() {
+    const nav = navRef.current
+    if (!nav) return
+    window.sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop))
+  }
+
   function toggleMenu(href: string) {
     setExpandedMenus((current) => {
       const next = new Set(current)
@@ -72,7 +106,7 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
   }
 
   return (
-    <nav className="flex-1 overflow-y-auto py-3 text-sm" aria-label="Main navigation">
+    <nav ref={navRef} className="flex-1 overflow-y-auto py-3 text-sm" aria-label="Main navigation" onScroll={rememberSidebarScroll}>
       {navigationSections.map((section) => {
         const items = visibleItems.filter((item) => item.section === section.key)
         if (!items.length) return null
@@ -89,9 +123,12 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
                 <div key={item.href}>
                   <div className={`flex border-l-4 transition hover:bg-slate-800 ${active ? 'border-blue-500 bg-slate-800 text-white' : 'border-transparent text-slate-300'}`}>
                     <Link
+                      aria-current={pathname === item.href ? 'page' : undefined}
                       className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2 text-left"
+                      data-active-nav={active ? 'true' : undefined}
                       href={item.href}
                       onClick={() => {
+                        rememberSidebarScroll()
                         if (item.children?.length) toggleMenu(item.href)
                         onNavigate?.()
                       }}
@@ -119,11 +156,16 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
                         return (
                           <Link
                             key={child.href}
+                            aria-current={childIsActive ? 'page' : undefined}
                             className={`flex items-center gap-3 border-l-4 py-2 pl-11 pr-4 text-left transition hover:bg-slate-800 ${
                               childIsActive ? 'border-blue-400 bg-slate-800 text-white' : 'border-transparent text-slate-400'
                             }`}
+                            data-active-nav={childIsActive ? 'true' : undefined}
                             href={child.href}
-                            onClick={onNavigate}
+                            onClick={() => {
+                              rememberSidebarScroll()
+                              onNavigate?.()
+                            }}
                           >
                             <span className="w-5 text-center">{child.icon}</span>
                             <span className="truncate">{child.label}</span>

@@ -76,6 +76,12 @@ Baseline notes:
 | `/daily/transfer` | `view-transfer` | Missing period chips and exact action density. |
 | `/stock/transfer` | `view-stockTransfer` | Needs closer visual pass; likely minor density/action drift. |
 
+## Cross-Cutting Layout Tasks
+
+| Surface | Status | Notes |
+|---|---|---|
+| Sidebar navigation scroll | 2026-05-20 completed | Preserve sidebar `scrollTop` across route navigation and keep the selected menu item visible instead of resetting the menu to the top after clicking into another page. |
+
 ## Parity OK From Current Audit
 
 - `/owner-daily`
