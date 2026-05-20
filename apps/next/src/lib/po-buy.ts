@@ -23,17 +23,12 @@ export const poBuyItemSchema = z.object({
 })
 
 export const poBuyFormSchema = z.object({
-  branchId: optionalSafeId('สาขา'),
-  channelId: optionalSafeId('ช่องทางรับซื้อ'),
-  date: requiredDate,
   expectedDelivery: optionalDate,
   items: z.array(poBuyItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
   notes: optionalGeneralText('หมายเหตุ', 500),
   requireDelivery: z.boolean().default(true),
   supplierId: z.string().trim().min(1, 'เลือก Supplier').max(80, 'รหัส Supplier ยาวเกินไป').regex(safeIdPattern, 'รหัส Supplier มีรูปแบบไม่ถูกต้อง'),
-}).refine((value) => !value.expectedDelivery || value.expectedDelivery >= value.date, {
-  message: 'วันส่งมอบต้องไม่ก่อนวันที่ PO',
-  path: ['expectedDelivery'],
+  warehouseId: optionalSafeId('สาขา/คลัง'),
 })
 
 export type PoBuyFormValues = z.infer<typeof poBuyFormSchema>

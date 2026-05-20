@@ -88,19 +88,35 @@ function dateInRange(date: string, from: string | null, to: string | null) {
   return true
 }
 
+function bangkokDateInput(value: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+  }).formatToParts(value)
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
 async function optionsPayload() {
-  const [branches, channels, products, suppliers] = await Promise.all([
-    prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
-    prisma.purchase_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true } }),
+  const [products, suppliers, warehouses] = await Promise.all([
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
     prisma.suppliers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    prisma.warehouses.findMany({ include: { branches: { select: { code: true, name: true } } }, orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }] }),
   ])
 
   return {
-    branches,
-    channels,
     products,
     suppliers,
+    warehouses: warehouses.map((warehouse) => ({
+      active: warehouse.active,
+      branchId: warehouse.branch_id,
+      branchName: warehouse.branches?.name ?? null,
+      code: warehouse.code,
+      id: warehouse.id,
+      name: warehouse.name,
+    })),
   }
 }
 
@@ -255,17 +271,24 @@ export async function POST(request: Request) {
 
     const values = poBuyFormSchema.parse(await request.json())
     const actor = currentActor(context)
+    const issuedAt = new Date()
+    const issuedDate = bangkokDateInput(issuedAt)
     const productIds = [...new Set(values.items.map((item) => item.productId))]
-    const [supplier, branch, channel, products] = await Promise.all([
+    const [supplier, warehouse, products] = await Promise.all([
       prisma.suppliers.findFirst({ where: { active: true, id: values.supplierId } }),
-      values.branchId ? prisma.branches.findFirst({ where: { active: true, id: values.branchId } }) : Promise.resolve(null),
-      values.channelId ? prisma.purchase_channels.findFirst({ where: { active: true, id: values.channelId } }) : Promise.resolve(null),
+      values.warehouseId ? prisma.warehouses.findFirst({ where: { active: true, id: values.warehouseId } }) : Promise.resolve(null),
       prisma.products.findMany({ where: { active: true, id: { in: productIds } }, select: { active: true, code: true, id: true, name: true, unit: true } }),
     ])
 
     if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'Supplier ไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือก Supplier'] } }, { status: 400 })
-    if (values.branchId && !branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['สาขาไม่ถูกต้องหรือถูกปิดใช้งาน'] } }, { status: 400 })
-    if (values.channelId && !channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางรับซื้อไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { channelId: ['ช่องทางรับซื้อไม่ถูกต้องหรือถูกปิดใช้งาน'] } }, { status: 400 })
+    if (values.warehouseId && !warehouse) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขา/คลังไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { warehouseId: ['สาขา/คลังไม่ถูกต้องหรือถูกปิดใช้งาน'] } }, { status: 400 })
+    if (values.requireDelivery && values.expectedDelivery && values.expectedDelivery < issuedDate) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: 'วันส่งมอบต้องไม่ก่อนวันที่ออก PO',
+        fieldErrors: { expectedDelivery: ['วันส่งมอบต้องไม่ก่อนวันที่ออก PO'] },
+      }, { status: 400 })
+    }
 
     const productById = new Map(products.map((product) => [product.id, product]))
     const missingProductIndex = values.items.findIndex((item) => !productById.has(item.productId))
@@ -279,7 +302,7 @@ export async function POST(request: Request) {
 
     const created = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('po_buys.doc_no'))`
-      const docNo = await nextPoBuyDocNo(tx, values.date)
+      const docNo = await nextPoBuyDocNo(tx, issuedDate)
       const items = poItems(values, products, docNo)
       const qty = items.reduce((sum, item) => sum + item.qty, 0)
       const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0)
@@ -290,10 +313,11 @@ export async function POST(request: Request) {
 
       return tx.po_buys.create({
         data: {
-          branch_id: values.branchId,
-          channel_id: values.channelId,
+          branch_id: warehouse?.branch_id ?? null,
+          channel_id: null,
           created_by: actor,
-          date: normalizeDate(values.date),
+          created_at: issuedAt,
+          date: normalizeDate(issuedDate),
           delivery_date: deliveryDate,
           doc_no: docNo,
           expected_delivery: deliveryDate,
@@ -312,9 +336,10 @@ export async function POST(request: Request) {
           supplier_id: values.supplierId,
           total_amount: totalAmount,
           unit_price: firstItem.unitPrice,
-          updated_at: new Date(),
+          updated_at: issuedAt,
           updated_by: actor,
           version: 1,
+          warehouse_id: values.warehouseId,
         },
         select: { doc_no: true, id: true },
       })

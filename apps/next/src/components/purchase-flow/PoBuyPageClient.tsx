@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
+import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
 
 type Option = {
   active?: boolean | null
+  branchId?: string | null
+  branchName?: string | null
   code?: string | null
   id: string
   name: string
@@ -19,23 +21,20 @@ type PoBuyFormItem = {
 }
 
 type PoBuyFormState = {
-  branchId: string
-  channelId: string
-  date: string
   expectedDelivery: string
   items: PoBuyFormItem[]
   notes: string
   requireDelivery: boolean
   supplierId: string
+  warehouseId: string
 }
 
 type PoBuyPayload = {
   filters: { statuses: string[] }
   options: {
-    branches: Option[]
-    channels: Option[]
     products: Option[]
     suppliers: Option[]
+    warehouses: Option[]
   }
   rows: PoBuyRow[]
   summary: { costingOnly: number; delivery: number; open: number; remainingAmount: number; remainingQty: number; totalAmount: number; totalRows: number }
@@ -77,24 +76,21 @@ function blankItem(): PoBuyFormItem {
 
 function blankForm(): PoBuyFormState {
   return {
-    branchId: '',
-    channelId: '',
-    date: todayDateInput(),
     expectedDelivery: '',
     items: [blankItem()],
     notes: '',
     requireDelivery: true,
     supplierId: '',
+    warehouseId: '',
   }
 }
 
 function flattenClientErrors(values: PoBuyFormState) {
   const parsed = poBuyFormSchema.safeParse({
     ...values,
-    branchId: values.branchId || null,
-    channelId: values.channelId || null,
     expectedDelivery: values.requireDelivery ? values.expectedDelivery || null : null,
     notes: values.notes || null,
+    warehouseId: values.warehouseId || null,
   })
   if (parsed.success) return { data: parsed.data, errors: {} }
 
@@ -108,6 +104,11 @@ function flattenClientErrors(values: PoBuyFormState) {
 
 function optionLabel(option: Option) {
   return option.code ? `${option.code} - ${option.name}` : option.name
+}
+
+function warehouseLabel(option: Option) {
+  const warehouse = optionLabel(option)
+  return option.branchName ? `${option.branchName} / ${warehouse}` : warehouse
 }
 
 export function PoBuyPageClient() {
@@ -362,14 +363,13 @@ export function PoBuyPageClient() {
       </div>
       {showForm ? (
         <PoBuyFormModal
-          branches={data?.options.branches ?? []}
-          channels={data?.options.channels ?? []}
           errors={fieldErrors}
           form={form}
           formTotals={formTotals}
           isSaving={isSaving}
           products={data?.options.products ?? []}
           suppliers={data?.options.suppliers ?? []}
+          warehouses={data?.options.warehouses ?? []}
           onAddItem={addItem}
           onClose={() => setShowForm(false)}
           onRemoveItem={removeItem}
@@ -416,14 +416,13 @@ function statusBadge(status: string) {
 }
 
 function PoBuyFormModal({
-  branches,
-  channels,
   errors,
   form,
   formTotals,
   isSaving,
   products,
   suppliers,
+  warehouses,
   onAddItem,
   onClose,
   onRemoveItem,
@@ -431,14 +430,13 @@ function PoBuyFormModal({
   onUpdate,
   onUpdateItem,
 }: {
-  branches: Option[]
-  channels: Option[]
   errors: FieldErrors
   form: PoBuyFormState
   formTotals: { lineCount: number; totalCost: number; totalQty: number }
   isSaving: boolean
   products: Option[]
   suppliers: Option[]
+  warehouses: Option[]
   onAddItem: () => void
   onClose: () => void
   onRemoveItem: (index: number) => void
@@ -448,8 +446,7 @@ function PoBuyFormModal({
 }) {
   const activeSuppliers = suppliers.filter((supplier) => supplier.active !== false)
   const activeProducts = products.filter((product) => product.active !== false)
-  const activeBranches = branches.filter((branch) => branch.active !== false)
-  const activeChannels = channels.filter((channel) => channel.active !== false)
+  const activeWarehouses = warehouses.filter((warehouse) => warehouse.active !== false)
   const fieldError = (name: string) => errors[name] ? <div className="mt-1 text-xs text-red-600">{errors[name]}</div> : null
 
   return (
@@ -482,15 +479,6 @@ function PoBuyFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs">เลขที่</label>
-              <input className="w-full rounded border bg-slate-50 px-2 py-1.5 font-mono" readOnly value="ออกเลขอัตโนมัติหลังบันทึก" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs">วันที่</label>
-              <input className="w-full rounded border px-2 py-1.5" type="date" value={form.date} onChange={(event) => onUpdate('date', event.target.value)} />
-              {fieldError('date')}
-            </div>
-            <div>
               <label className="mb-1 block text-xs">Supplier *</label>
               <select className="w-full rounded border px-2 py-1.5" value={form.supplierId} onChange={(event) => onUpdate('supplierId', event.target.value)}>
                 <option value="">🔍 พิมพ์ชื่อ Supplier...</option>
@@ -499,20 +487,12 @@ function PoBuyFormModal({
               {fieldError('supplierId')}
             </div>
             <div>
-              <label className="mb-1 block text-xs">ช่องทางรับซื้อ</label>
-              <select className="w-full rounded border px-2 py-1.5" value={form.channelId} onChange={(event) => onUpdate('channelId', event.target.value)}>
+              <label className="mb-1 block text-xs">สาขา/คลัง</label>
+              <select className="w-full rounded border px-2 py-1.5" value={form.warehouseId} onChange={(event) => onUpdate('warehouseId', event.target.value)}>
                 <option value="">--</option>
-                {activeChannels.map((channel) => <option key={channel.id} value={channel.id}>{optionLabel(channel)}</option>)}
+                {activeWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouseLabel(warehouse)}</option>)}
               </select>
-              {fieldError('channelId')}
-            </div>
-            <div>
-              <label className="mb-1 block text-xs">สาขา</label>
-              <select className="w-full rounded border px-2 py-1.5" value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
-                <option value="">--</option>
-                {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{optionLabel(branch)}</option>)}
-              </select>
-              {fieldError('branchId')}
+              {fieldError('warehouseId')}
             </div>
             {form.requireDelivery ? (
               <div>

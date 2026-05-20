@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, normalizeCode, parseMasterDataForm, toIso, toNumber } from '@/lib/server/master-data'
+import { errorJson, masterDataJson, masterDataListJson, parseMasterDataForm, toIso, toNumber } from '@/lib/server/master-data'
+import { z } from 'zod'
 
 export const runtime = 'nodejs'
 
@@ -33,9 +34,35 @@ function mapSalesperson(row: Awaited<ReturnType<typeof prisma.salespersons.findM
   }
 }
 
+function codeValidationError(message: string) {
+  return new z.ZodError([{ code: 'custom', message, path: ['code'] }])
+}
+
+function normalizeSalespersonCode(value: string | null | undefined, fallback: string) {
+  const rawCode = (value?.trim() || fallback).toLowerCase()
+  const matched = rawCode.match(/^s(\d{1,3})$/)
+  if (!matched) throw codeValidationError('รหัสพนักงานขายต้องเป็นรูปแบบ s001-s999')
+
+  const number = Number(matched[1])
+  if (!Number.isInteger(number) || number < 1 || number > 999) throw codeValidationError('รหัสพนักงานขายต้องอยู่ระหว่าง s001-s999')
+
+  return `s${String(number).padStart(3, '0')}`
+}
+
 async function getNextCode() {
-  const last = await prisma.salespersons.findFirst({ where: { code: { startsWith: 'SAL' } }, orderBy: { code: 'desc' }, select: { code: true } })
-  return nextSequentialCode(last?.code, 'SAL')
+  const rows = await prisma.salespersons.findMany({
+    orderBy: { code: 'desc' },
+    select: { code: true },
+    where: { code: { startsWith: 's', mode: 'insensitive' } },
+  })
+  const lastNumber = rows.reduce((max, row) => {
+    const matched = String(row.code ?? '').toLowerCase().match(/^s(\d{3})$/)
+    const number = matched ? Number(matched[1]) : 0
+    return Number.isFinite(number) && number > max ? number : max
+  }, 0)
+  const nextNumber = lastNumber + 1
+  if (nextNumber > 999) throw codeValidationError('รหัสพนักงานขายเต็มช่วง s001-s999 แล้ว')
+  return `s${String(nextNumber).padStart(3, '0')}`
 }
 
 export async function GET() {
@@ -57,7 +84,7 @@ export async function POST(request: Request) {
     requirePermission(context, 'master.reference.manage')
 
     const values = parseMasterDataForm(await request.json())
-    const code = normalizeCode(values.code, values.id || await getNextCode())
+    const code = normalizeSalespersonCode(values.code, values.id || await getNextCode())
     const row = await prisma.salespersons.upsert({
       where: { id: values.id || code },
       create: {

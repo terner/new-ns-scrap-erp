@@ -3248,17 +3248,13 @@ components:
       additionalProperties: true
     POBuyCreateRequest:
       type: object
-      required: [date, supplierId, items]
+      required: [supplierId, items]
       properties:
-        date:
-          type: string
-          format: date
         supplierId:
           type: string
-        channelId:
+        warehouseId:
           type: [string, "null"]
-        branchId:
-          type: [string, "null"]
+          description: สาขา/คลัง selection; server derives `branch_id` from the selected warehouse and leaves `channel_id` null for new PO Buy rows.
         expectedDelivery:
           type: [string, "null"]
           format: date
