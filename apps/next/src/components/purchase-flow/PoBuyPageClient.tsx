@@ -263,7 +263,7 @@ export function PoBuyPageClient() {
   return (
     <section className="space-y-4">
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-        <strong>📥 PO Buy = จองซื้อล่วงหน้า</strong> — ยังไม่นับเป็น Stock จริง แต่เข้า Cost Pool ใช้ Match กับ PO Sell ได้ทันที · 1 บิลรองรับหลายรายการ
+        <strong>📥 PO Buy = จองซื้อล่วงหน้า</strong> — ยังไม่นับเป็น Stock จริงจนกว่าจะรับของ · 1 บิลรองรับหลายรายการ
       </div>
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
@@ -326,10 +326,9 @@ export function PoBuyPageClient() {
         </div>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2">
         <PurposeCard active={filter === 'delivery'} count={data?.summary.delivery ?? 0} description="PO ที่ supplier ต้องส่งของ · เข้า PO Outstanding · ตัดบิลรับซื้อ" label="📦 ส่งของจริง" onClick={() => setFilter('delivery')} tone="indigo" />
-        <PurposeCard active={filter === 'costing'} count={data?.summary.costingOnly ?? 0} description="Imported · ไม่เข้า PO Outstanding · matching กับ PO Sell เท่านั้น" label="💰 Cost Pool / Deal Costing" onClick={() => setFilter('costing')} tone="emerald" />
-        <PurposeCard active={filter === 'all'} count={data?.summary.totalRows ?? 0} description="รวมทั้ง 2 ประเภท" label="📋 ทั้งหมด" onClick={() => setFilter('all')} tone="slate" />
+        <PurposeCard active={filter === 'all'} count={data?.summary.totalRows ?? 0} description="รวม PO Buy ทั้งหมด" label="📋 ทั้งหมด" onClick={() => setFilter('all')} tone="slate" />
       </div>
 
       <div className="overflow-x-auto rounded-xl bg-white shadow">
