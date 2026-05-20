@@ -200,7 +200,7 @@ Status terms:
 |---|---|---|---|---|---|
 | `/master-data/customers` | ลูกค้า | done | `GET/POST /api/master-data/customers`, `GET /export`, `PATCH /{id}/status` | `customers` | `master.customers.view` |
 | `/master-data/salespersons` | พนักงานขาย | done | `GET/POST /api/master-data/salespersons`, `PATCH /{id}` | `salespersons` | `master.reference.view` |
-| `/master-data/suppliers` | ผู้ขาย | done | `GET/POST /api/master-data/suppliers`, `GET /export`, `PATCH /{id}` | `suppliers` | `master.suppliers.view` |
+| `/master-data/suppliers` | ผู้ขาย | done | `GET/POST /api/master-data/suppliers`, `GET /export`, `POST /import`, `PATCH /{id}` | `suppliers` | `master.suppliers.view` |
 | `/master-data/products` | สินค้า | done | `GET/POST /api/master-data/products`, `GET /export`, `PATCH /{id}` | `products` | `master.products.view` |
 | `/master-data/product-types` | ประเภทสินค้า | done | `GET/POST /api/master-data/product-types`, `PATCH /{id}` | `product_types` | `master.reference.view` |
 | `/master-data/product-units` | หน่วยสินค้า | done | `GET/POST /api/master-data/product-units`, `PATCH /{id}` | `product_units` | `master.reference.view` |

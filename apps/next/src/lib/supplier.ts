@@ -68,13 +68,17 @@ const optionalAccountNoSchema = z.preprocess(
     .default(null),
 )
 
-const phoneSchema = z.string().trim()
-  .min(1, 'กรอกเบอร์โทรศัพท์')
-  .regex(/^\+?[0-9][0-9\s().-]{7,24}$/, 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง')
-  .refine((value) => {
-    const digits = compactDigits(value)
-    return digits.length >= 9 && digits.length <= 15
-  }, 'เบอร์โทรศัพท์ต้องมีตัวเลข 9-15 หลัก')
+const optionalPhoneSchema = z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .regex(/^\+?[0-9][0-9\s().-]{7,24}$/, 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง')
+    .refine((value) => {
+      const digits = compactDigits(value)
+      return digits.length >= 9 && digits.length <= 15
+    }, 'เบอร์โทรศัพท์ต้องมีตัวเลข 9-15 หลัก')
+    .nullable()
+    .default(null),
+)
 
 export const supplierSchema = z.object({
   id: z.string().min(1),
@@ -120,7 +124,13 @@ export const supplierListResultSchema = z.object({
   total: z.number().int().min(0),
   totalPages: z.number().int().min(1),
 })
+export const supplierImportResultSchema = z.object({
+  inserted: z.number().int().min(0),
+  totalRows: z.number().int().min(0),
+  updated: z.number().int().min(0),
+})
 export type Supplier = z.infer<typeof supplierSchema>
+export type SupplierImportResult = z.infer<typeof supplierImportResultSchema>
 export type SupplierListResult = z.infer<typeof supplierListResultSchema>
 
 export type SupplierListOptions = {
@@ -145,7 +155,7 @@ export const supplierFormSchema = z.object({
   type: z.enum(['บุคคล', 'นิติบุคคล'], { required_error: 'เลือกประเภทผู้ขาย' }),
   marketScope: z.enum(['ในประเทศ', 'ต่างประเทศ']).default('ในประเทศ'),
   taxId: optionalTaxIdSchema,
-  phone: phoneSchema,
+  phone: optionalPhoneSchema,
   address: optionalGeneralText('ที่อยู่เต็ม/หมายเหตุที่อยู่', 500),
   addressNo: optionalGeneralText('บ้านเลขที่', 40),
   addressMoo: optionalMooSchema,
@@ -168,9 +178,11 @@ export const supplierFormSchema = z.object({
   active: z.boolean().default(true),
 }).superRefine((values, context) => {
   if (values.type === 'บุคคล') {
-    if (!values.nameTitle) context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกคำนำหน้าชื่อ', path: ['nameTitle'] })
-    if (!values.firstName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อ', path: ['firstName'] })
-    if (!values.lastName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกนามสกุล', path: ['lastName'] })
+    if (!values.name && (!values.nameTitle || !values.firstName || !values.lastName)) {
+      if (!values.nameTitle) context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกคำนำหน้าชื่อ', path: ['nameTitle'] })
+      if (!values.firstName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อ', path: ['firstName'] })
+      if (!values.lastName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกนามสกุล', path: ['lastName'] })
+    }
   } else if (!values.name) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบริษัท', path: ['name'] })
   }
@@ -213,6 +225,17 @@ export async function exportSuppliers(options: SupplierListOptions = {}): Promis
     blob: await readBlobResponse(response, 'Export Excel ไม่สำเร็จ'),
     filename,
   }
+}
+
+export async function importSuppliers(file: File): Promise<SupplierImportResult> {
+  const body = new FormData()
+  body.append('file', file)
+
+  const response = await fetch('/api/master-data/suppliers/import', {
+    method: 'POST',
+    body,
+  })
+  return readJsonResponse(response, supplierImportResultSchema, 'Import Excel ไม่สำเร็จ')
 }
 
 export async function saveSupplier(values: SupplierFormValues): Promise<Supplier> {

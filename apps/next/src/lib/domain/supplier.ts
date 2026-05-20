@@ -95,7 +95,7 @@ export function toSupplierWriteInput(values: SupplierFormValues) {
   const parsed = supplierFormSchema.parse(values)
   const code = (parsed.code || parsed.id || '').toUpperCase()
   const personName = [parsed.nameTitle, parsed.firstName, parsed.lastName].map((part) => part?.trim()).filter(Boolean).join(' ')
-  const name = parsed.type === 'บุคคล' ? personName : parsed.name
+  const name = parsed.type === 'บุคคล' ? personName || parsed.name : parsed.name
 
   return {
     id: parsed.id || code,

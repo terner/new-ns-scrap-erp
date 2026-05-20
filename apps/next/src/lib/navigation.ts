@@ -53,6 +53,7 @@ const exactPathPermissions: Record<string, string> = {
   '/api/master-data/products/export': 'master.products.export',
   '/api/master-data/suppliers': 'master.suppliers.view',
   '/api/master-data/suppliers/export': 'master.suppliers.export',
+  '/api/master-data/suppliers/import': 'master.suppliers.create',
   '/dashboard': 'reports.reports.view',
   '/daily-report': 'reports.reports.view',
   '/master-data/customers': 'master.customers.view',
