@@ -1,10 +1,42 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
+import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
+
+type Option = {
+  active?: boolean | null
+  code?: string | null
+  id: string
+  name: string
+  unit?: string | null
+}
+
+type PoBuyFormItem = {
+  productId: string
+  qty: number
+  unitPrice: number
+}
+
+type PoBuyFormState = {
+  branchId: string
+  channelId: string
+  date: string
+  expectedDelivery: string
+  items: PoBuyFormItem[]
+  notes: string
+  requireDelivery: boolean
+  supplierId: string
+}
 
 type PoBuyPayload = {
   filters: { statuses: string[] }
+  options: {
+    branches: Option[]
+    channels: Option[]
+    products: Option[]
+    suppliers: Option[]
+  }
   rows: PoBuyRow[]
   summary: { costingOnly: number; delivery: number; open: number; remainingAmount: number; remainingQty: number; totalAmount: number; totalRows: number }
 }
@@ -37,14 +69,59 @@ type PoBuyRow = {
   totalAmount: number
 }
 
+type FieldErrors = Record<string, string>
+
+function blankItem(): PoBuyFormItem {
+  return { productId: '', qty: 0, unitPrice: 0 }
+}
+
+function blankForm(): PoBuyFormState {
+  return {
+    branchId: '',
+    channelId: '',
+    date: todayDateInput(),
+    expectedDelivery: '',
+    items: [blankItem()],
+    notes: '',
+    requireDelivery: true,
+    supplierId: '',
+  }
+}
+
+function flattenClientErrors(values: PoBuyFormState) {
+  const parsed = poBuyFormSchema.safeParse({
+    ...values,
+    branchId: values.branchId || null,
+    channelId: values.channelId || null,
+    expectedDelivery: values.requireDelivery ? values.expectedDelivery || null : null,
+    notes: values.notes || null,
+  })
+  if (parsed.success) return { data: parsed.data, errors: {} }
+
+  const errors: FieldErrors = {}
+  parsed.error.issues.forEach((issue) => {
+    const path = issue.path.join('.')
+    if (!errors[path]) errors[path] = issue.message
+  })
+  return { data: null, errors }
+}
+
+function optionLabel(option: Option) {
+  return option.code ? `${option.code} - ${option.name}` : option.name
+}
+
 export function PoBuyPageClient() {
   const [data, setData] = useState<PoBuyPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [filter, setFilter] = useState<'all' | 'delivery' | 'costing'>('all')
+  const [form, setForm] = useState<PoBuyFormState>(() => blankForm())
   const [fromDate, setFromDate] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedRow, setSelectedRow] = useState<PoBuyRow | null>(null)
+  const [showForm, setShowForm] = useState(false)
   const [status, setStatus] = useState('all')
   const [toDate, setToDate] = useState('')
 
@@ -63,6 +140,77 @@ export function PoBuyPageClient() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  const formTotals = useMemo(() => {
+    const totalQty = form.items.reduce((sum, item) => sum + Number(item.qty || 0), 0)
+    const totalCost = form.items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.unitPrice || 0), 0)
+    return { lineCount: form.items.length, totalCost, totalQty }
+  }, [form.items])
+
+  const openCreateForm = () => {
+    setForm(blankForm())
+    setFieldErrors({})
+    setError(null)
+    setShowForm(true)
+  }
+
+  const updateForm = <Key extends keyof PoBuyFormState>(key: Key, value: PoBuyFormState[Key]) => {
+    setForm((current) => ({ ...current, [key]: value }))
+    setFieldErrors((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
+  const updateItem = <Key extends keyof PoBuyFormItem>(index: number, key: Key, value: PoBuyFormItem[Key]) => {
+    setForm((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item),
+    }))
+    setFieldErrors((current) => {
+      const next = { ...current }
+      delete next[`items.${index}.${key}`]
+      return next
+    })
+  }
+
+  const addItem = () => {
+    setForm((current) => ({ ...current, items: [...current.items, blankItem()] }))
+  }
+
+  const removeItem = (index: number) => {
+    setForm((current) => current.items.length <= 1
+      ? current
+      : { ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) })
+  }
+
+  const submitForm = async () => {
+    const parsed = flattenClientErrors(form)
+    if (!parsed.data) {
+      setFieldErrors(parsed.errors)
+      setError('ตรวจข้อมูลในฟอร์มก่อนบันทึก')
+      return
+    }
+
+    setError(null)
+    setFieldErrors({})
+    setIsSaving(true)
+    try {
+      const payload: PoBuyFormValues = parsed.data
+      const created = await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
+        body: JSON.stringify(payload),
+        method: 'POST',
+      })
+      setShowForm(false)
+      setSearch(created.docNo)
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'บันทึก PO Buy ไม่ได้')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -161,7 +309,7 @@ export function PoBuyPageClient() {
           <span className="text-slate-400">→</span>
           <input aria-label="วันที่สิ้นสุด" className="rounded-lg border px-2 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
           {hasFilters ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={resetFilters}>✕ ล้าง</button> : null}
-          <button className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm text-white opacity-60" type="button" disabled>+ PO Buy ใหม่</button>
+          <button className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ PO Buy ใหม่</button>
           <a className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -212,6 +360,24 @@ export function PoBuyPageClient() {
           </tbody>
         </table>
       </div>
+      {showForm ? (
+        <PoBuyFormModal
+          branches={data?.options.branches ?? []}
+          channels={data?.options.channels ?? []}
+          errors={fieldErrors}
+          form={form}
+          formTotals={formTotals}
+          isSaving={isSaving}
+          products={data?.options.products ?? []}
+          suppliers={data?.options.suppliers ?? []}
+          onAddItem={addItem}
+          onClose={() => setShowForm(false)}
+          onRemoveItem={removeItem}
+          onSubmit={submitForm}
+          onUpdate={updateForm}
+          onUpdateItem={updateItem}
+        />
+      ) : null}
       {selectedRow ? <PoBuyDetailModal row={selectedRow} onClose={() => setSelectedRow(null)} /> : null}
     </section>
   )
@@ -247,6 +413,170 @@ function statusBadge(status: string) {
   if (normalized.includes('partial')) return 'bg-amber-100 text-amber-700'
   if (normalized.includes('cancel')) return 'bg-slate-100 text-slate-500'
   return 'bg-blue-100 text-blue-700'
+}
+
+function PoBuyFormModal({
+  branches,
+  channels,
+  errors,
+  form,
+  formTotals,
+  isSaving,
+  products,
+  suppliers,
+  onAddItem,
+  onClose,
+  onRemoveItem,
+  onSubmit,
+  onUpdate,
+  onUpdateItem,
+}: {
+  branches: Option[]
+  channels: Option[]
+  errors: FieldErrors
+  form: PoBuyFormState
+  formTotals: { lineCount: number; totalCost: number; totalQty: number }
+  isSaving: boolean
+  products: Option[]
+  suppliers: Option[]
+  onAddItem: () => void
+  onClose: () => void
+  onRemoveItem: (index: number) => void
+  onSubmit: () => void
+  onUpdate: <Key extends keyof PoBuyFormState>(key: Key, value: PoBuyFormState[Key]) => void
+  onUpdateItem: <Key extends keyof PoBuyFormItem>(index: number, key: Key, value: PoBuyFormItem[Key]) => void
+}) {
+  const activeSuppliers = suppliers.filter((supplier) => supplier.active !== false)
+  const activeProducts = products.filter((product) => product.active !== false)
+  const activeBranches = branches.filter((branch) => branch.active !== false)
+  const activeChannels = channels.filter((channel) => channel.active !== false)
+  const fieldError = (name: string) => errors[name] ? <div className="mt-1 text-xs text-red-600">{errors[name]}</div> : null
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="po-buy-form-title">
+      <div className="mx-auto my-4 max-w-2xl rounded-xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <h3 id="po-buy-form-title" className="font-semibold">สร้าง PO Buy (จองซื้อ / ตั้งต้นทุน)</h3>
+          <button className="text-2xl text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>×</button>
+        </div>
+        <div className="space-y-3 p-5 text-sm">
+          <div className="rounded border-l-4 border-amber-500 bg-amber-50 p-3">
+            <label className="mb-2 block text-xs font-bold text-amber-800">🎯 วัตถุประสงค์ของ PO Buy นี้</label>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <label className={`flex cursor-pointer items-start gap-2 rounded border-2 bg-white p-2 ${form.requireDelivery ? 'border-blue-500' : 'border-transparent'}`}>
+                <input checked={form.requireDelivery} className="mt-1" type="radio" onChange={() => onUpdate('requireDelivery', true)} />
+                <span>
+                  <span className="block text-sm font-bold text-blue-700">📦 ต้องส่งของจริง</span>
+                  <span className="text-xs text-slate-500">เข้า PO Outstanding Report · รอรับสินค้าตามเวลา</span>
+                </span>
+              </label>
+              <label className={`flex cursor-pointer items-start gap-2 rounded border-2 bg-white p-2 ${!form.requireDelivery ? 'border-emerald-500' : 'border-transparent'}`}>
+                <input checked={!form.requireDelivery} className="mt-1" type="radio" onChange={() => onUpdate('requireDelivery', false)} />
+                <span>
+                  <span className="block text-sm font-bold text-emerald-700">💰 ตั้งต้นทุน Dual Costing เท่านั้น</span>
+                  <span className="text-xs text-slate-500">ส่งของหมดแล้ว / ใช้คำนวณต้นทุน · <b>ไม่เข้า PO Outstanding Report</b></span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs">เลขที่</label>
+              <input className="w-full rounded border bg-slate-50 px-2 py-1.5 font-mono" readOnly value="ออกเลขอัตโนมัติหลังบันทึก" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs">วันที่</label>
+              <input className="w-full rounded border px-2 py-1.5" type="date" value={form.date} onChange={(event) => onUpdate('date', event.target.value)} />
+              {fieldError('date')}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs">Supplier *</label>
+              <select className="w-full rounded border px-2 py-1.5" value={form.supplierId} onChange={(event) => onUpdate('supplierId', event.target.value)}>
+                <option value="">🔍 พิมพ์ชื่อ Supplier...</option>
+                {activeSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{optionLabel(supplier)}</option>)}
+              </select>
+              {fieldError('supplierId')}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs">ช่องทางรับซื้อ</label>
+              <select className="w-full rounded border px-2 py-1.5" value={form.channelId} onChange={(event) => onUpdate('channelId', event.target.value)}>
+                <option value="">--</option>
+                {activeChannels.map((channel) => <option key={channel.id} value={channel.id}>{optionLabel(channel)}</option>)}
+              </select>
+              {fieldError('channelId')}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs">สาขา</label>
+              <select className="w-full rounded border px-2 py-1.5" value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
+                <option value="">--</option>
+                {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{optionLabel(branch)}</option>)}
+              </select>
+              {fieldError('branchId')}
+            </div>
+            {form.requireDelivery ? (
+              <div>
+                <label className="mb-1 block text-xs">วันส่งมอบ</label>
+                <input className="w-full rounded border px-2 py-1.5" type="date" value={form.expectedDelivery} onChange={(event) => onUpdate('expectedDelivery', event.target.value)} />
+                {fieldError('expectedDelivery')}
+              </div>
+            ) : null}
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="font-medium">📋 รายการสินค้า ({form.items.length})</label>
+              <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700" type="button" onClick={onAddItem}>+ เพิ่มรายการ</button>
+            </div>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100">
+                  <tr><th className="p-2 text-left">สินค้า / Grade *</th><th className="w-32 p-2 text-right">จำนวน (กก.) *</th><th className="w-32 p-2 text-right">ราคา/หน่วย *</th><th className="w-32 p-2 text-right">มูลค่ารวม</th><th className="w-8 p-2" /></tr>
+                </thead>
+                <tbody>
+                  {form.items.map((item, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="p-1 align-top">
+                        <select className="w-full rounded border px-2 py-1.5" value={item.productId} onChange={(event) => onUpdateItem(index, 'productId', event.target.value)}>
+                          <option value="">🔍 พิมพ์รหัส/ชื่อสินค้า...</option>
+                          {activeProducts.map((product) => <option key={product.id} value={product.id}>{optionLabel(product)}</option>)}
+                        </select>
+                        {fieldError(`items.${index}.productId`)}
+                      </td>
+                      <td className="p-1 align-top">
+                        <input className="w-full rounded border px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.qty} onChange={(event) => onUpdateItem(index, 'qty', Number(event.target.value))} />
+                        {fieldError(`items.${index}.qty`)}
+                      </td>
+                      <td className="p-1 align-top">
+                        <input className="w-full rounded border px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.unitPrice} onChange={(event) => onUpdateItem(index, 'unitPrice', Number(event.target.value))} />
+                        {fieldError(`items.${index}.unitPrice`)}
+                      </td>
+                      <td className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</td>
+                      <td className="p-1 text-center">{form.items.length > 1 ? <button className="px-2 text-red-500" type="button" onClick={() => onRemoveItem(index)}>×</button> : null}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-slate-50 font-bold">
+                  <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.totalCost)}</td><td /></tr>
+                </tfoot>
+              </table>
+            </div>
+            {fieldError('items')}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs">หมายเหตุ</label>
+            <textarea className="w-full rounded border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
+            {fieldError('notes')}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
+          <button className="px-4 py-2 text-sm" disabled={isSaving} type="button" onClick={onClose}>ยกเลิก</button>
+          <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก PO Buy'}</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow }) {

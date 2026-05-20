@@ -988,6 +988,25 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Result: D2 PO Buy read-only polish implemented and validated; write/cancel/move remains deferred.
 - Commit: `01b4bcd feat: polish po buy read baseline` pushed to `main`.
 
+### D2a: PO Buy Create/Add-List
+
+- [x] เปิด `+ PO Buy ใหม่` สำหรับสร้างรายการใหม่
+- [x] เพิ่ม modal add-list ตาม legacy `view-poBuy`
+- [x] เพิ่ม server-side validation และ `POST /api/purchase/po-buy`
+- [ ] edit/cancel/move purpose ยัง deferred
+
+#### Execution Log
+
+- Task: enable PO Buy add-list create flow after user redirect from Anomaly/GL follow-up work.
+- Legacy refs: remote/local legacy `view-poBuy` at `old-apps/legacy/index.html:21577`; source behavior opens `สร้าง PO Buy (จองซื้อ / ตั้งต้นทุน)`, defaults to one blank item, generates `POBYYMM-000N`, validates Supplier/items/product/qty/unit price, and sets costing-only rows to `Received` with zero remaining quantity.
+- Files changed: `apps/next/src/lib/po-buy.ts`, `apps/next/src/app/api/purchase/po-buy/route.ts`, `apps/next/src/components/purchase-flow/PoBuyPageClient.tsx`, `docs/api/openapi.yaml`, `docs/migration/17-next-remaining-modules-progress.md`, `docs/migration/00-current-work.md`, `docs/migration/18-next-system-sitemap.md`.
+- DB/API changes: added `POST /api/purchase/po-buy` using existing `po_buys` fields only; no schema migration. New rows use the generated `doc_no` as both business document number and meaningful `id` for created PO Buy rows. Existing UUID-backed legacy rows remain readable.
+- Validation added: shared Zod schema validates date, supplier, optional branch/channel, delivery date ordering, notes length/syntax, and 1-50 item rows with product/positive quantity/positive unit price. Server verifies active Supplier/Product/Branch/Channel before insert.
+- UI behavior: enabled the existing blue `+ PO Buy ใหม่` CTA and added the legacy-style modal with amber purpose selector, delivery/costing radio cards, 2-column header fields, multi-line item table, live totals, remove row behavior only when more than one row exists, note field, and blue save button.
+- Playwright smoke: unauth QA subagent confirmed `/purchase/po-buy` redirects to login. Main authenticated Playwright QA passed after restarting the stale dev server: modal opened, required-field validation showed, add/remove item worked, costing-only radio hid delivery date, live total updated to `1.00`, API `POST /api/purchase/po-buy` created dev-target row `POB2605-0009`, and search found it as `Received` with `requireDelivery=false`, `remainingQty=0`, and `totalAmount=1`. Desktop/mobile screenshots saved under `/tmp/ns-scrap-erp-po-buy-auth-qa/`; mobile had no horizontal overflow and no non-HMR console/request errors.
+- Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, `git diff --check`, and `npm run build --workspace @ns-scrap-erp/next` passed. OpenAPI lint still reports existing skeleton warnings only.
+- Behavior intentionally deferred: edit existing PO Buy, cancel, move delivery/costing purpose, audit-log table, and allocation/reversal side effects remain disabled/deferred.
+
 ### D3: Trading Dashboard
 
 - [x] API `/api/trading/dashboard`

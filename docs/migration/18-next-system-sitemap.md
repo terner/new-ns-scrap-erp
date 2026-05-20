@@ -112,7 +112,7 @@ Status terms:
 
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
-| `/purchase/po-buy` | PO Buy | read baseline / polished | `GET /api/purchase/po-buy` | `po_buys`, `suppliers`, `products` | `finance.cash.view` |
+| `/purchase/po-buy` | PO Buy | create add-list enabled / read polish | `GET, POST /api/purchase/po-buy` | `po_buys`, `suppliers`, `products`, `purchase_channels`, `branches` | `finance.cash.view` |
 | `/sales/po-sell` | PO Sell | read baseline | `GET /api/sales/po-sell` | `po_sells`, `customers`, `sales_channels`, `branches`, `products`, `trading_deals` / match data | `finance.cash.view` |
 | `/dual-costing/cost-pool` | Cost Pool | read-derived baseline | `GET /api/dual-costing/cost-pool` | `po_buys`, `purchase_bills`, `production_outputs`, `grade_adjustments`, `trading_deals`, `products`, `branches` | `finance.cash.view` |
 | `/dual-costing/cost-allocator` | Cost Allocator | read-only simulation baseline | `GET /api/dual-costing/cost-allocator` | `po_sells`, `sales_bills`, `trading_deals`, derived Cost Pool rows | `finance.cash.view` |

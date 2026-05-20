@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
+import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { toDateOnly, toNumber } from '@/lib/server/daily'
+import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
+import type { Prisma } from '../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
 
@@ -14,6 +16,14 @@ type PoItem = {
   qty?: number | string
   unitPrice?: number | string
   remainingQty?: number | string
+}
+
+type ProductOption = {
+  active: boolean | null
+  code: string
+  id: string
+  name: string
+  unit: string | null
 }
 
 function jsonNumber(value: unknown) {
@@ -76,6 +86,57 @@ function dateInRange(date: string, from: string | null, to: string | null) {
   if (from && date < from) return false
   if (to && date > to) return false
   return true
+}
+
+async function optionsPayload() {
+  const [branches, channels, products, suppliers] = await Promise.all([
+    prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    prisma.purchase_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true } }),
+    prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
+    prisma.suppliers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+  ])
+
+  return {
+    branches,
+    channels,
+    products,
+    suppliers,
+  }
+}
+
+async function nextPoBuyDocNo(tx: Prisma.TransactionClient, date: string) {
+  const compactDate = date.slice(2, 4) + date.slice(5, 7)
+  const startsWith = `POB${compactDate}-`
+  const rows = await tx.$queryRaw<Array<{ doc_no: string }>>`
+    select doc_no
+    from public.po_buys
+    where doc_no like ${`${startsWith}%`}
+  `
+  const lastNumber = rows.reduce((max, row) => {
+    const running = Number(row.doc_no.split('-').at(-1))
+    return Number.isFinite(running) && running > max ? running : max
+  }, 0)
+
+  return `${startsWith}${String(lastNumber + 1).padStart(4, '0')}`
+}
+
+function poItems(values: PoBuyFormValues, products: ProductOption[], docNo: string) {
+  const productById = new Map(products.map((product) => [product.id, product]))
+  return values.items.map((item, index) => {
+    const product = productById.get(item.productId)
+    const remainingQty = values.requireDelivery ? item.qty : 0
+    return {
+      id: `${docNo}-${String(index + 1).padStart(2, '0')}`,
+      productCode: product?.code ?? '',
+      productId: item.productId,
+      productName: product?.name ?? item.productId,
+      qty: item.qty,
+      remainingQty,
+      totalCost: item.qty * item.unitPrice,
+      unit: product?.unit ?? 'กก.',
+      unitPrice: item.unitPrice,
+    }
+  })
 }
 
 export async function GET(request: Request) {
@@ -169,6 +230,7 @@ export async function GET(request: Request) {
       filters: {
         statuses: Array.from(new Set(poRows.map((row) => row.status ?? 'Open'))).sort(),
       },
+      options: await optionsPayload(),
       rows,
       summary: {
         costingOnly: rows.filter((row) => !row.requireDelivery).length,
@@ -183,5 +245,84 @@ export async function GET(request: Request) {
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'โหลด PO Buy ไม่ได้', 500)
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'finance.cash.view')
+
+    const values = poBuyFormSchema.parse(await request.json())
+    const actor = currentActor(context)
+    const productIds = [...new Set(values.items.map((item) => item.productId))]
+    const [supplier, branch, channel, products] = await Promise.all([
+      prisma.suppliers.findFirst({ where: { active: true, id: values.supplierId } }),
+      values.branchId ? prisma.branches.findFirst({ where: { active: true, id: values.branchId } }) : Promise.resolve(null),
+      values.channelId ? prisma.purchase_channels.findFirst({ where: { active: true, id: values.channelId } }) : Promise.resolve(null),
+      prisma.products.findMany({ where: { active: true, id: { in: productIds } }, select: { active: true, code: true, id: true, name: true, unit: true } }),
+    ])
+
+    if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'Supplier ไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือก Supplier'] } }, { status: 400 })
+    if (values.branchId && !branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['สาขาไม่ถูกต้องหรือถูกปิดใช้งาน'] } }, { status: 400 })
+    if (values.channelId && !channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางรับซื้อไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { channelId: ['ช่องทางรับซื้อไม่ถูกต้องหรือถูกปิดใช้งาน'] } }, { status: 400 })
+
+    const productById = new Map(products.map((product) => [product.id, product]))
+    const missingProductIndex = values.items.findIndex((item) => !productById.has(item.productId))
+    if (missingProductIndex >= 0) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: `รายการที่ ${missingProductIndex + 1}: สินค้าไม่ถูกต้องหรือถูกปิดใช้งาน`,
+        fieldErrors: { [`items.${missingProductIndex}.productId`]: ['สินค้าไม่ถูกต้องหรือถูกปิดใช้งาน'] },
+      }, { status: 400 })
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('po_buys.doc_no'))`
+      const docNo = await nextPoBuyDocNo(tx, values.date)
+      const items = poItems(values, products, docNo)
+      const qty = items.reduce((sum, item) => sum + item.qty, 0)
+      const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0)
+      const totalAmount = items.reduce((sum, item) => sum + item.totalCost, 0)
+      const remainingAmount = values.requireDelivery ? items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0) : 0
+      const firstItem = items[0]
+      const deliveryDate = values.requireDelivery && values.expectedDelivery ? normalizeDate(values.expectedDelivery) : null
+
+      return tx.po_buys.create({
+        data: {
+          branch_id: values.branchId,
+          channel_id: values.channelId,
+          created_by: actor,
+          date: normalizeDate(values.date),
+          delivery_date: deliveryDate,
+          doc_no: docNo,
+          expected_delivery: deliveryDate,
+          id: docNo,
+          is_opening_pool: !values.requireDelivery,
+          items,
+          note: values.notes,
+          notes: values.notes,
+          product_id: firstItem.productId,
+          purpose: values.requireDelivery ? 'FULL' : 'COSTING',
+          qty,
+          remaining_amount: remainingAmount,
+          remaining_qty: remainingQty,
+          require_delivery: values.requireDelivery,
+          status: values.requireDelivery ? 'Open' : 'Received',
+          supplier_id: values.supplierId,
+          total_amount: totalAmount,
+          unit_price: firstItem.unitPrice,
+          updated_at: new Date(),
+          updated_by: actor,
+          version: 1,
+        },
+        select: { doc_no: true, id: true },
+      })
+    })
+
+    return NextResponse.json({ docNo: created.doc_no, id: created.id }, { status: 201 })
+  } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'บันทึก PO Buy ไม่ได้', 500)
   }
 }

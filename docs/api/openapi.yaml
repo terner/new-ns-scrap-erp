@@ -1624,10 +1624,11 @@ paths:
     get:
       tags: [Purchase]
       operationId: listPurchasePoBuy
-      summary: List PO buy read baseline
+      summary: List PO buy
       description: >
-        Read-only PO Buy contract for Batch D2. User-facing rows expose `docNo`
-        and keep UUIDs internal; write/cancel/move flows are deferred.
+        PO Buy list/export contract. User-facing rows expose `docNo`; newly
+        created PO Buy records use the running `POBYYMM-000N` document number
+        as the meaningful record id.
       parameters:
         - $ref: "#/components/parameters/POBuyQ"
         - $ref: "#/components/parameters/POBuyStatus"
@@ -1646,6 +1647,40 @@ paths:
               schema:
                 type: string
                 format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Purchase]
+      operationId: createPurchasePoBuy
+      summary: Create PO Buy
+      description: >
+        Creates a delivery PO Buy or costing-only PO Buy using the legacy
+        add-list workflow. The server generates `POBYYMM-000N`, calculates
+        totals from item rows, and sets remaining quantity/status from
+        `requireDelivery`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/POBuyCreateRequest"
+      responses:
+        "201":
+          description: Created PO Buy document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [docNo, id]
+                properties:
+                  docNo:
+                    type: string
+                  id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -3211,6 +3246,46 @@ components:
           type: object
           additionalProperties: true
       additionalProperties: true
+    POBuyCreateRequest:
+      type: object
+      required: [date, supplierId, items]
+      properties:
+        date:
+          type: string
+          format: date
+        supplierId:
+          type: string
+        channelId:
+          type: [string, "null"]
+        branchId:
+          type: [string, "null"]
+        expectedDelivery:
+          type: [string, "null"]
+          format: date
+        requireDelivery:
+          type: boolean
+          default: true
+          description: true for delivery PO; false for costing-only PO.
+        notes:
+          type: [string, "null"]
+          maxLength: 500
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            required: [productId, qty, unitPrice]
+            properties:
+              productId:
+                type: string
+              qty:
+                type: number
+                exclusiveMinimum: 0
+              unitPrice:
+                type: number
+                exclusiveMinimum: 0
+      additionalProperties: false
     TradingDashboardResponse:
       type: object
       required: [productList, purchases, recentDeals, sales, summary, trend]
