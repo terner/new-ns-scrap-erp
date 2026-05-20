@@ -363,11 +363,9 @@ export const paymentMethodsPageConfig: MasterDataPageConfig = {
   entityName: 'วิธีจ่าย/รับเงิน',
   emptyMessage: 'ไม่พบข้อมูลวิธีจ่าย/รับเงิน',
   fields: [
-    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อ', required: true },
   ],
   columns: [
-    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อ' },
     statusColumn,
   ],

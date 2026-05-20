@@ -6,8 +6,10 @@ import {
   exportSuppliers,
   importSuppliers,
   listSuppliers,
+  normalizeSupplierPaymentMethod,
   saveSupplier,
   setSupplierActive,
+  supplierPaymentMethodValues,
   type Supplier,
   type SupplierFormValues,
 } from '@/lib/supplier'
@@ -81,7 +83,7 @@ function supplierToForm(supplier: Supplier): SupplierFormValues {
     : supplier.accountNo
       ? [{
         id: null,
-        paymentMethod: 'โอนเงิน' as const,
+        paymentMethod: 'เงินโอน' as const,
         bankName: supplier.bankName,
         accountNo: sanitizeAccountNoInput(supplier.accountNo),
         bankAccount: supplier.bankAccount,
@@ -138,7 +140,7 @@ function supplierReceivingLines(supplier: Supplier) {
   if (accounts.length === 0 && (supplier.bankName || supplier.accountNo)) {
     const branchSuffix = supplier.branchId ? ` (สาขา ${supplier.branchId})` : ''
     return [{
-      bankName: `${supplier.bankName || 'โอนเงิน'}${branchSuffix}`,
+      bankName: `${supplier.bankName || 'เงินโอน'}${branchSuffix}`,
       accountNo: formatAccountNoDisplay(supplier.accountNo) || '-',
       rawAccountNo: sanitizeAccountNoInput(supplier.accountNo ?? '') || null,
     }]
@@ -151,7 +153,7 @@ function supplierReceivingLines(supplier: Supplier) {
 
     const branchSuffix = account.branchCode ? ` (สาขา ${account.branchCode})` : ''
     return {
-      bankName: `${account.bankName || 'โอนเงิน'}${branchSuffix}`,
+      bankName: `${account.bankName || 'เงินโอน'}${branchSuffix}`,
       accountNo: formatAccountNoDisplay(account.accountNo) || '-',
       rawAccountNo: sanitizeAccountNoInput(account.accountNo ?? '') || null,
     }
@@ -196,6 +198,7 @@ export function SuppliersPageClient() {
   const [salespersonFilter, setSalespersonFilter] = useState('')
   const [salespersons, setSalespersons] = useState<MasterDataRecord[]>([])
   const [bankNames, setBankNames] = useState<MasterDataRecord[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<MasterDataRecord[]>([])
   const [copiedAccountKey, setCopiedAccountKey] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
@@ -267,7 +270,7 @@ export function SuppliersPageClient() {
   async function openCreateForm() {
     setSelectedSupplier(null)
     try {
-      await Promise.all([loadAddressData(), loadBankNames()])
+      await Promise.all([loadAddressData(), loadBankNames(), loadPaymentMethods()])
     } catch (caught) {
       setError(getErrorMessage(caught, 'โหลดข้อมูลที่อยู่ไทยไม่ได้'))
       return
@@ -278,7 +281,7 @@ export function SuppliersPageClient() {
   async function openEditForm(supplier: Supplier) {
     setSelectedSupplier(supplier)
     try {
-      await Promise.all([loadAddressData(), loadBankNames()])
+      await Promise.all([loadAddressData(), loadBankNames(), loadPaymentMethods()])
     } catch (caught) {
       setError(getErrorMessage(caught, 'โหลดข้อมูลที่อยู่ไทยไม่ได้'))
       return
@@ -290,6 +293,12 @@ export function SuppliersPageClient() {
     if (bankNames.length) return
     const rows = await listMasterDataRecords('/api/master-data/bank-names')
     setBankNames(rows.filter((bankName) => bankName.active))
+  }
+
+  async function loadPaymentMethods() {
+    if (paymentMethods.length) return
+    const rows = await listMasterDataRecords('/api/master-data/payment-methods')
+    setPaymentMethods(rows.filter((paymentMethod) => paymentMethod.active))
   }
 
   async function handleSubmit(values: SupplierFormValues) {
@@ -553,6 +562,7 @@ export function SuppliersPageClient() {
               districts={districts}
               isSaving={isSaving}
               bankNames={bankNames}
+              paymentMethods={paymentMethods}
               provinces={provinces}
               salespersons={salespersons}
               subdistricts={subdistricts}
@@ -678,6 +688,7 @@ export function SuppliersPageClient() {
 
 type SupplierFormProps = {
   bankNames: MasterDataRecord[]
+  paymentMethods: MasterDataRecord[]
   supplier: Supplier | null
   districts: ThaiDistrict[]
   isSaving: boolean
@@ -712,7 +723,7 @@ function CopyAccountButton({ accountKey, accountNo, copied, label, onCopy }: Cop
   )
 }
 
-function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, salespersons, subdistricts, onCancel, onSubmit }: SupplierFormProps) {
+function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving, provinces, salespersons, subdistricts, onCancel, onSubmit }: SupplierFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<SupplierFormValues>(() => (supplier ? supplierToForm(supplier) : emptySupplierForm))
 
@@ -744,6 +755,23 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
     }
     return names
   }, [bankNames, form.bankAccounts, form.bankName])
+  const paymentMethodOptions = useMemo(() => {
+    const configuredMethods = new Map<SupplierBankAccountForm['paymentMethod'], string>()
+    paymentMethods.forEach((paymentMethod) => {
+      const value = normalizeSupplierPaymentMethod(paymentMethod.name) ?? normalizeSupplierPaymentMethod(paymentMethod.code)
+      if (value && !configuredMethods.has(value)) configuredMethods.set(value, paymentMethod.name)
+    })
+    const visibleMethods = supplierPaymentMethodValues
+      .filter((paymentMethod) => configuredMethods.has(paymentMethod))
+      .map((paymentMethod) => ({ value: paymentMethod, label: configuredMethods.get(paymentMethod) ?? paymentMethod }))
+    const currentMethods = form.bankAccounts
+      .map((account) => normalizeSupplierPaymentMethod(account.paymentMethod))
+      .filter((paymentMethod): paymentMethod is SupplierBankAccountForm['paymentMethod'] => Boolean(paymentMethod))
+      .map((paymentMethod) => ({ value: paymentMethod, label: configuredMethods.get(paymentMethod) ?? paymentMethod }))
+    const options = uniqueValues([...visibleMethods, ...currentMethods].map((option) => option.value))
+      .map((value) => [...visibleMethods, ...currentMethods].find((option) => option.value === value) ?? { value, label: value })
+    return options.length ? options : supplierPaymentMethodValues.map((value) => ({ value, label: value }))
+  }, [form.bankAccounts, paymentMethods])
 
   function update<K extends keyof SupplierFormValues>(key: K, value: SupplierFormValues[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -954,13 +982,12 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
           </div>
           <div className="space-y-3">
             {form.bankAccounts.map((account, index) => {
-              const isTransfer = account.paymentMethod === 'โอนเงิน'
+              const isTransfer = account.paymentMethod === 'เงินโอน'
               return (
                 <div key={`${account.id ?? 'new'}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <div className="grid gap-4 md:grid-cols-5">
                     <SelectField required error={errors[`bankAccounts.${index}.paymentMethod`]} label="ช่องทางการชำระเงิน" value={account.paymentMethod} onChange={(value) => updateBankAccount(index, 'paymentMethod', value as SupplierBankAccountForm['paymentMethod'])}>
-                      <option value="เงินสด">เงินสด</option>
-                      <option value="โอนเงิน">โอนเงิน</option>
+                      {paymentMethodOptions.map((paymentMethod) => <option key={paymentMethod.value} value={paymentMethod.value}>{paymentMethod.label}</option>)}
                     </SelectField>
                     {isTransfer ? (
                       <>

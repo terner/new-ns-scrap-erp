@@ -122,7 +122,7 @@ function formatBankAccounts(supplier: Supplier) {
   return supplier.bankAccounts
     .map((account) => account.paymentMethod === 'เงินสด'
       ? 'เงินสด'
-      : ['โอนเงิน', account.bankName, formatAccountNoDisplay(account.accountNo), account.branchCode ? `สาขา:${account.branchCode}` : null, account.bankAccount].filter(Boolean).join(' // '))
+      : ['เงินโอน', account.bankName, formatAccountNoDisplay(account.accountNo), account.branchCode ? `สาขา:${account.branchCode}` : null, account.bankAccount].filter(Boolean).join(' // '))
     .join(' | ')
 }
 

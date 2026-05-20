@@ -1,4 +1,4 @@
-import { supplierFormSchema, supplierSchema, type Supplier, type SupplierFormValues } from '@/lib/supplier'
+import { normalizeSupplierPaymentMethod, supplierFormSchema, supplierSchema, type Supplier, type SupplierFormValues, type SupplierPaymentMethod } from '@/lib/supplier'
 
 type PrismaSupplier = {
   id: string
@@ -52,7 +52,7 @@ type PrismaSupplier = {
 type SupplierBankAccountWriteRow = {
   id: string
   supplier_id: string
-  payment_method: 'เงินสด' | 'โอนเงิน'
+  payment_method: SupplierPaymentMethod
   bank_name: string | null
   account_no: string | null
   account_name: string | null
@@ -81,7 +81,7 @@ function primaryBankAccount(values: SupplierFormValues) {
       bankName: normalizeBankName(account.bankName),
       accountNo: normalizeAccountNo(account.accountNo),
     }))
-    .filter((account): account is typeof account & { accountNo: string } => account.paymentMethod === 'โอนเงิน' && Boolean(account.accountNo))
+    .filter((account): account is typeof account & { accountNo: string } => account.paymentMethod === 'เงินโอน' && Boolean(account.accountNo))
   return accounts.find((account) => account.isPrimary) ?? accounts[0] ?? null
 }
 
@@ -112,7 +112,7 @@ export function supplierBankAccountRows(values: SupplierFormValues, supplierId: 
     rows.push({
       id: account.id || `${supplierId}-${accountNo}`,
       supplier_id: supplierId,
-      payment_method: 'โอนเงิน',
+      payment_method: 'เงินโอน',
       bank_name: normalizeBankName(account.bankName),
       account_no: accountNo,
       account_name: account.bankAccount || null,
@@ -159,7 +159,7 @@ export function mapPrismaSupplier(row: PrismaSupplier): Supplier {
     bankAccount: row.bank_account_name,
     bankAccounts: (row.supplier_bank_accounts ?? []).map((account) => ({
       id: account.id,
-      paymentMethod: account.payment_method === 'โอนเงิน' ? 'โอนเงิน' : 'เงินสด',
+      paymentMethod: normalizeSupplierPaymentMethod(account.payment_method) ?? 'เงินสด',
       bankName: normalizeBankName(account.bank_name),
       accountNo: normalizeAccountNo(account.account_no),
       bankAccount: account.account_name,

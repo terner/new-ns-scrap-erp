@@ -91,7 +91,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         updatedAt: toIso(record.updated_at as Date | null),
       }
     },
-    data: (values, id, code) => ({
+    data: (values, id, _code) => ({
       id,
       name: values.name,
       symbol: values.symbol || null,
@@ -273,21 +273,20 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   paymentMethods: {
     delegate: () => prisma.payment_methods as Delegate,
     prefix: 'PM-',
-    orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    orderBy: [{ name: 'asc' }],
     map: (row) => {
       const record = asRecord(row)
       return {
         id: record.id,
-        code: record.code,
+        code: null,
         name: record.name,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
       }
     },
-    data: (values, id, code) => ({
+    data: (values, id, _code) => ({
       id,
-      code,
       name: values.name,
       active: values.active,
     }),

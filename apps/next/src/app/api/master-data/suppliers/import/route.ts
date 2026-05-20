@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
-import { supplierFormSchema } from '@/lib/supplier'
+import { normalizeSupplierPaymentMethod, supplierFormSchema, type SupplierPaymentMethod } from '@/lib/supplier'
 import { supplierBankAccountRows, toSupplierWriteInput } from '@/lib/domain/supplier'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -50,7 +50,7 @@ type ImportField = keyof typeof headerMap
 type ImportRow = Record<string, unknown>
 type ImportBankAccount = {
   id: null
-  paymentMethod: 'เงินสด' | 'โอนเงิน'
+  paymentMethod: SupplierPaymentMethod
   bankName: string | null
   accountNo: string | null
   bankAccount: string | null
@@ -151,7 +151,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
       }
 
       const parts = text.split('//').map((part) => part.trim()).filter(Boolean)
-      const startsWithTransfer = parts[0] === 'โอนเงิน'
+      const startsWithTransfer = normalizeSupplierPaymentMethod(parts[0]) === 'เงินโอน'
       const bankName = stripCashMarker(startsWithTransfer ? parts[1] ?? '' : parts[0] ?? '')
       const accountText = startsWithTransfer ? parts[2] ?? text : parts[1] ?? text
       const accountNos = splitAccountNumbers(accountText || text)
@@ -164,7 +164,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
       accountNos.forEach((accountNo, accountIndex) => {
         accounts.push({
           id: null,
-          paymentMethod: 'โอนเงิน',
+          paymentMethod: 'เงินโอน',
           bankName: bankName || null,
           accountNo,
           bankAccount: accountName || null,
@@ -204,7 +204,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
 
   return accountNos.map((accountNo, index) => ({
     id: null,
-    paymentMethod: 'โอนเงิน' as const,
+    paymentMethod: 'เงินโอน' as const,
     bankName: bankName || null,
     accountNo,
     bankAccount: rawAccountName,

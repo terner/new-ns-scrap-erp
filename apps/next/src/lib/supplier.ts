@@ -10,6 +10,18 @@ const personNamePattern = /^[\p{L}\p{M}.' -]+$/u
 const accountNoPattern = /^\d{2,40}$/
 const internationalPostalCodePattern = /^[A-Za-z0-9][A-Za-z0-9\s-]{0,31}$/
 
+export const supplierPaymentMethodValues = ['เงินสด', 'เงินโอน'] as const
+export type SupplierPaymentMethod = typeof supplierPaymentMethodValues[number]
+
+export function normalizeSupplierPaymentMethod(value: string | null | undefined): SupplierPaymentMethod | null {
+  const normalized = value?.trim()
+  if (!normalized) return null
+  const lower = normalized.toLowerCase()
+  if (normalized.includes('เงินสด') || lower.includes('cash')) return 'เงินสด'
+  if (normalized.includes('เงินโอน') || normalized.includes('โอนเงิน') || lower.includes('bank transfer')) return 'เงินโอน'
+  return null
+}
+
 const optionalBusinessText = (label: string, maxLength = 160) => z.preprocess(
   blankToNull,
   z.string().trim()
@@ -93,7 +105,10 @@ const optionalAccountNoSchema = z.preprocess(
     .default(null),
 )
 
-const supplierPaymentMethodSchema = z.enum(['เงินสด', 'โอนเงิน'], { required_error: 'เลือกช่องทางการชำระเงิน' })
+const supplierPaymentMethodSchema = z.preprocess(
+  (value) => typeof value === 'string' ? normalizeSupplierPaymentMethod(value) : value,
+  z.enum(supplierPaymentMethodValues, { required_error: 'เลือกช่องทางการชำระเงิน' }),
+)
 
 export const supplierBankAccountSchema = z.object({
   id: z.preprocess(blankToNull, z.string().trim().max(80, 'รหัสบัญชียาวเกินไป').nullable().default(null)),
