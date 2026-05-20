@@ -62,6 +62,7 @@ Baseline notes:
 | `/production/yield-loss-report` | 2026-05-20 | Restored the legacy amber explanation banner and P&L Impact card trio for Yield Gain, Abnormal Loss, and Net P&L using existing API fields. Row amount coloring now emphasizes abnormal loss, gain, and net P&L; output loss reason parity remains deferred until loss-output notes are wired. |
 | `/production/machine-utilization` | 2026-05-20 | Restored the legacy formula info banner and expanded table shape with Est.Hrs and total cost columns using existing API fields. Actual yield, yield diff, and utilization now receive legacy-like color emphasis; maintenance status remains read-only. |
 | `/daily/transfer` | 2026-05-20 | Restored the legacy transfer filter/action density: blue info copy, compact filter card, account placeholders with direction icons, clear-filter button, period chips for all/today/7 days/current month, inline count/total summary, rounded table shell, and explicit edit/delete action column. Existing create/edit POST behavior is preserved; delete remains disabled because the active Next API has no reviewed DELETE/tombstone flow. |
+| `/stock/transfer` | 2026-05-20 | Restored the legacy stock transfer density: compact search/date/from-branch/to-branch filters, all/today/7-days/current-month period chips, inline count/weight summary, blue create CTA, red/emerald source-destination modal panels, sender/receiver/notes fields, item-row density, seven-column table with kg labels, legacy empty state, and disabled cancel action shell. Existing stock ledger POST behavior is preserved; cancel/tombstone flow and sender/receiver persistence remain deferred until schema/write semantics are reviewed. |
 
 ## P1 Backlog
 
@@ -74,7 +75,6 @@ Baseline notes:
 |---|---|---|
 | `/pending-sales` | `view-pendingSales` | Next has main shell, but legacy dashboard/table density should be rechecked before final UAT. |
 | `/anomaly-detector` | `view-anomalyDetector` | Next scan UI is close, but legacy copy references 40 checks/11 groups and has jump-to-fix behavior. |
-| `/stock/transfer` | `view-stockTransfer` | Needs closer visual pass; likely minor density/action drift. |
 
 ## Cross-Cutting Layout Tasks
 
@@ -116,6 +116,6 @@ Next routes without a direct standalone legacy page:
 
 ## Active Execution Order
 
-1. P1 Dashboard data parity follow-up: `/dashboard` server-side filters, aging buckets, cash composition, stock-by-branch/group, and richer chart datasets
-2. P1 Daily transaction surfaces
-3. P1/P2 production report polish
+1. P2 Main Sales Control polish: `/pending-sales` LME form density, pending-sale table surface, and read-only formula parity.
+2. P2 Anomaly Detector polish: category strip, severity visual parity, copy/rule coverage notes, and record-level jump-to-fix follow-up.
+3. P1 Dashboard data parity follow-up: `/dashboard` server-side filters, aging buckets, cash composition, stock-by-branch/group, and richer chart datasets

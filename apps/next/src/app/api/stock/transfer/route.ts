@@ -43,6 +43,7 @@ export async function GET() {
       from: string
       id: string
       itemCount: number
+      notes: string
       to: string
       totalQty: number
     }>()
@@ -54,9 +55,11 @@ export async function GET() {
         from: '',
         id: key,
         itemCount: 0,
+        notes: row.notes ?? '',
         to: '',
         totalQty: 0,
       }
+      if (!current.notes && row.notes) current.notes = row.notes
       if (toNumber(row.qty_out) > 0) current.from = `${row.branches?.name ?? '-'} / ${row.warehouses?.name ?? '-'}`
       if (toNumber(row.qty_in) > 0) current.to = `${row.branches?.name ?? '-'} / ${row.warehouses?.name ?? '-'}`
       if (toNumber(row.qty_out) > 0) {
