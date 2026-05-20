@@ -88,8 +88,9 @@ function blankForm(): PoBuyFormState {
 function flattenClientErrors(values: PoBuyFormState) {
   const parsed = poBuyFormSchema.safeParse({
     ...values,
-    expectedDelivery: values.requireDelivery ? values.expectedDelivery || null : null,
+    expectedDelivery: values.expectedDelivery || null,
     notes: values.notes || null,
+    requireDelivery: true,
   })
   if (parsed.success) return { data: parsed.data, errors: {} }
 
@@ -556,30 +557,10 @@ function PoBuyFormModal({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="po-buy-form-title">
       <div className="mx-auto my-4 max-w-2xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b px-5 py-3">
-          <h3 id="po-buy-form-title" className="font-semibold">สร้าง PO Buy (จองซื้อ / ตั้งต้นทุน)</h3>
+          <h3 id="po-buy-form-title" className="font-semibold">สร้าง PO Buy (จองซื้อ)</h3>
           <button className="text-2xl text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>×</button>
         </div>
         <div className="space-y-3 p-5 text-sm">
-          <div className="rounded border-l-4 border-amber-500 bg-amber-50 p-3">
-            <label className="mb-2 block text-xs font-bold text-amber-800">🎯 วัตถุประสงค์ของ PO Buy นี้</label>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <label className={`flex cursor-pointer items-start gap-2 rounded border-2 bg-white p-2 ${form.requireDelivery ? 'border-blue-500' : 'border-transparent'}`}>
-                <input checked={form.requireDelivery} className="mt-1" type="radio" onChange={() => onUpdate('requireDelivery', true)} />
-                <span>
-                  <span className="block text-sm font-bold text-blue-700">📦 ต้องส่งของจริง</span>
-                  <span className="text-xs text-slate-500">เข้า PO Outstanding Report · รอรับสินค้าตามเวลา</span>
-                </span>
-              </label>
-              <label className={`flex cursor-pointer items-start gap-2 rounded border-2 bg-white p-2 ${!form.requireDelivery ? 'border-emerald-500' : 'border-transparent'}`}>
-                <input checked={!form.requireDelivery} className="mt-1" type="radio" onChange={() => onUpdate('requireDelivery', false)} />
-                <span>
-                  <span className="block text-sm font-bold text-emerald-700">💰 ตั้งต้นทุน Dual Costing เท่านั้น</span>
-                  <span className="text-xs text-slate-500">ส่งของหมดแล้ว / ใช้คำนวณต้นทุน · <b>ไม่เข้า PO Outstanding Report</b></span>
-                </span>
-              </label>
-            </div>
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <SupplierSearchCombobox
@@ -591,20 +572,18 @@ function PoBuyFormModal({
               {fieldError('supplierId')}
             </div>
             <div>
-              <label className="mb-1 block text-xs">สาขา *</label>
+              <label className="mb-1 block text-xs">สาขา/คลัง *</label>
               <select className="w-full rounded border px-2 py-1.5" value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
-                <option value="">เลือกสาขา</option>
+                <option value="">เลือกสาขา/คลัง</option>
                 {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
               </select>
               {fieldError('branchId')}
             </div>
-            {form.requireDelivery ? (
-              <div>
-                <label className="mb-1 block text-xs">วันส่งมอบ</label>
-                <input className="w-full rounded border px-2 py-1.5" type="date" value={form.expectedDelivery} onChange={(event) => onUpdate('expectedDelivery', event.target.value)} />
-                {fieldError('expectedDelivery')}
-              </div>
-            ) : null}
+            <div>
+              <label className="mb-1 block text-xs">วันส่งมอบ</label>
+              <input className="w-full rounded border px-2 py-1.5" type="date" value={form.expectedDelivery} onChange={(event) => onUpdate('expectedDelivery', event.target.value)} />
+              {fieldError('expectedDelivery')}
+            </div>
           </div>
 
           <div>
