@@ -879,17 +879,11 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
               <TextField required className="md:col-span-2" error={errors.name} label="ชื่อบริษัท/ร้านค้า" value={form.name ?? ''} onChange={(value) => update('name', value || null)} />
             )}
             <TextField error={errors.taxId} label="เลขผู้เสียภาษี" value={form.taxId ?? ''} onChange={(value) => update('taxId', value || null)} />
+            <TextField error={errors.phone} label="โทรศัพท์" value={form.phone ?? ''} onChange={(value) => update('phone', value)} />
             <SelectField required error={errors.salesId} label="ผู้ดูแล" value={form.salesId ?? ''} onChange={updateSalesperson}>
               <option value="">เลือกผู้ดูแล</option>
               {salespersons.map((salesperson) => <option key={salesperson.id} value={salesperson.id}>{salesperson.name}</option>)}
             </SelectField>
-          </div>
-        </section>
-
-        <section>
-          <h4 className="mb-3 text-sm font-bold text-slate-700">ช่องทางติดต่อ</h4>
-          <div className="grid gap-4 md:grid-cols-4">
-            <TextField error={errors.phone} label="โทรศัพท์" value={form.phone ?? ''} onChange={(value) => update('phone', value)} />
           </div>
         </section>
 
