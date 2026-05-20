@@ -276,7 +276,7 @@ export async function POST(request: Request) {
     if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['เลือกสาขา'] } }, { status: 400 })
     if (!/^\d{2}$/.test(branch.code)) return NextResponse.json({ code: 'BAD_REQUEST', error: 'รหัสสาขาต้องเป็นตัวเลข 2 หลักเพื่อออกเลข PO', fieldErrors: { branchId: ['รหัสสาขาต้องเป็นตัวเลข 2 หลัก'] } }, { status: 400 })
     if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'Supplier ไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือก Supplier'] } }, { status: 400 })
-    if (values.requireDelivery && values.expectedDelivery && values.expectedDelivery < issuedDate) {
+    if (values.expectedDelivery < issuedDate) {
       return NextResponse.json({
         code: 'BAD_REQUEST',
         error: 'วันส่งมอบต้องไม่ก่อนวันที่ออก PO',
@@ -301,9 +301,9 @@ export async function POST(request: Request) {
       const qty = items.reduce((sum, item) => sum + item.qty, 0)
       const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0)
       const totalAmount = items.reduce((sum, item) => sum + item.totalCost, 0)
-      const remainingAmount = values.requireDelivery ? items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0) : 0
+      const remainingAmount = items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0)
       const firstItem = items[0]
-      const deliveryDate = values.requireDelivery && values.expectedDelivery ? normalizeDate(values.expectedDelivery) : null
+      const deliveryDate = normalizeDate(values.expectedDelivery)
 
       return tx.po_buys.create({
         data: {
@@ -316,17 +316,17 @@ export async function POST(request: Request) {
           doc_no: docNo,
           expected_delivery: deliveryDate,
           id: docNo,
-          is_opening_pool: !values.requireDelivery,
+          is_opening_pool: false,
           items,
           note: values.notes,
           notes: values.notes,
           product_id: firstItem.productId,
-          purpose: values.requireDelivery ? 'FULL' : 'COSTING',
+          purpose: 'FULL',
           qty,
           remaining_amount: remainingAmount,
           remaining_qty: remainingQty,
-          require_delivery: values.requireDelivery,
-          status: values.requireDelivery ? 'Open' : 'Received',
+          require_delivery: true,
+          status: 'Open',
           supplier_id: values.supplierId,
           total_amount: totalAmount,
           unit_price: firstItem.unitPrice,

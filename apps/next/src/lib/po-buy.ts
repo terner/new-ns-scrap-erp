@@ -5,7 +5,10 @@ const safeIdPattern = /^[A-Za-z0-9_.:-]+$/
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
 
 const requiredDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD')
-const optionalDate = z.preprocess(blankToNull, requiredDate.nullable().default(null))
+const requiredDeliveryDate = z.preprocess(
+  blankToNull,
+  z.string({ invalid_type_error: 'กรอกวันส่งมอบ', required_error: 'กรอกวันส่งมอบ' }).trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD'),
+)
 const optionalGeneralText = (label: string, maxLength = 500) => z.preprocess(
   blankToNull,
   z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
@@ -20,10 +23,10 @@ export const poBuyItemSchema = z.object({
 
 export const poBuyFormSchema = z.object({
   branchId: z.string().trim().min(1, 'เลือกสาขา').max(80, 'รหัสสาขายาวเกินไป').regex(safeIdPattern, 'รหัสสาขามีรูปแบบไม่ถูกต้อง'),
-  expectedDelivery: optionalDate,
+  expectedDelivery: requiredDeliveryDate,
   items: z.array(poBuyItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
   notes: optionalGeneralText('หมายเหตุ', 500),
-  requireDelivery: z.boolean().default(true),
+  requireDelivery: z.literal(true, { invalid_type_error: 'PO Buy ต้องเป็นรายการรอส่งมอบ' }).default(true),
   supplierId: z.string().trim().min(1, 'เลือก Supplier').max(80, 'รหัส Supplier ยาวเกินไป').regex(safeIdPattern, 'รหัส Supplier มีรูปแบบไม่ถูกต้อง'),
 })
 

@@ -580,8 +580,8 @@ function PoBuyFormModal({
               {fieldError('branchId')}
             </div>
             <div>
-              <label className="mb-1 block text-xs">วันส่งมอบ</label>
-              <input className="w-full rounded border px-2 py-1.5" type="date" value={form.expectedDelivery} onChange={(event) => onUpdate('expectedDelivery', event.target.value)} />
+              <label className="mb-1 block text-xs">วันส่งมอบ *</label>
+              <input className="w-full rounded border px-2 py-1.5" required type="date" value={form.expectedDelivery} onChange={(event) => onUpdate('expectedDelivery', event.target.value)} />
               {fieldError('expectedDelivery')}
             </div>
           </div>
