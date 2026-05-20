@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
 
@@ -109,6 +109,10 @@ function optionLabel(option: Option) {
 function warehouseLabel(option: Option) {
   const warehouse = optionLabel(option)
   return option.branchName ? `${option.branchName} / ${warehouse}` : warehouse
+}
+
+function searchableText(option: Option) {
+  return `${option.code ?? ''} ${option.name} ${option.id}`.toLowerCase()
 }
 
 export function PoBuyPageClient() {
@@ -415,6 +419,111 @@ function statusBadge(status: string) {
   return 'bg-blue-100 text-blue-700'
 }
 
+function SupplierSearchCombobox({
+  error,
+  options,
+  value,
+  onChange,
+}: {
+  error?: string
+  options: Option[]
+  value: string
+  onChange: (supplierId: string) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const selectedSupplier = useMemo(() => options.find((supplier) => supplier.id === value) ?? null, [options, value])
+  const selectedLabel = selectedSupplier ? optionLabel(selectedSupplier) : ''
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(selectedLabel)
+
+  useEffect(() => {
+    setQuery(selectedLabel)
+  }, [selectedLabel])
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    const rows = normalizedQuery
+      ? options.filter((supplier) => searchableText(supplier).includes(normalizedQuery))
+      : options
+    return rows.slice(0, 80)
+  }, [options, query])
+
+  const selectSupplier = (supplier: Option) => {
+    onChange(supplier.id)
+    setQuery(optionLabel(supplier))
+    setOpen(false)
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div className="relative">
+      <label className="mb-1 block text-xs" htmlFor="po-buy-supplier-search">Supplier *</label>
+      <input
+        ref={inputRef}
+        aria-autocomplete="list"
+        aria-controls="po-buy-supplier-options"
+        aria-expanded={open}
+        aria-invalid={Boolean(error)}
+        className={`w-full rounded border px-2 py-1.5 outline-none focus:border-blue-600 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+        id="po-buy-supplier-search"
+        placeholder="🔍 พิมพ์ชื่อ Supplier..."
+        role="combobox"
+        type="search"
+        value={query}
+        onBlur={() => {
+          window.setTimeout(() => {
+            const exactMatch = options.find((supplier) => optionLabel(supplier).toLowerCase() === query.trim().toLowerCase())
+            if (exactMatch) {
+              onChange(exactMatch.id)
+              setQuery(optionLabel(exactMatch))
+            } else if (selectedSupplier) {
+              setQuery(optionLabel(selectedSupplier))
+            }
+            setOpen(false)
+          }, 120)
+        }}
+        onChange={(event) => {
+          const nextQuery = event.target.value
+          setQuery(nextQuery)
+          setOpen(true)
+          if (value && nextQuery !== selectedLabel) onChange('')
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setOpen(false)
+            return
+          }
+          if (event.key === 'Enter' && open && filteredOptions[0]) {
+            event.preventDefault()
+            selectSupplier(filteredOptions[0])
+          }
+        }}
+      />
+      {open ? (
+        <div id="po-buy-supplier-options" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl" role="listbox">
+          {filteredOptions.length > 0 ? filteredOptions.map((supplier) => (
+            <button
+              key={supplier.id}
+              className={`block w-full px-3 py-2 text-left hover:bg-blue-50 ${supplier.id === value ? 'bg-blue-100 text-blue-800' : ''}`}
+              role="option"
+              type="button"
+              aria-selected={supplier.id === value}
+              onMouseDown={(event) => {
+                event.preventDefault()
+                selectSupplier(supplier)
+              }}
+            >
+              <span className="block font-medium">{supplier.name}</span>
+              <span className="block text-xs text-slate-500">{supplier.code ? `${supplier.code} · ` : ''}{supplier.id}</span>
+            </button>
+          )) : <div className="px-3 py-2 text-sm text-slate-500">ไม่พบ Supplier ที่ตรงกับคำค้นหา</div>}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function PoBuyFormModal({
   errors,
   form,
@@ -479,11 +588,12 @@ function PoBuyFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs">Supplier *</label>
-              <select className="w-full rounded border px-2 py-1.5" value={form.supplierId} onChange={(event) => onUpdate('supplierId', event.target.value)}>
-                <option value="">🔍 พิมพ์ชื่อ Supplier...</option>
-                {activeSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{optionLabel(supplier)}</option>)}
-              </select>
+              <SupplierSearchCombobox
+                error={errors.supplierId}
+                options={activeSuppliers}
+                value={form.supplierId}
+                onChange={(supplierId) => onUpdate('supplierId', supplierId)}
+              />
               {fieldError('supplierId')}
             </div>
             <div>
