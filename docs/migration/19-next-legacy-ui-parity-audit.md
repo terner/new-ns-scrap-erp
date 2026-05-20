@@ -83,7 +83,7 @@ Baseline notes:
 
 | Surface | Status | Notes |
 |---|---|---|
-| Sidebar navigation scroll | 2026-05-20 completed | Preserve sidebar `scrollTop` across route navigation and keep the selected menu item visible instead of resetting the menu to the top after clicking into another page. |
+| Sidebar navigation scroll | 2026-05-20 completed | Preserve sidebar `scrollTop` across route navigation and keep the selected menu item visible. The follow-up fix restores saved scroll only once, avoids `Number(null) === 0` top resets, and suppresses programmatic scroll saves during active-item visibility adjustments. |
 
 ## Parity OK From Current Audit
 

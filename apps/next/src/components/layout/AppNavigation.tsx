@@ -14,6 +14,8 @@ const SIDEBAR_SCROLL_KEY = 'ns-scrap-erp-sidebar-scroll-top'
 export function AppNavigation({ onNavigate }: AppNavigationProps) {
   const pathname = usePathname()
   const navRef = useRef<HTMLElement | null>(null)
+  const hasRestoredScrollRef = useRef(false)
+  const suppressScrollSaveRef = useRef(false)
   const [authContext, setAuthContext] = useState<{ isAdmin: boolean; permissions: string[] } | null>(null)
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
 
@@ -65,13 +67,31 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
   useEffect(() => {
     const nav = navRef.current
     if (!nav) return
+    if (hasRestoredScrollRef.current) return
+    hasRestoredScrollRef.current = true
+
+    const savedScrollTop = window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY)
+    if (savedScrollTop === null) return
+
+    const parsedScrollTop = Number(savedScrollTop)
+    if (!Number.isFinite(parsedScrollTop)) return
 
     const frame = requestAnimationFrame(() => {
-      const savedScrollTop = Number(window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY))
-      if (Number.isFinite(savedScrollTop)) {
-        nav.scrollTop = savedScrollTop
-      }
+      suppressScrollSaveRef.current = true
+      nav.scrollTop = parsedScrollTop
+      requestAnimationFrame(() => {
+        suppressScrollSaveRef.current = false
+      })
+    })
 
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+
+    const frame = requestAnimationFrame(() => {
       const activeItem = nav.querySelector<HTMLElement>('[data-active-nav="true"]')
       if (!activeItem) return
 
@@ -79,8 +99,12 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
       const activeRect = activeItem.getBoundingClientRect()
       const isVisible = activeRect.top >= navRect.top && activeRect.bottom <= navRect.bottom
       if (!isVisible) {
+        suppressScrollSaveRef.current = true
         activeItem.scrollIntoView({ block: 'nearest' })
-        window.sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop))
+        requestAnimationFrame(() => {
+          window.sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop))
+          suppressScrollSaveRef.current = false
+        })
       }
     })
 
@@ -88,6 +112,7 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
   }, [expandedMenus, pathname, visibleItems])
 
   function rememberSidebarScroll() {
+    if (suppressScrollSaveRef.current) return
     const nav = navRef.current
     if (!nav) return
     window.sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop))
