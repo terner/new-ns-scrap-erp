@@ -56,6 +56,10 @@ function defaultRange(date: Date) {
   return { from: dateOnly(monthStart(date)), to: dateOnly(date) }
 }
 
+function monthIndex(value: string) {
+  return Number(value.slice(0, 4)) * 12 + Number(value.slice(5, 7))
+}
+
 function activeStatus(status?: string | null) {
   return !['cancelled', 'void', 'reversed'].includes((status ?? '').toLowerCase())
 }
@@ -139,7 +143,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   const todayStart = startOfDay(selectedDate)
   const todayEnd = endOfDay(selectedDate)
 
-  const [purchases, sales, expenses, payments, receipts, stockRows, deals, finance, productionRows, cash, bankToday, bankRange, loanSchedules, stockIssues, products, salespersons, branches] = await Promise.all([
+  const [purchases, sales, expenses, payments, receipts, stockRows, deals, finance, productionRows, cash, bankToday, bankRange, loanSchedules, stockIssues, products, salespersons, branches, suppliers, customers, historicalRows] = await Promise.all([
     prisma.purchase_bills.findMany({ include: { suppliers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000, where: { branch_id: filter.branchId || undefined, supplier_id: filter.supplierId || undefined, date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
     prisma.sales_bills.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000, where: { branch_id: filter.branchId || undefined, customer_id: filter.customerId || undefined, date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
     prisma.expenses.findMany({ include: { expense_categories: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 3000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
@@ -157,6 +161,9 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     prisma.products.findMany({ where: { active: { not: false } } }),
     prisma.salespersons.findMany({ where: { active: { not: false } } }),
     prisma.branches.findMany({ orderBy: [{ name: 'asc' }], where: { active: { not: false } } }),
+    prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], select: { id: true, name: true }, where: { active: { not: false } } }),
+    prisma.customers.findMany({ orderBy: [{ name: 'asc' }], select: { id: true, name: true }, where: { active: { not: false } } }),
+    prisma.historical_monthly.findMany({ orderBy: [{ year: 'asc' }, { month: 'asc' }], take: 5000 }),
   ])
 
   const productById = new Map(products.map((row) => [row.id, row]))
@@ -184,11 +191,24 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     current.cashOut += toNumber(row.amount_out)
     bankByAccountMap.set(key, current)
   }
-  const purchaseAmount = activePurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0)
-  const salesAmount = activeSales.reduce((sum, row) => sum + toNumber(row.total_amount), 0)
-  const cogs = activeSales.reduce((sum, row) => sum + toNumber(row.cogs_amount || row.total_cost), 0)
-  const grossProfit = activeSales.reduce((sum, row) => sum + toNumber(row.gross_profit), 0) || salesAmount - cogs
-  const expenseAmount = expenses.filter((row) => activeStatus(row.status)).reduce((sum, row) => sum + toNumber(row.amount), 0)
+  const fromMonth = monthIndex(from.slice(0, 7))
+  const toMonth = monthIndex(to.slice(0, 7))
+  const scopedHistoricalRows = historicalRows.filter((row) => {
+    if (!row.year || !row.month) return false
+    const current = row.year * 12 + row.month
+    return current >= fromMonth && current <= toMonth
+  })
+  const historicalRevenue = scopedHistoricalRows.filter((row) => row.metric_type === 'pnl' && row.category_id === 'revenue').reduce((sum, row) => sum + toNumber(row.amount), 0)
+  const historicalCogs = scopedHistoricalRows.filter((row) => row.metric_type === 'pnl' && row.category_id === 'cogs').reduce((sum, row) => sum + toNumber(row.amount), 0)
+  const historicalExpenses = scopedHistoricalRows.filter((row) => row.metric_type === 'expense').reduce((sum, row) => sum + toNumber(row.amount), 0)
+  const livePurchaseAmount = activePurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0)
+  const liveSalesAmount = activeSales.reduce((sum, row) => sum + toNumber(row.total_amount), 0)
+  const liveCogs = activeSales.reduce((sum, row) => sum + toNumber(row.cogs_amount || row.total_cost), 0)
+  const purchaseAmount = livePurchaseAmount + historicalCogs
+  const salesAmount = liveSalesAmount + historicalRevenue
+  const cogs = liveCogs + historicalCogs
+  const grossProfit = (activeSales.reduce((sum, row) => sum + toNumber(row.gross_profit), 0) || liveSalesAmount - liveCogs) + historicalRevenue - historicalCogs
+  const expenseAmount = expenses.filter((row) => activeStatus(row.status)).reduce((sum, row) => sum + toNumber(row.amount), 0) + historicalExpenses
   const stockQty = stockRows.reduce((sum, row) => sum + toNumber(row.qty_in) - toNumber(row.qty_out), 0)
   const stockValue = stockRows.reduce((sum, row) => sum + toNumber(row.value_in) - toNumber(row.value_out), 0)
   const production = summarizeProductionMetrics(productionRows)
@@ -355,6 +375,18 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     month.gp += toNumber(row.gross_profit) || toNumber(row.total_amount) - toNumber(row.cogs_amount || row.total_cost)
   })
   expenses.filter((row) => activeStatus(row.status)).forEach((row) => { ensureMonth(row.date).expense += toNumber(row.amount) })
+  scopedHistoricalRows.forEach((row) => {
+    if (!row.year || !row.month) return
+    const date = new Date(row.year, row.month - 1, 1)
+    const month = ensureMonth(date)
+    const amount = toNumber(row.amount)
+    if (row.metric_type === 'pnl' && row.category_id === 'revenue') month.sales += amount
+    if (row.metric_type === 'pnl' && row.category_id === 'cogs') {
+      month.purchase += amount
+      month.gp -= amount
+    }
+    if (row.metric_type === 'expense') month.expense += amount
+  })
   const arDueRows = activeSales.map((row) => {
     const dueDate = addDays(row.date, row.credit_term ?? 0)
     return { amount: toNumber(row.receivable_balance), daysOverdue: Math.max(0, daysBetween(dueDate, selectedDate)), docNo: row.doc_no, due: dateOnly(dueDate), id: row.id, name: row.customers?.name ?? row.customer_id ?? '-' }
@@ -369,8 +401,10 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   return {
     filterOptions: {
       branches: branches.map((row) => ({ id: row.id, name: row.name })),
+      customers: customers.map((row) => ({ id: row.id, name: row.name })),
       groups: Array.from(new Set(products.map((row) => row.metal_group ?? 'อื่นๆ'))).sort(),
       products: products.map((row) => ({ code: row.code, id: row.id, name: row.name })),
+      suppliers: suppliers.map((row) => ({ id: row.id, name: row.name })),
     },
     filters: { date: dateOnly(selectedDate), from, to },
     sourceState: {
@@ -401,6 +435,12 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
         grossProfit,
         netProfit: salesAmount - cogs - expenseAmount,
         revenue: salesAmount,
+      },
+      historical: {
+        cogs: historicalCogs,
+        expenses: historicalExpenses,
+        revenue: historicalRevenue,
+        rows: scopedHistoricalRows.length,
       },
       monthlyTrend: Array.from(monthlyTrendMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(-6),
       sections: {

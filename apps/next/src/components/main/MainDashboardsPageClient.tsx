@@ -11,6 +11,7 @@ type MainPayload = {
       ar: Record<string, number>
     }
     cashComposition: { label: string; value: number }[]
+    historical: { cogs: number; expenses: number; revenue: number; rows: number }
     kpi: Record<string, number>
     monthlyTrend: { expense: number; gp: number; label: string; purchase: number; sales: number }[]
     sections: {
@@ -50,8 +51,10 @@ type MainPayload = {
   }
   filterOptions: {
     branches: { id: string; name: string }[]
+    customers: { id: string; name: string }[]
     groups: string[]
     products: { code: string; id: string; name: string }[]
+    suppliers: { id: string; name: string }[]
   }
   filters: { date: string; from: string; to: string }
   ownerDaily: {
@@ -218,8 +221,8 @@ function DashboardView(props: {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option className="text-slate-900" value="">🏢 ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
           <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option className="text-slate-900" value="">📦 ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option className="text-slate-900" key={group} value={group}>{group}</option>)}</select>
-          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardSupplierId} onChange={(event) => setDashboardSupplierId(event.target.value)}><option className="text-slate-900" value="">🏭 ทุก Supplier</option>{(analytics?.topSuppliers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
-          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardCustomerId} onChange={(event) => setDashboardCustomerId(event.target.value)}><option className="text-slate-900" value="">👥 ทุก Customer</option>{(analytics?.topCustomers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
+          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardSupplierId} onChange={(event) => setDashboardSupplierId(event.target.value)}><option className="text-slate-900" value="">🏭 ทุก Supplier</option>{(data?.filterOptions.suppliers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
+          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardCustomerId} onChange={(event) => setDashboardCustomerId(event.target.value)}><option className="text-slate-900" value="">👥 ทุก Customer</option>{(data?.filterOptions.customers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
           <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardProductId} onChange={(event) => setDashboardProductId(event.target.value)}><option className="text-slate-900" value="">🏷 ทุกสินค้า</option>{(data?.filterOptions.products ?? []).slice(0, 300).map((row) => <option className="text-slate-900" key={`${row.id}-${row.code}`} value={row.id}>{row.code} - {row.name}</option>)}</select>
           <button className="ml-auto rounded bg-amber-500 px-3 py-1 font-bold text-slate-900 hover:bg-amber-600" onClick={clearFilters} type="button">✕ ล้าง Filter</button>
         </div>
@@ -232,7 +235,15 @@ function DashboardView(props: {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50 p-4 shadow-sm">
-        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-500">ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026</div>
+        {(data?.dashboard.historical.rows ?? 0) > 0 ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs">
+            <span className="font-bold text-amber-800">📅 รวมยอด Historical:</span>
+            <span className="rounded bg-white px-2 py-0.5">Revenue <b className="text-emerald-700">{money(data?.dashboard.historical.revenue)}</b></span>
+            <span className="rounded bg-white px-2 py-0.5">COGS <b className="text-red-700">{money(data?.dashboard.historical.cogs)}</b></span>
+            <span className="rounded bg-white px-2 py-0.5">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
+            <span className="text-slate-500">({data?.dashboard.historical.rows ?? 0} rows)</span>
+          </div>
+        ) : <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-500">ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026</div>}
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <DashboardKpi icon="📈" label="Revenue" sub="ยอดขาย" tone="from-blue-500 to-blue-700" value={money(k.revenue)} />
           <DashboardKpi icon="💸" label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="from-rose-500 to-red-600" value={money(k.expenses)} />

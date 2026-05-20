@@ -67,6 +67,7 @@ Baseline notes:
 | `/anomaly-detector` | 2026-05-20 | Restored safe legacy polish for the Anomaly Detector shell: severity cards now sit directly under the hero, As-of is a compact secondary row, category count tags are back from server `stats.byCategory`, group severity badge/title/count colors now match legacy red/amber/blue emphasis, and the checklist copy now states the active 18 rule groups instead of falsely claiming legacy 40-check coverage. Record-level jump/highlight and the remaining legacy 40-check rules remain deferred until target route highlight contracts and missing data sources are designed. |
 | `/dashboard` | 2026-05-20 | Completed the first read-only data parity follow-up after the visual shell: dashboard period buttons and custom dates now request `/api/dashboard?from=&to=`, AR/AP aging buckets are computed server-side instead of rendering zero placeholders, cash composition includes FCD, AR, AP, OD, and Net Cash, stock-by-branch and stock-by-group now come from stock ledger balances, and monthly trend rows drive the dashboard chart panels. Branch/supplier/customer/product/group server filters and historical monthly baseline merge remain follow-up work. |
 | `/dashboard` | 2026-05-20 | Completed the second read-only data filter follow-up: dashboard branch/supplier/customer/product/group controls now become `/api/dashboard` query parameters, purchase/sales KPIs and analysis rows filter server-side, and dashboard filter options now include active branches/groups/products from the API payload. Historical monthly baseline merge and fuller option lists for supplier/customer beyond visible in-period rows remain follow-up work. |
+| `/dashboard` | 2026-05-20 | Completed the third read-only dashboard data follow-up: historical monthly rows now merge into dashboard revenue/COGS/expense totals and monthly trend rows using `historical_monthly` (`pnl/revenue`, `pnl/cogs`, and `expense`), the historical indicator shows actual merged amounts and row count, and supplier/customer filter options now come from active master data instead of only visible in-period top rows. Remaining dashboard work is now design-level only: how to reconcile historical figures with statutory GL once GL/closing-period tables exist. |
 
 ## P1 Backlog
 
@@ -118,5 +119,5 @@ Next routes without a direct standalone legacy page:
 
 ## Active Execution Order
 
-1. P1 Dashboard data follow-up: historical monthly baseline merge and fuller supplier/customer option payloads for filters.
-2. Follow-up design: Anomaly Detector legacy 40-check parity and record-level jump/highlight contracts.
+1. Follow-up design: Anomaly Detector legacy 40-check parity and record-level jump/highlight contracts.
+2. Follow-up design: statutory dashboard/GL reconciliation once GL journal, closing period, and retained earnings contracts exist.
