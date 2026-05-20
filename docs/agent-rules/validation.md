@@ -11,6 +11,7 @@ For every new or changed form/API field, define validation before saving data:
 - Phone inputs must strip/prevent letters and unsupported symbols, allowing only digits, spaces, dashes, parentheses, dots, and leading plus.
 - Phone inputs must enforce 9-15 digits; do not allow more than 15 digits to remain in the field.
 - Display Thai phone numbers in readable form where possible: 10-digit mobile numbers as `085-555-5555` and 9-digit local numbers as `02-555-5555`.
+- Tax ID inputs must strip/prevent every non-digit character while typing/pasting. Do not let spaces, dashes, Thai letters, English letters, or punctuation remain in the field. For Thai party tax IDs, limit the input to 13 digits and validate the same rule again in the shared schema/API boundary.
 - Show field-level error messages in the form for all validation failures.
 - Do not rely on HTML input types alone. Use Zod or the module's existing schema layer as the source of truth.
 - Keep validation practical for Thai business data: allow Thai text where appropriate, but reject control characters, obviously invalid punctuation, malformed identifiers, and negative values where not allowed.

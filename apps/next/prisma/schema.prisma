@@ -1841,6 +1841,12 @@ model suppliers {
   address_province    String?
   address_postal_code String?
   address_country     String?          @default("ไทย")
+  country_code        String?          @default("TH")
+  address_line1       String?
+  address_line2       String?
+  address_city        String?
+  address_state_region String?
+  address_postal_code_intl String?
   assets              assets[]
   payments            payments[]
   po_buys             po_buys[]
@@ -1853,6 +1859,7 @@ model suppliers {
   @@index([active], map: "idx_suppliers_active")
   @@index([market_scope], map: "idx_suppliers_market_scope")
   @@index([type], map: "idx_suppliers_type")
+  @@index([country_code], map: "idx_suppliers_country_code")
   @@schema("public")
 }
 

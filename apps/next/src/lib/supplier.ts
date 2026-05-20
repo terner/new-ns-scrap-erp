@@ -7,6 +7,7 @@ const compactDigits = (value: string) => value.replace(/\D/g, '')
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
 const personNamePattern = /^[\p{L}\p{M}.' -]+$/u
 const accountNoPattern = /^[0-9][0-9\s-]{1,38}[0-9]$/
+const internationalPostalCodePattern = /^[A-Za-z0-9][A-Za-z0-9\s-]{0,31}$/
 
 const optionalBusinessText = (label: string, maxLength = 160) => z.preprocess(
   blankToNull,
@@ -47,6 +48,26 @@ const optionalPostalCodeSchema = z.preprocess(
   blankToNull,
   z.string().trim()
     .regex(/^\d{5}$/, 'รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก')
+    .nullable()
+    .default(null),
+)
+
+const optionalCountryCodeSchema = z.preprocess(
+  (value) => {
+    const normalized = blankToNull(value)
+    return typeof normalized === 'string' ? normalized.trim().toUpperCase() : normalized
+  },
+  z.string()
+    .regex(/^[A-Z]{2}$/, 'รหัสประเทศต้องเป็น ISO 3166-1 alpha-2 เช่น TH, JP, US')
+    .nullable()
+    .default(null),
+)
+
+const optionalInternationalPostalCodeSchema = z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .max(32, 'รหัสไปรษณีย์สากลยาวเกินไป')
+    .regex(internationalPostalCodePattern, 'รหัสไปรษณีย์สากลใช้ได้เฉพาะตัวอักษร ตัวเลข ช่องว่าง และขีด')
     .nullable()
     .default(null),
 )
@@ -101,6 +122,12 @@ export const supplierSchema = z.object({
   addressProvince: z.string().nullable().default(null),
   addressPostalCode: z.string().nullable().default(null),
   addressCountry: z.string().nullable().default(null),
+  countryCode: z.string().nullable().default(null),
+  addressLine1: z.string().nullable().default(null),
+  addressLine2: z.string().nullable().default(null),
+  addressCity: z.string().nullable().default(null),
+  addressStateRegion: z.string().nullable().default(null),
+  addressPostalCodeIntl: z.string().nullable().default(null),
   bankName: z.string().nullable().default(null),
   accountNo: z.string().nullable().default(null),
   bankAccount: z.string().nullable().default(null),
@@ -165,7 +192,13 @@ export const supplierFormSchema = z.object({
   addressDistrict: optionalGeneralText('อำเภอ/เขต', 120),
   addressProvince: optionalGeneralText('จังหวัด', 120),
   addressPostalCode: optionalPostalCodeSchema,
-  addressCountry: z.preprocess(blankToNull, z.string().trim().max(80, 'ประเทศยาวเกินไป').regex(personNamePattern, 'ประเทศมีรูปแบบไม่ถูกต้อง').nullable().default('ไทย')),
+  addressCountry: optionalGeneralText('ประเทศ', 80),
+  countryCode: optionalCountryCodeSchema,
+  addressLine1: optionalGeneralText('ที่อยู่บรรทัด 1', 255),
+  addressLine2: optionalGeneralText('ที่อยู่บรรทัด 2', 255),
+  addressCity: optionalGeneralText('เมือง', 120),
+  addressStateRegion: optionalGeneralText('รัฐ/จังหวัด/ภูมิภาค', 120),
+  addressPostalCodeIntl: optionalInternationalPostalCodeSchema,
   bankName: optionalGeneralText('ธนาคารรับเงิน', 120),
   accountNo: optionalAccountNoSchema,
   bankAccount: optionalGeneralText('ชื่อบัญชีรับเงิน', 160),
@@ -185,6 +218,33 @@ export const supplierFormSchema = z.object({
     }
   } else if (!values.name) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบริษัท', path: ['name'] })
+  }
+
+  if (!values.salesId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกผู้ดูแล', path: ['salesId'] })
+  }
+
+  if (values.marketScope === 'ในประเทศ') {
+    if (values.countryCode && values.countryCode !== 'TH') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'ผู้ขายในประเทศต้องใช้รหัสประเทศ TH', path: ['countryCode'] })
+    }
+    if (values.addressCountry && values.addressCountry !== 'ไทย') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'ผู้ขายในประเทศต้องใช้ประเทศ ไทย', path: ['addressCountry'] })
+    }
+    return
+  }
+
+  if (!values.countryCode || values.countryCode === 'TH') {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกต่างประเทศต้องกรอกรหัสประเทศ ISO ที่ไม่ใช่ TH', path: ['countryCode'] })
+  }
+  if (!values.addressCountry) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกประเทศ', path: ['addressCountry'] })
+  }
+  if (!values.addressLine1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกที่อยู่บรรทัด 1', path: ['addressLine1'] })
+  }
+  if (!values.addressCity) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกเมือง', path: ['addressCity'] })
   }
 })
 
