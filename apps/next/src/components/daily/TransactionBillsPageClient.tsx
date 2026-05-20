@@ -383,17 +383,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     setFieldErrors({})
   }
 
-  function applyQuickPo(value: string) {
-    updateForm('poBuyId', value || null)
-    if (!value) return
-
-    setForm((current) => ({
-      ...current,
-      items: current.items.map((item, index) => index === 0 ? { ...item, poBuyId: value } : item),
-      purchaseSource: current.purchaseSource === 'SPOT_BUY' ? 'PO_RECEIPT' : current.purchaseSource,
-    }))
-  }
-
   function removeItem(index: number) {
     setForm((current) => ({ ...current, items: current.items.filter((_item, itemIndex) => itemIndex !== index) }))
   }
@@ -649,19 +638,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {form.transactionMode === 'TRADING' ? (
                   <div className="mt-3 rounded border border-purple-200 bg-purple-50 p-2 text-xs text-purple-700">รายการ Trading ไม่เข้า Stock และจะใช้สำหรับจับคู่ขายใน Trading Matching ภายหลัง</div>
                 ) : null}
-                <div className="mt-3 rounded-lg border-2 border-indigo-200 bg-indigo-50 p-3 text-xs text-slate-700">
-                  <div className="font-bold text-indigo-700">ผสม Spot + ตัด PO ในบิลเดียวได้</div>
-                  <div className="mt-1">เลือก PO ที่หัวบิลเพื่อช่วย set รายการแรก หรือเลือก PO แยกรายการในตารางด้านล่างได้ เว้นว่าง = Spot Buy</div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="whitespace-nowrap text-slate-600">Quick Load PO:</span>
-                    <select className="min-w-[240px] flex-1 rounded border px-2 py-1" value={form.poBuyId ?? ''} onChange={(event) => applyQuickPo(event.target.value)}>
-                      <option value="">-- ไม่ใช้ Quick Load --</option>
-                      {activePoBuys.map((po) => <option key={po.id} value={po.id}>{po.label ?? po.name}</option>)}
-                    </select>
-                    <span className="text-slate-500">เลือกแล้วจะผูก PO ให้รายการแรกก่อน</span>
-                  </div>
-                  {fieldErrors.poBuyId ? <div className="mt-1 text-xs text-red-600">{fieldErrors.poBuyId}</div> : null}
-                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -684,28 +660,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
                 <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full min-w-[780px] text-sm">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="p-2 text-left" colSpan={4}>สินค้า *</th>
-                        <th className="p-2 text-left text-indigo-700" colSpan={form.salesId ? 3 : 2}>PO</th>
-                        <th className="w-16 p-2"></th>
-                      </tr>
-                      <tr className="border-t border-slate-200">
-                        <th className="w-28 p-2 text-right">Gross</th>
-                        <th className="w-28 p-2 text-right text-amber-700">หัก</th>
-                        <th className="w-28 p-2 text-right text-emerald-700">สุทธิ</th>
-                        <th className="w-28 p-2 text-right">ราคา/กก.</th>
-                        {form.salesId ? <th className="w-28 p-2 text-right text-purple-700">ราคาหน้าใบ</th> : null}
-                        <th className="w-28 p-2 text-right">ส่วนลด</th>
-                        <th className="w-32 p-2 text-right">ยอดรวม</th>
-                        <th className="w-16 p-2"></th>
-                      </tr>
-                    </thead>
                     <tbody>
                       {form.items.map((item, index) => (
                         <Fragment key={index}>
                           <tr className="border-t align-top hover:bg-blue-50/30">
                             <td className="p-2" colSpan={4}>
+                              <div className="mb-1 text-[11px] font-semibold text-slate-500">สินค้า *</div>
                               <select className="w-full rounded border px-2 py-2" value={item.productId} onChange={(event) => updateItem(index, 'productId', event.target.value)}>
                                 <option value="">เลือกสินค้า</option>
                                 {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.code ? `${product.code} — ` : ''}{product.name}{product.unit ? ` (${product.unit})` : ''}</option>)}
@@ -713,6 +673,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                               <input className="mt-1.5 w-full rounded border bg-yellow-50 px-2 py-1 text-xs" placeholder="ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)" value={item.displayName ?? ''} onChange={(event) => updateItem(index, 'displayName', event.target.value || null)} />
                             </td>
                             <td className="p-2" colSpan={form.salesId ? 3 : 2}>
+                              <div className="mb-1 text-[11px] font-semibold text-indigo-700">PO</div>
                               <select className="w-full rounded border bg-blue-50 px-2 py-2 text-xs" value={item.poBuyId ?? ''} onChange={(event) => updateItem(index, 'poBuyId', event.target.value || null)}>
                                 <option value="">Spot Buy</option>
                                 {activePoBuys.map((po) => <option key={po.id} value={po.id}>{po.label ?? po.name}</option>)}

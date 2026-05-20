@@ -49,8 +49,13 @@ async function nextBankNameId() {
   return `BANK-${String(maxNumber + 1).padStart(3, '0')}`
 }
 
-function requireReferencePermission(permissionCode: 'master.reference.view' | 'master.reference.manage') {
-  return getCurrentAuthContext().then((context) => requirePermission(context, permissionCode))
+function permissionForSimpleMaster(kind: SimpleMasterKind, action: 'manage' | 'view') {
+  if (kind === 'vatSettings' || kind === 'whtSettings') return 'system.settings.manage'
+  return action === 'manage' ? 'master.reference.manage' : 'master.reference.view'
+}
+
+function requireSimpleMasterPermission(kind: SimpleMasterKind, action: 'manage' | 'view') {
+  return getCurrentAuthContext().then((context) => requirePermission(context, permissionForSimpleMaster(kind, action)))
 }
 
 function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMasterValues) {
@@ -382,7 +387,7 @@ async function nextId(config: SimpleMasterConfig) {
 }
 
 export async function listSimpleMasterData(kind: SimpleMasterKind) {
-  await requireReferencePermission('master.reference.view')
+  await requireSimpleMasterPermission(kind, 'view')
 
   const config = configs[kind]
   const rows = await config.delegate().findMany({ orderBy: config.orderBy, include: config.include })
@@ -390,7 +395,7 @@ export async function listSimpleMasterData(kind: SimpleMasterKind) {
 }
 
 export async function saveSimpleMasterData(request: Request, kind: SimpleMasterKind) {
-  await requireReferencePermission('master.reference.manage')
+  await requireSimpleMasterPermission(kind, 'manage')
 
   const config = configs[kind]
   const values = validateSimpleMasterValues(kind, parseMasterDataForm(await request.json()))
@@ -406,7 +411,7 @@ export async function saveSimpleMasterData(request: Request, kind: SimpleMasterK
 }
 
 export async function patchSimpleMasterData(request: Request, kind: SimpleMasterKind, id: string) {
-  await requireReferencePermission('master.reference.manage')
+  await requireSimpleMasterPermission(kind, 'manage')
 
   const config = configs[kind]
   const values = updateMasterDataStatusSchema.parse(await request.json())
