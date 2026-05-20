@@ -35,7 +35,6 @@ export async function GET(request: Request) {
         estHours,
         id: machine.id,
         inputQty,
-        maintenanceStatus: machine.maintenance_status ?? '-',
         name: machine.name,
         normalYieldPct: normalYield,
         orderCount: machineRows.length,

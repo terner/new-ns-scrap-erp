@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { AuthStatus } from '@/components/layout/AuthStatus'
@@ -10,11 +10,57 @@ type AppShellProps = {
   children: React.ReactNode
 }
 
+type BranchOption = {
+  code: string | null
+  id: string
+  name: string
+}
+
+const SELECTED_BRANCH_KEY = 'ns-scrap-erp-selected-branch-id'
+
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [selectedBranchId, setSelectedBranchId] = useState('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const title = pageTitleForPath(pathname)
   const isAuthPage = pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
+
+  useEffect(() => {
+    if (isAuthPage) return
+
+    const savedBranchId = window.localStorage.getItem(SELECTED_BRANCH_KEY)
+    if (savedBranchId) setSelectedBranchId(savedBranchId)
+
+    let mounted = true
+    async function loadBranches() {
+      try {
+        const response = await fetch('/api/branches', { cache: 'no-store' })
+        const payload = await response.json().catch(() => null)
+        if (!mounted || !response.ok) return
+        const nextBranches = Array.isArray(payload?.branches) ? payload.branches : []
+        setBranches(nextBranches)
+        if (savedBranchId && savedBranchId !== 'all' && !nextBranches.some((branch: BranchOption) => branch.id === savedBranchId)) {
+          setSelectedBranchId('all')
+          window.localStorage.setItem(SELECTED_BRANCH_KEY, 'all')
+        }
+      } catch {
+        if (mounted) setBranches([])
+      }
+    }
+
+    void loadBranches()
+
+    return () => {
+      mounted = false
+    }
+  }, [isAuthPage])
+
+  function handleBranchChange(value: string) {
+    setSelectedBranchId(value)
+    window.localStorage.setItem(SELECTED_BRANCH_KEY, value)
+    window.dispatchEvent(new CustomEvent('ns-scrap-erp-branch-change', { detail: { branchId: value === 'all' ? null : value } }))
+  }
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-100 text-slate-900">{children}</div>
@@ -46,8 +92,13 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <select aria-label="เลือกสาขา" className="hidden rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm sm:block" defaultValue="all">
+            <select aria-label="เลือกสาขา" className="hidden rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm sm:block" value={selectedBranchId} onChange={(event) => handleBranchChange(event.target.value)}>
               <option value="all">ทุกสาขา</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.code ? `${branch.code} · ${branch.name}` : branch.name}
+                </option>
+              ))}
             </select>
             <AuthStatus />
           </div>

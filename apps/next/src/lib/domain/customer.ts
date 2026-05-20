@@ -23,14 +23,15 @@ type PrismaCustomer = {
   address_province: string | null
   address_postal_code: string | null
   address_country: string | null
-  contact: string | null
-  contact_title: string | null
-  contact_first_name: string | null
-  contact_last_name: string | null
+  country_code: string | null
+  address_line1: string | null
+  address_line2: string | null
+  address_city: string | null
+  address_state_region: string | null
+  address_postal_code_intl: string | null
   credit_term: number | null
   credit_limit: Prisma.Decimal | null
   sales_id: string | null
-  notes: string | null
   active: boolean | null
   created_at: Date | null
   updated_at: Date | null
@@ -59,14 +60,15 @@ export function mapPrismaCustomer(row: PrismaCustomer): Customer {
     addressProvince: row.address_province,
     addressPostalCode: row.address_postal_code,
     addressCountry: row.address_country,
-    contact: row.contact,
-    contactTitle: row.contact_title,
-    contactFirstName: row.contact_first_name,
-    contactLastName: row.contact_last_name,
+    countryCode: row.country_code,
+    addressLine1: row.address_line1,
+    addressLine2: row.address_line2,
+    addressCity: row.address_city,
+    addressStateRegion: row.address_state_region,
+    addressPostalCodeIntl: row.address_postal_code_intl,
     creditTerm: row.credit_term,
     creditLimit: row.credit_limit === null ? null : row.credit_limit.toNumber(),
     salesId: row.sales_id,
-    notes: row.notes,
     active: row.active ?? true,
     createdAt: row.created_at?.toISOString() ?? null,
     updatedAt: row.updated_at?.toISOString() ?? null,
@@ -74,6 +76,19 @@ export function mapPrismaCustomer(row: PrismaCustomer): Customer {
 }
 
 function compactAddress(values: CustomerFormValues) {
+  if (values.marketScope === 'ต่างประเทศ') {
+    const parts = [
+      values.addressLine1,
+      values.addressLine2,
+      values.addressCity,
+      values.addressStateRegion,
+      values.addressPostalCodeIntl,
+      values.addressCountry,
+    ]
+
+    return parts.map((part) => part?.trim()).filter(Boolean).join(', ') || values.address || null
+  }
+
   const parts = [
     values.addressNo,
     values.addressMoo ? `หมู่ ${values.addressMoo}` : null,
@@ -89,12 +104,21 @@ function compactAddress(values: CustomerFormValues) {
   return parts.map((part) => part?.trim()).filter(Boolean).join(' ') || values.address || null
 }
 
+function domesticAddressLine1(values: CustomerFormValues) {
+  return [
+    values.addressNo,
+    values.addressMoo ? `หมู่ ${values.addressMoo}` : null,
+    values.addressVillage,
+    values.addressRoad,
+  ].map((part) => part?.trim()).filter(Boolean).join(' ') || null
+}
+
 export function toCustomerWriteInput(values: CustomerFormValues) {
   const parsed = customerFormSchema.parse(values)
   const code = parsed.code?.toUpperCase() || parsed.id || ''
   const personName = [parsed.nameTitle, parsed.firstName, parsed.lastName].map((part) => part?.trim()).filter(Boolean).join(' ')
-  const contactName = [parsed.contactTitle, parsed.contactFirstName, parsed.contactLastName].map((part) => part?.trim()).filter(Boolean).join(' ')
   const name = parsed.type === 'บุคคล' ? personName : parsed.name
+  const isDomestic = parsed.marketScope === 'ในประเทศ'
 
   return {
     id: parsed.id || code,
@@ -109,23 +133,24 @@ export function toCustomerWriteInput(values: CustomerFormValues) {
     phone: parsed.phone || null,
     email: parsed.email || null,
     address: compactAddress(parsed),
-    address_no: parsed.addressNo || null,
-    address_moo: parsed.addressMoo || null,
-    address_village: parsed.addressVillage || null,
-    address_road: parsed.addressRoad || null,
-    address_subdistrict: parsed.addressSubdistrict || null,
-    address_district: parsed.addressDistrict || null,
-    address_province: parsed.addressProvince || null,
-    address_postal_code: parsed.addressPostalCode || null,
-    address_country: parsed.addressCountry || 'ไทย',
-    contact: contactName || parsed.contact || null,
-    contact_title: parsed.contactTitle || null,
-    contact_first_name: parsed.contactFirstName || null,
-    contact_last_name: parsed.contactLastName || null,
+    address_no: isDomestic ? parsed.addressNo || null : null,
+    address_moo: isDomestic ? parsed.addressMoo || null : null,
+    address_village: isDomestic ? parsed.addressVillage || null : null,
+    address_road: isDomestic ? parsed.addressRoad || null : null,
+    address_subdistrict: isDomestic ? parsed.addressSubdistrict || null : null,
+    address_district: isDomestic ? parsed.addressDistrict || null : null,
+    address_province: isDomestic ? parsed.addressProvince || null : null,
+    address_postal_code: isDomestic ? parsed.addressPostalCode || null : null,
+    address_country: isDomestic ? 'ไทย' : parsed.addressCountry || null,
+    country_code: isDomestic ? 'TH' : parsed.countryCode?.toUpperCase() ?? null,
+    address_line1: isDomestic ? parsed.addressLine1 || domesticAddressLine1(parsed) : parsed.addressLine1 || null,
+    address_line2: parsed.addressLine2 || null,
+    address_city: isDomestic ? parsed.addressCity || parsed.addressDistrict || null : parsed.addressCity || null,
+    address_state_region: isDomestic ? parsed.addressStateRegion || parsed.addressProvince || null : parsed.addressStateRegion || null,
+    address_postal_code_intl: isDomestic ? parsed.addressPostalCodeIntl || parsed.addressPostalCode || null : parsed.addressPostalCodeIntl || null,
     credit_term: parsed.creditTerm,
     credit_limit: parsed.creditLimit,
     sales_id: parsed.salesId || null,
-    notes: parsed.notes || null,
     active: parsed.active,
   }
 }

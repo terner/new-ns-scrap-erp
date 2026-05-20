@@ -1,13 +1,13 @@
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, normalizeCode, parseMasterDataForm } from '@/lib/server/master-data'
+import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, parseMasterDataForm } from '@/lib/server/master-data'
 
 export const runtime = 'nodejs'
 
 function mapExpenseCategory(row: Awaited<ReturnType<typeof prisma.expense_categories.findMany>>[number]) {
   return {
     id: row.id,
-    code: row.id,
+    code: null,
     name: row.name,
     active: row.active ?? true,
     type: null,
@@ -16,7 +16,7 @@ function mapExpenseCategory(row: Awaited<ReturnType<typeof prisma.expense_catego
     note: null,
     symbol: null,
     rateToThb: null,
-    parentId: row.parent_id,
+    parentId: null,
     channelType: null,
     bankName: null,
     accountNo: null,
@@ -33,7 +33,7 @@ function mapExpenseCategory(row: Awaited<ReturnType<typeof prisma.expense_catego
   }
 }
 
-async function getNextCode() {
+async function getNextId() {
   const last = await prisma.expense_categories.findFirst({ where: { id: { startsWith: 'EXP' } }, orderBy: { id: 'desc' }, select: { id: true } })
   return nextSequentialCode(last?.id, 'EXP')
 }
@@ -57,11 +57,11 @@ export async function POST(request: Request) {
     requirePermission(context, 'master.reference.manage')
 
     const values = parseMasterDataForm(await request.json())
-    const id = normalizeCode(values.code, values.id || await getNextCode())
+    const id = values.id || await getNextId()
     const row = await prisma.expense_categories.upsert({
-      where: { id: values.id || id },
-      create: { id, name: values.name, parent_id: values.parentId || null, active: values.active },
-      update: { name: values.name, parent_id: values.parentId || null, active: values.active },
+      where: { id },
+      create: { id, name: values.name, active: values.active },
+      update: { name: values.name, active: values.active },
     })
     return masterDataJson(mapExpenseCategory(row))
   } catch (caught) {

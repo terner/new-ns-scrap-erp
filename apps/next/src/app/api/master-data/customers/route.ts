@@ -12,7 +12,6 @@ export const runtime = 'nodejs'
 const sortColumns = {
   active: 'active',
   code: 'code',
-  contact: 'contact',
   creditLimit: 'credit_limit',
   creditTerm: 'credit_term',
   email: 'email',
@@ -59,9 +58,12 @@ function customerSearchWhere(q: string, customerType: string, marketScope: strin
       { phone: { contains: q, mode: 'insensitive' } },
       { email: { contains: q, mode: 'insensitive' } },
       { address: { contains: q, mode: 'insensitive' } },
-      { contact: { contains: q, mode: 'insensitive' } },
+      { address_line1: { contains: q, mode: 'insensitive' } },
+      { address_line2: { contains: q, mode: 'insensitive' } },
+      { address_city: { contains: q, mode: 'insensitive' } },
+      { address_state_region: { contains: q, mode: 'insensitive' } },
+      { country_code: { contains: q, mode: 'insensitive' } },
       { sales_id: { contains: q, mode: 'insensitive' } },
-      { notes: { contains: q, mode: 'insensitive' } },
     ]
 
   return where

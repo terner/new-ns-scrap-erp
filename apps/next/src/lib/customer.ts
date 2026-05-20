@@ -6,6 +6,7 @@ const businessTextPattern = /^[\p{L}\p{M}\p{N}\s.&,()/'"-]+$/u
 const compactDigits = (value: string) => value.replace(/\D/g, '')
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
 const personNamePattern = /^[\p{L}\p{M}.' -]+$/u
+const internationalPostalCodePattern = /^[A-Za-z0-9][A-Za-z0-9\s-]{0,31}$/
 
 const asciiEmailSchema = z.preprocess(blankToNull, z.string().trim()
   .email('รูปแบบอีเมลไม่ถูกต้อง')
@@ -56,6 +57,26 @@ const optionalPostalCodeSchema = z.preprocess(
     .default(null),
 )
 
+const optionalCountryCodeSchema = z.preprocess(
+  (value) => {
+    const normalized = blankToNull(value)
+    return typeof normalized === 'string' ? normalized.trim().toUpperCase() : normalized
+  },
+  z.string()
+    .regex(/^[A-Z]{2}$/, 'รหัสประเทศต้องเป็น ISO 3166-1 alpha-2 เช่น TH, JP, US')
+    .nullable()
+    .default(null),
+)
+
+const optionalInternationalPostalCodeSchema = z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .max(32, 'รหัสไปรษณีย์สากลยาวเกินไป')
+    .regex(internationalPostalCodePattern, 'รหัสไปรษณีย์สากลใช้ได้เฉพาะตัวอักษร ตัวเลข ช่องว่าง และขีด')
+    .nullable()
+    .default(null),
+)
+
 const optionalMooSchema = z.preprocess(
   blankToNull,
   z.string().trim()
@@ -94,14 +115,15 @@ export const customerSchema = z.object({
   addressProvince: z.string().nullable().default(null),
   addressPostalCode: z.string().nullable().default(null),
   addressCountry: z.string().nullable().default(null),
-  contact: z.string().nullable().default(null),
-  contactTitle: z.string().nullable().default(null),
-  contactFirstName: z.string().nullable().default(null),
-  contactLastName: z.string().nullable().default(null),
+  countryCode: z.string().nullable().default(null),
+  addressLine1: z.string().nullable().default(null),
+  addressLine2: z.string().nullable().default(null),
+  addressCity: z.string().nullable().default(null),
+  addressStateRegion: z.string().nullable().default(null),
+  addressPostalCodeIntl: z.string().nullable().default(null),
   creditTerm: z.number().int().nullable().default(null),
   creditLimit: z.number().nullable().default(null),
   salesId: z.string().nullable().default(null),
-  notes: z.string().nullable().default(null),
   active: z.boolean().default(true),
   createdAt: z.string().nullable().default(null),
   updatedAt: z.string().nullable().default(null),
@@ -157,14 +179,15 @@ export const customerFormSchema = z.object({
   addressProvince: optionalGeneralText('จังหวัด', 120),
   addressPostalCode: optionalPostalCodeSchema,
   addressCountry: z.preprocess(blankToNull, z.string().trim().max(80, 'ประเทศยาวเกินไป').regex(personNamePattern, 'ประเทศมีรูปแบบไม่ถูกต้อง').nullable().default('ไทย')),
-  contact: optionalGeneralText('ผู้ติดต่อ'),
-  contactTitle: optionalPersonName('คำนำหน้าผู้ติดต่อ'),
-  contactFirstName: optionalPersonName('ชื่อผู้ติดต่อ'),
-  contactLastName: optionalPersonName('นามสกุลผู้ติดต่อ'),
+  countryCode: optionalCountryCodeSchema,
+  addressLine1: optionalGeneralText('ที่อยู่บรรทัด 1', 255),
+  addressLine2: optionalGeneralText('ที่อยู่บรรทัด 2', 255),
+  addressCity: optionalGeneralText('เมือง', 120),
+  addressStateRegion: optionalGeneralText('รัฐ/จังหวัด/ภูมิภาค', 120),
+  addressPostalCodeIntl: optionalInternationalPostalCodeSchema,
   creditTerm: z.number().int().min(0).nullable().default(null),
   creditLimit: z.number().min(0).nullable().default(null),
   salesId: z.string().trim().nullable().default(null),
-  notes: z.string().trim().nullable().default(null),
   active: z.boolean().default(true),
 }).superRefine((values, context) => {
   if (values.type === 'บุคคล') {
@@ -181,14 +204,20 @@ export const customerFormSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบริษัท', path: ['name'] })
   }
 
-  if (!values.contactTitle) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกคำนำหน้าผู้ติดต่อ', path: ['contactTitle'] })
-  }
-  if (!values.contactFirstName) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อผู้ติดต่อ', path: ['contactFirstName'] })
-  }
-  if (!values.contactLastName) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกนามสกุลผู้ติดต่อ', path: ['contactLastName'] })
+  if (values.marketScope === 'ในประเทศ') {
+    if (values.countryCode && values.countryCode !== 'TH') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'ลูกค้าในประเทศต้องใช้รหัสประเทศ TH', path: ['countryCode'] })
+    }
+  } else {
+    if (!values.addressCountry || values.addressCountry === 'ไทย') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกประเทศ', path: ['addressCountry'] })
+    }
+    if (!values.addressLine1) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกที่อยู่บรรทัด 1', path: ['addressLine1'] })
+    }
+    if (!values.addressCity) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกเมือง', path: ['addressCity'] })
+    }
   }
 })
 

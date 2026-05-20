@@ -58,7 +58,6 @@ function recordToForm(record: MasterDataRecord): MasterDataFormValues {
     creditTerm: record.creditTerm,
     grade: record.grade,
     itemStatus: record.itemStatus,
-    maintenanceStatus: record.maintenanceStatus,
     metalGroup: record.metalGroup,
     normalYieldPct: record.normalYieldPct,
     requiredDoc: record.requiredDoc,

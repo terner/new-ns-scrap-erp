@@ -14,7 +14,7 @@ export async function PATCH(request: Request, { params }: MasterDataRouteProps) 
     const row = await prisma.expense_categories.update({ where: { id }, data: { active: values.active } })
     return masterDataJson({
       id: row.id,
-      code: row.id,
+      code: null,
       name: row.name,
       active: row.active ?? true,
       type: null,
@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: MasterDataRouteProps) 
       note: null,
       symbol: null,
       rateToThb: null,
-      parentId: row.parent_id,
+      parentId: null,
       channelType: null,
       bankName: null,
       accountNo: null,

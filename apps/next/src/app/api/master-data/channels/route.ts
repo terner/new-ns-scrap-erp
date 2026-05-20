@@ -1,18 +1,14 @@
-import { z } from 'zod'
 import { prisma } from '@/lib/server/prisma'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { errorJson, masterDataJson, masterDataListJson, nextSequentialCode, parseMasterDataForm } from '@/lib/server/master-data'
 
 export const runtime = 'nodejs'
 
-type PurchaseChannel = Awaited<ReturnType<typeof prisma.purchase_channels.findMany>>[number]
 type SalesChannel = Awaited<ReturnType<typeof prisma.sales_channels.findMany>>[number]
 
-const channelTypeSchema = z.enum(['purchase', 'sales'])
-
-function mapChannel(row: PurchaseChannel | SalesChannel, channelType: 'purchase' | 'sales') {
+function mapChannel(row: SalesChannel) {
   return {
-    id: `${channelType}:${row.id}`,
+    id: `sales:${row.id}`,
     code: null,
     name: row.name,
     active: row.active ?? true,
@@ -23,7 +19,7 @@ function mapChannel(row: PurchaseChannel | SalesChannel, channelType: 'purchase'
     symbol: null,
     rateToThb: null,
     parentId: null,
-    channelType,
+    channelType: null,
     bankName: null,
     accountNo: null,
     currency: null,
@@ -39,12 +35,9 @@ function mapChannel(row: PurchaseChannel | SalesChannel, channelType: 'purchase'
   }
 }
 
-async function getNextChannelId(channelType: 'purchase' | 'sales') {
-  const prefix = channelType === 'purchase' ? 'PC' : 'SC'
-  const last = channelType === 'purchase'
-    ? await prisma.purchase_channels.findFirst({ where: { id: { startsWith: prefix } }, orderBy: { id: 'desc' }, select: { id: true } })
-    : await prisma.sales_channels.findFirst({ where: { id: { startsWith: prefix } }, orderBy: { id: 'desc' }, select: { id: true } })
-  return nextSequentialCode(last?.id, prefix)
+async function getNextChannelId() {
+  const last = await prisma.sales_channels.findFirst({ where: { id: { startsWith: 'SC' } }, orderBy: { id: 'desc' }, select: { id: true } })
+  return nextSequentialCode(last?.id, 'SC')
 }
 
 export async function GET() {
@@ -52,11 +45,8 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'master.reference.view')
 
-    const [purchaseRows, salesRows] = await Promise.all([
-      prisma.purchase_channels.findMany({ orderBy: [{ id: 'asc' }, { name: 'asc' }] }),
-      prisma.sales_channels.findMany({ orderBy: [{ id: 'asc' }, { name: 'asc' }] }),
-    ])
-    return masterDataListJson([...purchaseRows.map((row) => mapChannel(row, 'purchase')), ...salesRows.map((row) => mapChannel(row, 'sales'))])
+    const salesRows = await prisma.sales_channels.findMany({ orderBy: [{ name: 'asc' }, { id: 'asc' }] })
+    return masterDataListJson(salesRows.map(mapChannel))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'โหลดข้อมูลช่องทางไม่ได้', 500)
@@ -69,25 +59,15 @@ export async function POST(request: Request) {
     requirePermission(context, 'master.reference.manage')
 
     const values = parseMasterDataForm(await request.json())
-    const channelType = channelTypeSchema.parse(values.channelType)
     const rawId = values.id?.replace(/^(purchase|sales):/, '')
-    const id = rawId || await getNextChannelId(channelType)
+    const id = rawId || await getNextChannelId()
 
-    if (channelType === 'sales') {
-      const row = await prisma.sales_channels.upsert({
-        where: { id },
-        create: { id, name: values.name, active: values.active },
-        update: { name: values.name, active: values.active },
-      })
-      return masterDataJson(mapChannel(row, 'sales'))
-    }
-
-    const row = await prisma.purchase_channels.upsert({
+    const row = await prisma.sales_channels.upsert({
       where: { id },
       create: { id, name: values.name, active: values.active },
       update: { name: values.name, active: values.active },
     })
-    return masterDataJson(mapChannel(row, 'purchase'))
+    return masterDataJson(mapChannel(row))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'บันทึกข้อมูลช่องทางไม่ได้')

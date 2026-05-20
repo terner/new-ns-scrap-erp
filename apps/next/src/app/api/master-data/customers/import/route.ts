@@ -15,19 +15,21 @@ const headerMap = {
   active: ['สถานะ', 'active'],
   address: ['ที่อยู่เต็ม/หมายเหตุที่อยู่', 'ที่อยู่', 'address'],
   addressCountry: ['ประเทศ', 'addressCountry'],
+  addressCity: ['เมือง', 'addressCity', 'address_city'],
   addressDistrict: ['อำเภอ/เขต', 'อำเภอ', 'เขต', 'addressDistrict'],
+  addressLine1: ['ที่อยู่บรรทัด 1', 'addressLine1', 'address_line1'],
+  addressLine2: ['ที่อยู่บรรทัด 2', 'addressLine2', 'address_line2'],
   addressMoo: ['หมู่', 'addressMoo'],
   addressNo: ['บ้านเลขที่', 'addressNo'],
+  addressPostalCodeIntl: ['รหัสไปรษณีย์สากล', 'addressPostalCodeIntl', 'address_postal_code_intl'],
   addressPostalCode: ['รหัสไปรษณีย์', 'addressPostalCode'],
   addressProvince: ['จังหวัด', 'addressProvince'],
   addressRoad: ['ถนน', 'addressRoad'],
+  addressStateRegion: ['รัฐ/จังหวัด/ภูมิภาค', 'addressStateRegion', 'address_state_region'],
   addressSubdistrict: ['ตำบล/แขวง', 'ตำบล', 'แขวง', 'addressSubdistrict'],
   addressVillage: ['หมู่บ้าน/อาคาร', 'หมู่บ้าน', 'อาคาร', 'addressVillage'],
   code: ['รหัสลูกค้า', 'code'],
-  contact: ['ผู้ติดต่อ', 'contact'],
-  contactFirstName: ['ชื่อผู้ติดต่อ', 'contactFirstName'],
-  contactLastName: ['นามสกุลผู้ติดต่อ', 'contactLastName'],
-  contactTitle: ['คำนำหน้าผู้ติดต่อ', 'contactTitle'],
+  countryCode: ['รหัสประเทศ (ISO)', 'countryCode', 'country_code'],
   creditLimit: ['วงเงินเครดิต', 'creditLimit'],
   creditTerm: ['เครดิตเทอม (วัน)', 'เครดิตเทอม', 'creditTerm'],
   email: ['อีเมล', 'email'],
@@ -36,7 +38,6 @@ const headerMap = {
   marketScope: ['ประเทศ/ตลาด', 'marketScope'],
   name: ['ชื่อลูกค้า/บริษัท', 'ชื่อบริษัท', 'name'],
   nameTitle: ['คำนำหน้าชื่อ', 'nameTitle'],
-  notes: ['หมายเหตุ', 'notes'],
   phone: ['โทรศัพท์', 'โทร', 'phone'],
   salesId: ['รหัสพนักงานขาย', 'salesId'],
   taxId: ['เลขผู้เสียภาษี', 'taxId'],
@@ -93,10 +94,12 @@ function normalizeCustomerType(value: string, row: ImportRow) {
   return cellText(row, 'firstName') || cellText(row, 'lastName') ? 'บุคคล' : 'นิติบุคคล'
 }
 
-function normalizeMarketScope(value: string, country: string) {
+function normalizeMarketScope(value: string, countryCode: string, country: string) {
   const normalized = value.trim().toLowerCase()
   if (normalized === 'ต่างประเทศ' || normalized === 'foreign' || normalized === 'overseas') return 'ต่างประเทศ'
+  const normalizedCountryCode = countryCode.trim().toUpperCase()
   const normalizedCountry = country.trim().toLowerCase()
+  if (normalizedCountryCode && normalizedCountryCode !== 'TH') return 'ต่างประเทศ'
   if (normalizedCountry && normalizedCountry !== 'ไทย' && normalizedCountry !== 'thailand') return 'ต่างประเทศ'
   return 'ในประเทศ'
 }
@@ -197,7 +200,8 @@ export async function POST(request: Request) {
       if (code) seenCodes.add(code)
 
       const addressCountry = cellText(row, 'addressCountry')
-      const marketScope = normalizeMarketScope(cellText(row, 'marketScope'), addressCountry)
+      const countryCode = cellText(row, 'countryCode')
+      const marketScope = normalizeMarketScope(cellText(row, 'marketScope'), countryCode, addressCountry)
       const values = {
         id: code || undefined,
         code: code || null,
@@ -220,14 +224,15 @@ export async function POST(request: Request) {
         addressProvince: cellText(row, 'addressProvince') || null,
         addressPostalCode: cellText(row, 'addressPostalCode') || null,
         addressCountry: addressCountry || 'ไทย',
-        contact: cellText(row, 'contact') || null,
-        contactTitle: cellText(row, 'contactTitle') || null,
-        contactFirstName: cellText(row, 'contactFirstName') || null,
-        contactLastName: cellText(row, 'contactLastName') || null,
+        countryCode: countryCode || (marketScope === 'ในประเทศ' ? 'TH' : null),
+        addressLine1: cellText(row, 'addressLine1') || null,
+        addressLine2: cellText(row, 'addressLine2') || null,
+        addressCity: cellText(row, 'addressCity') || null,
+        addressStateRegion: cellText(row, 'addressStateRegion') || null,
+        addressPostalCodeIntl: cellText(row, 'addressPostalCodeIntl') || null,
         creditTerm: cellNumber(row, 'creditTerm'),
         creditLimit: cellNumber(row, 'creditLimit'),
         salesId: cellText(row, 'salesId') || null,
-        notes: cellText(row, 'notes') || null,
         active: normalizeActive(cellText(row, 'active')),
       }
 

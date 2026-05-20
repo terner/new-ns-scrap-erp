@@ -15,7 +15,7 @@ import {
   updateMasterDataStatusSchema,
 } from '@/lib/server/master-data'
 
-type SimpleMasterKind = 'bankNames' | 'directors' | 'machines' | 'productionLines' | 'productionOutputCategories' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes'
+type SimpleMasterKind = 'bankNames' | 'directors' | 'machineTypes' | 'machines' | 'productionLines' | 'productionOutputCategories' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes'
 
 type Delegate = {
   findMany: (args?: unknown) => Promise<unknown[]>
@@ -36,8 +36,6 @@ type SimpleMasterConfig = {
 
 const asRecord = (row: unknown) => row as Record<string, unknown>
 const directorTypeSchema = z.enum(['กรรมการ', 'พนักงาน', 'อื่นๆ']).nullable()
-const machineTypeSchema = z.enum(['Sorting', 'Cutting', 'Baling', 'Crushing', 'Melting', 'Other']).nullable()
-const maintenanceStatusSchema = z.enum(['Normal', 'Maintenance', 'Breakdown']).nullable()
 
 type SimpleMasterValues = ReturnType<typeof parseMasterDataForm>
 
@@ -58,11 +56,6 @@ function requireReferencePermission(permissionCode: 'master.reference.view' | 'm
 function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMasterValues) {
   if (kind === 'directors') {
     directorTypeSchema.parse(values.type)
-  }
-
-  if (kind === 'machines') {
-    machineTypeSchema.parse(values.type)
-    maintenanceStatusSchema.parse(values.maintenanceStatus)
   }
 
   if (kind === 'productionOutputCategories') {
@@ -129,6 +122,27 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       active: values.active,
     }),
   },
+  machineTypes: {
+    delegate: () => prisma.production_machine_types as Delegate,
+    prefix: 'MT-',
+    orderBy: [{ name: 'asc' }],
+    map: (row) => {
+      const record = asRecord(row)
+      return {
+        id: record.id,
+        code: null,
+        name: record.name,
+        active: record.active,
+        createdAt: toIso(record.created_at as Date | null),
+        updatedAt: toIso(record.updated_at as Date | null),
+      }
+    },
+    data: (values, id, _code) => ({
+      id,
+      name: values.name,
+      active: values.active,
+    }),
+  },
   machines: {
     delegate: () => prisma.production_machines as Delegate,
     prefix: 'MC',
@@ -147,7 +161,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         capacityKgPerHr: toNumber(record.capacity_kg_per_hr as { toNumber: () => number } | number | null),
         normalYieldPct: toNumber(record.normal_yield_pct as { toNumber: () => number } | number | null),
         stdProcessCostPerHr: toNumber(record.std_process_cost_per_hr as { toNumber: () => number } | number | null),
-        maintenanceStatus: record.maintenance_status,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -162,7 +175,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       capacity_kg_per_hr: values.capacityKgPerHr,
       normal_yield_pct: values.normalYieldPct,
       std_process_cost_per_hr: values.stdProcessCostPerHr,
-      maintenance_status: values.maintenanceStatus || null,
       active: values.active,
     }),
   },
@@ -227,12 +239,12 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   productUnits: {
     delegate: () => prisma.product_units as Delegate,
     prefix: 'U',
-    orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    orderBy: [{ name: 'asc' }],
     map: (row) => {
       const record = asRecord(row)
       return {
         id: record.id,
-        code: record.code,
+        code: null,
         name: record.name,
         symbol: record.symbol,
         active: record.active,
@@ -240,9 +252,8 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         updatedAt: toIso(record.updated_at as Date | null),
       }
     },
-    data: (values, id, code) => ({
+    data: (values, id, _code) => ({
       id,
-      code,
       name: values.name,
       symbol: values.symbol || null,
       active: values.active,
@@ -251,21 +262,20 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   productTypes: {
     delegate: () => prisma.product_types as Delegate,
     prefix: 'PT-',
-    orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    orderBy: [{ name: 'asc' }],
     map: (row) => {
       const record = asRecord(row)
       return {
         id: record.id,
-        code: record.code,
+        code: null,
         name: record.name,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
       }
     },
-    data: (values, id, code) => ({
+    data: (values, id, _code) => ({
       id,
-      code,
       name: values.name,
       active: values.active,
     }),
@@ -335,6 +345,10 @@ export async function saveSimpleMasterData(request: Request, kind: SimpleMasterK
 
   const config = configs[kind]
   const values = validateSimpleMasterValues(kind, parseMasterDataForm(await request.json()))
+  if (kind === 'machines' && values.type) {
+    const machineType = await prisma.production_machine_types.findFirst({ where: { active: true, name: values.type } })
+    if (!machineType) throw new Error('ประเภทเครื่องจักรที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')
+  }
   const id = values.id || values.code || await nextId(config)
   const code = values.code || id
   const data = config.data(values, id, code)

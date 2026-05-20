@@ -711,14 +711,25 @@ function CopyAccountButton({ accountKey, accountNo, copied, label, onCopy }: Cop
   return (
     <button
       aria-label={`คัดลอกเลขบัญชี ${label}`}
-      className="rounded border border-slate-300 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+      className={`inline-flex h-6 w-6 items-center justify-center rounded border text-slate-600 transition hover:bg-slate-100 ${copied ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-white'}`}
+      title={copied ? 'คัดลอกแล้ว' : 'คัดลอกเลขบัญชี'}
       type="button"
       onClick={(event) => {
         event.stopPropagation()
         void onCopy(accountKey, accountNo)
       }}
     >
-      {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
+      <span className="sr-only">{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
+      {copied ? (
+        <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      ) : (
+        <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+          <rect height="14" rx="2" width="14" x="8" y="8" />
+          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+        </svg>
+      )}
     </button>
   )
 }

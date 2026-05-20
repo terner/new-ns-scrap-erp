@@ -250,7 +250,7 @@ export async function buildAnomalyDetector(asOfValue?: string | null) {
   })
   const customerNames = new Map<string, number>()
   customers.forEach((customer) => {
-    if (!customer.phone && !customer.contact) push({ action: 'เพิ่มข้อมูลติดต่อที่ Master Data ลูกค้า', category: 'Master', detail: `${customer.code ?? '-'} · ${customer.name}`, fixHref: '/master-data/customers', icon: 'ℹ', id: `cust-no-contact-${customer.id}`, severity: 'info', title: `ลูกค้าไม่มีข้อมูลติดต่อ: ${customer.name}` })
+    if (!customer.phone && !customer.email) push({ action: 'เพิ่มข้อมูลติดต่อที่ Master Data ลูกค้า', category: 'Master', detail: `${customer.code ?? '-'} · ${customer.name}`, fixHref: '/master-data/customers', icon: 'ℹ', id: `cust-no-contact-${customer.id}`, severity: 'info', title: `ลูกค้าไม่มีข้อมูลติดต่อ: ${customer.name}` })
     const key = customer.name.trim().toLowerCase()
     customerNames.set(key, (customerNames.get(key) ?? 0) + 1)
   })

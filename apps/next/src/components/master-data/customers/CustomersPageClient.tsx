@@ -16,7 +16,7 @@ import { getErrorMessage } from '@/lib/api-client'
 import { formatPhoneDisplay, sanitizePhoneInput } from '@/lib/format'
 import { listThaiDistricts, listThaiProvinces, listThaiSubdistricts, type ThaiDistrict, type ThaiProvince, type ThaiSubdistrict } from '@/lib/thai-address'
 
-type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'phone' | 'email' | 'contact' | 'creditTerm' | 'creditLimit' | 'active'
+type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'phone' | 'email' | 'creditTerm' | 'creditLimit' | 'active'
 
 const emptyCustomerForm: CustomerFormValues = {
   id: undefined,
@@ -39,15 +39,16 @@ const emptyCustomerForm: CustomerFormValues = {
   addressProvince: null,
   addressPostalCode: null,
   addressCountry: 'ไทย',
-  contact: null,
-  contactTitle: null,
-  contactFirstName: null,
-  contactLastName: null,
+  countryCode: 'TH',
+  addressLine1: null,
+  addressLine2: null,
+  addressCity: null,
+  addressStateRegion: null,
+  addressPostalCodeIntl: null,
   creditTerm: null,
   creditLimit: null,
   marketScope: 'ในประเทศ',
   salesId: null,
-  notes: null,
   active: true,
 }
 
@@ -75,15 +76,16 @@ function customerToForm(customer: Customer): CustomerFormValues {
     addressProvince: customer.addressProvince,
     addressPostalCode: customer.addressPostalCode,
     addressCountry: customer.addressCountry ?? 'ไทย',
-    contact: customer.contact,
-    contactTitle: customer.contactTitle,
-    contactFirstName: customer.contactFirstName,
-    contactLastName: customer.contactLastName,
+    countryCode: customer.countryCode ?? (customer.marketScope === 'ต่างประเทศ' ? null : 'TH'),
+    addressLine1: customer.addressLine1,
+    addressLine2: customer.addressLine2,
+    addressCity: customer.addressCity,
+    addressStateRegion: customer.addressStateRegion,
+    addressPostalCodeIntl: customer.addressPostalCodeIntl,
     creditTerm: customer.creditTerm,
     creditLimit: customer.creditLimit,
     marketScope: customer.marketScope,
     salesId: customer.salesId,
-    notes: customer.notes,
     active: customer.active,
   }
 }
@@ -467,7 +469,6 @@ export function CustomersPageClient() {
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('type')}>ประเภท{sortLabel('type')}</button></th>
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('phone')}>โทร{sortLabel('phone')}</button></th>
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('email')}>อีเมล{sortLabel('email')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('contact')}>ผู้ติดต่อ{sortLabel('contact')}</button></th>
                 <th className="min-w-[220px] p-2 text-left">ที่อยู่</th>
                 <th className="p-2 text-right"><button className="font-semibold" type="button" onClick={() => setSort('creditTerm')}>Term (วัน){sortLabel('creditTerm')}</button></th>
                 <th className="p-2 text-right"><button className="font-semibold" type="button" onClick={() => setSort('creditLimit')}>วงเงินเครดิต{sortLabel('creditLimit')}</button></th>
@@ -496,7 +497,6 @@ export function CustomersPageClient() {
                   <td className="p-2">{displayValue(customer.type)}</td>
                   <td className="p-2">{displayValue(formatPhoneDisplay(customer.phone))}</td>
                   <td className="p-2">{displayValue(customer.email)}</td>
-                  <td className="p-2">{displayValue(customer.contact)}</td>
                   <td className="p-2">{displayValue(customer.address)}</td>
                   <td className="p-2 text-right">{customer.creditTerm ?? '-'}</td>
                   <td className="p-2 text-right">{formatMoney(customer.creditLimit)}</td>
@@ -524,7 +524,7 @@ export function CustomersPageClient() {
               ))}
               {paginatedCustomers.length === 0 ? (
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={12}>ไม่พบข้อมูลที่ค้นหา</td>
+                  <td className="p-4 text-center text-sm text-slate-500" colSpan={11}>ไม่พบข้อมูลที่ค้นหา</td>
                 </tr>
               ) : null}
             </tbody>
@@ -589,6 +589,8 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
       addressProvince: nextProvince,
       addressDistrict: nextDistrict,
       addressSubdistrict: nextSubdistrict,
+      addressCountry: nextPostalCode.length === 5 ? 'ไทย' : current.addressCountry,
+      countryCode: nextPostalCode.length === 5 ? 'TH' : current.countryCode,
     }))
   }
 
@@ -603,11 +605,29 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
     }))
   }
 
+  function updateMarketScope(value: CustomerFormValues['marketScope']) {
+    setForm((current) => ({
+      ...current,
+      marketScope: value,
+      countryCode: value === 'ในประเทศ' ? 'TH' : null,
+      addressCountry: value === 'ในประเทศ' ? 'ไทย' : current.addressCountry === 'ไทย' ? null : current.addressCountry,
+      addressLine1: value === 'ในประเทศ' ? current.addressLine1 : current.addressLine1 ?? current.address,
+      addressLine2: value === 'ในประเทศ' ? current.addressLine2 : current.addressLine2,
+      addressCity: value === 'ในประเทศ' ? current.addressCity : current.addressCity,
+      addressStateRegion: value === 'ในประเทศ' ? current.addressStateRegion : current.addressStateRegion,
+      addressPostalCodeIntl: value === 'ในประเทศ' ? current.addressPostalCodeIntl : current.addressPostalCodeIntl,
+      addressPostalCode: value === 'ต่างประเทศ' ? null : current.addressPostalCode,
+      addressProvince: value === 'ต่างประเทศ' ? null : current.addressProvince,
+      addressDistrict: value === 'ต่างประเทศ' ? null : current.addressDistrict,
+      addressSubdistrict: value === 'ต่างประเทศ' ? null : current.addressSubdistrict,
+    }))
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const parsed = customerFormSchema.safeParse(form)
     if (!parsed.success) {
-      setErrors(Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])))
+      setErrors(Object.fromEntries(parsed.error.issues.map((issue) => [issue.path.join('.'), issue.message])))
       return
     }
 
@@ -626,88 +646,86 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
         <section>
           <h4 className="mb-3 text-sm font-bold text-slate-700">ข้อมูลลูกค้า</h4>
           <div className="grid gap-4 md:grid-cols-4">
-            <SelectField error={errors.type} label="ประเภทลูกค้า" value={form.type} onChange={(value) => updateCustomerType(value as CustomerFormValues['type'])}>
+            <SelectField required error={errors.type} label="ประเภทลูกค้า" value={form.type} onChange={(value) => updateCustomerType(value as CustomerFormValues['type'])}>
               <option value="บุคคล">บุคคล</option>
               <option value="นิติบุคคล">นิติบุคคล</option>
             </SelectField>
-            <SelectField label="ประเทศ/ตลาด" value={form.marketScope} onChange={(value) => update('marketScope', value as CustomerFormValues['marketScope'])}>
-              <option value="ในประเทศ">ในประเทศ</option>
-              <option value="ต่างประเทศ">ต่างประเทศ</option>
-            </SelectField>
             {form.type === 'บุคคล' ? (
               <>
-                <SelectField error={errors.nameTitle} label="คำนำหน้าชื่อ" value={form.nameTitle ?? ''} onChange={(value) => update('nameTitle', value || null)}>
+                <SelectField required error={errors.nameTitle} label="คำนำหน้าชื่อ" value={form.nameTitle ?? ''} onChange={(value) => update('nameTitle', value || null)}>
                   <option value="">เลือกคำนำหน้า</option>
                   {personTitleOptions.map((title) => <option key={title} value={title}>{title}</option>)}
                 </SelectField>
-                <TextField error={errors.firstName} label="ชื่อ" value={form.firstName ?? ''} onChange={(value) => update('firstName', value || null)} />
-                <TextField error={errors.lastName} label="นามสกุล" value={form.lastName ?? ''} onChange={(value) => update('lastName', value || null)} />
+                <TextField required error={errors.firstName} label="ชื่อ" value={form.firstName ?? ''} onChange={(value) => update('firstName', value || null)} />
+                <TextField required error={errors.lastName} label="นามสกุล" value={form.lastName ?? ''} onChange={(value) => update('lastName', value || null)} />
               </>
             ) : (
-              <TextField className="md:col-span-2" error={errors.name} label="ชื่อบริษัท" value={form.name ?? ''} onChange={(value) => update('name', value || null)} />
+              <TextField required className="md:col-span-2" error={errors.name} label="ชื่อบริษัท" value={form.name ?? ''} onChange={(value) => update('name', value || null)} />
             )}
             <TextField error={errors.taxId} label="เลขผู้เสียภาษี" value={form.taxId ?? ''} onChange={(value) => update('taxId', value || null)} />
+            <TextField required error={errors.phone} label="โทรศัพท์" value={form.phone ?? ''} onChange={(value) => update('phone', value)} />
+            <TextField error={errors.email} label="อีเมล" type="email" value={form.email ?? ''} onChange={(value) => update('email', value || null)} />
             <TextField error={errors.creditTerm} label="เครดิตเทอม (วัน)" type="number" value={form.creditTerm ?? ''} onChange={(value) => update('creditTerm', value === '' ? null : Number(value))} />
             <TextField error={errors.creditLimit} label="วงเงินเครดิต" type="number" value={form.creditLimit ?? ''} onChange={(value) => update('creditLimit', value === '' ? null : Number(value))} />
           </div>
         </section>
 
         <section>
-          <h4 className="mb-3 text-sm font-bold text-slate-700">ข้อมูลติดต่อ</h4>
-          <div className="grid gap-4 md:grid-cols-4">
-            <SelectField error={errors.contactTitle} label="คำนำหน้าผู้ติดต่อ" value={form.contactTitle ?? ''} onChange={(value) => update('contactTitle', value || null)}>
-              <option value="">เลือกคำนำหน้า</option>
-              {personTitleOptions.map((title) => <option key={title} value={title}>{title}</option>)}
-            </SelectField>
-            <TextField error={errors.contactFirstName} label="ชื่อผู้ติดต่อ" value={form.contactFirstName ?? ''} onChange={(value) => update('contactFirstName', value || null)} />
-            <TextField error={errors.contactLastName} label="นามสกุลผู้ติดต่อ" value={form.contactLastName ?? ''} onChange={(value) => update('contactLastName', value || null)} />
-            <TextField error={errors.phone} label="โทรศัพท์" value={form.phone ?? ''} onChange={(value) => update('phone', value)} />
-            <TextField error={errors.email} label="อีเมล" type="email" value={form.email ?? ''} onChange={(value) => update('email', value || null)} />
-          </div>
-        </section>
-
-        <section>
           <h4 className="mb-3 text-sm font-bold text-slate-700">ที่อยู่</h4>
           <div className="grid gap-4 md:grid-cols-4">
-            <TextField error={errors.addressPostalCode} label="รหัสไปรษณีย์" value={form.addressPostalCode ?? ''} onChange={updatePostalCode} />
-            <SelectField error={errors.addressProvince} label="จังหวัด" value={form.addressProvince ?? ''} onChange={(value) => {
-              setForm((current) => ({ ...current, addressProvince: value || null, addressDistrict: null, addressSubdistrict: null }))
-            }}>
-              <option value="">เลือกจังหวัด</option>
-              {provinceOptions.map((province) => <option key={province.code} value={province.nameTh}>{province.nameTh}</option>)}
+            <SelectField required className="md:col-span-2" label="ประเทศ/ตลาด" value={form.marketScope} onChange={(value) => updateMarketScope(value as CustomerFormValues['marketScope'])}>
+              <option value="ในประเทศ">ในประเทศ</option>
+              <option value="ต่างประเทศ">ต่างประเทศ</option>
             </SelectField>
-            <SelectField disabled={!selectedProvince && filteredDistricts.length === 0} error={errors.addressDistrict} label="อำเภอ/เขต" value={form.addressDistrict ?? ''} onChange={(value) => {
-              setForm((current) => ({ ...current, addressDistrict: value || null, addressSubdistrict: null }))
-            }}>
-              <option value="">เลือกอำเภอ/เขต</option>
-              {filteredDistricts.map((district) => <option key={district.code} value={district.nameTh}>{district.nameTh}</option>)}
-            </SelectField>
-            <SelectField disabled={filteredSubdistricts.length === 0} error={errors.addressSubdistrict} label="ตำบล/แขวง" value={form.addressSubdistrict ?? ''} onChange={(value) => {
-              const subdistrict = filteredSubdistricts.find((item) => item.nameTh === value)
-              const province = subdistrict ? provinces.find((item) => item.code === subdistrict.provinceCode) : null
-              const district = subdistrict ? districts.find((item) => item.code === subdistrict.districtCode) : null
-              setForm((current) => ({
-                ...current,
-                addressPostalCode: subdistrict?.postalCode ?? current.addressPostalCode,
-                addressProvince: province?.nameTh ?? current.addressProvince,
-                addressDistrict: district?.nameTh ?? current.addressDistrict,
-                addressSubdistrict: value || null,
-              }))
-            }}>
-              <option value="">เลือกตำบล/แขวง</option>
-              {filteredSubdistricts.map((subdistrict) => <option key={subdistrict.code} value={subdistrict.nameTh}>{subdistrict.nameTh}</option>)}
-            </SelectField>
-            <TextField error={errors.addressNo} label="บ้านเลขที่" value={form.addressNo ?? ''} onChange={(value) => update('addressNo', value || null)} />
-            <TextField error={errors.addressMoo} label="หมู่" value={form.addressMoo ?? ''} onChange={(value) => update('addressMoo', value || null)} />
-            <TextField className="md:col-span-2" error={errors.addressVillage} label="หมู่บ้าน/อาคาร" value={form.addressVillage ?? ''} onChange={(value) => update('addressVillage', value || null)} />
-            <TextField error={errors.addressRoad} label="ถนน" value={form.addressRoad ?? ''} onChange={(value) => update('addressRoad', value || null)} />
-            <TextField error={errors.addressCountry} label="ประเทศ" value={form.addressCountry ?? 'ไทย'} onChange={(value) => update('addressCountry', value || 'ไทย')} />
+            {form.marketScope === 'ในประเทศ' ? (
+              <>
+                <TextField error={errors.addressPostalCode} label="รหัสไปรษณีย์" value={form.addressPostalCode ?? ''} onChange={updatePostalCode} />
+                <SelectField error={errors.addressProvince} label="จังหวัด" value={form.addressProvince ?? ''} onChange={(value) => {
+                  setForm((current) => ({ ...current, addressProvince: value || null, addressDistrict: null, addressSubdistrict: null, addressCountry: value ? 'ไทย' : current.addressCountry, countryCode: value ? 'TH' : current.countryCode }))
+                }}>
+                  <option value="">เลือกจังหวัด</option>
+                  {provinceOptions.map((province) => <option key={province.code} value={province.nameTh}>{province.nameTh}</option>)}
+                </SelectField>
+                <SelectField disabled={!selectedProvince && filteredDistricts.length === 0} error={errors.addressDistrict} label="อำเภอ/เขต" value={form.addressDistrict ?? ''} onChange={(value) => {
+                  setForm((current) => ({ ...current, addressDistrict: value || null, addressSubdistrict: null }))
+                }}>
+                  <option value="">เลือกอำเภอ/เขต</option>
+                  {filteredDistricts.map((district) => <option key={district.code} value={district.nameTh}>{district.nameTh}</option>)}
+                </SelectField>
+                <SelectField disabled={filteredSubdistricts.length === 0} error={errors.addressSubdistrict} label="ตำบล/แขวง" value={form.addressSubdistrict ?? ''} onChange={(value) => {
+                  const subdistrict = filteredSubdistricts.find((item) => item.nameTh === value)
+                  const province = subdistrict ? provinces.find((item) => item.code === subdistrict.provinceCode) : null
+                  const district = subdistrict ? districts.find((item) => item.code === subdistrict.districtCode) : null
+                  setForm((current) => ({
+                    ...current,
+                    addressPostalCode: subdistrict?.postalCode ?? current.addressPostalCode,
+                    addressProvince: province?.nameTh ?? current.addressProvince,
+                    addressDistrict: district?.nameTh ?? current.addressDistrict,
+                    addressSubdistrict: value || null,
+                    addressCountry: value ? 'ไทย' : current.addressCountry,
+                    countryCode: value ? 'TH' : current.countryCode,
+                  }))
+                }}>
+                  <option value="">เลือกตำบล/แขวง</option>
+                  {filteredSubdistricts.map((subdistrict) => <option key={subdistrict.code} value={subdistrict.nameTh}>{subdistrict.nameTh}</option>)}
+                </SelectField>
+                <TextField error={errors.addressNo} label="บ้านเลขที่" value={form.addressNo ?? ''} onChange={(value) => update('addressNo', value || null)} />
+                <TextField error={errors.addressMoo} label="หมู่" value={form.addressMoo ?? ''} onChange={(value) => update('addressMoo', value || null)} />
+                <TextField className="md:col-span-2" error={errors.addressVillage} label="หมู่บ้าน/อาคาร" value={form.addressVillage ?? ''} onChange={(value) => update('addressVillage', value || null)} />
+                <TextField error={errors.addressRoad} label="ถนน" value={form.addressRoad ?? ''} onChange={(value) => update('addressRoad', value || null)} />
+              </>
+            ) : (
+              <>
+                <TextField required error={errors.addressCountry} label="ประเทศ" value={form.addressCountry ?? ''} onChange={(value) => update('addressCountry', value || null)} />
+                <TextField required className="md:col-span-2" error={errors.addressLine1} label="ที่อยู่บรรทัด 1" value={form.addressLine1 ?? ''} onChange={(value) => update('addressLine1', value || null)} />
+                <TextField className="md:col-span-2" error={errors.addressLine2} label="ที่อยู่บรรทัด 2" value={form.addressLine2 ?? ''} onChange={(value) => update('addressLine2', value || null)} />
+                <TextField required error={errors.addressCity} label="เมือง" value={form.addressCity ?? ''} onChange={(value) => update('addressCity', value || null)} />
+                <TextField error={errors.addressStateRegion} label="รัฐ/จังหวัด/ภูมิภาค" value={form.addressStateRegion ?? ''} onChange={(value) => update('addressStateRegion', value || null)} />
+                <TextField error={errors.addressPostalCodeIntl} label="รหัสไปรษณีย์สากล" value={form.addressPostalCodeIntl ?? ''} onChange={(value) => update('addressPostalCodeIntl', value || null)} />
+              </>
+            )}
             <TextField className="md:col-span-2" error={errors.address} label="ที่อยู่เต็ม/หมายเหตุที่อยู่" value={form.address ?? ''} onChange={(value) => update('address', value || null)} />
           </div>
-        </section>
-
-        <section>
-          <TextField error={errors.notes} label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => update('notes', value || null)} />
         </section>
       </div>
 
@@ -728,22 +746,26 @@ type TextFieldProps = {
   error?: string
   label: string
   readOnly?: boolean
+  required?: boolean
   type?: string
   value: string | number
   onChange: (value: string) => void
 }
 
-function TextField({ className = '', error, label, readOnly = false, type = 'text', value, onChange }: TextFieldProps) {
+function TextField({ className = '', error, label, readOnly = false, required = false, type = 'text', value, onChange }: TextFieldProps) {
   const isEmailField = type === 'email'
   const isPhoneField = label === 'โทรศัพท์'
+  const isTaxIdField = label === 'เลขผู้เสียภาษี'
+  const isThaiPostalCodeField = label === 'รหัสไปรษณีย์'
 
   return (
     <label className={`block text-sm font-medium ${className}`}>
-      {label}
+      {label}{required ? <span className="ml-1 text-red-600">*</span> : null}
       <input
         className={`mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 ${readOnly ? 'bg-slate-50' : ''}`}
-        inputMode={isEmailField ? 'email' : isPhoneField ? 'tel' : undefined}
+        inputMode={isEmailField ? 'email' : isPhoneField ? 'tel' : isTaxIdField || isThaiPostalCodeField ? 'numeric' : undefined}
         readOnly={readOnly}
+        required={required}
         type={type}
         value={value}
         onChange={(event) => {
@@ -751,7 +773,11 @@ function TextField({ className = '', error, label, readOnly = false, type = 'tex
             ? event.target.value.replace(/[^\x20-\x7E]/g, '')
             : isPhoneField
               ? sanitizePhoneInput(event.target.value)
-              : event.target.value
+              : isTaxIdField
+                ? event.target.value.replace(/\D/g, '').slice(0, 13)
+                : isThaiPostalCodeField
+                  ? event.target.value.replace(/\D/g, '').slice(0, 5)
+                  : event.target.value
           onChange(nextValue)
         }}
       />
@@ -762,20 +788,23 @@ function TextField({ className = '', error, label, readOnly = false, type = 'tex
 
 type SelectFieldProps = {
   children: React.ReactNode
+  className?: string
   disabled?: boolean
   error?: string
   label: string
+  required?: boolean
   value: string
   onChange: (value: string) => void
 }
 
-function SelectField({ children, disabled = false, error, label, value, onChange }: SelectFieldProps) {
+function SelectField({ children, className = '', disabled = false, error, label, required = false, value, onChange }: SelectFieldProps) {
   return (
-    <label className="block text-sm font-medium">
-      {label}
+    <label className={`block text-sm font-medium ${className}`}>
+      {label}{required ? <span className="ml-1 text-red-600">*</span> : null}
       <select
         className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 disabled:bg-slate-100"
         disabled={disabled}
+        required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >

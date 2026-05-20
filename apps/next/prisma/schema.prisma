@@ -722,17 +722,10 @@ model customers {
   code                String?
   name                String
   tax_id              String?
-  contact             String?
-  contact_title       String?
-  contact_first_name  String?
-  contact_last_name   String?
   phone               String?
   email               String?
   address             String?
-  bank_name           String?
-  bank_account        String?
   credit_term         Int?            @default(0)
-  notes               String?
   active              Boolean?        @default(true)
   created_at          DateTime?       @default(now()) @db.Timestamptz(6)
   updated_at          DateTime?       @default(now()) @db.Timestamptz(6)
@@ -750,6 +743,12 @@ model customers {
   address_province    String?
   address_postal_code String?
   address_country     String?         @default("ไทย")
+  country_code        String?
+  address_line1       String?
+  address_line2       String?
+  address_city        String?
+  address_state_region String?
+  address_postal_code_intl String?
   market_scope        String          @default("ในประเทศ")
   name_title          String?
   first_name          String?
@@ -762,6 +761,7 @@ model customers {
 
   @@index([name], map: "idx_customers_name")
   @@index([active], map: "idx_customers_active")
+  @@index([country_code], map: "idx_customers_country_code")
   @@index([market_scope], map: "idx_customers_market_scope")
   @@index([type], map: "idx_customers_type")
   @@schema("public")
@@ -816,11 +816,10 @@ model equity {
 }
 
 model expense_categories {
-  id        String     @id
-  name      String
-  parent_id String?
-  active    Boolean?   @default(true)
-  expenses  expenses[]
+  id       String     @id
+  name     String
+  active   Boolean?   @default(true)
+  expenses expenses[]
 
   @@schema("public")
 }
@@ -1039,7 +1038,6 @@ model production_machines {
   capacity_kg_per_hr      Decimal?            @db.Decimal(14, 3)
   normal_yield_pct        Decimal?            @db.Decimal(7, 3)
   std_process_cost_per_hr Decimal?            @db.Decimal(14, 2)
-  maintenance_status      String?
   active                  Boolean             @default(true)
   created_at              DateTime            @default(now()) @db.Timestamptz(6)
   updated_at              DateTime            @default(now()) @db.Timestamptz(6)
@@ -1048,6 +1046,17 @@ model production_machines {
 
   @@index([active])
   @@index([branch_id])
+  @@schema("public")
+}
+
+model production_machine_types {
+  id         String   @id
+  name       String   @unique
+  active     Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([active])
   @@schema("public")
 }
 
@@ -1413,7 +1422,6 @@ model products {
 
 model product_units {
   id         String   @id
-  code       String   @unique
   name       String
   symbol     String?
   active     Boolean  @default(true)
@@ -1426,7 +1434,6 @@ model product_units {
 
 model product_types {
   id         String   @id
-  code       String   @unique
   name       String   @unique
   active     Boolean  @default(true)
   created_at DateTime @default(now()) @db.Timestamptz(6)

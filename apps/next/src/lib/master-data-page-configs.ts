@@ -47,29 +47,23 @@ export const expenseCategoriesPageConfig: MasterDataPageConfig = {
   entityName: 'หมวดค่าใช้จ่าย',
   emptyMessage: 'ไม่พบข้อมูลหมวดค่าใช้จ่าย',
   fields: [
-    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อหมวด', required: true },
-    { key: 'parentId', label: 'หมวดแม่' },
   ],
   columns: [
-    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อหมวด' },
-    { key: 'parentId', label: 'หมวดแม่' },
     statusColumn,
   ],
 }
 
 export const channelsPageConfig: MasterDataPageConfig = {
   apiPath: '/api/master-data/channels',
-  createLabel: 'เพิ่มช่องทาง',
-  entityName: 'ช่องทางซื้อ/ขาย',
-  emptyMessage: 'ไม่พบข้อมูลช่องทางซื้อ/ขาย',
+  createLabel: 'เพิ่มช่องทางขาย',
+  entityName: 'ช่องทางขาย',
+  emptyMessage: 'ไม่พบข้อมูลช่องทางขาย',
   fields: [
-    { key: 'channelType', label: 'ประเภทช่องทาง', type: 'select', required: true, options: [{ label: 'ซื้อ', value: 'purchase' }, { label: 'ขาย', value: 'sales' }] },
     { key: 'name', label: 'ชื่อช่องทาง', required: true },
   ],
   columns: [
-    { key: 'channelType', label: 'ประเภท' },
     { key: 'name', label: 'ชื่อช่องทาง' },
     statusColumn,
   ],
@@ -194,12 +188,10 @@ export const productUnitsPageConfig: MasterDataPageConfig = {
   entityName: 'หน่วยสินค้า',
   emptyMessage: 'ไม่พบข้อมูลหน่วยสินค้า',
   fields: [
-    { key: 'code', label: 'รหัสหน่วย', required: true },
     { key: 'name', label: 'ชื่อหน่วย', required: true },
     { key: 'symbol', label: 'ตัวย่อ' },
   ],
   columns: [
-    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อหน่วย' },
     { key: 'symbol', label: 'ตัวย่อ', align: 'center' },
     statusColumn,
@@ -212,11 +204,9 @@ export const productTypesPageConfig: MasterDataPageConfig = {
   entityName: 'ประเภทสินค้า',
   emptyMessage: 'ไม่พบข้อมูลประเภทสินค้า',
   fields: [
-    { key: 'code', label: 'รหัสประเภท', required: true },
     { key: 'name', label: 'ชื่อประเภท', required: true },
   ],
   columns: [
-    { key: 'code', label: 'รหัส' },
     { key: 'name', label: 'ชื่อประเภท' },
     statusColumn,
   ],
@@ -255,11 +245,10 @@ export const machinesPageConfig: MasterDataPageConfig = {
     { key: 'code', label: 'รหัสเครื่องจักร', required: true },
     { key: 'name', label: 'ชื่อเครื่องจักร', required: true },
     { key: 'branchId', label: 'รหัสสาขา' },
-    { key: 'type', label: 'ประเภท', type: 'select', options: [{ label: 'Sorting', value: 'Sorting' }, { label: 'Cutting', value: 'Cutting' }, { label: 'Baling', value: 'Baling' }, { label: 'Crushing', value: 'Crushing' }, { label: 'Melting', value: 'Melting' }, { label: 'Other', value: 'Other' }] },
+    { key: 'type', label: 'ประเภท', type: 'select', optionsApiPath: '/api/master-data/machine-types' },
     { key: 'capacityKgPerHr', label: 'กำลังผลิต (กก./ชม.)', type: 'number' },
     { key: 'normalYieldPct', label: 'Normal Yield %', type: 'number' },
     { key: 'stdProcessCostPerHr', label: 'ค่า Process/ชม.', type: 'number' },
-    { key: 'maintenanceStatus', label: 'สถานะบำรุงรักษา', type: 'select', options: [{ label: 'Normal', value: 'Normal' }, { label: 'Maintenance', value: 'Maintenance' }, { label: 'Breakdown', value: 'Breakdown' }] },
   ],
   columns: [
     { key: 'code', label: 'รหัส' },
@@ -268,7 +257,20 @@ export const machinesPageConfig: MasterDataPageConfig = {
     { key: 'type', label: 'ประเภท' },
     { key: 'capacityKgPerHr', label: 'กก./ชม.', align: 'right', format: 'number' },
     { key: 'normalYieldPct', label: 'Yield %', align: 'right', format: 'number' },
-    { key: 'maintenanceStatus', label: 'บำรุงรักษา' },
+    statusColumn,
+  ],
+}
+
+export const machineTypesPageConfig: MasterDataPageConfig = {
+  apiPath: '/api/master-data/machine-types',
+  createLabel: 'เพิ่มประเภทเครื่องจักร',
+  entityName: 'ประเภทเครื่องจักร',
+  emptyMessage: 'ไม่พบข้อมูลประเภทเครื่องจักร',
+  fields: [
+    { key: 'name', label: 'ชื่อประเภท', required: true },
+  ],
+  columns: [
+    { key: 'name', label: 'ชื่อประเภท' },
     statusColumn,
   ],
 }
