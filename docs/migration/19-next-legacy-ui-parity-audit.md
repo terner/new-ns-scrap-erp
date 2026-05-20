@@ -61,6 +61,7 @@ Baseline notes:
 | `/production/report` | 2026-05-20 | Restored the missing legacy report block by adding client-side product output summary before the detail table and stronger table/card visual emphasis using existing read payload fields (`productName`, `outputQty`, `totalCost`). Branch/machine/status server filters and exact multi-output item aggregation remain deferred. |
 | `/production/yield-loss-report` | 2026-05-20 | Restored the legacy amber explanation banner and P&L Impact card trio for Yield Gain, Abnormal Loss, and Net P&L using existing API fields. Row amount coloring now emphasizes abnormal loss, gain, and net P&L; output loss reason parity remains deferred until loss-output notes are wired. |
 | `/production/machine-utilization` | 2026-05-20 | Restored the legacy formula info banner and expanded table shape with Est.Hrs and total cost columns using existing API fields. Actual yield, yield diff, and utilization now receive legacy-like color emphasis; maintenance status remains read-only. |
+| `/daily/transfer` | 2026-05-20 | Restored the legacy transfer filter/action density: blue info copy, compact filter card, account placeholders with direction icons, clear-filter button, period chips for all/today/7 days/current month, inline count/total summary, rounded table shell, and explicit edit/delete action column. Existing create/edit POST behavior is preserved; delete remains disabled because the active Next API has no reviewed DELETE/tombstone flow. |
 
 ## P1 Backlog
 
@@ -73,7 +74,6 @@ Baseline notes:
 |---|---|---|
 | `/pending-sales` | `view-pendingSales` | Next has main shell, but legacy dashboard/table density should be rechecked before final UAT. |
 | `/anomaly-detector` | `view-anomalyDetector` | Next scan UI is close, but legacy copy references 40 checks/11 groups and has jump-to-fix behavior. |
-| `/daily/transfer` | `view-transfer` | Missing period chips and exact action density. |
 | `/stock/transfer` | `view-stockTransfer` | Needs closer visual pass; likely minor density/action drift. |
 
 ## Cross-Cutting Layout Tasks

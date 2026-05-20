@@ -40,6 +40,7 @@ export function DailyTransferPageClient() {
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [period, setPeriod] = useState('')
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
 
@@ -73,6 +74,33 @@ export function DailyTransferPageClient() {
   }, [dateFrom, dateTo, fromAccountId, rows, search, toAccountId])
 
   const totalAmount = filteredRows.reduce((sum, row) => sum + row.amount, 0)
+
+  function applyPeriod(nextPeriod: '' | 'month' | 'today' | 'week') {
+    setPeriod(nextPeriod)
+    const today = todayDateInput()
+    const start = new Date(`${today}T00:00:00.000Z`)
+    if (nextPeriod === 'today') {
+      setDateFrom(today)
+      setDateTo(today)
+    } else if (nextPeriod === 'week') {
+      start.setDate(start.getDate() - 6)
+      setDateFrom(start.toISOString().slice(0, 10))
+      setDateTo(today)
+    } else if (nextPeriod === 'month') {
+      setDateFrom(`${today.slice(0, 7)}-01`)
+      setDateTo(today)
+    } else {
+      setDateFrom('')
+      setDateTo('')
+    }
+  }
+
+  function clearFilters() {
+    setSearch('')
+    setFromAccountId('')
+    setToAccountId('')
+    applyPeriod('')
+  }
 
   function openCreateForm() {
     setForm({ ...emptyForm, date: todayDateInput() })
@@ -125,24 +153,33 @@ export function DailyTransferPageClient() {
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-        <strong>โอนเงินระหว่างบัญชี</strong> สร้างรายการ Bank Statement สองฝั่งแบบ deterministic ตาม flow เดิม
+        <strong>โอนเงินระหว่างบัญชี</strong> — สร้าง Bank Statement 2 ฝั่ง
       </div>
 
-      <div className="rounded-lg bg-white p-4 shadow">
+      <div className="space-y-2 rounded-xl bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-56 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="ค้นหาเลขที่ / หมายเหตุ" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          <span className="text-slate-400">ถึง</span>
-          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <input className="min-w-56 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="🔍 ค้นหาเลขที่ / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPeriod('') }} />
+          <span className="text-slate-400">→</span>
+          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPeriod('') }} />
           <select className="rounded-lg border px-2 py-2 text-sm" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)}>
-            <option value="">ทุกบัญชีต้นทาง</option>
+            <option value="">📤 ทุกบัญชีต้นทาง</option>
             {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
           <select className="rounded-lg border px-2 py-2 text-sm" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)}>
-            <option value="">ทุกบัญชีปลายทาง</option>
+            <option value="">📥 ทุกบัญชีปลายทาง</option>
             {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
-          <button className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={openCreateForm}>+ โอนใหม่</button>
+          {search || dateFrom || dateTo || fromAccountId || toAccountId ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง</button> : null}
+          <button className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ โอนใหม่</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">📅 ช่วง:</span>
+          <PeriodButton active={period === ''} label="ทั้งหมด" tone="slate" onClick={() => applyPeriod('')} />
+          <PeriodButton active={period === 'today'} label="วันนี้" tone="blue" onClick={() => applyPeriod('today')} />
+          <PeriodButton active={period === 'week'} label="7 วัน" tone="emerald" onClick={() => applyPeriod('week')} />
+          <PeriodButton active={period === 'month'} label="เดือนนี้" tone="amber" onClick={() => applyPeriod('month')} />
+          <span className="ml-auto text-xs text-slate-500">📊 พบ <b className="text-slate-700">{filteredRows.length}</b> รายการ · 💰 รวม <b className="text-blue-700">{formatMoney(totalAmount)}</b></span>
         </div>
       </div>
 
@@ -171,11 +208,7 @@ export function DailyTransferPageClient() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{filteredRows.length}</span> รายการ · รวม <span className="font-semibold text-blue-700">{formatMoney(totalAmount)}</span></div>
-      </div>
-
-      <div className="overflow-x-auto rounded-lg bg-white shadow">
+      <div className="overflow-x-auto rounded-xl bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -186,12 +219,13 @@ export function DailyTransferPageClient() {
               <th className="p-2 text-right">จำนวน</th>
               <th className="p-2 text-right">Fee</th>
               <th className="p-2 text-left">ผู้ทำ</th>
+              <th className="p-2 text-right">Action</th>
             </tr>
           </thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={7}>กำลังโหลดข้อมูล</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && filteredRows.map((row) => (
-              <tr key={row.id} className="cursor-pointer border-t hover:bg-slate-50" onClick={() => openEditForm(row)}>
+              <tr key={row.id} className="border-t hover:bg-slate-50">
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
                 <td className="p-2">{row.date}</td>
                 <td className="p-2 text-red-600">{row.fromAccountName}</td>
@@ -199,14 +233,28 @@ export function DailyTransferPageClient() {
                 <td className="p-2 text-right font-medium">{formatMoney(row.amount)}</td>
                 <td className="p-2 text-right text-amber-700">{formatMoney(row.fee)}</td>
                 <td className="p-2">{row.byPerson || '-'}</td>
+                <td className="space-x-2 whitespace-nowrap p-2 text-right">
+                  <button className="text-xs text-blue-600 hover:underline" type="button" onClick={() => openEditForm(row)}>✏️ แก้</button>
+                  <button className="text-xs text-red-300" disabled type="button">🗑 ลบ</button>
+                </td>
               </tr>
             ))}
-            {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={7}>ยังไม่มีรายการ</td></tr> : null}
+            {!isLoading && filteredRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={8}>ยังไม่มีรายการ</td></tr> : null}
           </tbody>
         </table>
       </div>
     </section>
   )
+}
+
+function PeriodButton(props: { active: boolean; label: string; onClick: () => void; tone: 'amber' | 'blue' | 'emerald' | 'slate' }) {
+  const activeClass = {
+    amber: 'border-amber-600 bg-amber-600 text-white',
+    blue: 'border-blue-600 bg-blue-600 text-white',
+    emerald: 'border-emerald-600 bg-emerald-600 text-white',
+    slate: 'border-slate-700 bg-slate-700 text-white',
+  }[props.tone]
+  return <button className={`rounded border px-3 py-1 text-xs font-medium ${props.active ? activeClass : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`} type="button" onClick={props.onClick}>{props.label}</button>
 }
 
 function TextField(props: { error?: string; label: string; onChange?: (value: string) => void; readOnly?: boolean; required?: boolean; type?: string; value: string }) {
