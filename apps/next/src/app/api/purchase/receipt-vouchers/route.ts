@@ -19,17 +19,28 @@ export async function GET() {
     return NextResponse.json({
       rows: rows.map((row) => ({
         amountInWords: row.amount_in_words ?? '',
+        createdAt: row.created_at?.toISOString() ?? '',
+        createdBy: row.created_by ?? '',
         date: toDateOnly(row.date),
         docNo: row.doc_no ?? row.id,
         id: row.id,
+        items: row.items ?? [],
         licensePlate: row.license_plate ?? '',
         note: row.note ?? '',
+        payerSignerName: row.payer_signer_name ?? '',
+        paymentMethod: row.payment_method ?? '',
+        purchaseBillId: row.purchase_bill_id ?? '',
         purchaseBillDocNo: row.purchase_bill_doc_no ?? '',
+        receiverSignerName: row.receiver_signer_name ?? '',
+        salesPerson: row.sales_person ?? '',
+        sellerAddress: row.seller_address ?? '',
         sellerName: row.seller_name ?? '',
         sellerPhone: row.seller_phone ?? '',
         sellerTaxId: row.seller_tax_id ?? '',
         totalAmount: toNumber(row.total_amount),
         totalQty: toNumber(row.total_qty),
+        updatedAt: row.updated_at?.toISOString() ?? '',
+        updatedBy: row.updated_by ?? '',
       })),
     })
   } catch (caught) {
