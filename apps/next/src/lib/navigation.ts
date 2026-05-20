@@ -223,6 +223,7 @@ export const navigationItems: NavigationItem[] = [
   { href: '/finance-accounting/asset-disposal', icon: '🗑️', label: 'จำหน่ายทรัพย์สิน', section: 'finance-accounting' },
   { href: '/finance-accounting/loan-contracts', icon: '🏦', label: 'Loan / Leasing / BSL', section: 'finance-accounting' },
   { href: '/finance-accounting/loan-dashboard', icon: '📊', label: 'Loan Dashboard', section: 'finance-accounting' },
+  { href: '/finance-accounting/asset-overview', icon: '💎', label: 'Net Worth / Track Asset', section: 'finance-accounting' },
   { href: '/finance-accounting/equity-maint', icon: '👑', label: 'Equity / ทุนจดทะเบียน', section: 'finance-accounting' },
   { href: '/finance-accounting/opening-balance', icon: '🚀', label: 'Opening Balance / ตั้งต้นยอด', section: 'finance-accounting' },
   { href: '/finance-accounting/historical-data', icon: '📅', label: 'ข้อมูลย้อนหลัง ม.ค.-เม.ย. 2026 (ก่อน Go-Live)', section: 'finance-accounting' },

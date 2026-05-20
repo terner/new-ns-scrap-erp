@@ -46,7 +46,7 @@ Status terms:
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
 | Reports | 1 | 1 | 0 | reports index |
-| Finance / Accounting | 18 | 18 | 0 | financial-dashboard, cash-flow-analysis, cf-forecast-calendar, working-capital, stock-finance, profit-leak, tax-vat-wht, pl-statement, balance-sheet, cash-flow-statement, asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, equity-maint, opening-balance, historical-data |
+| Finance / Accounting | 19 | 19 | 0 | financial-dashboard, cash-flow-analysis, cf-forecast-calendar, working-capital, stock-finance, profit-leak, tax-vat-wht, pl-statement, balance-sheet, cash-flow-statement, asset-register, depreciation, asset-disposal, loan-contracts, loan-dashboard, asset-overview, equity-maint, opening-balance, historical-data |
 | Master Data | 18 | 18 | 0 | broad master-data coverage |
 | Admin | 6 | 6 | 0 | company, users, audit, transaction ledger; password and migration tools are client baselines |
 
@@ -189,6 +189,7 @@ Status terms:
 | `/finance-accounting/asset-disposal` | จำหน่ายทรัพย์สิน | read/design baseline | `GET /api/finance-accounting/asset-disposal` | `assets`, `depreciations`; disposal table missing | `finance.financials.view` |
 | `/finance-accounting/loan-contracts` | Loan / Leasing / BSL | read/design baseline | `GET /api/finance-accounting/loan-contracts` | `loans`, `loan_schedules`, `loan_payments` | `finance.financials.view` |
 | `/finance-accounting/loan-dashboard` | Loan Dashboard | read baseline | `GET /api/finance-accounting/loan-dashboard` | `loans`, `loan_schedules`, `loan_payments` | `finance.financials.view` |
+| `/finance-accounting/asset-overview` | Net Worth / Track Asset | management/read baseline | `GET /api/finance-accounting/asset-overview` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `assets`, `loans`, `trading_deals` | `finance.financials.view` |
 | `/finance-accounting/equity-maint` | Equity / ทุนจดทะเบียน | read/design baseline | `GET /api/finance-accounting/equity-maint` | `equity` | `finance.financials.view` |
 | `/finance-accounting/opening-balance` | Opening Balance / ตั้งต้นยอด | read/design baseline | `GET /api/finance-accounting/opening-balance` | `opening_balance`, `accounts`, `branches` | `finance.financials.view` |
 | `/finance-accounting/historical-data` | ข้อมูลย้อนหลัง ม.ค.-เม.ย. 2026 | read/design baseline | `GET /api/finance-accounting/historical-data` | `historical_monthly` | `finance.financials.view` |

@@ -20,8 +20,8 @@ Method:
 Baseline notes:
 
 - The remote legacy HTML snapshot differs from local `old-apps/legacy/index.html`, so remote snapshot is the stronger baseline for this audit pass.
-- Next has 82 audited routes after excluding `master-data` and `admin`.
-- Automatic menu mapping matched 77 routes to legacy views.
+- Next has 83 audited routes after excluding `master-data` and `admin`.
+- Automatic menu mapping matched 78 routes to legacy views.
 
 ## Priority Legend
 
@@ -39,6 +39,7 @@ Baseline notes:
 
 | Route | Checkpoint | Notes |
 |---|---|---|
+| `/finance-accounting/asset-overview` | 2026-05-20 | Restored the remote-legacy-only `trackAssetOverview` surface as Net Worth / Track Asset: dark `#0b1220` shell, toolbar with As-of/branch filters, disabled export, KPI strip, alert/source limitation, asset/debt donuts, AR aging, cash/receivable/stock/debt tables, and Pending Sale/Trading Pending blocks. It composes existing Financial Dashboard plus Cash & Others read helpers only; no GL/statutory claim, write action, allocation, posting, or new schema behavior was added. |
 | `/daily/payment-approval` | 2026-05-20 | Restored legacy green gradient hero, AP/expense tabs, search/date/approved filters, select all/clear, five KPI strip, amber selected-total action bar, AP/expense dense tables, highlighted bank/account cells, local-only selection/pay amount state, and disabled approve/print controls. No approval mutation, print document generation, DB schema, or API write behavior was added. |
 | `/daily/expense-dashboard` | 2026-05-20 | Restored legacy rose/orange dashboard surface for dashboard-only mode: 3/6/12 month selector, four KPI cards, anomaly/no-anomaly panels, category-by-month heatmap, footer totals, and anomaly rule note. It uses existing `/api/daily/expenses` rows and legacy-compatible `amount + vat` dashboard math; no write/export/repair action or new API was added. |
 | `/daily/expense` | 2026-05-20 | Restored the first legacy list/read surface: blue Expense Voucher info banner and create CTA, gradient monthly/pending/paid/trend cards, category/payee progress panels, dense filter bar with date/payee/account/status/clear/export shell, and a denser table with due date, reference, category, overdue state, Net Pay emphasis, VAT/WHT breakdown, and edit action. Destructive repair tools, delete, quick-pay, multi-line voucher write, auto category creation, and export remain deferred. |
@@ -111,7 +112,7 @@ Baseline notes:
 
 Legacy views without a clear active Next counterpart after excluding master/admin:
 
-- `trackAssetOverview`
+- None currently known from the remote snapshot audit list.
 
 Next routes without a direct standalone legacy page:
 
@@ -119,6 +120,5 @@ Next routes without a direct standalone legacy page:
 
 ## Active Execution Order
 
-1. Missing view implementation: `trackAssetOverview` / Net Worth Track Asset read-only baseline.
-2. Follow-up design: Anomaly Detector legacy 40-check parity and record-level jump/highlight contracts.
-3. Follow-up design: statutory dashboard/GL reconciliation once GL journal, closing period, and retained earnings contracts exist.
+1. Follow-up design: Anomaly Detector legacy 40-check parity and record-level jump/highlight contracts.
+2. Follow-up design: statutory dashboard/GL reconciliation once GL journal, closing period, and retained earnings contracts exist.

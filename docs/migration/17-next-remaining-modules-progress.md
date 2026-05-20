@@ -1670,6 +1670,23 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Targeted smoke after fixes: authenticated Playwright check on `/finance-accounting/historical-data` returned API `200`, no visible UUID, no desktop/mobile horizontal overflow, and no console/request failures.
 - Push marker: committed and pushed as `f4a9762` (`fix: audit finance accounting baselines`).
 
+### A9: Net Worth / Track Asset Remote Legacy View
+
+- [x] `/finance-accounting/asset-overview`
+- [x] `GET /api/finance-accounting/asset-overview`
+- [x] Sidebar route entry
+- [x] OpenAPI and sitemap entries
+- [x] Browser QA and full validation
+
+#### Execution Log
+
+- Task: Restore remote-legacy-only `trackAssetOverview` / Net Worth Track Asset as a Finance / Accounting management/read surface.
+- Files changed: added one Next page, one dark legacy-style client component, one read-only API route, sidebar entry, OpenAPI path, sitemap row, and parity/current-work docs.
+- DB/API changes: composes existing Financial Dashboard and Cash & Others read helpers from `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `assets`, `loans`, and `trading_deals`; no schema change, no write action, no allocation, no GL posting, no statutory balance sheet claim.
+- UI baseline: preserves the confirmed remote legacy dark `ta-overview` shell with toolbar, KPI strip, alert/source limitation, asset/debt donuts, AR aging, and compact cash/receivable/stock/debt blocks.
+- Validation: passed `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`. OpenAPI remains valid with the existing warning baseline.
+- Browser QA: unauth subagent confirmed `/finance-accounting/asset-overview` redirects to `/login?redirect=%2Ffinance-accounting%2Fasset-overview` and `/api/finance-accounting/asset-overview?asOf=2026-05-20` returns `401`; desktop/mobile login surfaces have no horizontal overflow. Authenticated smoke on `http://127.0.0.1:3100` confirmed the API returns `200`, the page renders the dark `#0b1220` shell, sidebar contains `Net Worth / Track Asset`, Export is disabled, desktop/mobile widths have no page-level horizontal overflow, and no console/request errors were found after excluding the local dev HMR WebSocket warning.
+
 ## Batch M: Main Dashboards and Operational Control
 
 ### M0: Module Overview

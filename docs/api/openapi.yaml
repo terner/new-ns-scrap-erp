@@ -648,6 +648,31 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/finance-accounting/asset-overview:
+    get:
+      tags: [Finance Accounting]
+      operationId: readFinanceAccountingAssetOverview
+      summary: Read Net Worth / Track Asset management overview from financial dashboard and cash/others sources
+      parameters:
+        - in: query
+          name: asOf
+          schema:
+            type: string
+            format: date
+          required: false
+        - in: query
+          name: branchId
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/finance-accounting/equity-maint:
     get:
       tags: [Finance Accounting]
