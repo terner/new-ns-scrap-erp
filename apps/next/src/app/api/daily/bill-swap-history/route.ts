@@ -15,15 +15,26 @@ export async function GET() {
       orderBy: [{ swap_date: 'desc' }],
       take: 5000,
     })
+    const supplierIds = Array.from(new Set(rows.flatMap((row) => [row.before_supplier_id, row.after_supplier_id]).filter(Boolean) as string[]))
+    const billIds = Array.from(new Set(rows.map((row) => row.bill_id).filter(Boolean)))
+    const [suppliers, bills] = await Promise.all([
+      supplierIds.length ? prisma.suppliers.findMany({ select: { id: true, name: true }, where: { id: { in: supplierIds } } }) : [],
+      billIds.length ? prisma.purchase_bills.findMany({ select: { doc_no: true, id: true }, where: { id: { in: billIds } } }) : [],
+    ])
+    const supplierNameById = new Map(suppliers.map((supplier) => [supplier.id, supplier.name]))
+    const billDocNoById = new Map(bills.map((bill) => [bill.id, bill.doc_no]))
 
     return NextResponse.json({
       rows: rows.map((row) => ({
         afterAmount: toNumber(row.after_amount),
         afterPrice: toNumber(row.after_price),
         afterSupplierId: row.after_supplier_id ?? '',
+        afterSupplierName: row.after_supplier_id ? supplierNameById.get(row.after_supplier_id) ?? row.after_supplier_id : '',
         beforeAmount: toNumber(row.before_amount),
         beforePrice: toNumber(row.before_price),
         beforeSupplierId: row.before_supplier_id ?? '',
+        beforeSupplierName: row.before_supplier_id ? supplierNameById.get(row.before_supplier_id) ?? row.before_supplier_id : '',
+        billDocNo: billDocNoById.get(row.bill_id) ?? row.bill_id,
         billId: row.bill_id,
         changedBy: row.changed_by ?? '',
         id: row.id,
