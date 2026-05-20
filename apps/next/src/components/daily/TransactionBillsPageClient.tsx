@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
@@ -122,6 +122,14 @@ const blankItem = (): PurchaseBillFormValues['items'][number] => ({
   salesPrice: 0,
 })
 
+function optionLabel(option: Option) {
+  return option.code ? `${option.code} - ${option.name}` : option.name
+}
+
+function searchableOptionText(option: Option) {
+  return `${option.code ?? ''} ${option.name} ${option.id}`.toLowerCase()
+}
+
 const initialPurchaseForm = (): PurchaseBillFormValues => ({
   branchId: '',
   channelId: null,
@@ -231,12 +239,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const total = totalAmount
   const title = mode === 'purchase' ? 'บิลรับซื้อ' : mode === 'sales' ? 'บิลขาย' : 'เบิกออกรอบิล'
   const activeBranches = options.branches.filter((option) => option.active !== false)
-  const activeChannels = options.channels.filter((option) => option.active !== false)
   const activePoBuys = options.poBuys.filter((option) => option.active !== false && (!form.supplierId || option.supplier_id === form.supplierId))
   const activeProducts = options.products.filter((option) => option.active !== false)
   const activeSalespersons = options.salespersons.filter((option) => option.active !== false)
   const activeSuppliers = options.suppliers.filter((option) => option.active !== false)
-  const activeWarehouses = options.warehouses.filter((option) => option.active !== false && (!form.branchId || option.branch_id === form.branchId))
   const formSubtotal = form.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - item.discount), 0)
   const formTotalWeight = form.items.reduce((sum, item) => sum + item.qty, 0)
   const formAfterDiscount = Math.max(0, formSubtotal - form.discountTotal)
@@ -653,19 +659,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
                 <div className="grid gap-3 md:grid-cols-3">
-                <Field error={fieldErrors.date} label="วันที่ *"><input className="w-full rounded border px-3 py-2" type="date" value={form.date} onChange={(event) => updateForm('date', event.target.value)} /></Field>
-                <Field label="เลขที่บิล"><div className="rounded border bg-slate-100 px-3 py-2 font-mono font-bold text-slate-500">{editingBillId ? rows.find((row) => !isStockIssueRow(row) && row.id === editingBillId)?.docNo ?? 'เลขเดิม' : 'ระบบจะออกเลขให้ตอนบันทึก เช่น PB012605-0001'}</div></Field>
                 <Field error={fieldErrors.refNo} label="เลขที่อ้างอิง (บิล Supplier)"><input className="w-full rounded border px-3 py-2 font-mono" placeholder="เช่น INV-12345" value={form.refNo ?? ''} onChange={(event) => updateForm('refNo', event.target.value || null)} /></Field>
-                <SelectField className="md:col-span-3" error={fieldErrors.supplierId} label="ผู้ขาย *" options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
-                <SelectField error={fieldErrors.branchId} label="สาขา *" options={activeBranches} value={form.branchId} onChange={(value) => updateForm('branchId', value)} />
-                <SelectField error={fieldErrors.warehouseId} label="คลัง" options={activeWarehouses} value={form.warehouseId ?? ''} onChange={(value) => updateForm('warehouseId', value || null)} />
-                <SelectField error={fieldErrors.channelId} label="ช่องทางซื้อ" options={activeChannels} value={form.channelId ?? ''} onChange={(value) => updateForm('channelId', value || null)} />
+                <SupplierSearchCombobox className="md:col-span-3" error={fieldErrors.supplierId} options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
+                <SelectField error={fieldErrors.branchId} label="สาขา/คลัง *" options={activeBranches} value={form.branchId} onChange={(value) => updateForm('branchId', value)} />
                 <Field error={fieldErrors.licensePlate} label="ทะเบียนรถ"><input className="w-full rounded border px-3 py-2 uppercase" placeholder="เช่น 1กข-1234 / 70-1234" value={form.licensePlate ?? ''} onChange={(event) => updateForm('licensePlate', event.target.value.toUpperCase() || null)} /></Field>
                 <Field error={fieldErrors.contactPhone} label="เบอร์โทร"><input className="w-full rounded border px-3 py-2" inputMode="tel" placeholder="085-555-5555" value={form.contactPhone ?? ''} onChange={(event) => updateForm('contactPhone', sanitizePhoneInput(event.target.value) || null)} /></Field>
                 <SelectField error={fieldErrors.salesId} label="เซลที่ดูแล" options={activeSalespersons} placeholder="ลูกค้าบริษัท / ไม่มีเซล" value={form.salesId ?? ''} onChange={(value) => updateForm('salesId', value || null)} />
                 <Field label="ที่มา"><select className="w-full rounded border px-3 py-2" value={form.purchaseSource} onChange={(event) => updateForm('purchaseSource', event.target.value as PurchaseBillFormValues['purchaseSource'])}><option value="SPOT_BUY">SPOT BUY</option><option value="PO_RECEIPT">PO RECEIPT</option><option value="MIXED">MIXED</option></select></Field>
-                <Field label="VAT"><select className="w-full rounded border px-3 py-2" value={form.vatType} onChange={(event) => updateForm('vatType', event.target.value as PurchaseBillFormValues['vatType'])}><option value="NONE">No VAT</option><option value="EXCLUDE">VAT 7% แยกนอก</option><option value="INCLUDE">VAT รวมใน</option></select></Field>
-                <label className="flex items-center gap-2 pt-6 text-sm text-slate-700"><input checked={form.hasVat} className="size-4" type="checkbox" onChange={(event) => updateForm('hasVat', event.target.checked)} /> มี VAT</label>
                 </div>
               </div>
 
@@ -886,6 +886,114 @@ function SelectField({ className, error, label, onChange, options, placeholder =
         {options.map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} — ` : ''}{option.name}</option>)}
       </select>
     </Field>
+  )
+}
+
+function SupplierSearchCombobox({
+  className = '',
+  error,
+  options,
+  value,
+  onChange,
+}: {
+  className?: string
+  error?: string
+  options: Option[]
+  value: string
+  onChange: (supplierId: string) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const selectedSupplier = useMemo(() => options.find((supplier) => supplier.id === value) ?? null, [options, value])
+  const selectedLabel = selectedSupplier ? optionLabel(selectedSupplier) : ''
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(selectedLabel)
+
+  useEffect(() => {
+    setQuery(selectedLabel)
+  }, [selectedLabel])
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    const rows = normalizedQuery
+      ? options.filter((supplier) => searchableOptionText(supplier).includes(normalizedQuery))
+      : options
+    return rows.slice(0, 80)
+  }, [options, query])
+
+  const selectSupplier = (supplier: Option) => {
+    onChange(supplier.id)
+    setQuery(optionLabel(supplier))
+    setOpen(false)
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <label className="mb-1 block text-xs font-bold text-slate-700" htmlFor="purchase-bill-supplier-search">ผู้ขาย *</label>
+      <input
+        ref={inputRef}
+        aria-autocomplete="list"
+        aria-controls="purchase-bill-supplier-options"
+        aria-expanded={open}
+        aria-invalid={Boolean(error)}
+        className={`w-full rounded border px-3 py-2 outline-none focus:border-blue-600 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+        id="purchase-bill-supplier-search"
+        placeholder="ค้นหาชื่อหรือรหัสผู้ขาย"
+        role="combobox"
+        type="search"
+        value={query}
+        onBlur={() => {
+          window.setTimeout(() => {
+            const exactMatch = options.find((supplier) => optionLabel(supplier).toLowerCase() === query.trim().toLowerCase())
+            if (exactMatch) {
+              onChange(exactMatch.id)
+              setQuery(optionLabel(exactMatch))
+            } else if (selectedSupplier) {
+              setQuery(optionLabel(selectedSupplier))
+            }
+            setOpen(false)
+          }, 120)
+        }}
+        onChange={(event) => {
+          const nextQuery = event.target.value
+          setQuery(nextQuery)
+          setOpen(true)
+          if (value && nextQuery !== selectedLabel) onChange('')
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setOpen(false)
+            return
+          }
+          if (event.key === 'Enter' && open && filteredOptions[0]) {
+            event.preventDefault()
+            selectSupplier(filteredOptions[0])
+          }
+        }}
+      />
+      {error ? <span className="mt-1 block text-xs text-red-600">{error}</span> : null}
+      {open ? (
+        <div id="purchase-bill-supplier-options" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl" role="listbox">
+          {filteredOptions.length > 0 ? filteredOptions.map((supplier) => (
+            <button
+              key={supplier.id}
+              aria-selected={supplier.id === value}
+              className={`block w-full px-3 py-2 text-left hover:bg-blue-50 ${supplier.id === value ? 'bg-blue-100 text-blue-800' : ''}`}
+              role="option"
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault()
+                selectSupplier(supplier)
+              }}
+            >
+              <span className="block font-medium">{supplier.name}</span>
+              <span className="block text-xs text-slate-500">{supplier.code ? `${supplier.code} · ` : ''}{supplier.id}</span>
+            </button>
+          )) : <div className="px-3 py-2 text-sm text-slate-500">ไม่พบผู้ขายที่ตรงกับคำค้นหา</div>}
+        </div>
+      ) : null}
+    </div>
   )
 }
 

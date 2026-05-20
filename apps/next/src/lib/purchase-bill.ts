@@ -53,7 +53,7 @@ export const purchaseBillItemSchema = z.object({
 })
 
 export const purchaseBillFormSchema = z.object({
-  branchId: z.string().trim().min(1, 'เลือกสาขา'),
+  branchId: z.string().trim().min(1, 'เลือกสาขา/คลัง'),
   channelId: optionalSafeId('ช่องทาง'),
   contactPhone: optionalPhone('เบอร์โทร'),
   date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD'),
@@ -77,9 +77,6 @@ export const purchaseBillFormSchema = z.object({
   vatInvoiceReceived: z.boolean().default(false),
   vatType: z.enum(['NONE', 'EXCLUDE', 'INCLUDE']).default('NONE'),
   warehouseId: optionalSafeId('คลัง'),
-}).refine((value) => value.transactionMode !== 'STOCK' || Boolean(value.warehouseId), {
-  message: 'เลือกคลังเมื่อเป็นบิล STOCK',
-  path: ['warehouseId'],
 }).refine((value) => !value.vatInvoiceReceived || Boolean(value.vatInvoiceNo), {
   message: 'กรอกเลขที่ใบกำกับภาษีเมื่อระบุว่าได้รับแล้ว',
   path: ['vatInvoiceNo'],

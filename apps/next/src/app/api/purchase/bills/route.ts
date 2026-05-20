@@ -37,6 +37,17 @@ function branchBillCode(branchCode: string | null | undefined) {
   return digits ? digits.padStart(2, '0').slice(-2) : null
 }
 
+function bangkokDateInput(value: Date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+  }).formatToParts(value)
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${byType.year}-${byType.month}-${byType.day}`
+}
+
 function billJson(row: PurchaseBillRow) {
   return {
     branchId: row.branch_id ?? '',
@@ -379,21 +390,24 @@ export async function POST(request: Request) {
       }
     })
 
+    const createdAt = new Date()
+    const billDate = bangkokDateInput(createdAt)
     let bill: { doc_no: string; id: string } | null = null
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         bill = await prisma.$transaction(async (tx) => {
           await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('purchase_bills.doc_no'))`
           const id = `PB-${randomUUID()}`
-          const docNo = await nextPurchaseBillDocNo(tx, values.date, effectiveBranchCode)
+          const docNo = await nextPurchaseBillDocNo(tx, billDate, effectiveBranchCode)
 
           const createdBill = await tx.purchase_bills.create({
             data: {
               branch_id: effectiveBranch.id,
               channel_id: values.channelId,
               contact_phone: values.contactPhone,
+              created_at: createdAt,
               created_by: actor,
-              date: normalizeDate(values.date),
+              date: normalizeDate(billDate),
               discount: values.discountTotal,
               discount_total: values.discountTotal,
               doc_no: docNo,
@@ -414,7 +428,7 @@ export async function POST(request: Request) {
               supplier_id: values.supplierId,
               total_amount: totals.totalAmount,
               transaction_mode: values.transactionMode,
-              updated_at: new Date(),
+              updated_at: createdAt,
               updated_by: actor,
               vat_amount: totals.vatAmount,
               vat_invoice_date: values.vatInvoiceDate ? normalizeDate(values.vatInvoiceDate) : null,
@@ -432,7 +446,7 @@ export async function POST(request: Request) {
               data: items.map((item) => ({
                 branch_id: effectiveBranch.id,
                 created_by: actor,
-                date: normalizeDate(values.date),
+                date: normalizeDate(billDate),
                 id: `SL-PB-${randomUUID()}`,
                 lot_no: item.lotNo,
                 movement_type: 'รับซื้อเข้า',
