@@ -48,6 +48,11 @@ type MainPayload = {
     salesBills: { amount: number; docNo: string; name: string; qty: number }[]
     summary: Record<string, number>
   }
+  filterOptions: {
+    branches: { id: string; name: string }[]
+    groups: string[]
+    products: { code: string; id: string; name: string }[]
+  }
   filters: { date: string; from: string; to: string }
   ownerDaily: {
     actualActivity: { cashIn: number; cashOut: number; expenseOut: number; fgQty: number; fgValue: number; net: number; paymentOut: number }
@@ -75,6 +80,11 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   const [rangeFrom, setRangeFrom] = useState(() => mode === 'dashboard' ? `${today().slice(0, 4)}-01-01` : today())
   const [rangeMode, setRangeMode] = useState(mode === 'dashboard' ? 'year' : 'today')
   const [rangeTo, setRangeTo] = useState(today())
+  const [dashboardBranchId, setDashboardBranchId] = useState('')
+  const [dashboardCustomerId, setDashboardCustomerId] = useState('')
+  const [dashboardGroup, setDashboardGroup] = useState('')
+  const [dashboardProductId, setDashboardProductId] = useState('')
+  const [dashboardSupplierId, setDashboardSupplierId] = useState('')
   const [data, setData] = useState<MainPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -86,17 +96,24 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
       params.set('from', rangeFrom)
       params.set('to', rangeTo)
     }
+    if (mode === 'dashboard') {
+      if (dashboardBranchId) params.set('branchId', dashboardBranchId)
+      if (dashboardCustomerId) params.set('customerId', dashboardCustomerId)
+      if (dashboardGroup) params.set('group', dashboardGroup)
+      if (dashboardProductId) params.set('productId', dashboardProductId)
+      if (dashboardSupplierId) params.set('supplierId', dashboardSupplierId)
+    }
     setError(null)
     setIsLoading(true)
     dailyFetchJson<MainPayload>(`${endpoint}?${params.toString()}`)
       .then(setData)
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้'))
       .finally(() => setIsLoading(false))
-  }, [date, endpoint, mode, rangeFrom, rangeTo])
+  }, [dashboardBranchId, dashboardCustomerId, dashboardGroup, dashboardProductId, dashboardSupplierId, date, endpoint, mode, rangeFrom, rangeTo])
 
   return (
     <section className="space-y-4">
-      {mode === 'dashboard' ? <DashboardView data={data} date={date} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
+      {mode === 'dashboard' ? <DashboardView dashboardBranchId={dashboardBranchId} dashboardCustomerId={dashboardCustomerId} dashboardGroup={dashboardGroup} dashboardProductId={dashboardProductId} dashboardSupplierId={dashboardSupplierId} data={data} date={date} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setDashboardBranchId={setDashboardBranchId} setDashboardCustomerId={setDashboardCustomerId} setDashboardGroup={setDashboardGroup} setDashboardProductId={setDashboardProductId} setDashboardSupplierId={setDashboardSupplierId} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
       {mode === 'owner-daily' ? <OwnerDailyView data={data} /> : null}
       {mode === 'daily-report' ? <DailyReportView data={data} date={date} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setDate={setDate} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
       <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
@@ -108,12 +125,27 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   )
 }
 
-function DashboardView({ data, date, rangeFrom, rangeMode, rangeTo, setRangeFrom, setRangeMode, setRangeTo }: { data: MainPayload | null; date: string; rangeFrom: string; rangeMode: string; rangeTo: string; setRangeFrom: (value: string) => void; setRangeMode: (value: string) => void; setRangeTo: (value: string) => void }) {
-  const [branchFilter, setBranchFilter] = useState('')
-  const [groupFilter, setGroupFilter] = useState('')
-  const [supplierFilter, setSupplierFilter] = useState('')
-  const [customerFilter, setCustomerFilter] = useState('')
-  const [productFilter, setProductFilter] = useState('')
+function DashboardView(props: {
+  dashboardBranchId: string
+  dashboardCustomerId: string
+  dashboardGroup: string
+  dashboardProductId: string
+  dashboardSupplierId: string
+  data: MainPayload | null
+  date: string
+  rangeFrom: string
+  rangeMode: string
+  rangeTo: string
+  setDashboardBranchId: (value: string) => void
+  setDashboardCustomerId: (value: string) => void
+  setDashboardGroup: (value: string) => void
+  setDashboardProductId: (value: string) => void
+  setDashboardSupplierId: (value: string) => void
+  setRangeFrom: (value: string) => void
+  setRangeMode: (value: string) => void
+  setRangeTo: (value: string) => void
+}) {
+  const { dashboardBranchId, dashboardCustomerId, dashboardGroup, dashboardProductId, dashboardSupplierId, data, date, rangeFrom, rangeMode, rangeTo, setDashboardBranchId, setDashboardCustomerId, setDashboardGroup, setDashboardProductId, setDashboardSupplierId, setRangeFrom, setRangeMode, setRangeTo } = props
   const k = data?.dashboard.kpi ?? {}
   const section = data?.dashboard.sections
   const analytics = data?.dailyReport.analytics
@@ -156,11 +188,11 @@ function DashboardView({ data, date, rangeFrom, rangeMode, rangeTo, setRangeFrom
     }
   }
   const clearFilters = () => {
-    setBranchFilter('')
-    setGroupFilter('')
-    setSupplierFilter('')
-    setCustomerFilter('')
-    setProductFilter('')
+    setDashboardBranchId('')
+    setDashboardGroup('')
+    setDashboardSupplierId('')
+    setDashboardCustomerId('')
+    setDashboardProductId('')
     applyPeriod('year')
   }
   return (
@@ -184,11 +216,11 @@ function DashboardView({ data, date, rangeFrom, rangeMode, rangeTo, setRangeFrom
           <span className="ml-auto rounded bg-white/10 px-2 py-1 text-xs">📊 {filteredCount}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)}><option className="text-slate-900" value="">🏢 ทุกสาขา</option></select>
-          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option className="text-slate-900" value="">📦 ทุกหมวด</option>{(analytics?.groupSummary ?? []).map((row) => <option className="text-slate-900" key={row.group} value={row.group}>{row.group}</option>)}</select>
-          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option className="text-slate-900" value="">🏭 ทุก Supplier</option>{(analytics?.topSuppliers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
-          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)}><option className="text-slate-900" value="">👥 ทุก Customer</option>{(analytics?.topCustomers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
-          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option className="text-slate-900" value="">🏷 ทุกสินค้า</option>{[...(analytics?.topProductsIn ?? []), ...(analytics?.topProductsOut ?? [])].slice(0, 20).map((row) => <option className="text-slate-900" key={`${row.id}-${row.code}`} value={row.id}>{row.code} - {row.name}</option>)}</select>
+          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option className="text-slate-900" value="">🏢 ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
+          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option className="text-slate-900" value="">📦 ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option className="text-slate-900" key={group} value={group}>{group}</option>)}</select>
+          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardSupplierId} onChange={(event) => setDashboardSupplierId(event.target.value)}><option className="text-slate-900" value="">🏭 ทุก Supplier</option>{(analytics?.topSuppliers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
+          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardCustomerId} onChange={(event) => setDashboardCustomerId(event.target.value)}><option className="text-slate-900" value="">👥 ทุก Customer</option>{(analytics?.topCustomers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
+          <select className="max-w-xs rounded border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardProductId} onChange={(event) => setDashboardProductId(event.target.value)}><option className="text-slate-900" value="">🏷 ทุกสินค้า</option>{(data?.filterOptions.products ?? []).slice(0, 300).map((row) => <option className="text-slate-900" key={`${row.id}-${row.code}`} value={row.id}>{row.code} - {row.name}</option>)}</select>
           <button className="ml-auto rounded bg-amber-500 px-3 py-1 font-bold text-slate-900 hover:bg-amber-600" onClick={clearFilters} type="button">✕ ล้าง Filter</button>
         </div>
       </div>

@@ -66,6 +66,7 @@ Baseline notes:
 | `/pending-sales` | 2026-05-20 | Restored the legacy Pending Sales polish: LME Reference Pricing now uses disabled input-style fields and disabled save shell, LME percent details show product count and editable-looking percent inputs, CSV export is active client-side, gain/diff formulas now use `avgPriceRemain` like legacy, and the Patch 28 `ตารางรอขาย` section is back with formula explanation, five KPI cards, shortage highlighting, dual-costing table, footer totals, and CSV export. All changes are read/report only; LME save, LME percent persistence, matching/allocation writes, and sales-plan locks remain deferred. |
 | `/anomaly-detector` | 2026-05-20 | Restored safe legacy polish for the Anomaly Detector shell: severity cards now sit directly under the hero, As-of is a compact secondary row, category count tags are back from server `stats.byCategory`, group severity badge/title/count colors now match legacy red/amber/blue emphasis, and the checklist copy now states the active 18 rule groups instead of falsely claiming legacy 40-check coverage. Record-level jump/highlight and the remaining legacy 40-check rules remain deferred until target route highlight contracts and missing data sources are designed. |
 | `/dashboard` | 2026-05-20 | Completed the first read-only data parity follow-up after the visual shell: dashboard period buttons and custom dates now request `/api/dashboard?from=&to=`, AR/AP aging buckets are computed server-side instead of rendering zero placeholders, cash composition includes FCD, AR, AP, OD, and Net Cash, stock-by-branch and stock-by-group now come from stock ledger balances, and monthly trend rows drive the dashboard chart panels. Branch/supplier/customer/product/group server filters and historical monthly baseline merge remain follow-up work. |
+| `/dashboard` | 2026-05-20 | Completed the second read-only data filter follow-up: dashboard branch/supplier/customer/product/group controls now become `/api/dashboard` query parameters, purchase/sales KPIs and analysis rows filter server-side, and dashboard filter options now include active branches/groups/products from the API payload. Historical monthly baseline merge and fuller option lists for supplier/customer beyond visible in-period rows remain follow-up work. |
 
 ## P1 Backlog
 
@@ -117,5 +118,5 @@ Next routes without a direct standalone legacy page:
 
 ## Active Execution Order
 
-1. P1 Dashboard filter/data follow-up: branch/supplier/customer/product/group server filters and historical monthly baseline merge.
+1. P1 Dashboard data follow-up: historical monthly baseline merge and fuller supplier/customer option payloads for filters.
 2. Follow-up design: Anomaly Detector legacy 40-check parity and record-level jump/highlight contracts.

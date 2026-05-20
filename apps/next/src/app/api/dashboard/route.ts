@@ -16,9 +16,14 @@ export async function GET(request: NextRequest) {
     requirePermission(context, 'reports.reports.view')
     const params = request.nextUrl.searchParams
     return NextResponse.json(await buildMainDashboards({
+      branchId: params.get('branchId') || undefined,
+      customerId: params.get('customerId') || undefined,
       date: parseDate(params.get('date')),
       dateFrom: params.get('from') || undefined,
       dateTo: params.get('to') || undefined,
+      group: params.get('group') || undefined,
+      productId: params.get('productId') || undefined,
+      supplierId: params.get('supplierId') || undefined,
     }))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)

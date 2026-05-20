@@ -4,9 +4,14 @@ import { loadProductionMetrics, summarizeProductionMetrics } from '@/lib/server/
 import { prisma } from '@/lib/server/prisma'
 
 export type MainDashboardFilter = {
+  branchId?: string
+  customerId?: string
   date: Date
   dateFrom?: string
   dateTo?: string
+  group?: string
+  productId?: string
+  supplierId?: string
 }
 
 function dateOnly(date: Date) {
@@ -84,6 +89,15 @@ function itemRows(items: unknown) {
   })
 }
 
+function billHasProductOrGroup(items: unknown, productById: Map<string, { metal_group: string | null }>, productId?: string, group?: string) {
+  if (!productId && !group) return true
+  return itemRows(items).some((item) => {
+    if (productId && item.productId !== productId) return false
+    if (group && (productById.get(item.productId)?.metal_group ?? 'อื่นๆ') !== group) return false
+    return true
+  })
+}
+
 async function cashBalances(asOf: Date) {
   const [accounts, bankRows] = await Promise.all([
     prisma.accounts.findMany({ where: { active: true } }),
@@ -125,9 +139,9 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   const todayStart = startOfDay(selectedDate)
   const todayEnd = endOfDay(selectedDate)
 
-  const [purchases, sales, expenses, payments, receipts, stockRows, deals, finance, productionRows, cash, bankToday, bankRange, loanSchedules, stockIssues, products, salespersons] = await Promise.all([
-    prisma.purchase_bills.findMany({ include: { suppliers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
-    prisma.sales_bills.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
+  const [purchases, sales, expenses, payments, receipts, stockRows, deals, finance, productionRows, cash, bankToday, bankRange, loanSchedules, stockIssues, products, salespersons, branches] = await Promise.all([
+    prisma.purchase_bills.findMany({ include: { suppliers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000, where: { branch_id: filter.branchId || undefined, supplier_id: filter.supplierId || undefined, date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
+    prisma.sales_bills.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 5000, where: { branch_id: filter.branchId || undefined, customer_id: filter.customerId || undefined, date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
     prisma.expenses.findMany({ include: { expense_categories: true }, orderBy: [{ date: 'desc' }, { doc_no: 'desc' }], take: 3000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
     prisma.payments.findMany({ orderBy: [{ date: 'desc' }], take: 3000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
     prisma.receipts.findMany({ orderBy: [{ date: 'desc' }], take: 3000, where: { date: { gte: new Date(`${from}T00:00:00.000Z`), lte: new Date(`${to}T23:59:59.999Z`) } } }),
@@ -142,10 +156,12 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     prisma.stock_issues.findMany({ include: { customers: true }, orderBy: [{ date: 'desc' }], take: 1000, where: { status: { in: ['pending', 'Pending', 'draft', 'Draft', 'open', 'Open'] } } }),
     prisma.products.findMany({ where: { active: { not: false } } }),
     prisma.salespersons.findMany({ where: { active: { not: false } } }),
+    prisma.branches.findMany({ orderBy: [{ name: 'asc' }], where: { active: { not: false } } }),
   ])
 
-  const activePurchases = purchases.filter((row) => activeStatus(row.status))
-  const activeSales = sales.filter((row) => activeStatus(row.status))
+  const productById = new Map(products.map((row) => [row.id, row]))
+  const activePurchases = purchases.filter((row) => activeStatus(row.status) && billHasProductOrGroup(row.items, productById, filter.productId, filter.group))
+  const activeSales = sales.filter((row) => activeStatus(row.status) && billHasProductOrGroup(row.items, productById, filter.productId, filter.group))
   const todayPurchases = activePurchases.filter((row) => row.date >= todayStart && row.date <= todayEnd)
   const todaySales = activeSales.filter((row) => row.date >= todayStart && row.date <= todayEnd)
   const todayExpenses = expenses.filter((row) => row.date >= todayStart && row.date <= todayEnd && activeStatus(row.status))
@@ -179,7 +195,6 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   const tradingPending = deals.filter((deal) => !['Matched', 'Closed', 'Cancelled', 'cancelled'].includes(deal.status ?? '')).length
   const cashIn = receipts.reduce((sum, row) => sum + toNumber(row.net_amount || row.amount), 0)
   const cashOut = payments.reduce((sum, row) => sum + toNumber(row.net_amount || row.amount), 0) + expenseAmount
-  const productById = new Map(products.map((row) => [row.id, row]))
   const salespersonById = new Map(salespersons.map((row) => [row.id, row]))
   const groupMap = new Map<string, { buyAmt: number; buyQty: number; group: string; products: Map<string, { buyAmt: number; buyQty: number; productCode: string; productId: string; productName: string; sellAmt: number; sellQty: number }>; sellAmt: number; sellQty: number }>()
   const ensureGroup = (group: string) => {
@@ -352,6 +367,11 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   const tradingPaidTotal = tradingPurchases.reduce((sum, row) => sum + toNumber(row.paid_amount), 0)
 
   return {
+    filterOptions: {
+      branches: branches.map((row) => ({ id: row.id, name: row.name })),
+      groups: Array.from(new Set(products.map((row) => row.metal_group ?? 'อื่นๆ'))).sort(),
+      products: products.map((row) => ({ code: row.code, id: row.id, name: row.name })),
+    },
     filters: { date: dateOnly(selectedDate), from, to },
     sourceState: {
       basis: 'Main dashboard read/report baseline from operational tables and existing module helpers.',
