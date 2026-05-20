@@ -39,6 +39,14 @@ function daysBetween(from: Date, to: Date) {
   return Math.floor((startOfDay(to).getTime() - startOfDay(from).getTime()) / 86400000)
 }
 
+function agingBucket(daysOverdue: number) {
+  if (daysOverdue <= 0) return 'current'
+  if (daysOverdue <= 30) return '1-30'
+  if (daysOverdue <= 60) return '31-60'
+  if (daysOverdue <= 90) return '61-90'
+  return 'over90'
+}
+
 function defaultRange(date: Date) {
   return { from: dateOnly(monthStart(date)), to: dateOnly(date) }
 }
@@ -98,13 +106,15 @@ async function cashBalances(asOf: Date) {
     if (type.includes('od')) {
       acc.odUsed += Math.max(0, -balance)
       acc.odLimit += toNumber(account.od_limit)
+    } else if (type.includes('fcd') || type.includes('foreign') || type.includes('ต่างประเทศ')) {
+      acc.fcd += balance
     } else if (type.includes('cash') || type.includes('เงินสด')) {
       acc.cash += balance
     } else {
       acc.bank += balance
     }
     return acc
-  }, { bank: 0, cash: 0, odLimit: 0, odUsed: 0 })
+  }, { bank: 0, cash: 0, fcd: 0, odLimit: 0, odUsed: 0 })
 }
 
 export async function buildMainDashboards(filter: MainDashboardFilter) {
@@ -284,6 +294,52 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   const fgRows = stockRows.filter((row) => (row.output_category ?? row.products?.item_status ?? '').toUpperCase() === 'FG')
   const fgQty = fgRows.reduce((sum, row) => sum + toNumber(row.qty_in) - toNumber(row.qty_out), 0)
   const fgValue = fgRows.reduce((sum, row) => sum + toNumber(row.value_in) - toNumber(row.value_out), 0)
+  const emptyAging = () => ({ '1-30': 0, '31-60': 0, '61-90': 0, current: 0, over90: 0 })
+  const arAgingBuckets = emptyAging()
+  const apAgingBuckets = emptyAging()
+  activeSales.forEach((row) => {
+    const amount = toNumber(row.receivable_balance)
+    if (amount <= 0) return
+    const dueDate = addDays(row.date, row.credit_term ?? 0)
+    arAgingBuckets[agingBucket(daysBetween(dueDate, selectedDate))] += amount
+  })
+  activePurchases.forEach((row) => {
+    const amount = toNumber(row.payable_balance)
+    if (amount <= 0) return
+    const dueDate = addDays(row.date, row.suppliers?.credit_term ?? 0)
+    apAgingBuckets[agingBucket(daysBetween(dueDate, selectedDate))] += amount
+  })
+  const stockByBranchMap = new Map<string, { name: string; qty: number; value: number }>()
+  const stockByGroupMap = new Map<string, { group: string; qty: number; value: number }>()
+  stockRows.forEach((row) => {
+    const qty = toNumber(row.qty_in) - toNumber(row.qty_out)
+    const value = toNumber(row.value_in) - toNumber(row.value_out)
+    if (Math.abs(qty) < 0.001 && Math.abs(value) < 0.001) return
+    const branchKey = row.branch_id ?? 'unknown'
+    const branch = stockByBranchMap.get(branchKey) ?? { name: row.branches?.name ?? row.branch_id ?? '-', qty: 0, value: 0 }
+    branch.qty += qty
+    branch.value += value
+    stockByBranchMap.set(branchKey, branch)
+    const groupKey = row.products?.metal_group ?? 'อื่นๆ'
+    const group = stockByGroupMap.get(groupKey) ?? { group: groupKey, qty: 0, value: 0 }
+    group.qty += qty
+    group.value += value
+    stockByGroupMap.set(groupKey, group)
+  })
+  const monthlyTrendMap = new Map<string, { expense: number; gp: number; label: string; purchase: number; sales: number }>()
+  const ensureMonth = (date: Date) => {
+    const label = dateOnly(date).slice(0, 7)
+    const current = monthlyTrendMap.get(label) ?? { expense: 0, gp: 0, label, purchase: 0, sales: 0 }
+    monthlyTrendMap.set(label, current)
+    return current
+  }
+  activePurchases.forEach((row) => { ensureMonth(row.date).purchase += toNumber(row.total_amount) })
+  activeSales.forEach((row) => {
+    const month = ensureMonth(row.date)
+    month.sales += toNumber(row.total_amount)
+    month.gp += toNumber(row.gross_profit) || toNumber(row.total_amount) - toNumber(row.cogs_amount || row.total_cost)
+  })
+  expenses.filter((row) => activeStatus(row.status)).forEach((row) => { ensureMonth(row.date).expense += toNumber(row.amount) })
   const arDueRows = activeSales.map((row) => {
     const dueDate = addDays(row.date, row.credit_term ?? 0)
     return { amount: toNumber(row.receivable_balance), daysOverdue: Math.max(0, daysBetween(dueDate, selectedDate)), docNo: row.doc_no, due: dateOnly(dueDate), id: row.id, name: row.customers?.name ?? row.customer_id ?? '-' }
@@ -307,21 +363,34 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
         { label: 'AR', value: finance.summary.ar },
         { label: 'AP', value: finance.summary.ap },
       ],
+      agingBuckets: { ap: apAgingBuckets, ar: arAgingBuckets },
+      cashComposition: [
+        { label: '💵 เงินสด', value: cash.cash },
+        { label: '🏦 ธนาคาร', value: cash.bank },
+        { label: '💱 FCD', value: cash.fcd },
+        { label: '📥 AR', value: finance.summary.ar },
+        { label: '📤 AP', value: -finance.summary.ap },
+        { label: '⚠ OD Used', value: cash.odUsed },
+        { label: '💎 Net Cash', value: cash.cash + cash.bank + cash.fcd + finance.summary.ar - finance.summary.ap - cash.odUsed },
+      ].filter((row) => row.value !== 0),
       kpi: {
         ar: finance.summary.ar,
         ap: finance.summary.ap,
-        cashBalance: cash.cash + cash.bank,
+        cashBalance: cash.cash + cash.bank + cash.fcd,
         expenses: expenseAmount + cogs,
         grossProfit,
         netProfit: salesAmount - cogs - expenseAmount,
         revenue: salesAmount,
       },
+      monthlyTrend: Array.from(monthlyTrendMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(-6),
       sections: {
-        cash: { ...cash, netCash: cash.cash + cash.bank - cash.odUsed },
+        cash: { ...cash, netCash: cash.cash + cash.bank + cash.fcd + finance.summary.ar - finance.summary.ap - cash.odUsed },
         purchase: { amount: purchaseAmount, count: activePurchases.length, qty: activePurchases.reduce((sum, row) => sum + itemsQty(row.items), 0), today: todayPurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
         sales: { amount: salesAmount, count: activeSales.length, gp: grossProfit, qty: activeSales.reduce((sum, row) => sum + itemsQty(row.items), 0), today: todaySales.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
         stock: { qty: stockQty, value: stockValue },
       },
+      stockByBranch: Array.from(stockByBranchMap.values()).filter((row) => row.qty !== 0 || row.value !== 0).sort((a, b) => b.value - a.value),
+      stockByGroup: Array.from(stockByGroupMap.values()).filter((row) => row.qty !== 0 || row.value !== 0).sort((a, b) => b.value - a.value),
       trend: [
         { label: 'ซื้อ', value: purchaseAmount },
         { label: 'ขาย', value: salesAmount },

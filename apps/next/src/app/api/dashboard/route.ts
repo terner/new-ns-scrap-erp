@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'reports.reports.view')
     const params = request.nextUrl.searchParams
-    return NextResponse.json(await buildMainDashboards({ date: parseDate(params.get('date')), dateFrom: params.get('from') || undefined, dateTo: params.get('to') || undefined }))
+    return NextResponse.json(await buildMainDashboards({
+      date: parseDate(params.get('date')),
+      dateFrom: params.get('from') || undefined,
+      dateTo: params.get('to') || undefined,
+    }))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'โหลด Dashboard ไม่ได้', 500)

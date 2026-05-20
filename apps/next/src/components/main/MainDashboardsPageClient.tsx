@@ -6,13 +6,21 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 type MainPayload = {
   dashboard: {
     aging: { label: string; value: number }[]
+    agingBuckets: {
+      ap: Record<string, number>
+      ar: Record<string, number>
+    }
+    cashComposition: { label: string; value: number }[]
     kpi: Record<string, number>
+    monthlyTrend: { expense: number; gp: number; label: string; purchase: number; sales: number }[]
     sections: {
       cash: Record<string, number>
       purchase: Record<string, number>
       sales: Record<string, number>
       stock: Record<string, number>
     }
+    stockByBranch: { name: string; qty: number; value: number }[]
+    stockByGroup: { group: string; qty: number; value: number }[]
     trend: { label: string; value: number }[]
   }
   dailyReport: {
@@ -64,8 +72,8 @@ function today() {
 
 export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   const [date, setDate] = useState(today())
-  const [rangeFrom, setRangeFrom] = useState(today())
-  const [rangeMode, setRangeMode] = useState('today')
+  const [rangeFrom, setRangeFrom] = useState(() => mode === 'dashboard' ? `${today().slice(0, 4)}-01-01` : today())
+  const [rangeMode, setRangeMode] = useState(mode === 'dashboard' ? 'year' : 'today')
   const [rangeTo, setRangeTo] = useState(today())
   const [data, setData] = useState<MainPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -74,7 +82,7 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
 
   useEffect(() => {
     const params = new URLSearchParams({ date })
-    if (mode === 'daily-report') {
+    if (mode === 'daily-report' || mode === 'dashboard') {
       params.set('from', rangeFrom)
       params.set('to', rangeTo)
     }
@@ -88,7 +96,7 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
 
   return (
     <section className="space-y-4">
-      {mode === 'dashboard' ? <DashboardView data={data} /> : null}
+      {mode === 'dashboard' ? <DashboardView data={data} date={date} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
       {mode === 'owner-daily' ? <OwnerDailyView data={data} /> : null}
       {mode === 'daily-report' ? <DailyReportView data={data} date={date} rangeFrom={rangeFrom} rangeMode={rangeMode} rangeTo={rangeTo} setDate={setDate} setRangeFrom={setRangeFrom} setRangeMode={setRangeMode} setRangeTo={setRangeTo} /> : null}
       <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
@@ -100,8 +108,7 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   )
 }
 
-function DashboardView({ data }: { data: MainPayload | null }) {
-  const [period, setPeriod] = useState('month')
+function DashboardView({ data, date, rangeFrom, rangeMode, rangeTo, setRangeFrom, setRangeMode, setRangeTo }: { data: MainPayload | null; date: string; rangeFrom: string; rangeMode: string; rangeTo: string; setRangeFrom: (value: string) => void; setRangeMode: (value: string) => void; setRangeTo: (value: string) => void }) {
   const [branchFilter, setBranchFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
@@ -125,12 +132,36 @@ function DashboardView({ data }: { data: MainPayload | null }) {
   const stockValue = section?.stock.value ?? 0
   const gpPct = salesAmount > 0 ? (gp / salesAmount) * 100 : 0
   const filteredCount = `${money(section?.purchase.count)} ซื้อ · ${money(section?.sales.count)} ขาย`
+  const applyPeriod = (nextPeriod: string) => {
+    setRangeMode(nextPeriod)
+    if (nextPeriod === 'today') {
+      setRangeFrom(date)
+      setRangeTo(date)
+    } else if (nextPeriod === 'week') {
+      const start = new Date(`${date}T00:00:00`)
+      start.setDate(start.getDate() - 6)
+      setRangeFrom(start.toISOString().slice(0, 10))
+      setRangeTo(date)
+    } else if (nextPeriod === 'month') {
+      setRangeFrom(`${date.slice(0, 7)}-01`)
+      setRangeTo(date)
+    } else if (nextPeriod === 'quarter') {
+      const parsed = new Date(`${date}T00:00:00`)
+      const quarterMonth = Math.floor(parsed.getMonth() / 3) * 3
+      setRangeFrom(`${parsed.getFullYear()}-${String(quarterMonth + 1).padStart(2, '0')}-01`)
+      setRangeTo(date)
+    } else if (nextPeriod === 'year') {
+      setRangeFrom(`${date.slice(0, 4)}-01-01`)
+      setRangeTo(date)
+    }
+  }
   const clearFilters = () => {
     setBranchFilter('')
     setGroupFilter('')
     setSupplierFilter('')
     setCustomerFilter('')
     setProductFilter('')
+    applyPeriod('year')
   }
   return (
     <>
@@ -144,12 +175,12 @@ function DashboardView({ data }: { data: MainPayload | null }) {
             ['week', '7 วัน'],
             ['today', 'วันนี้'],
           ].map(([key, label]) => (
-            <button className={`rounded-lg px-3 py-1.5 text-xs font-bold ${period === key ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} key={key} onClick={() => setPeriod(key)} type="button">{label}</button>
+            <button className={`rounded-lg px-3 py-1.5 text-xs font-bold ${rangeMode === key ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
           <span className="mx-2 opacity-30">|</span>
-          <input className="rounded border border-white/20 bg-white/10 px-2 py-1 text-xs" readOnly type="date" value={data?.filters.from ?? ''} />
+          <input className="rounded border border-white/20 bg-white/10 px-2 py-1 text-xs" type="date" value={rangeFrom} onChange={(event) => { setRangeMode('custom'); setRangeFrom(event.target.value) }} />
           <span>→</span>
-          <input className="rounded border border-white/20 bg-white/10 px-2 py-1 text-xs" readOnly type="date" value={data?.filters.to ?? ''} />
+          <input className="rounded border border-white/20 bg-white/10 px-2 py-1 text-xs" type="date" value={rangeTo} onChange={(event) => { setRangeMode('custom'); setRangeTo(event.target.value) }} />
           <span className="ml-auto rounded bg-white/10 px-2 py-1 text-xs">📊 {filteredCount}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -180,20 +211,20 @@ function DashboardView({ data }: { data: MainPayload | null }) {
         </div>
         <div className="mb-4 grid gap-3 lg:grid-cols-3">
           <DashboardChartCard title="Revenue vs Expense (Monthly)">
-            <BarRows rows={[{ label: 'Revenue', value: k.revenue ?? 0 }, { label: 'Expenses', value: k.expenses ?? 0 }, { label: 'Net Profit', value: k.netProfit ?? 0 }]} />
+            <BarRows rows={(data?.dashboard.monthlyTrend ?? []).flatMap((row) => [{ label: `${monthLabel(row.label)} Rev`, value: row.sales }, { label: `${monthLabel(row.label)} Exp`, value: row.expense + Math.max(0, row.sales - row.gp) }])} />
           </DashboardChartCard>
           <DashboardChartCard title="Cash Flow Overview">
-            <BarRows rows={[{ label: 'Cash', value: section?.cash.cash ?? 0 }, { label: 'Bank', value: section?.cash.bank ?? 0 }, { label: 'OD Used', value: section?.cash.odUsed ?? 0 }, { label: 'Net Cash', value: section?.cash.netCash ?? 0 }]} />
+            <BarRows rows={(data?.dashboard.cashComposition ?? []).map((row) => ({ label: row.label, value: row.value }))} />
           </DashboardChartCard>
           <DashboardChartCard title="Expense Breakdown">
-            <BarRows rows={[{ label: 'COGS + Expenses', value: k.expenses ?? 0 }, { label: 'Gross Profit', value: gp }, { label: 'Net Profit', value: k.netProfit ?? 0 }]} />
+            <BarRows rows={(data?.dashboard.monthlyTrend ?? []).map((row) => ({ label: monthLabel(row.label), value: row.expense }))} />
           </DashboardChartCard>
         </div>
         <div className="grid gap-3 lg:grid-cols-3">
           <DashboardChartCard title="Receivables & Payables Aging">
             <table className="w-full text-xs">
               <thead className="text-slate-500"><tr><th className="py-1 text-left">Type</th><th className="text-right">Current</th><th className="text-right">1-30</th><th className="text-right">31-60</th><th className="text-right">61-90</th><th className="text-right">&gt;90</th><th className="text-right">Total</th></tr></thead>
-              <tbody><tr className="border-t"><td className="py-1.5 font-medium text-emerald-700">📥 AR ลูกหนี้</td><td className="text-right">{money(k.ar)}</td><td className="text-right">0</td><td className="text-right">0</td><td className="text-right">0</td><td className="text-right">0</td><td className="text-right font-bold">{money(k.ar)}</td></tr><tr className="border-t"><td className="py-1.5 font-medium text-red-700">📤 AP เจ้าหนี้</td><td className="text-right">{money(k.ap)}</td><td className="text-right">0</td><td className="text-right">0</td><td className="text-right">0</td><td className="text-right">0</td><td className="text-right font-bold">{money(k.ap)}</td></tr></tbody>
+              <tbody><AgingRow buckets={data?.dashboard.agingBuckets.ar} label="📥 AR ลูกหนี้" tone="emerald" total={k.ar ?? 0} /><AgingRow buckets={data?.dashboard.agingBuckets.ap} label="📤 AP เจ้าหนี้" tone="red" total={k.ap ?? 0} /></tbody>
             </table>
           </DashboardChartCard>
           <DashboardChartCard title="Channel Performance">
@@ -218,7 +249,7 @@ function DashboardView({ data }: { data: MainPayload | null }) {
         <DashboardChartCard title="📦 มูลค่าสินค้าตามหมวด">
           <table className="w-full text-xs">
             <thead className="bg-slate-50 text-slate-500"><tr><th className="p-1.5 text-left">หมวด</th><th className="p-1.5 text-right">กก.</th><th className="p-1.5 text-right">มูลค่า</th></tr></thead>
-            <tbody>{(analytics?.groupSummary ?? []).map((row) => <tr className="border-t" key={row.group}><td className="p-1.5 font-medium">{row.group}</td><td className="p-1.5 text-right">{money(row.qty)}</td><td className="p-1.5 text-right font-bold text-indigo-700">{money(row.amount)}</td></tr>)}</tbody>
+            <tbody>{(data?.dashboard.stockByGroup ?? []).map((row) => <tr className="border-t" key={row.group}><td className="p-1.5 font-medium">{row.group}</td><td className="p-1.5 text-right">{money(row.qty)}</td><td className="p-1.5 text-right font-bold text-indigo-700">{money(row.value)}</td></tr>)}</tbody>
           </table>
         </DashboardChartCard>
       </div>
@@ -240,7 +271,7 @@ function DashboardView({ data }: { data: MainPayload | null }) {
       <Section border="border-amber-500" title="💰 ฝั่งการเงิน — Cash / Bank / OD">
         <Metric label="💵 เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
         <Metric label="🏦 ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
-        <Metric label="💱 FCD" tone="purple" value="0" />
+        <Metric label="💱 FCD" tone="purple" value={money(section?.cash.fcd)} />
         <Metric label="⚠ OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
         <Metric label="💎 Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
       </Section>
@@ -248,9 +279,21 @@ function DashboardView({ data }: { data: MainPayload | null }) {
         <Metric label="⚖ น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
         <Metric label="💰 มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
         <Metric label="📊 ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
+        {(data?.dashboard.stockByBranch ?? []).slice(0, 3).map((row) => <Metric key={row.name} label={`🏢 ${row.name}`} value={`${money(row.qty)} กก. · ${money(row.value)}`} />)}
       </Section>
     </>
   )
+}
+
+function monthLabel(value: string) {
+  const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+  const month = Number(value.slice(5, 7)) - 1
+  return `${monthNames[month] ?? value.slice(5, 7)} ${value.slice(2, 4)}`
+}
+
+function AgingRow({ buckets, label, tone, total }: { buckets?: Record<string, number>; label: string; tone: 'emerald' | 'red'; total: number }) {
+  const textTone = tone === 'emerald' ? 'text-emerald-700' : 'text-red-700'
+  return <tr className="border-t"><td className={`py-1.5 font-medium ${textTone}`}>{label}</td><td className="text-right">{money(buckets?.current)}</td><td className="text-right">{money(buckets?.['1-30'])}</td><td className="text-right">{money(buckets?.['31-60'])}</td><td className="text-right">{money(buckets?.['61-90'])}</td><td className="text-right">{money(buckets?.over90)}</td><td className={`text-right font-bold ${textTone}`}>{money(total)}</td></tr>
 }
 
 function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: string; sub: string; tone: string; value: string }) {
