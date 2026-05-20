@@ -125,6 +125,91 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
     URL.revokeObjectURL(url)
   }
 
+  if (mode === 'cost') {
+    const breakdown = data?.breakdown ?? {}
+    const summary = data?.summary ?? {}
+    const costRows = rows
+    const costTotals = {
+      electricity: breakdown['Electricity Cost'] ?? 0,
+      fuel: breakdown['Fuel Cost'] ?? 0,
+      labor: breakdown['Labor Cost'] ?? 0,
+      machine: breakdown['Machine Cost'] ?? 0,
+      maintenance: breakdown['Maintenance Cost'] ?? 0,
+      otherProc: Object.entries(breakdown).filter(([key]) => !['RM', 'Labor Cost', 'Electricity Cost', 'Machine Cost', 'Fuel Cost', 'Maintenance Cost'].includes(key)).reduce((sum, [, value]) => sum + value, 0),
+      rm: breakdown.RM ?? summary.inputCost ?? 0,
+      total: summary.totalCost ?? 0,
+      outputQty: summary.outputQty ?? 0,
+    }
+
+    function exportCostCsv() {
+      const header = ['เลขที่', 'วันที่', 'RM', 'Labor', 'Electricity', 'Machine', 'Fuel', 'Maintenance', 'Other Proc', 'Total Cost', 'Output (kg)', '฿/กก.', 'Method']
+      const body = costRows.map((row) => {
+        const costs = costBreakdown(row)
+        return [
+          String(row.docNo ?? ''),
+          String(row.date ?? ''),
+          String(row.inputCost ?? 0),
+          String(costs.labor),
+          String(costs.electricity),
+          String(costs.machine),
+          String(costs.fuel),
+          String(costs.maintenance),
+          String(costs.otherProc),
+          String(row.totalCost ?? 0),
+          String(row.outputQty ?? 0),
+          String(row.costPerKg ?? 0),
+          String(row.costAllocationMethod ?? row.productionType ?? ''),
+        ]
+      })
+      const csv = [header, ...body].map((line) => line.map((value) => `"${value.replace(/"/g, '""')}"`).join(',')).join('\n')
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `production-cost-${new Date().toISOString().slice(0, 10)}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    }
+
+    return (
+      <section className="space-y-4">
+        {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+        <div className="flex flex-wrap gap-2">
+          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <button className="rounded-lg border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
+          <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCostCsv}>Export CSV</button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-7">
+          <CostCard label="RM Cost" tone="red" value={costTotals.rm} />
+          <CostCard label="Labor" value={costTotals.labor} />
+          <CostCard label="Electricity" value={costTotals.electricity} />
+          <CostCard label="Machine" value={costTotals.machine} />
+          <CostCard label="Fuel" value={costTotals.fuel} />
+          <CostCard label="Other Process" value={costTotals.otherProc + costTotals.maintenance} />
+          <div className="rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 text-white shadow">
+            <div className="opacity-80">Total / Cost per Kg</div>
+            <div className="text-base font-bold">{formatMoney(costTotals.total)}</div>
+            <div className="text-xs opacity-80">{formatMoney(costTotals.outputQty > 0 ? costTotals.total / costTotals.outputQty : 0)} ฿/กก.</div>
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-xl bg-white shadow">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
+            <tbody>
+              {isLoading ? <tr><td className="py-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
+              {!isLoading && costRows.map((row, index) => {
+                const costs = costBreakdown(row)
+                return <tr key={String(row.id ?? index)} className="border-t hover:bg-slate-50"><td className="p-2 font-mono text-xs">{String(row.docNo ?? '')}</td><td className="p-2">{String(row.date ?? '')}</td><td className="p-2 text-right">{formatMoney(Number(row.inputCost ?? 0))}</td><td className="p-2 text-right">{formatMoney(costs.labor)}</td><td className="p-2 text-right">{formatMoney(costs.electricity)}</td><td className="p-2 text-right">{formatMoney(costs.machine)}</td><td className="p-2 text-right">{formatMoney(costs.fuel)}</td><td className="p-2 text-right">{formatMoney(costs.maintenance)}</td><td className="p-2 text-right">{formatMoney(costs.otherProc)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))}</td><td className="p-2 text-right text-slate-700">{formatMoney(Number(row.costPerKg ?? 0))}</td><td className="p-2 text-xs">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</td></tr>
+              })}
+              {!isLoading && costRows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={13}>ไม่มีข้อมูล</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )
+  }
+
   if (mode === 'dashboard') {
     const summary = data?.summary ?? {}
     const topProducts = data?.topProducts ?? []
@@ -290,6 +375,21 @@ function StatusBar({ count, max, status }: { count: number; max: number; status:
       <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-purple-500" style={{ width: `${Math.max(4, (count / max) * 100)}%` }} /></div>
     </div>
   )
+}
+
+function CostCard({ label, tone, value }: { label: string; tone?: 'red'; value: number }) {
+  return <div className="rounded-xl bg-white p-3 shadow"><div className="text-slate-500">{label}</div><div className={`text-base font-bold ${tone === 'red' ? 'text-red-700' : 'text-slate-900'}`}>{formatMoney(value)}</div></div>
+}
+
+function costBreakdown(row: Row) {
+  const breakdown = typeof row.costBreakdown === 'object' && row.costBreakdown ? row.costBreakdown as Record<string, number> : {}
+  const labor = breakdown['Labor Cost'] ?? 0
+  const electricity = breakdown['Electricity Cost'] ?? 0
+  const machine = breakdown['Machine Cost'] ?? 0
+  const fuel = breakdown['Fuel Cost'] ?? 0
+  const maintenance = breakdown['Maintenance Cost'] ?? 0
+  const otherProc = Number(row.processCost ?? 0) - labor - electricity - machine - fuel - maintenance
+  return { electricity, fuel, labor, machine, maintenance, otherProc: Math.max(0, otherProc) }
 }
 
 function formatCell(value: Row[string], type?: Column['type']) {

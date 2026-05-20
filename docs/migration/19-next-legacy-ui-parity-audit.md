@@ -34,7 +34,6 @@ Baseline notes:
 
 | Route | Legacy view | Current issue | Next file |
 |---|---|---|---|
-| `/production/production-cost-report` | `view-productionCostReport` | Missing seven cost cards and cost-type breakdown emphasis. | `apps/next/src/components/production/ProductionReportPageClient.tsx` |
 
 ## Completed In This Parity Pass
 
@@ -45,6 +44,7 @@ Baseline notes:
 | `/daily/expense` | 2026-05-20 | Restored the first legacy list/read surface: blue Expense Voucher info banner and create CTA, gradient monthly/pending/paid/trend cards, category/payee progress panels, dense filter bar with date/payee/account/status/clear/export shell, and a denser table with due date, reference, category, overdue state, Net Pay emphasis, VAT/WHT breakdown, and edit action. Destructive repair tools, delete, quick-pay, multi-line voucher write, auto category creation, and export remain deferred. |
 | `/production/orders` | 2026-05-20 | Restored the first legacy production operations surface: dense filter card with date/status/preset ranges, card-grid order list with status color, target product, input/planned/output KPIs, yield bar, and cost footer; detail opens as a read-only tabbed surface with status actions disabled, target product banner, lock/status banners, six KPI cards, Header/Input/Output/Process Cost/Cost Allocation tabs, production variance panel, and allocation preview. Input/output/reverse/recompute/status mutation remains disabled. |
 | `/production/dashboard` | 2026-05-20 | Restored the legacy production dashboard surface: purple/pink hero with range presets and custom dates, four colored KPI cards, daily Input/Output/Loss chart panel, monthly Input/Output chart panel, status panel, Top 10 products table with code/cost/avg cost, and Machine Utilization table. API changes are read-only aggregate fields only; no production mutation, cost recompute, stock write, or posting behavior was added. |
+| `/production/production-cost-report` | 2026-05-20 | Restored the legacy cost report surface: date filter/export row, seven cost cards, gradient Total/Cost per Kg card, 13-column cost breakdown table, legacy CSV columns, and cost allocation method field from the read helper. It renders existing read-only `costBreakdown` data; no cost recalculation, stock mutation, or posting behavior was added. |
 
 ## P1 Backlog
 
@@ -110,7 +110,6 @@ Next routes without a direct standalone legacy page:
 
 ## Active Execution Order
 
-1. P0 Production tools: `/production/production-cost-report`
-2. P1 PO/Reports/Main: `/po-reports/outstanding`, `/reports`, `/sales-plan`, `/dashboard`
-3. P1 Daily transaction surfaces
-4. P1/P2 production report polish
+1. P1 PO/Reports/Main: `/po-reports/outstanding`, `/reports`, `/sales-plan`, `/dashboard`
+2. P1 Daily transaction surfaces
+3. P1/P2 production report polish

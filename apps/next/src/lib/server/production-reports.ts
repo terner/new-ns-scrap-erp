@@ -14,6 +14,7 @@ export type ProductionOrderMetric = {
   branchName: string
   costPerKg: number
   costBreakdown: Record<string, number>
+  costAllocationMethod: string
   date: string
   docNo: string
   id: string
@@ -97,6 +98,7 @@ export async function loadProductionMetrics(filters: ProductionReportFilters = {
 
     return {
       branchName: order.branches?.name ?? '-',
+      costAllocationMethod: order.cost_allocation_method ?? order.production_type ?? '-',
       costPerKg: outputQty > 0 ? totalCost / outputQty : 0,
       costBreakdown: Object.fromEntries(order.process_costs
         .filter((cost) => cost.status !== 'reversed' && cost.include_in_production)
