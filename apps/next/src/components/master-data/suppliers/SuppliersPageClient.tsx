@@ -720,7 +720,7 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
             ) : (
               <TextField required className="md:col-span-2" error={errors.name} label="ชื่อบริษัท/ร้านค้า" value={form.name ?? ''} onChange={(value) => update('name', value || null)} />
             )}
-            <TextField required error={errors.taxId} label="เลขผู้เสียภาษี" value={form.taxId} onChange={(value) => update('taxId', value)} />
+            <TextField error={errors.taxId} label="เลขผู้เสียภาษี" value={form.taxId ?? ''} onChange={(value) => update('taxId', value || null)} />
             <SelectField required error={errors.salesId} label="ผู้ดูแล" value={form.salesId ?? ''} onChange={updateSalesperson}>
               <option value="">เลือกผู้ดูแล</option>
               {salespersons.map((salesperson) => <option key={salesperson.id} value={salesperson.id}>{salesperson.name}</option>)}

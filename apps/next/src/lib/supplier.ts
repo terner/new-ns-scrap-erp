@@ -44,16 +44,6 @@ const optionalTaxIdSchema = z.preprocess(
     .default(null),
 )
 
-const requiredTaxIdSchema = z.preprocess(
-  (value) => {
-    if (value == null) return ''
-    return typeof value === 'string' ? value.trim() : value
-  },
-  z.string({ invalid_type_error: 'กรอกเลขผู้เสียภาษี', required_error: 'กรอกเลขผู้เสียภาษี' })
-    .min(1, 'กรอกเลขผู้เสียภาษี')
-    .regex(/^\d{13}$/, 'เลขผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก'),
-)
-
 const optionalPostalCodeSchema = z.preprocess(
   blankToNull,
   z.string().trim()
@@ -191,7 +181,7 @@ export const supplierFormSchema = z.object({
   lastName: optionalPersonName('นามสกุล'),
   type: z.enum(['บุคคล', 'นิติบุคคล'], { required_error: 'เลือกประเภทผู้ขาย' }),
   marketScope: z.enum(['ในประเทศ', 'ต่างประเทศ']).default('ในประเทศ'),
-  taxId: requiredTaxIdSchema,
+  taxId: optionalTaxIdSchema,
   phone: optionalPhoneSchema,
   address: optionalGeneralText('ที่อยู่เต็ม/หมายเหตุที่อยู่', 500),
   addressNo: optionalGeneralText('บ้านเลขที่', 40),

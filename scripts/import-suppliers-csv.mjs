@@ -5,7 +5,6 @@ import { Client } from 'pg'
 const csvPath = process.argv.find((arg) => arg.endsWith('.csv')) ?? 'nsscrap permission and master data   - ผู้ขาย.csv'
 const shouldApply = process.argv.includes('--apply')
 const defaultOwnerName = 'PLOY'
-const placeholderTaxId = '0000000000000'
 const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
 
 function loadEnv() {
@@ -146,13 +145,12 @@ function compactAddress({ address, subdistrict, district, province }) {
 }
 
 function supplierRowFromCsv(row, index, salesLookup) {
-  const [, rawName, rawTaxId, , rawPhone, rawBank, rawOwner, rawAddress, rawSubdistrict, rawDistrict, rawProvince] = row.cells
+  const [, rawName, , , rawPhone, rawBank, rawOwner, rawAddress, rawSubdistrict, rawDistrict, rawProvince] = row.cells
   const name = cleanText(rawName)
   if (!name) throw new Error(`แถว ${row.lineNumber}: ไม่มีชื่อผู้ขาย`)
   const person = splitPersonName(name)
   const type = person ? 'บุคคล' : 'นิติบุคคล'
-  const taxDigits = String(rawTaxId ?? '').replace(/\D/g, '')
-  const taxId = taxDigits.length === 13 ? taxDigits : placeholderTaxId
+  const taxId = null
   const phoneDigits = String(rawPhone ?? '').replace(/[^\d+().\s-]/g, '').trim()
   const ownerName = cleanText(rawOwner) ?? defaultOwnerName
   const salesperson = salesLookup.get(ownerName.toUpperCase())
@@ -203,8 +201,18 @@ function supplierRowFromCsv(row, index, salesLookup) {
     address_postal_code_intl: null,
     source_line: row.lineNumber,
     source_kind: 'csv',
-    tax_placeholder: taxId === placeholderTaxId,
+    missing_tax: true,
     owner_placeholder: !cleanText(rawOwner),
+  }
+}
+
+function mergeFallbackBank(row, fallback) {
+  if (!fallback || (row.bank_name && row.bank_account)) return row
+  const oldBank = parseBank([fallback.bank_name, fallback.bank_account].filter(Boolean).join(' // '))
+  return {
+    ...row,
+    bank_name: row.bank_name ?? oldBank.bankName,
+    bank_account: row.bank_account ?? oldBank.accountNo,
   }
 }
 
@@ -267,6 +275,20 @@ async function main() {
 
   const existingSuppliers = await client.query('select * from public.suppliers')
   const existingById = new Map(existingSuppliers.rows.map((row) => [row.id, row]))
+  const existingByName = new Map()
+  for (const row of existingSuppliers.rows) {
+    const key = compactName(row.name)
+    if (!key) continue
+    const existing = existingByName.get(key)
+    const score = (row.bank_name ? 1 : 0) + (row.bank_account ? 2 : 0)
+    const existingScore = existing ? (existing.bank_name ? 1 : 0) + (existing.bank_account ? 2 : 0) : -1
+    if (!existing || score > existingScore) existingByName.set(key, row)
+  }
+  for (const row of importedRows) {
+    const merged = mergeFallbackBank(row, existingByName.get(compactName(row.name)))
+    row.bank_name = merged.bank_name
+    row.bank_account = merged.bank_account
+  }
   const referenced = await client.query(`
     select distinct supplier_id from (
       select supplier_id from public.assets where supplier_id is not null
@@ -294,7 +316,7 @@ async function main() {
       ...oldRow,
       id: newId,
       code: newId,
-      tax_id: String(oldRow.tax_id ?? '').replace(/\D/g, '').length === 13 ? oldRow.tax_id : placeholderTaxId,
+      tax_id: String(oldRow.tax_id ?? '').replace(/\D/g, '').length === 13 ? oldRow.tax_id : null,
       bank_name: normalizedOldBank.bankName,
       bank_account: normalizedOldBank.accountNo ?? oldRow.bank_account,
       active: false,
@@ -311,7 +333,7 @@ async function main() {
   const bankRows = await client.query('select name from public.bank_names')
   const existingBankNames = new Set(bankRows.rows.map((row) => row.name))
   const missingBanks = bankNames.filter((name) => !existingBankNames.has(name))
-  const taxPlaceholderCount = importedRows.filter((row) => row.tax_placeholder).length
+  const missingTaxCount = importedRows.filter((row) => row.missing_tax).length
   const ownerPlaceholderCount = importedRows.filter((row) => row.owner_placeholder).length
 
   const summary = {
@@ -319,7 +341,7 @@ async function main() {
     csvRows: importedRows.length,
     preservedReferencedRows: preservedRows.length,
     finalSupplierRows: allRows.length,
-    taxPlaceholderCount,
+    missingTaxCount,
     ownerPlaceholderCount,
     missingBanks,
     referencedSuppliers: referenced.rows.length,
