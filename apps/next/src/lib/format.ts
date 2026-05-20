@@ -8,8 +8,10 @@ export function formatPhoneDisplay(value: string | null | undefined) {
 
 export function formatAccountNoDisplay(value: string | null | undefined) {
   if (!value) return null
+  const digits = value.replace(/\D/g, '')
+  if (digits.length === 10) return `${digits.slice(0, 3)} - ${digits.slice(3, 6)} - ${digits.slice(6)}`
 
-  return value.replace(/\D/g, '')
+  return digits
 }
 
 export function sanitizePhoneInput(value: string) {

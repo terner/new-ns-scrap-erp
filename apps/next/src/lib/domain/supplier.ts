@@ -43,6 +43,7 @@ type PrismaSupplier = {
     bank_name: string | null
     account_no: string | null
     account_name: string | null
+    branch_code: string | null
     is_primary: boolean | null
     active: boolean | null
   }>
@@ -55,6 +56,7 @@ type SupplierBankAccountWriteRow = {
   bank_name: string | null
   account_no: string | null
   account_name: string | null
+  branch_code: string | null
   is_primary: boolean
   active: boolean
 }
@@ -96,6 +98,7 @@ export function supplierBankAccountRows(values: SupplierFormValues, supplierId: 
         bank_name: null,
         account_no: null,
         account_name: null,
+        branch_code: null,
         is_primary: index === 0 || account.isPrimary,
         active: account.active,
       })
@@ -113,6 +116,7 @@ export function supplierBankAccountRows(values: SupplierFormValues, supplierId: 
       bank_name: normalizeBankName(account.bankName),
       account_no: accountNo,
       account_name: account.bankAccount || null,
+      branch_code: account.branchCode || null,
       is_primary: index === 0 || account.isPrimary,
       active: account.active,
     })
@@ -159,6 +163,7 @@ export function mapPrismaSupplier(row: PrismaSupplier): Supplier {
       bankName: normalizeBankName(account.bank_name),
       accountNo: normalizeAccountNo(account.account_no),
       bankAccount: account.account_name,
+      branchCode: account.branch_code,
       isPrimary: account.is_primary ?? false,
       active: account.active ?? true,
     })),

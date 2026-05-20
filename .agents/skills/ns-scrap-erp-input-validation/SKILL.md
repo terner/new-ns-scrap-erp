@@ -26,6 +26,7 @@ Follow `AGENTS.md` first. This skill expands the project rule that every new or 
 - Tax ID: validate expected digit length before saving.
 - Thai postcode: strip every non-digit character while typing/pasting, cap the value at 5 digits, and validate the same 5-digit rule in the shared schema/API boundary.
 - Bank account number: strip every non-digit character while typing/pasting and store account numbers as digits only. Do not keep spaces, dashes, Thai letters, English letters, or punctuation in `account_no` / `bank_account` fields. Keep account holder/name fields separate and text-capable.
+- Bank account display: render 10-digit account numbers as `XXX - XXX - XXXX` while preserving digit-only storage/submission.
 - Supplier receiving accounts: choose payment method before account fields. `เงินสด` does not require bank/account data; `โอนเงิน` must require a bank and digit-only account number. Imported cash markers such as `เงินสด` must be stripped from bank/account fields.
 - Codes/IDs: validate allowed characters and length; prefer stable machine-safe characters.
 - Numbers/money/percentages: validate min/max, integer vs decimal, and reject negative values unless the business rule allows them.

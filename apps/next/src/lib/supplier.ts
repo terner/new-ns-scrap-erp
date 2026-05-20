@@ -101,6 +101,7 @@ export const supplierBankAccountSchema = z.object({
   bankName: optionalGeneralText('ธนาคารรับเงิน', 120),
   accountNo: optionalAccountNoSchema,
   bankAccount: optionalGeneralText('ชื่อบัญชีรับเงิน', 160),
+  branchCode: optionalGeneralText('รหัสสาขา', 80),
   isPrimary: z.boolean().default(false),
   active: z.boolean().default(true),
 })

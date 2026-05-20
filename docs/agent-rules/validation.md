@@ -14,6 +14,7 @@ For every new or changed form/API field, define validation before saving data:
 - Tax ID inputs must strip/prevent every non-digit character while typing/pasting. Do not let spaces, dashes, Thai letters, English letters, or punctuation remain in the field. For Thai party tax IDs, limit the input to 13 digits and validate the same rule again in the shared schema/API boundary.
 - Thai postcode inputs must strip/prevent every non-digit character while typing/pasting and limit the visible value to 5 digits. Validate the same 5-digit rule again in the shared schema/API boundary.
 - Bank account number inputs must strip/prevent every non-digit character while typing/pasting. Store account numbers as digits only; do not keep spaces, dashes, Thai letters, English letters, or punctuation in `account_no` / `bank_account` fields. Keep account holder/name fields separate and text-capable.
+- Bank account number display should format 10-digit account numbers as `XXX - XXX - XXXX`, while still storing and submitting digits only.
 - Supplier receiving accounts must capture payment method first: `เงินสด` does not require bank/account fields, while `โอนเงิน` must validate bank and digit-only account number before save. Strip cash markers such as `เงินสด` from imported bank/account text instead of storing them in bank or account fields.
 - Show field-level error messages in the form for all validation failures.
 - Do not rely on HTML input types alone. Use Zod or the module's existing schema layer as the source of truth.

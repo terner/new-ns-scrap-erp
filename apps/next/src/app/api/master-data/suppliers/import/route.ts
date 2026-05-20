@@ -31,6 +31,7 @@ const headerMap = {
   addressSubdistrict: ['ตำบล/แขวง', 'ตำบล', 'แขวง', 'addressSubdistrict'],
   addressVillage: ['หมู่บ้าน/อาคาร', 'หมู่บ้าน', 'อาคาร', 'addressVillage'],
   bankAccount: ['ชื่อบัญชีรับเงิน', 'bankAccount'],
+  branchCode: ['รหัสสาขาบัญชี', 'รหัสสาขา', 'branchCode', 'branch_code'],
   bankName: ['ธนาคารรับเงิน', 'ธนาคาร', 'bankName'],
   code: ['รหัสผู้ขาย', 'code'],
   countryCode: ['รหัสประเทศ (ISO)', 'countryCode', 'country_code'],
@@ -53,6 +54,7 @@ type ImportBankAccount = {
   bankName: string | null
   accountNo: string | null
   bankAccount: string | null
+  branchCode: string | null
   isPrimary: boolean
   active: boolean
 }
@@ -141,6 +143,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
           bankName: null,
           accountNo: null,
           bankAccount: null,
+          branchCode: null,
           isPrimary: index === 0,
           active: true,
         })
@@ -150,9 +153,14 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
       const parts = text.split('//').map((part) => part.trim()).filter(Boolean)
       const startsWithTransfer = parts[0] === 'โอนเงิน'
       const bankName = stripCashMarker(startsWithTransfer ? parts[1] ?? '' : parts[0] ?? '')
-      const accountText = startsWithTransfer ? parts.slice(2).join(' ') : parts.slice(1).join(' ')
+      const accountText = startsWithTransfer ? parts[2] ?? text : parts[1] ?? text
       const accountNos = splitAccountNumbers(accountText || text)
-      const accountName = startsWithTransfer ? parts[3] ?? supplierName : parts[2] ?? supplierName
+      const branchPartIndex = startsWithTransfer ? 3 : 2
+      const branchPart = parts[branchPartIndex]?.startsWith('สาขา:') ? parts[branchPartIndex] : null
+      const branchCode = branchPart?.replace(/^สาขา:/, '').trim() || null
+      const accountName = startsWithTransfer
+        ? branchPart ? parts[4] ?? supplierName : parts[3] ?? supplierName
+        : branchPart ? parts[3] ?? supplierName : parts[2] ?? supplierName
       accountNos.forEach((accountNo, accountIndex) => {
         accounts.push({
           id: null,
@@ -160,6 +168,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
           bankName: bankName || null,
           accountNo,
           bankAccount: accountName || null,
+          branchCode,
           isPrimary: index === 0 && accountIndex === 0,
           active: true,
         })
@@ -171,6 +180,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
   const rawBankText = cellText(row, 'bankName')
   const rawAccountNo = cellText(row, 'accountNo')
   const rawAccountName = cellText(row, 'bankAccount') || supplierName || null
+  const rawBranchCode = cellText(row, 'branchCode') || null
   const parts = rawBankText.split('//')
   const bankName = stripCashMarker(parts[0] ?? rawBankText)
   const accountText = rawAccountNo || parts.slice(1).join(' ') || rawBankText
@@ -185,6 +195,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
         bankName: null,
         accountNo: null,
         bankAccount: null,
+        branchCode: null,
         isPrimary: true,
         active: true,
       }]
@@ -197,6 +208,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
     bankName: bankName || null,
     accountNo,
     bankAccount: rawAccountName,
+    branchCode: rawBranchCode,
     isPrimary: index === 0,
     active: true,
   }))

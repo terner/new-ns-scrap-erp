@@ -1864,6 +1864,7 @@ model supplier_bank_accounts {
   bank_name      String?
   account_no     String?
   account_name   String?
+  branch_code    String?
   is_primary     Boolean?  @default(false)
   active         Boolean?  @default(true)
   created_at     DateTime? @default(now()) @db.Timestamptz(6)

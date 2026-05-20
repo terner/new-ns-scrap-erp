@@ -26,6 +26,7 @@ const emptyBankAccount: SupplierBankAccountForm = {
   bankName: null,
   accountNo: null,
   bankAccount: null,
+  branchCode: null,
   isPrimary: true,
   active: true,
 }
@@ -84,6 +85,7 @@ function supplierToForm(supplier: Supplier): SupplierFormValues {
         bankName: supplier.bankName,
         accountNo: sanitizeAccountNoInput(supplier.accountNo),
         bankAccount: supplier.bankAccount,
+        branchCode: supplier.branchId,
         isPrimary: true,
         active: true,
       }]
@@ -131,6 +133,31 @@ function displayValue(value: string | number | null) {
   return value === null || value === '' ? '-' : value
 }
 
+function supplierReceivingLines(supplier: Supplier) {
+  const accounts = supplier.bankAccounts.filter((account) => account.active !== false)
+  if (accounts.length === 0 && (supplier.bankName || supplier.accountNo)) {
+    const branchSuffix = supplier.branchId ? ` (สาขา ${supplier.branchId})` : ''
+    return [{
+      bankName: `${supplier.bankName || 'โอนเงิน'}${branchSuffix}`,
+      accountNo: formatAccountNoDisplay(supplier.accountNo) || '-',
+      rawAccountNo: sanitizeAccountNoInput(supplier.accountNo ?? '') || null,
+    }]
+  }
+
+  return accounts.map((account) => {
+    if (account.paymentMethod === 'เงินสด') {
+      return { bankName: 'เงินสด', accountNo: '-', rawAccountNo: null }
+    }
+
+    const branchSuffix = account.branchCode ? ` (สาขา ${account.branchCode})` : ''
+    return {
+      bankName: `${account.bankName || 'โอนเงิน'}${branchSuffix}`,
+      accountNo: formatAccountNoDisplay(account.accountNo) || '-',
+      rawAccountNo: sanitizeAccountNoInput(account.accountNo ?? '') || null,
+    }
+  })
+}
+
 function uniqueValues<T>(values: T[]) {
   return Array.from(new Set(values))
 }
@@ -169,6 +196,7 @@ export function SuppliersPageClient() {
   const [salespersonFilter, setSalespersonFilter] = useState('')
   const [salespersons, setSalespersons] = useState<MasterDataRecord[]>([])
   const [bankNames, setBankNames] = useState<MasterDataRecord[]>([])
+  const [copiedAccountKey, setCopiedAccountKey] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -362,6 +390,27 @@ export function SuppliersPageClient() {
     return sortDirection === 'asc' ? ' ↑' : ' ↓'
   }
 
+  async function copyAccountNo(accountKey: string, accountNo: string) {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(accountNo)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = accountNo
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
+      setCopiedAccountKey(accountKey)
+      window.setTimeout(() => setCopiedAccountKey((current) => current === accountKey ? null : current), 1200)
+    } catch (caught) {
+      setError(getErrorMessage(caught, 'คัดลอกเลขบัญชีไม่ได้'))
+    }
+  }
+
   return (
     <section className="space-y-4">
       {error ? (
@@ -537,50 +586,83 @@ export function SuppliersPageClient() {
               </tr>
             </thead>
             <tbody>
-              {paginatedSuppliers.map((supplier) => (
-                <tr
-                  key={supplier.id}
-                  className="cursor-pointer border-t hover:bg-slate-50"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => void openEditForm(supplier)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      void openEditForm(supplier)
-                    }
-                  }}
-                >
-                  <td className="p-2 font-mono text-xs">{supplier.code}</td>
-                  <td className="p-2 font-medium">{supplier.name}</td>
-                  <td className="p-2 font-mono text-xs">{displayValue(supplier.taxId)}</td>
-                  <td className="p-2">{displayValue(supplier.type)}</td>
-                  <td className="p-2">{displayValue(formatPhoneDisplay(supplier.phone))}</td>
-                  <td className="p-2">{displayValue(supplier.bankName)}</td>
-                  <td className="p-2 font-mono text-xs">{displayValue(formatAccountNoDisplay(supplier.accountNo))}</td>
-                  <td className="p-2">{displayValue(supplier.salesName)}</td>
-                  <td className="p-2 text-center">
-                    <ActiveToggle
-                      checked={supplier.active}
-                      disabled={pendingToggleIds.has(supplier.id)}
-                      label={supplier.active ? 'ใช้งาน' : 'ปิด'}
-                      onChange={(active) => void handleToggleActive(supplier, active)}
-                    />
-                  </td>
-                  <td className="p-2 text-center">
-                    <button
-                      className="text-blue-600"
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
+              {paginatedSuppliers.map((supplier) => {
+                const receivingLines = supplierReceivingLines(supplier)
+                return (
+                  <tr
+                    key={supplier.id}
+                    className="cursor-pointer border-t hover:bg-slate-50"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => void openEditForm(supplier)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
                         void openEditForm(supplier)
-                      }}
-                    >
-                      แก้ไข
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      }
+                    }}
+                  >
+                    <td className="p-2 font-mono text-xs">{supplier.code}</td>
+                    <td className="p-2 font-medium">{supplier.name}</td>
+                    <td className="p-2 font-mono text-xs">{displayValue(supplier.taxId)}</td>
+                    <td className="p-2">{displayValue(supplier.type)}</td>
+                    <td className="p-2">{displayValue(formatPhoneDisplay(supplier.phone))}</td>
+                    <td className="p-2 align-top">
+                      {receivingLines.length ? (
+                        <div className="space-y-1">
+                          {receivingLines.map((line, index) => (
+                            <div key={`${supplier.id}-bank-${index}`} className="min-h-5 leading-5">{line.bankName}</div>
+                          ))}
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="p-2 align-top font-mono text-xs">
+                      {receivingLines.length ? (
+                        <div className="space-y-1">
+                          {receivingLines.map((line, index) => {
+                            const accountKey = `${supplier.id}-account-${index}`
+                            return (
+                              <div key={accountKey} className="flex min-h-5 items-center gap-2 leading-5">
+                                <span>{line.accountNo}</span>
+                                {line.rawAccountNo ? (
+                                  <CopyAccountButton
+                                    accountKey={accountKey}
+                                    accountNo={line.rawAccountNo}
+                                    copied={copiedAccountKey === accountKey}
+                                    label={line.accountNo}
+                                    onCopy={copyAccountNo}
+                                  />
+                                ) : null}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="p-2">{displayValue(supplier.salesName)}</td>
+                    <td className="p-2 text-center">
+                      <ActiveToggle
+                        checked={supplier.active}
+                        disabled={pendingToggleIds.has(supplier.id)}
+                        label={supplier.active ? 'ใช้งาน' : 'ปิด'}
+                        onChange={(active) => void handleToggleActive(supplier, active)}
+                      />
+                    </td>
+                    <td className="p-2 text-center">
+                      <button
+                        className="text-blue-600"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void openEditForm(supplier)
+                        }}
+                      >
+                        แก้ไข
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
               {paginatedSuppliers.length === 0 ? (
                 <tr>
                   <td className="p-4 text-center text-sm text-slate-500" colSpan={10}>ไม่พบข้อมูลที่ค้นหา</td>
@@ -604,6 +686,30 @@ type SupplierFormProps = {
   subdistricts: ThaiSubdistrict[]
   onCancel: () => void
   onSubmit: (values: SupplierFormValues) => Promise<void>
+}
+
+type CopyAccountButtonProps = {
+  accountKey: string
+  accountNo: string
+  copied: boolean
+  label: string
+  onCopy: (accountKey: string, accountNo: string) => Promise<void>
+}
+
+function CopyAccountButton({ accountKey, accountNo, copied, label, onCopy }: CopyAccountButtonProps) {
+  return (
+    <button
+      aria-label={`คัดลอกเลขบัญชี ${label}`}
+      className="rounded border border-slate-300 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation()
+        void onCopy(accountKey, accountNo)
+      }}
+    >
+      {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
+    </button>
+  )
 }
 
 function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, salespersons, subdistricts, onCancel, onSubmit }: SupplierFormProps) {
@@ -649,7 +755,7 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
         if (accountIndex !== index) return account
         const nextAccount = { ...account, [key]: value }
         if (key === 'paymentMethod' && value === 'เงินสด') {
-          return { ...nextAccount, bankName: null, accountNo: null, bankAccount: null }
+          return { ...nextAccount, bankName: null, accountNo: null, bankAccount: null, branchCode: null }
         }
         return nextAccount
       })
@@ -662,7 +768,7 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
       ...current,
       bankAccounts: [
         ...current.bankAccounts,
-        { ...emptyBankAccount, id: null, isPrimary: current.bankAccounts.length === 0 },
+        { ...emptyBankAccount, id: null, isPrimary: false },
       ],
     }))
   }
@@ -671,19 +777,8 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
     setForm((current) => {
       const bankAccounts = current.bankAccounts.filter((_, accountIndex) => accountIndex !== index)
       if (!bankAccounts.length) return { ...current, bankAccounts: [{ ...emptyBankAccount }] }
-      if (!bankAccounts.some((account) => account.isPrimary)) bankAccounts[0] = { ...bankAccounts[0], isPrimary: true }
       return { ...current, bankAccounts }
     })
-  }
-
-  function setPrimaryBankAccount(index: number) {
-    setForm((current) => ({
-      ...current,
-      bankAccounts: current.bankAccounts.map((account, accountIndex) => ({
-        ...account,
-        isPrimary: accountIndex === index,
-      })),
-    }))
   }
 
   function updatePostalCode(value: string) {
@@ -868,7 +963,7 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
               const isTransfer = account.paymentMethod === 'โอนเงิน'
               return (
                 <div key={`${account.id ?? 'new'}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid gap-4 md:grid-cols-5">
                     <SelectField required error={errors[`bankAccounts.${index}.paymentMethod`]} label="ช่องทางการชำระเงิน" value={account.paymentMethod} onChange={(value) => updateBankAccount(index, 'paymentMethod', value as SupplierBankAccountForm['paymentMethod'])}>
                       <option value="เงินสด">เงินสด</option>
                       <option value="โอนเงิน">โอนเงิน</option>
@@ -881,24 +976,11 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
                         </SelectField>
                         <TextField required error={errors[`bankAccounts.${index}.accountNo`]} label="เลขที่บัญชีรับเงิน" value={account.accountNo ?? ''} onChange={(value) => updateBankAccount(index, 'accountNo', value || null)} />
                         <TextField error={errors[`bankAccounts.${index}.bankAccount`]} label="ชื่อบัญชีรับเงิน" value={account.bankAccount ?? ''} onChange={(value) => updateBankAccount(index, 'bankAccount', value || null)} />
+                        <TextField error={errors[`bankAccounts.${index}.branchCode`]} label="รหัสสาขา" value={account.branchCode ?? ''} onChange={(value) => updateBankAccount(index, 'branchCode', value || null)} />
                       </>
-                    ) : (
-                      <div className="flex items-end text-sm text-slate-500 md:col-span-3">
-                        เงินสดไม่ต้องกรอกข้อมูลบัญชีรับเงิน
-                      </div>
-                    )}
+                    ) : null}
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
-                      <input
-                        checked={account.isPrimary}
-                        className="h-4 w-4"
-                        name="primarySupplierBankAccount"
-                        type="radio"
-                        onChange={() => setPrimaryBankAccount(index)}
-                      />
-                      ใช้เป็นช่องทางหลัก
-                    </label>
+                  <div className="mt-3 flex flex-wrap justify-end gap-2">
                     {form.bankAccounts.length > 1 ? (
                       <button className="text-xs font-semibold text-red-700 hover:text-red-900" type="button" onClick={() => removeBankAccount(index)}>
                         ลบบัญชี
@@ -909,9 +991,6 @@ function SupplierForm({ supplier, bankNames, districts, isSaving, provinces, sal
               )
             })}
             {errors.bankAccounts ? <div className="text-xs text-red-700">{errors.bankAccounts}</div> : null}
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-4">
-            <TextField error={errors.branchId} label="รหัสสาขา" value={form.branchId ?? ''} onChange={(value) => update('branchId', value || null)} />
           </div>
         </section>
 
