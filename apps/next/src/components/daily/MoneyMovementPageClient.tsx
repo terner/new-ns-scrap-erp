@@ -418,18 +418,20 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
     <section className="space-y-5">
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className={`rounded-lg bg-gradient-to-r ${theme.banner} p-5 text-white shadow`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold opacity-90">{subtitle}</div>
-            <h1 className="text-2xl font-bold">{mode === 'payment' ? 'จ่ายเงิน Supplier' : 'รับเงิน Customer'}</h1>
-            <p className="mt-1 text-sm opacity-90">{mode === 'payment' ? 'บันทึกเงินออกจากบัญชีและประวัติ voucher จ่าย Supplier' : 'บันทึกเงินเข้าบัญชีและประวัติ voucher รับ Customer'}</p>
+      {mode === 'payment' ? null : (
+        <div className={`rounded-lg bg-gradient-to-r ${theme.banner} p-5 text-white shadow`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold opacity-90">{subtitle}</div>
+              <h1 className="text-2xl font-bold">รับเงิน Customer</h1>
+              <p className="mt-1 text-sm opacity-90">บันทึกเงินเข้าบัญชีและประวัติ voucher รับ Customer</p>
+            </div>
+            <button className={`rounded-lg px-4 py-2 text-sm font-bold text-white shadow ${theme.action}`} type="button" onClick={openForm}>
+              + รับเงิน Customer
+            </button>
           </div>
-          <button className={`rounded-lg px-4 py-2 text-sm font-bold text-white shadow ${theme.action}`} type="button" onClick={openForm}>
-            {mode === 'payment' ? '+ จ่ายเงิน Supplier' : '+ รับเงิน Customer'}
-          </button>
         </div>
-      </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-5">
         <KpiCard label="จำนวน Voucher" value={rows.length.toLocaleString('th-TH')} tone="slate" />

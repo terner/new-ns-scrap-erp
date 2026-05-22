@@ -170,7 +170,7 @@ export const navigationItems: NavigationItem[] = [
   { href: '/sales/bills', icon: '📤', label: 'บิลขาย', pageTitle: 'บิลขาย-ดูบิลขาย, สถานะรับเงิน, Gross Profit, ค้างรับ และ Trading match baseline', section: 'daily' },
   { href: '/sales/stock-issue', icon: '📦', label: 'เบิกออกรอบิล (Pending Sale)', section: 'daily' },
   { href: '/daily/payment-approval', icon: '✅', label: 'อนุมัติโอนเงิน (Payment Approval)', section: 'daily' },
-  { href: '/purchase/payments', icon: '💸', label: 'จ่ายเงิน Supplier', section: 'daily' },
+  { href: '/purchase/payments', icon: '💸', label: 'จ่ายเงิน Supplier', pageTitle: 'จ่ายเงิน Supplier-บันทึกเงินออกจากบัญชีและประวัติ voucher จ่าย Supplier', section: 'daily' },
   { href: '/purchase/receipt-vouchers', icon: '🧾', label: 'ใบสำคัญรับเงิน (Receipt Voucher)', section: 'daily' },
   { href: '/sales/receipts', icon: '💰', label: 'รับเงิน Customer', section: 'daily' },
   { href: '/daily/transfer', icon: '🔄', label: 'โอนเงินระหว่างบัญชี', section: 'daily' },
