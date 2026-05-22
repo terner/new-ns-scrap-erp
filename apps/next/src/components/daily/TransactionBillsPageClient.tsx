@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { purchaseBillFormSchema, type PurchaseBillFormValues } from '@/lib/purchase-bill'
 
@@ -168,6 +169,7 @@ const initialPurchaseForm = (): PurchaseBillFormValues => ({
 })
 
 export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientProps) {
+  const router = useRouter()
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -290,6 +292,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     }
     setSortKey(nextKey)
     setSortDirection(nextKey === 'date' || nextKey === 'totalAmount' || nextKey === 'outstanding' ? 'desc' : 'asc')
+  }
+
+  function openRow(row: BillRow | StockIssueRow) {
+    if (mode !== 'purchase' || isStockIssueRow(row)) return
+    router.push(`/purchase/bills/${row.id}`)
   }
 
   function openPurchaseForm() {
@@ -580,7 +587,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && pageRows.map((row) => (
-              <tr key={row.id} className="border-t hover:bg-slate-50">
+              <tr key={row.id} className={`border-t hover:bg-slate-50 ${mode === 'purchase' && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 font-mono text-xs text-slate-600">{row.refNo || '-'}</td> : null}
                 <td className="p-2">{row.date}</td>
