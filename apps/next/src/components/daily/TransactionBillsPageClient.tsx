@@ -542,7 +542,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ · รวม <span className="font-semibold text-blue-700">{formatMoney(total)}</span></div>
+        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             aria-label="จำนวนรายการต่อหน้า"
