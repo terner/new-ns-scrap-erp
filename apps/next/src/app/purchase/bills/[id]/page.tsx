@@ -67,10 +67,9 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-4">
-      <PageTitleOverride title={`รายละเอียดบิลรับซื้อ ${bill.doc_no}`} />
-      <div className="flex flex-wrap justify-end gap-2">
+      <PageTitleOverride breadcrumbLabel={bill.doc_no} title={`รายละเอียดบิลรับซื้อ - ${bill.doc_no}`} />
+      <div className="flex flex-wrap justify-start gap-2">
         <Link className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50" href="/purchase/bills">กลับรายการ</Link>
-        <button className="rounded-lg bg-slate-300 px-4 py-2 text-sm font-semibold text-slate-600" disabled type="button">แก้ไขเร็ว ๆ นี้</button>
       </div>
 
       <section className="grid gap-3 md:grid-cols-4">

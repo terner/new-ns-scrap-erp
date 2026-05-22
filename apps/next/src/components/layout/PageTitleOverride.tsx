@@ -5,17 +5,23 @@ import { useEffect } from 'react'
 const PAGE_TITLE_EVENT = 'ns-scrap-erp-page-title'
 
 type PageTitleOverrideProps = {
+  breadcrumbLabel?: string
   title: string
 }
 
-export function PageTitleOverride({ title }: PageTitleOverrideProps) {
+export function PageTitleOverride({ breadcrumbLabel, title }: PageTitleOverrideProps) {
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent(PAGE_TITLE_EVENT, { detail: { title } }))
+    const detail = { breadcrumbLabel, title }
+    window.dispatchEvent(new CustomEvent(PAGE_TITLE_EVENT, { detail }))
+    const timer = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(PAGE_TITLE_EVENT, { detail }))
+    }, 0)
 
     return () => {
-      window.dispatchEvent(new CustomEvent(PAGE_TITLE_EVENT, { detail: { title: null } }))
+      window.clearTimeout(timer)
+      window.dispatchEvent(new CustomEvent(PAGE_TITLE_EVENT, { detail: { breadcrumbLabel: null, title: null } }))
     }
-  }, [title])
+  }, [breadcrumbLabel, title])
 
   return null
 }

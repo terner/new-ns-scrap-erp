@@ -25,19 +25,27 @@ export function AppShell({ children }: AppShellProps) {
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [breadcrumbLabelOverride, setBreadcrumbLabelOverride] = useState<string | null>(null)
   const [titleOverride, setTitleOverride] = useState<string | null>(null)
   const lastActivityPathRef = useRef<string | null>(null)
   const title = titleOverride ?? pageTitleForPath(pathname)
   const breadcrumbs = breadcrumbsForPath(pathname)
+  const renderedBreadcrumbs = breadcrumbLabelOverride && breadcrumbs.length > 0
+    ? breadcrumbs.map((breadcrumb, index) => (index === breadcrumbs.length - 1 ? { ...breadcrumb, label: breadcrumbLabelOverride } : breadcrumb))
+    : breadcrumbs
   const isAuthPage = pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
 
   useEffect(() => {
+    setBreadcrumbLabelOverride(null)
     setTitleOverride(null)
   }, [pathname])
 
   useEffect(() => {
     function handlePageTitle(event: Event) {
-      const nextTitle = (event as CustomEvent<{ title?: string | null }>).detail?.title
+      const detail = (event as CustomEvent<{ breadcrumbLabel?: string | null; title?: string | null }>).detail
+      const nextBreadcrumbLabel = detail?.breadcrumbLabel
+      const nextTitle = detail?.title
+      setBreadcrumbLabelOverride(nextBreadcrumbLabel || null)
       setTitleOverride(nextTitle || null)
     }
 
@@ -156,11 +164,11 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        {breadcrumbs.length > 0 ? (
+        {renderedBreadcrumbs.length > 0 ? (
           <nav aria-label="Breadcrumb" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500 lg:px-6">
             <ol className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {breadcrumbs.map((breadcrumb, index) => {
-                const isLast = index === breadcrumbs.length - 1
+              {renderedBreadcrumbs.map((breadcrumb, index) => {
+                const isLast = index === renderedBreadcrumbs.length - 1
                 return (
                   <li className="flex min-w-0 items-center gap-1.5" key={`${breadcrumb.label}-${index}`}>
                     {breadcrumb.href && !isLast ? (
