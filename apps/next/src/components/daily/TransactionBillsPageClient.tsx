@@ -530,7 +530,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             <Segment value="" current={filterMode} label="ทั้งหมด" onClick={setFilterMode} />
             <Segment value="STOCK" current={filterMode} label="📦 STOCK" onClick={setFilterMode} />
             <Segment value="TRADING" current={filterMode} label="🔄 TRADING" onClick={setFilterMode} />
-            <span className="ml-auto text-xs text-slate-500">📊 พบ <b className="text-slate-700">{totalRows.toLocaleString('th-TH')}</b> บิล</span>
           </div>
         ) : null}
       </div>
