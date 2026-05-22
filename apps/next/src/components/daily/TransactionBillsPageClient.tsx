@@ -511,7 +511,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <span className="text-slate-400">→</span>
           <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
           {(search || dateFrom || dateTo || filterMode) ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง Filter</button> : null}
-          {mode === 'purchase' ? <button className="ml-auto rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : `📥 Export Excel (${totalRows})`}</button> : null}
+          {mode === 'purchase' ? <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : `Export Excel (${totalRows})`}</button> : null}
           {mode === 'purchase' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</button> : null}
           {mode === 'sales' ? <button className="ml-auto rounded bg-amber-100 px-3 py-2 text-xs font-bold text-amber-700 opacity-70" disabled type="button">🔄 Recalc กำไร</button> : null}
           {mode === 'stock-issue' ? (
