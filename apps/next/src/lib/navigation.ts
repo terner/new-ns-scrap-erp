@@ -22,6 +22,11 @@ export type NavigationItem = {
   section: NavigationSectionKey
 }
 
+export type BreadcrumbItem = {
+  href?: string
+  label: string
+}
+
 const exactPathPermissions: Record<string, string> = {
   '/admin/audit': 'system.audit.view',
   '/admin/company-profile': 'system.settings.manage',
@@ -280,4 +285,35 @@ export function pageTitleForPath(pathname: string) {
   }
 
   return 'NS Scrap ERP'
+}
+
+export function breadcrumbsForPath(pathname: string): BreadcrumbItem[] {
+  if (pathname === '/login') return []
+
+  const normalizedPath = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname
+
+  for (const item of navigationItems) {
+    const sectionLabel = navigationSections.find((section) => section.key === item.section)?.label
+    const child = item.children?.find((entry) => entry.href === normalizedPath)
+
+    if (child) {
+      return [
+        ...(sectionLabel ? [{ label: sectionLabel }] : []),
+        { href: item.href, label: item.label },
+        { label: child.label },
+      ]
+    }
+
+    if (item.href === normalizedPath) {
+      return [
+        ...(sectionLabel ? [{ label: sectionLabel }] : []),
+        { label: item.label },
+      ]
+    }
+  }
+
+  return normalizedPath
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => ({ label: decodeURIComponent(segment) }))
 }

@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { AuthStatus } from '@/components/layout/AuthStatus'
-import { pageTitleForPath } from '@/lib/navigation'
+import { breadcrumbsForPath, pageTitleForPath } from '@/lib/navigation'
 
 type AppShellProps = {
   children: React.ReactNode
@@ -25,6 +26,7 @@ export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const lastActivityPathRef = useRef<string | null>(null)
   const title = pageTitleForPath(pathname)
+  const breadcrumbs = breadcrumbsForPath(pathname)
   const isAuthPage = pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
 
   useEffect(() => {
@@ -137,6 +139,28 @@ export function AppShell({ children }: AppShellProps) {
             <AuthStatus />
           </div>
         </header>
+
+        {breadcrumbs.length > 0 ? (
+          <nav aria-label="Breadcrumb" className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500 lg:px-6">
+            <ol className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {breadcrumbs.map((breadcrumb, index) => {
+                const isLast = index === breadcrumbs.length - 1
+                return (
+                  <li className="flex min-w-0 items-center gap-1.5" key={`${breadcrumb.label}-${index}`}>
+                    {breadcrumb.href && !isLast ? (
+                      <Link className="max-w-52 truncate font-medium text-slate-600 hover:text-blue-700 hover:underline" href={breadcrumb.href}>
+                        {breadcrumb.label}
+                      </Link>
+                    ) : (
+                      <span className={isLast ? 'max-w-[36rem] truncate font-semibold text-slate-700' : 'max-w-52 truncate'}>{breadcrumb.label}</span>
+                    )}
+                    {!isLast ? <span className="text-slate-300">/</span> : null}
+                  </li>
+                )
+              })}
+            </ol>
+          </nav>
+        ) : null}
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
