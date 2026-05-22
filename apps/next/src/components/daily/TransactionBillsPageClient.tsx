@@ -2,7 +2,6 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { purchaseBillFormSchema, type PurchaseBillFormValues } from '@/lib/purchase-bill'
 
@@ -169,13 +168,11 @@ const initialPurchaseForm = (): PurchaseBillFormValues => ({
 })
 
 export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientProps) {
-  const router = useRouter()
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [filterMode, setFilterMode] = useState(mode === 'stock-issue' ? 'pending' : '')
-  const [filterSource, setFilterSource] = useState('')
   const [form, setForm] = useState<PurchaseBillFormValues>(initialPurchaseForm())
   const [editingBillId, setEditingBillId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -205,9 +202,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     if (dateTo) params.set('dateTo', dateTo)
     if (mode === 'purchase' && filterMode) params.set('filterMode', filterMode)
     if (mode === 'stock-issue' && filterMode) params.set('status', filterMode)
-    if (mode === 'purchase' && filterSource) params.set('filterSource', filterSource)
     return `${apiPath}?${params.toString()}`
-  }, [apiPath, dateFrom, dateTo, filterMode, filterSource, mode, page, pageSize, search, sortDirection, sortKey])
+  }, [apiPath, dateFrom, dateTo, filterMode, mode, page, pageSize, search, sortDirection, sortKey])
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -247,7 +243,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
   useEffect(() => {
     setPage(1)
-  }, [dateFrom, dateTo, filterMode, filterSource, pageSize, search, sortDirection, sortKey])
+  }, [dateFrom, dateTo, filterMode, pageSize, search, sortDirection, sortKey])
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -278,14 +274,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const stockIssueQty = stockIssueRows.reduce((sum, row) => sum + (row.totalQty ?? 0), 0)
   const stockIssueCost = stockIssueRows.reduce((sum, row) => sum + row.totalCost, 0)
   const stockIssueEst = stockIssueRows.reduce((sum, row) => sum + row.totalEstAmount, 0)
-  const tableColSpan = mode === 'purchase' ? 13 : mode === 'sales' ? 13 : 10
+  const tableColSpan = mode === 'purchase' ? 10 : mode === 'sales' ? 13 : 10
 
   function clearFilters() {
     setSearch('')
     setDateFrom('')
     setDateTo('')
     setFilterMode('')
-    setFilterSource('')
   }
 
   function changeSort(nextKey: SortKey) {
@@ -295,11 +290,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     }
     setSortKey(nextKey)
     setSortDirection(nextKey === 'date' || nextKey === 'totalAmount' || nextKey === 'outstanding' ? 'desc' : 'asc')
-  }
-
-  function openRow(row: BillRow | StockIssueRow) {
-    if (mode !== 'purchase' || isStockIssueRow(row)) return
-    router.push(`/purchase/bills/${row.id}`)
   }
 
   function openPurchaseForm() {
@@ -429,7 +419,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
       if (filterMode) params.set('filterMode', filterMode)
-      if (filterSource) params.set('filterSource', filterSource)
       const response = await fetch(`/api/purchase/bills?${params.toString()}`, { cache: 'no-store' })
       if (!response.ok) throw new Error('Export Excel ไม่สำเร็จ')
       const blob = await response.blob()
@@ -519,7 +508,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
           <span className="text-slate-400">→</span>
           <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-          {(search || dateFrom || dateTo || filterMode || filterSource) ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง Filter</button> : null}
+          {(search || dateFrom || dateTo || filterMode) ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง Filter</button> : null}
           {mode === 'purchase' ? <button className="ml-auto rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : `📥 Export Excel (${totalRows})`}</button> : null}
           {mode === 'purchase' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</button> : null}
           {mode === 'sales' ? <button className="ml-auto rounded bg-amber-100 px-3 py-2 text-xs font-bold text-amber-700 opacity-70" disabled type="button">🔄 Recalc กำไร</button> : null}
@@ -541,12 +530,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             <Segment value="" current={filterMode} label="ทั้งหมด" onClick={setFilterMode} />
             <Segment value="STOCK" current={filterMode} label="📦 STOCK" onClick={setFilterMode} />
             <Segment value="TRADING" current={filterMode} label="🔄 TRADING" onClick={setFilterMode} />
-            <span className="mx-2 text-slate-300">|</span>
-            <span className="text-xs text-slate-500">ที่มา:</span>
-            <Segment value="" current={filterSource} label="ทั้งหมด" onClick={setFilterSource} />
-            <Segment value="SPOT_BUY" current={filterSource} label="📦 SPOT BUY" onClick={setFilterSource} />
-            <Segment value="PO_RECEIPT" current={filterSource} label="📋 PO_RECEIPT" onClick={setFilterSource} />
-            <Segment value="MIXED" current={filterSource} label="🔀 ผสม" onClick={setFilterSource} />
             <span className="ml-auto text-xs text-slate-500">📊 พบ <b className="text-slate-700">{totalRows.toLocaleString('th-TH')}</b> บิล</span>
           </div>
         ) : null}
@@ -579,7 +562,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               {mode === 'sales' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่อ้างอิง" sortKey="refNo" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} sortKey="name" onSort={changeSort} />
-              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" sortKey="warehouse" onSort={changeSort} />
+              {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" sortKey="warehouse" onSort={changeSort} /> : null}
               {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" sortKey="transactionMode" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" sortKey="itemCount" onSort={changeSort} />
@@ -589,7 +572,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               {mode === 'sales' ? <th className="p-2 text-right">GP / Margin</th> : null}
               {mode === 'sales' ? <th className="p-2 text-right">รับแล้ว</th> : null}
               {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ค้างชำระ" sortKey="outstanding" onSort={changeSort} /> : null}
-              {mode !== 'stock-issue' ? <th className="p-2 text-center">VAT</th> : null}
+              {mode === 'sales' ? <th className="p-2 text-center">VAT</th> : null}
               {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="ผู้กรอก / เวลา" sortKey="createdBy" onSort={changeSort} /> : null}
               {mode === 'purchase' ? <th className="p-2 text-right">จัดการ</th> : null}
               {mode === 'sales' ? <th className="p-2 text-right">จัดการ</th> : null}
@@ -598,12 +581,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && pageRows.map((row) => (
-              <tr key={row.id} className={`border-t hover:bg-slate-50 ${mode === 'purchase' && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
+              <tr key={row.id} className="border-t hover:bg-slate-50">
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 font-mono text-xs text-slate-600">{row.refNo || '-'}</td> : null}
                 <td className="p-2">{row.date}</td>
                 <td className="p-2">{'supplierName' in row ? row.supplierName : row.customerName}</td>
-                <td className="p-2">{formatBranchWarehouse(row)}</td>
+                {mode !== 'purchase' ? <td className="p-2">{formatBranchWarehouse(row)}</td> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{row.transactionMode ?? '-'}</span></td> : null}
                 <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(row.status)}`}>{statusText(row.status)}</span></td>
                 <td className="p-2 text-right">{row.itemCount}</td>
@@ -613,9 +596,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className={`p-2 text-right font-semibold ${(row.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><div>{formatMoney(row.grossProfit ?? 0)}</div><div className="text-xs text-slate-500">{formatMoney((row.totalAmount ?? 0) > 0 ? (row.grossProfit ?? 0) / (row.totalAmount ?? 1) * 100 : 0)}%</div></td> : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-right text-blue-700">{formatMoney(row.receivedAmount ?? 0)}</td> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-right text-red-700">{formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)}</td> : null}
-                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${(mode === 'purchase' ? row.vatInvoiceReceived : row.vatInvoiceIssued) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{mode === 'purchase' ? row.vatInvoiceReceived ? 'ได้รับแล้ว' : 'รอติดตาม' : row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 font-mono text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
+                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.vatInvoiceIssued ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 font-mono text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-xs text-slate-600"><div>{row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.createdAt)}</div></td> : null}
-                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openRow(row) }}>อ่าน</button><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}>แก้ไข</button><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-400" disabled type="button">พิมพ์</button></div></td> : null}
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}>แก้ไข</button></div></td> : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 opacity-70" disabled type="button">อ่าน</button><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-400" disabled type="button">พิมพ์</button><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-400" disabled type="button">แก้</button></div></td> : null}
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1 whitespace-nowrap"><button className="rounded bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 opacity-70" disabled={row.status !== 'pending'} type="button">→ เปิดบิลขาย</button><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-400" disabled type="button">แก้</button><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-400" disabled type="button">ยกเลิก</button></div></td> : null}
               </tr>
