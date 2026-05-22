@@ -503,7 +503,7 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
           value={String(value ?? '')}
           onChange={(event) => onChange(event.target.value)}
         >
-          <option value="">ไม่ระบุ</option>
+          {!field.required ? <option value="">เลือก</option> : null}
           {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
         {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}

@@ -58,6 +58,7 @@ export async function POST(request: Request) {
     requirePermission(context, 'master.reference.manage')
 
     const values = parseMasterDataForm(await request.json())
+    if (!values.branchId) return errorJson(new Error('กรอกสาขา'), 'กรอกสาขา')
     const code = normalizeCode(values.code, values.id || '')
     const id = values.id || code
     const row = await prisma.warehouses.upsert({
