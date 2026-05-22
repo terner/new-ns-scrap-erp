@@ -69,6 +69,8 @@ type PoBuyRow = {
 }
 
 type FieldErrors = Record<string, string>
+type PoBuySortDirection = 'asc' | 'desc'
+type PoBuySortKey = 'date' | 'docNo' | 'expectedDelivery' | 'itemCount' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount'
 
 function blankItem(): PoBuyFormItem {
   return { productId: '', qty: 0, unitPrice: 0 }
@@ -122,6 +124,8 @@ export function PoBuyPageClient() {
   const [search, setSearch] = useState('')
   const [selectedRow, setSelectedRow] = useState<PoBuyRow | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [sortDirection, setSortDirection] = useState<PoBuySortDirection>('desc')
+  const [sortKey, setSortKey] = useState<PoBuySortKey>('date')
   const [status, setStatus] = useState('all')
   const [toDate, setToDate] = useState('')
 
@@ -214,7 +218,7 @@ export function PoBuyPageClient() {
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return (data?.rows ?? []).filter((row) => {
+    const filteredRows = (data?.rows ?? []).filter((row) => {
       if (filter === 'delivery' && !row.requireDelivery) return false
       if (filter === 'costing' && row.requireDelivery) return false
       if (status !== 'all' && row.status !== status) return false
@@ -223,7 +227,15 @@ export function PoBuyPageClient() {
       if (!query) return true
       return `${row.docNo} ${row.supplierName} ${row.productName} ${row.status} ${row.purposeLabel}`.toLowerCase().includes(query)
     })
-  }, [data?.rows, filter, fromDate, search, status, toDate])
+    return [...filteredRows].sort((left, right) => {
+      const leftValue = poBuySortValue(left, sortKey)
+      const rightValue = poBuySortValue(right, sortKey)
+      const result = typeof leftValue === 'number' && typeof rightValue === 'number'
+        ? leftValue - rightValue
+        : String(leftValue).localeCompare(String(rightValue), 'th')
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [data?.rows, filter, fromDate, search, sortDirection, sortKey, status, toDate])
 
   const openRows = (data?.rows ?? []).filter((row) => row.status.toLowerCase().includes('open'))
   const partialRows = (data?.rows ?? []).filter((row) => row.status.toLowerCase().includes('partial'))
@@ -256,6 +268,15 @@ export function PoBuyPageClient() {
     setSearch('')
     setStatus('all')
     setToDate('')
+  }
+
+  const changeSort = (nextKey: PoBuySortKey) => {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(nextKey)
+    setSortDirection(nextKey === 'date' ? 'desc' : 'asc')
   }
 
   const hasFilters = filter !== 'all' || status !== 'all' || fromDate || toDate || search.trim()
@@ -309,8 +330,8 @@ export function PoBuyPageClient() {
           <span className="text-slate-400">→</span>
           <input aria-label="วันที่สิ้นสุด" className="rounded-lg border px-2 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
           {hasFilters ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={resetFilters}>✕ ล้าง</button> : null}
-          <button className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ PO Buy ใหม่</button>
-          <a className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
+          <a className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" href={exportHref}>Export Excel</a>
+          <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ PO Buy ใหม่</button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">สถานะ:</span>
@@ -331,16 +352,16 @@ export function PoBuyPageClient() {
         <PurposeCard active={filter === 'all'} count={data?.summary.totalRows ?? 0} description="รวม PO Buy ทั้งหมด" label="📋 ทั้งหมด" onClick={() => setFilter('all')} tone="slate" />
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-lg bg-white shadow">
         <table className="w-full min-w-[1180px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-2 text-center">เลือก</th><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Supplier</th><th className="p-2 text-left">รายการ</th><th className="p-2 text-right">จำนวนรวม</th><th className="p-2 text-right">มูลค่ารวม</th><th className="p-2 text-right">รอรับรวม</th><th className="p-2 text-left">Delivery</th><th className="p-2 text-center">สถานะ</th><th className="p-2 text-right">Actions</th></tr></thead>
+          <thead className="bg-slate-100"><tr><th className="p-2 text-center font-semibold text-slate-700">เลือก</th><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Delivery" sortKey="expectedDelivery" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /></tr></thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={11}>ยังไม่มี PO Buy</td></tr> : null}
-            {!isLoading && rows.map((row) => (
-              <tr key={row.id} className={`border-t hover:bg-blue-50/30 ${!row.requireDelivery ? 'bg-emerald-50/30' : ''}`}>
-                <td className="p-2 text-center"><input aria-label={`เลือก ${row.docNo}`} type="checkbox" disabled /></td>
-                <td className="p-2 font-mono text-xs">{row.docNo}{!row.requireDelivery ? <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700">💰 Costing</span> : null}</td>
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={10}>ยังไม่มี PO Buy</td></tr> : null}
+            {!isLoading && rows.map((row, index) => (
+              <tr key={row.id} className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
+                <td className="p-2 text-center"><input aria-label={`เลือก ${row.docNo}`} type="checkbox" disabled onClick={(event) => event.stopPropagation()} /></td>
+                <td className="p-2 font-mono text-xs">{row.docNo}{!row.requireDelivery ? <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">Costing</span> : null}</td>
                 <td className="p-2">{row.date}</td>
                 <td className="p-2">{row.supplierName}</td>
                 <td className="max-w-72 truncate p-2 text-xs">{row.productName}</td>
@@ -349,11 +370,6 @@ export function PoBuyPageClient() {
                 <td className="p-2 text-right text-amber-700">{formatMoney(row.remainingQty)}</td>
                 <td className="p-2">{row.expectedDelivery || '-'}</td>
                 <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(row.status)}`}>{row.status}</span></td>
-                <td className="whitespace-nowrap p-2 text-right">
-                  <button className="mr-2 text-xs text-blue-600 hover:underline" type="button" onClick={() => setSelectedRow(row)}>ดู</button>
-                  <button className="mr-2 text-xs text-amber-600 opacity-50" type="button" disabled>ย้าย</button>
-                  <button className="text-xs text-red-600 opacity-50" type="button" disabled>ยกเลิก</button>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -396,6 +412,46 @@ function PurposeCard({ active, count, description, label, onClick, tone }: { act
   const activeClass = tone === 'emerald' ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : tone === 'indigo' ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-700 bg-slate-100 ring-2 ring-slate-300'
   const countClass = tone === 'emerald' ? 'text-emerald-700' : tone === 'indigo' ? 'text-indigo-700' : 'text-slate-700'
   return <button className={`rounded-xl border-2 p-3 text-left shadow-sm transition ${active ? activeClass : 'border-slate-200 bg-white hover:border-slate-400'}`} type="button" onClick={onClick}><div className="flex items-center justify-between"><div className="text-sm font-bold">{label}</div><div className={`text-2xl font-extrabold ${active ? countClass : 'text-slate-700'}`}>{count}</div></div><div className="mt-0.5 text-xs text-slate-500">{description}</div></button>
+}
+
+function poBuySortValue(row: PoBuyRow, key: PoBuySortKey) {
+  if (key === 'date') return row.date
+  if (key === 'docNo') return row.docNo
+  if (key === 'expectedDelivery') return row.expectedDelivery || '9999-12-31'
+  if (key === 'itemCount') return row.itemCount
+  if (key === 'productName') return row.productName
+  if (key === 'qty') return row.qty
+  if (key === 'remainingQty') return row.remainingQty
+  if (key === 'status') return row.status
+  if (key === 'supplierName') return row.supplierName
+  return row.totalAmount
+}
+
+function PoBuySortHeader({
+  activeKey,
+  align = 'left',
+  direction,
+  label,
+  sortKey,
+  onSort,
+}: {
+  activeKey: PoBuySortKey
+  align?: 'center' | 'left' | 'right'
+  direction: PoBuySortDirection
+  label: string
+  sortKey: PoBuySortKey
+  onSort: (key: PoBuySortKey) => void
+}) {
+  const active = activeKey === sortKey
+  const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
+  return (
+    <th className="p-0">
+      <button className={`flex w-full items-center gap-1 p-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
+        <span>{label}</span>
+        <span className="text-slate-400">{active ? (direction === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </button>
+    </th>
+  )
 }
 
 function statusButtonClass(status: string, active: boolean) {
