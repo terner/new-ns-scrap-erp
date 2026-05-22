@@ -60,10 +60,17 @@ function roundMoney(value: number) {
 }
 
 function parseMoneyInput(value: string) {
-  const normalized = value.replace(/,/g, '').trim()
+  const normalized = sanitizeMoneyInput(value).trim()
   if (!normalized) return 0
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function sanitizeMoneyInput(value: string) {
+  const normalized = value.replace(/,/g, '').replace(/[^\d.]/g, '')
+  const [whole = '', ...decimalParts] = normalized.split('.')
+  if (decimalParts.length === 0) return whole
+  return `${whole}.${decimalParts.join('')}`
 }
 
 function paymentCashAmountFromSettlement(totalAmount: number, ratePercent: number) {
@@ -135,6 +142,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
   const [billPageSize, setBillPageSize] = useState(25)
   const [form, setForm] = useState<MoneyForm>(() => initialForm(mode))
   const [isBillLocked, setIsBillLocked] = useState(false)
+  const [moneyDrafts, setMoneyDrafts] = useState<Record<string, string>>({})
 
   const apiPath = mode === 'payment' ? '/api/purchase/payments' : '/api/sales/receipts'
   const partyKey = mode === 'payment' ? 'supplierId' : 'customerId'
@@ -254,6 +262,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
 
   function openForm() {
     setForm(initialForm(mode))
+    setMoneyDrafts({})
     setIsBillLocked(false)
     setError(null)
     setFormOpen(true)
@@ -276,6 +285,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
       }],
       supplierId: bill.supplierId ?? '',
     } as unknown as MoneyForm)
+    setMoneyDrafts({})
     setIsBillLocked(true)
     setError(null)
     setFormOpen(true)
@@ -392,6 +402,29 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
 
   function updatePaymentSplit(index: number, patch: Partial<PaymentSplit>) {
     syncPaymentSplits(paymentSplits.map((split, splitIndex) => (splitIndex === index ? { ...split, ...patch } : split)))
+  }
+
+  function moneyInputValue(key: string, value: number) {
+    if (Object.prototype.hasOwnProperty.call(moneyDrafts, key)) return moneyDrafts[key]
+    return value ? formatMoney(value) : ''
+  }
+
+  function startMoneyInput(key: string, value: number) {
+    setMoneyDrafts((current) => ({ ...current, [key]: value ? String(value) : '' }))
+  }
+
+  function changeMoneyInput(key: string, rawValue: string, onValue: (value: number) => void) {
+    const nextValue = sanitizeMoneyInput(rawValue)
+    setMoneyDrafts((current) => ({ ...current, [key]: nextValue }))
+    onValue(parseMoneyInput(nextValue))
+  }
+
+  function finishMoneyInput(key: string) {
+    setMoneyDrafts((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
   }
 
   function normalizedPaymentForm() {
@@ -570,8 +603,8 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
               <button className="text-2xl text-slate-500" type="button" onClick={() => setFormOpen(false)}>&times;</button>
             </div>
             {mode === 'payment' ? (
-              <div className="space-y-4 p-5 text-sm">
-                <div className="max-w-xs">
+              <div className="flex flex-col gap-4 p-5 text-sm">
+                <div className="order-1 max-w-xs">
                   <label className="block">
                     <span className="mb-1 block text-xs">วิธีจ่าย</span>
                     <select className="w-full rounded border px-2 py-1.5 text-sm" required value={form.method ?? 'โอน'} onChange={(event) => setForm({ ...form, method: event.target.value })}>
@@ -583,7 +616,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                   </label>
                 </div>
 
-                <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
+                <div className="order-3 rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <h4 className="font-medium text-blue-900">💳 บัญชีจ่าย * <span className="text-xs font-normal text-slate-600">(เลือกได้หลายบัญชี กรณีวงเงินเต็ม → split)</span></h4>
                     <button className="rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700" type="button" onClick={addPaymentSplit}>+ เพิ่มบัญชี</button>
@@ -593,6 +626,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                       const splitAccount = activeAccounts.find((account) => account.id === split.accountId)
                       const splitBalance = splitAccount?.balance ?? 0
                       const splitAmount = Number(split.amount) || 0
+                      const splitAmountKey = `split-${split.id ?? splitIndex}-amount`
                       return (
                       <div key={split.id ?? splitIndex} className="grid grid-cols-12 items-center gap-2 rounded border bg-white p-2">
                         <div className="col-span-1 text-center text-xs font-bold text-slate-500">#{splitIndex + 1}</div>
@@ -613,8 +647,10 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                             inputMode="decimal"
                             placeholder={paymentSplits.length === 1 ? formatMoney(formNetAmount) : 'จำนวนเงิน'}
                             type="text"
-                            value={formatMoney(split.amount)}
-                            onChange={(event) => updatePaymentSplit(splitIndex, { amount: parseMoneyInput(event.target.value) })}
+                            value={moneyInputValue(splitAmountKey, splitAmount)}
+                            onBlur={() => finishMoneyInput(splitAmountKey)}
+                            onChange={(event) => changeMoneyInput(splitAmountKey, event.target.value, (amount) => updatePaymentSplit(splitIndex, { amount }))}
+                            onFocus={() => startMoneyInput(splitAmountKey, splitAmount)}
                           />
                         </div>
                         <div className="col-span-1 text-center">
@@ -635,7 +671,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                             </label>
                             <label className="block text-amber-700">
                               <span>➖ จ่าย</span>
-                              <input className="mt-1 w-full bg-transparent p-0 text-right font-semibold text-amber-700 disabled:opacity-100" disabled type="text" value={formatMoney(splitAmount)} />
+                              <input className="mt-1 w-full bg-transparent p-0 text-right font-semibold text-amber-700 disabled:opacity-100" disabled type="text" value={splitAmount ? formatMoney(splitAmount) : ''} />
                             </label>
                             <label className="block text-emerald-700">
                               <span>📊 หลังจ่าย</span>
@@ -663,7 +699,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                   </div>
                 </div>
 
-                <div>
+                <div className="order-2">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <h4 className="font-semibold text-slate-800">รายการจ่าย ({paymentLines.length}) — เลือกบิลที่ต้องการจ่ายได้เลย ระบบจะ auto-fill Supplier</h4>
                     <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700" type="button" onClick={addPaymentLine}>+ เพิ่มบรรทัด</button>
@@ -687,6 +723,9 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                           const lineBill = line.billId ? billMap.get(line.billId) : null
                           const lineBalance = lineBill?.payableBalance ?? 0
                           const lineBillOptions = paymentSelectableBillsForLine(lineIndex)
+                          const lineAmountKey = `line-${line.id ?? lineIndex}-amount`
+                          const lineDiscountKey = `line-${line.id ?? lineIndex}-discount`
+                          const lineFeeKey = `line-${line.id ?? lineIndex}-fee`
                           return (
                             <tr key={line.id ?? lineIndex} className="border-t">
                               <td className="p-1">
@@ -709,10 +748,10 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                                 </datalist>
                               </td>
                               <td className="p-1"><input className="w-full rounded border bg-slate-50 px-1 py-1 text-right text-amber-700 disabled:opacity-100" disabled type="text" value={formatMoney(lineBalance)} /></td>
-                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={formatMoney(line.amount)} onChange={(event) => updatePaymentLine(lineIndex, { amount: parseMoneyInput(event.target.value) })} /></td>
+                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={moneyInputValue(lineAmountKey, Number(line.amount) || 0)} onBlur={() => finishMoneyInput(lineAmountKey)} onChange={(event) => changeMoneyInput(lineAmountKey, event.target.value, (amount) => updatePaymentLine(lineIndex, { amount }))} onFocus={() => startMoneyInput(lineAmountKey, Number(line.amount) || 0)} /></td>
                               <td className="p-1"><input className="w-full rounded border bg-slate-50 px-1 py-1 text-right disabled:opacity-100" disabled type="text" value={formatMoney(line.withholdingTax)} /></td>
-                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={formatMoney(line.discount)} onChange={(event) => updatePaymentLine(lineIndex, { discount: parseMoneyInput(event.target.value) })} /></td>
-                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={formatMoney(line.fee)} onChange={(event) => updatePaymentLine(lineIndex, { fee: parseMoneyInput(event.target.value) })} /></td>
+                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={moneyInputValue(lineDiscountKey, Number(line.discount) || 0)} onBlur={() => finishMoneyInput(lineDiscountKey)} onChange={(event) => changeMoneyInput(lineDiscountKey, event.target.value, (discount) => updatePaymentLine(lineIndex, { discount }))} onFocus={() => startMoneyInput(lineDiscountKey, Number(line.discount) || 0)} /></td>
+                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={moneyInputValue(lineFeeKey, Number(line.fee) || 0)} onBlur={() => finishMoneyInput(lineFeeKey)} onChange={(event) => changeMoneyInput(lineFeeKey, event.target.value, (fee) => updatePaymentLine(lineIndex, { fee }))} onFocus={() => startMoneyInput(lineFeeKey, Number(line.fee) || 0)} /></td>
                               <td className="p-1 text-center"><button className="px-1 text-red-500 disabled:text-slate-300" disabled={paymentLines.length <= 1 || (isBillLocked && lineIndex === 0)} type="button" onClick={() => removePaymentLine(lineIndex)}>×</button></td>
                             </tr>
                           )
@@ -735,7 +774,9 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                   <div className="mt-1 text-xs text-slate-500">* Net Cash Out = ยอดจ่าย - WHT + Bank Fee</div>
                 </div>
 
-                <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+                <div className="order-4">
+                  <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+                </div>
               </div>
             ) : (
               <>
