@@ -49,6 +49,7 @@ type PoBuyItem = {
 }
 
 type PoBuyRow = {
+  branchId: string
   createdBy: string
   date: string
   docNo: string
@@ -56,6 +57,7 @@ type PoBuyRow = {
   id: string
   itemCount: number
   items: PoBuyItem[]
+  notes: string
   productName: string
   purpose: string
   purposeLabel: string
@@ -64,6 +66,7 @@ type PoBuyRow = {
   remainingQty: number
   requireDelivery: boolean
   status: string
+  supplierId: string
   supplierName: string
   totalAmount: number
 }
@@ -113,13 +116,20 @@ function searchableText(option: Option) {
 }
 
 export function PoBuyPageClient() {
+  const [cancelNote, setCancelNote] = useState('')
+  const [cancelNoteError, setCancelNoteError] = useState('')
+  const [cancelingRow, setCancelingRow] = useState<PoBuyRow | null>(null)
   const [data, setData] = useState<PoBuyPayload | null>(null)
+  const [editingPoId, setEditingPoId] = useState<string | null>(null)
+  const [editingPoNo, setEditingPoNo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [form, setForm] = useState<PoBuyFormState>(() => blankForm())
   const [fromDate, setFromDate] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
   const [selectedPoIds, setSelectedPoIds] = useState<string[]>([])
   const [selectedRow, setSelectedRow] = useState<PoBuyRow | null>(null)
@@ -152,10 +162,40 @@ export function PoBuyPageClient() {
   }, [form.items])
 
   const openCreateForm = () => {
+    setEditingPoId(null)
+    setEditingPoNo(null)
     setForm(blankForm())
     setFieldErrors({})
     setError(null)
     setShowForm(true)
+  }
+
+  const openEditForm = (row: PoBuyRow) => {
+    setEditingPoId(row.id)
+    setEditingPoNo(row.docNo)
+    setSelectedRow(null)
+    setForm({
+      branchId: row.branchId,
+      expectedDelivery: row.expectedDelivery,
+      items: row.items.map((item) => ({
+        productId: item.productId,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+      })),
+      notes: row.notes ?? '',
+      requireDelivery: true,
+      supplierId: row.supplierId,
+    })
+    setFieldErrors({})
+    setError(null)
+    setShowForm(true)
+  }
+
+  const openCancelDialog = (row: PoBuyRow) => {
+    setCancelingRow(row)
+    setCancelNote('')
+    setCancelNoteError('')
+    setError(null)
   }
 
   const updateForm = <Key extends keyof PoBuyFormState>(key: Key, value: PoBuyFormState[Key]) => {
@@ -203,14 +243,43 @@ export function PoBuyPageClient() {
     try {
       const payload: PoBuyFormValues = parsed.data
       const created = await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
-        body: JSON.stringify(payload),
-        method: 'POST',
+        body: JSON.stringify(editingPoId ? { ...payload, id: editingPoId } : payload),
+        method: editingPoId ? 'PUT' : 'POST',
       })
       setShowForm(false)
+      setEditingPoId(null)
+      setEditingPoNo(null)
       setSearch(created.docNo)
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'บันทึก PO Buy ไม่ได้')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const submitCancel = async () => {
+    if (!cancelingRow) return
+    const note = cancelNote.trim()
+    if (!note) {
+      setCancelNoteError('กรอกหมายเหตุการยกเลิก')
+      return
+    }
+
+    setError(null)
+    setCancelNoteError('')
+    setIsSaving(true)
+    try {
+      const cancelled = await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
+        body: JSON.stringify({ id: cancelingRow.id, note }),
+        method: 'PATCH',
+      })
+      setCancelingRow(null)
+      setCancelNote('')
+      setSearch(cancelled.docNo)
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ยกเลิก PO Buy ไม่ได้')
     } finally {
       setIsSaving(false)
     }
@@ -234,6 +303,10 @@ export function PoBuyPageClient() {
       return sortDirection === 'asc' ? result : -result
     })
   }, [data?.rows, fromDate, search, sortDirection, sortKey, status, toDate])
+
+  useEffect(() => {
+    setPage(1)
+  }, [fromDate, pageSize, search, sortDirection, sortKey, status, toDate])
 
   const openRows = (data?.rows ?? []).filter((row) => row.status.toLowerCase().includes('open'))
   const partialRows = (data?.rows ?? []).filter((row) => row.status.toLowerCase().includes('partial'))
@@ -265,12 +338,16 @@ export function PoBuyPageClient() {
   }
 
   const hasFilters = status !== 'all' || fromDate || toDate || search.trim()
-  const allVisibleSelected = rows.length > 0 && rows.every((row) => selectedPoIds.includes(row.id))
+  const totalRows = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const allVisibleSelected = pageRows.length > 0 && pageRows.every((row) => selectedPoIds.includes(row.id))
 
   const toggleVisibleSelection = () => {
     setSelectedPoIds((current) => {
-      if (allVisibleSelected) return current.filter((id) => !rows.some((row) => row.id === id))
-      return [...new Set([...current, ...rows.map((row) => row.id)])]
+      if (allVisibleSelected) return current.filter((id) => !pageRows.some((row) => row.id === id))
+      return [...new Set([...current, ...pageRows.map((row) => row.id)])]
     })
   }
 
@@ -319,13 +396,33 @@ export function PoBuyPageClient() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="rounded border border-slate-300 px-2 py-1"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            <option value={10}>10 / หน้า</option>
+            <option value={25}>25 / หน้า</option>
+            <option value={50}>50 / หน้า</option>
+            <option value={100}>100 / หน้า</option>
+          </select>
+          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-lg bg-white shadow">
         <table className="w-full min-w-[1180px] text-sm">
           <thead className="bg-slate-100"><tr><th className="p-2 text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></th><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Delivery" sortKey="expectedDelivery" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><th className="p-2 text-right font-semibold text-slate-700">จัดการ</th></tr></thead>
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={11}>ยังไม่มี PO Buy</td></tr> : null}
-            {!isLoading && rows.map((row, index) => (
+            {!isLoading && pageRows.map((row, index) => (
               <tr key={row.id} className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
                 <td className="p-2 text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></td>
                 <td className="p-2 font-mono text-xs">{row.docNo}{!row.requireDelivery ? <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">Costing</span> : null}</td>
@@ -338,8 +435,8 @@ export function PoBuyPageClient() {
                 <td className="p-2">{row.expectedDelivery || '-'}</td>
                 <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(row.status)}`}>{row.status}</span></td>
                 <td className="whitespace-nowrap p-2 text-right">
-                  <button className="mr-2 text-xs text-amber-600 opacity-50" type="button" disabled onClick={(event) => event.stopPropagation()}>ย้าย</button>
-                  <button className="text-xs text-red-600 opacity-50" type="button" disabled onClick={(event) => event.stopPropagation()}>ยกเลิก</button>
+                  <button className="mr-2 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
+                  <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</button>
                 </td>
               </tr>
             ))}
@@ -352,7 +449,9 @@ export function PoBuyPageClient() {
           errors={fieldErrors}
           form={form}
           formTotals={formTotals}
+          heading={editingPoNo ? `แก้ไข PO Buy ${editingPoNo}` : 'สร้าง PO Buy (จองซื้อ)'}
           isSaving={isSaving}
+          submitLabel={editingPoId ? 'บันทึกการแก้ไข' : 'บันทึก PO Buy'}
           products={data?.options.products ?? []}
           suppliers={data?.options.suppliers ?? []}
           onAddItem={addItem}
@@ -363,6 +462,25 @@ export function PoBuyPageClient() {
           onUpdateItem={updateItem}
         />
       ) : null}
+      {cancelingRow ? (
+        <PoBuyCancelModal
+          error={cancelNoteError}
+          isSaving={isSaving}
+          note={cancelNote}
+          row={cancelingRow}
+          onChangeNote={(value) => {
+            setCancelNote(value)
+            setCancelNoteError('')
+          }}
+          onClose={() => {
+            if (isSaving) return
+            setCancelingRow(null)
+            setCancelNote('')
+            setCancelNoteError('')
+          }}
+          onSubmit={submitCancel}
+        />
+      ) : null}
       {selectedRow ? <PoBuyDetailModal row={selectedRow} onClose={() => setSelectedRow(null)} /> : null}
     </section>
   )
@@ -371,6 +489,51 @@ export function PoBuyPageClient() {
 function Metric({ box, color, label, sublabel, value }: { box?: boolean; color: 'amber' | 'blue' | 'emerald' | 'red'; label: string; sublabel: string; value: string }) {
   const colorClass = color === 'red' ? 'border-red-300 bg-red-50 text-red-700' : color === 'amber' ? `${box ? 'border-amber-300 bg-amber-50' : 'border-amber-500 bg-white'} text-amber-700` : color === 'emerald' ? 'border-emerald-500 bg-white text-emerald-700' : 'border-blue-500 bg-white text-blue-700'
   return <div className={`rounded-xl p-4 shadow ${box ? 'border-2' : 'border-l-4'} ${colorClass}`}><div className="text-xs">{label}</div><div className="text-2xl font-bold">{value}</div><div className="text-xs text-slate-400">{sublabel}</div></div>
+}
+
+function PoBuyCancelModal({
+  error,
+  isSaving,
+  note,
+  onChangeNote,
+  onClose,
+  onSubmit,
+  row,
+}: {
+  error: string
+  isSaving: boolean
+  note: string
+  onChangeNote: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+  row: PoBuyRow
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40 p-0 md:items-center md:justify-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="po-buy-cancel-title">
+      <div className="w-full rounded-t-lg bg-white shadow-xl md:max-w-lg md:rounded-lg">
+        <div className="border-b p-4">
+          <h2 id="po-buy-cancel-title" className="font-semibold">ยกเลิก PO Buy {row.docNo}</h2>
+          <p className="mt-1 text-sm text-slate-500">{row.supplierName}</p>
+        </div>
+        <div className="space-y-2 p-4 text-sm">
+          <label className="block text-xs font-medium text-slate-600" htmlFor="po-buy-cancel-note">หมายเหตุการยกเลิก *</label>
+          <textarea
+            id="po-buy-cancel-note"
+            className="w-full rounded border px-3 py-2"
+            maxLength={500}
+            rows={3}
+            value={note}
+            onChange={(event) => onChangeNote(event.target.value)}
+          />
+          {error ? <div className="text-xs text-red-600">{error}</div> : null}
+        </div>
+        <div className="flex justify-end gap-2 border-t bg-slate-50 px-4 py-3">
+          <button className="px-4 py-2 text-sm" disabled={isSaving} type="button" onClick={onClose}>ปิด</button>
+          <button className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={onSubmit}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function poBuySortValue(row: PoBuyRow, key: PoBuySortKey) {
@@ -538,8 +701,10 @@ function PoBuyFormModal({
   errors,
   form,
   formTotals,
+  heading,
   isSaving,
   products,
+  submitLabel,
   suppliers,
   onAddItem,
   onClose,
@@ -552,8 +717,10 @@ function PoBuyFormModal({
   errors: FieldErrors
   form: PoBuyFormState
   formTotals: { lineCount: number; totalCost: number; totalQty: number }
+  heading: string
   isSaving: boolean
   products: Option[]
+  submitLabel: string
   suppliers: Option[]
   onAddItem: () => void
   onClose: () => void
@@ -571,7 +738,7 @@ function PoBuyFormModal({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="po-buy-form-title">
       <div className="mx-auto my-4 max-w-2xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b px-5 py-3">
-          <h3 id="po-buy-form-title" className="font-semibold">สร้าง PO Buy (จองซื้อ)</h3>
+          <h3 id="po-buy-form-title" className="font-semibold">{heading}</h3>
           <button className="text-2xl text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>×</button>
         </div>
         <div className="space-y-3 p-5 text-sm">
@@ -649,7 +816,7 @@ function PoBuyFormModal({
         </div>
         <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
           <button className="px-4 py-2 text-sm" disabled={isSaving} type="button" onClick={onClose}>ยกเลิก</button>
-          <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก PO Buy'}</button>
+          <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</button>
         </div>
       </div>
     </div>

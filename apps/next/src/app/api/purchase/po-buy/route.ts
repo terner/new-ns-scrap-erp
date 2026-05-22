@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
-import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
+import { poBuyCancelSchema, poBuyFormSchema, poBuyUpdateSchema, type PoBuyFormValues } from '@/lib/po-buy'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
@@ -190,12 +190,14 @@ export async function GET(request: Request) {
 
       return {
         createdBy: po.created_by ?? '',
+        branchId: po.branch_id ?? '',
         date: toDateOnly(po.date),
         docNo: po.doc_no,
         expectedDelivery: toDateOnly(po.expected_delivery),
         id: po.id,
         itemCount: items.length,
         items,
+        notes: po.notes ?? po.note ?? '',
         productName: items.map((item) => item.productName).filter(Boolean).join(', ') || productName || '-',
         purpose: po.purpose ?? '',
         purposeLabel: requireDelivery ? 'Delivery' : 'Costing',
@@ -345,5 +347,135 @@ export async function POST(request: Request) {
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'บันทึก PO Buy ไม่ได้', 500)
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'finance.cash.view')
+
+    const values = poBuyUpdateSchema.parse(await request.json())
+    const actor = currentActor(context)
+    const productIds = [...new Set(values.items.map((item) => item.productId))]
+    const [existing, branch, supplier, products] = await Promise.all([
+      prisma.po_buys.findUnique({ where: { id: values.id } }),
+      prisma.branches.findFirst({ where: { active: true, id: values.branchId }, select: { id: true } }),
+      prisma.suppliers.findFirst({ where: { active: true, id: values.supplierId } }),
+      prisma.products.findMany({ where: { active: true, id: { in: productIds } }, select: { active: true, code: true, id: true, name: true, unit: true } }),
+    ])
+
+    if (!existing) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบ PO Buy ที่ต้องการแก้ไข' }, { status: 404 })
+    const existingQty = toNumber(existing.qty)
+    const existingRemainingQty = toNumber(existing.remaining_qty)
+    const existingTotalAmount = toNumber(existing.total_amount)
+    const existingRemainingAmount = toNumber(existing.remaining_amount)
+    const isUnreceived = existing.status === 'Open' && existingQty === existingRemainingQty && existingTotalAmount === existingRemainingAmount
+    if (!isUnreceived) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขได้เฉพาะ PO Buy ที่ยังไม่ถูกตัดรับสินค้า' }, { status: 400 })
+    }
+    if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['เลือกสาขา'] } }, { status: 400 })
+    if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'Supplier ไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือก Supplier'] } }, { status: 400 })
+
+    const issuedDate = bangkokDateInput(existing.created_at ?? new Date())
+    if (values.expectedDelivery < issuedDate) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: 'วันส่งมอบต้องไม่ก่อนวันที่ออก PO',
+        fieldErrors: { expectedDelivery: ['วันส่งมอบต้องไม่ก่อนวันที่ออก PO'] },
+      }, { status: 400 })
+    }
+
+    const productById = new Map(products.map((product) => [product.id, product]))
+    const missingProductIndex = values.items.findIndex((item) => !productById.has(item.productId))
+    if (missingProductIndex >= 0) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: `รายการที่ ${missingProductIndex + 1}: สินค้าไม่ถูกต้องหรือถูกปิดใช้งาน`,
+        fieldErrors: { [`items.${missingProductIndex}.productId`]: ['สินค้าไม่ถูกต้องหรือถูกปิดใช้งาน'] },
+      }, { status: 400 })
+    }
+
+    const items = poItems(values, products, existing.doc_no)
+    const qty = items.reduce((sum, item) => sum + item.qty, 0)
+    const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0)
+    const totalAmount = items.reduce((sum, item) => sum + item.totalCost, 0)
+    const remainingAmount = items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0)
+    const firstItem = items[0]
+    const deliveryDate = normalizeDate(values.expectedDelivery)
+
+    const updated = await prisma.po_buys.update({
+      where: { id: values.id },
+      data: {
+        branch_id: branch.id,
+        delivery_date: deliveryDate,
+        expected_delivery: deliveryDate,
+        items,
+        note: values.notes,
+        notes: values.notes,
+        product_id: firstItem.productId,
+        qty,
+        remaining_amount: remainingAmount,
+        remaining_qty: remainingQty,
+        supplier_id: values.supplierId,
+        total_amount: totalAmount,
+        unit_price: firstItem.unitPrice,
+        updated_at: new Date(),
+        updated_by: actor,
+        version: { increment: 1 },
+      },
+      select: { doc_no: true, id: true },
+    })
+
+    return NextResponse.json({ docNo: updated.doc_no, id: updated.id })
+  } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'แก้ไข PO Buy ไม่ได้', 500)
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'finance.cash.view')
+
+    const values = poBuyCancelSchema.parse(await request.json())
+    const actor = currentActor(context)
+    const existing = await prisma.po_buys.findUnique({ where: { id: values.id } })
+    if (!existing) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบ PO Buy ที่ต้องการยกเลิก' }, { status: 404 })
+    if (String(existing.status ?? '').toLowerCase().includes('cancel')) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy นี้ถูกยกเลิกแล้ว' }, { status: 400 })
+    }
+
+    const existingQty = toNumber(existing.qty)
+    const existingRemainingQty = toNumber(existing.remaining_qty)
+    const existingTotalAmount = toNumber(existing.total_amount)
+    const existingRemainingAmount = toNumber(existing.remaining_amount)
+    const isUnreceived = existingQty === existingRemainingQty && existingTotalAmount === existingRemainingAmount
+    if (!isUnreceived) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกได้เฉพาะ PO Buy ที่ยังไม่ถูกตัดรับสินค้า' }, { status: 400 })
+    }
+
+    const cancellationNote = `ยกเลิก: ${values.note}`
+    const nextNotes = [existing.notes ?? existing.note ?? '', cancellationNote].filter(Boolean).join('\n')
+    const updated = await prisma.po_buys.update({
+      where: { id: values.id },
+      data: {
+        note: nextNotes,
+        notes: nextNotes,
+        remaining_amount: 0,
+        remaining_qty: 0,
+        status: 'Cancelled',
+        updated_at: new Date(),
+        updated_by: actor,
+        version: { increment: 1 },
+      },
+      select: { doc_no: true, id: true },
+    })
+
+    return NextResponse.json({ docNo: updated.doc_no, id: updated.id })
+  } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'ยกเลิก PO Buy ไม่ได้', 500)
   }
 }

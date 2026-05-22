@@ -30,4 +30,15 @@ export const poBuyFormSchema = z.object({
   supplierId: z.string().trim().min(1, 'เลือก Supplier').max(80, 'รหัส Supplier ยาวเกินไป').regex(safeIdPattern, 'รหัส Supplier มีรูปแบบไม่ถูกต้อง'),
 })
 
+export const poBuyUpdateSchema = poBuyFormSchema.extend({
+  id: z.string().trim().min(1, 'ระบุ PO Buy ที่ต้องการแก้ไข').max(80, 'รหัส PO Buy ยาวเกินไป').regex(safeIdPattern, 'รหัส PO Buy มีรูปแบบไม่ถูกต้อง'),
+})
+
+export const poBuyCancelSchema = z.object({
+  id: z.string().trim().min(1, 'ระบุ PO Buy ที่ต้องการยกเลิก').max(80, 'รหัส PO Buy ยาวเกินไป').regex(safeIdPattern, 'รหัส PO Buy มีรูปแบบไม่ถูกต้อง'),
+  note: z.string().trim().min(1, 'กรอกหมายเหตุการยกเลิก').max(500, 'หมายเหตุยาวเกินไป').regex(generalTextPattern, 'หมายเหตุมีรูปแบบไม่ถูกต้อง'),
+})
+
 export type PoBuyFormValues = z.infer<typeof poBuyFormSchema>
+export type PoBuyCancelValues = z.infer<typeof poBuyCancelSchema>
+export type PoBuyUpdateValues = z.infer<typeof poBuyUpdateSchema>
