@@ -190,9 +190,10 @@ export function StockLedgerPageClient() {
         </table>
       </div>
       <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
-        <span>หน้า {page} / {totalPages} · ทั้งหมด {data?.total ?? 0} รายการ</span>
-        <div className="flex gap-2">
+        <span>พบทั้งหมด <span className="font-semibold text-slate-900">{data?.total ?? 0}</span> รายการ</span>
+        <div className="flex items-center gap-2">
           <button className="rounded border px-3 py-1 disabled:opacity-40" disabled={page <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          <span className="px-1">หน้า {page} / {totalPages}</span>
           <button className="rounded border px-3 py-1 disabled:opacity-40" disabled={page >= totalPages} type="button" onClick={() => setPage((value) => value + 1)}>ถัดไป</button>
         </div>
       </div>

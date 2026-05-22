@@ -10,22 +10,26 @@ export const runtime = 'nodejs'
 type BillQuery = {
   dateFrom?: string
   dateTo?: string
+  filterMode?: string
   page: number
   pageSize: number
   search?: string
   sortDirection: Prisma.SortOrder
   sortKey: string
+  status?: string
 }
 
 function parseBillQuery(url: URL): BillQuery {
   return {
     dateFrom: url.searchParams.get('dateFrom') || undefined,
     dateTo: url.searchParams.get('dateTo') || undefined,
+    filterMode: url.searchParams.get('filterMode') || undefined,
     page: Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1),
     pageSize: Math.min(100, Math.max(10, Number(url.searchParams.get('pageSize') ?? 10) || 10)),
     search: url.searchParams.get('search')?.trim() || undefined,
     sortDirection: url.searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc',
     sortKey: url.searchParams.get('sortKey') || 'date',
+    status: url.searchParams.get('status') || undefined,
   }
 }
 
@@ -38,6 +42,8 @@ function billWhere(query: BillQuery): Prisma.sales_billsWhereInput {
       ...(query.dateTo ? { lte: normalizeDate(query.dateTo) } : {}),
     }
   }
+  if (query.filterMode) where.transaction_mode = query.filterMode
+  if (query.status) where.status = query.status
   if (query.search) {
     where.OR = [
       { doc_no: { contains: query.search, mode: 'insensitive' } },

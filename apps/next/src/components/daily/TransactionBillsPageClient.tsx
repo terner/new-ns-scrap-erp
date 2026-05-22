@@ -199,8 +199,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     if (search.trim()) params.set('search', search.trim())
     if (dateFrom) params.set('dateFrom', dateFrom)
     if (dateTo) params.set('dateTo', dateTo)
-    if (mode === 'purchase' && filterMode) params.set('filterMode', filterMode)
-    if (mode === 'purchase' && statusFilter) params.set('status', statusFilter)
+    if ((mode === 'purchase' || mode === 'sales') && filterMode) params.set('filterMode', filterMode)
+    if ((mode === 'purchase' || mode === 'sales') && statusFilter) params.set('status', statusFilter)
     if (mode === 'stock-issue' && filterMode) params.set('status', filterMode)
     return `${apiPath}?${params.toString()}`
   }, [apiPath, dateFrom, dateTo, filterMode, mode, page, pageSize, search, sortDirection, sortKey, statusFilter])
@@ -540,10 +540,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
           <span className="text-slate-400">→</span>
           <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-          {(search || dateFrom || dateTo || filterMode || statusFilter) ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง Filter</button> : null}
+          {(search || dateFrom || dateTo || filterMode || statusFilter) ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง</button> : null}
           {mode === 'purchase' ? <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : 'Export Excel'}</button> : null}
           {mode === 'purchase' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</button> : null}
-          {mode === 'sales' ? <button className="ml-auto rounded bg-amber-100 px-3 py-2 text-xs font-bold text-amber-700 opacity-70" disabled type="button">🔄 Recalc กำไร</button> : null}
+          {mode === 'sales' ? <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white opacity-60" disabled type="button">Export Excel</button> : null}
+          {mode === 'sales' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white opacity-60" disabled type="button">+ บิลขายใหม่</button> : null}
           {mode === 'stock-issue' ? (
             <>
               <select className="rounded-lg border px-3 py-2 text-sm" value={filterMode} onChange={(event) => setFilterMode(event.target.value)}>
@@ -556,7 +557,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             </>
           ) : null}
         </div>
-        {mode === 'purchase' ? (
+        {mode === 'purchase' || mode === 'sales' ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">ประเภท:</span>
             <Segment value="" current={filterMode} label="ทุกประเภท" onClick={setFilterMode} />
@@ -564,20 +565,20 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             <Segment value="TRADING" current={filterMode} label="🔄 TRADING" onClick={setFilterMode} />
           </div>
         ) : null}
-        {mode === 'purchase' ? (
+        {mode === 'purchase' || mode === 'sales' ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">สถานะ:</span>
             <Segment value="" current={statusFilter} label="ทุกสถานะ" onClick={setStatusFilter} />
             <Segment value="open" current={statusFilter} label="เปิดอยู่" onClick={setStatusFilter} />
             <Segment value="partial" current={statusFilter} label="บางส่วน" onClick={setStatusFilter} />
-            <Segment value="paid" current={statusFilter} label="จ่ายครบ" onClick={setStatusFilter} />
+            <Segment value="paid" current={statusFilter} label={mode === 'purchase' ? 'จ่ายครบ' : 'รับครบ'} onClick={setStatusFilter} />
             <Segment value="cancelled" current={statusFilter} label="ยกเลิก" onClick={setStatusFilter} />
           </div>
         ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ จาก <span className="font-semibold text-slate-900">{totalPages}</span> หน้า</div>
+        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             aria-label="จำนวนรายการต่อหน้า"

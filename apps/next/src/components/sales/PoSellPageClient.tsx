@@ -127,6 +127,15 @@ export function PoSellPageClient() {
     return `/api/sales/po-sell?${params.toString()}`
   }, [fromDate, matchStatus, search, status, toDate])
 
+  const hasFilters = Boolean(search.trim() || fromDate || toDate || matchStatus !== 'all' || status !== 'all')
+  const resetFilters = () => {
+    setSearch('')
+    setFromDate('')
+    setToDate('')
+    setMatchStatus('all')
+    setStatus('all')
+  }
+
   return (
     <section>
       <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
@@ -190,9 +199,16 @@ export function PoSellPageClient() {
           <input aria-label="จากวันที่" className="rounded-lg border px-2 py-2 text-sm" title="จากวันที่" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
           <span className="text-slate-400">→</span>
           <input aria-label="ถึงวันที่" className="rounded-lg border px-2 py-2 text-sm" title="ถึงวันที่" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-          {search || fromDate || toDate || matchStatus !== 'all' || status !== 'all' ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={() => { setSearch(''); setFromDate(''); setToDate(''); setMatchStatus('all'); setStatus('all') }}>✕ ล้าง</button> : null}
-          <button className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm text-white opacity-60" disabled title="รอออกแบบ write permission, allocation side effects, audit, and validation ก่อนเปิดใช้งาน" type="button">+ PO Sell ใหม่</button>
-          <a className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-white" href={exportHref}>📥 .xlsx</a>
+          {hasFilters ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={resetFilters}>✕ ล้าง</button> : null}
+          <a className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" href={exportHref}>Export Excel</a>
+          <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white opacity-60" disabled title="รอออกแบบ write permission, allocation side effects, audit, and validation ก่อนเปิดใช้งาน" type="button">+ PO Sell ใหม่</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">สถานะ:</span>
+          <MatchButton active={status === 'all'} label="ทั้งหมด" onClick={() => setStatus('all')} />
+          {(data?.filters.statuses ?? []).map((item) => (
+            <MatchButton key={item} active={status === item} label={item} tone={item.toLowerCase().includes('cancel') ? 'slate' : 'emerald'} onClick={() => setStatus(item)} />
+          ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">สถานะ Match:</span>
@@ -201,12 +217,11 @@ export function PoSellPageClient() {
           <MatchButton active={matchStatus === 'Partially Matched'} label="Partial" tone="amber" onClick={() => setMatchStatus('Partially Matched')} />
           <MatchButton active={matchStatus === 'Fully Matched'} label="Full" tone="emerald" onClick={() => setMatchStatus('Fully Matched')} />
           <MatchButton active={matchStatus === 'Over Matched'} label="Over" tone="red" onClick={() => setMatchStatus('Over Matched')} />
-          <MatchButton active={status === 'Cancelled'} label="Cancelled" tone="slate" onClick={() => setStatus(status === 'Cancelled' ? 'all' : 'Cancelled')} />
         </div>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ จาก <span className="font-semibold text-slate-900">{totalPages}</span> หน้า</div>
+        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             aria-label="จำนวนรายการต่อหน้า"
