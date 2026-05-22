@@ -536,21 +536,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
             </div>
             {mode === 'payment' ? (
               <div className="space-y-4 p-5 text-sm">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                  <label className="block">
-                    <span className="mb-1 block text-xs">เลขที่</span>
-                    <input className="w-full rounded border bg-slate-50 px-2 py-1.5 font-mono text-sm" readOnly value="ระบบออกให้" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs">วันที่</span>
-                    <input className="w-full rounded border bg-slate-50 px-2 py-1.5 text-sm" readOnly type="date" value={form.date} />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs">สาขา (filter)</span>
-                    <select className="w-full rounded border bg-slate-50 px-2 py-1.5 text-sm" disabled>
-                      <option value="">ทุกสาขา</option>
-                    </select>
-                  </label>
+                <div className="max-w-xs">
                   <label className="block">
                     <span className="mb-1 block text-xs">วิธีจ่าย</span>
                     <select className="w-full rounded border px-2 py-1.5 text-sm" required value={form.method ?? 'โอน'} onChange={(event) => setForm({ ...form, method: event.target.value })}>
@@ -561,8 +547,6 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                     </select>
                   </label>
                 </div>
-
-                <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
 
                 <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -708,6 +692,8 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                   </div>
                   <div className="mt-1 text-xs text-slate-500">Net Cash Out = ยอดจ่าย - WHT + Bank Fee</div>
                 </div>
+
+                <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
               </div>
             ) : (
               <>
