@@ -82,7 +82,7 @@ export async function GET() {
 
     const [accounts, suppliers, bills, payments, whtRatePercent] = await Promise.all([
       listDailyAccounts(),
-      prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true } }),
+      prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, bank_account: true, id: true, name: true } }),
       prisma.purchase_bills.findMany({
         orderBy: [{ date: 'desc' }],
         select: { date: true, doc_no: true, id: true, paid_amount: true, payable_balance: true, status: true, supplier_id: true, total_amount: true },
@@ -126,7 +126,12 @@ export async function GET() {
         withholdingTax: toNumber(payment.withholding_tax),
       })),
       settings: { whtRatePercent },
-      suppliers,
+      suppliers: suppliers.map((supplier) => ({
+        active: supplier.active,
+        bankAccount: supplier.bank_account,
+        id: supplier.id,
+        name: supplier.name,
+      })),
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)

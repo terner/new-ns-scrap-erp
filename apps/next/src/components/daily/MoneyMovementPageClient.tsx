@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { customerReceiptFormSchema, dailyFetchJson, formatMoney, supplierPaymentFormSchema, todayDateInput, type CustomerReceiptFormValues, type DailyAccountOption, type SupplierPaymentFormValues } from '@/lib/daily'
 
-type Party = { active: boolean | null; id: string; name: string }
+type Party = { active: boolean | null; bankAccount?: string | null; id: string; name: string }
 type Bill = {
   customerId?: string | null
   date?: string
@@ -67,6 +67,14 @@ function paymentCashAmountFromSettlement(totalAmount: number, ratePercent: numbe
 function withholdingTaxFromCashAmount(amount: number, ratePercent: number) {
   if (!Number.isFinite(ratePercent) || ratePercent <= 0 || ratePercent >= 100) return 0
   return roundMoney(amount * ratePercent / (100 - ratePercent))
+}
+
+function ageInDays(dateValue: string | undefined) {
+  if (!dateValue) return 0
+  const start = new Date(`${dateValue.slice(0, 10)}T00:00:00.000Z`).getTime()
+  const today = new Date(`${todayDateInput()}T00:00:00.000Z`).getTime()
+  if (!Number.isFinite(start) || !Number.isFinite(today)) return 0
+  return Math.max(0, Math.floor((today - start) / 86_400_000))
 }
 
 const paymentTheme = {
@@ -155,6 +163,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
 
   const activeAccounts = useMemo(() => data.accounts.filter((account) => account.active), [data.accounts])
   const partyMap = useMemo(() => new Map(parties.map((party) => [party.id, party.name])), [parties])
+  const supplierBankAccountMap = useMemo(() => new Map((data.suppliers ?? []).map((supplier) => [supplier.id, supplier.bankAccount ?? '-'])), [data.suppliers])
   const billMap = useMemo(() => new Map(data.bills.map((bill) => [bill.id, bill])), [data.bills])
   const paymentLines = mode === 'payment' ? (form as SupplierPaymentFormValues).lines ?? [] : []
   const selectedBill = form.billId ? billMap.get(form.billId) : null
@@ -495,27 +504,30 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                   <th className="p-2 text-left">เลขบิล</th>
                   <th className="p-2 text-left">วันที่</th>
                   <th className="p-2 text-left">Supplier</th>
+                  <th className="p-2 text-left">เลขบัญชี</th>
                   <th className="p-2 text-right">ยอดรวม</th>
                   <th className="p-2 text-right">จ่ายแล้ว</th>
                   <th className="p-2 text-right">คงเหลือ</th>
-                  <th className="p-2 text-center">สถานะ</th>
-                  <th className="p-2 text-center">จัดการ</th>
+                  <th className="p-2 text-right">อายุ(วัน)</th>
+                  <th className="p-2 text-center" />
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>กำลังโหลดข้อมูล</td></tr> : null}
+                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
                 {!isLoading && supplierBillPageRows.map((bill) => {
                   const status = paymentBillStatus(bill)
                   const balance = bill.payableBalance ?? 0
+                  const supplierBankAccount = supplierBankAccountMap.get(bill.supplierId ?? '') ?? '-'
                   return (
                     <tr key={bill.id} className="border-t hover:bg-slate-50">
                       <td className="p-2 font-mono text-xs font-semibold text-slate-700">{bill.docNo}</td>
                       <td className="p-2">{bill.date || '-'}</td>
                       <td className="max-w-72 truncate p-2 font-medium text-slate-800">{partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}</td>
+                      <td className="max-w-40 truncate p-2 font-mono text-xs text-slate-600">{supplierBankAccount || '-'}</td>
                       <td className="p-2 text-right font-semibold">{formatMoney(bill.totalAmount)}</td>
                       <td className="p-2 text-right text-blue-700">{formatMoney(bill.paidAmount)}</td>
                       <td className={`p-2 text-right font-bold ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</td>
-                      <td className="p-2 text-center"><PaymentBillStatusBadge status={status} /></td>
+                      <td className="p-2 text-right">{ageInDays(bill.date)}</td>
                       <td className="p-2 text-center">
                         {balance > 0 && status !== 'cancelled' ? (
                           <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openFormForBill(bill)}>ทำจ่าย</button>
@@ -526,7 +538,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                     </tr>
                   )
                 })}
-                {!isLoading && supplierBillPageRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>ไม่พบบิลตามเงื่อนไข</td></tr> : null}
+                {!isLoading && supplierBillPageRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>ไม่พบบิลตามเงื่อนไข</td></tr> : null}
               </tbody>
             </table>
           </div>
@@ -811,23 +823,6 @@ function paymentBillStatus(bill: Bill) {
   if (balance <= 0.01 && paid > 0) return 'paid'
   if (paid > 0 && balance > 0.01) return 'partial'
   return 'open'
-}
-
-function PaymentBillStatusBadge({ status }: { status: string }) {
-  const config = {
-    cancelled: 'border-slate-300 bg-slate-100 text-slate-600',
-    open: 'border-rose-200 bg-rose-50 text-rose-700',
-    paid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    partial: 'border-amber-200 bg-amber-50 text-amber-700',
-  } as const
-  const labels = {
-    cancelled: 'ยกเลิก',
-    open: 'ค้างจ่าย',
-    paid: 'จ่ายครบ',
-    partial: 'จ่ายบางส่วน',
-  } as const
-  const key = (status in config ? status : 'open') as keyof typeof config
-  return <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${config[key]}`}>{labels[key]}</span>
 }
 
 function BillSelect(props: {
