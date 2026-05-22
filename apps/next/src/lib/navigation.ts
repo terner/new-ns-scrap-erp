@@ -18,6 +18,7 @@ export type NavigationItem = {
   href: string
   icon: string
   label: string
+  pageTitle?: string
   section: NavigationSectionKey
 }
 
@@ -160,7 +161,7 @@ export const navigationItems: NavigationItem[] = [
   { href: '/tracking/customer', icon: '👥', label: 'Customer Tracking', section: 'tracking' },
   { href: '/tracking/supplier', icon: '🏭', label: 'Supplier Tracking', section: 'tracking' },
   { href: '/tracking/product', icon: '📦', label: 'Product Tracking', section: 'tracking' },
-  { href: '/purchase/bills', icon: '📥', label: 'บิลรับซื้อ', section: 'daily' },
+  { href: '/purchase/bills', icon: '📥', label: 'บิลรับซื้อ', pageTitle: 'บิลรับซื้อ-บันทึกบิลซื้อแบบ Stock / Trading พร้อม PO receipt, VAT, WAC และเอกสารรับสินค้า', section: 'daily' },
   { href: '/sales/bills', icon: '📤', label: 'บิลขาย', section: 'daily' },
   { href: '/sales/stock-issue', icon: '📦', label: 'เบิกออกรอบิล (Pending Sale)', section: 'daily' },
   { href: '/daily/payment-approval', icon: '✅', label: 'อนุมัติโอนเงิน (Payment Approval)', section: 'daily' },
@@ -274,8 +275,8 @@ export function pageTitleForPath(pathname: string) {
 
   for (const item of navigationItems) {
     const child = item.children?.find((entry) => entry.href === pathname)
-    if (child) return child.label
-    if (item.href === pathname) return item.label
+    if (child) return child.pageTitle ?? child.label
+    if (item.href === pathname) return item.pageTitle ?? item.label
   }
 
   return 'NS Scrap ERP'

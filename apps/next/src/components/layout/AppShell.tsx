@@ -122,7 +122,7 @@ export function AppShell({ children }: AppShellProps) {
             <button aria-label="เปิดเมนู" className="text-xl text-slate-600 lg:hidden" type="button" onClick={() => setSidebarOpen(!sidebarOpen)}>
               ☰
             </button>
-            <h1 className="truncate text-lg font-semibold text-slate-800">{title}</h1>
+            <h1 className="min-w-0 break-words text-sm font-semibold leading-snug text-slate-800 sm:text-base lg:text-lg">{title}</h1>
           </div>
 
           <div className="flex items-center gap-3">

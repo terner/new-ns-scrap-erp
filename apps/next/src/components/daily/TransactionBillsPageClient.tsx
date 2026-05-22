@@ -450,11 +450,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     <section className="space-y-4">
       {mode === 'purchase' ? (
         <>
-          <div className="rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-700 p-4 text-white shadow">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><h1 className="text-2xl font-bold">📥 บิลรับซื้อ</h1><p className="mt-1 text-sm opacity-90">บันทึกบิลซื้อแบบ Stock / Trading พร้อม PO receipt, VAT, WAC และเอกสารรับสินค้า</p></div>
-            </div>
-          </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <TransactionKpi label="จำนวนบิลในหน้า" tone="blue" value={totalRows.toLocaleString('th-TH')} />
             <TransactionKpi label="ยอดซื้อรวม" tone="blue" value={formatMoney(total)} />
