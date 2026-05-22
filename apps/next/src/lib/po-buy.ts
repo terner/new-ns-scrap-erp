@@ -26,7 +26,6 @@ export const poBuyFormSchema = z.object({
   expectedDelivery: requiredDeliveryDate,
   items: z.array(poBuyItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
   notes: optionalGeneralText('หมายเหตุ', 500),
-  requireDelivery: z.literal(true, { invalid_type_error: 'PO Buy ต้องเป็นรายการรอส่งมอบ' }).default(true),
   supplierId: z.string().trim().min(1, 'เลือก Supplier').max(80, 'รหัส Supplier ยาวเกินไป').regex(safeIdPattern, 'รหัส Supplier มีรูปแบบไม่ถูกต้อง'),
 })
 

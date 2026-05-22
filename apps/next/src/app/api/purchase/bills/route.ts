@@ -554,16 +554,16 @@ export async function PATCH(request: Request) {
       const paidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
       if (paidAmount > 0) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกไม่ได้ เพราะบิลนี้มีการชำระเงินแล้ว' }, { status: 400 })
 
-      const cancellationNote = `ยกเลิก: ${values.note}`
-      const nextNotes = [existingBill.notes ?? existingBill.note ?? '', cancellationNote].filter(Boolean).join('\n')
+      const cancelledAt = new Date()
       const cancelledBill = await prisma.$transaction(async (tx) => {
         const bill = await tx.purchase_bills.update({
           data: {
-            note: nextNotes,
-            notes: nextNotes,
+            cancel_note: values.note,
+            cancelled_at: cancelledAt,
+            cancelled_by: actor,
             payable_balance: 0,
             status: 'cancelled',
-            updated_at: new Date(),
+            updated_at: cancelledAt,
             updated_by: actor,
           },
           select: { doc_no: true, id: true },

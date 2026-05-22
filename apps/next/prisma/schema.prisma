@@ -1231,6 +1231,9 @@ model po_buys {
   status            String?    @default("Open")
   items             Json?
   notes             String?
+  cancel_note       String?
+  cancelled_at      DateTime?  @db.Timestamptz(6)
+  cancelled_by      String?
   created_at        DateTime?  @default(now()) @db.Timestamptz(6)
   product_id        String?
   branch_id         String?
@@ -1496,6 +1499,9 @@ model purchase_bills {
   payable_balance         Decimal?           @default(0) @db.Decimal
   status                  String?            @default("open")
   notes                   String?
+  cancel_note             String?
+  cancelled_at            DateTime?          @db.Timestamptz(6)
+  cancelled_by            String?
   created_by              String?
   date                    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updated_at              DateTime?          @default(now()) @db.Timestamptz(6)

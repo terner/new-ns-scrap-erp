@@ -133,14 +133,13 @@ function poItems(values: PoBuyFormValues, products: ProductOption[], docNo: stri
   const productById = new Map(products.map((product) => [product.id, product]))
   return values.items.map((item, index) => {
     const product = productById.get(item.productId)
-    const remainingQty = values.requireDelivery ? item.qty : 0
     return {
       id: `${docNo}-${String(index + 1).padStart(2, '0')}`,
       productCode: product?.code ?? '',
       productId: item.productId,
       productName: product?.name ?? item.productId,
       qty: item.qty,
-      remainingQty,
+      remainingQty: item.qty,
       totalCost: item.qty * item.unitPrice,
       unit: product?.unit ?? 'กก.',
       unitPrice: item.unitPrice,
@@ -156,12 +155,10 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const q = url.searchParams.get('q')?.trim().toLowerCase()
     const statusFilter = url.searchParams.get('status')
-    const purposeFilter = url.searchParams.get('purpose')
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
     const selectedIds = new Set((url.searchParams.get('ids') ?? '').split(',').map((id) => id.trim()).filter(Boolean))
     const activeStatusFilter = statusFilter && statusFilter !== 'all' ? statusFilter : null
-    const activePurposeFilter = purposeFilter && purposeFilter !== 'all' ? purposeFilter : null
 
     const poRows = await prisma.po_buys.findMany({
       include: { suppliers: true },
@@ -185,7 +182,6 @@ export async function GET(request: Request) {
       const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0) || toNumber(po.remaining_qty)
       const totalAmount = toNumber(po.total_amount) || items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0)
       const remainingAmount = toNumber(po.remaining_amount) || items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0)
-      const requireDelivery = po.require_delivery !== false
       const status = po.status ?? 'Open'
 
       return {
@@ -199,12 +195,9 @@ export async function GET(request: Request) {
         items,
         notes: po.notes ?? po.note ?? '',
         productName: items.map((item) => item.productName).filter(Boolean).join(', ') || productName || '-',
-        purpose: po.purpose ?? '',
-        purposeLabel: requireDelivery ? 'Delivery' : 'Costing',
         qty,
         remainingAmount,
         remainingQty,
-        requireDelivery,
         status,
         supplierId: po.supplier_id ?? '',
         supplierName: po.suppliers?.name ?? po.supplier_id ?? '-',
@@ -213,12 +206,11 @@ export async function GET(request: Request) {
     })
       .filter((row) => selectedIds.size === 0 || selectedIds.has(row.id))
       .filter((row) => !activeStatusFilter || row.status === activeStatusFilter)
-      .filter((row) => !activePurposeFilter || (activePurposeFilter === 'delivery' ? row.requireDelivery : !row.requireDelivery))
       .filter((row) => dateInRange(row.date, from, to))
       .filter((row) => {
         if (!q) return true
         const productText = row.items.map((item) => item.productName).join(' ')
-        return `${row.docNo} ${row.supplierName} ${productText} ${row.status} ${row.purpose} ${row.purposeLabel}`.toLowerCase().includes(q)
+        return `${row.docNo} ${row.supplierName} ${productText} ${row.status}`.toLowerCase().includes(q)
       })
 
     if (url.searchParams.get('format') === 'xlsx') {
@@ -229,7 +221,6 @@ export async function GET(request: Request) {
         ExpectedDelivery: row.expectedDelivery,
         ItemCount: row.itemCount,
         Product: row.productName,
-        Purpose: row.purposeLabel,
         Qty: row.qty,
         RemainingAmount: row.remainingAmount,
         RemainingQty: row.remainingQty,
@@ -246,8 +237,6 @@ export async function GET(request: Request) {
       options: await optionsPayload(),
       rows,
       summary: {
-        costingOnly: rows.filter((row) => !row.requireDelivery).length,
-        delivery: rows.filter((row) => row.requireDelivery).length,
         open: rows.filter((row) => !['Cancelled', 'cancelled', 'Received', 'received'].includes(row.status)).length,
         remainingAmount: rows.reduce((sum, row) => sum + row.remainingAmount, 0),
         remainingQty: rows.reduce((sum, row) => sum + row.remainingQty, 0),
@@ -325,11 +314,9 @@ export async function POST(request: Request) {
           note: values.notes,
           notes: values.notes,
           product_id: firstItem.productId,
-          purpose: 'FULL',
           qty,
           remaining_amount: remainingAmount,
           remaining_qty: remainingQty,
-          require_delivery: true,
           status: 'Open',
           supplier_id: values.supplierId,
           total_amount: totalAmount,
@@ -456,17 +443,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกได้เฉพาะ PO Buy ที่ยังไม่ถูกตัดรับสินค้า' }, { status: 400 })
     }
 
-    const cancellationNote = `ยกเลิก: ${values.note}`
-    const nextNotes = [existing.notes ?? existing.note ?? '', cancellationNote].filter(Boolean).join('\n')
+    const cancelledAt = new Date()
     const updated = await prisma.po_buys.update({
       where: { id: values.id },
       data: {
-        note: nextNotes,
-        notes: nextNotes,
+        cancel_note: values.note,
+        cancelled_at: cancelledAt,
+        cancelled_by: actor,
         remaining_amount: 0,
         remaining_qty: 0,
         status: 'Cancelled',
-        updated_at: new Date(),
+        updated_at: cancelledAt,
         updated_by: actor,
         version: { increment: 1 },
       },

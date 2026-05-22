@@ -52,6 +52,8 @@ export function PoSellPageClient() {
   const [fromDate, setFromDate] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [matchStatus, setMatchStatus] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [toDate, setToDate] = useState('')
@@ -88,6 +90,15 @@ export function PoSellPageClient() {
       return `${row.docNo} ${row.customerName} ${row.channelName} ${row.branchName} ${row.productName} ${row.status} ${row.matchStatus}`.toLowerCase().includes(query)
     })
   }, [data?.rows, matchStatus, search, status])
+
+  useEffect(() => {
+    setPage(1)
+  }, [fromDate, matchStatus, pageSize, search, status, toDate])
+
+  const totalRows = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const topCustomers = useMemo(() => {
     const byCustomer = new Map<string, { count: number; name: string; remaining: number; revenue: number }>()
@@ -191,7 +202,26 @@ export function PoSellPageClient() {
           <MatchButton active={matchStatus === 'Fully Matched'} label="Full" tone="emerald" onClick={() => setMatchStatus('Fully Matched')} />
           <MatchButton active={matchStatus === 'Over Matched'} label="Over" tone="red" onClick={() => setMatchStatus('Over Matched')} />
           <MatchButton active={status === 'Cancelled'} label="Cancelled" tone="slate" onClick={() => setStatus(status === 'Cancelled' ? 'all' : 'Cancelled')} />
-          <span className="ml-auto text-xs text-slate-500">📊 พบ <b className="text-slate-700">{rows.length}</b> PO</span>
+        </div>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ จาก <span className="font-semibold text-slate-900">{totalPages}</span> หน้า</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="rounded border border-slate-300 px-2 py-1"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            <option value={10}>10 / หน้า</option>
+            <option value={25}>25 / หน้า</option>
+            <option value={50}>50 / หน้า</option>
+            <option value={100}>100 / หน้า</option>
+          </select>
+          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
         </div>
       </div>
 
@@ -216,7 +246,7 @@ export function PoSellPageClient() {
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={12}>ยังไม่มี PO Sell</td></tr> : null}
-            {!isLoading && rows.map((row) => (
+            {!isLoading && pageRows.map((row) => (
               <tr key={row.id} className="border-t hover:bg-slate-50">
                 <td className="p-2 font-mono">{row.docNo}</td>
                 <td className="p-2">{row.date}</td>
