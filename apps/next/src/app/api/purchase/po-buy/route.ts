@@ -159,6 +159,7 @@ export async function GET(request: Request) {
     const purposeFilter = url.searchParams.get('purpose')
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
+    const selectedIds = new Set((url.searchParams.get('ids') ?? '').split(',').map((id) => id.trim()).filter(Boolean))
     const activeStatusFilter = statusFilter && statusFilter !== 'all' ? statusFilter : null
     const activePurposeFilter = purposeFilter && purposeFilter !== 'all' ? purposeFilter : null
 
@@ -208,6 +209,7 @@ export async function GET(request: Request) {
         totalAmount,
       }
     })
+      .filter((row) => selectedIds.size === 0 || selectedIds.has(row.id))
       .filter((row) => !activeStatusFilter || row.status === activeStatusFilter)
       .filter((row) => !activePurposeFilter || (activePurposeFilter === 'delivery' ? row.requireDelivery : !row.requireDelivery))
       .filter((row) => dateInRange(row.date, from, to))
