@@ -119,8 +119,6 @@ const reports: ReportLink[] = [
   { category: 'finance', href: '/finance/ap', label: 'เจ้าหนี้ (AP)', owner: 'Finance', status: 'read baseline', summary: 'AP aging, supplier exposure และ payment queue' },
   { category: 'finance', href: '/finance/bank', label: 'Cash / Bank Statement', owner: 'Finance', status: 'read baseline', summary: 'Bank statement, duplicate checks และ export' },
   { category: 'finance', href: '/finance/cash-position', label: 'Cash Position', owner: 'Finance', status: 'read baseline', summary: 'เงินสด/ธนาคารและ short-term need' },
-  { category: 'finance', href: '/finance/foreign/fx-rate', label: 'FX Rate', owner: 'Foreign Finance', status: 'read/write baseline', summary: 'FX rate management baseline' },
-  { category: 'finance', href: '/finance/foreign/fx-gain-loss-report', label: 'FX Gain/Loss', owner: 'Foreign Finance', status: 'read baseline', summary: 'Realized FX gain/loss report' },
   { category: 'accounting', href: '/finance-accounting/financial-dashboard', label: 'Financial Dashboard', owner: 'Accounting', status: 'read baseline', summary: 'Accounting management dashboard' },
   { category: 'accounting', href: '/finance-accounting/cash-flow-analysis', label: 'Cash Flow Analysis', owner: 'Accounting', status: 'read baseline', summary: 'Cash flow and working capital sources' },
   { category: 'accounting', href: '/finance-accounting/pl-statement', label: 'งบกำไรขาดทุน (P&L)', owner: 'Accounting', status: 'management/read', summary: 'Management P&L baseline, not statutory yet' },

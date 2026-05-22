@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
-import type { CustomerReturnFormValues, StatusConvertFormValues, StockAdjustFormValues, StockConvertFormValues, StockOption } from '@/lib/stock'
+import type { StatusConvertFormValues, StockAdjustFormValues, StockConvertFormValues, StockOption } from '@/lib/stock'
 
-type Mode = 'adjust' | 'convert' | 'customer-return' | 'status-convert'
+type Mode = 'adjust' | 'convert' | 'status-convert'
 type Payload = {
   reference: { branches: StockOption[]; customers?: StockOption[]; products: StockOption[]; warehouses: StockOption[] }
   rows: Array<Record<string, string | number | boolean | null>>
@@ -28,11 +28,6 @@ const config = {
     api: '/api/stock/convert',
     title: 'Grade Adjustment / ปรับเกรดสินค้า',
   },
-  'customer-return': {
-    accent: 'from-purple-700 to-pink-700',
-    api: '/api/stock/customer-return',
-    title: 'Customer Return Stock / สต๊อกของคืนลูกค้า',
-  },
   'status-convert': {
     accent: 'from-purple-700 to-pink-700',
     api: '/api/stock/status-convert',
@@ -52,7 +47,6 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [costStatusFilter, setCostStatusFilter] = useState('')
-  const [customerReturnBranchFilter, setCustomerReturnBranchFilter] = useState('')
   const [search, setSearch] = useState('')
   const [sourceTypeFilter, setSourceTypeFilter] = useState('')
   const [toDateFilter, setToDateFilter] = useState('')
@@ -87,10 +81,9 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       .filter((row) => mode !== 'adjust' || !adjustTypeFilter || row.adjustType === adjustTypeFilter)
       .filter((row) => mode !== 'adjust' || !fromDateFilter || String(row.date ?? '') >= fromDateFilter)
       .filter((row) => mode !== 'adjust' || !toDateFilter || String(row.date ?? '') <= toDateFilter)
-      .filter((row) => mode !== 'customer-return' || !customerReturnBranchFilter || row.branchId === customerReturnBranchFilter)
-  }, [adjustBranchFilter, adjustTypeFilter, costStatusFilter, customerReturnBranchFilter, data.rows, fromDateFilter, mode, search, sourceTypeFilter, toDateFilter])
+  }, [adjustBranchFilter, adjustTypeFilter, costStatusFilter, data.rows, fromDateFilter, mode, search, sourceTypeFilter, toDateFilter])
 
-  async function submit(values: StatusConvertFormValues | StockConvertFormValues | StockAdjustFormValues | CustomerReturnFormValues) {
+  async function submit(values: StatusConvertFormValues | StockConvertFormValues | StockAdjustFormValues) {
     setError(null)
     setIsSaving(true)
     try {
@@ -106,9 +99,9 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
 
   return (
     <section className="space-y-4">
-      <div className={`${mode === 'status-convert' || mode === 'customer-return' ? 'rounded-2xl' : 'rounded-xl'} bg-gradient-to-r ${meta.accent} p-5 text-white shadow ${mode === 'convert' ? 'flex items-start justify-between gap-4' : ''}`}>
+      <div className={`${mode === 'status-convert' ? 'rounded-2xl' : 'rounded-xl'} bg-gradient-to-r ${meta.accent} p-5 text-white shadow ${mode === 'convert' ? 'flex items-start justify-between gap-4' : ''}`}>
         <div>
-          <h1 className={mode === 'convert' || mode === 'adjust' || mode === 'status-convert' || mode === 'customer-return' ? 'flex items-center gap-2 text-2xl font-bold' : 'text-2xl font-bold'}>{mode === 'convert' ? '🔀 Grade Adjustment / ปรับเกรดสินค้า' : mode === 'adjust' ? '🔢 Stock Count Adjustment / ปรับสต๊อกจากการนับจริง' : mode === 'status-convert' ? '🔄 ปรับสถานะสินค้า (Status Convert)' : mode === 'customer-return' ? '↩️ Customer Return Stock / สต๊อกของคืนลูกค้า' : meta.title}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold">{mode === 'convert' ? '🔀 Grade Adjustment / ปรับเกรดสินค้า' : mode === 'adjust' ? '🔢 Stock Count Adjustment / ปรับสต๊อกจากการนับจริง' : '🔄 ปรับสถานะสินค้า (Status Convert)'}</h1>
           <p className="mt-1 text-sm opacity-90">{descriptionFor(mode)}</p>
         </div>
         {mode === 'convert' ? <a className="shrink-0 rounded-lg bg-white px-4 py-2 font-bold text-cyan-700 hover:bg-cyan-50" href={`${pathname}?new=1`}>+ ปรับเกรดใหม่</a> : null}
@@ -120,7 +113,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       <div className={mode === 'convert' || mode === 'adjust' ? 'flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow' : 'rounded-lg bg-white p-3 shadow'}>
         <div className="flex flex-wrap items-center gap-2">
           {mode === 'adjust' ? <a className="rounded bg-amber-600 px-4 py-2 font-bold text-white hover:bg-amber-700" href={`${pathname}?new=1`}>+ ปรับสต๊อกใหม่ (Quick Adjust)</a> : null}
-          <input className={mode === 'convert' || mode === 'adjust' || mode === 'customer-return' || mode === 'status-convert' ? 'min-w-[200px] flex-1 rounded border px-3 py-2 text-sm' : 'min-w-56 flex-1 rounded-lg border px-3 py-2 text-sm'} placeholder={mode === 'convert' ? 'ค้นหา doc/source/target/ref...' : mode === 'adjust' ? 'ค้นหา doc/สินค้า/เหตุผล...' : mode === 'status-convert' ? '🔍 ค้นหาเลขที่/สินค้า/หมายเหตุ...' : mode === 'customer-return' ? 'ค้นหา...' : 'ค้นหาเลขที่/สินค้า/เหตุผล/สาขา'} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="min-w-[200px] flex-1 rounded border px-3 py-2 text-sm" placeholder={mode === 'convert' ? 'ค้นหา doc/source/target/ref...' : mode === 'adjust' ? 'ค้นหา doc/สินค้า/เหตุผล...' : '🔍 ค้นหาเลขที่/สินค้า/หมายเหตุ...'} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           {mode === 'convert' ? (
             <>
               <select className="rounded border bg-amber-50 px-3 py-2 text-sm font-medium" value={sourceTypeFilter} onChange={(event) => setSourceTypeFilter(event.target.value)}>
@@ -152,16 +145,8 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             </>
           ) : mode === 'status-convert' ? (
             <a className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700" href={`${pathname}?new=1`}>+ ปรับสถานะใหม่</a>
-          ) : mode === 'customer-return' ? (
-            <>
-              <select className="rounded border px-3 py-2 text-sm" value={customerReturnBranchFilter} onChange={(event) => setCustomerReturnBranchFilter(event.target.value)}>
-                <option value="">ทุกสาขา</option>
-                {data.reference.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-              </select>
-              <button className="rounded bg-purple-600 px-3 py-2 text-sm text-white opacity-60" disabled title="รอ export contract สำหรับ customer return" type="button">📥 CSV</button>
-            </>
           ) : <a className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white" href={`${pathname}?new=1`}>+ เพิ่มรายการ</a>}
-          {mode === 'status-convert' || mode === 'customer-return' ? null : <button className="rounded bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => void loadData()}>Refresh</button>}
+          {mode === 'status-convert' ? null : <button className="rounded bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => void loadData()}>Refresh</button>}
         </div>
       </div>
       {formOpen ? (
@@ -171,13 +156,11 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             {mode === 'status-convert' ? <StatusConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
             {mode === 'convert' ? <ConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
             {mode === 'adjust' ? <AdjustForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
-            {mode === 'customer-return' ? <CustomerReturnForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
           </div>
         </div>
       ) : null}
       <OperationTable isLoading={isLoading} mode={mode} rows={rows} />
       {mode === 'adjust' ? <AdjustUsageBox /> : null}
-      {mode === 'customer-return' ? <CustomerReturnUsageBox /> : null}
     </section>
   )
 }
@@ -185,8 +168,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
 function descriptionFor(mode: Mode) {
   if (mode === 'status-convert') return 'เปลี่ยนสถานะ RM ↔ WIP ↔ FG ไม่ต้องเปิดใบสั่งผลิต · สร้าง Stock Ledger 2 ฝั่งอัตโนมัติ · เก็บประวัติพร้อมเหตุผล'
   if (mode === 'convert') return 'ตัดสินค้าต้นทางและเพิ่มสินค้าปลายทางด้วยต้นทุน WAC ของ source'
-  if (mode === 'adjust') return 'หาของไม่เจอ · สต๊อกตัด 0 แล้ว แต่ในระบบยังมี · นับเกินระบบ — Quick Adjust ทีละ row · Note-only ไม่ลง P&L'
-  return 'แยกออกจาก Stock พร้อมขาย · กดปุ่ม "📤 ส่งคืน" เพื่อบันทึกว่าส่งออกไปแล้ว'
+  return 'หาของไม่เจอ · สต๊อกตัด 0 แล้ว แต่ในระบบยังมี · นับเกินระบบ — Quick Adjust ทีละ row · Note-only ไม่ลง P&L'
 }
 
 function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
@@ -228,15 +210,6 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
     )
   }
   if (mode === 'status-convert') return null
-  if (mode === 'customer-return') {
-    return (
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Metric cardClassName="rounded-xl bg-white p-3 shadow" label="รายการของคืน" value={String(rows.length)} valueClassName="text-xl font-bold text-slate-900" />
-        <Metric cardClassName="rounded-xl bg-white p-3 shadow" label="น้ำหนักคงเหลือ" value={`${formatMoney(totalQty)} กก.`} valueClassName="text-xl font-bold text-purple-700" />
-        <Metric cardClassName="rounded-xl bg-white p-3 shadow" label="มูลค่าจม" value={formatMoney(totalValue)} valueClassName="text-xl font-bold text-red-700" />
-      </div>
-    )
-  }
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Metric label="รายการ" value={String(rows.length)} />
@@ -284,24 +257,11 @@ function AdjustUsageBox() {
   )
 }
 
-function CustomerReturnUsageBox() {
-  return (
-    <div className="rounded border-l-4 border-blue-500 bg-blue-50 p-4 text-sm">
-      <h3 className="mb-1 font-bold">💡 ข้อแนะนำ</h3>
-      <ul className="ml-5 list-disc space-y-1 text-slate-700">
-        <li>ของคืนเหล่านี้ <strong>ไม่นับ</strong>ใน Stock พร้อมขายในหน้าบิลขาย</li>
-        <li>กดปุ่ม <strong>📤 ส่งคืน</strong> เมื่อส่งของคืนออกให้ลูกค้าหรือ Supplier — สถานะจะเปลี่ยนเป็น &quot;ส่งคืนหมดแล้ว&quot; + ลด stock</li>
-        <li>ถ้าต้องการเอามาขาย → เปิดใบสั่งผลิตใหม่เพื่อ <strong>Reprocess / ปรับเกรด</strong> output category เป็น <code>FG</code>/<code>RM</code></li>
-      </ul>
-    </div>
-  )
-}
-
 function OperationTable({ isLoading, mode, rows }: { isLoading: boolean; mode: Mode; rows: Payload['rows'] }) {
   const columns = columnsFor(mode)
   return (
-    <div className={mode === 'convert' || mode === 'status-convert' || mode === 'customer-return' ? 'overflow-x-auto rounded-xl bg-white shadow' : 'overflow-x-auto rounded-lg bg-white shadow'}>
-      <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' || mode === 'customer-return' ? 'w-full min-w-[1120px] text-sm' : 'w-full min-w-[1000px] text-sm'}>
+    <div className={mode === 'convert' || mode === 'status-convert' ? 'overflow-x-auto rounded-xl bg-white shadow' : 'overflow-x-auto rounded-lg bg-white shadow'}>
+      <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1120px] text-sm' : 'w-full min-w-[1000px] text-sm'}>
         <thead className="bg-slate-100"><tr>{columns.map((column) => <th key={column.key} className={`p-2 text-left ${column.headerClassName ?? ''}`}>{column.label}</th>)}</tr></thead>
         <tbody>
           {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
@@ -316,7 +276,6 @@ function OperationTable({ isLoading, mode, rows }: { isLoading: boolean; mode: M
 function emptyTextFor(mode: Mode) {
   if (mode === 'convert') return 'ยังไม่มีรายการปรับเกรด'
   if (mode === 'status-convert') return 'ยังไม่เคยปรับสถานะ — กดปุ่ม "+ ปรับสถานะใหม่"'
-  if (mode === 'customer-return') return 'ไม่มีของคืนลูกค้า ✓'
   return 'ยังไม่มีรายการ'
 }
 
@@ -355,9 +314,7 @@ function columnsFor(mode: Mode): OperationColumn[] {
     { key: 'status', label: 'สถานะ', cellClassName: 'text-center' },
     { key: 'action', label: 'การกระทำ', cellClassName: 'text-center' },
   ]
-  return [
-    { key: 'productCode', label: 'รหัส' }, { key: 'productName', label: 'สินค้า' }, { key: 'locationDisplay', label: 'สาขา/คลัง' }, { key: 'lotNo', label: 'Lot' }, { key: 'customerName', label: 'ลูกค้าที่คืน' }, { key: 'reason', label: 'เหตุผล' }, { key: 'qty', label: 'คงเหลือ', cellClassName: 'text-right font-bold text-purple-700' }, { key: 'sentQty', label: 'ส่งคืนแล้ว', cellClassName: 'text-right text-emerald-700' }, { key: 'value', label: 'มูลค่าคงเหลือ', cellClassName: 'text-right text-red-700' }, { key: 'returnStatus', label: 'สถานะ', cellClassName: 'text-center' }, { key: 'returnAction', label: 'การกระทำ', cellClassName: 'text-center' },
-  ]
+  return []
 }
 
 function formatCell(value: unknown) {
@@ -371,21 +328,6 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
     if (key === 'productDisplay') return <><b>{formatCell(row.productCode)}</b><div className="text-xs text-slate-500">{formatCell(row.productName)}</div></>
     if (key === 'locationDisplay') return <span className="text-xs">{formatCell(row.branchName)}<br />{formatCell(row.warehouseName)}</span>
     if (key === 'statusFlow') return <><span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">{formatCell(row.statusFrom)}</span><span className="mx-1 text-amber-600">→</span><span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{formatCell(row.statusTo)}</span></>
-  }
-  if (mode === 'customer-return') {
-    if (key === 'locationDisplay') return <span className="text-xs">{formatCell(row.branchName)}<br />{formatCell(row.warehouseName)}</span>
-    if (key === 'sentQty') return Number(row.sentQty ?? 0) > 0 ? formatMoney(Number(row.sentQty)) : '-'
-    if (key === 'returnStatus') {
-      const qty = Number(row.qty ?? 0)
-      const sentQty = Number(row.sentQty ?? 0)
-      const label = qty <= 0.001 ? 'ส่งคืนหมดแล้ว' : sentQty > 0 ? 'ส่งคืนบางส่วน' : 'รอส่งคืน'
-      const color = qty <= 0.001 ? 'bg-emerald-100 text-emerald-700' : sentQty > 0 ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
-      return <span className={`rounded px-2 py-1 text-xs font-medium ${color}`}>{label}</span>
-    }
-    if (key === 'returnAction') {
-      const qty = Number(row.qty ?? 0)
-      return qty > 0.001 ? <button className="rounded bg-emerald-600 px-3 py-1 text-xs text-white opacity-60" disabled title="รอออกแบบ send-back/audit/rollback ก่อนเปิดใช้งาน" type="button">📤 ส่งคืน</button> : <span className="text-xs text-emerald-600">✓ ส่งครบ</span>
-    }
   }
   if (mode === 'convert') {
     if (key === 'action') {
@@ -519,20 +461,6 @@ function AdjustForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (v
     <Field label="Lot" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
     <Field label="ยอดในระบบ" type="number" value={String(values.systemQty)} onChange={(systemQty) => setValues({ ...values, systemQty: Number(systemQty) })} />
     <Field label="นับจริง" type="number" value={String(values.countedQty)} onChange={(countedQty) => setValues({ ...values, countedQty: Number(countedQty) })} />
-    <Field label="เหตุผล" value={values.reason} onChange={(reason) => setValues({ ...values, reason })} />
-  </FormShell>
-}
-
-function CustomerReturnForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (values: CustomerReturnFormValues) => void; reference: Payload['reference'] }) {
-  const [values, setValues] = useState<CustomerReturnFormValues>({ action: 'receive', branchId: '', customerId: null, date: todayDateInput(), deliveryRefNo: null, docNo: null, lotNo: null, notes: null, productId: '', qty: 0, reason: '', returnRowKey: null, unitCost: 0, warehouseId: '' })
-  return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} onSubmit={() => props.onSubmit(values)}>
-    <BaseDateDoc values={values} setValues={setValues} />
-    <Select label="สินค้า" options={props.reference.products} value={values.productId} onChange={(productId) => setValues({ ...values, productId })} />
-    <Select label="ลูกค้า" options={props.reference.customers ?? []} value={values.customerId ?? ''} onChange={(customerId) => setValues({ ...values, customerId })} />
-    <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
-    <Field label="น้ำหนัก" type="number" value={String(values.qty)} onChange={(qty) => setValues({ ...values, qty: Number(qty) })} />
-    <Field label="ต้นทุน/กก." type="number" value={String(values.unitCost)} onChange={(unitCost) => setValues({ ...values, unitCost: Number(unitCost) })} />
-    <Field label="Lot" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
     <Field label="เหตุผล" value={values.reason} onChange={(reason) => setValues({ ...values, reason })} />
   </FormShell>
 }

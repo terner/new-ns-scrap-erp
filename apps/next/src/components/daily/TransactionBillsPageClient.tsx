@@ -4,7 +4,6 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
-import { sanitizePhoneInput } from '@/lib/format'
 import { purchaseBillFormSchema, type PurchaseBillFormValues } from '@/lib/purchase-bill'
 
 type BillRow = {
@@ -145,7 +144,7 @@ const initialPurchaseForm = (): PurchaseBillFormValues => ({
   discountTotal: 0,
   hasVat: false,
   items: [blankItem()],
-  licensePlate: null,
+  licensePlate: '',
   note: null,
   notes: null,
   poBuyId: null,
@@ -326,7 +325,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       discountTotal: row.discountTotal ?? 0,
       hasVat: row.hasVat ?? false,
       items,
-      licensePlate: row.licensePlate || null,
+      licensePlate: row.licensePlate || '',
       note: row.note || null,
       notes: row.note || null,
       poBuyId: row.poBuyId || null,
@@ -644,11 +643,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
                 <div className="grid gap-3 md:grid-cols-3">
                 <SelectField hideCode error={fieldErrors.branchId} label="สาขา/คลัง *" options={activeBranches} value={form.branchId} onChange={(value) => updateForm('branchId', value)} />
-                <Field error={fieldErrors.refNo} label="เลขที่อ้างอิง (บิล Supplier)"><input className="w-full rounded border px-3 py-2 font-mono" placeholder="เช่น INV-12345" value={form.refNo ?? ''} onChange={(event) => updateForm('refNo', event.target.value || null)} /></Field>
                 <SupplierSearchCombobox className="md:col-span-3" error={fieldErrors.supplierId} options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
-                <Field error={fieldErrors.licensePlate} label="ทะเบียนรถ"><input className="w-full rounded border px-3 py-2 uppercase" placeholder="เช่น 1กข-1234 / 70-1234" value={form.licensePlate ?? ''} onChange={(event) => updateForm('licensePlate', event.target.value.toUpperCase() || null)} /></Field>
-                <Field error={fieldErrors.contactPhone} label="เบอร์โทร"><input className="w-full rounded border px-3 py-2" inputMode="tel" placeholder="085-555-5555" value={form.contactPhone ?? ''} onChange={(event) => updateForm('contactPhone', sanitizePhoneInput(event.target.value) || null)} /></Field>
-                <Field label="ที่มา"><select className="w-full rounded border px-3 py-2" value={form.purchaseSource} onChange={(event) => updateForm('purchaseSource', event.target.value as PurchaseBillFormValues['purchaseSource'])}><option value="SPOT_BUY">SPOT BUY</option><option value="PO_RECEIPT">PO RECEIPT</option><option value="MIXED">MIXED</option></select></Field>
+                <Field error={fieldErrors.licensePlate} label="ทะเบียนรถ *"><input className="w-full rounded border px-3 py-2 uppercase" placeholder="เช่น 1กข-1234 / 70-1234" value={form.licensePlate} onChange={(event) => updateForm('licensePlate', event.target.value.toUpperCase())} /></Field>
                 </div>
               </div>
 
@@ -673,7 +669,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                               <input className="mt-1.5 w-full rounded border bg-yellow-50 px-2 py-1 text-xs" placeholder="ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)" value={item.displayName ?? ''} onChange={(event) => updateItem(index, 'displayName', event.target.value || null)} />
                             </td>
                             <td className="p-2" colSpan={form.salesId ? 3 : 2}>
-                              <div className="mb-1 text-[11px] font-semibold text-indigo-700">PO</div>
+                              <div className="mb-1 text-[11px] font-semibold text-indigo-700">อ้างอิง PO</div>
                               <select className="w-full rounded border bg-blue-50 px-2 py-2 text-xs" value={item.poBuyId ?? ''} onChange={(event) => updateItem(index, 'poBuyId', event.target.value || null)}>
                                 <option value="">Spot Buy</option>
                                 {activePoBuys.map((po) => <option key={po.id} value={po.id}>{po.label ?? po.name}</option>)}

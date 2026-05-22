@@ -1498,6 +1498,22 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Commands: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI still has the existing 113 skeleton warnings outside this batch.
 - Result: Foreign Finance route/API baselines are complete for FF1-FF6; money-moving writes, dedicated ITF/ORC schemas, import/match reconciliation schema, and more granular foreign finance permissions remain deferred.
 
+### FF8: Hide From Active Navigation
+
+#### Execution Log
+
+- Task: Hide the Foreign Finance menu category because it is not in active use/development.
+- Legacy refs: none; user-facing navigation cleanup only.
+- Files changed: `apps/next/src/lib/navigation.ts`, `apps/next/src/app/reports/ReportsIndexPageClient.tsx`, `docs/migration/18-next-system-sitemap.md`, this tracker, and current work handoff.
+- DB/API changes: none. Existing `/finance/foreign/*` pages and `/api/finance/foreign/*` route handlers remain in code for future reactivation.
+- Buttons/actions checked: sidebar category and six Foreign Finance sidebar entries removed; reports index FX Rate / FX Gain-Loss links removed.
+- Modal/form checked: not applicable; no page/form behavior changed.
+- Validation added: sitemap now records Foreign Finance as hidden/retained rather than active navigation.
+- Playwright smoke: not run; source-level check confirmed no `foreign-finance`, `การเงินต่างประเทศ`, `/finance/foreign/*`, or `Foreign Finance` entries remain in active navigation/report index catalogs. Build passed after the change.
+- Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`.
+- Result: Foreign Finance is hidden from user-facing navigation/report entry points; retained direct pages/APIs remain for future reactivation.
+- Commit: this change set.
+
 ## Batch A: Finance / Accounting
 
 ### A0: Module Overview
@@ -2305,6 +2321,22 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Commands: `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`.
 - Result: `/stock/status-convert` and `/stock/customer-return` now restore the legacy compact stock operation visual surfaces while preserving existing write semantics. Send-back, CSV export, field-level validation, reverse/audit/rollback, product status mutation, and cost-policy hardening remain deferred.
 - Commit: `8ea1bbc fix: restore stock operation legacy ui parity`.
+
+### UI-STOCK3: Retire `/stock/customer-return`
+
+#### Execution Log
+
+- Task: remove `/stock/customer-return` from the active Next app because the page is not used.
+- Legacy refs: none; user request on 2026-05-22 supersedes the earlier clone/parity target for this route.
+- Files changed: `apps/next/src/lib/navigation.ts`, `apps/next/src/app/stock/customer-return/page.tsx`, `apps/next/src/app/api/stock/customer-return/route.ts`, `apps/next/src/components/stock/StockOperationPageClient.tsx`, `apps/next/src/lib/stock.ts`, `docs/api/openapi.yaml`, `docs/migration/18-next-system-sitemap.md`, this tracker, and current work handoff.
+- DB/API changes: removed the active page route and API route only; no database schema or stock history data changed.
+- Buttons/actions checked: sidebar entry removed; customer-return form/action branch removed from the shared stock operation component.
+- Modal/form checked: Customer Return form branch and Zod schema removed.
+- Validation added: OpenAPI no longer documents `/api/stock/customer-return`; sitemap marks the route retired.
+- Playwright smoke: not run; production build route manifest confirms `/stock/customer-return` and `/api/stock/customer-return` are no longer generated.
+- Commands: `rm -rf .next`, `npm run build --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check`.
+- Result: `/stock/customer-return` is retired from the active Next app; no database schema or stock history data changed.
+- Commit: this change set.
 
 ### UI-DR: Daily Reports / รายงานประจำวัน Legacy UI Parity Revision
 

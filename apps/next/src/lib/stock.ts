@@ -9,10 +9,6 @@ const optionalDocNo = z.preprocess(
   blankToNull,
   z.string().trim().max(40, 'เลขที่เอกสารยาวเกินไป').regex(docNoPattern, 'เลขที่เอกสารใช้ได้เฉพาะอังกฤษ ตัวเลข ขีดกลาง และ underscore').nullable().default(null),
 )
-const optionalSafeId = (label: string) => z.preprocess(
-  blankToNull,
-  z.string().trim().max(100, `${label}ยาวเกินไป`).regex(/^[A-Za-z0-9_.:-]+$/, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
-)
 const optionalGeneralText = (label: string, maxLength = 500) => z.preprocess(
   blankToNull,
   z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
@@ -92,25 +88,6 @@ export const stockAdjustFormSchema = z.object({
 })
 
 export type StockAdjustFormValues = z.infer<typeof stockAdjustFormSchema>
-
-export const customerReturnFormSchema = z.object({
-  action: z.enum(['receive', 'send_back']).default('receive'),
-  branchId: z.string().trim().min(1, 'เลือกสาขา'),
-  customerId: optionalSafeId('ลูกค้า'),
-  date: requiredDate,
-  deliveryRefNo: optionalDocNo,
-  docNo: optionalDocNo,
-  lotNo: optionalGeneralText('Lot', 80),
-  notes: optionalGeneralText('หมายเหตุ', 500),
-  productId: z.string().trim().min(1, 'เลือกสินค้า'),
-  qty: positiveQty('น้ำหนัก'),
-  reason: z.string().trim().min(2, 'กรอกเหตุผล').max(240, 'เหตุผลยาวเกินไป').regex(generalTextPattern, 'เหตุผลมีรูปแบบไม่ถูกต้อง'),
-  returnRowKey: optionalSafeId('รายการของคืน'),
-  unitCost: nonNegativeQty('ต้นทุน').default(0),
-  warehouseId: z.string().trim().min(1, 'เลือกคลัง'),
-})
-
-export type CustomerReturnFormValues = z.infer<typeof customerReturnFormSchema>
 
 export type StockOption = {
   active: boolean | null

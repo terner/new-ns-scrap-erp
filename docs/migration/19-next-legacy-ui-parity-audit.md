@@ -106,7 +106,10 @@ Baseline notes:
 - `/stock/convert`
 - `/stock/adjust`
 - `/stock/status-convert`
-- `/stock/customer-return`
+
+## Retired From Active App
+
+- `/stock/customer-return` - removed on 2026-05-22 per user request because the page is not used.
 
 ## Missing Or Unmapped Legacy Views
 

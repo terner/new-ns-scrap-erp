@@ -1978,38 +1978,6 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /api/stock/customer-return:
-    get:
-      tags: [Stock]
-      operationId: listCustomerReturnStock
-      summary: List customer return stock
-      responses:
-        "200":
-          description: Customer return stock rows and stock reference options
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StockOperationListResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-    post:
-      tags: [Stock]
-      operationId: createCustomerReturnStockMovement
-      summary: Receive or send back customer return stock
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CustomerReturnRequest"
-      responses:
-        "200":
-          $ref: "#/components/responses/StockWriteOk"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
   /api/tracking/customer:
     get:
       tags: [Tracking]
@@ -2886,32 +2854,6 @@ components:
     ApiObject:
       type: object
       additionalProperties: true
-    CustomerReturnRequest:
-      allOf:
-        - $ref: "#/components/schemas/StockBaseWriteRequest"
-        - type: object
-          required: [action, branchId, date, productId, qty, reason, unitCost, warehouseId]
-          properties:
-            action:
-              type: string
-              enum: [receive, send_back]
-              default: receive
-            customerId:
-              type: [string, "null"]
-            deliveryRefNo:
-              $ref: "#/components/schemas/OptionalDocNo"
-            qty:
-              type: number
-              exclusiveMinimum: 0
-            reason:
-              type: string
-              minLength: 2
-              maxLength: 240
-            returnRowKey:
-              type: [string, "null"]
-            unitCost:
-              type: number
-              minimum: 0
     Error:
       type: object
       properties:

@@ -5,7 +5,6 @@ export type NavigationSectionKey =
   | 'production'
   | 'dual-costing'
   | 'finance-debt'
-  | 'foreign-finance'
   | 'stock'
   | 'trading'
   | 'po-reports'
@@ -137,7 +136,6 @@ export const navigationSections: Array<{ key: NavigationSectionKey; label: strin
   { key: 'production', label: 'การผลิต' },
   { key: 'dual-costing', label: 'Dual Costing (จองดีล)' },
   { key: 'finance-debt', label: 'การเงิน & หนี้' },
-  { key: 'foreign-finance', label: 'การเงินต่างประเทศ' },
   { key: 'stock', label: 'สินค้า' },
   { key: 'trading', label: 'Trading / ซื้อมาขายไป' },
   { key: 'po-reports', label: 'PO Reports' },
@@ -199,18 +197,11 @@ export const navigationItems: NavigationItem[] = [
   { href: '/finance/cash-position', icon: '💼', label: 'Cash Position', section: 'finance-debt' },
   { href: '/finance/supplier-advance', icon: '⏪', label: 'จ่ายล่วงหน้า Supplier', section: 'finance-debt' },
   { href: '/finance/customer-advance', icon: '⏩', label: 'รับล่วงหน้าจาก Customer', section: 'finance-debt' },
-  { href: '/finance/foreign/intl-transfer', icon: '🌐', label: 'โอนเงินต่างประเทศ', section: 'foreign-finance' },
-  { href: '/finance/foreign/overseas-receipt', icon: '📥', label: 'รับเงินจากต่างประเทศ', section: 'foreign-finance' },
-  { href: '/finance/foreign/fx-rate', icon: '💱', label: 'FX Rate Management', section: 'foreign-finance' },
-  { href: '/finance/foreign/fcd-ledger', icon: '💵', label: 'FCD Ledger', section: 'foreign-finance' },
-  { href: '/finance/foreign/fx-gain-loss-report', icon: '📊', label: 'FX Gain/Loss Report', section: 'foreign-finance' },
-  { href: '/finance/foreign/bank-reconciliation', icon: '⚖️', label: 'Bank Reconciliation', section: 'foreign-finance' },
   { href: '/stock/balance', icon: '📦', label: 'สต๊อกคงเหลือ', section: 'stock' },
   { href: '/stock/ledger', icon: '📋', label: 'Stock Ledger', section: 'stock' },
   { href: '/stock/status-convert', icon: '🔄', label: 'ปรับสถานะสินค้า (RM→FG)', section: 'stock' },
   { href: '/stock/convert', icon: '🔀', label: 'Grade Adjustment / ปรับเกรด', section: 'stock' },
   { href: '/stock/adjust', icon: '🔢', label: 'นับสต๊อก / Stock Count Adjust', section: 'stock' },
-  { href: '/stock/customer-return', icon: '↩️', label: 'Customer Return / ของคืน', section: 'stock' },
   { href: '/trading/dashboard', icon: '🔄', label: 'Trading Dashboard', section: 'trading' },
   { href: '/trading/matching', icon: '🤝', label: 'Trading Matching / จับคู่ดีล', section: 'trading' },
   { href: '/po-reports/outstanding', icon: '📑', label: 'PO ซื้อ/ขาย คงเหลือ', section: 'po-reports' },

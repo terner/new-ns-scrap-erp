@@ -131,6 +131,8 @@ Status date: 2026-05-19
 - Current purchase-bill modal follow-up: `/purchase/bills` no longer shows modal fields for `เลขที่บิล`, `วันที่`, `คลัง`, `ช่องทางซื้อ`, `เซลที่ดูแล`, VAT type, or the VAT checkbox in the bill-info section. Purchase bill numbers and the create timestamp are system-generated on save, new bill document dates derive from `created_at` in Bangkok time, branch selection is labeled `สาขา/คลัง` and shows branch names without codes, the supplier field is searchable, saved `sales_id` derives from supplier master data, and item rows now wrap so `Gross` and later quantity/price fields start on the next line under product/PO.
 - Current tax config follow-up: dev-target now has configurable `vat_settings` and `wht_settings` master/config tables seeded with VAT 7% and WHT 3%. `/admin/system-settings` manages both active rates under the System module. `/purchase/bills` now reads the active VAT percent from DB, displays that percent in the modal summary, calculates VAT from that rate instead of hardcoded `7`, and stores the rate used in `purchase_bills.vat_rate_percent`. WHT is available as config for the next payment/receipt flow pass but is not yet applied to purchase bill totals.
 - Current UI pattern note: legacy-style list tables should keep the white rounded shadow card, compact zebra rows, slate header, and slate row separators as the default table surface unless the legacy page has a more specific color/header pattern. Branch dropdowns should display branch names only; do not show branch codes in dropdown labels. Keep branch codes stored and visible only where the branch master or document-numbering logic explicitly needs them.
+- Current navigation cleanup: per user request on 2026-05-22, the `การเงินต่างประเทศ` / Foreign Finance category is hidden from the active Next sidebar and report index because it is not in active use/development. Existing `/finance/foreign/*` pages and APIs are retained in code as future baselines; money-moving writes remain deferred.
+- Current route retirement: per user request on 2026-05-22, `/stock/customer-return` has been removed from the active Next app because it is not used. The sidebar item, page route, API route, OpenAPI path/schema, and shared Customer Return form/schema branch were removed; no stock history or database tables were changed.
 
 ## File Naming Changes
 
@@ -261,7 +263,7 @@ Validation:
 Post-SYS UI parity priority after the first 10 route audit now includes a dedicated Daily Reports / รายงานประจำวัน group:
 
 1. Finish Finance and Debt: `/finance/supplier-advance`, `/finance/customer-advance`
-2. Finish Stock parity: `/stock/status-convert`, `/stock/customer-return` (completed locally; commit/push pending)
+2. Stock parity is closed for active routes; `/stock/customer-return` is retired from the active app per user request.
 3. Daily Reports / รายงานประจำวัน: `/owner-daily`, `/daily-report`, with `/dashboard` checked where shared daily-report cards overlap
 4. Tracking 360
 5. Dual Costing / Trading / PO

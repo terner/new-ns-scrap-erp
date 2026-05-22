@@ -20,6 +20,11 @@ const optionalGeneralText = (label: string, maxLength = 500) => z.preprocess(
   z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
 )
 
+const requiredGeneralText = (label: string, maxLength = 500) => z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim() : ''),
+  z.string().min(1, `กรอก${label}`).max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`),
+)
+
 const optionalPhone = (label: string) => z.preprocess(
   blankToNull,
   z.string().trim()
@@ -60,7 +65,7 @@ export const purchaseBillFormSchema = z.object({
   discountTotal: money('ส่วนลดท้ายบิล').default(0),
   hasVat: z.boolean().default(false),
   items: z.array(purchaseBillItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
-  licensePlate: optionalGeneralText('ทะเบียนรถ', 40),
+  licensePlate: requiredGeneralText('ทะเบียนรถ', 40),
   note: optionalGeneralText('หมายเหตุ', 500),
   notes: optionalGeneralText('หมายเหตุ', 500),
   poBuyId: optionalSafeId('Quick Load PO'),

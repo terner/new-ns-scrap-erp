@@ -41,8 +41,8 @@ Status terms:
 | Production | 8 | 8 | 0 | read baseline plus output category write |
 | Dual Costing | 7 | 1 | 6 | PO buy only |
 | Finance and Debt | 6 | 1 | 5 | AP only |
-| Foreign Finance | 6 | 6 | 0 | fx-rate, intl-transfer, overseas-receipt, fcd-ledger, fx-gain-loss, bank-reconciliation |
-| Stock | 6 | 6 | 0 | balance, ledger, status convert, grade convert, adjust, customer return |
+| Foreign Finance | 0 active; 6 hidden/retained | 6 | 0 | routes/APIs retained but hidden from sidebar and reports index until the module is needed |
+| Stock | 5 | 5 | 0 | balance, ledger, status convert, grade convert, adjust; customer return retired from active app |
 | Trading | 2 | 1 | 1 | matching only |
 | PO Reports | 1 | 1 | 0 | outstanding only |
 | Reports | 1 | 1 | 0 | reports index |
@@ -136,6 +136,8 @@ Status terms:
 
 ### Foreign Finance
 
+User-facing navigation status: hidden for now per user request on 2026-05-22 because the module is not in active use/development. The dedicated pages and APIs remain in code as retained baselines and can still be opened by direct URL for future work.
+
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
 | `/finance/foreign/intl-transfer` | โอนเงินต่างประเทศ | read/form baseline | `GET /api/finance/foreign/intl-transfer` | `accounts`, `overseas_recipients`, `overseas_remittance_purposes`, `fx_rates`, `bank_statement` (`ITF`) | `finance.cash.view` |
@@ -154,7 +156,7 @@ Status terms:
 | `/stock/status-convert` | ปรับสถานะสินค้า | partial write | `GET/POST /api/stock/status-convert` | `stock_ledger` | `stock.ledger.view` |
 | `/stock/convert` | Grade Adjustment | partial write | `GET/POST /api/stock/convert` | `stock_ledger`, `grade_adjustments` | `stock.ledger.view` |
 | `/stock/adjust` | นับสต๊อก / Stock Count Adjust | partial write | `GET/POST /api/stock/adjust` | `stock_ledger`, `stock_adjustments` | `stock.ledger.view` |
-| `/stock/customer-return` | Customer Return / ของคืน | partial write | `GET/POST /api/stock/customer-return` | `stock_ledger` | `stock.ledger.view` |
+| `/stock/customer-return` | Customer Return / ของคืน | retired | removed on 2026-05-22 per user request | retained stock history only; no active page/API | none |
 
 ### Trading And PO Reports
 
@@ -251,8 +253,9 @@ Current API groups:
 - Master Data: customers, suppliers, products, lookup masters, Thai address lookup
 - Production: orders, dashboard, reports, output categories
 - Purchase/Sales: purchase bills, payments, receipt vouchers, sales bills, stock issue, receipts, PO Sell
-- Finance/Foreign Finance: AR, AP, bank statement, cash position, advances, FX rate management
-- Stock: ledger, transfer, balance, status convert, grade convert, count adjust, customer return
+- Finance: AR, AP, bank statement, cash position, advances
+- Foreign Finance: retained route/API baselines exist but are hidden from sidebar, sitemap page, generated sitemap, and reports index until this module is reactivated
+- Stock: ledger, transfer, balance, status convert, grade convert, count adjust
 - Tracking/Trading/PO Reports: supplier tracking, trading matching, PO outstanding
 - Health: simple runtime health endpoint
 
@@ -260,6 +263,6 @@ Current API groups:
 
 - Stock pages now have first Next page/API baselines.
 - Stock write flows are traceable through `stock_ledger`, but production-grade void/reversal, branch-scope enforcement, and cost-source/WAC policy hardening remain follow-up work.
-- Main dashboard/reporting routes now have 11/11 read or read-design page/API baselines; Finance / Accounting has 18/18 read or read-design page/API baselines, and Foreign Finance has dedicated route/API baselines with money-moving writes still deferred.
+- Main dashboard/reporting routes now have 11/11 read or read-design page/API baselines; Finance / Accounting has 18/18 read or read-design page/API baselines, and Foreign Finance has retained route/API baselines hidden from user-facing navigation with money-moving writes still deferred.
 - Several write flows are intentionally partial and still need side-effect reconciliation before production use.
 - `/sales/po-sell` D1 read baseline is implemented; write/cancel/match allocation flows remain deferred and user-facing identifiers should use `docNo`.
