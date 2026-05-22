@@ -354,10 +354,10 @@ export function PoBuyPageClient() {
 
       <div className="overflow-x-auto rounded-lg bg-white shadow">
         <table className="w-full min-w-[1180px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-2 text-center font-semibold text-slate-700">เลือก</th><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Delivery" sortKey="expectedDelivery" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /></tr></thead>
+          <thead className="bg-slate-100"><tr><th className="p-2 text-center font-semibold text-slate-700">เลือก</th><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Delivery" sortKey="expectedDelivery" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><th className="p-2 text-right font-semibold text-slate-700">จัดการ</th></tr></thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={10}>ยังไม่มี PO Buy</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={11}>ยังไม่มี PO Buy</td></tr> : null}
             {!isLoading && rows.map((row, index) => (
               <tr key={row.id} className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
                 <td className="p-2 text-center"><input aria-label={`เลือก ${row.docNo}`} type="checkbox" disabled onClick={(event) => event.stopPropagation()} /></td>
@@ -370,6 +370,10 @@ export function PoBuyPageClient() {
                 <td className="p-2 text-right text-amber-700">{formatMoney(row.remainingQty)}</td>
                 <td className="p-2">{row.expectedDelivery || '-'}</td>
                 <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(row.status)}`}>{row.status}</span></td>
+                <td className="whitespace-nowrap p-2 text-right">
+                  <button className="mr-2 text-xs text-amber-600 opacity-50" type="button" disabled onClick={(event) => event.stopPropagation()}>ย้าย</button>
+                  <button className="text-xs text-red-600 opacity-50" type="button" disabled onClick={(event) => event.stopPropagation()}>ยกเลิก</button>
+                </td>
               </tr>
             ))}
           </tbody>
