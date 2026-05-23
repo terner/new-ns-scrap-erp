@@ -20,7 +20,6 @@ type ProductRef = {
   id: string
   metalGroup: string
   name: string
-  targetMarginPct: number
   unit: string
 }
 
@@ -129,7 +128,7 @@ function createProductAgg(product?: ProductRef, name = 'ไม่ระบุส
     sellQty: 0,
     stockQty: 0,
     stockValue: 0,
-    targetMarginPct: product?.targetMarginPct ?? 8,
+    targetMarginPct: 8,
     unit: product?.unit ?? 'kg',
   }
 }
@@ -146,7 +145,7 @@ export async function buildProfitCostAnalysis(filter: ProfitCostFilter) {
   const [products, purchaseBills, salesBills, stockRows, branches, salesChannels, suppliers, customers] = await Promise.all([
     prisma.products.findMany({
       orderBy: [{ metal_group: 'asc' }, { code: 'asc' }, { name: 'asc' }],
-      select: { code: true, id: true, metal_group: true, name: true, target_margin_pct: true, unit: true },
+      select: { code: true, id: true, metal_group: true, name: true, unit: true },
       where: {
         active: { not: false },
         ...(selectedMetalGroups.size ? { metal_group: { in: Array.from(selectedMetalGroups) } } : {}),
@@ -193,7 +192,6 @@ export async function buildProfitCostAnalysis(filter: ProfitCostFilter) {
     id: product.id,
     metalGroup: product.metal_group ?? '',
     name: product.name,
-    targetMarginPct: toNumber(product.target_margin_pct),
     unit: product.unit ?? 'kg',
   }))
   const productsByKey = new Map<string, ProductRef>()

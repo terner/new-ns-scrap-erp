@@ -302,7 +302,7 @@ export function PoBuyPageClient() {
       if (fromDate && row.date < fromDate) return false
       if (toDate && row.date > toDate) return false
       if (!query) return true
-      return `${row.docNo} ${row.supplierName} ${row.productName} ${row.status}`.toLowerCase().includes(query)
+      return `${row.docNo} ${row.supplierName} ${row.productName} ${row.status} ${row.notes}`.toLowerCase().includes(query)
     })
     return [...filteredRows].sort((left, right) => {
       const leftValue = poBuySortValue(left, sortKey)
@@ -427,27 +427,30 @@ export function PoBuyPageClient() {
       </div>
 
       <div className="overflow-x-auto rounded-lg bg-white shadow">
-        <table className="w-full min-w-[1180px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-2 text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></th><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><th className="p-2 text-right font-semibold text-slate-700">จัดการ</th></tr></thead>
+        <table className="w-full min-w-[1240px] text-sm">
+          <thead className="bg-slate-100"><tr><th className="p-2 text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></th><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><th className="w-16 p-2 text-center font-semibold text-slate-700">หมายเหตุ</th><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><th className="p-2 text-right font-semibold text-slate-700">จัดการ</th></tr></thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={12}>ยังไม่มี PO Buy</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</td></tr> : null}
             {!isLoading && pageRows.map((row, index) => (
               <tr key={row.id} className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
                 <td className="p-2 text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></td>
-                <td className="p-2 font-mono text-xs">{row.docNo}</td>
-                <td className="p-2">{row.date}</td>
-                <td className="p-2">{row.supplierName}</td>
-                <td className="max-w-72 truncate p-2 text-xs">{row.productName}</td>
-                <td className="p-2 text-right">{formatMoney(row.qty)}</td>
-                <td className="p-2 text-right font-medium">{formatMoney(row.totalAmount)}</td>
-                <td className="p-2 text-right text-amber-700">{formatMoney(row.remainingQty)}</td>
-                <td className="p-2">{row.expectedDelivery || '-'}</td>
-                <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(row.status)}`}>{row.status}</span></td>
-                <td className="p-2 text-xs text-slate-600"><div>{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></td>
+                <td className="w-36 whitespace-nowrap p-2 font-mono">{row.docNo}</td>
+                <td className="w-28 whitespace-nowrap p-2">{row.date}</td>
+                <td className="w-36 p-2">{row.supplierName}</td>
+                <td className="p-2">
+                  <PoBuyTruncatedText text={row.productName} />
+                </td>
+                <PoBuyNumberCell value={formatMoney(row.qty)} />
+                <PoBuyNumberCell strong value={formatMoney(row.totalAmount)} widthClass="w-32 max-w-32" />
+                <PoBuyNumberCell tone="amber" value={formatMoney(row.remainingQty)} />
+                <td className="w-28 whitespace-nowrap p-2">{row.expectedDelivery || '-'}</td>
+                <td className="p-2 text-center"><PoBuyNoteIndicator note={row.notes} poNo={row.docNo} /></td>
+                <td className="w-28 whitespace-nowrap p-2 text-center"><span className={`rounded-full px-2 py-0.5 ${statusBadge(row.status)}`}>{row.status}</span></td>
+                <td className="w-28 whitespace-nowrap p-2 text-xs text-slate-600"><div className="truncate">{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></td>
                 <td className="whitespace-nowrap p-2 text-right">
-                  <button className="mr-2 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
-                  <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</button>
+                  <button className="mr-2 rounded border border-slate-300 px-2 py-1 hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
+                  <button className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</button>
                 </td>
               </tr>
             ))}
@@ -500,6 +503,66 @@ export function PoBuyPageClient() {
 function Metric({ box, color, label, sublabel, value }: { box?: boolean; color: 'amber' | 'blue' | 'emerald' | 'red'; label: string; sublabel: string; value: string }) {
   const colorClass = color === 'red' ? 'border-red-300 bg-red-50 text-red-700' : color === 'amber' ? `${box ? 'border-amber-300 bg-amber-50' : 'border-amber-500 bg-white'} text-amber-700` : color === 'emerald' ? 'border-emerald-500 bg-white text-emerald-700' : 'border-blue-500 bg-white text-blue-700'
   return <div className={`rounded-xl p-4 shadow ${box ? 'border-2' : 'border-l-4'} ${colorClass}`}><div className="text-xs">{label}</div><div className="text-2xl font-bold">{value}</div><div className="text-xs text-slate-400">{sublabel}</div></div>
+}
+
+function PoBuyNoteIndicator({ note, poNo }: { note: string; poNo: string }) {
+  const text = note.trim()
+  if (!text) return <span className="text-slate-300">-</span>
+
+  return (
+    <span className="group relative inline-flex">
+      <button
+        aria-label={`ดูหมายเหตุ ${poNo}`}
+        className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-semibold leading-none text-slate-600 hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        type="button"
+        onClick={(event) => event.stopPropagation()}
+      >
+        i
+      </button>
+      <span className="pointer-events-none absolute right-0 top-8 z-20 hidden w-72 whitespace-pre-wrap rounded border border-amber-200 bg-amber-50 p-3 text-left text-xs leading-relaxed text-amber-950 shadow-lg group-hover:block group-focus-within:block">
+        {text}
+      </span>
+    </span>
+  )
+}
+
+function PoBuyTruncatedText({ text }: { text: string }) {
+  return (
+    <span className="group relative block min-w-0" tabIndex={0}>
+      <span className="block truncate">{text || '-'}</span>
+      {text ? (
+        <span className="pointer-events-none absolute left-0 top-6 z-20 hidden w-80 whitespace-normal rounded border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed text-amber-950 shadow-lg group-hover:block group-focus:block">
+          {text}
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+function PoBuyNumberCell({
+  strong,
+  tone,
+  value,
+  widthClass = 'w-28 max-w-28',
+}: {
+  strong?: boolean
+  tone?: 'amber'
+  value: string
+  widthClass?: string
+}) {
+  const colorClass = tone === 'amber' ? 'text-amber-700' : strong ? 'text-slate-900' : 'text-slate-700'
+  const weightClass = strong ? 'font-medium' : ''
+
+  return (
+    <td className={`p-2 text-right tabular-nums ${colorClass} ${weightClass}`}>
+      <span className={`group relative ml-auto block ${widthClass}`} tabIndex={0}>
+        <span className="block truncate">{value}</span>
+        <span className="pointer-events-none absolute right-0 top-6 z-20 hidden whitespace-nowrap rounded border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed text-amber-950 shadow-lg group-hover:block group-focus:block">
+          {value}
+        </span>
+      </span>
+    </td>
+  )
 }
 
 function PoBuyCancelModal({
@@ -564,6 +627,7 @@ function poBuySortValue(row: PoBuyRow, key: PoBuySortKey) {
 function PoBuySortHeader({
   activeKey,
   align = 'left',
+  className = '',
   direction,
   label,
   sortKey,
@@ -571,6 +635,7 @@ function PoBuySortHeader({
 }: {
   activeKey: PoBuySortKey
   align?: 'center' | 'left' | 'right'
+  className?: string
   direction: PoBuySortDirection
   label: string
   sortKey: PoBuySortKey
@@ -579,7 +644,7 @@ function PoBuySortHeader({
   const active = activeKey === sortKey
   const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
   return (
-    <th className="p-0">
+    <th className={`p-0 ${className}`}>
       <button className={`flex w-full items-center gap-1 p-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
         <span>{label}</span>
         <span className="text-slate-400">{active ? (direction === 'asc' ? '▲' : '▼') : '↕'}</span>
@@ -847,12 +912,20 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
           <button className="rounded-lg border px-3 py-1.5 text-sm" type="button" onClick={onClose}>ปิด</button>
         </div>
         <div className="grid gap-3 p-4 md:grid-cols-3">
-          <Detail label="วันที่" value={row.date || '-'} />
-          <Detail label="กำหนดส่ง" value={row.expectedDelivery || '-'} />
+          <Detail label="วันที่สร้างเอกสาร" value={row.date || '-'} />
+          <Detail label="วันที่กำหนดส่ง" value={row.expectedDelivery || '-'} />
           <Detail label="สถานะ" value={row.status} />
           <Detail label="Qty" value={formatMoney(row.qty)} />
           <Detail label="คงเหลือ" value={formatMoney(row.remainingQty)} />
         </div>
+        {row.notes.trim() ? (
+          <div className="px-4 pb-4">
+            <div className="rounded-lg bg-slate-50 p-3 text-sm">
+              <div className="text-xs text-slate-500">หมายเหตุ</div>
+              <div className="mt-1 whitespace-pre-wrap text-slate-700">{row.notes}</div>
+            </div>
+          </div>
+        ) : null}
         <div className="px-4 pb-4">
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">

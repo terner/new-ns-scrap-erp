@@ -213,7 +213,7 @@ export async function GET(request: Request) {
       .filter((row) => {
         if (!q) return true
         const productText = row.items.map((item) => item.productName).join(' ')
-        return `${row.docNo} ${row.supplierName} ${productText} ${row.status}`.toLowerCase().includes(q)
+        return `${row.docNo} ${row.supplierName} ${productText} ${row.status} ${row.notes}`.toLowerCase().includes(q)
       })
 
     if (url.searchParams.get('format') === 'xlsx') {
@@ -223,6 +223,7 @@ export async function GET(request: Request) {
         DocNo: row.docNo,
         ExpectedDelivery: row.expectedDelivery,
         ItemCount: row.itemCount,
+        Notes: row.notes,
         Product: row.productName,
         Qty: row.qty,
         RemainingAmount: row.remainingAmount,

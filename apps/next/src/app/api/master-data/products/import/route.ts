@@ -15,9 +15,8 @@ const headerMap = {
   active: ['สถานะ', 'active'],
   code: ['รหัสสินค้า', 'code'],
   id: ['รหัสภายใน', 'id'],
-  itemStatus: ['รับเข้าเป็น', 'สถานะรับเข้าสต๊อก', 'itemStatus', 'item_status'],
+  itemStatus: ['ประเภทคลังที่จะรับเข้า', 'รับเข้าเป็น', 'สถานะรับเข้าสต๊อก', 'itemStatus', 'item_status'],
   name: ['ชื่อสินค้า', 'name'],
-  targetMarginPct: ['Target Margin %', 'targetMarginPct', 'target_margin_pct'],
   type: ['ประเภทสินค้า', 'ประเภท', 'type'],
   unit: ['หน่วย', 'unit'],
 } as const
@@ -43,16 +42,6 @@ function cellText(row: ImportRow, field: ImportField) {
   if (value === null || value === undefined) return ''
   if (value instanceof Date) return value.toISOString()
   return String(value).trim()
-}
-
-function cellNumber(row: ImportRow, field: ImportField) {
-  const value = getCell(row, field)
-  if (value === null || value === undefined || value === '') return null
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null
-  const normalized = String(value).replace(/,/g, '').replace(/%/g, '').trim()
-  if (!normalized) return null
-  const number = Number(normalized)
-  return Number.isFinite(number) ? number : null
 }
 
 function normalizeActive(value: string) {
@@ -187,7 +176,6 @@ export async function POST(request: Request) {
         itemStatus: cellText(row, 'itemStatus') || 'RM',
         type: cellText(row, 'type') || null,
         unit: cellText(row, 'unit') || null,
-        targetMarginPct: cellNumber(row, 'targetMarginPct'),
         active: normalizeActive(cellText(row, 'active')),
       }
 

@@ -250,7 +250,7 @@ Continuation rule:
   - Product list UX now loads once and runs search/filter/sort/count/pagination in the frontend.
   - Product filters cover type, metal group, item status `RM/WIP/FG`, and active state.
   - Product row click opens the edit modal; no select column is used.
-  - Product form includes code, name, type, unit, metal group, item status, grade, standard price, standard cost, target margin %, and active toggle.
+  - Product form includes code, name, type, unit, warehouse receiving type (`RM`/`FG`/`WIP`/`SCRAP`), and active toggle.
   - Product form/API now use product-specific Zod validation instead of the generic master-data schema.
   - Product export uses `/api/master-data/products/export` and generates a real `.xlsx` workbook with summary and product sheets.
   - `/master-data/suppliers` has been upgraded to the customer-style specialized page with frontend search/filter/sort/count/pagination, structured Thai address form, add/edit modal, syntax validation, active toggle, and `.xlsx` export.

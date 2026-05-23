@@ -17,7 +17,6 @@ const sortColumns = {
   code: 'code',
   itemStatus: 'item_status',
   name: 'name',
-  targetMarginPct: 'target_margin_pct',
   type: 'type',
   unit: 'unit',
 } as const
@@ -26,9 +25,8 @@ const productColumns: Array<{ key: keyof Product; label: string; width: number }
   { key: 'code', label: 'รหัสสินค้า', width: 90 },
   { key: 'name', label: 'ชื่อสินค้า', width: 220 },
   { key: 'type', label: 'ประเภทสินค้า', width: 140 },
-  { key: 'itemStatus', label: 'รับเข้าเป็น', width: 100 },
+  { key: 'itemStatus', label: 'ประเภทคลังที่จะรับเข้า', width: 180 },
   { key: 'unit', label: 'หน่วย', width: 80 },
-  { key: 'targetMarginPct', label: 'Target Margin %', width: 120 },
   { key: 'active', label: 'สถานะ', width: 90 },
   { key: 'createdAt', label: 'สร้างเมื่อ', width: 150 },
   { key: 'updatedAt', label: 'แก้ไขเมื่อ', width: 150 },

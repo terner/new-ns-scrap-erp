@@ -1443,7 +1443,6 @@ model products {
   version            Int?                 @default(1)
   type               String?
   grade              String?
-  target_margin_pct  Decimal?             @db.Decimal
   grade_adjustments  grade_adjustments[]
   production_inputs  production_inputs[]
   production_orders  production_orders[]

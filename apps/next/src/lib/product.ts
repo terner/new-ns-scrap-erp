@@ -23,7 +23,6 @@ export const productSchema = z.object({
   itemStatus: z.enum(['RM', 'WIP', 'FG', 'SCRAP']).default('RM'),
   type: z.string().nullable().default(null),
   unit: z.string().nullable().default(null),
-  targetMarginPct: z.number().nullable().default(null),
   createdAt: z.string().nullable().default(null),
   updatedAt: z.string().nullable().default(null),
 })
@@ -82,14 +81,6 @@ export const productFormSchema = z.object({
       .regex(productTextPattern, 'หน่วยมีรูปแบบไม่ถูกต้อง')
       .nullable()
       .default('กก.'),
-  ),
-  targetMarginPct: z.preprocess(
-    blankToNull,
-    z.number({ invalid_type_error: 'ต้องเป็นตัวเลข' })
-      .min(0, 'ต้องไม่ติดลบ')
-      .max(100, 'Margin ต้องไม่เกิน 100%')
-      .nullable()
-      .default(null),
   ),
   active: z.boolean().default(true),
 })

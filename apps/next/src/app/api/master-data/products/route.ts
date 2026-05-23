@@ -13,7 +13,6 @@ const sortColumns = {
   code: 'code',
   itemStatus: 'item_status',
   name: 'name',
-  targetMarginPct: 'target_margin_pct',
   type: 'type',
   unit: 'unit',
 } as const
