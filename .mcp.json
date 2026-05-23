@@ -29,6 +29,11 @@
         "@playwright/mcp@latest",
         "--headless"
       ]
+    },
+    "clickup": {
+      "type": "http",
+      "description": "Project-level ClickUp MCP for tasks, milestones, project planning, and delivery tracking.",
+      "url": "https://mcp.clickup.com/mcp"
     }
   }
 }
