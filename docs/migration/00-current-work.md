@@ -526,6 +526,7 @@ At every checkpoint, update docs as if a new session will start from only the re
   - reverse/cancel/close/lock cost
   - stock ledger/cost allocation reconciliation
 - Purchase follow-ups:
+  - target purchase flow spec is now documented at `docs/notes/Purchase Flow.md`: PO Buy -> Weight Ticket -> Purchase Bill -> Payment, including fields to fill, generated document numbers, Thai statuses, and validation rules
   - void/reversal
   - PO remaining qty reconciliation
   - header/line table refactor
