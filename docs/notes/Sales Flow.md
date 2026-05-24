@@ -15,24 +15,15 @@ created: 2026-05-24
 
 # Sales Flow / Flow ขาย
 
-เอกสารนี้เป็น target flow สำหรับงานขายในระบบ Next app โดยอ้างอิง legacy flow เดิมจาก `old-apps/legacy/index.html` และปรับให้เหมาะกับโครงสร้างใหม่
-
-Legacy baseline ที่ใช้ตรวจ:
-
-| Legacy view | ความหมาย |
-|---|---|
-| `view-poSell` | PO Sell / จองขายล่วงหน้า |
-| `view-stockIssue` | Pending Sale / เบิกออกรอบิล |
-| `view-sales` | บิลขาย |
-| `view-receipt` | รับเงิน Customer |
-
-หลักการที่ยืนยันสำหรับ target:
+เอกสารนี้เป็น target flow สำหรับงานขายในระบบ Next app โดยยึด business rule ที่คุยล่าสุด:
 
 - ไม่มีสถานะ `Draft`
 - เมื่อกดบันทึก ให้ถือว่าออกเอกสารและมีผลทันที
-- ถ้าเบิกสินค้าก่อนออกบิล ต้องใช้ `เบิกออกรอบิล / Pending Sale` และตัด stock ทันที
-- บิลขายที่ออกจาก Pending Sale ต้องไม่ตัด stock ซ้ำ
-- การรับเงินต้องเกิดผ่าน Receipt Voucher เพื่อให้ตัดลูกหนี้และลง bank statement ได้ครบ
+- ถ้าสินค้าออกจากคลังก่อนเปิดบิล ต้องทำใบเบิกออกรอบิลก่อน
+- ใบเบิกออกรอบิลต้องตัด stock ทันที
+- บิลขายควรออกจากยอดที่เบิกแล้ว ถ้ามีการเบิกออกรอบิล
+- บิลขายที่ออกจากใบเบิกออกรอบิลต้องไม่ตัด stock ซ้ำ
+- ใบรับเงินต้องตัดลูกหนี้และลง bank statement ใน transaction เดียวกัน
 - เอกสารที่มีผลทาง stock/เงินแล้ว ถ้ายกเลิกต้องทำผ่าน reversal/status log ไม่ลบทิ้งเงียบ ๆ
 
 ## ภาพรวมเอกสารใน Flow ขาย
@@ -53,7 +44,7 @@ Legacy baseline ที่ใช้ตรวจ:
 | บิลขาย | `SB012605-0001` |
 | ใบรับเงิน | `RCP012605-0001` |
 
-หมายเหตุ: legacy ใช้ `POS`, `PSALE`, `SB`, `RCP` เป็น prefix หลักอยู่แล้ว แต่เลขเอกสาร target ควรเป็น branch-aware เหมือนฝั่งซื้อ
+เลขเอกสาร target ควรเป็น branch-aware เหมือนฝั่งซื้อ เพื่อให้ดูสาขาและช่วงเวลาได้จากเลขเอกสาร
 
 ## Flow ขายแบบมี PO Sell
 
@@ -122,6 +113,42 @@ Spot Sale มีได้ 2 แบบ ขึ้นกับการทำงา
 | 3 | ระบบอัปเดตบิลขาย | ไม่ต้องกรอกเพิ่ม | ไม่มี | Sales Bill = `รับบางส่วน` หรือ `รับครบ` | ยอดค้างรับลดลง |
 
 Target rule: ถ้าของออกจากคลังก่อนเปิดบิล ให้ใช้แบบ A เพื่อให้ stock ถูกต้องตามเวลาที่ของออกจริง
+
+## มุมเมนูที่ใช้ในแต่ละขั้นตอน
+
+หัวข้อนี้แยกจาก flow หลักเพื่อให้ดูเร็วว่าแต่ละ step ต้องไปทำที่เมนูไหน ส่วน step ที่เป็นระบบอัตโนมัติไม่ต้องเข้าหน้าเอง
+
+### Flow ขายแบบมี PO Sell
+
+| Step | ทำอะไร | เมนูที่ใช้ | Route |
+|---|---|---|---|
+| 1 | สร้าง PO Sell | `Dual Costing (จองดีล) > PO Sell (จองขาย)` | `/sales/po-sell` |
+| 2 | เตรียมส่งของให้ Customer | ไม่ต้องเข้าระบบ | - |
+| 3 | เบิกออกรอบิลจาก PO Sell | `รายการประจำวัน > เบิกออกรอบิล (Pending Sale)` | `/sales/stock-issue` |
+| 4 | ระบบอัปเดต PO Sell จากการเบิก | ระบบอัตโนมัติ | - |
+| 5 | เปิดบิลขายจาก Pending Sale | `รายการประจำวัน > บิลขาย` | `/sales/bills` |
+| 6 | ระบบอัปเดต Pending Sale | ระบบอัตโนมัติ | - |
+| 7 | ระบบอัปเดต PO Sell จากบิลขาย | ระบบอัตโนมัติ | - |
+| 8 | รับเงิน Customer | `รายการประจำวัน > รับเงิน Customer` | `/sales/receipts` |
+| 9 | ระบบอัปเดตบิลขาย | ระบบอัตโนมัติ | - |
+
+### Flow ขายสด / Spot Sale แบบเบิกของก่อน
+
+| Step | ทำอะไร | เมนูที่ใช้ | Route |
+|---|---|---|---|
+| 1 | เบิกออกรอบิลแบบไม่มี PO | `รายการประจำวัน > เบิกออกรอบิล (Pending Sale)` | `/sales/stock-issue` |
+| 2 | เปิดบิลขายจาก Pending Sale | `รายการประจำวัน > บิลขาย` | `/sales/bills` |
+| 3 | ระบบอัปเดต Pending Sale | ระบบอัตโนมัติ | - |
+| 4 | รับเงิน Customer | `รายการประจำวัน > รับเงิน Customer` | `/sales/receipts` |
+| 5 | ระบบอัปเดตบิลขาย | ระบบอัตโนมัติ | - |
+
+### Flow ขายสด / Spot Sale แบบเปิดบิลทันที
+
+| Step | ทำอะไร | เมนูที่ใช้ | Route |
+|---|---|---|---|
+| 1 | เปิดบิลขายตรง | `รายการประจำวัน > บิลขาย` | `/sales/bills` |
+| 2 | รับเงิน Customer | `รายการประจำวัน > รับเงิน Customer` | `/sales/receipts` |
+| 3 | ระบบอัปเดตบิลขาย | ระบบอัตโนมัติ | - |
 
 ## รายละเอียดข้อมูลที่กรอกในแต่ละหน้า
 
@@ -262,100 +289,102 @@ Target rule สำคัญ:
 | Sales bill receivable balance | ลดจากยอดที่รับ/หัก |
 | Bank statement | สร้างเงินเข้าอ้างอิง `RCP` |
 
-## สถานะเอกสารที่ควรใช้
+## สถานะภาษาไทย
 
 ### PO Sell
 
-| สถานะ | ใช้เมื่อไหร่ | แก้ไขได้ไหม |
-|---|---|---|
-| `เปิดอยู่` | สร้าง PO Sell แล้ว ยังไม่เบิกครบ | แก้ได้ถ้ายังไม่มี downstream หรือแก้แบบควบคุมยอดคงเหลือ |
-| `เบิกบางส่วน รอออกบิล` | มี PSALE บางส่วนแล้ว แต่ยังออกบิลไม่ครบ | แก้ PO ต้นทางได้จำกัด |
-| `เบิกครบ รอออกบิล` | เบิกครบจำนวน PO แล้ว แต่ยังออกบิลไม่ครบ | ไม่ควรแก้จำนวนหลัก |
-| `ออกบิลบางส่วน` | มี SB บางส่วนแล้ว | แก้ได้เฉพาะข้อมูลไม่กระทบยอด |
-| `ออกบิลแล้ว` | ออกบิลครบ | ปิด flow ปกติ |
-| `ปิดส่งไม่ครบ` | ปิด PO โดยส่งไม่ครบ | ต้องมีเหตุผล |
-| `ยกเลิก` | ยกเลิกก่อนมี downstream หรือผ่าน reversal ที่ครบ | ต้องมี audit log |
-
-### Pending Sale / Stock Issue
-
-| สถานะ | ใช้เมื่อไหร่ | ผลทาง stock |
-|---|---|---|
-| `เบิกแล้ว รอออกบิล` | บันทึก PSALE แล้ว | Stock ถูกตัดแล้ว |
-| `ออกบิลบางส่วน` | บางส่วนถูกนำไปเปิด SB แล้ว | Stock ไม่ถูกตัดซ้ำ |
-| `ออกบิลแล้ว` | ยอด PSALE ถูกเปิด SB ครบ | Stock ไม่ถูกตัดซ้ำ |
-| `กลับรายการ` | ยกเลิกหรือคืน stock หลังมีผลแล้ว | ต้องมี stock reversal |
-
-### Sales Bill
-
-| สถานะ | ใช้เมื่อไหร่ | ผลทางบัญชี |
-|---|---|---|
-| `เปิดอยู่` | เปิดบิลแล้ว ยังไม่รับเงิน | เกิด AR |
-| `รับบางส่วน` | รับเงินบางส่วน | AR ลดลง |
-| `รับครบ` | รับเงินครบ | AR เป็นศูนย์ |
-| `ยกเลิก` | ยกเลิกบิล | ต้อง reverse AR และ stock/PSALE link ถ้ามี |
-
-### Receipt
-
-| สถานะ | ใช้เมื่อไหร่ | ผลทางเงิน |
-|---|---|---|
-| `บันทึกรับเงินแล้ว` | บันทึก receipt สำเร็จ | เงินเข้า bank statement และตัด AR |
-| `กลับรายการ` | ยกเลิก receipt หลังบันทึก | ต้อง reverse bank statement และคืน AR |
-
-## Source of Truth และ Snapshot
-
-หลักการเดียวกับฝั่งซื้อ: เอกสารที่จบแล้วต้องอ่านได้โดยไม่ต้องคำนวณใหม่จาก master data ที่อาจเปลี่ยนภายหลัง
-
-| เรื่อง | ควรเก็บในเอกสาร | เหตุผล |
-|---|---|---|
-| VAT | `vat_type`, `vat_rate_percent`, `vat_amount`, `subtotal`, `total_amount` | VAT เปลี่ยนย้อนหลังไม่ได้ |
-| Customer/Supplier name | เก็บ FK เป็นหลัก และ snapshot เฉพาะข้อมูลที่ต้องพิมพ์เอกสารย้อนหลัง | master data อาจเปลี่ยนชื่อ/ที่อยู่ |
-| ต้นทุนขาย | เก็บ `unit_cost`, `total_cost`, `cogs_amount`, `gross_profit` ใน SB/line | อ่านบิลเก่าไม่ควรคำนวณ WAC ใหม่ |
-| Stock movement | เก็บใน `stock_ledger` ด้วย ref ชัดเจน | audit stock ต้อง trace เอกสารต้นทางได้ |
-| สถานะ | current state อยู่บนตารางหลัก และมี status log append-only | หน้า detail/history ใช้ log ได้ |
-
-## ตารางหลักที่เกี่ยวข้อง
-
-| ตาราง | บทบาท |
+| สถานะ | ใช้เมื่อไหร่ |
 |---|---|
-| `po_sells` | current state ของ PO Sell และยอดคงเหลือ |
-| `stock_issues` | current state ของ Pending Sale / PSALE |
-| `sales_bills` | current state ของบิลขาย/AR |
-| `receipts` | current state ของใบรับเงิน |
-| `bank_statement` | รายการเงินเข้าออกที่เกิดจาก receipt |
-| `stock_ledger` | รายการ stock movement |
-| `*_status_logs` | append-only history ของการเปลี่ยนสถานะ |
-| `*_summary_current` | summary/KPI ที่ refresh จาก write path |
+| `เปิดอยู่` | สร้าง PO Sell แล้ว ยังไม่มีการเบิกครบ |
+| `เบิกบางส่วน รอออกบิล` | มี PSALE บางส่วนแล้ว แต่ยังออกบิลไม่ครบ |
+| `เบิกครบ รอออกบิล` | เบิกครบจำนวน PO แล้ว แต่ยังออกบิลไม่ครบ |
+| `ออกบิลบางส่วน` | มี SB บางส่วนแล้ว |
+| `ออกบิลแล้ว` | ออกบิลครบตาม PO แล้ว |
+| `ปิดส่งไม่ครบ` | ปิด PO โดยส่งไม่ครบ และมีเหตุผลประกอบ |
+| `ยกเลิก` | ยกเลิก PO ก่อน flow จบ หรือผ่าน reversal ที่ครบ |
 
-## Validation Rules ที่ต้องมี
+### ใบเบิกออกรอบิล
 
-| Rule | เหตุผล |
+| สถานะ | ใช้เมื่อไหร่ |
 |---|---|
-| PO Sell ต้องเลือก Customer และมีสินค้าอย่างน้อย 1 รายการ | เอกสารจองขายต้องมีคู่ค้าและยอด |
-| PSALE ที่อ้าง PO ห้ามเบิกเกิน PO remaining qty | กันส่งเกิน PO โดยไม่ตั้งใจ |
-| PSALE ต้องเช็ค stock พร้อมขายก่อนบันทึก | เพราะบันทึกแล้วตัด stock ทันที |
-| SB จาก PSALE ห้ามออกบิลเกิน PSALE unbilled qty | กันเปิดบิลซ้ำ |
-| SB จาก PSALE ห้ามสร้าง stock out ซ้ำ | PSALE ตัด stock แล้ว |
-| SB ขายตรงต้องสร้าง stock ledger ใน transaction เดียวกับ sales bill | กันบิลขายเกิดแต่ stock ไม่ถูกตัด |
-| Receipt ห้ามรับเงินเกิน receivable balance | กันยอด AR ติดลบ |
-| การยกเลิกเอกสารที่มีผลแล้วต้องมี reversal/audit log | trace ได้และไม่ทำให้ยอดหายเงียบ |
+| `เบิกแล้ว รอออกบิล` | บันทึก PSALE แล้ว และ stock ถูกตัดแล้ว |
+| `ออกบิลบางส่วน` | ยอด PSALE ถูกนำไปเปิด SB บางส่วน |
+| `ออกบิลแล้ว` | ยอด PSALE ถูกนำไปเปิด SB ครบแล้ว |
+| `กลับรายการ` | ยกเลิกหรือคืน stock หลังมีผลแล้ว |
 
-## Current Next Gap ที่ต้องตามต่อ
+### บิลขาย
 
-| เรื่อง | สถานะปัจจุบัน | Target |
-|---|---|---|
-| `/sales/po-sell` | มี create API แล้ว แต่ status ยังเป็น `Open` และ match status ยังผูกกับบิล/ดีลแบบ legacy | ทำ status ไทย/target และแยกยอดเบิก/ยอดออกบิล |
-| `/sales/stock-issue` | API ปัจจุบันเป็น read baseline ยังไม่มี write/convert ใน Next | เพิ่ม create/update/convert/reversal แบบ transaction-safe |
-| `/sales/bills` | มี create API แล้ว แต่ยังไม่อัปเดต PO Sell/PSALE remaining และยังต้อง harden stock ledger rule | ออกบิลจาก PSALE ต้อง link และไม่ตัด stock ซ้ำ |
-| `/sales/receipts` | มี receipt write และ bank statement แล้ว | ต้อง refresh SB received/balance/status ใน write path ให้ครบและมี status log |
-| Status history | ยังไม่ครบ | เพิ่ม `po_sell_status_logs`, `stock_issue_status_logs`, `sales_bill_status_logs`, `receipt_status_logs` |
-| Summary table | ยังไม่ครบ | เพิ่ม summary current สำหรับ PO Sell, Pending Sale, Sales Bill/AR |
+| สถานะ | ใช้เมื่อไหร่ |
+|---|---|
+| `เปิดอยู่` | เปิดบิลแล้ว ตั้งลูกหนี้แล้ว ยังไม่รับเงิน |
+| `รับบางส่วน` | มีการรับเงินบางส่วน |
+| `รับครบ` | รับเงินครบแล้ว |
+| `ยกเลิก` | ยกเลิกบิลตาม rule ที่อนุญาต |
 
-## งาน Implementation ที่ควรทำต่อ
+### ใบรับเงิน
 
-1. ออกแบบ/เพิ่ม status log tables ฝั่งขาย
-2. เพิ่ม summary tables สำหรับ PO Sell, Pending Sale และ AR/Sales Bill
-3. ทำ write service กลางสำหรับ `create PSALE`, `convert PSALE to SB`, `create direct SB`, `create RCP`
-4. ทำ transaction ให้ update current state, append status log, update stock/bank ledger และ refresh summary พร้อมกัน
-5. ปรับ UI detail ให้แสดง timeline/history จาก status logs
-6. ปรับ document number ให้ branch-aware ครบทุกเอกสารขาย
-7. ทำ legacy parity QA เฉพาะ flow ขาย: PO Sell -> PSALE -> SB -> RCP
+| สถานะ | ใช้เมื่อไหร่ |
+|---|---|
+| `บันทึกรับเงินแล้ว` | บันทึกรับเงินแล้ว กระทบเงินสด/ธนาคารและตัดลูกหนี้แล้ว |
+| `กลับรายการ` | กลับรายการใบรับเงิน |
+
+### รายการสต๊อก
+
+| สถานะ | ใช้เมื่อไหร่ |
+|---|---|
+| `บันทึกแล้ว` | รายการ stock มีผลแล้ว |
+| `กลับรายการ` | มีรายการกลับ stock แล้ว |
+
+## Validation Rules
+
+### ตอนเบิกออกรอบิลจาก PO Sell
+
+- PO Sell ต้องไม่ใช่ `ยกเลิก`
+- PO Sell ต้องยังไม่ `ออกบิลแล้ว`
+- จำนวนที่เบิกต้องไม่เกินยอด PO ที่ยังเบิกได้ เว้นแต่มี policy ส่งเกินและมีเหตุผล
+- Stock พร้อมขายต้องพอ เพราะบันทึก PSALE แล้วตัด stock ทันที
+
+### ตอนออกบิลขาย
+
+- ถ้าเปิดจาก PSALE ต้องเลือก PSALE ที่สถานะ `เบิกแล้ว รอออกบิล` หรือ `ออกบิลบางส่วน`
+- ห้ามเลือก PSALE ที่ `ออกบิลแล้ว` หรือ `กลับรายการ`
+- จำนวนที่ออกบิลต้องไม่เกินยอด PSALE ที่ยังไม่ออกบิล
+- ถ้าเปิดจาก PSALE ต้องไม่สร้าง stock out ซ้ำ
+- ถ้าเปิดบิลขายตรง ต้องสร้าง stock ledger ใน transaction เดียวกับ sales bill
+- ต้อง snapshot VAT, total amount, cost, และ gross profit ที่ใช้ในบิล
+
+### ตอนรับเงิน
+
+- รับเงินได้เฉพาะ SB ที่ยังไม่ `รับครบ` และไม่ `ยกเลิก`
+- ยอดรับรวมต้องไม่เกินยอดค้างรับ
+- เมื่อรับเงินแล้วต้องอัปเดต received amount, receivable balance, และสถานะ SB ใน transaction เดียวกัน
+- ต้องสร้าง bank statement อ้างอิง `RCP` ใน transaction เดียวกัน
+
+## Source of Truth ที่ควรมี
+
+เอกสารที่จบแล้วต้องอ่านได้โดยไม่ต้องคำนวณใหม่จาก master data ที่อาจเปลี่ยนภายหลัง โดยเฉพาะ VAT, ยอดรวม, ต้นทุนขาย, และ gross profit
+
+| เรื่อง | Source of truth |
+|---|---|
+| PO Sell ปัจจุบัน | `po_sells` |
+| ยอดเบิกออกรอบิล | `stock_issues` |
+| ยอดออกบิล | `sales_bills` + sales bill line table ในอนาคต |
+| ยอดรับเงิน | `receipts` |
+| ผลต่อเงินสด/ธนาคาร | `bank_statement` |
+| ผลต่อ stock | `stock_ledger` |
+| ประวัติสถานะ | append-only status logs |
+| Summary/KPI | maintained summary current tables |
+
+## งาน Implementation ที่ตามมา
+
+- เพิ่ม status log สำหรับ PO Sell, PSALE, SB, Receipt
+- เพิ่ม summary tables สำหรับ PO Sell, Pending Sale และ AR/Sales Bill
+- ปรับ `/sales/po-sell` ให้ใช้ status ไทยและแยกยอดเบิก/ยอดออกบิล
+- เพิ่ม write path ให้ `/sales/stock-issue` สร้าง/แก้/กลับรายการ PSALE แบบ transaction-safe
+- ปรับ `/sales/bills` ให้ออกบิลจาก PSALE แล้ว link กลับโดยไม่ตัด stock ซ้ำ
+- ปรับ `/sales/receipts` ให้ refresh SB received amount, receivable balance, และ status ใน write path
+- ทำ write service กลางสำหรับ `create PSALE`, `convert PSALE to SB`, `create direct SB`, `create RCP`
+- ทำ transaction ให้ update current state, append status log, update stock/bank ledger และ refresh summary พร้อมกัน
+- ปรับ UI detail ให้แสดง timeline/history จาก status logs
+- ปรับ document number ให้ branch-aware ครบทุกเอกสารขาย
+- ทำ QA flow ขายครบสาย: PO Sell -> PSALE -> SB -> RCP
