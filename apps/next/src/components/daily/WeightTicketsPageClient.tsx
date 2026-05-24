@@ -6,6 +6,7 @@ import { CheckCircle2, ImagePlus, Minus, Package2, Plus, Scale, Trash2, Truck } 
 import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
@@ -380,7 +381,7 @@ export function WeightTicketsPageClient() {
             <SectionHeader title="ข้อมูลทั่วไป" subtitle="บังคับกรอกเพื่อส่งต่อไปยังงานออกบิลหรือเอกสารขนส่ง" />
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <FieldBlock error={showError('date')} label="วันที่*">
-                <Input type="date" value={form.date} onBlur={() => markTouched('date')} onChange={(event) => updateForm('date', event.target.value)} />
+                <DatePickerInput className="w-full" value={form.date} onChange={(value) => { markTouched('date'); updateForm('date', value) }} />
               </FieldBlock>
               <FieldBlock error={showError('time')} label="เวลา*">
                 <Input type="time" value={form.time} onBlur={() => markTouched('time')} onChange={(event) => updateForm('time', event.target.value)} />

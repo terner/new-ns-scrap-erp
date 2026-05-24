@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type Category = { availableForSale: boolean; code: string; name: string; stockEffect: string }
 type ProductionOrderRow = {
@@ -60,8 +62,11 @@ export function ProductionOrdersPageClient() {
   const [selectedRow, setSelectedRow] = useState<ProductionOrderRow | null>(null)
   const [sort, setSort] = useState('date')
   const [status, setStatus] = useState('')
+  const latestLoadRequestRef = useRef(0)
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
@@ -75,10 +80,14 @@ export function ProductionOrdersPageClient() {
       if (status) params.set('status', status)
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
-      setData(await dailyFetchJson<ProductionOrdersPayload>(`/api/production/orders?${params.toString()}`))
+      const payload = await dailyFetchJson<ProductionOrdersPayload>(`/api/production/orders?${params.toString()}`)
+      if (requestId !== latestLoadRequestRef.current) return
+      setData(payload)
     } catch (caught) {
+      if (requestId !== latestLoadRequestRef.current) return
       setError(caught instanceof Error ? caught.message : 'โหลดใบสั่งผลิตไม่ได้')
     } finally {
+      if (requestId !== latestLoadRequestRef.current) return
       setIsLoading(false)
     }
   }, [dateFrom, dateTo, direction, page, pageSize, search, sort, status])
@@ -140,9 +149,9 @@ export function ProductionOrdersPageClient() {
         <div className="flex flex-wrap items-center gap-2">
           <input className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหาเลขใบสั่งผลิต / สินค้า / หมายเหตุ..." type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
           <label className="text-xs text-slate-500">วันที่:</label>
-          <input className="rounded-md border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1) }} />
+          <DatePickerInput className="w-[130px]" value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} />
           <span className="text-slate-400">→</span>
-          <input className="rounded-md border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPage(1) }} />
+          <DatePickerInput className="w-[130px]" value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} />
           <select className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}>
             {statusOptions.map((option) => <option key={option || 'all'} value={option}>{option || 'ทุกสถานะ'}</option>)}
           </select>
@@ -173,7 +182,7 @@ export function ProductionOrdersPageClient() {
               <div key={row.id} className={`relative cursor-pointer overflow-hidden rounded-md border-2 p-4 shadow-md transition hover:shadow-xl ${cardClass(row.status)}`} onClick={() => openDetail(row)}>
                 <div className="absolute right-2 top-2"><StatusBadge status={row.status} /></div>
                 <div className="mb-1 font-mono text-xs text-slate-400">{row.docNo}</div>
-                <div className="mb-3 text-xs text-slate-500">{row.date} · {row.branchName}</div>
+                <div className="mb-3 text-xs text-slate-500">{formatDateDisplay(row.date)} · {row.branchName}</div>
                 <div className="mb-3 rounded-md border border-slate-200 bg-white/80 p-3">
                   <div className="mb-1 text-xs text-slate-500">สินค้าที่ผลิต</div>
                   <div className="text-base font-bold leading-tight text-amber-700">{row.productName || 'ยังไม่ได้กำหนดสินค้า'}</div>
@@ -346,8 +355,8 @@ function ProductionOrderModal({ categories, mode, row, onClose }: { categories: 
             </div>
           ) : null}
 
-          {tab === 'input' ? <ReadOnlyTable empty="ยังไม่มีการเบิกวัตถุดิบ" title="วัตถุดิบที่เบิก (Multi-round)" action="+ เบิกวัตถุดิบ" columns={['เลขที่', 'วันที่', 'จำนวน', 'มูลค่า', 'สถานะ']} rows={row ? [[row.docNo, row.date, formatMoney(row.inputQty), formatMoney(row.inputCost), row.inputCount ? 'active' : '-']] : []} /> : null}
-          {tab === 'output' ? <ReadOnlyTable empty="ยังไม่มีผลผลิต" title="ผลผลิต (Multi-round, multi-grade, รวม Loss/Waste)" action="+ รับผลผลิต" columns={['เลขที่', 'วันที่', 'Output Type', 'จำนวน', 'มูลค่า']} rows={row ? [[row.docNo, row.date, row.outputCategories.map((item) => item.name).join(', ') || '-', formatMoney(row.outputQty), formatMoney(row.outputValue)]] : []} /> : null}
+          {tab === 'input' ? <ReadOnlyTable empty="ยังไม่มีการเบิกวัตถุดิบ" title="วัตถุดิบที่เบิก (Multi-round)" action="+ เบิกวัตถุดิบ" columns={['เลขที่', 'วันที่', 'จำนวน', 'มูลค่า', 'สถานะ']} rows={row ? [[row.docNo, formatDateDisplay(row.date), formatMoney(row.inputQty), formatMoney(row.inputCost), row.inputCount ? 'active' : '-']] : []} /> : null}
+          {tab === 'output' ? <ReadOnlyTable empty="ยังไม่มีผลผลิต" title="ผลผลิต (Multi-round, multi-grade, รวม Loss/Waste)" action="+ รับผลผลิต" columns={['เลขที่', 'วันที่', 'Output Type', 'จำนวน', 'มูลค่า']} rows={row ? [[row.docNo, formatDateDisplay(row.date), row.outputCategories.map((item) => item.name).join(', ') || '-', formatMoney(row.outputQty), formatMoney(row.outputValue)]] : []} /> : null}
           {tab === 'cost' ? <ReadOnlyTable empty="ยังไม่มี Process Cost" title="Process Cost" action="+ เพิ่มค่าใช้จ่าย" columns={['เลขที่', 'วันที่', 'ประเภท', 'จำนวน', 'สถานะ']} rows={[]} /> : null}
           {tab === 'allocation' ? (
             <div className="rounded-md-b-md bg-white p-5 shadow">

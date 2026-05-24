@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type AccountOption = { currency: string; id: string; label: string; name: string; type: string }
 type CustomerOption = { id: string; label: string; name: string }
@@ -120,7 +122,7 @@ export function OverseasReceiptPageClient() {
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={12}>ยังไม่มีรายการรับเงินต่างประเทศ</td></tr> : null}
             {data?.rows.map((row) => (
               <tr key={row.id} className="border-t">
-                <td className="p-2 font-mono">{row.docNo}</td><td className="p-2">{row.date}</td><td className="p-2">{row.description || '-'}</td><td className="p-2 text-xs">-</td><td className="p-2 text-right font-medium">-</td><td className="p-2">-</td><td className="p-2 text-right">-</td><td className="p-2 text-right font-medium text-emerald-700">{formatMoney(row.amountThb)}</td><td className="p-2 text-right text-amber-700">{formatMoney(row.feeThb)}</td><td className="p-2 text-right text-emerald-700">0</td><td className="p-2 text-center"><span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{row.status}</span></td><td className="p-2 text-right text-xs text-slate-400">Read-only</td>
+                <td className="p-2 font-mono">{row.docNo}</td><td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.description || '-'}</td><td className="p-2 text-xs">-</td><td className="p-2 text-right font-medium">-</td><td className="p-2">-</td><td className="p-2 text-right">-</td><td className="p-2 text-right font-medium text-emerald-700">{formatMoney(row.amountThb)}</td><td className="p-2 text-right text-amber-700">{formatMoney(row.feeThb)}</td><td className="p-2 text-right text-emerald-700">0</td><td className="p-2 text-center"><span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{row.status}</span></td><td className="p-2 text-right text-xs text-slate-400">Read-only</td>
               </tr>
             ))}
           </tbody>
@@ -134,7 +136,7 @@ export function OverseasReceiptPageClient() {
             <div className="space-y-3 p-5 text-sm">
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="เลขที่"><input className="w-full rounded-md border bg-slate-50 px-2 py-1.5 font-mono" readOnly value="ORC-DRAFT" /></Field>
-                <Field label="วันที่"><input className="w-full rounded-md border px-2 py-1.5" type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field>
+                <Field label="วันที่"><DatePickerInput className="w-full" value={form.date} onChange={(value) => setForm({ ...form, date: value })} /></Field>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="Customer *"><select className="w-full rounded-md border px-2 py-1.5" value={form.customerId} onChange={(event) => setForm({ ...form, billId: '', customerId: event.target.value })}><option value="">--</option>{data?.filters.customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.label}</option>)}</select></Field>
@@ -159,7 +161,7 @@ export function OverseasReceiptPageClient() {
               <div className="rounded-md bg-emerald-50 p-3 text-right text-xs">Net Received: <span className="font-bold text-emerald-700">{formatMoney(netReceived)}</span> | FX G/L: <span className="font-bold text-emerald-700">0</span></div>
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="SWIFT Reference"><input className="w-full rounded-md border px-2 py-1.5 font-mono" value={form.swiftRef} onChange={(event) => setForm({ ...form, swiftRef: event.target.value })} /></Field>
-                <Field label="Value Date"><input className="w-full rounded-md border px-2 py-1.5" type="date" value={form.valueDate} onChange={(event) => setForm({ ...form, valueDate: event.target.value })} /></Field>
+                <Field label="Value Date"><DatePickerInput className="w-full" value={form.valueDate} onChange={(value) => setForm({ ...form, valueDate: value })} /></Field>
               </div>
               <Field label="หมายเหตุ"><textarea className="w-full rounded-md border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
             </div>

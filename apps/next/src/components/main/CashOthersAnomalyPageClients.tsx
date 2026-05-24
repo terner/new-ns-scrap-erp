@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type AnyRow = Record<string, number | string | boolean | null | undefined>
@@ -39,15 +40,26 @@ export function CashOthersSummaryPageClient() {
   const [asOf, setAsOf] = useState(today())
   const [data, setData] = useState<CashOthersPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const latestLoadRequestRef = useRef(0)
   useEffect(() => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
-    dailyFetchJson<CashOthersPayload>(`/api/cash-others-summary?asOf=${asOf}`).then(setData).catch((caught) => setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้'))
+    dailyFetchJson<CashOthersPayload>(`/api/cash-others-summary?asOf=${asOf}`)
+      .then((payload) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setData(payload)
+      })
+      .catch((caught) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้')
+      })
   }, [asOf])
   const summary = data?.summary ?? {}
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow"><label className="text-xs font-bold text-slate-500">As of</label><input className="rounded-md border border-slate-200 px-3 py-2 text-sm font-bold" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /><span className="flex-1" /><button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500" disabled type="button">Export disabled</button></div>
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow"><label className="text-xs font-bold text-slate-500">As of</label><DatePickerInput className="w-[140px]" value={asOf} onChange={setAsOf} /><span className="flex-1" /><button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500" disabled type="button">Export disabled</button></div>
       <div className="grid grid-cols-1 gap-4 rounded-md bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-center text-white shadow-lg md:grid-cols-4">
         <Grand label="Total Asset" value={summary.totalAsset} />
         <Grand label="Total Debt" value={summary.totalDebt} />
@@ -78,9 +90,20 @@ export function AnomalyDetectorPageClient() {
   const [filter, setFilter] = useState<'critical' | 'info' | 'warn' | ''>('')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
+  const latestLoadRequestRef = useRef(0)
   useEffect(() => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
-    dailyFetchJson<AnomalyPayload>(`/api/anomaly-detector?asOf=${asOf}`).then(setData).catch((caught) => setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้'))
+    dailyFetchJson<AnomalyPayload>(`/api/anomaly-detector?asOf=${asOf}`)
+      .then((payload) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setData(payload)
+      })
+      .catch((caught) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้')
+      })
   }, [asOf])
   const filtered = (data?.anomalies ?? []).filter((item) => !filter || item.severity === filter)
   const grouped = useMemo(() => {
@@ -130,7 +153,7 @@ export function AnomalyDetectorPageClient() {
       </div>
       <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <label className="text-xs font-bold text-slate-500">As of</label>
-        <input className="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
+        <DatePickerInput className="w-[140px]" value={asOf} onChange={setAsOf} />
         <span className="text-xs text-slate-400">Read-only scan · {data?.stats.ruleGroups ?? 0} rule groups active</span>
       </div>
       {(data?.anomalies.length ?? 0) > 0 ? <CategoryTags categories={data?.stats.byCategory ?? []} /> : null}

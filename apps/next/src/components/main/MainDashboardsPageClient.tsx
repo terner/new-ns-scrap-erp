@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type MainPayload = {
@@ -92,8 +93,11 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const endpoint = mode === 'dashboard' ? '/api/dashboard' : mode === 'owner-daily' ? '/api/owner-daily' : '/api/daily-report'
+  const latestLoadRequestRef = useRef(0)
 
   useEffect(() => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     const params = new URLSearchParams({ date })
     if (mode === 'daily-report' || mode === 'dashboard') {
       params.set('from', rangeFrom)
@@ -109,9 +113,18 @@ export function MainDashboardsPageClient({ mode }: { mode: Mode }) {
     setError(null)
     setIsLoading(true)
     dailyFetchJson<MainPayload>(`${endpoint}?${params.toString()}`)
-      .then(setData)
-      .catch((caught) => setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้'))
-      .finally(() => setIsLoading(false))
+      .then((payload) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setData(payload)
+      })
+      .catch((caught) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้')
+      })
+      .finally(() => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setIsLoading(false)
+      })
   }, [dashboardBranchId, dashboardCustomerId, dashboardGroup, dashboardProductId, dashboardSupplierId, date, endpoint, mode, rangeFrom, rangeTo])
 
   return (
@@ -213,9 +226,9 @@ function DashboardView(props: {
             <button className={`rounded-md px-3 py-1.5 text-xs font-bold ${rangeMode === key ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
           <span className="mx-2 opacity-30">|</span>
-          <input className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs" type="date" value={rangeFrom} onChange={(event) => { setRangeMode('custom'); setRangeFrom(event.target.value) }} />
+          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
           <span>→</span>
-          <input className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs" type="date" value={rangeTo} onChange={(event) => { setRangeMode('custom'); setRangeTo(event.target.value) }} />
+          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
           <span className="ml-auto rounded-md bg-white/10 px-2 py-1 text-xs">📊 {filteredCount}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -421,7 +434,7 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
     <>
       <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200" type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
-        <input className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        <DatePickerInput className="w-[140px]" value={date} onChange={setDate} />
         <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30" disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
         <button className={isToday ? 'rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white' : 'rounded-md bg-yellow-300 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-yellow-200'} type="button" onClick={() => setDate(today())}>📍 วันนี้</button>
       </div>
@@ -439,9 +452,9 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
             <div><h2 className="text-2xl font-bold">📊 Analytics Dashboard</h2><p className="mt-1 text-xs opacity-90">รายงานสรุปแบบช่วงเวลา + Top 10/5 + Charts</p></div>
             <div className="flex flex-wrap items-center gap-2">
               {['today', 'yesterday', 'last7', 'last30', 'last90', 'month'].map((mode) => <button key={mode} className={rangeMode === mode ? 'rounded-md bg-white px-3 py-1.5 text-xs font-bold text-purple-700' : 'rounded-md bg-white/20 px-3 py-1.5 text-xs hover:bg-white/30'} type="button" onClick={() => applyRange(mode)}>{rangeLabel(mode)}</button>)}
-              <input className="rounded-md px-2 py-1 text-xs text-slate-900" type="date" value={rangeFrom} onChange={(event) => { setRangeMode('custom'); setRangeFrom(event.target.value) }} />
+              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
               <span className="text-xs">→</span>
-              <input className="rounded-md px-2 py-1 text-xs text-slate-900" type="date" value={rangeTo} onChange={(event) => { setRangeMode('custom'); setRangeTo(event.target.value) }} />
+              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
               <button className="rounded-md bg-white px-3 py-1.5 text-xs font-bold text-purple-700" type="button" onClick={printReport}>🖨 Export PDF / Print</button>
             </div>
           </div>

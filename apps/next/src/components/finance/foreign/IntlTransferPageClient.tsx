@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type AccountOption = { currency: string; id: string; label: string; name: string }
 type BeneficiaryOption = { country: string | null; currency: string; id: string; label: string; name: string }
@@ -122,7 +124,7 @@ export function IntlTransferPageClient() {
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มีรายการโอนต่างประเทศ</td></tr> : null}
             {data?.rows.map((row) => (
               <tr key={row.id} className="border-t">
-                <td className="p-2 font-mono">{row.docNo}</td><td className="p-2">{row.date}</td><td className="p-2">{row.description || '-'}</td><td className="p-2 text-xs">-</td><td className="p-2 text-xs">{row.type}</td><td className="p-2 text-right font-medium">-</td><td className="p-2">-</td><td className="p-2 text-right">-</td><td className="p-2 text-right">{formatMoney(row.amountThb)}</td><td className="p-2 text-right text-amber-700">{formatMoney(row.fee)}</td><td className="p-2 text-center text-xs">-</td><td className="p-2 text-center"><span className="rounded-md bg-purple-100 px-2 py-0.5 text-xs text-purple-700">{row.status}</span></td><td className="p-2 text-right text-xs text-slate-400">Read-only</td>
+                <td className="p-2 font-mono">{row.docNo}</td><td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.description || '-'}</td><td className="p-2 text-xs">-</td><td className="p-2 text-xs">{row.type}</td><td className="p-2 text-right font-medium">-</td><td className="p-2">-</td><td className="p-2 text-right">-</td><td className="p-2 text-right">{formatMoney(row.amountThb)}</td><td className="p-2 text-right text-amber-700">{formatMoney(row.fee)}</td><td className="p-2 text-center text-xs">-</td><td className="p-2 text-center"><span className="rounded-md bg-purple-100 px-2 py-0.5 text-xs text-purple-700">{row.status}</span></td><td className="p-2 text-right text-xs text-slate-400">Read-only</td>
               </tr>
             ))}
           </tbody>
@@ -136,7 +138,7 @@ export function IntlTransferPageClient() {
             <div className="space-y-3 p-5 text-sm">
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="เลขที่"><input className="w-full rounded-md border bg-slate-50 px-2 py-1.5 font-mono" readOnly value="ITF-DRAFT" /></Field>
-                <Field label="วันที่"><input className="w-full rounded-md border px-2 py-1.5" type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field>
+                <Field label="วันที่"><DatePickerInput className="w-full" value={form.date} onChange={(value) => setForm({ ...form, date: value })} /></Field>
                 <Field label="วัตถุประสงค์"><select className="w-full rounded-md border px-2 py-1.5" value={form.purposeId} onChange={(event) => setForm({ ...form, purposeId: event.target.value })}><option value="">--</option>{data?.filters.purposes.map((purpose) => <option key={purpose.id} value={purpose.id}>{purpose.label}</option>)}</select></Field>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
@@ -167,7 +169,7 @@ export function IntlTransferPageClient() {
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="SWIFT Reference"><input className="w-full rounded-md border px-2 py-1.5 font-mono" value={form.swiftRef} onChange={(event) => setForm({ ...form, swiftRef: event.target.value })} /></Field>
-                <Field label="วัน Value Date คาดการณ์"><input className="w-full rounded-md border px-2 py-1.5" type="date" value={form.expectedValueDate} onChange={(event) => setForm({ ...form, expectedValueDate: event.target.value })} /></Field>
+                <Field label="วัน Value Date คาดการณ์"><DatePickerInput className="w-full" value={form.expectedValueDate} onChange={(value) => setForm({ ...form, expectedValueDate: value })} /></Field>
               </div>
               <Field label="หมายเหตุ"><textarea className="w-full rounded-md border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
             </div>

@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type Row = Record<string, string | number | boolean | null | undefined | Record<string, number>>
 type Payload = {
@@ -19,7 +21,7 @@ type Column = {
   key: string
   label: string
   tone?: 'good' | 'bad'
-  type?: 'money' | 'number' | 'percent' | 'text'
+  type?: 'date' | 'money' | 'number' | 'percent' | 'text'
 }
 
 const configs: Record<string, { apiPath: string; columns: Column[]; metrics: Array<{ key: string; label: string; type?: 'money' | 'number' | 'percent' }>; title: string; exportable?: boolean }> = {
@@ -27,34 +29,34 @@ const configs: Record<string, { apiPath: string; columns: Column[]; metrics: Arr
     apiPath: '/api/production/dashboard',
     title: 'Production Dashboard',
     metrics: [{ key: 'count', label: 'ใบสั่งผลิต' }, { key: 'outputQty', label: 'ผลิตได้', type: 'number' }, { key: 'wipQty', label: 'WIP', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'lossPct', label: 'Loss', type: 'percent' }],
-    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่' }, { key: 'productName', label: 'สินค้า' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'status', label: 'สถานะ' }],
+    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'productName', label: 'สินค้า' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'status', label: 'สถานะ' }],
   },
   wip: {
     apiPath: '/api/production/wip-report',
     title: 'WIP คงเหลือ',
     metrics: [{ key: 'count', label: 'ใบที่มี WIP' }, { key: 'wipQty', label: 'WIP Qty', type: 'number' }, { key: 'wipValue', label: 'WIP Value', type: 'money' }],
-    columns: [{ key: 'docNo', label: 'ใบสั่งผลิต' }, { key: 'date', label: 'วันที่เริ่ม' }, { key: 'ageDays', label: 'อายุ (วัน)', type: 'number' }, { key: 'branchName', label: 'สาขา' }, { key: 'machineName', label: 'เครื่องจักร' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP Qty', type: 'number' }, { key: 'wipValue', label: 'WIP Value', type: 'money' }, { key: 'status', label: 'สถานะ' }],
+    columns: [{ key: 'docNo', label: 'ใบสั่งผลิต' }, { key: 'date', label: 'วันที่เริ่ม', type: 'date' }, { key: 'ageDays', label: 'อายุ (วัน)', type: 'number' }, { key: 'branchName', label: 'สาขา' }, { key: 'machineName', label: 'เครื่องจักร' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP Qty', type: 'number' }, { key: 'wipValue', label: 'WIP Value', type: 'money' }, { key: 'status', label: 'สถานะ' }],
   },
   report: {
     apiPath: '/api/production/report',
     title: 'รายงานการผลิต / Yield',
     exportable: true,
     metrics: [{ key: 'count', label: 'ใบสั่งผลิต' }, { key: 'inputQty', label: 'วัตถุดิบรวม', type: 'number' }, { key: 'outputQty', label: 'ผลผลิตรวม', type: 'number' }, { key: 'lossQty', label: 'Loss รวม', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'costPerKg', label: 'ต้นทุน/กก.', type: 'money' }],
-    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่' }, { key: 'productionType', label: 'ประเภท' }, { key: 'machineName', label: 'เครื่อง' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }],
+    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'productionType', label: 'ประเภท' }, { key: 'machineName', label: 'เครื่อง' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }],
   },
   cost: {
     apiPath: '/api/production/production-cost-report',
     title: 'Production Cost Report',
     exportable: true,
     metrics: [{ key: 'inputCost', label: 'RM Cost', type: 'money' }, { key: 'processCost', label: 'Process Cost', type: 'money' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: 'ต้นทุน/กก.', type: 'money' }],
-    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่' }, { key: 'inputCost', label: 'RM', type: 'money' }, { key: 'processCost', label: 'Process', type: 'money' }, { key: 'totalCost', label: 'Total', type: 'money' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }, { key: 'productionType', label: 'Method' }],
+    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'inputCost', label: 'RM', type: 'money' }, { key: 'processCost', label: 'Process', type: 'money' }, { key: 'totalCost', label: 'Total', type: 'money' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }, { key: 'productionType', label: 'Method' }],
   },
   yieldLoss: {
     apiPath: '/api/production/yield-loss-report',
     title: 'Yield/Loss + Abnormal',
     exportable: true,
     metrics: [{ key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldGainValue', label: 'Yield Gain', type: 'money' }, { key: 'abnormalLossValue', label: 'Abnormal Loss', type: 'money' }, { key: 'netPnL', label: 'Net P&L', type: 'money' }],
-    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'lossPct', label: 'Loss %', type: 'percent' }, { key: 'normalLossPercent', label: 'Normal %', type: 'percent' }, { key: 'abnormalLossValue', label: 'Loss Value', type: 'money' }, { key: 'yieldGainValue', label: 'Gain', type: 'money' }, { key: 'netPnL', label: 'Net P&L', type: 'money' }],
+    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'lossPct', label: 'Loss %', type: 'percent' }, { key: 'normalLossPercent', label: 'Normal %', type: 'percent' }, { key: 'abnormalLossValue', label: 'Loss Value', type: 'money' }, { key: 'yieldGainValue', label: 'Gain', type: 'money' }, { key: 'netPnL', label: 'Net P&L', type: 'money' }],
   },
   machine: {
     apiPath: '/api/production/machine-utilization',
@@ -71,8 +73,11 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   const [dateTo, setDateTo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const latestLoadRequestRef = useRef(0)
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
@@ -80,10 +85,14 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
       const suffix = params.toString() ? `?${params.toString()}` : ''
-      setData(await dailyFetchJson<Payload>(`${config.apiPath}${suffix}`))
+      const payload = await dailyFetchJson<Payload>(`${config.apiPath}${suffix}`)
+      if (requestId !== latestLoadRequestRef.current) return
+      setData(payload)
     } catch (caught) {
+      if (requestId !== latestLoadRequestRef.current) return
       setError(caught instanceof Error ? caught.message : `โหลด${config.title}ไม่ได้`)
     } finally {
+      if (requestId !== latestLoadRequestRef.current) return
       setIsLoading(false)
     }
   }, [config.apiPath, config.title, dateFrom, dateTo])
@@ -187,8 +196,8 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       <section className="space-y-4">
         {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
         <div className="flex flex-wrap gap-2">
-          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <DatePickerInput className="w-[130px]" value={dateFrom} onChange={setDateFrom} />
+          <DatePickerInput className="w-[130px]" value={dateTo} onChange={setDateTo} />
           <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
           <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCostCsv}>Export CSV</button>
         </div>
@@ -212,7 +221,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
               {isLoading ? <tr><td className="py-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
               {!isLoading && costRows.map((row, index) => {
                 const costs = costBreakdown(row)
-                return <tr key={String(row.id ?? index)} className="border-t hover:bg-slate-50"><td className="p-2 font-mono text-xs">{String(row.docNo ?? '')}</td><td className="p-2">{String(row.date ?? '')}</td><td className="p-2 text-right">{formatMoney(Number(row.inputCost ?? 0))}</td><td className="p-2 text-right">{formatMoney(costs.labor)}</td><td className="p-2 text-right">{formatMoney(costs.electricity)}</td><td className="p-2 text-right">{formatMoney(costs.machine)}</td><td className="p-2 text-right">{formatMoney(costs.fuel)}</td><td className="p-2 text-right">{formatMoney(costs.maintenance)}</td><td className="p-2 text-right">{formatMoney(costs.otherProc)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))}</td><td className="p-2 text-right text-slate-700">{formatMoney(Number(row.costPerKg ?? 0))}</td><td className="p-2 text-xs">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</td></tr>
+                return <tr key={String(row.id ?? index)} className="border-t hover:bg-slate-50"><td className="p-2 font-mono text-xs">{String(row.docNo ?? '')}</td><td className="p-2">{formatDateDisplay(String(row.date ?? ''))}</td><td className="p-2 text-right">{formatMoney(Number(row.inputCost ?? 0))}</td><td className="p-2 text-right">{formatMoney(costs.labor)}</td><td className="p-2 text-right">{formatMoney(costs.electricity)}</td><td className="p-2 text-right">{formatMoney(costs.machine)}</td><td className="p-2 text-right">{formatMoney(costs.fuel)}</td><td className="p-2 text-right">{formatMoney(costs.maintenance)}</td><td className="p-2 text-right">{formatMoney(costs.otherProc)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))}</td><td className="p-2 text-right text-slate-700">{formatMoney(Number(row.costPerKg ?? 0))}</td><td className="p-2 text-xs">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</td></tr>
               })}
               {!isLoading && costRows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={13}>ไม่มีข้อมูล</td></tr> : null}
             </tbody>
@@ -248,9 +257,9 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                 ['month', 'เดือนนี้'],
                 ['year', 'ปีนี้'],
               ].map(([value, label]) => <button key={value} className="rounded-md bg-white/20 px-3 py-1.5 text-xs hover:bg-white/30" type="button" onClick={() => applyDashboardRange(value as Parameters<typeof applyDashboardRange>[0])}>{label}</button>)}
-              <input className="rounded-md px-2 py-1 text-xs text-slate-900" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={dateFrom} onChange={setDateFrom} />
               <span className="text-xs">→</span>
-              <input className="rounded-md px-2 py-1 text-xs text-slate-900" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={dateTo} onChange={setDateTo} />
             </div>
           </div>
         </div>
@@ -308,8 +317,8 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       <div className="rounded-md bg-white p-4 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <DatePickerInput className="w-[130px]" value={dateFrom} onChange={setDateFrom} />
+          <DatePickerInput className="w-[130px]" value={dateTo} onChange={setDateTo} />
           <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
           {config.exportable ? <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" type="button" onClick={exportCsv}>Export CSV</button> : null}
         </div>
@@ -440,6 +449,7 @@ function costBreakdown(row: Row) {
 
 function formatCell(value: Row[string], type?: Column['type']) {
   if (value === null || value === undefined || typeof value === 'object') return '-'
+  if (type === 'date') return formatDateDisplay(String(value))
   if (type === 'money') return formatMoney(Number(value))
   if (type === 'number') return formatMoney(Number(value))
   if (type === 'percent') return `${Number(value).toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`

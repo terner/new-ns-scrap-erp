@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type BillSummaryRow = {
   date: string
@@ -58,6 +60,7 @@ function defaultToDate() {
 }
 
 export function TradingDashboardPageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [data, setData] = useState<TradingDashboardPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fromDate, setFromDate] = useState(defaultFromDate)
@@ -65,16 +68,22 @@ export function TradingDashboardPageClient() {
   const [toDate, setToDate] = useState(defaultToDate)
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
       const params = new URLSearchParams()
       params.set('from', fromDate)
       params.set('to', toDate)
-      setData(await dailyFetchJson<TradingDashboardPayload>(`/api/trading/dashboard?${params.toString()}`))
+      const payload = await dailyFetchJson<TradingDashboardPayload>(`/api/trading/dashboard?${params.toString()}`)
+      if (latestLoadRequestRef.current !== requestId) return
+      setData(payload)
     } catch (caught) {
+      if (latestLoadRequestRef.current !== requestId) return
       setError(caught instanceof Error ? caught.message : 'โหลด Trading Dashboard ไม่ได้')
     } finally {
+      if (latestLoadRequestRef.current !== requestId) return
       setIsLoading(false)
     }
   }, [fromDate, toDate])
@@ -101,9 +110,9 @@ export function TradingDashboardPageClient() {
 
       <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <label className="text-sm" htmlFor="trading-from">From</label>
-        <input id="trading-from" className="rounded-md border px-2 py-1.5 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+        <DatePickerInput id="trading-from" className="w-[130px]" value={fromDate} onChange={setFromDate} />
         <label className="text-sm" htmlFor="trading-to">To</label>
-        <input id="trading-to" className="rounded-md border px-2 py-1.5 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        <DatePickerInput id="trading-to" className="w-[130px]" value={toDate} onChange={setToDate} />
         <button className="rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50" type="button" onClick={() => void loadData()}>รีเฟรช</button>
       </div>
 
@@ -349,7 +358,7 @@ function BillTable({ empty, headerTone, matchedLabel, partyLabel, rows, title }:
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-t">
-                <td className="p-2">{row.date}</td>
+                <td className="p-2">{formatDateDisplay(row.date)}</td>
                 <td className="p-2 font-mono">{row.docNo}</td>
                 <td className="p-2">{row.partyName}</td>
                 <td className="p-2 text-right">{formatMoney(row.totalAmount)}</td>

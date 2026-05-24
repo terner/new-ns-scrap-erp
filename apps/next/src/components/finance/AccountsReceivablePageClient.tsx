@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type SelectOption = {
   active: boolean | null
@@ -277,11 +279,11 @@ export function AccountsReceivablePageClient() {
           <span className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500">พบ {data?.pagination.totalRows ?? 0} รายการ</span>
           <label className="text-xs text-slate-500">
             จากวันที่
-            <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-900" type="date" value={from} onChange={(event) => { setPage(1); setFrom(event.target.value) }} />
+            <DatePickerInput className="mt-1 w-full" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
           </label>
           <label className="text-xs text-slate-500">
             ถึงวันที่
-            <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-900" type="date" value={to} onChange={(event) => { setPage(1); setTo(event.target.value) }} />
+            <DatePickerInput className="mt-1 w-full" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
           </label>
           <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => { setBranchId(''); setBucket(''); setChannelId(''); setCustomerId(''); setFrom(''); setPage(1); setQ(''); setStatus(''); setTo('') }}>ล้างตัวกรอง</button>
         </div>
@@ -325,8 +327,8 @@ function DetailTable({ isLoading, onOpen, onSort, rows, selectedSort, sortDirect
             <tr key={row.id} className={`border-t ${row.aging > 30 ? 'bg-red-50/50' : row.aging > 0 ? 'bg-amber-50/30' : ''}`}>
               <td className="p-2">{row.customerName}</td>
               <td className="p-2"><button className="font-mono text-xs text-blue-600" type="button" onClick={() => onOpen(row)}>{row.docNo}</button></td>
-              <td className="p-2">{row.date}</td>
-              <td className="p-2">{row.dueDate}</td>
+              <td className="p-2">{formatDateDisplay(row.date)}</td>
+              <td className="p-2">{formatDateDisplay(row.dueDate)}</td>
               <td className={`p-2 text-right ${row.aging > 30 ? 'font-bold text-red-600' : row.aging > 0 ? 'text-amber-600' : ''}`}>{row.aging}</td>
               <td className="p-2 text-right">{formatMoney(row.totalAmount)}</td>
               <td className="p-2 text-right text-emerald-600">{formatMoney(row.receivedAmount)}</td>
@@ -352,7 +354,7 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
           <button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Info label="วันที่บิล" value={row.date} />
+          <Info label="วันที่บิล" value={formatDateDisplay(row.date)} />
           <Info label="ครบกำหนด" value={row.dueDate} />
           <Info label="Credit term" value={`${row.creditTerm} วัน`} />
           <Info label="อายุหนี้" value={`${row.aging} วัน (${row.bucket})`} />

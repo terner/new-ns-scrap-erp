@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { getErrorMessage, readBlobResponse, readJsonResponse } from '@/lib/api-client'
+import { formatDateDisplay } from '@/lib/format'
 
 const transactionLedgerPayloadSchema = z.object({
   accounts: z.array(z.object({
@@ -277,9 +279,9 @@ export function TransactionLedgerPageClient() {
       <div className="rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <input className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา เลขที่ / รายละเอียด / ผู้รับ-ส่ง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <input className="rounded-md border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <DatePickerInput className="w-[130px]" value={dateFrom} onChange={setDateFrom} />
           <span className="text-slate-400">→</span>
-          <input className="rounded-md border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <DatePickerInput className="w-[130px]" value={dateTo} onChange={setDateTo} />
           <select className="rounded-md border px-3 py-2 text-sm" value={filterAccount} onChange={(event) => setFilterAccount(event.target.value)}>
             <option value="">💳 ทุกบัญชี</option>
             {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
@@ -347,7 +349,7 @@ export function TransactionLedgerPageClient() {
               <tr><td className="py-8 text-center text-slate-400" colSpan={10}>กำลังโหลด Transaction Ledger</td></tr>
             ) : ledger.length > 0 ? ledger.map((row) => (
               <tr key={row.id} className="border-t hover:bg-slate-50">
-                <td className="p-2 text-xs">{row.date || '-'}</td>
+                <td className="p-2 text-xs">{row.date ? formatDateDisplay(row.date) : '-'}</td>
                 <td className="p-2 text-xs">{row.accountName}</td>
                 <td className="p-2"><span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{row.refType}</span></td>
                 <td className="p-2 font-mono text-xs">{row.refNo}</td>

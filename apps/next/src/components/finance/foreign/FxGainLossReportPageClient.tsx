@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type FxGainLossRow = {
   currency: string
@@ -32,6 +34,7 @@ export function FxGainLossReportPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [refType, setRefType] = useState('all')
   const [toDate, setToDate] = useState('')
+  const latestLoadRequestRef = useRef(0)
 
   const query = useMemo(() => {
     const params = new URLSearchParams()
@@ -43,13 +46,19 @@ export function FxGainLossReportPageClient() {
   }, [currency, fromDate, refType, toDate])
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
-      setData(await dailyFetchJson<FxGainLossPayload>(`/api/finance/foreign/fx-gain-loss-report${query ? `?${query}` : ''}`))
+      const payload = await dailyFetchJson<FxGainLossPayload>(`/api/finance/foreign/fx-gain-loss-report${query ? `?${query}` : ''}`)
+      if (requestId !== latestLoadRequestRef.current) return
+      setData(payload)
     } catch (caught) {
+      if (requestId !== latestLoadRequestRef.current) return
       setError(caught instanceof Error ? caught.message : 'โหลด FX Gain/Loss ไม่ได้')
     } finally {
+      if (requestId !== latestLoadRequestRef.current) return
       setIsLoading(false)
     }
   }, [query])
@@ -67,8 +76,8 @@ export function FxGainLossReportPageClient() {
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="flex flex-wrap gap-2">
-        <input aria-label="จากวันที่" className="rounded-md border border-slate-200 px-3 py-2 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-        <input aria-label="ถึงวันที่" className="rounded-md border border-slate-200 px-3 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" value={fromDate} onChange={setFromDate} />
+        <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" value={toDate} onChange={setToDate} />
         <select aria-label="สกุลเงิน" className="rounded-md border border-slate-200 px-3 py-2 text-sm" value={currency} onChange={(event) => setCurrency(event.target.value)}>
           <option value="all">ทุกสกุล</option>
           {(data?.filters.currencies ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
@@ -106,7 +115,7 @@ export function FxGainLossReportPageClient() {
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={10}>ยังไม่มี FX Gain/Loss</td></tr> : null}
             {!isLoading && data?.rows.map((row) => (
               <tr key={row.id} className="border-t hover:bg-slate-50">
-                <td className="p-2">{row.date}</td>
+                <td className="p-2">{formatDateDisplay(row.date)}</td>
                 <td className="p-2 text-xs">{row.transactionType}</td>
                 <td className="p-2 font-mono text-xs">{row.reference}</td>
                 <td className="p-2">{row.currency || '-'}</td>

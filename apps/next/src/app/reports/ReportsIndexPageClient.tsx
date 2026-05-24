@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 
 type CatalogTab = 'accounting' | 'all' | 'daily' | 'finance' | 'main' | 'production' | 'stock' | 'tracking'
 type LegacyTab = 'purchase-channel' | 'purchase-product' | 'purchase-supplier' | 'sales-channel' | 'sales-customer'
@@ -185,6 +186,7 @@ function downloadCsv(filename: string, columns: Column[], rows: AggregateRow[]) 
 }
 
 export function ReportsIndexPageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [catalogTab, setCatalogTab] = useState<CatalogTab>('all')
   const [legacyTab, setLegacyTab] = useState<LegacyTab>('purchase-channel')
   const [query, setQuery] = useState('')
@@ -195,6 +197,8 @@ export function ReportsIndexPageClient() {
   const [error, setError] = useState('')
 
   const loadAggregate = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setLoading(true)
     setError('')
     try {
@@ -203,11 +207,15 @@ export function ReportsIndexPageClient() {
       if (toDate) params.set('toDate', toDate)
       const response = await fetch(`/api/reports/aggregate${params.size ? `?${params.toString()}` : ''}`, { cache: 'no-store' })
       if (!response.ok) throw new Error('โหลดรายงานสรุปไม่ได้')
-      setData(await response.json() as AggregatePayload)
+      const payload = await response.json() as AggregatePayload
+      if (latestLoadRequestRef.current !== requestId) return
+      setData(payload)
     } catch (caught) {
+      if (latestLoadRequestRef.current !== requestId) return
       setData(null)
       setError(caught instanceof Error ? caught.message : 'โหลดรายงานสรุปไม่ได้')
     } finally {
+      if (latestLoadRequestRef.current !== requestId) return
       setLoading(false)
     }
   }, [fromDate, toDate])
@@ -259,8 +267,8 @@ export function ReportsIndexPageClient() {
     <section className="space-y-4">
       <div className="rounded-md bg-white p-4 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="rounded-md border px-3 py-2 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
-          <input className="rounded-md border px-3 py-2 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
+          <DatePickerInput className="w-[130px]" onChange={setFromDate} value={fromDate} />
+          <DatePickerInput className="w-[130px]" onChange={setToDate} value={toDate} />
           <span className="text-xs text-slate-500">เว้นว่างเพื่อดูทุกช่วงเวลา</span>
           <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={exportActiveTab} type="button">
             Export CSV รายงานนี้

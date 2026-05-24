@@ -1,6 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { formatDateDisplay } from '@/lib/format'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type DealMarginRow = {
@@ -29,6 +31,7 @@ type Payload = {
 }
 
 export function DealMarginPageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [channel, setChannel] = useState('all')
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -45,13 +48,19 @@ export function DealMarginPageClient() {
   }, [channel, fromDate, toDate])
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
-      setData(await dailyFetchJson<Payload>(`/api/dual-costing/deal-margin?${queryString}`))
+      const payload = await dailyFetchJson<Payload>(`/api/dual-costing/deal-margin?${queryString}`)
+      if (latestLoadRequestRef.current !== requestId) return
+      setData(payload)
     } catch (caught) {
+      if (latestLoadRequestRef.current !== requestId) return
       setError(caught instanceof Error ? caught.message : 'โหลด Deal Margin ไม่ได้')
     } finally {
+      if (latestLoadRequestRef.current !== requestId) return
       setIsLoading(false)
     }
   }, [queryString])
@@ -115,8 +124,8 @@ export function DealMarginPageClient() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <input className="rounded-md border px-3 py-2 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-        <input className="rounded-md border px-3 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        <DatePickerInput className="w-[130px]" value={fromDate} onChange={setFromDate} />
+        <DatePickerInput className="w-[130px]" value={toDate} onChange={setToDate} />
         <select className="rounded-md border px-3 py-2 text-sm" value={channel} onChange={(event) => setChannel(event.target.value)}>
           <option value="all">ทุกช่องทาง</option>
           {(data?.filters.channels ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
@@ -132,7 +141,7 @@ export function DealMarginPageClient() {
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={14}>ยังไม่มี PO Sell</td></tr> : null}
             {!isLoading && (data?.rows ?? []).map((row) => (
               <tr key={row.id} className="border-t">
-                <td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2">{row.date}</td><td className="p-2">{row.customer}</td><td className="p-2">{row.channel}</td><td className="p-2">{row.product}</td><td className="p-2 text-right">{formatMoney(row.sellQty)}</td><td className="p-2 text-right">{formatMoney(row.unitPrice)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(row.totalRevenue)}</td><td className="p-2 text-right">{formatMoney(row.matchedQty)}</td><td className="p-2 text-right">{formatMoney(row.avgCost)}</td><td className="p-2 text-right text-red-600">{formatMoney(row.matchedCost)}</td><td className={`p-2 text-right font-bold ${row.margin >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(row.margin)}</td><td className={`p-2 text-right ${row.marginPct >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{row.marginPct.toFixed(2)}%</td><td className="p-2 text-center"><span className={`rounded-md px-2 py-0.5 text-xs ${row.statusMatch === 'Fully' ? 'bg-emerald-100 text-emerald-700' : row.statusMatch === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>{row.statusMatch}</span></td>
+                <td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.customer}</td><td className="p-2">{row.channel}</td><td className="p-2">{row.product}</td><td className="p-2 text-right">{formatMoney(row.sellQty)}</td><td className="p-2 text-right">{formatMoney(row.unitPrice)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(row.totalRevenue)}</td><td className="p-2 text-right">{formatMoney(row.matchedQty)}</td><td className="p-2 text-right">{formatMoney(row.avgCost)}</td><td className="p-2 text-right text-red-600">{formatMoney(row.matchedCost)}</td><td className={`p-2 text-right font-bold ${row.margin >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(row.margin)}</td><td className={`p-2 text-right ${row.marginPct >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{row.marginPct.toFixed(2)}%</td><td className="p-2 text-center"><span className={`rounded-md px-2 py-0.5 text-xs ${row.statusMatch === 'Fully' ? 'bg-emerald-100 text-emerald-700' : row.statusMatch === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>{row.statusMatch}</span></td>
               </tr>
             ))}
           </tbody>

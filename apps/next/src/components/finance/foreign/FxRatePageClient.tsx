@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type FxRateRow = {
   active: boolean
@@ -69,6 +71,7 @@ function emptyForm(): FormState {
 }
 
 export function FxRatePageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [active, setActive] = useState('true')
   const [data, setData] = useState<FxRatePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -91,13 +94,19 @@ export function FxRatePageClient() {
   }, [active, fromCurrency, fromDate, toDate])
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
-      setData(await dailyFetchJson<FxRatePayload>(`/api/finance/foreign/fx-rate${queryString ? `?${queryString}` : ''}`))
+      const payload = await dailyFetchJson<FxRatePayload>(`/api/finance/foreign/fx-rate${queryString ? `?${queryString}` : ''}`)
+      if (latestLoadRequestRef.current !== requestId) return
+      setData(payload)
     } catch (caught) {
+      if (latestLoadRequestRef.current !== requestId) return
       setError(caught instanceof Error ? caught.message : 'โหลด FX Rate ไม่ได้')
     } finally {
+      if (latestLoadRequestRef.current !== requestId) return
       setIsLoading(false)
     }
   }, [queryString])
@@ -190,7 +199,7 @@ export function FxRatePageClient() {
           <div key={rate.id} className="rounded-md bg-white p-3 text-center shadow">
             <div className="text-xs text-slate-500">{rate.fromCurrency} -&gt; {rate.toCurrency}</div>
             <div className="text-2xl font-bold text-blue-600">{formatRate(rate.rate)}</div>
-            <div className="mt-1 text-xs text-slate-400">{rate.rateDate}</div>
+            <div className="mt-1 text-xs text-slate-400">{formatDateDisplay(rate.rateDate)}</div>
           </div>
         ))}
         {!isLoading && (data?.latestRates.length ?? 0) === 0 ? <div className="rounded-md bg-white p-3 text-sm text-slate-500 shadow">ยังไม่มี FX Rate</div> : null}
@@ -199,8 +208,8 @@ export function FxRatePageClient() {
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-lg font-semibold text-slate-900">FX Rate History</h2>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <input aria-label="จากวันที่" className="rounded-md border border-slate-200 px-3 py-2" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-          <input aria-label="ถึงวันที่" className="rounded-md border border-slate-200 px-3 py-2" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" value={fromDate} onChange={setFromDate} />
+          <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" value={toDate} onChange={setToDate} />
           <select aria-label="สกุลต้นทาง" className="rounded-md border border-slate-200 px-3 py-2" value={fromCurrency} onChange={(event) => setFromCurrency(event.target.value)}>
             <option value="all">ทุกสกุล</option>
             {(data?.filters.fromCurrencies ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
@@ -233,7 +242,7 @@ export function FxRatePageClient() {
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>ยังไม่มี FX Rate</td></tr> : null}
             {!isLoading && data?.rows.map((row) => (
               <tr key={row.id} className="border-t hover:bg-slate-50">
-                <td className="p-2">{row.rateDate}</td>
+                <td className="p-2">{formatDateDisplay(row.rateDate)}</td>
                 <td className="p-2 font-medium">{row.fromCurrency}</td>
                 <td className="p-2 font-medium">{row.toCurrency}</td>
                 <td className="p-2 text-xs">{row.rateType}</td>
@@ -255,7 +264,7 @@ export function FxRatePageClient() {
               <button className="text-2xl text-slate-400" type="button" onClick={() => setShowForm(false)}>&times;</button>
             </div>
             <div className="grid gap-3 p-5 text-sm md:grid-cols-2">
-              <Field label="วันที่" error={fieldErrors.rateDate}><input className="w-full rounded-md border px-2 py-1.5" type="date" value={form.rateDate} onChange={(event) => setForm({ ...form, rateDate: event.target.value })} /></Field>
+              <Field label="วันที่" error={fieldErrors.rateDate}><DatePickerInput className="w-full" value={form.rateDate} onChange={(value) => setForm({ ...form, rateDate: value })} /></Field>
               <Field label="Rate Type" error={fieldErrors.rateType}><select className="w-full rounded-md border px-2 py-1.5" value={form.rateType} onChange={(event) => setForm({ ...form, rateType: event.target.value })}>{rateTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
               <Field label="From" error={fieldErrors.fromCurrency}><CurrencySelect options={currencyOptions} value={form.fromCurrency} onChange={(value) => setForm({ ...form, fromCurrency: value })} /></Field>
               <Field label="To" error={fieldErrors.toCurrency}><CurrencySelect options={currencyOptions} value={form.toCurrency} onChange={(value) => setForm({ ...form, toCurrency: value })} /></Field>

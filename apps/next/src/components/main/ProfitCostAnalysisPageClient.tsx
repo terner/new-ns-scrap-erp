@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type Option = { active: boolean; code?: string; creditTerm?: number; id: string; name: string }
 type ProductRow = {
@@ -62,6 +64,7 @@ function monthStart() {
 }
 
 export function ProfitCostAnalysisPageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [from, setFrom] = useState(monthStart())
   const [to, setTo] = useState(today())
   const [branchId, setBranchId] = useState('')
@@ -88,17 +91,26 @@ export function ProfitCostAnalysisPageClient() {
   }, [branchId, customerId, from, purchaseChannelId, salesChannelId, selectedMetalGroups, supplierId, to])
 
   useEffect(() => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     dailyFetchJson<ProfitCostPayload>(`/api/profit-cost-analysis?${query}`)
       .then((payload) => {
+        if (latestLoadRequestRef.current !== requestId) return
         setData(payload)
         if (selectedMetalGroups.length === 0 && payload.filters.selectedMetalGroups.length > 0) {
           setSelectedMetalGroups(payload.filters.selectedMetalGroups)
         }
       })
-      .catch((caught) => setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้'))
-      .finally(() => setIsLoading(false))
+      .catch((caught) => {
+        if (latestLoadRequestRef.current !== requestId) return
+        setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้')
+      })
+      .finally(() => {
+        if (latestLoadRequestRef.current !== requestId) return
+        setIsLoading(false)
+      })
   }, [query, selectedMetalGroups.length])
 
   const summary = data?.summary ?? {}
@@ -112,8 +124,8 @@ export function ProfitCostAnalysisPageClient() {
     <section className="space-y-4">
       <div className="rounded-md bg-white p-4 shadow-lg">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-          <Field label="จากวันที่"><input className={controlClass} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field>
-          <Field label="ถึงวันที่"><input className={controlClass} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></Field>
+          <Field label="จากวันที่"><DatePickerInput className="w-full" value={from} onChange={setFrom} /></Field>
+          <Field label="ถึงวันที่"><DatePickerInput className="w-full" value={to} onChange={setTo} /></Field>
           <Field label="สาขา"><Select options={data?.filters.branches ?? []} value={branchId} onChange={setBranchId} /></Field>
           <Field label="ช่องทางซื้อ"><Select options={data?.filters.purchaseChannels ?? []} value={purchaseChannelId} onChange={setPurchaseChannelId} /></Field>
           <Field label="ช่องทางขาย"><Select options={data?.filters.salesChannels ?? []} value={salesChannelId} onChange={setSalesChannelId} /></Field>
@@ -195,7 +207,7 @@ export function ProfitCostAnalysisPageClient() {
           {activeTab === 'suppliers' ? <SimpleTable rows={(data?.rows.suppliers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.paid), money(row.payable), String(row.billCount)])} headers={['Supplier', 'กก.', 'ซื้อ', 'จ่ายแล้ว', 'ค้างจ่าย', 'บิล']} /> : null}
           {activeTab === 'customers' ? <SimpleTable rows={(data?.rows.customers ?? []).map((row) => [row.name, money(row.qty), money(row.amount), money(row.gp), `${pct(row.gpPct)}%`, money(row.receivable)])} headers={['Customer', 'กก.', 'ขาย', 'GP', 'GP %', 'ค้างรับ']} /> : null}
           {activeTab === 'channels' ? <SimpleTable rows={(data?.rows.channels ?? []).map((row) => [row.group, row.name, money(row.qty), money(row.amount), money(row.gp), String(row.billCount)])} headers={['Group', 'Channel', 'กก.', 'ยอด', 'GP', 'บิล']} /> : null}
-          {activeTab === 'trend' ? <SimpleTable rows={(data?.rows.trend ?? []).map((row) => [row.date, money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['Date', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} /> : null}
+          {activeTab === 'trend' ? <SimpleTable rows={(data?.rows.trend ?? []).map((row) => [formatDateDisplay(row.date), money(row.buyAmount), money(row.revenue), money(row.cogs), money(row.gp), money(row.sellQty)])} headers={['Date', 'ซื้อ', 'ขาย', 'COGS', 'GP', 'ขาย กก.']} /> : null}
           {activeTab === 'alerts' ? <SimpleTable rows={(data?.alerts ?? []).map((row) => [row.severity, row.type, row.label, money(row.amount)])} headers={['Severity', 'Type', 'รายการ', 'ค่า']} /> : null}
         </div>
       </div>

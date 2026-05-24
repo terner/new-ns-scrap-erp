@@ -73,6 +73,7 @@ export function DatePickerInput({
     <InputGroup className={className ?? 'w-[130px]'}>
       <InputGroupInput
         aria-label={ariaLabel}
+        className="tabular-nums"
         disabled={disabled}
         id={resolvedId}
         placeholder={placeholder}

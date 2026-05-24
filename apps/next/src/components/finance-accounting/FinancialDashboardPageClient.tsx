@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type BranchRow = { code: string; id: string; name: string }
@@ -37,7 +38,7 @@ export function FinancialDashboardPageClient() {
       </div>
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
-        <label className="flex items-center gap-2 text-sm"><span>As of</span><input className="rounded-md border px-2 py-1.5 text-sm" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /></label>
+        <label className="flex items-center gap-2 text-sm"><span>As of</span><DatePickerInput className="w-[140px]" value={asOf} onChange={setAsOf} /></label>
         <select className="rounded-md border bg-white px-2 py-1.5 text-sm" value={branchId} onChange={(event) => setBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
       </div>
 
@@ -106,12 +107,25 @@ function useApi<T>(url: string) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const latestLoadRequestRef = useRef(0)
   useEffect(() => {
-    let mounted = true
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setIsLoading(true)
     setError(null)
-    dailyFetchJson<T>(url).then((payload) => mounted ? setData(payload) : undefined).catch((caught) => mounted ? setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้') : undefined).finally(() => mounted ? setIsLoading(false) : undefined)
-    return () => { mounted = false }
+    dailyFetchJson<T>(url)
+      .then((payload) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setData(payload)
+      })
+      .catch((caught) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setError(caught instanceof Error ? caught.message : 'โหลดข้อมูลไม่ได้')
+      })
+      .finally(() => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setIsLoading(false)
+      })
   }, [url])
   return { data, error, isLoading }
 }

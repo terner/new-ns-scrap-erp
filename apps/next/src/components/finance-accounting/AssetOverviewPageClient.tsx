@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type AnyRow = Record<string, number | string | boolean | null | undefined>
@@ -39,14 +40,23 @@ export function AssetOverviewPageClient() {
   const [branchId, setBranchId] = useState('ALL')
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const latestLoadRequestRef = useRef(0)
 
   useEffect(() => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     const params = new URLSearchParams({ asOf })
     if (branchId !== 'ALL') params.set('branchId', branchId)
     dailyFetchJson<Payload>(`/api/finance-accounting/asset-overview?${params}`)
-      .then(setData)
-      .catch((caught) => setError(caught instanceof Error ? caught.message : 'โหลด Net Worth / Track Asset ไม่ได้'))
+      .then((payload) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setData(payload)
+      })
+      .catch((caught) => {
+        if (requestId !== latestLoadRequestRef.current) return
+        setError(caught instanceof Error ? caught.message : 'โหลด Net Worth / Track Asset ไม่ได้')
+      })
   }, [asOf, branchId])
 
   const summary = data?.summary ?? {}
@@ -59,7 +69,7 @@ export function AssetOverviewPageClient() {
           <p className="mt-1 text-xs text-[#8a96b8]">Management overview · assets, debt, liquidity, AR aging</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input className="rounded-md border border-[#1f2c4a] bg-[#0e1729] px-3 py-2 text-sm font-bold text-[#e6ecff]" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
+          <DatePickerInput className="w-[140px] border-[#1f2c4a] bg-[#0e1729] text-[#e6ecff]" value={asOf} onChange={setAsOf} />
           <select className="rounded-md border border-[#1f2c4a] bg-[#0e1729] px-3 py-2 text-sm text-[#e6ecff]" value={branchId} onChange={(event) => setBranchId(event.target.value)}>
             <option value="ALL">ทุกสาขา</option>
             {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}

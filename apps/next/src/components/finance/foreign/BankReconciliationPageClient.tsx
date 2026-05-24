@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type AccountOption = { id: string; label: string; name: string }
 type ErpRow = { date: string; id: string; in: number; out: number; refNo: string; type: string }
@@ -15,6 +17,7 @@ type Payload = {
 }
 
 export function BankReconciliationPageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [accountId, setAccountId] = useState('')
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -31,15 +34,20 @@ export function BankReconciliationPageClient() {
   }, [accountId, fromDate, toDate])
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
       const payload = await dailyFetchJson<Payload>(`/api/finance/foreign/bank-reconciliation${query ? `?${query}` : ''}`)
+      if (latestLoadRequestRef.current !== requestId) return
       setData(payload)
       if (!accountId && payload.filters.accounts[0]?.id) setAccountId(payload.filters.accounts[0].id)
     } catch (caught) {
+      if (latestLoadRequestRef.current !== requestId) return
       setError(caught instanceof Error ? caught.message : 'โหลด Bank Reconciliation ไม่ได้')
     } finally {
+      if (latestLoadRequestRef.current !== requestId) return
       setIsLoading(false)
     }
   }, [accountId, query])
@@ -60,8 +68,8 @@ export function BankReconciliationPageClient() {
         <select className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm md:w-72" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
           {(data?.filters.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
         </select>
-        <input aria-label="จากวันที่" className="rounded-md border border-slate-200 px-3 py-2 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-        <input aria-label="ถึงวันที่" className="rounded-md border border-slate-200 px-3 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" value={fromDate} onChange={setFromDate} />
+        <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" value={toDate} onChange={setToDate} />
         <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white opacity-60" disabled type="button">Import CSV</button>
         <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm text-white opacity-60" disabled type="button">Auto Match</button>
       </div>
@@ -117,7 +125,7 @@ function ErpTable({ isLoading, rows }: { isLoading: boolean; rows: ErpRow[] }) {
         {!isLoading && rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={5}>ไม่มีรายการใน ERP</td></tr> : null}
         {!isLoading && rows.map((row) => (
           <tr key={row.id} className="border-t">
-            <td className="p-2">{row.date}</td><td className="p-2">{row.type}</td><td className="p-2 font-mono text-blue-600">{row.refNo}</td><td className="p-2 text-right text-emerald-600">{row.in ? formatMoney(row.in) : '-'}</td><td className="p-2 text-right text-red-600">{row.out ? formatMoney(row.out) : '-'}</td>
+            <td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.type}</td><td className="p-2 font-mono text-blue-600">{row.refNo}</td><td className="p-2 text-right text-emerald-600">{row.in ? formatMoney(row.in) : '-'}</td><td className="p-2 text-right text-red-600">{row.out ? formatMoney(row.out) : '-'}</td>
           </tr>
         ))}
       </tbody>

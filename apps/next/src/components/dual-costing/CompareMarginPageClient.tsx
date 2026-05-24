@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type Totals = {
@@ -19,6 +20,7 @@ type Payload = {
 }
 
 export function CompareMarginPageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fromDate, setFromDate] = useState('')
@@ -33,13 +35,19 @@ export function CompareMarginPageClient() {
   }, [fromDate, toDate])
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
-      setData(await dailyFetchJson<Payload>(`/api/dual-costing/compare-margin?${queryString}`))
+      const payload = await dailyFetchJson<Payload>(`/api/dual-costing/compare-margin?${queryString}`)
+      if (latestLoadRequestRef.current !== requestId) return
+      setData(payload)
     } catch (caught) {
+      if (latestLoadRequestRef.current !== requestId) return
       setError(caught instanceof Error ? caught.message : 'โหลด Compare Margin ไม่ได้')
     } finally {
+      if (latestLoadRequestRef.current !== requestId) return
       setIsLoading(false)
     }
   }, [queryString])
@@ -75,8 +83,8 @@ export function CompareMarginPageClient() {
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3 rounded-md border border-slate-200 bg-white/70 p-3 text-xs text-slate-500">
         <div className="flex flex-wrap gap-2">
-          <input className="rounded-md border border-slate-200 bg-white px-2 py-1.5" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-          <input className="rounded-md border border-slate-200 bg-white px-2 py-1.5" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          <DatePickerInput className="w-[130px]" value={fromDate} onChange={setFromDate} />
+          <DatePickerInput className="w-[130px]" value={toDate} onChange={setToDate} />
         </div>
         <div className="flex flex-wrap gap-3">
           <span>Deal rows: <strong className="text-slate-700">{data?.dealTotals.rows ?? 0}</strong></span>

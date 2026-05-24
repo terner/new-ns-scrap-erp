@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
+import { formatDateDisplay } from '@/lib/format'
 
 type AccountOption = {
   accountNo: string | null
@@ -48,6 +50,7 @@ function currentMonthStart() {
 }
 
 export function BankStatementPageClient() {
+  const latestLoadRequestRef = useRef(0)
   const [accountId, setAccountId] = useState('')
   const [data, setData] = useState<BankPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -78,13 +81,19 @@ export function BankStatementPageClient() {
   }, [accountId, from, page, q, refType, sortDirection, to, type])
 
   const loadData = useCallback(async () => {
+    const requestId = latestLoadRequestRef.current + 1
+    latestLoadRequestRef.current = requestId
     setError(null)
     setIsLoading(true)
     try {
-      setData(await dailyFetchJson<BankPayload>(`/api/finance/bank?${query.toString()}`))
+      const payload = await dailyFetchJson<BankPayload>(`/api/finance/bank?${query.toString()}`)
+      if (latestLoadRequestRef.current !== requestId) return
+      setData(payload)
     } catch (caught) {
+      if (latestLoadRequestRef.current !== requestId) return
       setError(caught instanceof Error ? caught.message : 'โหลด Bank Statement ไม่ได้')
     } finally {
+      if (latestLoadRequestRef.current !== requestId) return
       setIsLoading(false)
     }
   }, [query])
@@ -166,9 +175,9 @@ export function BankStatementPageClient() {
         <select className="w-64 rounded-md border px-3 py-2 text-sm font-medium text-slate-900" value={accountId} onChange={(event) => { setPage(1); setAccountId(event.target.value) }}>
           {(data?.filters.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{account.name} ({account.type})</option>)}
         </select>
-        <input className="rounded-md border px-2 py-2 text-xs text-slate-900" type="date" value={from} onChange={(event) => { setPage(1); setFrom(event.target.value) }} />
+        <DatePickerInput className="w-[130px]" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
         <span className="text-xs text-slate-400">→</span>
-        <input className="rounded-md border px-2 py-2 text-xs text-slate-900" type="date" value={to} onChange={(event) => { setPage(1); setTo(event.target.value) }} />
+        <DatePickerInput className="w-[130px]" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
         <button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : '📤 .xlsx'}</button>
         <button className="rounded-md bg-red-100 px-3 py-2 text-xs font-bold text-red-700 opacity-70" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ลบ Duplicate</button>
       </div>
@@ -240,8 +249,8 @@ function ChartPanel({ rows, title, variant }: { rows: BankRow[]; title: string; 
         {variant === 'balance'
           ? chartRows.map((row) => (
               <div key={`${row.id}-balance`} className="flex min-w-5 flex-1 flex-col items-center justify-end gap-1">
-                <div className={`w-full rounded-md-t ${row.runningBalance >= 0 ? 'bg-blue-500/80' : 'bg-red-500/80'}`} style={{ height: `${Math.max(6, Math.abs(row.runningBalance) / maxBalance * 220)}px` }} title={`${row.date}: ${formatMoney(row.runningBalance)}`} />
-                <span className="w-full truncate text-center text-[10px] text-slate-400">{row.date === '-' ? 'ยกมา' : row.date.slice(5)}</span>
+                <div className={`w-full rounded-md-t ${row.runningBalance >= 0 ? 'bg-blue-500/80' : 'bg-red-500/80'}`} style={{ height: `${Math.max(6, Math.abs(row.runningBalance) / maxBalance * 220)}px` }} title={`${formatDateDisplay(row.date)}: ${formatMoney(row.runningBalance)}`} />
+                <span className="w-full truncate text-center text-[10px] text-slate-400">{row.date === '-' ? 'ยกมา' : formatDateDisplay(row.date).slice(0, 5)}</span>
               </div>
             ))
           : chartRows.map((row) => (
@@ -250,7 +259,7 @@ function ChartPanel({ rows, title, variant }: { rows: BankRow[]; title: string; 
                   <div className="w-full rounded-md-t bg-emerald-500/80" style={{ height: `${row.amountIn > 0 ? Math.max(4, row.amountIn / maxFlow * 110) : 2}px` }} title={`เข้า ${formatMoney(row.amountIn)}`} />
                   <div className="w-full rounded-md-b bg-rose-500/80" style={{ height: `${row.amountOut > 0 ? Math.max(4, row.amountOut / maxFlow * 110) : 2}px` }} title={`ออก ${formatMoney(row.amountOut)}`} />
                 </div>
-                <span className="w-full truncate text-center text-[10px] text-slate-400">{row.date === '-' ? 'ยกมา' : row.date.slice(5)}</span>
+                <span className="w-full truncate text-center text-[10px] text-slate-400">{row.date === '-' ? 'ยกมา' : formatDateDisplay(row.date).slice(0, 5)}</span>
               </div>
             ))}
       </div>
@@ -284,7 +293,7 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
               const isOpening = row.type === 'ยอดยกมา'
               return (
                 <tr key={row.id} className={`border-t transition hover:bg-yellow-50 ${isOpening ? 'bg-amber-50 font-bold' : ''}`}>
-                  <td className="p-2 font-mono text-xs">{row.date}</td>
+                  <td className="p-2 font-mono text-xs">{isOpening ? row.date : formatDateDisplay(row.date)}</td>
                   <td className="p-2 text-xs"><span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${isOpening ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>{row.type || row.refType || '-'}</span></td>
                   <td className="max-w-96 truncate p-2 text-xs">{row.description || row.note || '-'}</td>
                   <td className="p-2 font-mono text-xs text-blue-600">
@@ -315,7 +324,7 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
           <button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Info label="วันที่" value={row.date} />
+          <Info label="วันที่" value={formatDateDisplay(row.date)} />
           <Info label="บัญชี" value={row.accountName} />
           <Info label="ธนาคาร" value={row.bankName || '-'} />
           <Info label="เลขบัญชี" value={row.accountNo || '-'} />
