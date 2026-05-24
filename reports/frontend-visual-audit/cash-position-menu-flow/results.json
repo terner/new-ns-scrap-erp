@@ -1,0 +1,22 @@
+[
+  {
+    "appName": "live",
+    "clicked": true,
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "screenshot": "reports/frontend-visual-audit/cash-position-menu-flow/cashPosition-live-desktop.png",
+    "text": "💰 Net Cash Position 9,100,000.00 = Cash + Bank + FCD + AR − AP − OD ใช้ 🥧 องค์ประกอบเงิน (Liquid) รวม 9,100,000.00 💵 Cash 🏦 Bank 💱 FCD ⚖ AR vs AP 📥 ลูกหนี้ (AR) 0.00 📤 เจ้าหนี้ (AP) 0.00 Net (AR − AP) 0.00 🏆 Top บัญชีที่มียอด 1 กสิกรไทย กระแสรายวัน · ธนาคาร 5,000,000.00 2 ไทยพาณิชย์ ออมทรัพย์ · ธนาคาร 3,000,000.00 3 เงินสดในมือ – สำนักงานใหญ่ · เงินสด 500,000.00 4 เงินสดในมือ – สมุทรสาคร · เงินสด 300,000.00 5 เงินสดในมือ – นครสวรรค์ · เงินสด 300,000.00 💵 เงินสดรวม 1,100,000.00 🏦 ธนาคารรวม 8,000,000.00 💱 FCD (THB equiv.) 0.00 ⚠ OD ใช้ไป 0.00 เหลือใช้ 10,000,000.00 📥 ลูกหนี้รวม (เงินที่จะได้รับ) 0.00 📤 เจ้าหนี้รวม (เงินที่ต้องจ่าย) 0.00 Net Cash Position (สภาพคล่องสุทธิ) 9,100,000.00 = เงินสด + ธนาคาร + FCD + ลูกหนี้ - เจ้าหนี้ - OD ใช้ไป รายละเอียดบัญชีเงินทั้งหมด รหัส ชื่อบัญชี ประเภท ธนาคาร เลขบัญชี สกุล วงเงิน OD ยอดคงเหลือ CASH-HQ เงินสดในมือ – สำนักงานใหญ่ เงินสด - - THB - 500,000.00 CASH-SK เงินสดในมือ – สมุทรสาคร เงินสด - - THB - 300,000.00 CASH-NS เงินสดในมือ – นครสวรรค์ เงินสด - - THB - 300,000.00 KBANK-CA กสิกรไทย กระแสรายวัน ธนาคาร กสิกรไทย 001-1-23456-7 THB - 5,000,000.00 SCB-CA ไทยพาณิชย์ ออมทรัพย์ ธนาคาร ไทยพาณิชย์ 002-2-34567-8 THB - 3,000,000.00 KBANK-OD กสิกรไทย OD OD กสิกรไทย 001-OD-99999 THB 10,000,000.00 0.00 KBANK-FCD กสิกรไทย FCD USD FCD กสิกรไทย 001-FCD-12345 USD - 0.00"
+  },
+  {
+    "appName": "vue",
+    "clicked": true,
+    "consoleMessages": [],
+    "screenshot": "reports/frontend-visual-audit/cash-position-menu-flow/cashPosition-vue-desktop.png",
+    "text": "💰 Net Cash Position 6,075,200 = Cash + Bank + FCD + AR − AP − OD ใช้ 🥧 องค์ประกอบเงิน (Liquid) รวม 6,490,000 💵 Cash 🏦 Bank 💱 FCD ⚖ AR vs AP 📥 ลูกหนี้ (AR) 704,400 📤 เจ้าหนี้ (AP) 769,200 Net (AR − AP) -64,800 🏆 Top บัญชีที่มียอด 1 กสิกรไทย กระแสรายวัน · ธนาคาร 5,280,000 2 กสิกรไทย FCD USD · FCD 710,000 3 เงินสดในมือ – สำนักงานใหญ่ · เงินสด 500,000 💵 เงินสดรวม 500,000 🏦 ธนาคารรวม 5,280,000 💱 FCD (THB equiv.) 710,000 ⚠ OD ใช้ไป 350,000 เหลือใช้ 1,650,000 📥 ลูกหนี้รวม (เงินที่จะได้รับ) 704,400 📤 เจ้าหนี้รวม (เงินที่ต้องจ่าย) 769,200 รายละเอียดบัญชีเงินทั้งหมด รหัส ชื่อบัญชี ประเภท ธนาคาร เลขบัญชี สกุล วงเงิน OD ยอดคงเหลือ CASH-HQ เงินสดในมือ – สำนักงานใหญ่ เงินสด - - THB - 500,000 KBANK-CA กสิกรไทย กระแสรายวัน ธนาคาร กสิกรไทย 001-1-23456-7 THB - 5,280,000 KBANK-FCD กสิกรไทย FCD USD FCD กสิกรไทย 001-FCD-12345 USD - 710,000 SCB-OD ไทยพาณิชย์ OD OD ไทยพาณิชย์ OD-9988 THB 2,000,000 -350,000"
+  }
+]

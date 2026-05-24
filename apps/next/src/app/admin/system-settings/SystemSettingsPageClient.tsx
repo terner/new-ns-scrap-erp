@@ -148,17 +148,17 @@ export function SystemSettingsPageClient() {
   return (
     <section className="space-y-4">
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
         </div>
       ) : null}
 
       {isLoading ? (
-        <div className="rounded-lg bg-white p-5 text-sm text-slate-500 shadow">กำลังโหลดค่าตั้งค่า</div>
+        <div className="rounded-md bg-white p-5 text-sm text-slate-500 shadow">กำลังโหลดค่าตั้งค่า</div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {cards.map((setting) => (
-            <section key={setting.kind} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <section key={setting.kind} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-4">
                 <h2 className="text-base font-bold text-slate-900">{setting.label}</h2>
                 <p className="mt-1 text-xs text-slate-500">{setting.helper}</p>
@@ -166,7 +166,7 @@ export function SystemSettingsPageClient() {
 
               <label className="block text-sm font-medium text-slate-700">
                 อัตรา %
-                <div className="mt-1.5 flex max-w-xs items-center overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-slate-700">
+                <div className="mt-1.5 flex max-w-xs items-center overflow-hidden rounded-md border border-slate-300 bg-white focus-within:border-slate-700">
                   <input
                     className="w-full px-3 py-2 text-right text-lg font-semibold outline-none"
                     inputMode="decimal"
@@ -183,7 +183,7 @@ export function SystemSettingsPageClient() {
 
               <div className="mt-4">
                 <button
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+                  className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
                   disabled={!setting.record || savingKind === setting.kind}
                   type="button"
                   onClick={() => requestSave(setting)}
@@ -198,7 +198,7 @@ export function SystemSettingsPageClient() {
 
       {pendingSave ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+          <div className="w-full max-w-md rounded-md bg-white shadow-xl">
             <div className="border-b border-slate-200 px-5 py-4">
               <h2 className="text-lg font-bold text-slate-900">ยืนยันการเปลี่ยนค่าระบบ</h2>
               <p className="mt-1 text-sm text-slate-600">ค่านี้มีผลกับการคำนวณทั้งระบบ</p>
@@ -207,11 +207,11 @@ export function SystemSettingsPageClient() {
             <div className="space-y-4 px-5 py-4 text-sm">
               <div className="font-semibold text-slate-900">{pendingSave.setting.label}</div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-slate-50 p-3">
+                <div className="rounded-md bg-slate-50 p-3">
                   <div className="text-xs text-slate-500">ค่าเดิม</div>
                   <div className="mt-1 text-xl font-bold text-slate-700">{pendingSave.currentValue ?? '-'}%</div>
                 </div>
-                <div className="rounded-lg bg-amber-50 p-3">
+                <div className="rounded-md bg-amber-50 p-3">
                   <div className="text-xs text-amber-700">ค่าใหม่</div>
                   <div className="mt-1 text-xl font-bold text-amber-800">{pendingSave.nextValue}%</div>
                 </div>
@@ -220,7 +220,7 @@ export function SystemSettingsPageClient() {
 
             <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
               <button
-                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
                 disabled={savingKind !== null}
                 type="button"
                 onClick={() => setPendingSave(null)}
@@ -228,7 +228,7 @@ export function SystemSettingsPageClient() {
                 ยกเลิก
               </button>
               <button
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
                 disabled={savingKind !== null}
                 type="button"
                 onClick={() => void confirmSave()}

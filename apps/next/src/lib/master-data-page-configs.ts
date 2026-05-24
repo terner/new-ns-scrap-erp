@@ -109,13 +109,14 @@ export const warehousesPageConfig: MasterDataPageConfig = {
 
 export const accountsPageConfig: MasterDataPageConfig = {
   apiPath: '/api/master-data/accounts',
-  createLabel: 'เพิ่มบัญชีเงิน',
-  entityName: 'บัญชีเงิน',
-  emptyMessage: 'ไม่พบข้อมูลบัญชีเงิน',
+  createLabel: 'เพิ่มบัญชีเงินบริษัท',
+  entityName: 'บัญชีเงินบริษัท',
+  emptyMessage: 'ไม่พบข้อมูลบัญชีเงินบริษัท',
   fields: [
     { key: 'name', label: 'ชื่อบัญชี', required: true },
     { key: 'type', label: 'ประเภท', type: 'select', required: true, options: [{ label: 'เงินสด', value: 'cash' }, { label: 'ธนาคาร', value: 'bank' }, { label: 'อื่น ๆ', value: 'other' }] },
     { key: 'bankName', label: 'ธนาคาร', type: 'select', optionsApiPath: '/api/master-data/bank-names' },
+    { key: 'bankBranch', label: 'สาขาธนาคาร' },
     { key: 'accountNo', label: 'เลขที่บัญชี' },
     { key: 'currency', label: 'สกุลเงิน' },
     { key: 'openingBalance', label: 'ยอดยกมา', type: 'number' },
@@ -123,9 +124,10 @@ export const accountsPageConfig: MasterDataPageConfig = {
     { key: 'branchId', label: 'สาขา', type: 'select', optionsApiPath: '/api/master-data/branches', optionValueKey: 'id' },
   ],
   columns: [
-    { key: 'name', label: 'ชื่อบัญชี' },
+    { key: 'name', label: 'ชื่อบัญชีบริษัท' },
     { key: 'type', label: 'ประเภท' },
     { key: 'bankName', label: 'ธนาคาร' },
+    { key: 'bankBranch', label: 'สาขาธนาคาร' },
     { key: 'accountNo', label: 'เลขที่บัญชี' },
     { key: 'currency', label: 'สกุลเงิน', align: 'center' },
     { key: 'openingBalance', label: 'ยอดยกมา', align: 'right', format: 'money' },

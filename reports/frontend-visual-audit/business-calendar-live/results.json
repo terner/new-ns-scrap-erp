@@ -1,0 +1,79 @@
+[
+  {
+    "appName": "live",
+    "url": "https://sirimasth.github.io/ns-scrap-erp/",
+    "currentUrl": "https://sirimasth.github.io/ns-scrap-erp/",
+    "consoleErrors": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "text": [
+      "☰",
+      "Business Calendar",
+      "☁️✓☁️ Auto-Sync ONล่าสุด: เพิ่งสด",
+      "ออกจากระบบ",
+      "← เดือนก่อน",
+      "เดือนถัดไป →",
+      "Combined",
+      "Purchase",
+      "Sales",
+      "Expense",
+      "📈 ซื้อ vs ขาย รายวัน",
+      "💰 GP สะสมรายวัน",
+      "วัน",
+      "📥 ซื้อ",
+      "📤 ขาย",
+      "COGS",
+      "💎 GP",
+      "💸 ค่าใช้จ่าย",
+      "💰 รับ",
+      "💸 จ่าย",
+      "📊 Net Cash",
+      "AR+",
+      "AP+",
+      "📥 Export Excel",
+      "✕"
+    ],
+    "screenshots": [
+      "reports/frontend-visual-audit/business-calendar-live/businessCalendar-live-desktop.png",
+      "reports/frontend-visual-audit/business-calendar-live/businessCalendar-live-mobile.png"
+    ]
+  },
+  {
+    "appName": "vue",
+    "url": "http://localhost:5174/business-calendar",
+    "currentUrl": "http://localhost:5174/business-calendar",
+    "consoleErrors": [],
+    "text": [
+      "☰",
+      "Business Calendar",
+      "ออกจากระบบ",
+      "← เดือนก่อน",
+      "เดือนถัดไป →",
+      "Combined",
+      "Purchase",
+      "Sales",
+      "Expense",
+      "📈 ซื้อ vs ขาย รายวัน",
+      "💰 GP สะสมรายวัน",
+      "วัน",
+      "📥 ซื้อ",
+      "📤 ขาย",
+      "COGS",
+      "💎 GP",
+      "💸 ค่าใช้จ่าย",
+      "💰 รับ",
+      "💸 จ่าย",
+      "📊 Net Cash",
+      "AR+",
+      "AP+"
+    ],
+    "screenshots": [
+      "reports/frontend-visual-audit/business-calendar-live/businessCalendar-vue-desktop.png",
+      "reports/frontend-visual-audit/business-calendar-live/businessCalendar-vue-mobile.png"
+    ]
+  }
+]

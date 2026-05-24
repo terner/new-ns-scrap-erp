@@ -14,7 +14,6 @@ as $$
     and au.active = true
   limit 1;
 $$;
-
 create or replace function public.current_app_role_codes()
 returns text[]
 language sql
@@ -30,7 +29,6 @@ as $$
     and au.active = true
     and ar.active = true;
 $$;
-
 create or replace function public.current_app_permission_codes()
 returns text[]
 language sql
@@ -49,7 +47,6 @@ as $$
     and ar.active = true
     and ap.active = true;
 $$;
-
 create or replace function public.is_app_admin()
 returns boolean
 language sql
@@ -63,7 +60,6 @@ as $$
     where role_code in ('admin', 'owner')
   );
 $$;
-
 create or replace function public.has_app_permission(_permission_code text)
 returns boolean
 language sql
@@ -74,7 +70,6 @@ as $$
   select public.is_app_admin()
     or _permission_code = any(public.current_app_permission_codes());
 $$;
-
 grant execute on function public.current_app_user_id() to authenticated;
 grant execute on function public.current_app_role_codes() to authenticated;
 grant execute on function public.current_app_permission_codes() to authenticated;

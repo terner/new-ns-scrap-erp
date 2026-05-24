@@ -110,17 +110,17 @@ export function ProfitCostAnalysisPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-purple-700 via-indigo-700 to-slate-900 p-5 text-white shadow-2xl">
+      <div className="overflow-hidden rounded-md bg-gradient-to-br from-purple-700 via-indigo-700 to-slate-900 p-5 text-white shadow-2xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold">💎 Profit & Cost Analysis</h1>
             <p className="mt-1 text-sm text-purple-100">วิเคราะห์ซื้อ ขาย COGS GP และ Stock Value ด้วย WAC/ต้นทุนจากบิลขาย</p>
           </div>
-          <button className="rounded-lg bg-white/15 px-4 py-2 text-sm font-bold text-white opacity-70" disabled type="button">Export CSV</button>
+          <button className="rounded-md bg-white/15 px-4 py-2 text-sm font-bold text-white opacity-70" disabled type="button">Export CSV</button>
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white p-4 shadow-lg">
+      <div className="rounded-md bg-white p-4 shadow-lg">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           <Field label="จากวันที่"><input className={controlClass} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field>
           <Field label="ถึงวันที่"><input className={controlClass} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></Field>
@@ -186,7 +186,7 @@ export function ProfitCostAnalysisPageClient() {
         </Panel>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
+      <div className="overflow-hidden rounded-md bg-white shadow-lg">
         <div className="flex flex-wrap gap-2 border-b bg-slate-50 p-3">
           {[
             ['products', 'Product'],
@@ -195,7 +195,7 @@ export function ProfitCostAnalysisPageClient() {
             ['channels', 'Channel'],
             ['trend', 'Trend'],
             ['alerts', 'Alerts'],
-          ].map(([key, label]) => <button key={key} className={`rounded-lg px-3 py-2 text-sm font-bold ${activeTab === key ? 'bg-purple-600 text-white' : 'bg-white text-slate-600 shadow-sm'}`} type="button" onClick={() => setActiveTab(key as Tab)}>{label}</button>)}
+          ].map(([key, label]) => <button key={key} className={`rounded-md px-3 py-2 text-sm font-bold ${activeTab === key ? 'bg-purple-600 text-white' : 'bg-white text-slate-600 shadow-sm'}`} type="button" onClick={() => setActiveTab(key as Tab)}>{label}</button>)}
         </div>
         <div className="p-3">
           {activeTab === 'products' ? <ProductTable rows={data?.rows.products ?? []} onSelect={setSelectedProduct} /> : null}
@@ -207,18 +207,18 @@ export function ProfitCostAnalysisPageClient() {
         </div>
       </div>
 
-      <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+      <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
         <b>Profit & Cost read baseline</b><span className="ml-2">{data?.sourceState.limitations[0] ?? 'ไม่มี write/posting action ใน baseline นี้'}</span>
       </div>
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      {isLoading ? <div className="rounded bg-white p-4 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {isLoading ? <div className="rounded-md bg-white p-4 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
       {selectedProduct ? <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} /> : null}
     </section>
   )
 }
 
-const controlClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-100'
-const chipClass = 'rounded-full px-3 py-1.5 text-xs font-bold shadow-sm'
+const controlClass = 'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-100'
+const chipClass = 'rounded-md-full px-3 py-1.5 text-xs font-bold shadow-sm'
 
 function Select({ onChange, options, value }: { onChange: (value: string) => void; options: Option[]; value: string }) {
   return <select className={controlClass} value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทั้งหมด</option>{options.map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} - ${option.name}` : option.name}</option>)}</select>
@@ -251,24 +251,24 @@ function toneClass(tone: string) {
 }
 
 function Metric({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
-  return <div className={`rounded-xl p-4 shadow ${toneClass(tone)}`}><div className="text-xs opacity-75">{label}</div><div className="mt-1 text-xl font-bold">{value}</div><div className="text-xs opacity-70">{sub}</div></div>
+  return <div className={`rounded-md p-4 shadow ${toneClass(tone)}`}><div className="text-xs opacity-75">{label}</div><div className="mt-1 text-xl font-bold">{value}</div><div className="text-xs opacity-70">{sub}</div></div>
 }
 
 function BigNumber({ label, tone, value }: { label: string; tone: string; value: string }) {
-  return <div className={`rounded-2xl bg-gradient-to-br ${tone} p-5 text-white shadow`}><div className="text-sm opacity-80">{label}</div><div className="mt-1 text-3xl font-bold">{value}</div></div>
+  return <div className={`rounded-md bg-gradient-to-br ${tone} p-5 text-white shadow`}><div className="text-sm opacity-80">{label}</div><div className="mt-1 text-3xl font-bold">{value}</div></div>
 }
 
 function SmallStat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg bg-slate-50 p-3"><div className="text-xs text-slate-500">{label}</div><div className="font-bold text-slate-800">{value}</div></div>
+  return <div className="rounded-md bg-slate-50 p-3"><div className="text-xs text-slate-500">{label}</div><div className="font-bold text-slate-800">{value}</div></div>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="overflow-hidden rounded-2xl bg-white shadow-lg"><div className="border-b bg-slate-50 p-3 font-bold">{title}</div><div className="p-4">{children}</div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow-lg"><div className="border-b bg-slate-50 p-3 font-bold">{title}</div><div className="p-4">{children}</div></div>
 }
 
 function BarRows({ rows }: { rows: { label: string; value: number }[] }) {
   const max = Math.max(1, ...rows.map((row) => Math.abs(row.value)))
-  return <div className="space-y-2">{rows.map((row) => <div key={row.label}><div className="mb-1 flex justify-between gap-3 text-xs"><span className="truncate">{row.label}</span><b>{money(row.value)}</b></div><div className="h-3 rounded bg-slate-100"><div className="h-3 rounded bg-gradient-to-r from-purple-500 to-indigo-600" style={{ width: `${Math.min(100, Math.abs(row.value) / max * 100)}%` }} /></div></div>)}</div>
+  return <div className="space-y-2">{rows.map((row) => <div key={row.label}><div className="mb-1 flex justify-between gap-3 text-xs"><span className="truncate">{row.label}</span><b>{money(row.value)}</b></div><div className="h-3 rounded-md bg-slate-100"><div className="h-3 rounded-md bg-gradient-to-r from-purple-500 to-indigo-600" style={{ width: `${Math.min(100, Math.abs(row.value) / max * 100)}%` }} /></div></div>)}</div>
 }
 
 function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void; rows: ProductRow[] }) {
@@ -313,13 +313,13 @@ function ProductModal({ onClose, product }: { onClose: () => void; product: Prod
   ]
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-md bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b bg-slate-900 p-4 text-white">
           <div>
             <h2 className="text-xl font-bold">{product.name}</h2>
             <p className="text-sm text-slate-300">{product.code || '-'} · {product.metalGroup || '-'}</p>
           </div>
-          <button className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-bold" type="button" onClick={onClose}>ปิด</button>
+          <button className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-bold" type="button" onClick={onClose}>ปิด</button>
         </div>
         <div className="overflow-x-auto p-4">
           <table className="min-w-[720px] w-full text-sm">

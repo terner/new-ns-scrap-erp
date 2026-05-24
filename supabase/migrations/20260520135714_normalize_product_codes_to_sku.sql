@@ -1,9 +1,7 @@
 create schema if not exists maintenance;
-
 create table if not exists maintenance.products_sku_code_backup_20260520135714 as
 select *
 from public.products;
-
 with ordered_products as (
   select
     id,

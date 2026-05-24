@@ -219,6 +219,28 @@ Reporting rule:
 
 ### 4.4.1 Channel Master
 
+### 4.5 Purchase Transaction State, History, and Summary
+
+- [ ] เพิ่ม maintained summary table สำหรับ PO Buy KPI cards (`po_buy_summary_current`)
+  - [ ] กำหนด schema `scope_type + scope_key` สำหรับ global row (`all/all`) และ branch rows (`branch/{branch_id}`)
+  - [ ] เพิ่ม columns อย่างน้อย `total_rows`, `open_count`, `partial_count`, `received_count`, `cancelled_count`, `remaining_qty`, `remaining_amount`, `total_amount`, `updated_at`
+  - [ ] กำหนดกติกาการนับให้ชัดว่าคอลัมน์ใดรวม `Cancelled` และคอลัมน์ใด exclude รายการยกเลิก
+  - [ ] สร้าง SQL function สำหรับ refresh summary ต่อ scope
+  - [ ] ผูก refresh summary เข้ากับเส้นทาง create/update/cancel ของ `po_buys`
+  - [ ] ตรวจ receive flow ที่กระทบ `po_buys.remaining_qty` / `remaining_amount` / `status` แล้วผูก refresh summary ให้ครบ
+- [ ] เพิ่ม append-only status log สำหรับ PO Buy (`po_buy_status_logs`)
+  - [ ] กำหนด columns ขั้นต่ำ `po_buy_id`, `from_status`, `to_status`, `action`, `reason`, `changed_by`, `changed_at`, `metadata`
+  - [ ] กำหนด action set ขั้นต่ำ เช่น `created`, `edited`, `cancelled`, `partially_received`, `received`, `reopened` (ถ้ามี)
+  - [ ] วางกติกา append-only ห้าม rewrite log เดิม
+- [ ] ออกแบบ pattern เดียวกันสำหรับบิลซื้อ (`purchase_bill_status_logs`) เพื่อใช้เป็น history/timeline ในหน้า detail
+- [ ] กำหนด source of truth ให้ชัด: `po_buys` และ `purchase_bills` เก็บ current mutable state ส่วน status logs เก็บประวัติแบบ append-only
+- [ ] บังคับให้ทุกเส้นทาง create/update/cancel/receive อัปเดต current state, status log, และ summary ผ่าน service/function/trigger กลาง
+- [ ] ย้าย PO Buy KPI read path ให้ดึงจาก summary table แทนการนับจาก row list ทุกครั้ง
+  - [ ] เพิ่ม fallback ชั่วคราวใน API กรณี environment ยังไม่ได้ apply migration
+  - [ ] เพิ่ม validation/check script หรือ query เปรียบเทียบ summary table กับ aggregate จาก `po_buys`
+- [ ] ออกแบบ audit/action log ชั้นระบบให้เชื่อมใช้ข้อมูลสถานะเดียวกันได้ โดยไม่ปนกับ business status history
+- [ ] ทบทวน field snapshot ของเอกสารซื้อให้ read/detail/print ใช้ค่าที่เก็บไว้ได้เลย ไม่ต้องคำนวณย้อนจาก master data ระหว่างอ่าน
+
 - [x] purchase channels read-only Vue pilot
 - [x] sales channels read-only Vue pilot
 - [ ] transaction modes
@@ -241,6 +263,7 @@ Reporting rule:
 - [x] สร้าง export pattern สำหรับ Next customer master: server-side Excel-compatible export ตาม search/filter/sort ปัจจุบัน
 - [x] กำหนด master-list pattern: search/filter/sort/count/pagination ทำใน frontend สำหรับ master data ขนาดเล็ก/กลาง
 - [x] ขยาย customer-style master pattern ไปที่ supplier: form แยกบุคคล/นิติบุคคล, market scope, structured Thai address, frontend list pattern, syntax validation, active toggle, และ `.xlsx` export
+- [x] สร้าง shared form-select pattern (`FormSelectField`) สำหรับ placeholder แบบ `เลือก...` ที่ซ่อนตัวเลือก placeholder หลังเลือกค่าแล้ว และนำไปใช้กับ customer/supplier form selects, generic `MasterDataPageClient` select generator, และ required helper-form selects
 - [x] Batch B: ยกระดับ `/master-data/products` เป็น specialized customer-style page พร้อม frontend search/filter/sort/count/pagination, row-click modal, validation, active toggle, permission guards, และ export ถ้าเหมาะสม
 - [x] Batch C1: harden `/master-data/branches`, `/master-data/warehouses`, `/master-data/accounts` ให้เข้า master pattern เดียวกันตามความเหมาะสม
 - [x] Batch C2: harden `/master-data/salespersons`, `/master-data/channels`, `/master-data/expense-categories`, `/master-data/currencies`

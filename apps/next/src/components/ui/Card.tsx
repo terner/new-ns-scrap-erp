@@ -1,7 +1,16 @@
-type CardProps = {
-  children: React.ReactNode
-}
+import * as React from 'react'
 
-export function Card({ children }: CardProps) {
-  return <div className="rounded-lg border border-scrap-line bg-white p-4 shadow-sm">{children}</div>
+import { cn } from '@/lib/utils'
+
+type CardProps = React.HTMLAttributes<HTMLDivElement>
+
+export function Card({ children, className, ...props }: CardProps) {
+  return (
+    <div
+      className={cn('rounded-md border border-scrap-line bg-white p-4 shadow-sm', className)}
+      {...props}
+    >
+      {children}
+    </div>
+  )
 }

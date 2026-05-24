@@ -6,5 +6,5 @@ export const metadata: Metadata = {
 }
 
 export default function PurchasePaymentsPage() {
-  return <MoneyMovementPageClient mode="payment" />
+  return <MoneyMovementPageClient entryOnly mode="payment" />
 }

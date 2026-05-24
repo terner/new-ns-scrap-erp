@@ -20,7 +20,6 @@ begin
   end if;
 end;
 $$;
-
 create table if not exists public.directors (
   id text primary key,
   code text not null unique,
@@ -34,7 +33,6 @@ create table if not exists public.directors (
   constraint directors_code_not_blank check (length(btrim(code)) > 0),
   constraint directors_name_not_blank check (length(btrim(name)) > 0)
 );
-
 create table if not exists public.machines (
   id text primary key,
   code text not null unique,
@@ -54,7 +52,6 @@ create table if not exists public.machines (
   constraint machines_yield_range check (normal_yield_pct is null or (normal_yield_pct >= 0 and normal_yield_pct <= 100)),
   constraint machines_process_cost_non_negative check (std_process_cost_per_hr is null or std_process_cost_per_hr >= 0)
 );
-
 create table if not exists public.production_lines (
   id text primary key,
   code text not null unique,
@@ -67,7 +64,6 @@ create table if not exists public.production_lines (
   constraint production_lines_code_not_blank check (length(btrim(code)) > 0),
   constraint production_lines_name_not_blank check (length(btrim(name)) > 0)
 );
-
 create table if not exists public.payment_methods (
   id text primary key,
   code text not null unique,
@@ -79,7 +75,6 @@ create table if not exists public.payment_methods (
   constraint payment_methods_code_not_blank check (length(btrim(code)) > 0),
   constraint payment_methods_name_not_blank check (length(btrim(name)) > 0)
 );
-
 create table if not exists public.remittance_purposes (
   id text primary key,
   code text not null unique,
@@ -91,7 +86,6 @@ create table if not exists public.remittance_purposes (
   constraint remittance_purposes_code_not_blank check (length(btrim(code)) > 0),
   constraint remittance_purposes_name_not_blank check (length(btrim(name)) > 0)
 );
-
 create index if not exists machines_branch_id_idx on public.machines(branch_id);
 create index if not exists machines_active_idx on public.machines(active);
 create index if not exists production_lines_branch_id_idx on public.production_lines(branch_id);
@@ -99,7 +93,6 @@ create index if not exists production_lines_active_idx on public.production_line
 create index if not exists directors_active_idx on public.directors(active);
 create index if not exists payment_methods_active_idx on public.payment_methods(active);
 create index if not exists remittance_purposes_active_idx on public.remittance_purposes(active);
-
 do $$
 begin
   if not exists (select 1 from pg_trigger where tgname = 'set_directors_updated_at' and tgrelid = 'public.directors'::regclass) then
@@ -133,20 +126,17 @@ begin
   end if;
 end;
 $$;
-
 alter table public.directors enable row level security;
 alter table public.machines enable row level security;
 alter table public.production_lines enable row level security;
 alter table public.payment_methods enable row level security;
 alter table public.remittance_purposes enable row level security;
-
 insert into public.directors (id, code, name, type, phone, bank_account, active)
 values
   ('D001', 'D001', 'คุณ ก. (กรรมการ)', 'กรรมการ', '081-xxxxxxx', 'กสิกร 111-2-33333-4', true),
   ('D002', 'D002', 'คุณ ข. (กรรมการ)', 'กรรมการ', '089-xxxxxxx', 'ไทยพาณิชย์ 222-3-44444-5', true),
   ('D003', 'E001', 'คุณสมหญิง', 'พนักงาน', '081-xxxxxxx', 'กรุงไทย 333-4-55555-6', true)
 on conflict (id) do nothing;
-
 insert into public.machines (id, code, name, branch_id, type, capacity_kg_per_hr, normal_yield_pct, std_process_cost_per_hr, maintenance_status, active)
 values
   ('MC001', 'PRESS-01', 'เครื่องอัดเศษเหล็ก #1', 'BR002', 'Baling', 2000, 95, 300, 'Normal', true),
@@ -154,14 +144,12 @@ values
   ('MC003', 'SHEAR-01', 'เครื่องตัดเหล็ก', 'BR002', 'Cutting', 1500, 97, 250, 'Normal', true),
   ('MC004', 'SORT-01', 'สายแยกประเภท', 'BR002', 'Sorting', 3000, 98, 200, 'Normal', true)
 on conflict (id) do nothing;
-
 insert into public.production_lines (id, code, name, branch_id, responsible_person, active)
 values
   ('PL001', 'LINE-A', 'Line A - คัดแยก/อัดก้อน', 'BR002', 'หัวหน้า A', true),
   ('PL002', 'LINE-B', 'Line B - ตัด/แปรรูป', 'BR002', 'หัวหน้า B', true),
   ('PL003', 'LINE-C', 'Line C - นครสวรรค์', 'BR003', 'หัวหน้า C', true)
 on conflict (id) do nothing;
-
 insert into public.payment_methods (id, code, name, type, active)
 values
   ('PM-001', 'PM-001', 'Cash', 'Cash', true),
@@ -171,7 +159,6 @@ values
   ('PM-005', 'PM-005', 'International Transfer', 'International Transfer', true),
   ('PM-006', 'PM-006', 'FCD Transfer', 'FCD Transfer', true)
 on conflict (id) do nothing;
-
 insert into public.remittance_purposes (id, code, name, required_doc, active)
 values
   ('RP-001', 'GOODS', 'ชำระค่าสินค้า', 'Invoice/PO', true),

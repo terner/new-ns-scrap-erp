@@ -206,13 +206,13 @@ export function AuditLogPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border bg-white p-4 shadow">
+      <div className="rounded-md border bg-white p-4 shadow">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Audit & Activity Log</h2>
             <p className="mt-1 text-sm text-slate-500">ตรวจสอบประวัติ user activity, auth event, user management และ permission-sensitive actions</p>
           </div>
-          <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60" disabled={isLoading} type="button" onClick={() => void loadRows()}>
+          <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60" disabled={isLoading} type="button" onClick={() => void loadRows()}>
             {isLoading ? 'กำลังโหลด...' : 'Refresh'}
           </button>
         </div>
@@ -222,7 +222,7 @@ export function AuditLogPageClient() {
         {eventGroups.filter((item) => item.value !== 'all').map((item) => (
           <button
             key={item.value}
-            className={`rounded-lg border bg-white p-3 text-left shadow-sm ring-1 ring-transparent transition hover:bg-slate-50 ${group === item.value ? 'border-slate-900' : 'border-slate-200'}`}
+            className={`rounded-md border bg-white p-3 text-left shadow-sm ring-1 ring-transparent transition hover:bg-slate-50 ${group === item.value ? 'border-slate-900' : 'border-slate-200'}`}
             type="button"
             onClick={() => {
               setGroup(item.value)
@@ -236,18 +236,18 @@ export function AuditLogPageClient() {
         ))}
       </div>
 
-      <div className="rounded-xl border bg-white p-4 shadow">
+      <div className="rounded-md border bg-white p-4 shadow">
         <div className="grid gap-3 lg:grid-cols-5">
           <label className="block text-sm font-medium lg:col-span-2">
             ค้นหา
-            <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" placeholder="event, user, metadata, user agent" value={query} onChange={(event) => {
+            <input className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" placeholder="event, user, metadata, user agent" value={query} onChange={(event) => {
               setQuery(event.target.value)
               setPage(1)
             }} />
           </label>
           <label className="block text-sm font-medium">
             กลุ่ม
-            <select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" value={group} onChange={(event) => {
+            <select className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" value={group} onChange={(event) => {
               setGroup(event.target.value as EventGroup)
               setPage(1)
             }}>
@@ -256,7 +256,7 @@ export function AuditLogPageClient() {
           </label>
           <label className="block text-sm font-medium">
             Event Type
-            <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" list="audit-event-types" placeholder="app_user.updated" value={eventType} onChange={(event) => {
+            <input className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" list="audit-event-types" placeholder="app_user.updated" value={eventType} onChange={(event) => {
               setEventType(event.target.value)
               setPage(1)
             }} />
@@ -266,7 +266,7 @@ export function AuditLogPageClient() {
           </label>
           <label className="block text-sm font-medium">
             ต่อหน้า
-            <select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" value={pageSize} onChange={(event) => {
+            <select className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" value={pageSize} onChange={(event) => {
               setPageSize(Number(event.target.value))
               setPage(1)
             }}>
@@ -275,36 +275,36 @@ export function AuditLogPageClient() {
           </label>
           <label className="block text-sm font-medium">
             ผู้ทำรายการ
-            <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" placeholder="username/display" value={actor} onChange={(event) => {
+            <input className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" placeholder="username/display" value={actor} onChange={(event) => {
               setActor(event.target.value)
               setPage(1)
             }} />
           </label>
           <label className="block text-sm font-medium">
             เป้าหมาย
-            <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" placeholder="username/display" value={target} onChange={(event) => {
+            <input className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700" placeholder="username/display" value={target} onChange={(event) => {
               setTarget(event.target.value)
               setPage(1)
             }} />
           </label>
           <div className="flex items-end gap-2 lg:col-span-3">
-            <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={resetFilters}>ล้าง filter</button>
-            <button className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50" disabled={isLoading || data.rows.length === 0} type="button" onClick={() => exportAuditCsv(data.rows)}>Export CSV หน้านี้</button>
+            <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={resetFilters}>ล้าง filter</button>
+            <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50" disabled={isLoading || data.rows.length === 0} type="button" onClick={() => exportAuditCsv(data.rows)}>Export CSV หน้านี้</button>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white shadow">
+      <div className="rounded-md border bg-white shadow">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 text-sm text-slate-600">
           <div>พบทั้งหมด <span className="font-semibold text-slate-900">{data.total.toLocaleString('th-TH')}</span> รายการ</div>
           <div className="flex items-center gap-2">
-            <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page <= 1 || isLoading} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+            <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page <= 1 || isLoading} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
             <span>หน้า {data.page} / {data.totalPages}</span>
-            <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page >= data.totalPages || isLoading} type="button" onClick={() => setPage((value) => Math.min(data.totalPages, value + 1))}>ถัดไป</button>
+            <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page >= data.totalPages || isLoading} type="button" onClick={() => setPage((value) => Math.min(data.totalPages, value + 1))}>ถัดไป</button>
           </div>
         </div>
 
-        {error ? <div className="m-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
+        {error ? <div className="m-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
         {isLoading ? <div className="p-6 text-center text-sm text-slate-500">กำลังโหลดข้อมูล</div> : null}
 
         {!isLoading ? (
@@ -326,7 +326,7 @@ export function AuditLogPageClient() {
                   return (
                     <tr key={row.id} className="cursor-pointer border-t hover:bg-slate-50" onClick={() => setSelectedRow(row)}>
                       <td className="whitespace-nowrap p-2 text-slate-600">{formatDate(row.createdAt)}</td>
-                      <td className="p-2"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${groupBadgeClass(groupLabel)}`}>{groupLabel}</span></td>
+                      <td className="p-2"><span className={`inline-flex rounded-md-full px-2 py-0.5 text-xs font-semibold ring-1 ${groupBadgeClass(groupLabel)}`}>{groupLabel}</span></td>
                       <td className="p-2">
                         <div className="font-medium text-slate-900">{eventTitle(row.eventType)}</div>
                         <div className="font-mono text-xs text-slate-500">{row.eventType}</div>
@@ -352,13 +352,13 @@ export function AuditLogPageClient() {
 
       {selectedRow ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" role="dialog" aria-modal="true">
-          <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
+          <div className="w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{eventTitle(selectedRow.eventType)}</h3>
                 <p className="mt-1 text-sm text-slate-500">{formatDate(selectedRow.createdAt)} · {selectedRow.id}</p>
               </div>
-              <button className="rounded-lg px-3 py-1 text-sm text-slate-600 hover:bg-slate-200" type="button" onClick={() => setSelectedRow(null)}>ปิด</button>
+              <button className="rounded-md px-3 py-1 text-sm text-slate-600 hover:bg-slate-200" type="button" onClick={() => setSelectedRow(null)}>ปิด</button>
             </div>
             <div className="grid gap-4 p-5 text-sm md:grid-cols-2">
               <div>
@@ -383,7 +383,7 @@ export function AuditLogPageClient() {
               </div>
               <div className="md:col-span-2">
                 <div className="text-xs font-semibold uppercase text-slate-500">Metadata</div>
-                <pre className="mt-2 max-h-80 overflow-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100">{metadataText(selectedRow.metadata)}</pre>
+                <pre className="mt-2 max-h-80 overflow-auto rounded-md bg-slate-950 p-4 text-xs text-slate-100">{metadataText(selectedRow.metadata)}</pre>
               </div>
             </div>
           </div>

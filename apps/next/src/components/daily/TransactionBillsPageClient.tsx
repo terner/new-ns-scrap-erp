@@ -1,8 +1,20 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/Button'
+import { Field, InputField, ProductSearchCombobox, SelectField, SupplierSearchCombobox, SummaryLine } from '@/components/daily/TransactionBillsFieldHelpers'
+import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { TableNumberCell } from '@/components/ui/TableNumberCell'
+import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/Table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip'
+import { SELECTED_BRANCH_KEY } from '@/lib/branch-selection'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { purchaseBillCancelSchema, purchaseBillFormSchema, type PurchaseBillCancelValues, type PurchaseBillFormValues } from '@/lib/purchase-bill'
 import { salesBillFormSchema, type SalesBillFormValues } from '@/lib/sales'
@@ -31,6 +43,7 @@ type BillRow = {
   licensePlate?: string
   note?: string
   paidAmount?: number
+  paymentDocNos?: string[]
   payableBalance?: number
   purchaseSource?: string
   receivableBalance?: number
@@ -136,14 +149,6 @@ const blankItem = (): PurchaseBillFormValues['items'][number] => ({
   salesPrice: 0,
 })
 
-function optionLabel(option: Option) {
-  return option.code ? `${option.code} - ${option.name}` : option.name
-}
-
-function searchableOptionText(option: Option) {
-  return `${option.code ?? ''} ${option.name} ${option.id}`.toLowerCase()
-}
-
 function formatPercent(value: number) {
   return value.toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: value % 1 === 0 ? 0 : 2 })
 }
@@ -155,12 +160,29 @@ function poQtyVariance(poQty: number, itemQty: number) {
   return { className: 'text-red-700', text: `เกิน ${formatMoney(Math.abs(diff))} กก.` }
 }
 
+const numberInputClass = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+
+function ExportButton({ isExporting, onClick }: { isExporting: boolean; onClick: () => void }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button aria-label="Export" className="ml-auto gap-2" disabled={isExporting} type="button" variant="export" onClick={onClick}>
+            <Download aria-hidden="true" className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">{isExporting ? 'กำลัง Export...' : 'ส่งออก Excel'}</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>ส่งออกข้อมูลตาม filter ปัจจุบัน</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 const initialPurchaseForm = (): PurchaseBillFormValues => ({
   branchId: '',
   discountTotal: 0,
   hasVat: false,
   items: [blankItem()],
-  licensePlate: '',
   note: null,
   notes: null,
   poBuyId: null,
@@ -221,6 +243,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [options, setOptions] = useState<OptionsPayload>({ branches: [], customers: [], poBuys: [], products: [], salesChannels: [], salespersons: [], suppliers: [], warehouses: [] })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [preferredBranchId, setPreferredBranchId] = useState<string | null>(null)
   const [rows, setRows] = useState<Array<BillRow | StockIssueRow>>([])
   const [search, setSearch] = useState('')
   const [salesFieldErrors, setSalesFieldErrors] = useState<Record<string, string>>({})
@@ -302,6 +325,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   }, [loadData])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const savedBranchId = window.localStorage.getItem(SELECTED_BRANCH_KEY)
+    if (!savedBranchId || savedBranchId === 'all') return
+    setPreferredBranchId(savedBranchId)
+  }, [])
+
+  useEffect(() => {
     setPage(1)
   }, [dateFrom, dateTo, filterMode, pageSize, search, sortDirection, sortKey, statusFilter])
 
@@ -311,6 +341,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const total = totalAmount
   const title = mode === 'purchase' ? 'บิลรับซื้อ' : mode === 'sales' ? 'บิลขาย' : 'เบิกออกรอบิล'
   const activeBranches = options.branches.filter((option) => option.active !== false)
+  const resolvedPreferredBranchId = preferredBranchId && activeBranches.some((branch) => branch.id === preferredBranchId) ? preferredBranchId : null
   const activePoBuys = options.poBuys.filter((option) => option.active !== false && (!form.supplierId || option.supplier_id === form.supplierId))
   const activeCustomers = options.customers.filter((option) => option.active !== false)
   const activeProducts = options.products.filter((option) => option.active !== false)
@@ -366,14 +397,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
   function openPurchaseForm() {
     setEditingBillId(null)
-    setForm(initialPurchaseForm())
+    setForm({ ...initialPurchaseForm(), branchId: resolvedPreferredBranchId ?? '' })
     setFieldErrors({})
     setError(null)
     setShowForm(true)
   }
 
   function openSalesForm() {
-    setSalesForm(initialSalesForm())
+    setSalesForm({ ...initialSalesForm(), branchId: resolvedPreferredBranchId })
     setSalesFieldErrors({})
     setError(null)
     setShowSalesForm(true)
@@ -399,7 +430,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       discountTotal: row.discountTotal ?? 0,
       hasVat: row.hasVat ?? false,
       items,
-      licensePlate: row.licensePlate || '',
       note: row.note || null,
       notes: row.note || null,
       poBuyId: row.poBuyId || null,
@@ -440,6 +470,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       ...(key === 'hasVat' ? { vatType: value ? 'EXCLUDE' : 'NONE' } : {}),
       ...(key === 'vatInvoiceReceived' && value === false ? { vatInvoiceDate: null, vatInvoiceNo: null } : {}),
     }))
+    if (key === 'branchId' && typeof window !== 'undefined') {
+      const nextBranchId = typeof value === 'string' && value ? value : null
+      setPreferredBranchId(nextBranchId)
+      if (nextBranchId) window.localStorage.setItem(SELECTED_BRANCH_KEY, nextBranchId)
+      else window.localStorage.removeItem(SELECTED_BRANCH_KEY)
+    }
     setFieldErrors((current) => ({ ...current, [key]: '' }))
   }
 
@@ -475,6 +511,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       ...(key === 'hasVat' ? { vatType: value ? 'EXCLUDE' : 'NONE' } : {}),
       ...(key === 'vatInvoiceIssued' && value === false ? { vatInvoiceDate: null, vatInvoiceNo: null } : {}),
     }))
+    if (key === 'branchId' && typeof window !== 'undefined') {
+      const nextBranchId = typeof value === 'string' && value ? value : null
+      setPreferredBranchId(nextBranchId)
+      if (nextBranchId) window.localStorage.setItem(SELECTED_BRANCH_KEY, nextBranchId)
+      else window.localStorage.removeItem(SELECTED_BRANCH_KEY)
+    }
     setSalesFieldErrors((current) => ({ ...current, [key]: '' }))
   }
 
@@ -602,33 +644,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
   return (
     <section className="space-y-4">
-      {mode === 'purchase' ? (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <TransactionKpi label="จำนวนบิลในหน้า" tone="blue" value={totalRows.toLocaleString('th-TH')} />
-            <TransactionKpi label="ยอดซื้อรวม" tone="blue" value={formatMoney(total)} />
-            <TransactionKpi label="ค้างจ่ายในหน้า" tone="red" value={formatMoney(visibleOutstanding)} />
-            <TransactionKpi label="ชำระแล้วในหน้า" tone="emerald" value={formatMoney(visiblePaid)} />
-            <TransactionKpi label="Stock / Trading" tone="slate" value={`${visibleStockCount} / ${visibleTradingCount}`} />
-          </div>
-        </>
-      ) : null}
-
-      {mode === 'sales' ? (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <TransactionKpi label="จำนวนบิล" tone="emerald" value={totalRows.toLocaleString('th-TH')} />
-            <TransactionKpi label="ยอดขายรวม" tone="emerald" value={formatMoney(total)} />
-            <TransactionKpi label="รับแล้วในหน้า" tone="blue" value={formatMoney(visiblePaid)} />
-            <TransactionKpi label="ค้างรับในหน้า" tone="red" value={formatMoney(visibleOutstanding)} />
-            <TransactionKpi label="GP / Margin" tone={visibleGp >= 0 ? 'amber' : 'red'} value={`${formatMoney(visibleGp)} · ${formatMoney(visibleMarginPct)}%`} />
-          </div>
-        </>
-      ) : null}
-
       {mode === 'stock-issue' ? (
         <>
-          <div className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 p-5 text-white shadow">
+          <div className="rounded-md bg-gradient-to-r from-amber-500 to-orange-500 p-5 text-white shadow">
             <h1 className="text-2xl font-bold">📦 เบิกออกรอบิล (Pending Sale)</h1>
             <p className="mt-1 text-sm opacity-90">เบิกสินค้าออกจากคลังก่อนเปิดบิลขายจริง — สต๊อกตัดทันที พอจะเปิดบิลค่อยกดเปิดบิลขาย</p>
           </div>
@@ -641,29 +659,35 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         </>
       ) : null}
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="space-y-2 rounded-xl bg-white p-3 shadow">
+      <div className="space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-[260px] flex-1 rounded-lg border px-3 py-2 text-sm" placeholder={mode === 'purchase' ? 'ค้นหาเลขบิล / เลขอ้างอิง / ชื่อ Supplier...' : 'ค้นหาเลขที่ / ชื่อ / สาขา / คลัง'} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <Input
+            className="min-w-[260px] flex-1 rounded-md"
+            placeholder={mode === 'purchase' ? 'ค้นหาเลขบิล / เลขอ้างอิง / ชื่อ Supplier...' : mode === 'sales' ? 'ค้นหาเลขบิล / เลขอ้างอิง / ชื่อลูกค้า...' : 'ค้นหาเลขที่ / ชื่อ / สาขา / คลัง'}
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
           <label className="text-xs text-slate-500">วันที่:</label>
-          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <DatePickerInput id="purchase-bills-date-from" value={dateFrom} onChange={setDateFrom} />
           <span className="text-slate-400">→</span>
-          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-          {(search || dateFrom || dateTo || filterMode || statusFilter) ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง</button> : null}
-          {mode === 'purchase' ? <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : 'Export Excel'}</button> : null}
-          {mode === 'purchase' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</button> : null}
-          {mode === 'sales' ? <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : 'Export Excel'}</button> : null}
-          {mode === 'sales' ? <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={openSalesForm}>+ บิลขายใหม่</button> : null}
+          <DatePickerInput id="purchase-bills-date-to" value={dateTo} onChange={setDateTo} />
+          {(search || dateFrom || dateTo || filterMode || statusFilter) ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
+          {mode === 'purchase' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
+          {mode === 'purchase' ? <Button type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</Button> : null}
+          {mode === 'sales' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
+          {mode === 'sales' ? <Button disabled={isSaving} type="button" onClick={openSalesForm}>+ บิลขายใหม่</Button> : null}
           {mode === 'stock-issue' ? (
             <>
-              <select className="rounded-lg border px-3 py-2 text-sm" value={filterMode} onChange={(event) => setFilterMode(event.target.value)}>
+              <Select className="w-auto" value={filterMode} onChange={(event) => setFilterMode(event.target.value)}>
                 <option value="">ทุกสถานะ</option>
                 <option value="pending">⏰ Pending</option>
                 <option value="converted">✓ เปิดบิลแล้ว</option>
                 <option value="cancelled">⊘ ยกเลิก</option>
-              </select>
-              <button className="ml-auto rounded bg-amber-600 px-4 py-2 text-sm font-bold text-white opacity-70" disabled type="button">+ เบิกออกใหม่</button>
+              </Select>
+              <Button className="ml-auto bg-amber-600 hover:bg-amber-700" disabled type="button">+ เบิกออกใหม่</Button>
             </>
           ) : null}
         </div>
@@ -679,9 +703,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">สถานะ:</span>
             <Segment value="" current={statusFilter} label="ทุกสถานะ" onClick={setStatusFilter} />
-            <Segment value={mode === 'purchase' ? 'open' : 'unreceived'} current={statusFilter} label="เปิดอยู่" onClick={setStatusFilter} />
-            <Segment value="partial" current={statusFilter} label="บางส่วน" onClick={setStatusFilter} />
-            <Segment value={mode === 'purchase' ? 'paid' : 'received'} current={statusFilter} label={mode === 'purchase' ? 'จ่ายครบ' : 'รับครบ'} onClick={setStatusFilter} />
+            <Segment value={mode === 'purchase' ? 'open' : 'unreceived'} current={statusFilter} label={mode === 'purchase' ? 'ยังไม่จ่าย' : 'เปิดอยู่'} onClick={setStatusFilter} />
+            <Segment value="partial" current={statusFilter} label={mode === 'purchase' ? 'จ่ายบางส่วน' : 'บางส่วน'} onClick={setStatusFilter} />
+            <Segment value={mode === 'purchase' ? 'paid' : 'received'} current={statusFilter} label={mode === 'purchase' ? 'เสร็จสิ้น' : 'รับครบ'} onClick={setStatusFilter} />
             <Segment value="cancelled" current={statusFilter} label="ยกเลิก" onClick={setStatusFilter} />
           </div>
         ) : null}
@@ -690,9 +714,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Select
             aria-label="จำนวนรายการต่อหน้า"
-            className="rounded border border-slate-300 px-2 py-1"
+            className="h-9 w-auto px-2 py-1"
             value={pageSize}
             onChange={(event) => setPageSize(Number(event.target.value))}
           >
@@ -700,24 +724,24 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             <option value={25}>25 / หน้า</option>
             <option value={50}>50 / หน้า</option>
             <option value={100}>100 / หน้า</option>
-          </select>
-          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          </Select>
+          <Button disabled={currentPage <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</Button>
           <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+          <Button disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</Button>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-lg bg-white shadow">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100">
+      <Table>
+          <TableHeader>
             <tr>
-              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} />
+              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่'} sortKey="docNo" onSort={changeSort} />
               {mode === 'sales' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่อ้างอิง" sortKey="refNo" onSort={changeSort} /> : null}
-              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} />
+              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'วันที่สร้างรายการ' : 'วันที่'} sortKey="date" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} sortKey="name" onSort={changeSort} />
               {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" sortKey="warehouse" onSort={changeSort} /> : null}
               {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" sortKey="transactionMode" onSort={changeSort} /> : null}
-              <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} />
-              <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" sortKey="itemCount" onSort={changeSort} />
+              <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'สถานะชำระเงิน' : 'สถานะ'} sortKey="status" onSort={changeSort} />
+              {mode === 'purchase' ? <th className="p-2 text-left">เลขที่การชำระเงิน</th> : null}
+              {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" sortKey="itemCount" onSort={changeSort} /> : null}
               {mode === 'stock-issue' ? <th className="p-2 text-right">น้ำหนัก</th> : null}
               {mode === 'stock-issue' ? <th className="p-2 text-right">ต้นทุน</th> : null}
               <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label={mode === 'stock-issue' ? 'ยอดคาด' : 'ยอดรวม'} sortKey="totalAmount" onSort={changeSort} />
@@ -729,41 +753,41 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               {mode === 'purchase' ? <th className="p-2 text-right">จัดการ</th> : null}
               {mode === 'sales' ? <th className="p-2 text-right">จัดการ</th> : null}
             </tr>
-          </thead>
-          <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>กำลังโหลดข้อมูล</td></tr> : null}
+          </TableHeader>
+          <TableBody>
+            {isLoading ? <TableRow><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>กำลังโหลดข้อมูล</td></TableRow> : null}
             {!isLoading && pageRows.map((row) => (
-              <tr key={row.id} className={`border-t hover:bg-slate-50 ${mode === 'purchase' && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
+              <TableRow key={row.id} className={`hover:bg-slate-50 ${mode === 'purchase' && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 font-mono text-xs text-slate-600">{row.refNo || '-'}</td> : null}
                 <td className="p-2">{row.date}</td>
                 <td className="p-2">{'supplierName' in row ? row.supplierName : row.customerName}</td>
                 {mode !== 'purchase' ? <td className="p-2">{formatBranchWarehouse(row)}</td> : null}
-                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{row.transactionMode ?? '-'}</span></td> : null}
-                <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(row.status)}`}>{statusText(row.status)}</span></td>
-                <td className="p-2 text-right">{row.itemCount}</td>
-                {mode === 'stock-issue' && isStockIssueRow(row) ? <td className="p-2 text-right">{formatMoney(row.totalQty ?? 0)}</td> : null}
-                {mode === 'stock-issue' && isStockIssueRow(row) ? <td className="p-2 text-right text-red-700">{formatMoney(row.totalCost)}</td> : null}
-                <td className="p-2 text-right font-semibold">{formatMoney(isStockIssueRow(row) ? row.totalEstAmount : row.totalAmount ?? 0)}</td>
+                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{row.transactionMode ?? '-'}</span></td> : null}
+                <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(row.status)}`}>{statusText(row.status)}</span></td>
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-xs">{row.paymentDocNos?.length ? <div className="space-y-0.5">{row.paymentDocNos.map((docNo: string) => <div key={`${row.id}-${docNo}`} className="font-mono text-slate-700">{docNo}</div>)}</div> : <span className="text-slate-400">-</span>}</td> : null}
+                {mode !== 'purchase' ? <td className="p-2 text-right">{row.itemCount}</td> : null}
+                {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.totalQty ?? 0)} /> : null}
+                {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell tone="amber" value={formatMoney(row.totalCost)} /> : null}
+                <TableNumberCell strong value={formatMoney(isStockIssueRow(row) ? row.totalEstAmount : row.totalAmount ?? 0)} />
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className={`p-2 text-right font-semibold ${(row.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><div>{formatMoney(row.grossProfit ?? 0)}</div><div className="text-xs text-slate-500">{formatMoney((row.totalAmount ?? 0) > 0 ? (row.grossProfit ?? 0) / (row.totalAmount ?? 1) * 100 : 0)}%</div></td> : null}
-                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-right text-blue-700">{formatMoney(row.receivedAmount ?? 0)}</td> : null}
-                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-right text-red-700">{formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)}</td> : null}
-                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${row.vatInvoiceIssued ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 font-mono text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
+                {mode === 'sales' && !isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.receivedAmount ?? 0)} /> : null}
+                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <TableNumberCell tone="amber" value={formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)} /> : null}
+                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.vatInvoiceIssued ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 font-mono text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-xs text-slate-600"><div>{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></td> : null}
-                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled={row.status.toLowerCase().includes('cancel')} type="button" onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}>แก้ไข</button><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled={row.status.toLowerCase().includes('cancel')} type="button" onClick={(event) => { event.stopPropagation(); openCancelPurchaseBill(row) }}>ยกเลิก</button></div></td> : null}
-                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอเปิด flow แก้ไขบิลขาย" type="button">แก้ไข</button><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอเปิด flow ยกเลิกบิลขาย" type="button">ยกเลิก</button></div></td> : null}
-                {mode === 'stock-issue' && isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1 whitespace-nowrap"><button className="rounded bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 opacity-70" disabled={row.status !== 'pending'} type="button">→ เปิดบิลขาย</button><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-400" disabled type="button">แก้</button><button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-400" disabled type="button">ยกเลิก</button></div></td> : null}
-              </tr>
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><Button className="px-2 py-1 text-xs" disabled={row.status.toLowerCase().includes('cancel')} size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}>แก้ไข</Button><Button className="px-2 py-1 text-xs" disabled={row.status.toLowerCase().includes('cancel')} size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelPurchaseBill(row) }}>ยกเลิก</Button></div></td> : null}
+                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><Button className="px-2 py-1 text-xs" disabled size="xs" title="รอเปิด flow แก้ไขบิลขาย" type="button" variant="outline">แก้ไข</Button><Button className="px-2 py-1 text-xs" disabled size="xs" title="รอเปิด flow ยกเลิกบิลขาย" type="button" variant="outline">ยกเลิก</Button></div></td> : null}
+                {mode === 'stock-issue' && isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1 whitespace-nowrap"><Button className="bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" disabled={row.status !== 'pending'} size="xs" type="button" variant="ghost">→ เปิดบิลขาย</Button><Button className="px-2 py-1 text-xs text-slate-400 hover:bg-slate-100" disabled size="xs" type="button" variant="ghost">แก้</Button><Button className="px-2 py-1 text-xs text-slate-400 hover:bg-slate-100" disabled size="xs" type="button" variant="ghost">ยกเลิก</Button></div></td> : null}
+              </TableRow>
             ))}
-            {!isLoading && totalRows === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>ยังไม่มีรายการ</td></tr> : null}
-          </tbody>
-        </table>
-      </div>
+            {!isLoading && totalRows === 0 ? <TableRow><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>ยังไม่มีรายการ</td></TableRow> : null}
+          </TableBody>
+      </Table>
 
       {showForm && mode === 'purchase' ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
-          <div className="mx-auto my-4 flex max-h-[94vh] max-w-5xl flex-col rounded-2xl bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
+          <div className="mx-auto my-4 flex max-h-[94vh] max-w-5xl flex-col rounded-md bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-md-t-md border-b bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
               <div>
                 <h3 className="text-xl font-bold">📥 {editingBillId ? 'แก้ไขบิลรับซื้อ' : 'สร้างบิลรับซื้อใหม่'}</h3>
                 <p className="mt-1 text-xs opacity-80">{editingBillId ? 'แก้ไขได้แม้มีการชำระแล้ว ระบบจะคำนวณยอดค้างและ stock ledger ใหม่' : 'บันทึก header และรายการสินค้าในบิลรับซื้อ'}</p>
@@ -771,33 +795,32 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <button className="text-3xl leading-none text-white/80 hover:text-white" type="button" onClick={() => setShowForm(false)}>&times;</button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6 text-sm">
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="amber">1</StepBadge>ประเภทบิล</h4>
                 <div className="grid gap-3 md:grid-cols-2">
                   <RadioCard active={form.transactionMode === 'STOCK'} label="📦 STOCK" note="ซื้อเข้าสต๊อก · เข้า Stock + คำนวณ WAC ภายหลัง" onClick={() => updateForm('transactionMode', 'STOCK')} />
                   <RadioCard active={form.transactionMode === 'TRADING'} label="🔄 TRADING" note="ซื้อขายผ่านมือ · ไม่เข้า Stock ไม่กระทบ WAC" onClick={() => updateForm('transactionMode', 'TRADING')} />
                 </div>
                 {form.transactionMode === 'TRADING' ? (
-                  <div className="mt-3 rounded border border-purple-200 bg-purple-50 p-2 text-xs text-purple-700">รายการ Trading ไม่เข้า Stock และจะใช้สำหรับจับคู่ขายใน Trading Matching ภายหลัง</div>
+                  <div className="mt-3 rounded-md border border-purple-200 bg-purple-50 p-2 text-xs text-purple-700">รายการ Trading ไม่เข้า Stock และจะใช้สำหรับจับคู่ขายใน Trading Matching ภายหลัง</div>
                 ) : null}
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
-                <div className="grid gap-3 md:grid-cols-3">
-                <SelectField hideCode error={fieldErrors.branchId} label="สาขา *" options={activeBranches} value={form.branchId} onChange={(value) => updateForm('branchId', value)} />
-                <SupplierSearchCombobox className="md:col-span-2" error={fieldErrors.supplierId} options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
-                <Field error={fieldErrors.licensePlate} label="ทะเบียนรถ *"><input className="w-full rounded border px-3 py-2 uppercase" placeholder="เช่น 1กข-1234 / 70-1234" value={form.licensePlate} onChange={(event) => updateForm('licensePlate', event.target.value.toUpperCase())} /></Field>
+                <div className="grid gap-3 md:grid-cols-[160px_420px] md:justify-start">
+                  <BranchSelectCombobox branches={activeBranches} error={fieldErrors.branchId} inputId="purchase-bill-branch-search" label="สาขา *" placeholder="เลือกสาขา" value={form.branchId} widthClassName="max-w-[160px]" onChange={(branchId) => updateForm('branchId', branchId ?? '')} />
+                  <SupplierSearchCombobox className="md:max-w-[420px]" error={fieldErrors.supplierId} options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="emerald">3</StepBadge>รายการสินค้า ({form.items.length})</h4>
-                  <button className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, blankItem()] }))}>+ เพิ่มรายการ</button>
+                  <button className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, blankItem()] }))}>+ เพิ่มรายการ</button>
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
-                <div className="overflow-x-auto rounded-lg border">
+                <div className="overflow-x-auto rounded-md border">
                   <table className="w-full min-w-[780px] text-sm">
                     <tbody>
                       {form.items.map((item, index) => (
@@ -805,11 +828,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           <tr className="border-t align-top hover:bg-blue-50/30">
                             <td className="p-2" colSpan={4}>
                               <ProductSearchCombobox inputId={`purchase-bill-product-search-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateItem(index, 'productId', value)} />
-                              <input className="mt-1.5 w-full rounded border bg-yellow-50 px-2 py-1 text-xs" placeholder="ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)" value={item.displayName ?? ''} onChange={(event) => updateItem(index, 'displayName', event.target.value || null)} />
+                              <input className="mt-1.5 w-full rounded-md border bg-yellow-50 px-2 py-1 text-xs" placeholder="ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)" value={item.displayName ?? ''} onChange={(event) => updateItem(index, 'displayName', event.target.value || null)} />
                             </td>
                             <td className="p-2" colSpan={form.salesId ? 3 : 2}>
                               <div className="mb-1 text-[11px] font-semibold text-indigo-700">อ้างอิง PO</div>
-                              <select className="w-full rounded border bg-blue-50 px-2 py-2 text-xs" value={item.poBuyId ?? ''} onChange={(event) => updateItem(index, 'poBuyId', event.target.value || null)}>
+                              <select className="w-full rounded-md border bg-blue-50 px-2 py-2 text-xs" value={item.poBuyId ?? ''} onChange={(event) => updateItem(index, 'poBuyId', event.target.value || null)}>
                                 <option value="">Spot Buy</option>
                                 {activePoBuys.map((po) => <option key={po.id} value={po.id}>{po.label ?? po.name}</option>)}
                               </select>
@@ -820,38 +843,38 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                 return <div className={`mt-1 text-[11px] font-semibold ${variance.className}`}>{variance.text}</div>
                               })()}
                             </td>
-                            <td className="p-2 align-middle" rowSpan={2}><button className="rounded px-3 py-2 text-red-600 hover:bg-red-50 disabled:opacity-40" disabled={form.items.length <= 1} type="button" onClick={() => removeItem(index)}>ลบ</button></td>
+                            <td className="p-2 align-middle" rowSpan={2}><button className="rounded-md px-3 py-2 text-red-600 hover:bg-red-50 disabled:opacity-40" disabled={form.items.length <= 1} type="button" onClick={() => removeItem(index)}>ลบ</button></td>
                           </tr>
                           <tr className="border-t border-slate-100 align-top hover:bg-blue-50/30">
                             <td className="p-2">
                               <div className="mb-1 text-[11px] font-semibold text-slate-500">Gross</div>
-                              <input className="w-full rounded border bg-slate-50 px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.grossWeight || ''} onChange={(event) => updateItemWeights(index, 'grossWeight', Number(event.target.value || 0))} />
+                              <input className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-mono ${numberInputClass}`} min="0" step="0.01" type="number" value={item.grossWeight || ''} onChange={(event) => updateItemWeights(index, 'grossWeight', Number(event.target.value || 0))} />
                             </td>
                             <td className="p-2">
                               <div className="mb-1 text-[11px] font-semibold text-amber-700">หัก</div>
-                              <input className="w-full rounded border bg-amber-50 px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateItemWeights(index, 'deductWeight', Number(event.target.value || 0))} />
+                              <input className={`w-full rounded-md border bg-amber-50 px-2 py-2 text-right font-mono ${numberInputClass}`} min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateItemWeights(index, 'deductWeight', Number(event.target.value || 0))} />
                             </td>
                             <td className="p-2">
                               <div className="mb-1 text-[11px] font-semibold text-emerald-700">สุทธิ</div>
-                              <input className="w-full rounded border bg-emerald-50 px-2 py-2 text-right font-mono font-bold text-emerald-700" min="0" step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateItem(index, 'qty', Number(event.target.value || 0))} />
+                              <input className={`w-full rounded-md border bg-emerald-50 px-2 py-2 text-right font-mono font-bold text-emerald-700 ${numberInputClass}`} min="0" step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateItem(index, 'qty', Number(event.target.value || 0))} />
                             </td>
                             <td className="p-2">
                               <div className="mb-1 text-[11px] font-semibold text-slate-500">ราคา/กก.</div>
-                              <input className="w-full rounded border px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.price || ''} onChange={(event) => updateItem(index, 'price', Number(event.target.value || 0))} />
+                              <input className={`w-full rounded-md border px-2 py-2 text-right font-mono ${numberInputClass}`} min="0" step="0.01" type="number" value={item.price || ''} onChange={(event) => updateItem(index, 'price', Number(event.target.value || 0))} />
                             </td>
                             {form.salesId ? (
                               <td className="p-2">
                                 <div className="mb-1 text-[11px] font-semibold text-purple-700">ราคาหน้าใบ</div>
-                                <input className="w-full rounded border bg-purple-50 px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.salesPrice || ''} onChange={(event) => updateItem(index, 'salesPrice', Number(event.target.value || 0))} />
+                                <input className={`w-full rounded-md border bg-purple-50 px-2 py-2 text-right font-mono ${numberInputClass}`} min="0" step="0.01" type="number" value={item.salesPrice || ''} onChange={(event) => updateItem(index, 'salesPrice', Number(event.target.value || 0))} />
                               </td>
                             ) : null}
                             <td className="p-2">
                               <div className="mb-1 text-[11px] font-semibold text-slate-500">ส่วนลด</div>
-                              <input className="w-full rounded border px-2 py-2 text-right font-mono" min="0" step="0.01" type="number" value={item.discount || ''} onChange={(event) => updateItem(index, 'discount', Number(event.target.value || 0))} />
+                              <input className={`w-full rounded-md border px-2 py-2 text-right font-mono ${numberInputClass}`} min="0" step="0.01" type="number" value={item.discount || ''} onChange={(event) => updateItem(index, 'discount', Number(event.target.value || 0))} />
                             </td>
                             <td className="p-2">
                               <div className="mb-1 text-[11px] font-semibold text-blue-700">ยอดรวม</div>
-                              <div className="rounded border border-blue-100 bg-blue-50 px-2 py-2 text-right font-mono font-bold text-blue-700">{formatMoney(Math.max(0, item.qty * item.price - item.discount))}</div>
+                              <div className="rounded-md border border-blue-100 bg-blue-50 px-2 py-2 text-right font-mono font-bold text-blue-700">{formatMoney(Math.max(0, item.qty * item.price - item.discount))}</div>
                             </td>
                           </tr>
                         </Fragment>
@@ -873,18 +896,18 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="purple">4</StepBadge>VAT & ยอดรวม</h4>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-3">
-                    <label className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-md border-2 p-3 ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white'}`}>
                       <input checked={form.hasVat} className="size-5" type="checkbox" onChange={(event) => updateForm('hasVat', event.target.checked)} />
                       <span className="font-bold text-slate-700">มี {vatLabel}</span>
                     </label>
-                    <Field error={fieldErrors.discountTotal} label="ส่วนลดท้ายบิล (บาท)"><input className="w-full rounded border px-3 py-2 text-right font-mono" min="0" step="0.01" type="number" value={form.discountTotal || ''} onChange={(event) => updateForm('discountTotal', Number(event.target.value || 0))} /></Field>
+                    <InputField error={fieldErrors.discountTotal} inputClassName="text-right font-mono" label="ส่วนลดท้ายบิล (บาท)" type="number" value={form.discountTotal ? String(form.discountTotal) : ''} onChange={(value) => updateForm('discountTotal', Number(value || 0))} />
                   </div>
-                  <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-                    <div className="mb-2 flex justify-between rounded border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ซื้อ</span><span className="font-mono">{formatMoney(formTotalWeight)} กก.</span></div>
+                  <div className="rounded-md border-2 border-blue-200 bg-blue-50 p-4">
+                    <div className="mb-2 flex justify-between rounded-md border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ซื้อ</span><span className="font-mono">{formatMoney(formTotalWeight)} กก.</span></div>
                     <SummaryLine label="ยอดรวมรายการ" value={formatMoney(formSubtotal)} />
                     {form.discountTotal > 0 ? <SummaryLine label="หักส่วนลด" tone="red" value={`-${formatMoney(form.discountTotal)}`} /> : null}
                     <SummaryLine label="หลังส่วนลด" value={formatMoney(formAfterDiscount)} />
@@ -895,39 +918,39 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               </div>
 
               {form.hasVat ? (
-                <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+                <div className="rounded-md border-2 border-amber-300 bg-amber-50 p-4">
                   <label className="mb-2 flex cursor-pointer items-center gap-2">
                     <input checked={form.vatInvoiceReceived} className="size-5" type="checkbox" onChange={(event) => updateForm('vatInvoiceReceived', event.target.checked)} />
                     <span className="font-bold text-amber-700">ได้รับใบกำกับภาษีตัวจริงแล้ว</span>
                   </label>
                   {form.vatInvoiceReceived ? (
                     <div className="mt-2 grid gap-3 md:grid-cols-2">
-                      <Field error={fieldErrors.vatInvoiceNo} label="เลขที่ใบกำกับภาษี"><input className="w-full rounded border px-3 py-2 font-mono" placeholder="เช่น TI-001" value={form.vatInvoiceNo ?? ''} onChange={(event) => updateForm('vatInvoiceNo', event.target.value || null)} /></Field>
-                      <Field error={fieldErrors.vatInvoiceDate} label="วันที่ใบกำกับภาษี"><input className="w-full rounded border px-3 py-2" type="date" value={form.vatInvoiceDate ?? ''} onChange={(event) => updateForm('vatInvoiceDate', event.target.value || null)} /></Field>
+                      <InputField error={fieldErrors.vatInvoiceNo} inputClassName="font-mono" label="เลขที่ใบกำกับภาษี" placeholder="เช่น TI-001" value={form.vatInvoiceNo ?? ''} onChange={(value) => updateForm('vatInvoiceNo', value || null)} />
+                      <InputField error={fieldErrors.vatInvoiceDate} label="วันที่ใบกำกับภาษี" type="date" value={form.vatInvoiceDate ?? ''} onChange={(value) => updateForm('vatInvoiceDate', value || null)} />
                     </div>
                   ) : <div className="mt-1 text-xs text-amber-700">ยังไม่ได้รับใบกำกับภาษีตัวจริง ต้องติดตามเพื่อใช้เครดิต VAT ซื้อ</div>}
                 </div>
               ) : null}
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <Field error={fieldErrors.note ?? fieldErrors.notes} label="หมายเหตุ"><textarea className="w-full rounded border px-3 py-2" rows={2} value={form.note ?? form.notes ?? ''} onChange={(event) => {
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                <Field error={fieldErrors.note ?? fieldErrors.notes} label="หมายเหตุ"><textarea className="w-full rounded-md border px-3 py-2" rows={2} value={form.note ?? form.notes ?? ''} onChange={(event) => {
                   const value = event.target.value || null
                   updateForm('note', value)
                   updateForm('notes', value)
                 }} /></Field>
               </div>
             </div>
-            <div className="flex justify-end gap-2 rounded-b-2xl border-t bg-white p-4">
-              <button className="rounded-lg border px-4 py-2 text-sm hover:bg-slate-50" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
-              <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : editingBillId ? 'บันทึกการแก้ไข' : 'บันทึกบิลรับซื้อ'}</button>
+            <div className="flex justify-end gap-2 rounded-md-b-md border-t bg-white p-4">
+              <button className="rounded-md border px-4 py-2 text-sm hover:bg-slate-50" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : editingBillId ? 'บันทึกการแก้ไข' : 'บันทึกบิลรับซื้อ'}</button>
             </div>
           </div>
         </div>
       ) : null}
       {showSalesForm && mode === 'sales' ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
-          <div className="mx-auto my-4 flex max-h-[94vh] max-w-5xl flex-col rounded-2xl bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-4 text-white">
+          <div className="mx-auto my-4 flex max-h-[94vh] max-w-5xl flex-col rounded-md bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-md-t-md border-b bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-4 text-white">
               <div>
                 <h3 className="text-xl font-bold">สร้างบิลขายใหม่</h3>
                 <p className="mt-1 text-xs opacity-80">บันทึกบิลขายแบบ Stock / Trading พร้อม VAT และข้อมูลรับเงิน</p>
@@ -935,7 +958,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <button className="text-3xl leading-none text-white/80 hover:text-white" type="button" onClick={() => setShowSalesForm(false)}>&times;</button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6 text-sm">
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="emerald">1</StepBadge>ประเภทบิล</h4>
                 <div className="grid gap-3 md:grid-cols-2">
                   <RadioCard active={salesForm.transactionMode === 'STOCK'} label="📦 STOCK" note="ขายจากสต๊อกจริง" onClick={() => updateSalesForm('transactionMode', 'STOCK')} />
@@ -943,24 +966,24 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
                 <div className="grid gap-3 md:grid-cols-4">
                   <SelectField className="md:col-span-2" error={salesFieldErrors.customerId} label="ลูกค้า *" options={activeCustomers} value={salesForm.customerId} onChange={(value) => updateSalesForm('customerId', value)} />
-                  <SelectField error={salesFieldErrors.branchId} label="สาขา/คลัง" options={activeBranches} value={salesForm.branchId ?? ''} onChange={(value) => updateSalesForm('branchId', value || null)} />
+                  <BranchSelectCombobox branches={activeBranches} error={salesFieldErrors.branchId} inputId="sales-bill-branch-search" label="สาขา/คลัง" placeholder="เลือกสาขา/คลัง" value={salesForm.branchId} onChange={(branchId) => updateSalesForm('branchId', branchId)} />
                   <SelectField error={salesFieldErrors.channelId} label="ช่องทางขาย" options={activeSalesChannels} value={salesForm.channelId ?? ''} onChange={(value) => updateSalesForm('channelId', value || null)} />
-                  <Field error={salesFieldErrors.refNo} label="เลขที่อ้างอิง"><input className="w-full rounded border px-3 py-2 font-mono" value={salesForm.refNo ?? ''} onChange={(event) => updateSalesForm('refNo', event.target.value || null)} /></Field>
-                  <Field error={salesFieldErrors.licensePlate} label="ทะเบียนรถ"><input className="w-full rounded border px-3 py-2 uppercase" value={salesForm.licensePlate ?? ''} onChange={(event) => updateSalesForm('licensePlate', event.target.value.toUpperCase() || null)} /></Field>
+                  <InputField error={salesFieldErrors.refNo} inputClassName="font-mono" label="เลขที่อ้างอิง" value={salesForm.refNo ?? ''} onChange={(value) => updateSalesForm('refNo', value || null)} />
+                  <InputField error={salesFieldErrors.licensePlate} inputClassName="uppercase" label="ทะเบียนรถ" value={salesForm.licensePlate ?? ''} onChange={(value) => updateSalesForm('licensePlate', value.toUpperCase() || null)} />
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="emerald">3</StepBadge>รายการสินค้า ({salesForm.items.length})</h4>
-                  <button className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" type="button" onClick={() => setSalesForm((current) => ({ ...current, items: [...current.items, blankSalesItem()] }))}>+ เพิ่มรายการ</button>
+                  <button className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" type="button" onClick={() => setSalesForm((current) => ({ ...current, items: [...current.items, blankSalesItem()] }))}>+ เพิ่มรายการ</button>
                 </div>
                 {salesFieldErrors.items ? <div className="mb-2 text-xs text-red-600">{salesFieldErrors.items}</div> : null}
-                <div className="overflow-x-auto rounded-lg border">
+                <div className="overflow-x-auto rounded-md border">
                   <table className="w-full min-w-[780px] text-sm">
                     <tbody>
                       {salesForm.items.map((item, index) => (
@@ -970,21 +993,21 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           </td>
                           <td className="p-2">
                             <div className="mb-1 text-[11px] font-semibold text-emerald-700">จำนวนสุทธิ</div>
-                            <input className="w-full rounded border px-2 py-2 text-right font-mono" min={0} step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateSalesItem(index, 'qty', Number(event.target.value))} />
+                            <input className="w-full rounded-md border px-2 py-2 text-right font-mono" min={0} step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateSalesItem(index, 'qty', Number(event.target.value))} />
                           </td>
                           <td className="p-2">
                             <div className="mb-1 text-[11px] font-semibold text-slate-500">ราคา/หน่วย</div>
-                            <input className="w-full rounded border px-2 py-2 text-right font-mono" min={0} step="0.01" type="number" value={item.price || ''} onChange={(event) => updateSalesItem(index, 'price', Number(event.target.value))} />
+                            <input className="w-full rounded-md border px-2 py-2 text-right font-mono" min={0} step="0.01" type="number" value={item.price || ''} onChange={(event) => updateSalesItem(index, 'price', Number(event.target.value))} />
                           </td>
                           <td className="p-2">
                             <div className="mb-1 text-[11px] font-semibold text-slate-500">ส่วนลด</div>
-                            <input className="w-full rounded border px-2 py-2 text-right font-mono" min={0} step="0.01" type="number" value={item.discount || ''} onChange={(event) => updateSalesItem(index, 'discount', Number(event.target.value))} />
+                            <input className="w-full rounded-md border px-2 py-2 text-right font-mono" min={0} step="0.01" type="number" value={item.discount || ''} onChange={(event) => updateSalesItem(index, 'discount', Number(event.target.value))} />
                           </td>
                           <td className="p-2">
                             <div className="mb-1 text-[11px] font-semibold text-blue-700">ยอดรวม</div>
-                            <div className="rounded border border-blue-100 bg-blue-50 px-2 py-2 text-right font-mono font-bold text-blue-700">{formatMoney(Math.max(0, item.qty * item.price - item.discount))}</div>
+                            <div className="rounded-md border border-blue-100 bg-blue-50 px-2 py-2 text-right font-mono font-bold text-blue-700">{formatMoney(Math.max(0, item.qty * item.price - item.discount))}</div>
                           </td>
-                          <td className="p-2 text-right"><button className="rounded border px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-40" disabled={salesForm.items.length <= 1} type="button" onClick={() => removeSalesItem(index)}>ลบ</button></td>
+                          <td className="p-2 text-right"><button className="rounded-md border px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-40" disabled={salesForm.items.length <= 1} type="button" onClick={() => removeSalesItem(index)}>ลบ</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -1001,11 +1024,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="purple">4</StepBadge>VAT & ยอดรวม</h4>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-3">
-                    <label className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 ${salesForm.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-md border-2 p-3 ${salesForm.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white'}`}>
                       <input checked={salesForm.hasVat} className="size-5" type="checkbox" onChange={(event) => updateSalesForm('hasVat', event.target.checked)} />
                       <span className="font-bold text-slate-700">มี {vatLabel}</span>
                     </label>
@@ -1016,10 +1039,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         <Segment current={salesForm.vatType} label="รวม VAT" value="INCLUDE" onClick={(value) => updateSalesForm('vatType', value as SalesBillFormValues['vatType'])} />
                       </div>
                     ) : null}
-                    <Field error={salesFieldErrors.discountTotal} label="ส่วนลดท้ายบิล (บาท)"><input className="w-full rounded border px-3 py-2 text-right font-mono" min={0} step="0.01" type="number" value={salesForm.discountTotal || ''} onChange={(event) => updateSalesForm('discountTotal', Number(event.target.value))} /></Field>
+                    <InputField error={salesFieldErrors.discountTotal} inputClassName="text-right font-mono" label="ส่วนลดท้ายบิล (บาท)" type="number" value={salesForm.discountTotal ? String(salesForm.discountTotal) : ''} onChange={(value) => updateSalesForm('discountTotal', Number(value || 0))} />
                   </div>
-                  <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-                    <div className="mb-2 flex justify-between rounded border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ขาย</span><span className="font-mono">{formatMoney(salesForm.items.reduce((sum, item) => sum + item.qty, 0))} กก.</span></div>
+                  <div className="rounded-md border-2 border-blue-200 bg-blue-50 p-4">
+                    <div className="mb-2 flex justify-between rounded-md border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ขาย</span><span className="font-mono">{formatMoney(salesForm.items.reduce((sum, item) => sum + item.qty, 0))} กก.</span></div>
                     <SummaryLine label="ยอดรวมรายการ" value={formatMoney(salesSubtotal)} />
                     {salesForm.discountTotal > 0 ? <SummaryLine label="หักส่วนลด" tone="red" value={`-${formatMoney(salesForm.discountTotal)}`} /> : null}
                     <SummaryLine label="หลังส่วนลด" value={formatMoney(salesAfterDiscount)} />
@@ -1030,43 +1053,48 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               </div>
 
               {salesForm.hasVat ? (
-                <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+                <div className="rounded-md border-2 border-amber-300 bg-amber-50 p-4">
                   <label className="mb-2 flex cursor-pointer items-center gap-2">
                     <input checked={salesForm.vatInvoiceIssued} className="size-5" type="checkbox" onChange={(event) => updateSalesForm('vatInvoiceIssued', event.target.checked)} />
                     <span className="font-bold text-amber-700">ออกใบกำกับภาษีแล้ว</span>
                   </label>
                   {salesForm.vatInvoiceIssued ? (
                     <div className="mt-2 grid gap-3 md:grid-cols-2">
-                      <Field error={salesFieldErrors.vatInvoiceNo} label="เลขที่ใบกำกับภาษี"><input className="w-full rounded border px-3 py-2 font-mono" value={salesForm.vatInvoiceNo ?? ''} onChange={(event) => updateSalesForm('vatInvoiceNo', event.target.value || null)} /></Field>
-                      <Field error={salesFieldErrors.vatInvoiceDate} label="วันที่ใบกำกับภาษี"><input className="w-full rounded border px-3 py-2" type="date" value={salesForm.vatInvoiceDate ?? ''} onChange={(event) => updateSalesForm('vatInvoiceDate', event.target.value || null)} /></Field>
+                      <InputField error={salesFieldErrors.vatInvoiceNo} inputClassName="font-mono" label="เลขที่ใบกำกับภาษี" value={salesForm.vatInvoiceNo ?? ''} onChange={(value) => updateSalesForm('vatInvoiceNo', value || null)} />
+                      <InputField error={salesFieldErrors.vatInvoiceDate} label="วันที่ใบกำกับภาษี" type="date" value={salesForm.vatInvoiceDate ?? ''} onChange={(value) => updateSalesForm('vatInvoiceDate', value || null)} />
                     </div>
                   ) : <div className="mt-1 text-xs text-amber-700">ยังไม่ได้ออกใบกำกับภาษี ต้องติดตามเพื่อใช้เอกสารขาย</div>}
                 </div>
               ) : null}
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <Field error={salesFieldErrors.note} label="หมายเหตุ"><textarea className="w-full rounded border px-3 py-2" rows={2} value={salesForm.note ?? ''} onChange={(event) => updateSalesForm('note', event.target.value || null)} /></Field>
+              <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                <Field error={salesFieldErrors.note} label="หมายเหตุ"><textarea className="w-full rounded-md border px-3 py-2" rows={2} value={salesForm.note ?? ''} onChange={(event) => updateSalesForm('note', event.target.value || null)} /></Field>
               </div>
             </div>
-            <div className="flex justify-end gap-2 rounded-b-2xl border-t bg-white p-4">
-              <button className="rounded-lg border px-4 py-2 text-sm hover:bg-slate-50" disabled={isSaving} type="button" onClick={() => setShowSalesForm(false)}>ยกเลิก</button>
-              <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void saveSalesBill()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกบิลขาย'}</button>
+            <div className="flex justify-end gap-2 rounded-md-b-md border-t bg-white p-4">
+              <button className="rounded-md border px-4 py-2 text-sm hover:bg-slate-50" disabled={isSaving} type="button" onClick={() => setShowSalesForm(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void saveSalesBill()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกบิลขาย'}</button>
             </div>
           </div>
         </div>
       ) : null}
       {cancelingBill ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40 p-0 md:items-center md:justify-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="purchase-bill-cancel-title">
-          <div className="w-full rounded-t-lg bg-white shadow-xl md:max-w-lg md:rounded-lg">
-            <div className="border-b p-4">
-              <h2 id="purchase-bill-cancel-title" className="font-semibold">ยกเลิกบิลรับซื้อ {cancelingBill.docNo}</h2>
-              <p className="mt-1 text-sm text-slate-500">{cancelingBill.supplierName ?? '-'}</p>
-            </div>
+        <Dialog open={Boolean(cancelingBill)} onOpenChange={(open) => {
+          if (open || isSaving) return
+          setCancelingBill(null)
+          setCancelNote('')
+          setCancelNoteError('')
+        }}>
+          <DialogContent hideClose className="w-full rounded-md-t-md p-0 md:rounded-md">
+            <DialogHeader className="border-b">
+              <DialogTitle id="purchase-bill-cancel-title">ยกเลิกบิลรับซื้อ {cancelingBill.docNo}</DialogTitle>
+              <DialogDescription>{cancelingBill.supplierName ?? '-'}</DialogDescription>
+            </DialogHeader>
             <div className="space-y-2 p-4 text-sm">
               <label className="block text-xs font-medium text-slate-600" htmlFor="purchase-bill-cancel-note">หมายเหตุการยกเลิก *</label>
               <textarea
                 id="purchase-bill-cancel-note"
-                className="w-full rounded border px-3 py-2"
+                className="w-full rounded-md border px-3 py-2"
                 maxLength={500}
                 rows={3}
                 value={cancelNote}
@@ -1077,17 +1105,17 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               />
               {cancelNoteError ? <div className="text-xs text-red-600">{cancelNoteError}</div> : null}
             </div>
-            <div className="flex justify-end gap-2 border-t bg-slate-50 px-4 py-3">
-              <button className="px-4 py-2 text-sm" disabled={isSaving} type="button" onClick={() => {
+            <DialogFooter>
+              <Button disabled={isSaving} type="button" variant="ghost" onClick={() => {
                 if (isSaving) return
                 setCancelingBill(null)
                 setCancelNote('')
                 setCancelNoteError('')
-              }}>ปิด</button>
-              <button className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void cancelPurchaseBill()}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</button>
-            </div>
-          </div>
-        </div>
+              }}>ปิด</Button>
+              <Button className="bg-red-600 hover:bg-red-700" disabled={isSaving} type="button" onClick={() => void cancelPurchaseBill()}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </section>
   )
@@ -1095,7 +1123,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
 function Segment({ current, label, onClick, value }: { current: string; label: string; onClick: (value: string) => void; value: string }) {
   const active = current === value
-  return <button className={`rounded border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`} type="button" onClick={() => onClick(value)}>{label}</button>
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`} type="button" onClick={() => onClick(value)}>{label}</button>
 }
 
 function TransactionKpi({ label, tone, value }: { label: string; tone: 'amber' | 'blue' | 'emerald' | 'red' | 'slate'; value: string }) {
@@ -1106,7 +1134,7 @@ function TransactionKpi({ label, tone, value }: { label: string; tone: 'amber' |
     red: 'border-red-200 bg-red-50 text-red-700',
     slate: 'border-slate-200 bg-white text-slate-700',
   }[tone]
-  return <div className={`rounded-xl border p-3 shadow-sm ${className}`}><div className="text-xs opacity-75">{label}</div><div className="mt-1 break-words text-xl font-bold">{value}</div></div>
+  return <div className={`rounded-md border p-3 shadow-sm ${className}`}><div className="text-xs opacity-75">{label}</div><div className="mt-1 break-words text-xl font-bold">{value}</div></div>
 }
 
 function statusBadgeClass(status: string) {
@@ -1121,14 +1149,14 @@ function statusBadgeClass(status: string) {
 function statusText(status: string) {
   const labels: Record<string, string> = {
     cancelled: 'ยกเลิก',
-    complete: 'เสร็จแล้ว',
-    completed: 'เสร็จแล้ว',
+    complete: 'เสร็จสิ้น',
+    completed: 'เสร็จสิ้น',
     converted: 'เปิดบิลแล้ว',
     draft: 'Draft',
-    open: 'เปิดอยู่',
-    paid: 'จ่ายครบ',
-    partial: 'บางส่วน',
-    partially_paid: 'บางส่วน',
+    open: 'ยังไม่จ่าย',
+    paid: 'เสร็จสิ้น',
+    partial: 'จ่ายบางส่วน',
+    partially_paid: 'จ่ายบางส่วน',
     received: 'รับครบ',
     unreceived: 'ยังไม่รับเงิน',
     unpaid: 'ยังไม่จ่าย',
@@ -1148,7 +1176,7 @@ function SortHeader({ activeKey, align, direction, label, onSort, sortKey }: { a
   const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
   return (
     <th className={`p-2 ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
-      <button className={`inline-flex w-full items-center gap-1 ${alignClass} rounded px-1 py-0.5 hover:bg-slate-200`} type="button" onClick={() => onSort(sortKey)}>
+      <button className={`inline-flex w-full items-center gap-1 ${alignClass} rounded-md px-1 py-0.5 hover:bg-slate-200`} type="button" onClick={() => onSort(sortKey)}>
         <span>{label}</span>
         <span className={`text-[10px] ${active ? 'text-slate-900' : 'text-slate-400'}`}>{active ? direction === 'asc' ? '▲' : '▼' : '↕'}</span>
       </button>
@@ -1176,216 +1204,6 @@ function normalizeBranchWarehouseName(value: string) {
   return value.replace(/\s+/g, '').toLowerCase()
 }
 
-function Field({ children, className, error, label }: { children: ReactNode; className?: string; error?: string; label: string }) {
-  return <label className={className}><span className="mb-1 block text-xs font-bold text-slate-700">{label}</span>{children}{error ? <span className="mt-1 block text-xs text-red-600">{error}</span> : null}</label>
-}
-
-function SelectField({ className, error, hideCode = false, label, onChange, options, placeholder = 'เลือก', value }: { className?: string; error?: string; hideCode?: boolean; label: string; onChange: (value: string) => void; options: Option[]; placeholder?: string; value: string }) {
-  return (
-    <Field className={className} error={error} label={label}>
-      <select className="w-full rounded border px-3 py-2" value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{placeholder}</option>
-        {options.map((option) => <option key={option.id} value={option.id}>{!hideCode && option.code ? `${option.code} — ` : ''}{option.name}</option>)}
-      </select>
-    </Field>
-  )
-}
-
-function SupplierSearchCombobox({
-  className = '',
-  error,
-  options,
-  value,
-  onChange,
-}: {
-  className?: string
-  error?: string
-  options: Option[]
-  value: string
-  onChange: (supplierId: string) => void
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const selectedSupplier = useMemo(() => options.find((supplier) => supplier.id === value) ?? null, [options, value])
-  const selectedLabel = selectedSupplier ? optionLabel(selectedSupplier) : ''
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState(selectedLabel)
-
-  useEffect(() => {
-    setQuery(selectedLabel)
-  }, [selectedLabel])
-
-  const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    const rows = normalizedQuery
-      ? options.filter((supplier) => searchableOptionText(supplier).includes(normalizedQuery))
-      : options
-    return rows.slice(0, 80)
-  }, [options, query])
-
-  const selectSupplier = (supplier: Option) => {
-    onChange(supplier.id)
-    setQuery(optionLabel(supplier))
-    setOpen(false)
-    inputRef.current?.focus()
-  }
-
-  return (
-    <div className={`relative ${className}`}>
-      <label className="mb-1 block text-xs font-bold text-slate-700" htmlFor="purchase-bill-supplier-search">ผู้ขาย *</label>
-      <input
-        ref={inputRef}
-        aria-autocomplete="list"
-        aria-controls="purchase-bill-supplier-options"
-        aria-expanded={open}
-        aria-invalid={Boolean(error)}
-        className={`w-full rounded border px-3 py-2 outline-none focus:border-blue-600 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-        id="purchase-bill-supplier-search"
-        placeholder="ค้นหาชื่อหรือรหัสผู้ขาย"
-        role="combobox"
-        type="search"
-        value={query}
-        onBlur={() => {
-          window.setTimeout(() => {
-            const exactMatch = options.find((supplier) => optionLabel(supplier).toLowerCase() === query.trim().toLowerCase())
-            if (exactMatch) {
-              onChange(exactMatch.id)
-              setQuery(optionLabel(exactMatch))
-            } else if (selectedSupplier) {
-              setQuery(optionLabel(selectedSupplier))
-            }
-            setOpen(false)
-          }, 120)
-        }}
-        onChange={(event) => {
-          const nextQuery = event.target.value
-          setQuery(nextQuery)
-          setOpen(true)
-          if (value && nextQuery !== selectedLabel) onChange('')
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            setOpen(false)
-            return
-          }
-          if (event.key === 'Enter' && open && filteredOptions[0]) {
-            event.preventDefault()
-            selectSupplier(filteredOptions[0])
-          }
-        }}
-      />
-      {error ? <span className="mt-1 block text-xs text-red-600">{error}</span> : null}
-      {open ? (
-        <div id="purchase-bill-supplier-options" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl" role="listbox">
-          {filteredOptions.length > 0 ? filteredOptions.map((supplier) => (
-            <button
-              key={supplier.id}
-              aria-selected={supplier.id === value}
-              className={`block w-full px-3 py-2 text-left hover:bg-blue-50 ${supplier.id === value ? 'bg-blue-100 text-blue-800' : ''}`}
-              role="option"
-              type="button"
-              onMouseDown={(event) => {
-                event.preventDefault()
-                selectSupplier(supplier)
-              }}
-            >
-              <span className="block font-medium">{supplier.name}</span>
-              <span className="block text-xs text-slate-500">{supplier.code ? `${supplier.code} · ` : ''}{supplier.id}</span>
-            </button>
-          )) : <div className="px-3 py-2 text-sm text-slate-500">ไม่พบผู้ขายที่ตรงกับคำค้นหา</div>}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function ProductSearchCombobox({
-  inputId,
-  options,
-  value,
-  onChange,
-}: {
-  inputId: string
-  options: Option[]
-  value: string
-  onChange: (productId: string) => void
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const selectedProduct = useMemo(() => options.find((product) => product.id === value) ?? null, [options, value])
-  const selectedLabel = selectedProduct ? optionLabel(selectedProduct) : ''
-  const listId = `${inputId}-options`
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState(selectedLabel)
-
-  useEffect(() => {
-    setQuery(selectedLabel)
-  }, [selectedLabel])
-
-  const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    const rows = normalizedQuery
-      ? options.filter((product) => searchableOptionText(product).includes(normalizedQuery))
-      : options
-    return rows.slice(0, 80)
-  }, [options, query])
-
-  const selectProduct = (product: Option) => {
-    onChange(product.id)
-    setQuery(optionLabel(product))
-    setOpen(false)
-    inputRef.current?.focus()
-  }
-
-  return (
-    <div className="relative">
-      <label className="mb-1 block text-[11px] font-semibold text-slate-500" htmlFor={inputId}>สินค้า *</label>
-      <input
-        ref={inputRef}
-        aria-autocomplete="list"
-        aria-controls={listId}
-        aria-expanded={open}
-        className="w-full rounded border border-slate-300 px-2 py-2 outline-none focus:border-blue-600"
-        id={inputId}
-        placeholder="ค้นหารหัสหรือชื่อสินค้า"
-        role="combobox"
-        type="search"
-        value={query}
-        onBlur={() => {
-          window.setTimeout(() => {
-            const exactMatch = options.find((product) => optionLabel(product).toLowerCase() === query.trim().toLowerCase())
-            if (exactMatch) {
-              onChange(exactMatch.id)
-              setQuery(optionLabel(exactMatch))
-            } else if (selectedProduct) {
-              setQuery(optionLabel(selectedProduct))
-            } else {
-              setQuery('')
-            }
-            setOpen(false)
-          }, 120)
-        }}
-        onChange={(event) => {
-          const nextQuery = event.target.value
-          setQuery(nextQuery)
-          setOpen(true)
-          if (value && nextQuery !== selectedLabel) onChange('')
-        }}
-        onFocus={() => setOpen(true)}
-      />
-      {open ? (
-        <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg" id={listId}>
-          {filteredOptions.length ? filteredOptions.map((product) => (
-            <button key={product.id} className="block w-full px-3 py-2 text-left text-xs hover:bg-blue-50" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectProduct(product)}>
-              <span className="font-medium text-slate-800">{optionLabel(product)}</span>
-              {product.unit ? <span className="ml-2 text-slate-400">({product.unit})</span> : null}
-            </button>
-          )) : <div className="px-3 py-2 text-xs text-slate-500">ไม่พบสินค้า</div>}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 function StepBadge({ children, tone }: { children: ReactNode; tone: 'amber' | 'blue' | 'emerald' | 'purple' }) {
   const className = {
     amber: 'bg-amber-100 text-amber-700',
@@ -1393,21 +1211,12 @@ function StepBadge({ children, tone }: { children: ReactNode; tone: 'amber' | 'b
     emerald: 'bg-emerald-100 text-emerald-700',
     purple: 'bg-purple-100 text-purple-700',
   }[tone]
-  return <span className={`flex size-6 items-center justify-center rounded-full text-xs ${className}`}>{children}</span>
-}
-
-function SummaryLine({ label, tone, value }: { label: string; tone?: 'red'; value: string }) {
-  return (
-    <div className="flex justify-between border-t border-blue-200 py-1 text-sm">
-      <span className="text-slate-600">{label}</span>
-      <span className={`font-mono ${tone === 'red' ? 'text-red-600' : 'text-slate-800'}`}>{value}</span>
-    </div>
-  )
+  return <span className={`flex size-6 items-center justify-center rounded-md-full text-xs ${className}`}>{children}</span>
 }
 
 function RadioCard({ active, label, note, onClick }: { active: boolean; label: string; note: string; onClick: () => void }) {
   return (
-    <button className={`rounded-lg border-2 p-3 text-left transition ${active ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} type="button" onClick={onClick}>
+    <button className={`rounded-md border-2 p-3 text-left transition ${active ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} type="button" onClick={onClick}>
       <div className="font-bold">{label}</div>
       <div className="text-xs text-slate-500">{note}</div>
     </button>

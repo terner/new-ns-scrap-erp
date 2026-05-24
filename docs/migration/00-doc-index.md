@@ -13,7 +13,8 @@
 3. `REQUIREMENTS_TARGET_SYSTEM.md` - requirements ของระบบเป้าหมาย
 4. `docs/migration/17-next-remaining-modules-progress.md` - tracker งานที่เหลือทั้งหมด
 5. `docs/agent-rules/README.md` - index ของ rule รายละเอียดเฉพาะงาน
-6. Tracker เฉพาะเรื่องที่เกี่ยวข้องกับงานนั้น
+6. `docs/design.md` - design conventions กลางของ active Next app
+7. Tracker เฉพาะเรื่องที่เกี่ยวข้องกับงานนั้น
 
 ## Canonical Sources
 
@@ -24,6 +25,8 @@
 | Target requirements | `REQUIREMENTS_TARGET_SYSTEM.md` | แทนชื่อเดิม `SRS.md`; ใช้เป็น SRS ของระบบใหม่/เป้าหมาย |
 | Legacy/prototype requirements | `REQUIREMENTS_LEGACY_PROTOTYPE.md` | แทนชื่อเดิม `NS_Scrap_ERP_System_Requirements.md`; ใช้อ้างอิงระบบเก่า |
 | Current work status | `docs/migration/00-current-work.md` | สรุป batch ปัจจุบัน, next task, blockers |
+| UI/design conventions | `docs/design.md` | source of truth สำหรับ list/filter/table/pagination/button/wording baseline |
+| Page checklist CSV | `docs/page-inventory-checklist.csv` | รายการหน้าสำหรับ assign dev, checklist, และ QA ใน Google Sheets |
 | Migration document map | `docs/migration/README.md` | รายการ docs migration ทั้งชุด |
 | Remaining module plan | `docs/migration/17-next-remaining-modules-progress.md` | batch/task tree, Playwright rule, OpenAPI/sitemap preflight |
 | Next sitemap/API map | `docs/migration/18-next-system-sitemap.md` | route/page/API/permission status baseline for active Next app |

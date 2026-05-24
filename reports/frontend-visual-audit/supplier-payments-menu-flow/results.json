@@ -1,0 +1,90 @@
+[
+  {
+    "appName": "live-menu",
+    "startUrl": "https://sirimasth.github.io/ns-scrap-erp/",
+    "currentUrl": "https://sirimasth.github.io/ns-scrap-erp/",
+    "clicked": true,
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials",
+      "warning: [PATCH 19 pull-tomb] EXEMPT 1000 tombs (stale > 24h) — kept local rows safe from orphan tombstones"
+    ],
+    "visibleText": [
+      "☰",
+      "จ่ายเงิน Supplier",
+      "ทุกสาขาสำนักงานใหญ่NS สมุทรสาครNS นครสวรรค์",
+      "⏳⬇ Pulling...ล่าสุด: เพิ่งสด",
+      "ออกจากระบบ",
+      "💸 จ่ายเงิน Supplier",
+      "🔄 รีเฟรชยอดค้าง (sync fix)",
+      "🔍 ค้นหา: เลขบิล / ชื่อ supplier / รหัส supplier / Ref No...",
+      "เลขบิล",
+      "วันที่",
+      "Supplier",
+      "เลขบัญชี",
+      "ยอดรวม",
+      "จ่ายแล้ว",
+      "คงเหลือ",
+      "อายุ(วัน)",
+      "🔍 ค้นหาเลข Voucher / ชื่อ Supplier / เลขบิล...",
+      "วันที่จ่าย:",
+      "💳 ทุกบัญชีเงินสดในมือ – สำนักงานใหญ่เงินสดในมือ – สมุทรสาครเงินสดในมือ – นครสวรรค์กสิกรไทย กระแสรายวันไทยพาณิชย์ ออมทรัพย์กสิกรไทย ODกสิกรไทย FCD USD",
+      "+ Payment Voucher",
+      "เลขที่",
+      "วันที่",
+      "Supplier",
+      "📋 บิลซื้อที่ตัดชำระ",
+      "บัญชี",
+      "วิธี",
+      "รายการ",
+      "ยอดรวม",
+      "📥 Export Excel",
+      "✕"
+    ],
+    "screenshots": [
+      "reports/frontend-visual-audit/supplier-payments-menu-flow/supplierPayments-live-menu-desktop.png",
+      "reports/frontend-visual-audit/supplier-payments-menu-flow/supplierPayments-live-menu-mobile.png"
+    ]
+  },
+  {
+    "appName": "vue-menu",
+    "startUrl": "http://localhost:5174/",
+    "currentUrl": "http://localhost:5174/purchase/payments",
+    "clicked": true,
+    "consoleMessages": [],
+    "visibleText": [
+      "☰",
+      "จ่ายเงิน Supplier",
+      "ออกจากระบบ",
+      "💸 จ่ายเงิน Supplier",
+      "🔄 รีเฟรชยอดค้าง (sync fix)",
+      "🔍 ค้นหา: เลขบิล / ชื่อ supplier / รหัส supplier / Ref No...",
+      "เลขบิล",
+      "วันที่",
+      "Supplier",
+      "เลขบัญชี",
+      "ยอดรวม",
+      "จ่ายแล้ว",
+      "คงเหลือ",
+      "อายุ(วัน)",
+      "🔍 ค้นหาเลขที่ / Supplier / เลขบิลซื้อ...",
+      "ทุกบัญชี",
+      "+ Payment Voucher",
+      "เลขที่",
+      "วันที่",
+      "Supplier",
+      "บิลซื้อ",
+      "บัญชีจ่าย",
+      "วิธีจ่าย",
+      "จำนวนบิล",
+      "ยอดจ่าย"
+    ],
+    "screenshots": [
+      "reports/frontend-visual-audit/supplier-payments-menu-flow/supplierPayments-vue-menu-desktop.png",
+      "reports/frontend-visual-audit/supplier-payments-menu-flow/supplierPayments-vue-menu-mobile.png"
+    ]
+  }
+]

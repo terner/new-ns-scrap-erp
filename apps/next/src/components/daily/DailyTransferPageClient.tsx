@@ -150,28 +150,28 @@ export function DailyTransferPageClient() {
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
         <strong>โอนเงินระหว่างบัญชี</strong> — สร้าง Bank Statement 2 ฝั่ง
       </div>
 
-      <div className="space-y-2 rounded-xl bg-white p-3 shadow">
+      <div className="space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-56 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="🔍 ค้นหาเลขที่ / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPeriod('') }} />
+          <input className="min-w-56 flex-1 rounded-md border px-3 py-2 text-sm" placeholder="🔍 ค้นหาเลขที่ / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="rounded-md border px-2 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPeriod('') }} />
           <span className="text-slate-400">→</span>
-          <input className="rounded-lg border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPeriod('') }} />
-          <select className="rounded-lg border px-2 py-2 text-sm" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)}>
+          <input className="rounded-md border px-2 py-2 text-sm" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPeriod('') }} />
+          <select className="rounded-md border px-2 py-2 text-sm" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)}>
             <option value="">📤 ทุกบัญชีต้นทาง</option>
             {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
-          <select className="rounded-lg border px-2 py-2 text-sm" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)}>
+          <select className="rounded-md border px-2 py-2 text-sm" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)}>
             <option value="">📥 ทุกบัญชีปลายทาง</option>
             {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
-          {search || dateFrom || dateTo || fromAccountId || toAccountId ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง</button> : null}
-          <button className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ โอนใหม่</button>
+          {search || dateFrom || dateTo || fromAccountId || toAccountId ? <button className="rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={clearFilters}>✕ ล้าง</button> : null}
+          <button className="ml-auto rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ โอนใหม่</button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">📅 ช่วง:</span>
@@ -185,7 +185,7 @@ export function DailyTransferPageClient() {
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form noValidate className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl" onSubmit={saveForm}>
+          <form noValidate className="w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
             <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
               <h3 className="font-bold">{form.id ? 'แก้ไขรายการโอนเงิน' : 'โอนเงินระหว่างบัญชี'}</h3>
               <button className="text-2xl text-slate-400" type="button" onClick={() => setFormOpen(false)}>&times;</button>
@@ -201,14 +201,14 @@ export function DailyTransferPageClient() {
               <TextField error={fieldErrors.notes} label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
             </div>
             <div className="flex justify-end gap-2 border-t px-5 py-4">
-              <button className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-              <button className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
             </div>
           </form>
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -234,7 +234,7 @@ export function DailyTransferPageClient() {
                 <td className="p-2 text-right text-amber-700">{formatMoney(row.fee)}</td>
                 <td className="p-2">{row.byPerson || '-'}</td>
                 <td className="space-x-2 whitespace-nowrap p-2 text-right">
-                  <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>จัดการ</button>
+                  <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>จัดการ</button>
                   <button className="text-xs text-red-300" disabled type="button">🗑 ลบ</button>
                 </td>
               </tr>
@@ -254,14 +254,14 @@ function PeriodButton(props: { active: boolean; label: string; onClick: () => vo
     emerald: 'border-emerald-600 bg-emerald-600 text-white',
     slate: 'border-slate-700 bg-slate-700 text-white',
   }[props.tone]
-  return <button className={`rounded border px-3 py-1 text-xs font-medium ${props.active ? activeClass : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`} type="button" onClick={props.onClick}>{props.label}</button>
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${props.active ? activeClass : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`} type="button" onClick={props.onClick}>{props.label}</button>
 }
 
 function TextField(props: { error?: string; label: string; onChange?: (value: string) => void; readOnly?: boolean; required?: boolean; type?: string; value: string }) {
   return (
     <label className="block text-sm font-medium">
       {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
-      <input className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'} ${props.readOnly ? 'bg-slate-50' : ''}`} readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange?.(event.target.value)} />
+      <input className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'} ${props.readOnly ? 'bg-slate-50' : ''}`} readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange?.(event.target.value)} />
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
   )
@@ -271,7 +271,7 @@ function SelectField(props: { error?: string; label: string; onChange: (value: s
   return (
     <label className="block text-sm font-medium">
       {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
-      <select className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
+      <select className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
         <option value="">ไม่ระบุ</option>
         {props.options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
       </select>

@@ -72,35 +72,35 @@ export function FcdLedgerPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+      <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
         <strong>FCD Ledger</strong> - เดินบัญชีเงินตราต่างประเทศ แสดงทั้งยอดสกุลต่างประเทศและมูลค่า THB equivalent
       </div>
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="flex flex-wrap gap-2">
-        <select className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm md:w-80" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+        <select className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm md:w-80" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
           {(data?.filters.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{account.label} ({account.currency})</option>)}
           {!isLoading && (data?.filters.accounts.length ?? 0) === 0 ? <option value="">ไม่มีบัญชี FCD</option> : null}
         </select>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <div className="rounded-xl bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <div className="text-xs text-slate-500">บัญชี</div>
           <div className="font-semibold">{data?.account?.name ?? '-'}</div>
         </div>
-        <div className="rounded-xl bg-indigo-50 p-4 shadow">
+        <div className="rounded-md bg-indigo-50 p-4 shadow">
           <div className="text-xs text-indigo-600">ยอดคงเหลือ ({currency || '-'})</div>
           <div className="text-2xl font-bold text-indigo-700">{formatMoney(data?.summary.foreignBalance ?? 0)}</div>
         </div>
-        <div className="rounded-xl bg-blue-50 p-4 shadow">
+        <div className="rounded-md bg-blue-50 p-4 shadow">
           <div className="text-xs text-blue-600">ยอดคงเหลือ THB Equivalent</div>
           <div className="text-2xl font-bold text-blue-700">{formatMoney(data?.summary.thbBalance ?? 0)}</div>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>

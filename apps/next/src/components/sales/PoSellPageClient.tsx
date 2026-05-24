@@ -214,27 +214,27 @@ export function PoSellPageClient() {
 
   return (
     <section>
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <Metric className="rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 p-4 text-white shadow" label="📋 PO ทั้งหมด" subLabel={`รายได้รวม ${formatMoney(data?.summary.totalAmount ?? 0)}`} value={`${data?.summary.totalRows ?? 0}`} valueClassName="text-2xl font-bold" />
-        <Metric className="rounded-xl border-l-4 border-slate-500 bg-white p-4 shadow" label="⚪ Not Matched" subLabel="รอ Match Cost" value={`${data?.summary.unmatched ?? 0}`} valueClassName="text-2xl font-bold text-slate-700" />
-        <Metric className="rounded-xl border-l-4 border-amber-500 bg-white p-4 shadow" label="⚙ Partial" subLabel="Match บางส่วน" value={`${data?.summary.partiallyMatched ?? 0}`} valueClassName="text-2xl font-bold text-amber-700" />
-        <Metric className="rounded-xl border-l-4 border-emerald-500 bg-white p-4 shadow" label="✓ Fully Matched" subLabel="พร้อมขาย" value={`${data?.summary.fullyMatched ?? 0}`} valueClassName="text-2xl font-bold text-emerald-700" />
-        <Metric className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow" label="⏳ น้ำหนักรอส่ง" subLabel={`จาก ${formatMoney(data?.summary.qty ?? 0)} กก.`} value={formatMoney(data?.summary.remainingQty ?? 0)} valueClassName="text-xl font-bold text-amber-700" />
-        <Metric className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4 shadow" label="💰 มูลค่ารอส่ง" subLabel="รายได้รอรับ" value={formatMoney(data?.summary.remainingAmount ?? 0)} valueClassName="text-xl font-bold text-emerald-700" />
+        <Metric className="rounded-md bg-gradient-to-br from-emerald-500 to-teal-700 p-4 text-white shadow" label="📋 PO ทั้งหมด" subLabel={`รายได้รวม ${formatMoney(data?.summary.totalAmount ?? 0)}`} value={`${data?.summary.totalRows ?? 0}`} valueClassName="text-2xl font-bold" />
+        <Metric className="rounded-md border-l-4 border-slate-500 bg-white p-4 shadow" label="⚪ Not Matched" subLabel="รอ Match Cost" value={`${data?.summary.unmatched ?? 0}`} valueClassName="text-2xl font-bold text-slate-700" />
+        <Metric className="rounded-md border-l-4 border-amber-500 bg-white p-4 shadow" label="⚙ Partial" subLabel="Match บางส่วน" value={`${data?.summary.partiallyMatched ?? 0}`} valueClassName="text-2xl font-bold text-amber-700" />
+        <Metric className="rounded-md border-l-4 border-emerald-500 bg-white p-4 shadow" label="✓ Fully Matched" subLabel="พร้อมขาย" value={`${data?.summary.fullyMatched ?? 0}`} valueClassName="text-2xl font-bold text-emerald-700" />
+        <Metric className="rounded-md border-2 border-amber-300 bg-amber-50 p-4 shadow" label="⏳ น้ำหนักรอส่ง" subLabel={`จาก ${formatMoney(data?.summary.qty ?? 0)} กก.`} value={formatMoney(data?.summary.remainingQty ?? 0)} valueClassName="text-xl font-bold text-amber-700" />
+        <Metric className="rounded-md border-2 border-emerald-300 bg-emerald-50 p-4 shadow" label="💰 มูลค่ารอส่ง" subLabel="รายได้รอรับ" value={formatMoney(data?.summary.remainingAmount ?? 0)} valueClassName="text-xl font-bold text-emerald-700" />
       </div>
 
-      <div className="mb-4 space-y-2 rounded-xl bg-white p-3 shadow">
+      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-[260px] flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="🔍 ค้นหาเลข PO / ชื่อ Customer / ชื่อสินค้า / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="🔍 ค้นหาเลข PO / ชื่อ Customer / ชื่อสินค้า / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-xs text-slate-500">วันที่:</label>
-          <input aria-label="จากวันที่" className="rounded-lg border px-2 py-2 text-sm" title="จากวันที่" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          <input aria-label="จากวันที่" className="rounded-md border px-2 py-2 text-sm" title="จากวันที่" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
           <span className="text-slate-400">→</span>
-          <input aria-label="ถึงวันที่" className="rounded-lg border px-2 py-2 text-sm" title="ถึงวันที่" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-          {hasFilters ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={resetFilters}>✕ ล้าง</button> : null}
-          <a className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" href={exportHref}>Export Excel</a>
-          <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={openCreateForm}>+ PO Sell ใหม่</button>
+          <input aria-label="ถึงวันที่" className="rounded-md border px-2 py-2 text-sm" title="ถึงวันที่" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          {hasFilters ? <button className="rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={resetFilters}>✕ ล้าง</button> : null}
+          <a className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" href={exportHref}>Export Excel</a>
+          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={openCreateForm}>+ PO Sell ใหม่</button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">สถานะ:</span>
@@ -258,7 +258,7 @@ export function PoSellPageClient() {
         <div className="flex flex-wrap items-center gap-2">
           <select
             aria-label="จำนวนรายการต่อหน้า"
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-md border border-slate-300 px-2 py-1"
             value={pageSize}
             onChange={(event) => setPageSize(Number(event.target.value))}
           >
@@ -267,13 +267,13 @@ export function PoSellPageClient() {
             <option value={50}>50 / หน้า</option>
             <option value={100}>100 / หน้า</option>
           </select>
-          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
           <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+          <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full min-w-[1120px] text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -307,7 +307,7 @@ export function PoSellPageClient() {
                 <td className={`p-2 text-right font-bold ${row.margin < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(row.margin)}</td>
                 <td className={`p-2 text-right ${row.marginPct < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatPercent(row.marginPct)}</td>
                 <td className="p-2 text-center"><StatusPill label={row.matchStatus} tone="match" /></td>
-                <td className="whitespace-nowrap p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ write permission/audit ก่อนเปิดใช้งาน" type="button">แก้ไข</button><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ cancel/reconciliation ก่อนเปิดใช้งาน" type="button">ยกเลิก</button></div></td>
+                <td className="whitespace-nowrap p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ write permission/audit ก่อนเปิดใช้งาน" type="button">แก้ไข</button><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ cancel/reconciliation ก่อนเปิดใช้งาน" type="button">ยกเลิก</button></div></td>
               </tr>
             ))}
           </tbody>
@@ -315,7 +315,7 @@ export function PoSellPageClient() {
       </div>
       {showForm ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="po-sell-form-title">
-          <div className="mx-auto my-4 max-w-2xl rounded-xl bg-white shadow-2xl">
+          <div className="mx-auto my-4 max-w-2xl rounded-md bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b px-5 py-3">
               <h3 id="po-sell-form-title" className="font-semibold">สร้าง PO Sell (จองขาย)</h3>
               <button className="text-2xl text-slate-400 hover:text-slate-600" type="button" onClick={() => setShowForm(false)}>×</button>
@@ -325,16 +325,16 @@ export function PoSellPageClient() {
                 <SelectField className="col-span-2" error={fieldErrors.customerId} label="Customer *" options={activeCustomers} value={form.customerId} onChange={(value) => updateForm('customerId', value)} />
                 <SelectField error={fieldErrors.branchId} label="สาขา/คลัง *" options={activeBranches} value={form.branchId ?? ''} onChange={(value) => updateForm('branchId', value || null)} />
                 <SelectField error={fieldErrors.channelId} label="ช่องทางขาย" options={activeChannels} value={form.channelId ?? ''} onChange={(value) => updateForm('channelId', value || null)} />
-                <Field error={fieldErrors.expectedDelivery} label="วันส่งมอบ *"><input className="w-full rounded border px-2 py-1.5" required type="date" value={form.expectedDelivery} onChange={(event) => updateForm('expectedDelivery', event.target.value)} /></Field>
+                <Field error={fieldErrors.expectedDelivery} label="วันส่งมอบ *"><input className="w-full rounded-md border px-2 py-1.5" required type="date" value={form.expectedDelivery} onChange={(event) => updateForm('expectedDelivery', event.target.value)} /></Field>
               </div>
 
               <div>
                 <div className="mb-3 flex items-center justify-between">
                   <label className="font-medium">📋 รายการสินค้า ({form.items.length})</label>
-                  <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, blankPoSellItem()] }))}>+ เพิ่มรายการ</button>
+                  <button className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, blankPoSellItem()] }))}>+ เพิ่มรายการ</button>
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
-                <div className="overflow-x-auto rounded-lg border">
+                <div className="overflow-x-auto rounded-md border">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-100">
                       <tr><th className="p-2 text-left">สินค้า / Grade *</th><th className="w-32 p-2 text-right">จำนวน (กก.) *</th><th className="w-32 p-2 text-right">ราคา/หน่วย *</th><th className="w-32 p-2 text-right">มูลค่ารวม</th><th className="w-8 p-2" /></tr>
@@ -343,8 +343,8 @@ export function PoSellPageClient() {
                       {form.items.map((item, index) => (
                         <tr key={index} className="border-t">
                           <td className="p-1 align-top"><ProductSelect inputId={`po-sell-product-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateItem(index, 'productId', value)} /></td>
-                          <td className="p-1 align-top"><input className="w-full rounded border px-2 py-1.5 text-right" min={0} step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateItem(index, 'qty', Number(event.target.value))} /></td>
-                          <td className="p-1 align-top"><input className="w-full rounded border px-2 py-1.5 text-right" min={0} step="0.01" type="number" value={item.price || ''} onChange={(event) => updateItem(index, 'price', Number(event.target.value))} /></td>
+                          <td className="p-1 align-top"><input className="w-full rounded-md border px-2 py-1.5 text-right" min={0} step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateItem(index, 'qty', Number(event.target.value))} /></td>
+                          <td className="p-1 align-top"><input className="w-full rounded-md border px-2 py-1.5 text-right" min={0} step="0.01" type="number" value={item.price || ''} onChange={(event) => updateItem(index, 'price', Number(event.target.value))} /></td>
                           <td className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(Math.max(0, item.qty * item.price - item.discount))}</td>
                           <td className="p-1 text-center">{form.items.length > 1 ? <button className="px-2 text-red-500" type="button" onClick={() => removeItem(index)}>×</button> : null}</td>
                         </tr>
@@ -359,13 +359,13 @@ export function PoSellPageClient() {
 
               <div>
                 <label className="mb-1 block text-xs">หมายเหตุ</label>
-                <textarea className="w-full rounded border px-2 py-1.5" rows={2} value={form.note ?? ''} onChange={(event) => updateForm('note', event.target.value || null)} />
+                <textarea className="w-full rounded-md border px-2 py-1.5" rows={2} value={form.note ?? ''} onChange={(event) => updateForm('note', event.target.value || null)} />
                 {fieldErrors.note ? <div className="mt-1 text-xs text-red-600">{fieldErrors.note}</div> : null}
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
               <button className="px-4 py-2 text-sm" disabled={isSaving} type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
-              <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void savePoSell()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก PO Sell'}</button>
+              <button className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void savePoSell()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก PO Sell'}</button>
             </div>
           </div>
         </div>
@@ -391,12 +391,12 @@ function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolea
     slate: 'border-slate-500 bg-slate-500 text-white',
   }[tone]
   const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-100'
-  return <button className={`rounded border px-3 py-1 text-xs font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
 }
 
 function StatusPill({ label, tone = 'status' }: { label: string; tone?: 'match' | 'status' }) {
   const color = tone === 'match' ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-100 text-slate-700'
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs ${color}`}>{label || '-'}</span>
+  return <span className={`inline-flex rounded-md-full px-2 py-0.5 text-xs ${color}`}>{label || '-'}</span>
 }
 
 function Field({ children, className, error, label }: { children: ReactNode; className?: string; error?: string; label: string }) {
@@ -406,7 +406,7 @@ function Field({ children, className, error, label }: { children: ReactNode; cla
 function SelectField({ className, error, label, onChange, options, placeholder = 'เลือก', value }: { className?: string; error?: string; label: string; onChange: (value: string) => void; options: Option[]; placeholder?: string; value: string }) {
   return (
     <Field className={className} error={error} label={label}>
-      <select className="w-full rounded border px-3 py-2" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select className="w-full rounded-md border px-3 py-2" value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">{placeholder}</option>
         {options.map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} - ` : ''}{option.name}</option>)}
       </select>
@@ -420,7 +420,7 @@ function optionLabel(option: Option) {
 
 function ProductSelect({ inputId, onChange, options, value }: { inputId: string; onChange: (productId: string) => void; options: Option[]; value: string }) {
   return (
-    <select id={inputId} className="w-full rounded border px-2 py-1.5" value={value} onChange={(event) => onChange(event.target.value)}>
+    <select id={inputId} className="w-full rounded-md border px-2 py-1.5" value={value} onChange={(event) => onChange(event.target.value)}>
       <option value="">พิมพ์รหัส/ชื่อสินค้า...</option>
       {options.map((option) => <option key={option.id} value={option.id}>{optionLabel(option)}</option>)}
     </select>

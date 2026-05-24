@@ -1,9 +1,24 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { BillSelect, Field, SelectField, SummaryPill } from '@/components/daily/MoneyMovementFieldHelpers'
+import { PaymentLinesSection, PaymentSplitsSection } from '@/components/daily/MoneyMovementFormSections'
+import { Button as UiButton } from '@/components/ui/Button'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Input as UiInput } from '@/components/ui/Input'
+import { Select as UiSelect } from '@/components/ui/Select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { customerReceiptFormSchema, dailyFetchJson, formatMoney, supplierPaymentFormSchema, todayDateInput, type CustomerReceiptFormValues, type DailyAccountOption, type SupplierPaymentFormValues } from '@/lib/daily'
+import { formatAccountNoDisplay } from '@/lib/format'
 
-type Party = { active: boolean | null; bankAccount?: string | null; id: string; name: string }
+type PartyBankAccount = {
+  accountNo?: string | null
+  active?: boolean | null
+  bankName?: string | null
+  paymentMethod?: string | null
+}
+type Party = { active: boolean | null; bankAccount?: string | null; bankAccounts?: PartyBankAccount[]; id: string; name: string }
 type Bill = {
   customerId?: string | null
   date?: string
@@ -19,8 +34,12 @@ type Bill = {
 type MoneyRow = {
   accountId?: string
   accountName: string
+  accountNames?: string[]
+  accountSummaries?: string[]
   amount: number
   billId?: string
+  billDocNo?: string
+  billDocNos?: string[]
   customerId?: string
   date: string
   docNo: string
@@ -45,6 +64,7 @@ type Payload = {
 type MoneyForm = SupplierPaymentFormValues | CustomerReceiptFormValues
 type PaymentLine = NonNullable<SupplierPaymentFormValues['lines']>[number] & { billText?: string }
 type PaymentSplit = SupplierPaymentFormValues['splits'][number]
+type HistorySortField = 'accountName' | 'amount' | 'date' | 'docNo' | 'netAmount' | 'partyName'
 const pageSizeOptions = [10, 25, 50, 100]
 
 function newPaymentLine(): PaymentLine {
@@ -91,6 +111,31 @@ function ageInDays(dateValue: string | undefined) {
   return Math.max(0, Math.floor((today - start) / 86_400_000))
 }
 
+function sanitizeAccountNo(value: string | null | undefined) {
+  return value?.replace(/\D/g, '') || ''
+}
+
+function supplierBankAccountLines(party: Party | undefined) {
+  const lines = (party?.bankAccounts ?? [])
+    .filter((account) => account.active !== false && account.paymentMethod !== 'เงินสด')
+    .map((account) => ({
+      accountNo: sanitizeAccountNo(account.accountNo),
+      bankName: account.bankName?.trim() || '-',
+    }))
+    .filter((account) => Boolean(account.accountNo))
+  if (lines.length > 0) {
+    const seen = new Set<string>()
+    return lines.filter((account) => {
+      if (seen.has(account.accountNo)) return false
+      seen.add(account.accountNo)
+      return true
+    })
+  }
+
+  const primary = sanitizeAccountNo(party?.bankAccount)
+  return primary ? [{ accountNo: primary, bankName: '-' }] : []
+}
+
 const paymentTheme = {
   action: 'bg-rose-600 hover:bg-rose-700',
   banner: 'from-rose-600 via-red-600 to-orange-500',
@@ -126,7 +171,15 @@ function initialForm(mode: 'payment' | 'receipt'): MoneyForm {
   } as MoneyForm
 }
 
-export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' }) {
+export function MoneyMovementPageClient({
+  entryOnly = false,
+  historyOnly = false,
+  mode,
+}: {
+  entryOnly?: boolean
+  historyOnly?: boolean
+  mode: 'payment' | 'receipt'
+}) {
   const [data, setData] = useState<Payload>({ accounts: [], bills: [], rows: [] })
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -137,20 +190,28 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
   const [dateTo, setDateTo] = useState('')
   const [accountFilter, setAccountFilter] = useState('')
   const [billSearch, setBillSearch] = useState('')
-  const [billStatusFilter, setBillStatusFilter] = useState('unpaid')
   const [billPage, setBillPage] = useState(1)
   const [billPageSize, setBillPageSize] = useState(25)
+  const [billSort, setBillSort] = useState<'age_desc' | 'balance_desc' | 'date_desc' | 'date_asc' | 'doc_desc' | 'supplier_asc'>('age_desc')
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyPageSize, setHistoryPageSize] = useState(10)
+  const [historySortField, setHistorySortField] = useState<HistorySortField>('docNo')
+  const [historySortDirection, setHistorySortDirection] = useState<'asc' | 'desc'>('desc')
   const [form, setForm] = useState<MoneyForm>(() => initialForm(mode))
   const [isBillLocked, setIsBillLocked] = useState(false)
   const [moneyDrafts, setMoneyDrafts] = useState<Record<string, string>>({})
+  const [copiedAccountKey, setCopiedAccountKey] = useState<string | null>(null)
 
-  const apiPath = mode === 'payment' ? '/api/purchase/payments' : '/api/sales/receipts'
+  const apiPath = historyOnly && mode === 'payment'
+    ? '/api/purchase/payment-history'
+    : mode === 'payment'
+      ? '/api/purchase/payments'
+      : '/api/sales/receipts'
   const partyKey = mode === 'payment' ? 'supplierId' : 'customerId'
   const parties = useMemo(() => (mode === 'payment' ? data.suppliers ?? [] : data.customers ?? []), [data.customers, data.suppliers, mode])
   const theme = mode === 'payment' ? paymentTheme : receiptTheme
   const title = mode === 'payment' ? 'จ่ายเงิน Supplier' : 'รับเงิน Customer'
   const subtitle = mode === 'payment' ? 'Payment Voucher' : 'Receipt Voucher'
-  const historyTitle = mode === 'payment' ? 'ประวัติการจ่ายเงินที่ทำไปแล้ว' : 'ประวัติการรับเงินที่ทำไปแล้ว'
   const amountLabel = mode === 'payment' ? 'ยอดจ่าย' : 'ยอดรับ'
   const accountLabel = mode === 'payment' ? 'บัญชีจ่าย' : 'บัญชีรับ'
   const partyLabel = mode === 'payment' ? 'ผู้ขาย' : 'ลูกค้า'
@@ -159,6 +220,8 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
   const partyValue = mode === 'payment'
     ? (form as SupplierPaymentFormValues).supplierId
     : (form as CustomerReceiptFormValues).customerId
+  const showEntrySection = !historyOnly
+  const showHistorySection = !entryOnly
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -178,7 +241,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
 
   const activeAccounts = useMemo(() => data.accounts.filter((account) => account.active), [data.accounts])
   const partyMap = useMemo(() => new Map(parties.map((party) => [party.id, party.name])), [parties])
-  const supplierBankAccountMap = useMemo(() => new Map((data.suppliers ?? []).map((supplier) => [supplier.id, supplier.bankAccount ?? '-'])), [data.suppliers])
+  const supplierMap = useMemo(() => new Map((data.suppliers ?? []).map((supplier) => [supplier.id, supplier])), [data.suppliers])
   const billMap = useMemo(() => new Map(data.bills.map((bill) => [bill.id, bill])), [data.bills])
   const paymentLines = useMemo(() => (mode === 'payment' ? (form as SupplierPaymentFormValues).lines ?? [] : []), [form, mode])
   const selectedBill = form.billId ? billMap.get(form.billId) : null
@@ -201,7 +264,6 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
     return outstandingBills.filter((bill) => bill.supplierId === paymentSupplierId)
   }, [mode, outstandingBills, paymentSupplierId])
   const selectedPaymentBillIds = useMemo(() => new Set(paymentLines.map((line) => line.billId).filter(Boolean)), [paymentLines])
-
   const supplierBills = useMemo(() => {
     if (mode !== 'payment') return []
     const query = billSearch.trim().toLowerCase()
@@ -209,14 +271,32 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
       const supplierName = partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? ''
       const balance = bill.payableBalance ?? 0
       const status = paymentBillStatus(bill)
-      const matchesSearch = !query || `${bill.docNo} ${supplierName} ${bill.date ?? ''}`.toLowerCase().includes(query)
-      const matchesStatus = billStatusFilter === 'all'
-        || (billStatusFilter === 'unpaid' && balance > 0 && status !== 'cancelled')
-        || (billStatusFilter === 'paid' && balance <= 0 && status !== 'cancelled')
-        || (billStatusFilter === 'cancelled' && status === 'cancelled')
+      const supplier = supplierMap.get(bill.supplierId ?? '')
+      const supplierBankAccounts = supplierBankAccountLines(supplier)
+      const searchHaystack = `${bill.docNo} ${supplierName} ${bill.date ?? ''} ${supplierBankAccounts.map((account) => `${account.bankName} ${account.accountNo}`).join(' ')}`.toLowerCase()
+      const matchesSearch = !query || searchHaystack.includes(query)
+      const matchesStatus = balance > 0 && status !== 'cancelled'
       return matchesSearch && matchesStatus
+    }).sort((left, right) => {
+      const leftSupplierName = partyMap.get(left.supplierId ?? '') ?? left.supplierId ?? ''
+      const rightSupplierName = partyMap.get(right.supplierId ?? '') ?? right.supplierId ?? ''
+      switch (billSort) {
+        case 'date_asc':
+          return String(left.date ?? '').localeCompare(String(right.date ?? ''))
+        case 'date_desc':
+          return String(right.date ?? '').localeCompare(String(left.date ?? ''))
+        case 'balance_desc':
+          return (right.payableBalance ?? 0) - (left.payableBalance ?? 0)
+        case 'doc_desc':
+          return right.docNo.localeCompare(left.docNo)
+        case 'supplier_asc':
+          return leftSupplierName.localeCompare(rightSupplierName, 'th')
+        case 'age_desc':
+        default:
+          return ageInDays(right.date) - ageInDays(left.date)
+      }
     })
-  }, [billSearch, billStatusFilter, data.bills, mode, partyMap])
+  }, [billSearch, billSort, data.bills, mode, partyMap, supplierMap])
 
   const supplierBillTotalRows = supplierBills.length
   const supplierBillTotalPages = Math.max(1, Math.ceil(supplierBillTotalRows / billPageSize))
@@ -225,7 +305,7 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
 
   useEffect(() => {
     setBillPage(1)
-  }, [billSearch, billStatusFilter, billPageSize])
+  }, [billSearch, billPageSize, billSort])
 
   useEffect(() => {
     if (billPage > supplierBillTotalPages) setBillPage(supplierBillTotalPages)
@@ -243,13 +323,29 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     return data.rows.filter((row) => {
-      const matchesSearch = !query || `${row.docNo} ${row.partyName} ${row.accountName} ${row.notes}`.toLowerCase().includes(query)
+      const matchesSearch = !query || `${row.docNo} ${row.partyName} ${row.accountName} ${(row.accountNames ?? []).join(' ')} ${(row.billDocNos ?? []).join(' ')} ${row.notes}`.toLowerCase().includes(query)
       const matchesAccount = !accountFilter || row.accountId === accountFilter || row.accountName === accountFilter
       const matchesFrom = !dateFrom || row.date >= dateFrom
       const matchesTo = !dateTo || row.date <= dateTo
       return matchesSearch && matchesAccount && matchesFrom && matchesTo
     })
   }, [accountFilter, data.rows, dateFrom, dateTo, search])
+
+  const historyRows = useMemo(() => {
+    return [...rows].sort((left, right) => {
+      const leftValue = left[historySortField]
+      const rightValue = right[historySortField]
+      const base = typeof leftValue === 'number' && typeof rightValue === 'number'
+        ? leftValue - rightValue
+        : String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'th')
+      return historySortDirection === 'asc' ? base : -base
+    })
+  }, [historySortDirection, historySortField, rows])
+
+  const historyTotalRows = historyRows.length
+  const historyTotalPages = Math.max(1, Math.ceil(historyTotalRows / historyPageSize))
+  const historyCurrentPage = Math.min(historyPage, historyTotalPages)
+  const historyPageRows = historyRows.slice((historyCurrentPage - 1) * historyPageSize, historyCurrentPage * historyPageSize)
 
   const metrics = useMemo(() => {
     const rowAmount = rows.reduce((sum, row) => sum + row.amount, 0)
@@ -259,6 +355,14 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
     const outstanding = outstandingBills.reduce((sum, bill) => sum + (mode === 'payment' ? bill.payableBalance ?? 0 : bill.receivableBalance ?? 0), 0)
     return { outstanding, rowAmount, rowFee, rowNet, rowWht }
   }, [mode, outstandingBills, rows])
+
+  useEffect(() => {
+    setHistoryPage(1)
+  }, [search, dateFrom, dateTo, accountFilter, historyPageSize, historySortField, historySortDirection])
+
+  useEffect(() => {
+    if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages)
+  }, [historyPage, historyTotalPages])
 
   function openForm() {
     setForm(initialForm(mode))
@@ -296,6 +400,41 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
     setDateFrom('')
     setDateTo('')
     setAccountFilter('')
+  }
+
+  async function copyAccountNo(accountKey: string, accountNo: string) {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(accountNo)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = accountNo
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
+      setCopiedAccountKey(accountKey)
+      window.setTimeout(() => setCopiedAccountKey((current) => current === accountKey ? null : current), 1200)
+    } catch {
+      setError('คัดลอกเลขบัญชีไม่ได้')
+    }
+  }
+
+  function toggleHistorySort(field: HistorySortField) {
+    if (historySortField === field) {
+      setHistorySortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setHistorySortField(field)
+    setHistorySortDirection(field === 'date' ? 'desc' : 'asc')
+  }
+
+  function historySortLabel(field: HistorySortField) {
+    if (historySortField !== field) return ' ↕'
+    return historySortDirection === 'asc' ? ' ↑' : ' ↓'
   }
 
   function selectBill(billId: string) {
@@ -472,19 +611,19 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
 
   return (
     <section className="space-y-5">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       {mode === 'payment' ? null : (
-        <div className={`rounded-lg bg-gradient-to-r ${theme.banner} p-5 text-white shadow`}>
+        <div className={`rounded-md bg-gradient-to-r ${theme.banner} p-5 text-white shadow`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold opacity-90">{subtitle}</div>
               <h1 className="text-2xl font-bold">รับเงิน Customer</h1>
               <p className="mt-1 text-sm opacity-90">บันทึกเงินเข้าบัญชีและประวัติ voucher รับ Customer</p>
             </div>
-            <button className={`rounded-lg px-4 py-2 text-sm font-bold text-white shadow ${theme.action}`} type="button" onClick={openForm}>
+            <UiButton className={`font-bold shadow ${theme.action}`} type="button" variant="default" onClick={openForm}>
               + รับเงิน Customer
-            </button>
+            </UiButton>
           </div>
         </div>
       )}
@@ -497,282 +636,235 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
         <KpiCard label={balanceLabel} value={formatMoney(metrics.outstanding)} tone="violet" />
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]">
-          <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="ค้นหาเลขที่ / ชื่อ / บัญชี / หมายเหตุ" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-          <select className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)}>
-            <option value="">ทุกบัญชี</option>
-            {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-          </select>
-          <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={clearFilters}>ล้างตัวกรอง</button>
-        </div>
-      </div>
-
-      {mode === 'payment' ? (
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
+      {mode === 'payment' && showEntrySection ? (
+        <>
+          <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">บิล Supplier ทั้งหมด</h2>
-              <p className="mt-1 text-sm text-slate-500">รวมบิลค้างจ่าย จ่ายบางส่วน จ่ายครบ และยกเลิกในตารางเดียว</p>
+              <h2 className="text-lg font-bold text-slate-900">บิล Supplier ค้างจ่าย</h2>
+              <p className="mt-1 text-sm text-slate-500">แสดงเฉพาะรายการที่ยังมียอดคงเหลือให้ทำจ่าย</p>
             </div>
-            <div className="text-sm text-slate-600">พบทั้งหมด <span className="font-semibold text-slate-900">{supplierBillTotalRows}</span> รายการ</div>
           </div>
-          <div className="grid gap-3 border-b border-slate-200 p-4 md:grid-cols-[1fr_220px]">
-            <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="ค้นหาเลขบิล / Supplier" type="search" value={billSearch} onChange={(event) => setBillSearch(event.target.value)} />
-            <select className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={billStatusFilter} onChange={(event) => setBillStatusFilter(event.target.value)}>
-              <option value="unpaid">เฉพาะค้างจ่าย</option>
-              <option value="all">ทั้งหมด</option>
-              <option value="paid">จ่ายครบแล้ว</option>
-              <option value="cancelled">ยกเลิก</option>
-            </select>
+          <div className="space-y-2 rounded-md bg-white p-3 shadow">
+            <div className="flex flex-wrap items-center gap-2">
+              <UiInput
+                className="min-w-[260px] flex-1 rounded-md"
+                placeholder="ค้นหาเลขบิล / Supplier / ธนาคาร / เลขบัญชี"
+                type="search"
+                value={billSearch}
+                onChange={(event) => setBillSearch(event.target.value)}
+              />
+              <UiButton
+                size="xs"
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setBillSearch('')
+                  setBillSort('age_desc')
+                }}
+              >
+                ✕ ล้าง
+              </UiButton>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500">เรียง:</span>
+              <UiSelect className="w-auto min-w-[180px]" value={billSort} onChange={(event) => setBillSort(event.target.value as typeof billSort)}>
+                <option value="age_desc">อายุค้างมากสุด</option>
+                <option value="balance_desc">ยอดคงเหลือมากสุด</option>
+                <option value="date_desc">วันที่ล่าสุด</option>
+                <option value="date_asc">วันที่เก่าสุด</option>
+                <option value="doc_desc">เลขบิลล่าสุด</option>
+                <option value="supplier_asc">Supplier A-Z</option>
+              </UiSelect>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <div>พบทั้งหมด <span className="font-semibold text-slate-900">{supplierBillTotalRows}</span> รายการ</div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <UiSelect
                 aria-label="จำนวนรายการต่อหน้า"
-                className="rounded border border-slate-300 px-2 py-1"
+                className="h-9 w-auto min-w-[96px] px-2"
                 value={billPageSize}
                 onChange={(event) => setBillPageSize(Number(event.target.value))}
               >
                 {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-              </select>
-              <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={supplierBillCurrentPage <= 1} type="button" onClick={() => setBillPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+              </UiSelect>
+              <UiButton className="font-normal" disabled={supplierBillCurrentPage <= 1} size="sm" type="button" variant="outline" onClick={() => setBillPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</UiButton>
               <span className="px-1">หน้า {supplierBillCurrentPage} / {supplierBillTotalPages}</span>
-              <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={supplierBillCurrentPage >= supplierBillTotalPages} type="button" onClick={() => setBillPage((value) => Math.min(supplierBillTotalPages, value + 1))}>ถัดไป</button>
+              <UiButton className="font-normal" disabled={supplierBillCurrentPage >= supplierBillTotalPages} size="sm" type="button" variant="outline" onClick={() => setBillPage((value) => Math.min(supplierBillTotalPages, value + 1))}>ถัดไป</UiButton>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-slate-100 text-slate-700">
-                <tr>
-                  <th className="p-2 text-left">เลขบิล</th>
-                  <th className="p-2 text-left">วันที่</th>
-                  <th className="p-2 text-left">Supplier</th>
-                  <th className="p-2 text-left">เลขบัญชี</th>
-                  <th className="p-2 text-right">ยอดรวม</th>
-                  <th className="p-2 text-right">จ่ายแล้ว</th>
-                  <th className="p-2 text-right">คงเหลือ</th>
-                  <th className="p-2 text-right">อายุ(วัน)</th>
-                  <th className="p-2 text-center" />
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
+          <Table className="min-w-[1220px]">
+            <TableHeader className="text-slate-700">
+              <tr>
+                <TableHead>เลขบิล</TableHead>
+                <TableHead>วันที่</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead className="w-36">ธนาคาร</TableHead>
+                <TableHead>เลขบัญชี</TableHead>
+                <TableHead className="w-40 text-right">ยอดรวม</TableHead>
+                <TableHead className="w-40 text-right">จ่ายแล้ว</TableHead>
+                <TableHead className="w-40 text-right">คงเหลือ</TableHead>
+                <TableHead className="w-20 text-right">อายุ(วัน)</TableHead>
+                <TableHead className="w-24 text-center" />
+              </tr>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
                 {!isLoading && supplierBillPageRows.map((bill) => {
-                  const status = paymentBillStatus(bill)
                   const balance = bill.payableBalance ?? 0
-                  const supplierBankAccount = supplierBankAccountMap.get(bill.supplierId ?? '') ?? '-'
+                  const supplier = supplierMap.get(bill.supplierId ?? '')
+                  const supplierBankAccounts = supplierBankAccountLines(supplier)
                   return (
-                    <tr key={bill.id} className="border-t hover:bg-slate-50">
-                      <td className="p-2 font-mono text-xs font-semibold text-slate-700">{bill.docNo}</td>
-                      <td className="p-2">{bill.date || '-'}</td>
-                      <td className="max-w-72 truncate p-2 font-medium text-slate-800">{partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}</td>
-                      <td className="max-w-40 truncate p-2 font-mono text-xs text-slate-600">{supplierBankAccount || '-'}</td>
-                      <td className="p-2 text-right font-semibold">{formatMoney(bill.totalAmount)}</td>
-                      <td className="p-2 text-right text-blue-700">{formatMoney(bill.paidAmount)}</td>
-                      <td className={`p-2 text-right font-bold ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</td>
-                      <td className="p-2 text-right">{ageInDays(bill.date)}</td>
-                      <td className="p-2 text-center">
-                        {balance > 0 && status !== 'cancelled' ? (
-                          <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openFormForBill(bill)}>ทำจ่าย</button>
+                    <TableRow key={bill.id} className="cursor-pointer hover:bg-slate-50" onClick={() => openFormForBill(bill)}>
+                      <TableCell className="font-mono text-xs font-semibold text-slate-700">{bill.docNo}</TableCell>
+                      <TableCell>{bill.date || '-'}</TableCell>
+                      <TableCell className="max-w-72 truncate font-medium text-slate-800">{partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}</TableCell>
+                      <TableCell className="w-36 text-xs text-slate-600">
+                        {supplierBankAccounts.length > 0 ? (
+                          <div className="space-y-1">
+                            {supplierBankAccounts.map((account, index) => {
+                              const accountKey = `${bill.id}-${account.accountNo}-${index}`
+                              const bankLabel = account.bankName || '-'
+                              return (
+                                <div key={accountKey} className="whitespace-nowrap">
+                                  {bankLabel}
+                                </div>
+                              )
+                            })}
+                          </div>
                         ) : (
-                          <span className="text-xs text-slate-400">-</span>
+                          <span>-</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="w-52 text-xs text-slate-600">
+                        {supplierBankAccounts.length > 0 ? (
+                          <div className="space-y-1">
+                            {supplierBankAccounts.map((account, index) => {
+                              const accountKey = `${bill.id}-${account.accountNo}-${index}`
+                              const copied = copiedAccountKey === accountKey
+                              const label = formatAccountNoDisplay(account.accountNo) || account.accountNo
+                              return (
+                                <div key={accountKey} className="flex items-center gap-1">
+                                  <span className="whitespace-nowrap font-mono">{label}</span>
+                                  <button
+                                    aria-label={`คัดลอกเลขบัญชี ${label}`}
+                                    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${copied ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'}`}
+                                    title={copied ? 'คัดลอกแล้ว' : 'คัดลอกเลขบัญชี'}
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      void copyAccountNo(accountKey, account.accountNo)
+                                    }}
+                                  >
+                                    <span className="sr-only">{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
+                                    {copied ? (
+                                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                                        <path d="M20 6 9 17l-5-5" />
+                                      </svg>
+                                    ) : (
+                                      <svg aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                                        <rect height="14" rx="2" width="14" x="8" y="8" />
+                                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="w-40 whitespace-nowrap text-right font-semibold tabular-nums">{formatMoney(bill.totalAmount)}</TableCell>
+                      <TableCell className="w-40 whitespace-nowrap text-right text-blue-700 tabular-nums">{formatMoney(bill.paidAmount)}</TableCell>
+                      <TableCell className={`w-40 whitespace-nowrap text-right font-bold tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</TableCell>
+                      <TableCell className="w-20 whitespace-nowrap text-right tabular-nums">{ageInDays(bill.date)}</TableCell>
+                      <TableCell className="text-center">
+                        <UiButton
+                          className="font-normal"
+                          size="xs"
+                          type="button"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openFormForBill(bill)
+                          }}
+                        >
+                          ทำจ่าย
+                        </UiButton>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-                {!isLoading && supplierBillPageRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>ไม่พบบิลตามเงื่อนไข</td></tr> : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              {!isLoading && supplierBillPageRows.length === 0 ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={10}>ไม่พบบิลค้างจ่ายตามเงื่อนไข</TableCell></TableRow> : null}
+            </TableBody>
+          </Table>
+        </>
       ) : null}
 
-      {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form className={`w-full overflow-hidden rounded-lg bg-white shadow-xl ${mode === 'payment' ? 'max-w-5xl' : 'max-w-4xl'}`} onSubmit={save}>
-            <div className={`flex items-center justify-between border-b px-5 py-4 ${mode === 'payment' ? 'bg-white text-slate-900' : theme.muted}`}>
+      {formOpen && showEntrySection ? (
+        <Dialog open onOpenChange={(open) => {
+          if (!open && !isSaving) setFormOpen(false)
+        }}>
+          <DialogContent className={`top-[max(2rem,50%)] max-h-[90vh] overflow-y-auto p-0 ${mode === 'payment' ? 'max-w-5xl' : 'max-w-4xl'}`} hideClose>
+            <form onSubmit={save}>
+            <DialogHeader className={`${mode === 'payment' ? 'bg-white text-slate-900' : theme.muted} flex-row items-center justify-between border-b px-5 py-4`}>
               <div>
-                <h3 className="font-bold">{mode === 'payment' ? 'สร้าง Payment Voucher' : title}</h3>
+                <DialogTitle className="font-bold">{mode === 'payment' ? 'สร้าง Payment Voucher' : title}</DialogTitle>
                 {mode === 'payment' ? null : <p className="text-xs opacity-80">{subtitle}</p>}
               </div>
-              <button className="text-2xl text-slate-500" type="button" onClick={() => setFormOpen(false)}>&times;</button>
-            </div>
+              <UiButton className="h-8 w-8 px-0 text-2xl text-slate-500" size="icon" type="button" variant="ghost" onClick={() => setFormOpen(false)}>&times;</UiButton>
+            </DialogHeader>
             {mode === 'payment' ? (
               <div className="flex flex-col gap-4 p-5 text-sm">
                 <div className="order-1 max-w-xs">
                   <label className="block">
                     <span className="mb-1 block text-xs">วิธีจ่าย</span>
-                    <select className="w-full rounded border px-2 py-1.5 text-sm" required value={form.method ?? 'โอน'} onChange={(event) => setForm({ ...form, method: event.target.value })}>
+                    <UiSelect className="h-9 rounded-md border px-2 py-1.5 text-sm" required value={form.method ?? 'โอน'} onChange={(event) => setForm({ ...form, method: event.target.value })}>
                       <option value="โอน">โอน</option>
                       <option value="เงินสด">เงินสด</option>
                       <option value="เช็ค">เช็ค</option>
                       <option value="PromptPay">PromptPay</option>
-                    </select>
+                    </UiSelect>
                   </label>
                 </div>
 
-                <div className="order-3 rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="font-medium text-blue-900">💳 บัญชีจ่าย * <span className="text-xs font-normal text-slate-600">(เลือกได้หลายบัญชี กรณีวงเงินเต็ม → split)</span></h4>
-                    <button className="rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700" type="button" onClick={addPaymentSplit}>+ เพิ่มบัญชี</button>
-                  </div>
-                  <div className="space-y-2">
-                    {paymentSplits.map((split, splitIndex) => {
-                      const splitAccount = activeAccounts.find((account) => account.id === split.accountId)
-                      const splitBalance = splitAccount?.balance ?? 0
-                      const splitAmount = Number(split.amount) || 0
-                      const splitAmountKey = `split-${split.id ?? splitIndex}-amount`
-                      return (
-                      <div key={split.id ?? splitIndex} className="grid grid-cols-12 items-center gap-2 rounded border bg-white p-2">
-                        <div className="col-span-1 text-center text-xs font-bold text-slate-500">#{splitIndex + 1}</div>
-                        <div className="col-span-6">
-                          <select
-                            className="w-full rounded border px-2 py-1.5 text-sm"
-                            required
-                            value={split.accountId}
-                            onChange={(event) => updatePaymentSplit(splitIndex, { accountId: event.target.value })}
-                          >
-                            <option disabled value="">-- เลือกบัญชี --</option>
-                            {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} (คงเหลือ {formatMoney(account.balance ?? 0)})</option>)}
-                          </select>
-                        </div>
-                        <div className="col-span-4">
-                          <input
-                            className="w-full rounded border px-2 py-1.5 text-right text-sm"
-                            inputMode="decimal"
-                            placeholder={paymentSplits.length === 1 ? formatMoney(formNetAmount) : 'จำนวนเงิน'}
-                            type="text"
-                            value={moneyInputValue(splitAmountKey, splitAmount)}
-                            onBlur={() => finishMoneyInput(splitAmountKey)}
-                            onChange={(event) => changeMoneyInput(splitAmountKey, event.target.value, (amount) => updatePaymentSplit(splitIndex, { amount }))}
-                            onFocus={() => startMoneyInput(splitAmountKey, splitAmount)}
-                          />
-                        </div>
-                        <div className="col-span-1 text-center">
-                          <button
-                            className="px-1 font-bold text-red-500 hover:text-red-700 disabled:text-slate-300"
-                            disabled={paymentSplits.length <= 1}
-                            type="button"
-                            onClick={() => removePaymentSplit(splitIndex)}
-                          >
-                            ×
-                          </button>
-                        </div>
-                        {split.accountId ? (
-                          <div className="col-span-12 grid grid-cols-3 gap-2 pl-2 text-xs">
-                            <label className="block text-blue-700">
-                              <span>💵 คงเหลือ</span>
-                              <input className="mt-1 w-full bg-transparent p-0 text-right font-semibold text-blue-700 disabled:opacity-100" disabled type="text" value={formatMoney(splitBalance)} />
-                            </label>
-                            <label className="block text-amber-700">
-                              <span>➖ จ่าย</span>
-                              <input className="mt-1 w-full bg-transparent p-0 text-right font-semibold text-amber-700 disabled:opacity-100" disabled type="text" value={splitAmount ? formatMoney(splitAmount) : ''} />
-                            </label>
-                            <label className="block text-emerald-700">
-                              <span>📊 หลังจ่าย</span>
-                              <input className="mt-1 w-full bg-transparent p-0 text-right font-semibold text-emerald-700 disabled:opacity-100" disabled type="text" value={formatMoney(splitBalance - splitAmount)} />
-                            </label>
-                          </div>
-                        ) : null}
-                      </div>
-                      )
-                    })}
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 border-t pt-2 text-sm">
-                    <div className="rounded bg-slate-100 p-2">
-                      <div className="text-xs text-slate-600">💰 รวมแยกบัญชี</div>
-                      <div className="font-bold">{formatMoney(paymentSplitTotal)}</div>
-                    </div>
-                    <div className="rounded bg-amber-50 p-2">
-                      <div className="text-xs text-amber-700">🎯 ยอดสุทธิที่ต้องจ่าย</div>
-                      <div className="font-bold text-amber-700">{formatMoney(formNetAmount)}</div>
-                    </div>
-                    <div className={`rounded p-2 ${Math.abs(paymentSplitTotal - formNetAmount) < 0.01 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                      <div className="text-xs">{Math.abs(paymentSplitTotal - formNetAmount) < 0.01 ? 'ตรงกัน' : '⚠️ ผลต่าง'}</div>
-                      <div className="font-bold">{formatMoney(formNetAmount - paymentSplitTotal)}</div>
-                    </div>
-                  </div>
-                </div>
+                <PaymentSplitsSection
+                  activeAccounts={activeAccounts}
+                  formNetAmount={formNetAmount}
+                  moneyInputValue={moneyInputValue}
+                  paymentSplitTotal={paymentSplitTotal}
+                  paymentSplits={paymentSplits}
+                  onAddPaymentSplit={addPaymentSplit}
+                  onChangeMoneyInput={changeMoneyInput}
+                  onFinishMoneyInput={finishMoneyInput}
+                  onRemovePaymentSplit={removePaymentSplit}
+                  onStartMoneyInput={startMoneyInput}
+                  onUpdatePaymentSplit={updatePaymentSplit}
+                />
 
-                <div className="order-2">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="font-semibold text-slate-800">รายการจ่าย ({paymentLines.length}) — เลือกบิลที่ต้องการจ่ายได้เลย ระบบจะ auto-fill Supplier</h4>
-                    <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700" type="button" onClick={addPaymentLine}>+ เพิ่มบรรทัด</button>
-                  </div>
-                  {paymentSelectableBills.length === 0 ? <div className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">⚠️ ไม่มีบิลซื้อค้างจ่ายของ Supplier นี้</div> : null}
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full min-w-[780px] text-xs">
-                      <thead className="bg-slate-100 text-slate-700">
-                        <tr>
-                          <th className="w-80 p-1 text-left">บิล (เลขที่ · วันที่ · Supplier · ยอดค้าง)</th>
-                          <th className="p-1 text-right">ค้าง</th>
-                          <th className="p-1 text-right">จ่าย</th>
-                          <th className="p-1 text-right">WHT</th>
-                          <th className="p-1 text-right">Discount</th>
-                          <th className="p-1 text-right">Bank Fee</th>
-                          <th className="w-10 p-1" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paymentLines.map((line, lineIndex) => {
-                          const lineBill = line.billId ? billMap.get(line.billId) : null
-                          const lineBalance = lineBill?.payableBalance ?? 0
-                          const lineBillOptions = paymentSelectableBillsForLine(lineIndex)
-                          const lineAmountKey = `line-${line.id ?? lineIndex}-amount`
-                          const lineDiscountKey = `line-${line.id ?? lineIndex}-discount`
-                          const lineFeeKey = `line-${line.id ?? lineIndex}-fee`
-                          return (
-                            <tr key={line.id ?? lineIndex} className="border-t">
-                              <td className="p-1">
-                                {isBillLocked && lineIndex === 0 && selectedBill ? (
-                                  <input className="w-full rounded border bg-slate-50 px-1 py-1 text-xs disabled:opacity-100" disabled value={paymentLineInputValue(line)} />
-                                ) : (
-                                  <input
-                                    autoComplete="off"
-                                    className="w-full rounded border px-1 py-1 text-xs"
-                                    list={`payment-bill-options-${line.id ?? lineIndex}`}
-                                    placeholder="🔍 พิมพ์เลขบิล / ชื่อ supplier..."
-                                    value={paymentLineInputValue(line)}
-                                    onChange={(event) => selectPaymentLineBill(lineIndex, event.target.value)}
-                                  />
-                                )}
-                                <datalist id={`payment-bill-options-${line.id ?? lineIndex}`}>
-                                  {lineBillOptions.map((bill) => (
-                                    <option key={bill.id} value={`${bill.docNo} | ${partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'} | ค้าง ${formatMoney(bill.payableBalance ?? 0)}`} />
-                                  ))}
-                                </datalist>
-                              </td>
-                              <td className="p-1"><input className="w-full rounded border bg-slate-50 px-1 py-1 text-right text-amber-700 disabled:opacity-100" disabled type="text" value={formatMoney(lineBalance)} /></td>
-                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={moneyInputValue(lineAmountKey, Number(line.amount) || 0)} onBlur={() => finishMoneyInput(lineAmountKey)} onChange={(event) => changeMoneyInput(lineAmountKey, event.target.value, (amount) => updatePaymentLine(lineIndex, { amount }))} onFocus={() => startMoneyInput(lineAmountKey, Number(line.amount) || 0)} /></td>
-                              <td className="p-1"><input className="w-full rounded border bg-slate-50 px-1 py-1 text-right disabled:opacity-100" disabled type="text" value={formatMoney(line.withholdingTax)} /></td>
-                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={moneyInputValue(lineDiscountKey, Number(line.discount) || 0)} onBlur={() => finishMoneyInput(lineDiscountKey)} onChange={(event) => changeMoneyInput(lineDiscountKey, event.target.value, (discount) => updatePaymentLine(lineIndex, { discount }))} onFocus={() => startMoneyInput(lineDiscountKey, Number(line.discount) || 0)} /></td>
-                              <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" inputMode="decimal" type="text" value={moneyInputValue(lineFeeKey, Number(line.fee) || 0)} onBlur={() => finishMoneyInput(lineFeeKey)} onChange={(event) => changeMoneyInput(lineFeeKey, event.target.value, (fee) => updatePaymentLine(lineIndex, { fee }))} onFocus={() => startMoneyInput(lineFeeKey, Number(line.fee) || 0)} /></td>
-                              <td className="p-1 text-center"><button className="px-1 text-red-500 disabled:text-slate-300" disabled={paymentLines.length <= 1 || (isBillLocked && lineIndex === 0)} type="button" onClick={() => removePaymentLine(lineIndex)}>×</button></td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                      <tfoot className="bg-slate-50 font-semibold">
-                        <tr>
-                          <td className="p-2 text-right">รวม</td>
-                          <td className="p-2 text-right text-amber-700">{formatMoney(paymentLineBalanceTotal)}</td>
-                          <td className="p-2 text-right text-red-700">{formatMoney(form.amount)}</td>
-                          <td className="p-2 text-right">{formatMoney(form.withholdingTax)}</td>
-                          <td className="p-2 text-right">{formatMoney(form.discount)}</td>
-                          <td className="p-2 text-right">{formatMoney(form.fee)}</td>
-                          <td />
-                        </tr>
-                        <tr><td className="p-2 text-right" colSpan={7}>Net Cash Out: <span className="text-base font-bold text-red-700">{formatMoney(formNetAmount)}</span></td></tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">* Net Cash Out = ยอดจ่าย - WHT + Bank Fee</div>
-                </div>
+                <PaymentLinesSection
+                  billMap={billMap}
+                  form={form}
+                  formNetAmount={formNetAmount}
+                  isBillLocked={isBillLocked}
+                  moneyInputValue={moneyInputValue}
+                  partyMap={partyMap}
+                  paymentLineBalanceTotal={paymentLineBalanceTotal}
+                  paymentLines={paymentLines}
+                  paymentSelectableBills={paymentSelectableBills}
+                  paymentSelectableBillsForLine={paymentSelectableBillsForLine}
+                  paymentLineInputValue={paymentLineInputValue}
+                  selectedBill={selectedBill ?? null}
+                  onAddPaymentLine={addPaymentLine}
+                  onChangeMoneyInput={changeMoneyInput}
+                  onFinishMoneyInput={finishMoneyInput}
+                  onRemovePaymentLine={removePaymentLine}
+                  onSelectPaymentLineBill={selectPaymentLineBill}
+                  onStartMoneyInput={startMoneyInput}
+                  onUpdatePaymentLine={updatePaymentLine}
+                />
 
                 <div className="order-4">
                   <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
@@ -790,8 +882,8 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                     value={form.billId ?? ''}
                     onChange={selectBill}
                   />
-                  <Select label={partyLabel} value={partyValue} onChange={(value) => setForm({ ...form, [partyKey]: value } as MoneyForm)} options={parties.filter((party) => party.active !== false)} />
-                  <Select label={accountLabel} value={form.accountId} onChange={(value) => setForm({ ...form, accountId: value })} options={activeAccounts} />
+                  <SelectField label={partyLabel} value={partyValue} onChange={(value) => setForm({ ...form, [partyKey]: value } as MoneyForm)} options={parties.filter((party) => party.active !== false)} />
+                  <SelectField label={accountLabel} value={form.accountId} onChange={(value) => setForm({ ...form, accountId: value })} options={activeAccounts} />
                   <Field label={amountLabel} type="number" value={String(form.amount)} onChange={(value) => setForm({ ...form, amount: Number(value) })} />
                   <Field label="WHT" type="number" value={String(form.withholdingTax)} onChange={(value) => setForm({ ...form, withholdingTax: Number(value) })} />
                   <Field label="ส่วนลด" type="number" value={String(form.discount)} onChange={(value) => setForm({ ...form, discount: Number(value) })} />
@@ -807,72 +899,129 @@ export function MoneyMovementPageClient({ mode }: { mode: 'payment' | 'receipt' 
                 </div>
               </>
             )}
-            <div className="flex justify-end gap-2 border-t px-5 py-4">
-              <button className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-              <button className={`rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 ${theme.action}`} disabled={isSaving} type="submit">บันทึก</button>
-            </div>
+            <DialogFooter className="border-t px-5 py-4">
+              <UiButton className="font-normal text-slate-600" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ยกเลิก</UiButton>
+              <UiButton className={`px-5 font-semibold text-white disabled:opacity-60 ${theme.action}`} disabled={isSaving} type="submit" variant="default">บันทึก</UiButton>
+            </DialogFooter>
           </form>
-        </div>
+        </DialogContent>
+        </Dialog>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-bold text-slate-900">📜 {historyTitle}</h2>
-        <div className="text-sm text-slate-600">พบ <span className="font-semibold text-slate-900">{rows.length}</span> รายการ · รวมสุทธิ <span className={`font-semibold ${theme.strong}`}>{formatMoney(metrics.rowNet)}</span></div>
-      </div>
+      {showHistorySection ? (
+        <>
+          <div className="space-y-2 rounded-md bg-white p-3 shadow">
+            <div className="flex flex-wrap items-center gap-2">
+              <UiInput className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลขที่ / ชื่อ / บัญชี / หมายเหตุ" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <label className="text-xs text-slate-500">วันที่:</label>
+              <DatePickerInput id={`${mode}-history-date-from`} value={dateFrom} onChange={setDateFrom} />
+              <span className="text-slate-400">→</span>
+              <DatePickerInput id={`${mode}-history-date-to`} value={dateTo} onChange={setDateTo} />
+              <UiButton size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</UiButton>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500">เรียง:</span>
+              <UiSelect
+                className="w-auto min-w-[220px]"
+                value={`${historySortField}:${historySortDirection}`}
+                onChange={(event) => {
+                  const [field, direction] = event.target.value.split(':') as [HistorySortField, 'asc' | 'desc']
+                  setHistorySortField(field)
+                  setHistorySortDirection(direction)
+                }}
+              >
+                <option value="docNo:desc">เลขที่รายการ ล่าสุด</option>
+                <option value="docNo:asc">เลขที่รายการ เก่าสุด</option>
+                <option value="date:desc">วันที่ ล่าสุด</option>
+                <option value="date:asc">วันที่ เก่าสุด</option>
+                <option value="partyName:asc">{partyLabel} A-Z</option>
+                <option value="partyName:desc">{partyLabel} Z-A</option>
+                <option value="accountName:asc">บัญชี A-Z</option>
+                <option value="accountName:desc">บัญชี Z-A</option>
+                <option value="amount:desc">{amountLabel} มากสุด</option>
+                <option value="amount:asc">{amountLabel} น้อยสุด</option>
+                <option value="netAmount:desc">สุทธิ มากสุด</option>
+                <option value="netAmount:asc">สุทธิ น้อยสุด</option>
+              </UiSelect>
+              <span className="text-xs text-slate-500">บัญชี:</span>
+              <UiSelect className="w-auto min-w-[180px]" value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)}>
+                <option value="">ทุกบัญชี</option>
+                {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+              </UiSelect>
+            </div>
+          </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[1100px] text-sm">
-          <thead className={`${theme.table} text-white`}>
-            <tr>
-              <th className="p-2 text-left">เลขที่</th>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">{partyLabel}</th>
-              <th className="p-2 text-left">บิลอ้างอิง</th>
-              <th className="p-2 text-left">บัญชี</th>
-              <th className="p-2 text-right">{amountLabel}</th>
-              <th className="p-2 text-right">WHT</th>
-              <th className="p-2 text-right">Fee</th>
-              <th className="p-2 text-right">สุทธิ</th>
-              <th className="p-2 text-left">หมายเหตุ</th>
-              <th className="p-2 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.map((row) => {
-              const bill = row.billId ? billMap.get(row.billId) : null
-              return (
-                <tr key={row.id} className="border-t hover:bg-slate-50">
-                  <td className="p-2 font-mono text-xs font-semibold text-slate-700">{row.docNo}</td>
-                  <td className="p-2">{row.date}</td>
-                  <td className="p-2 font-medium text-slate-800">{row.partyName}</td>
-                  <td className="p-2 font-mono text-xs">{bill?.docNo ?? row.billId ?? '-'}</td>
-                  <td className="p-2"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${theme.chip}`}>{row.accountName}</span></td>
-                  <td className="p-2 text-right font-semibold">{formatMoney(row.amount)}</td>
-                  <td className="p-2 text-right text-amber-700">{formatMoney(row.withholdingTax)}</td>
-                  <td className="p-2 text-right text-slate-600">{formatMoney(row.fee)}</td>
-                  <td className={`p-2 text-right font-bold ${theme.strong}`}>{formatMoney(row.netAmount)}</td>
-                  <td className="max-w-56 truncate p-2 text-slate-600">{row.notes || '-'}</td>
-                  <td className="p-2 text-center">
-                    <button className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-400" disabled type="button">ดู/พิมพ์</button>
-                  </td>
-                </tr>
-              )
-            })}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการ</td></tr> : null}
-          </tbody>
-          <tfoot className="bg-slate-100 font-semibold">
-            <tr>
-              <td className="p-2 text-right" colSpan={5}>รวม</td>
-              <td className="p-2 text-right">{formatMoney(metrics.rowAmount)}</td>
-              <td className="p-2 text-right">{formatMoney(metrics.rowWht)}</td>
-              <td className="p-2 text-right">{formatMoney(metrics.rowFee)}</td>
-              <td className={`p-2 text-right ${theme.strong}`}>{formatMoney(metrics.rowNet)}</td>
-              <td className="p-2" colSpan={2} />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div>พบทั้งหมด <span className="font-semibold text-slate-900">{historyTotalRows}</span> รายการ</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <UiSelect
+                aria-label="จำนวนรายการต่อหน้าประวัติ"
+                className="h-9 w-auto min-w-[96px] px-2"
+                value={historyPageSize}
+                onChange={(event) => setHistoryPageSize(Number(event.target.value))}
+              >
+                {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+              </UiSelect>
+              <UiButton className="font-normal" disabled={historyCurrentPage <= 1} size="sm" type="button" variant="outline" onClick={() => setHistoryPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</UiButton>
+              <span className="px-1">หน้า {historyCurrentPage} / {historyTotalPages}</span>
+              <UiButton className="font-normal" disabled={historyCurrentPage >= historyTotalPages} size="sm" type="button" variant="outline" onClick={() => setHistoryPage((value) => Math.min(historyTotalPages, value + 1))}>ถัดไป</UiButton>
+            </div>
+          </div>
+
+          <Table className="min-w-[1260px]">
+            <TableHeader className="text-slate-700">
+              <tr>
+                <TableHead><button className="font-semibold" type="button" onClick={() => toggleHistorySort('docNo')}>เลขที่รายการ{historySortLabel('docNo')}</button></TableHead>
+                <TableHead><button className="font-semibold" type="button" onClick={() => toggleHistorySort('date')}>วันที่สร้างรายการ{historySortLabel('date')}</button></TableHead>
+                <TableHead><button className="font-semibold" type="button" onClick={() => toggleHistorySort('partyName')}>{partyLabel}{historySortLabel('partyName')}</button></TableHead>
+                <TableHead>บิลอ้างอิง</TableHead>
+                <TableHead><button className="font-semibold" type="button" onClick={() => toggleHistorySort('accountName')}>บัญชีที่ใช้ทำจ่าย{historySortLabel('accountName')}</button></TableHead>
+                <TableHead className="w-44 text-right"><button className="font-semibold" type="button" onClick={() => toggleHistorySort('amount')}>{amountLabel}{historySortLabel('amount')}</button></TableHead>
+                <TableHead className="w-40 text-right">WHT</TableHead>
+                <TableHead className="w-40 text-right">Bank Fee</TableHead>
+                <TableHead className="w-44 text-right"><button className="font-semibold" type="button" onClick={() => toggleHistorySort('netAmount')}>สุทธิ{historySortLabel('netAmount')}</button></TableHead>
+                <TableHead>หมายเหตุ</TableHead>
+                <TableHead className="text-center">Action</TableHead>
+              </tr>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+                {!isLoading && historyPageRows.map((row) => {
+                  const billDocNos = row.billDocNos?.length ? row.billDocNos : [row.billId ? (billMap.get(row.billId)?.docNo ?? row.billDocNo ?? row.billId) : (row.billDocNo ?? '-')]
+                  const accountSummaries = row.accountSummaries?.length ? row.accountSummaries : [row.accountName]
+                  return (
+                    <TableRow key={row.id} className="hover:bg-slate-50">
+                      <TableCell className="font-mono text-xs font-semibold text-slate-700">{row.docNo}</TableCell>
+                      <TableCell>{row.date}</TableCell>
+                      <TableCell className="font-medium text-slate-800">{row.partyName}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="space-y-1">
+                          <div className="font-semibold text-slate-700">{billDocNos.length.toLocaleString('th-TH')} บิล</div>
+                          {billDocNos.map((docNo) => <div key={`${row.id}-bill-${docNo}`} className="font-mono text-slate-700">{docNo}</div>)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-800">
+                        <div className="space-y-1">
+                          <div className="font-semibold text-slate-700">{accountSummaries.length.toLocaleString('th-TH')} บัญชี</div>
+                          {accountSummaries.map((summary) => <div key={`${row.id}-account-${summary}`} className="whitespace-nowrap">{summary}</div>)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="w-44 whitespace-nowrap text-right font-semibold tabular-nums">{formatMoney(row.amount)}</TableCell>
+                      <TableCell className="w-40 whitespace-nowrap text-right text-amber-700 tabular-nums">{formatMoney(row.withholdingTax)}</TableCell>
+                      <TableCell className="w-40 whitespace-nowrap text-right text-slate-600 tabular-nums">{formatMoney(row.fee)}</TableCell>
+                      <TableCell className={`w-44 whitespace-nowrap text-right font-bold tabular-nums ${theme.strong}`}>{formatMoney(row.netAmount)}</TableCell>
+                      <TableCell className="max-w-56 truncate text-slate-600">{row.notes || '-'}</TableCell>
+                      <TableCell className="text-center">
+                        <UiButton className="font-normal text-slate-400" disabled size="xs" type="button" variant="outline">ดู/พิมพ์</UiButton>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              {!isLoading && historyPageRows.length === 0 ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการ</TableCell></TableRow> : null}
+            </TableBody>
+          </Table>
+        </>
+      ) : null}
     </section>
   )
 }
@@ -887,34 +1036,6 @@ function paymentBillStatus(bill: Bill) {
   return 'open'
 }
 
-function BillSelect(props: {
-  bills: Bill[]
-  label: string
-  mode: 'payment' | 'receipt'
-  onChange: (value: string) => void
-  partyMap: Map<string, string>
-  required?: boolean
-  value: string
-}) {
-  return (
-    <label className="block text-sm font-medium">
-      {props.label ? <span>{props.label}{props.required ? <span className="text-red-600"> *</span> : null}</span> : null}
-      <select className={`${props.label ? 'mt-1.5' : ''} w-full rounded-lg border border-slate-300 px-3 py-2`} required={props.required} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
-        <option disabled={props.required} value="">{props.required ? 'เลือกบิล' : 'ไม่ระบุ'}</option>
-        {props.bills.map((bill) => {
-          const partyId = props.mode === 'payment' ? bill.supplierId ?? '' : bill.customerId ?? ''
-          const balance = props.mode === 'payment' ? bill.payableBalance ?? 0 : bill.receivableBalance ?? 0
-          return <option key={bill.id} value={bill.id}>{bill.docNo} · {(props.partyMap.get(partyId) ?? partyId) || '-'} · {formatMoney(balance)}</option>
-        })}
-      </select>
-    </label>
-  )
-}
-
-function Field(props: { label: string; onChange: (value: string) => void; readOnly?: boolean; type?: string; value: string }) {
-  return <label className="block text-sm font-medium">{props.label}<input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2" readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label>
-}
-
 function KpiCard({ label, tone, value }: { label: string; tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'slate' | 'violet'; value: string }) {
   const tones = {
     amber: 'border-amber-200 bg-amber-50 text-amber-700',
@@ -924,22 +1045,5 @@ function KpiCard({ label, tone, value }: { label: string; tone: 'amber' | 'blue'
     slate: 'border-slate-200 bg-white text-slate-800',
     violet: 'border-violet-200 bg-violet-50 text-violet-700',
   }
-  return <div className={`rounded-lg border p-4 shadow-sm ${tones[tone]}`}><div className="text-xs font-semibold uppercase tracking-wide opacity-70">{label}</div><div className="mt-2 text-xl font-bold">{value}</div></div>
-}
-
-function Select(props: { allowEmpty?: boolean; label: string; onChange: (value: string) => void; options: Array<{ id: string; name: string }>; placeholder?: string; required?: boolean; value: string }) {
-  const allowEmpty = props.allowEmpty ?? true
-  return (
-    <label className="block text-sm font-medium">
-      {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
-      <select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2" required={props.required ?? !allowEmpty} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
-        {allowEmpty ? <option value="">ไม่ระบุ</option> : <option disabled value="">{props.placeholder ?? 'เลือกข้อมูล'}</option>}
-        {props.options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
-      </select>
-    </label>
-  )
-}
-
-function SummaryPill({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-slate-200 bg-white px-3 py-2"><div className="text-xs text-slate-500">{label}</div><div className="font-bold text-slate-900">{value}</div></div>
+  return <div className={`rounded-md border p-4 shadow-sm ${tones[tone]}`}><div className="text-xs font-semibold uppercase tracking-wide opacity-70">{label}</div><div className="mt-2 text-xl font-bold">{value}</div></div>
 }

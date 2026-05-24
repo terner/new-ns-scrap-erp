@@ -9,29 +9,27 @@ type ActiveToggleProps = {
 
 export function ActiveToggle({ checked, disabled = false, label = 'ใช้งาน', onChange }: ActiveToggleProps) {
   return (
-    <button
-      aria-checked={checked}
-      className="inline-flex items-center gap-2 rounded-full px-1 py-1 text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-      disabled={disabled}
-      role="switch"
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation()
-        onChange(!checked)
-      }}
-    >
-      <span
-        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border transition-colors ${
-          checked ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-slate-200'
-        }`}
+    <div className="inline-flex items-center gap-2">
+      <button
+        aria-checked={checked}
+        className={`peer group/switch relative inline-flex h-[18.4px] w-8 shrink-0 items-center rounded-full border border-transparent outline-none transition-all after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-emerald-500 focus-visible:ring-3 focus-visible:ring-emerald-100 ${
+          checked ? 'bg-emerald-600' : 'bg-slate-300'
+        } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+        disabled={disabled}
+        role="switch"
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onChange(!checked)
+        }}
       >
         <span
-          className={`absolute top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform ${
-            checked ? 'translate-x-5' : 'translate-x-0.5'
+          className={`pointer-events-none block size-4 rounded-full bg-white ring-0 transition-transform ${
+            checked ? 'translate-x-[14px]' : 'translate-x-0'
           }`}
         />
-      </span>
-      {label ? <span className="font-medium">{label}</span> : null}
-    </button>
+      </button>
+      {label ? <span className="text-sm font-medium text-slate-600">{label}</span> : null}
+    </div>
   )
 }

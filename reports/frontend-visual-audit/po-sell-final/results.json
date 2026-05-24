@@ -1,0 +1,22 @@
+[
+  {
+    "appName": "live",
+    "clicked": true,
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "screenshot": "reports/frontend-visual-audit/po-sell-final/poSell-live-desktop.png",
+    "text": "📤 PO Sell = จองขายล่วงหน้า — ใช้กับ Cost Allocator เพื่อคำนวณกำไรคาดการณ์ก่อนขายจริง 📋 PO ทั้งหมด 0 รายได้รวม 0.00 ⚪ Not Matched 0 รอ Match Cost ⚙ Partial 0 Match บางส่วน ✓ Fully Matched 0 พร้อมขาย ⏳ น้ำหนักรอส่ง 0.00 จาก 0.00 กก. 💰 มูลค่ารอส่ง 0.00 รายได้รอรับ 🏆 Top 5 Customer (ยอดสั่งจอง) ไม่มีข้อมูล 📋 PO ค้างส่งสินค้า (0) เรียงตามวันส่งมอบ ✅ ไม่มี PO ค้างส่ง วันที่: → + PO Sell ใหม่ สถานะ Match: ทั้งหมด ยังไม่ Match Partial Full Over Cancelled 📊 พบ 0 PO เลขที่ วันที่ Customer รายการ จำนวนรวม รายได้รวม Matched เหลือ Deal Margin % สถานะ Match ยังไม่มี PO Sell"
+  },
+  {
+    "appName": "vue",
+    "clicked": true,
+    "consoleMessages": [],
+    "screenshot": "reports/frontend-visual-audit/po-sell-final/poSell-vue-desktop.png",
+    "text": "📤 PO Sell = จองขายล่วงหน้า — ใช้กับ Cost Allocator เพื่อคำนวณกำไรคาดการณ์ก่อนขายจริง 📋 PO ทั้งหมด 0 รายได้รวม 0.00 ⚪ Not Matched 0 รอ Match Cost ⚙ Partial 0 Match บางส่วน ✓ Fully Matched 0 พร้อมขาย ⏳ น้ำหนักรอส่ง 0.00 จาก 0.00 กก. 💰 มูลค่ารอส่ง 0.00 รายได้รอรับ 🏆 Top 5 Customer (ยอดสั่งจอง) ไม่มีข้อมูล 📋 PO ค้างส่งสินค้า (0) เรียงตามวันส่งมอบ ✅ ไม่มี PO ค้างส่ง วันที่: → + PO Sell ใหม่ สถานะ Match: ทั้งหมด ยังไม่ Match Partial Full Over Cancelled 📊 พบ 0 PO เลขที่ วันที่ Customer รายการ จำนวนรวม รายได้รวม Matched เหลือ Deal Margin % สถานะ Match ยังไม่มี PO Sell"
+  }
+]

@@ -93,8 +93,8 @@ export function CashFlowAnalysisPageClient() {
         <Panel title="🪤 เงินจมที่ไหน"><TrapDonut ar={data?.summary.arNow ?? 0} cash={data?.summary.cashNow ?? 0} stock={data?.summary.stockNow ?? 0} /></Panel>
         <Panel title="🔥 Burn Rate & OD Status">
           <Bar label="⚠ OD ใช้แล้ว" max={Math.max(data?.summary.odLimit ?? 1, 1)} tone="emerald" value={data?.summary.odUsed ?? 0} />
-          <div className="rounded bg-slate-50 p-3 text-center"><div className="text-xs text-slate-500">🔥 Burn Rate (เฉลี่ย/วัน)</div><div className="text-2xl font-bold text-rose-600">{money(data?.summary.burnRate)}</div><div className="text-xs text-slate-400">บาท/วัน</div></div>
-          <div className="mt-3 rounded bg-emerald-50 p-3 text-center"><div className="text-xs text-emerald-700">⏰ OD จะเต็มวงเงินใน</div><div className="text-2xl font-bold text-emerald-700">{Math.round(data?.summary.daysToODMaxed ?? 0)} วัน</div></div>
+          <div className="rounded-md bg-slate-50 p-3 text-center"><div className="text-xs text-slate-500">🔥 Burn Rate (เฉลี่ย/วัน)</div><div className="text-2xl font-bold text-rose-600">{money(data?.summary.burnRate)}</div><div className="text-xs text-slate-400">บาท/วัน</div></div>
+          <div className="mt-3 rounded-md bg-emerald-50 p-3 text-center"><div className="text-xs text-emerald-700">⏰ OD จะเต็มวงเงินใน</div><div className="text-2xl font-bold text-emerald-700">{Math.round(data?.summary.daysToODMaxed ?? 0)} วัน</div></div>
         </Panel>
       </div>
       <Panel title="📈 Cash Projection (ปัจจุบัน → 7 วัน → 30 วัน)">
@@ -121,14 +121,14 @@ export function CashFlowForecastCalendarPageClient() {
       {error ? <ErrorBox message={error} /> : null}
       <FilterPanel>
         <span className="text-sm font-bold">Forecast:</span>
-        {[7, 30, 90].map((item) => <button key={item} className={`rounded px-3 py-1.5 text-sm font-medium ${horizon === item ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} type="button" onClick={() => setHorizon(item)}>{item} วัน</button>)}
+        {[7, 30, 90].map((item) => <button key={item} className={`rounded-md px-3 py-1.5 text-sm font-medium ${horizon === item ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} type="button" onClick={() => setHorizon(item)}>{item} วัน</button>)}
         <DateInput label="เริ่ม" value={startDate} onChange={setStartDate} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
         <span className="text-xs text-slate-500">เริ่มจาก {money(data?.summary.startCash)} → จบที่ {money(data?.summary.endCash)}</span>
       </FilterPanel>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <ForecastMega summary={data?.summary} horizon={horizon} />
-        <div className="col-span-1 rounded-2xl bg-white p-4 shadow md:col-span-2"><div className="mb-3 text-sm font-bold text-slate-700">📈 พยากรณ์เงินสดรายวัน ({horizon} วันข้างหน้า)</div><ProjectionSvg days={data?.dailyProjection ?? []} /></div>
+        <div className="col-span-1 rounded-md bg-white p-4 shadow md:col-span-2"><div className="mb-3 text-sm font-bold text-slate-700">📈 พยากรณ์เงินสดรายวัน ({horizon} วันข้างหน้า)</div><ProjectionSvg days={data?.dailyProjection ?? []} /></div>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="เงินสดเริ่มต้น" tone="blue" value={money(data?.summary.startCash)} />
@@ -137,7 +137,7 @@ export function CashFlowForecastCalendarPageClient() {
         <Stat label="เงินสดสิ้นสุด" tone={(data?.summary.endCash ?? 0) >= 0 ? 'emerald' : 'red'} value={money(data?.summary.endCash)} />
         <Stat label="⚠ ยอดต่ำสุด" tone={(data?.summary.lowestBal ?? 0) >= 0 ? 'emerald' : 'red'} value={money(data?.summary.lowestBal)} />
       </div>
-      {data?.summary.negDay ? <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-sm font-bold text-red-700">⚠ เงินสดจะติดลบในวันที่ {data.summary.negDay.date} (ยอด {money(data.summary.negDay.closing)}) · {data.summary.negCount} วัน</div> : null}
+      {data?.summary.negDay ? <div className="rounded-md border-2 border-red-300 bg-red-50 p-4 text-sm font-bold text-red-700">⚠ เงินสดจะติดลบในวันที่ {data.summary.negDay.date} (ยอด {money(data.summary.negDay.closing)}) · {data.summary.negCount} วัน</div> : null}
       <CalendarGrid days={data?.dailyProjection ?? []} isLoading={isLoading} onSelect={setModal} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2"><TopAr rows={data?.insights.topAR ?? []} /><TopAp rows={data?.insights.topAP ?? []} /></div>
       {modal ? <DayModal day={modal} onClose={() => setModal(null)} /> : null}
@@ -166,32 +166,32 @@ function money(value?: number) {
 
 function Hero({ subtitle, title, tone }: { subtitle: string; title: string; tone: 'analysis' | 'forecast' }) {
   const gradient = tone === 'analysis' ? 'from-cyan-700 to-blue-800' : 'from-sky-700 to-blue-800'
-  return <div className={`rounded-xl bg-gradient-to-r ${gradient} p-5 text-white shadow`}><h1 className="text-xl font-bold md:text-2xl">{title}</h1><p className="mt-1 text-sm opacity-80">{subtitle}</p></div>
+  return <div className={`rounded-md bg-gradient-to-r ${gradient} p-5 text-white shadow`}><h1 className="text-xl font-bold md:text-2xl">{title}</h1><p className="mt-1 text-sm opacity-80">{subtitle}</p></div>
 }
 
 function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
-  return <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Cash planning read baseline</b><span className="ml-2">พยากรณ์/วิเคราะห์จากข้อมูลธุรกรรม ยังไม่ใช่ GL หรือ cash-flow statutory statement</span>{sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}</div>
+  return <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Cash planning read baseline</b><span className="ml-2">พยากรณ์/วิเคราะห์จากข้อมูลธุรกรรม ยังไม่ใช่ GL หรือ cash-flow statutory statement</span>{sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}</div>
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
 }
 
 function DateInput({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
-  return <label className="flex items-center gap-2 text-sm"><span>{label}</span><input className="rounded border px-2 py-1.5 text-sm" type="date" value={value} onChange={(event) => onChange(event.target.value)} /></label>
+  return <label className="flex items-center gap-2 text-sm"><span>{label}</span><input className="rounded-md border px-2 py-1.5 text-sm" type="date" value={value} onChange={(event) => onChange(event.target.value)} /></label>
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded border bg-white px-2 py-1.5 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="rounded-md border bg-white px-2 py-1.5 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-2xl bg-white p-5 shadow-lg"><h3 className="mb-3 font-bold text-slate-800">{title}</h3>{children}</div>
+  return <div className="rounded-md bg-white p-5 shadow-lg"><h3 className="mb-3 font-bold text-slate-800">{title}</h3>{children}</div>
 }
 
 function Bar({ label, max, tone, value }: { label: string; max: number; tone: 'blue' | 'emerald'; value: number }) {
   const color = tone === 'emerald' ? 'from-emerald-500 to-teal-500 text-emerald-700' : 'from-blue-500 to-indigo-500 text-blue-700'
-  return <div className="mb-3"><div className="mb-1 flex justify-between text-sm"><span className="text-slate-600">{label}</span><span className={`font-bold ${color.split(' ').at(-1)}`}>{money(value)}</span></div><div className="h-4 w-full overflow-hidden rounded-full bg-slate-100"><div className={`h-4 rounded-full bg-gradient-to-r ${color}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} /></div></div>
+  return <div className="mb-3"><div className="mb-1 flex justify-between text-sm"><span className="text-slate-600">{label}</span><span className={`font-bold ${color.split(' ').at(-1)}`}>{money(value)}</span></div><div className="h-4 w-full overflow-hidden rounded-md-full bg-slate-100"><div className={`h-4 rounded-md-full bg-gradient-to-r ${color}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} /></div></div>
 }
 
 function TrapDonut({ ar, cash, stock }: { ar: number; cash: number; stock: number }) {
@@ -207,21 +207,21 @@ function Legend({ label, value }: { label: string; value: number }) {
 
 function ProjectionCard({ index, row }: { index: number; row: AnalysisPayload['charts']['projection'][number] }) {
   const cls = index === 0 ? 'from-blue-50 to-indigo-50' : index === 1 ? 'from-amber-50 to-orange-50' : 'from-emerald-50 to-teal-50'
-  return <div className={`rounded-xl bg-gradient-to-br ${cls} p-4 shadow`}><div className="mb-1 text-xs text-slate-500">{row.label}</div><div className={`text-3xl font-bold ${row.projected >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{money(row.projected)}</div>{row.expectedIn > 0 ? <div className="mt-2 text-xs text-emerald-600">📥 จะรับ +{money(row.expectedIn)}</div> : null}{row.expectedOut > 0 ? <div className="text-xs text-red-600">📤 จะจ่าย -{money(row.expectedOut)}</div> : null}</div>
+  return <div className={`rounded-md bg-gradient-to-br ${cls} p-4 shadow`}><div className="mb-1 text-xs text-slate-500">{row.label}</div><div className={`text-3xl font-bold ${row.projected >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{money(row.projected)}</div>{row.expectedIn > 0 ? <div className="mt-2 text-xs text-emerald-600">📥 จะรับ +{money(row.expectedIn)}</div> : null}{row.expectedOut > 0 ? <div className="text-xs text-red-600">📤 จะจ่าย -{money(row.expectedOut)}</div> : null}</div>
 }
 
 function InsightCard({ insight }: { insight: Insight }) {
   const cls = insight.type === 'danger' ? 'border-red-500 bg-red-50' : insight.type === 'warn' ? 'border-amber-500 bg-amber-50' : 'border-emerald-500 bg-emerald-50'
-  return <div className={`rounded-xl border-l-4 p-5 shadow ${cls}`}><h3 className="mb-2 text-base font-bold">{insight.title}</h3><div className="mb-2 text-sm font-medium text-slate-700">{insight.body}</div><div className="text-xs text-slate-600">{insight.explain}</div></div>
+  return <div className={`rounded-md border-l-4 p-5 shadow ${cls}`}><h3 className="mb-2 text-base font-bold">{insight.title}</h3><div className="mb-2 text-sm font-medium text-slate-700">{insight.body}</div><div className="text-xs text-slate-600">{insight.explain}</div></div>
 }
 
 function DetailTable({ isLoading, rows }: { isLoading: boolean; rows: AnalysisPayload['detailRows'] }) {
-  return <div className="rounded-xl bg-white p-4 shadow"><h3 className="mb-3 font-bold">📊 ตารางรายละเอียด</h3><table className="w-full text-sm"><tbody>{isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={2}>กำลังโหลดข้อมูล</td></tr> : null}{rows.map((row) => <tr key={row.label} className={`border-t ${row.tone === 'warn' ? 'bg-amber-50' : row.tone === 'bad' ? 'bg-red-50' : row.label.includes('Projected') ? 'bg-blue-50' : ''}`}><td className="p-2">{row.label}</td><td className={`p-2 text-right font-bold ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : ''}`}>{row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}</td></tr>)}</tbody></table></div>
+  return <div className="rounded-md bg-white p-4 shadow"><h3 className="mb-3 font-bold">📊 ตารางรายละเอียด</h3><table className="w-full text-sm"><tbody>{isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={2}>กำลังโหลดข้อมูล</td></tr> : null}{rows.map((row) => <tr key={row.label} className={`border-t ${row.tone === 'warn' ? 'bg-amber-50' : row.tone === 'bad' ? 'bg-red-50' : row.label.includes('Projected') ? 'bg-blue-50' : ''}`}><td className="p-2">{row.label}</td><td className={`p-2 text-right font-bold ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : ''}`}>{row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}</td></tr>)}</tbody></table></div>
 }
 
 function ForecastMega({ horizon, summary }: { horizon: number; summary?: ForecastPayload['summary'] }) {
   const ok = (summary?.lowestBal ?? 0) >= 0
-  return <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-xl ${ok ? 'bg-gradient-to-br from-emerald-500 to-teal-700' : 'bg-gradient-to-br from-red-500 to-rose-700 ring-4 ring-red-200'}`}><div className="absolute right-3 top-2 text-7xl opacity-15">{ok ? '💎' : '⚠'}</div><div className="text-xs opacity-80">{ok ? '✓ Forecast: เงินพอ' : '⚠ Forecast: เงินขาด!'}</div><div className="mt-1 text-4xl font-bold">{money(summary?.endCash)}</div><div className="mt-2 text-sm opacity-90">เงินสด ณ สิ้น {horizon} วัน</div><div className="mt-3 space-y-0.5 text-xs opacity-80"><div>เริ่มต้น: <b>{money(summary?.startCash)}</b></div><div>+ Expected In: <b>+{money(summary?.totalIn)}</b></div><div>- Expected Out: <b>-{money(summary?.totalOut)}</b></div><div>⚠ ต่ำสุด: <b>{money(summary?.lowestBal)}</b> {summary?.negCount ? `(${summary.negCount} วัน ติดลบ)` : ''}</div></div></div>
+  return <div className={`relative overflow-hidden rounded-md p-5 text-white shadow-xl ${ok ? 'bg-gradient-to-br from-emerald-500 to-teal-700' : 'bg-gradient-to-br from-red-500 to-rose-700 ring-4 ring-red-200'}`}><div className="absolute right-3 top-2 text-7xl opacity-15">{ok ? '💎' : '⚠'}</div><div className="text-xs opacity-80">{ok ? '✓ Forecast: เงินพอ' : '⚠ Forecast: เงินขาด!'}</div><div className="mt-1 text-4xl font-bold">{money(summary?.endCash)}</div><div className="mt-2 text-sm opacity-90">เงินสด ณ สิ้น {horizon} วัน</div><div className="mt-3 space-y-0.5 text-xs opacity-80"><div>เริ่มต้น: <b>{money(summary?.startCash)}</b></div><div>+ Expected In: <b>+{money(summary?.totalIn)}</b></div><div>- Expected Out: <b>-{money(summary?.totalOut)}</b></div><div>⚠ ต่ำสุด: <b>{money(summary?.lowestBal)}</b> {summary?.negCount ? `(${summary.negCount} วัน ติดลบ)` : ''}</div></div></div>
 }
 
 function ProjectionSvg({ days }: { days: ProjectionDay[] }) {
@@ -232,12 +232,12 @@ function ProjectionSvg({ days }: { days: ProjectionDay[] }) {
 
 function Stat({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' | 'red'; value: string }) {
   const color = tone === 'blue' ? 'text-blue-700' : tone === 'emerald' ? 'text-emerald-700' : 'text-red-700'
-  return <div className="rounded-xl bg-white p-3 shadow"><div className={`text-xs ${color}`}>{label}</div><div className={`text-lg font-bold ${color}`}>{value}</div></div>
+  return <div className="rounded-md bg-white p-3 shadow"><div className={`text-xs ${color}`}>{label}</div><div className={`text-lg font-bold ${color}`}>{value}</div></div>
 }
 
 function CalendarGrid({ days, isLoading, onSelect }: { days: ProjectionDay[]; isLoading: boolean; onSelect: (day: ProjectionDay) => void }) {
-  if (isLoading) return <div className="rounded-xl bg-white p-8 text-center text-slate-400 shadow">กำลังโหลดข้อมูล</div>
-  return <div className="overflow-x-auto rounded-xl bg-white p-3 shadow"><div className="mb-1 grid grid-cols-7 gap-1">{['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((day) => <div className="py-1 text-center text-xs font-bold text-slate-500" key={day}>{day}</div>)}</div><div className="grid grid-cols-7 gap-1" style={{ minWidth: 560 }}>{days.length ? Array.from({ length: days[0].dayOfWeek }, (_, index) => <div key={`pad${index}`} />) : null}{days.map((day) => <button key={day.date} className={`min-h-24 rounded border p-2 text-left text-xs transition ${day.closing < 0 ? 'border-red-300 bg-red-50' : day.isToday ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : 'border-slate-200 bg-white'} ${day.dayIn > 0 || day.dayOut > 0 ? 'border-2' : ''}`} type="button" onClick={() => onSelect(day)}><div className="mb-1 flex justify-between"><span className={`font-bold ${day.isToday ? 'text-blue-700' : 'text-slate-700'}`}>{day.dayOfMonth}{day.isToday ? ' (วันนี้)' : ''}</span><span className="text-slate-400">{day.date.slice(5, 7)}</span></div>{day.dayIn > 0 ? <div className="truncate text-emerald-700">+{money(day.dayIn)}</div> : null}{day.dayOut > 0 ? <div className="truncate text-red-600">-{money(day.dayOut)}</div> : null}<div className={`mt-1 truncate font-bold ${day.closing >= 0 ? 'text-slate-700' : 'text-red-700'}`}>{money(day.closing)}</div></button>)}</div></div>
+  if (isLoading) return <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow">กำลังโหลดข้อมูล</div>
+  return <div className="overflow-x-auto rounded-md bg-white p-3 shadow"><div className="mb-1 grid grid-cols-7 gap-1">{['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((day) => <div className="py-1 text-center text-xs font-bold text-slate-500" key={day}>{day}</div>)}</div><div className="grid grid-cols-7 gap-1" style={{ minWidth: 560 }}>{days.length ? Array.from({ length: days[0].dayOfWeek }, (_, index) => <div key={`pad${index}`} />) : null}{days.map((day) => <button key={day.date} className={`min-h-24 rounded-md border p-2 text-left text-xs transition ${day.closing < 0 ? 'border-red-300 bg-red-50' : day.isToday ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : 'border-slate-200 bg-white'} ${day.dayIn > 0 || day.dayOut > 0 ? 'border-2' : ''}`} type="button" onClick={() => onSelect(day)}><div className="mb-1 flex justify-between"><span className={`font-bold ${day.isToday ? 'text-blue-700' : 'text-slate-700'}`}>{day.dayOfMonth}{day.isToday ? ' (วันนี้)' : ''}</span><span className="text-slate-400">{day.date.slice(5, 7)}</span></div>{day.dayIn > 0 ? <div className="truncate text-emerald-700">+{money(day.dayIn)}</div> : null}{day.dayOut > 0 ? <div className="truncate text-red-600">-{money(day.dayOut)}</div> : null}<div className={`mt-1 truncate font-bold ${day.closing >= 0 ? 'text-slate-700' : 'text-red-700'}`}>{money(day.closing)}</div></button>)}</div></div>
 }
 
 function TopAr({ rows }: { rows: ForecastPayload['insights']['topAR'] }) {
@@ -250,11 +250,11 @@ function TopAp({ rows }: { rows: ForecastPayload['insights']['topAP'] }) {
 
 function InsightTable({ children, heading, tone }: { children: ReactNode; empty: string; heading: string; tone: 'emerald' | 'red' }) {
   const cls = tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-  return <div className="rounded-xl bg-white shadow"><div className={`border-b p-3 font-bold ${cls}`}>{heading}</div><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th></tr></thead>{children}</table></div>
+  return <div className="rounded-md bg-white shadow"><div className={`border-b p-3 font-bold ${cls}`}>{heading}</div><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th></tr></thead>{children}</table></div>
 }
 
 function DayModal({ day, onClose }: { day: ProjectionDay; onClose: () => void }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"><div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl"><div className="flex items-center justify-between border-b p-4"><h2 className="font-bold">📅 {day.date} · Closing {money(day.closing)}</h2><button className="rounded bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>Type</Th><Th>Ref</Th><Th>Label</Th><Th align="right">Amount</Th></tr></thead><tbody>{day.events.map((event) => <tr key={`${event.type}-${event.refNo}`} className="border-t"><Td>{event.type}</Td><Td mono>{event.refNo}</Td><Td>{event.label}</Td><Td align="right"><span className={event.inOut === 'IN' ? 'text-emerald-700' : 'text-red-700'}>{event.inOut === 'IN' ? '+' : '-'}{money(event.amount)}</span></Td></tr>)}{!day.events.length ? <tr><td className="py-5 text-center text-slate-400" colSpan={4}>ไม่มี event ในวันนี้</td></tr> : null}</tbody></table></div></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"><div className="w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl"><div className="flex items-center justify-between border-b p-4"><h2 className="font-bold">📅 {day.date} · Closing {money(day.closing)}</h2><button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>Type</Th><Th>Ref</Th><Th>Label</Th><Th align="right">Amount</Th></tr></thead><tbody>{day.events.map((event) => <tr key={`${event.type}-${event.refNo}`} className="border-t"><Td>{event.type}</Td><Td mono>{event.refNo}</Td><Td>{event.label}</Td><Td align="right"><span className={event.inOut === 'IN' ? 'text-emerald-700' : 'text-red-700'}>{event.inOut === 'IN' ? '+' : '-'}{money(event.amount)}</span></Td></tr>)}{!day.events.length ? <tr><td className="py-5 text-center text-slate-400" colSpan={4}>ไม่มี event ในวันนี้</td></tr> : null}</tbody></table></div></div>
 }
 
 function Th({ align = 'left', children }: { align?: 'center' | 'left' | 'right'; children: ReactNode }) {
@@ -268,5 +268,5 @@ function Td({ align = 'left', children, mono = false, strong = false }: { align?
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
+  return <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
 }

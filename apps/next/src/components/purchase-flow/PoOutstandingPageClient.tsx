@@ -73,17 +73,17 @@ export function PoOutstandingPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 p-5 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-purple-700 to-indigo-700 p-5 text-white shadow">
         <h1 className="text-2xl font-bold">รายงาน PO ซื้อ / PO ขาย คงเหลือ</h1>
         <p className="mt-1 text-sm opacity-80">PO Buy ที่ยังไม่ได้รับของ + PO Sell ที่ยังไม่ได้ส่งของ เรียงตามวันที่</p>
       </div>
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="flex gap-1 rounded-xl bg-white p-2 shadow">
-        <button className={`rounded px-5 py-2 text-sm font-medium ${tab === 'buy' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('buy'); setPartnerFilter(''); setProductFilter('') }}>PO ซื้อ คงเหลือ ({data?.summary.buyCount ?? 0})</button>
-        <button className={`rounded px-5 py-2 text-sm font-medium ${tab === 'sell' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('sell'); setPartnerFilter(''); setProductFilter('') }}>PO ขาย คงเหลือ ({data?.summary.sellCount ?? 0})</button>
+      <div className="flex gap-1 rounded-md bg-white p-2 shadow">
+        <button className={`rounded-md px-5 py-2 text-sm font-medium ${tab === 'buy' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('buy'); setPartnerFilter(''); setProductFilter('') }}>PO ซื้อ คงเหลือ ({data?.summary.buyCount ?? 0})</button>
+        <button className={`rounded-md px-5 py-2 text-sm font-medium ${tab === 'sell' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('sell'); setPartnerFilter(''); setProductFilter('') }}>PO ขาย คงเหลือ ({data?.summary.sellCount ?? 0})</button>
         <span className="flex-1" />
-        <button className="rounded bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCsv}>Export CSV</button>
+        <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCsv}>Export CSV</button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -93,20 +93,20 @@ export function PoOutstandingPageClient() {
         <Metric label={tab === 'buy' ? 'มูลค่ารอรับ' : 'มูลค่ารอส่ง'} tone={tab === 'buy' ? 'blue' : 'emerald'} value={formatMoney(totals.remainingValue)} />
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl bg-white p-3 shadow">
-        <input className="min-w-[220px] flex-1 rounded border px-3 py-2 text-sm" placeholder="ค้นหา PO / คู่ค้า / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="rounded border px-3 py-2 text-sm" value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)}>
+      <div className="flex flex-wrap gap-2 rounded-md bg-white p-3 shadow">
+        <input className="min-w-[220px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา PO / คู่ค้า / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <select className="rounded-md border px-3 py-2 text-sm" value={partnerFilter} onChange={(event) => setPartnerFilter(event.target.value)}>
           <option value="">ทุก {tab === 'buy' ? 'Supplier' : 'Customer'}</option>
           {partnerOptions.map((partner) => <option key={partner} value={partner}>{partner}</option>)}
         </select>
-        <select className="rounded border px-3 py-2 text-sm" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
+        <select className="rounded-md border px-3 py-2 text-sm" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
           <option value="">ทุกสินค้า</option>
           {productOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </div>
 
       {tab === 'buy' ? (
-        <div className="overflow-x-auto rounded-xl bg-white shadow">
+        <div className="overflow-x-auto rounded-md bg-white shadow">
           <div className="border-l-4 border-amber-500 bg-amber-50 p-2 text-xs text-amber-700">
             ตัดต้นทุนเป็น write/cost-pool side effect ใน legacy จึงแสดงเป็นคอลัมน์อ่านอย่างเดียวใน Next จนกว่าจะออกแบบ audit และ permission
           </div>
@@ -121,7 +121,7 @@ export function PoOutstandingPageClient() {
           </table>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl bg-white shadow">
+        <div className="overflow-x-auto rounded-md bg-white shadow">
           <table className="w-full text-sm">
             <thead className="bg-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Customer</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">จำนวนขาย</th><th className="p-2 text-right">ราคาขาย</th><th className="p-2 text-right">ขายแล้ว</th><th className="p-2 text-right">รอส่ง</th><th className="p-2 text-right">มูลค่ารอส่ง</th><th className="p-2 text-left">วันส่งมอบ</th><th className="p-2 text-center">สถานะ</th></tr></thead>
             <tbody>
@@ -139,5 +139,5 @@ export function PoOutstandingPageClient() {
 
 function Metric({ label, tone, value }: { label: string; tone?: 'amber' | 'blue' | 'emerald'; value: string }) {
   const className = tone === 'amber' ? 'border-l-4 border-amber-500 bg-amber-50 text-amber-700' : tone === 'blue' ? 'border-l-4 border-blue-500 bg-blue-50 text-blue-700' : tone === 'emerald' ? 'border-l-4 border-emerald-500 bg-emerald-50 text-emerald-700' : 'bg-white text-slate-900'
-  return <div className={`rounded-xl p-3 shadow ${className}`}><div className="text-xs opacity-80">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
+  return <div className={`rounded-md p-3 shadow ${className}`}><div className="text-xs opacity-80">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
 }

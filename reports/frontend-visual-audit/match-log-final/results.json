@@ -1,0 +1,22 @@
+[
+  {
+    "appName": "live",
+    "clicked": true,
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "screenshot": "reports/frontend-visual-audit/match-log-final/matchLog-live-desktop.png",
+    "text": "📋 Match Log — บันทึกการตัดต้นทุนจาก Cost Pool ห้ามลบ — ใช้ Reverse แทน Reverse → คืนต้นทุนให้ Cost Pool ทันที (Available Qty เพิ่มกลับ) รวม Matches 0 📤 Sales Match 0 🔀 Regrade Match 0 Active 0 รวม Qty 0.00 รวมมูลค่าต้นทุน 0.00 ทุก Match Type 📤 Sales (PO Sell) 🔀 Regrade (GA) ทุก Cost Type 📥 Purchase 🏭 Production 🔀 Regrade ทุก PO Sell ทุกสถานะ ✓ Approved ↶ Reversed Match Type Cost Type Match ID วันที่ Target / Reference Source Source No สินค้า Qty ฿/หน่วย มูลค่า Mode สถานะ ยังไม่มี Match Log ตามตัวกรอง"
+  },
+  {
+    "appName": "vue",
+    "clicked": true,
+    "consoleMessages": [],
+    "screenshot": "reports/frontend-visual-audit/match-log-final/matchLog-vue-desktop.png",
+    "text": "📋 Match Log — บันทึกการตัดต้นทุนจาก Cost Pool ห้ามลบ — ใช้ Reverse แทน Reverse → คืนต้นทุนให้ Cost Pool ทันที (Available Qty เพิ่มกลับ) รวม Matches 0 📤 Sales Match 0 🔀 Regrade Match 0 Active 0 รวม Qty 0.00 รวมมูลค่าต้นทุน 0.00 ทุก Match Type 📤 Sales (PO Sell) 🔀 Regrade (GA) ทุก Cost Type 📥 Purchase 🏭 Production 🔀 Regrade ทุก PO Sell ทุกสถานะ ✓ Approved ↶ Reversed Match Type Cost Type Match ID วันที่ Target / Reference Source Source No สินค้า Qty ฿/หน่วย มูลค่า Mode สถานะ ยังไม่มี Match Log ตามตัวกรอง"
+  }
+]

@@ -106,7 +106,7 @@ export function CashFlowCalendarPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800 shadow-sm">📅 Cash Flow Calendar — ปฏิทินรายวันของเงินเข้า/ออก จากบัญชี Cash/Bank/OD ทั้งหมด — คลิกแต่ละวันเพื่อ Drill Down</div>
+      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800 shadow-sm">📅 Cash Flow Calendar — ปฏิทินรายวันของเงินเข้า/ออก จากบัญชี Cash/Bank/OD ทั้งหมด — คลิกแต่ละวันเพื่อ Drill Down</div>
       <MonthControls month={month} setMonth={setMonth} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Metric label="ยอดต้นเดือน" value={money(summary.openingCash)} tone="slate" />
@@ -119,22 +119,22 @@ export function CashFlowCalendarPageClient() {
         <Panel title="📈 เงินเข้า-ออกรายวัน">
           <div className="mb-3 flex gap-4 text-xs"><Legend color="bg-emerald-500" text="เงินเข้า" /><Legend color="bg-red-500" text="เงินออก" /></div>
           <div className="flex h-48 items-end gap-1 border-b border-l border-slate-200 px-2">
-            {(data?.days ?? []).map((day) => <div key={day.date} className="flex h-full flex-1 items-end justify-center gap-0.5"><span className="w-1.5 rounded-t bg-emerald-500" style={{ height: `${pct(day.cashIn, maxFlow)}%` }} /><span className="w-1.5 rounded-t bg-red-500" style={{ height: `${pct(day.cashOut, maxFlow)}%` }} /></div>)}
+            {(data?.days ?? []).map((day) => <div key={day.date} className="flex h-full flex-1 items-end justify-center gap-0.5"><span className="w-1.5 rounded-md-t bg-emerald-500" style={{ height: `${pct(day.cashIn, maxFlow)}%` }} /><span className="w-1.5 rounded-md-t bg-red-500" style={{ height: `${pct(day.cashOut, maxFlow)}%` }} /></div>)}
           </div>
         </Panel>
         <Panel title="📈 ยอดเงินสะสม (Running Balance)">
           <div className="mb-3 text-xs text-slate-500">เส้นประ = ระดับ 0 บาท · จุดแดง = ติดลบ</div>
-          <div className="relative h-48 overflow-hidden rounded bg-slate-50">
+          <div className="relative h-48 overflow-hidden rounded-md bg-slate-50">
             <div className="absolute left-0 right-0 border-t border-dashed border-slate-400" style={{ top: `${100 - pct(0 - minBalance, maxBalance - minBalance)}%` }} />
             <div className="absolute inset-2 flex items-end gap-1">
-              {(data?.days ?? []).map((day) => <span key={day.date} className={`flex-1 rounded-t ${day.ending < 0 ? 'bg-red-500' : 'bg-blue-500'}`} style={{ height: `${pct(day.ending - minBalance, maxBalance - minBalance)}%` }} title={`${day.date} ${money(day.ending)}`} />)}
+              {(data?.days ?? []).map((day) => <span key={day.date} className={`flex-1 rounded-md-t ${day.ending < 0 ? 'bg-red-500' : 'bg-blue-500'}`} style={{ height: `${pct(day.ending - minBalance, maxBalance - minBalance)}%` }} title={`${day.date} ${money(day.ending)}`} />)}
             </div>
           </div>
         </Panel>
       </div>
-      <div className="overflow-hidden rounded-xl bg-white shadow">
+      <div className="overflow-hidden rounded-md bg-white shadow">
         <div className="grid grid-cols-7 bg-slate-100 text-center text-xs font-bold text-slate-700">{weekdays.map((day, index) => <div key={day} className={`p-2 ${index === 0 || index === 6 ? 'text-red-600' : ''}`}>{day}</div>)}</div>
-        {(data?.weeks ?? []).map((week, weekIndex) => <div key={weekIndex} className="grid grid-cols-7 border-t">{week.map((day, dayIndex) => day ? <button key={day.date} aria-label={`ดูรายการวันที่ ${day.date}`} className={`min-h-[110px] border-r p-2 text-left text-xs transition hover:bg-blue-50 ${day.isNegative ? 'bg-red-50' : 'bg-white'} ${day.isToday ? 'ring-2 ring-yellow-300 ring-inset' : ''}`} data-cash-day={day.date} type="button" onClick={() => setSelectedDayDate(day.date)} onPointerDown={() => setSelectedDayDate(day.date)}><div className="flex items-start justify-between"><span className={`font-bold ${day.weekday === 0 || day.weekday === 6 ? 'text-red-600' : 'text-slate-700'}`}>{day.day}</span>{day.entryCount ? <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">{day.entryCount}</span> : null}</div><div className="mt-2 space-y-1"><div className="text-emerald-700">↑ {money(day.cashIn)}</div><div className="text-red-700">↓ {money(day.cashOut)}</div><div className={`border-t pt-1 font-bold ${day.ending < 0 ? 'text-red-700' : 'text-slate-700'}`}>{money(day.ending)}</div></div></button> : <div key={`empty-${weekIndex}-${dayIndex}`} className="min-h-[110px] border-r bg-slate-50" />)}</div>)}
+        {(data?.weeks ?? []).map((week, weekIndex) => <div key={weekIndex} className="grid grid-cols-7 border-t">{week.map((day, dayIndex) => day ? <button key={day.date} aria-label={`ดูรายการวันที่ ${day.date}`} className={`min-h-[110px] border-r p-2 text-left text-xs transition hover:bg-blue-50 ${day.isNegative ? 'bg-red-50' : 'bg-white'} ${day.isToday ? 'ring-2 ring-yellow-300 ring-inset' : ''}`} data-cash-day={day.date} type="button" onClick={() => setSelectedDayDate(day.date)} onPointerDown={() => setSelectedDayDate(day.date)}><div className="flex items-start justify-between"><span className={`font-bold ${day.weekday === 0 || day.weekday === 6 ? 'text-red-600' : 'text-slate-700'}`}>{day.day}</span>{day.entryCount ? <span className="rounded-md-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">{day.entryCount}</span> : null}</div><div className="mt-2 space-y-1"><div className="text-emerald-700">↑ {money(day.cashIn)}</div><div className="text-red-700">↓ {money(day.cashOut)}</div><div className={`border-t pt-1 font-bold ${day.ending < 0 ? 'text-red-700' : 'text-slate-700'}`}>{money(day.ending)}</div></div></button> : <div key={`empty-${weekIndex}-${dayIndex}`} className="min-h-[110px] border-r bg-slate-50" />)}</div>)}
       </div>
       <div className="flex flex-wrap gap-3 text-xs text-slate-600"><Legend color="bg-emerald-500" text="เงินเข้า" /><Legend color="bg-red-500" text="เงินออก" /><Legend color="bg-red-100" text="ยอดติดลบ" /><Legend color="bg-yellow-200" text="วันนี้" /><span>คลิกแต่ละวันเพื่อดูรายการละเอียด</span></div>
       <Notice text={data?.sourceState.limitations[0]} />{error ? <ErrorBox text={error} /> : null}
@@ -162,10 +162,10 @@ export function BusinessCalendarPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 text-sm font-semibold text-purple-800 shadow-sm">🗓️ Business Calendar — ปฏิทินรายวัน: ยอดซื้อ / ยอดขาย / ค่าใช้จ่าย / รับ / จ่าย / Actual GP / Net Cash Flow</div>
+      <div className="rounded-md border border-purple-200 bg-purple-50 p-4 text-sm font-semibold text-purple-800 shadow-sm">🗓️ Business Calendar — ปฏิทินรายวัน: ยอดซื้อ / ยอดขาย / ค่าใช้จ่าย / รับ / จ่าย / Actual GP / Net Cash Flow</div>
       <div className="flex flex-wrap items-center gap-2">
         <MonthControls month={month} setMonth={setMonth} />
-        <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 shadow">{(['combined', 'purchase', 'sales', 'expense'] as Mode[]).map((item) => <ModeButton key={item} active={mode === item} mode={item} onClick={() => setMode(item)} />)}</div>
+        <div className="flex flex-wrap gap-2 rounded-md bg-white p-2 shadow">{(['combined', 'purchase', 'sales', 'expense'] as Mode[]).map((item) => <ModeButton key={item} active={mode === item} mode={item} onClick={() => setMode(item)} />)}</div>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
         <Metric label="ซื้อ" value={money(summary.purchaseAmount)} tone="blue" />
@@ -180,13 +180,13 @@ export function BusinessCalendarPageClient() {
         <Panel title="📈 ซื้อ vs ขาย รายวัน">
           <div className="mb-3 flex gap-4 text-xs"><Legend color="bg-blue-500" text="ซื้อ" /><Legend color="bg-emerald-500" text="ขาย" /></div>
           <div className="flex h-48 items-end gap-1 border-b border-l border-slate-200 px-2">
-            {(data?.days ?? []).map((day) => <div key={day.date} className="flex h-full flex-1 items-end justify-center gap-0.5"><span className="w-1.5 rounded-t bg-blue-500" style={{ height: `${pct(day.purchaseAmount, maxBuySell)}%` }} /><span className="w-1.5 rounded-t bg-emerald-500" style={{ height: `${pct(day.saleAmount, maxBuySell)}%` }} /></div>)}
+            {(data?.days ?? []).map((day) => <div key={day.date} className="flex h-full flex-1 items-end justify-center gap-0.5"><span className="w-1.5 rounded-md-t bg-blue-500" style={{ height: `${pct(day.purchaseAmount, maxBuySell)}%` }} /><span className="w-1.5 rounded-md-t bg-emerald-500" style={{ height: `${pct(day.saleAmount, maxBuySell)}%` }} /></div>)}
           </div>
         </Panel>
         <Panel title="💰 GP สะสมรายวัน">
           <div className="mb-3 text-xs text-slate-500">เส้นม่วง = GP สะสม · แท่งสีจาง = GP รายวัน</div>
           <div className="flex h-48 items-end gap-1 border-b border-l border-slate-200 bg-slate-50 px-2">
-            {gpRows.map((row) => <div key={row.date} className="relative flex h-full flex-1 items-end"><span className="w-full rounded-t bg-purple-200" style={{ height: `${pct(Math.abs(row.daily), maxRunningGp)}%` }} /><span className="absolute bottom-0 left-1/2 w-1 -translate-x-1/2 rounded-t bg-purple-700" style={{ height: `${pct(Math.abs(row.running), maxRunningGp)}%` }} /></div>)}
+            {gpRows.map((row) => <div key={row.date} className="relative flex h-full flex-1 items-end"><span className="w-full rounded-md-t bg-purple-200" style={{ height: `${pct(Math.abs(row.daily), maxRunningGp)}%` }} /><span className="absolute bottom-0 left-1/2 w-1 -translate-x-1/2 rounded-md-t bg-purple-700" style={{ height: `${pct(Math.abs(row.running), maxRunningGp)}%` }} /></div>)}
           </div>
         </Panel>
       </div>
@@ -197,11 +197,11 @@ export function BusinessCalendarPageClient() {
 }
 
 function MonthControls({ month, setMonth }: { month: string; setMonth: (month: string) => void }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow"><button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700" type="button" onClick={() => setMonth(shiftMonth(month, -1))}>← เดือนก่อน</button><input className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold" type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700" type="button" onClick={() => setMonth(shiftMonth(month, 1))}>เดือนถัดไป →</button></div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow"><button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700" type="button" onClick={() => setMonth(shiftMonth(month, -1))}>← เดือนก่อน</button><input className="rounded-md border border-slate-200 px-3 py-2 text-sm font-bold" type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700" type="button" onClick={() => setMonth(shiftMonth(month, 1))}>เดือนถัดไป →</button></div>
 }
 
 function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
-  return <div className="overflow-x-auto rounded-xl bg-white shadow"><table className="w-full min-w-[1040px] text-xs"><thead className="sticky top-0 bg-gradient-to-r from-slate-700 to-slate-900 text-white"><tr>{['วัน', '📥 ซื้อ', '📤 ขาย', 'COGS', '💎 GP', '💸 ค่าใช้จ่าย', '💰 รับ', '💸 จ่าย', '📊 Net Cash', 'AR+', 'AP+'].map((header) => <th key={header} className="p-2 text-right first:text-left">{header}</th>)}</tr></thead><tbody>{days.map((day) => <tr key={day.date} className={`border-t ${day.isWeekend ? 'bg-red-50/40' : ''} ${day.purchaseAmount + day.saleAmount + day.expenseAmount + day.receiptAmount + day.paymentAmount === 0 ? 'opacity-60' : ''}`}><td className="p-2 text-left font-bold">{day.day} {day.isToday ? <span className="rounded bg-yellow-200 px-1 text-[10px] text-yellow-900">วันนี้</span> : null}</td><Amount value={day.purchaseAmount} /><Amount value={day.saleAmount} /><Amount value={day.cogs} /><Amount value={day.gp} signed /><Amount value={day.expenseAmount} /><Amount value={day.receiptAmount} /><Amount value={day.paymentAmount} /><Amount value={day.netCash} signed /><Amount value={day.arIncrease} /><Amount value={day.apIncrease} /></tr>)}</tbody></table></div>
+  return <div className="overflow-x-auto rounded-md bg-white shadow"><table className="w-full min-w-[1040px] text-xs"><thead className="sticky top-0 bg-gradient-to-r from-slate-700 to-slate-900 text-white"><tr>{['วัน', '📥 ซื้อ', '📤 ขาย', 'COGS', '💎 GP', '💸 ค่าใช้จ่าย', '💰 รับ', '💸 จ่าย', '📊 Net Cash', 'AR+', 'AP+'].map((header) => <th key={header} className="p-2 text-right first:text-left">{header}</th>)}</tr></thead><tbody>{days.map((day) => <tr key={day.date} className={`border-t ${day.isWeekend ? 'bg-red-50/40' : ''} ${day.purchaseAmount + day.saleAmount + day.expenseAmount + day.receiptAmount + day.paymentAmount === 0 ? 'opacity-60' : ''}`}><td className="p-2 text-left font-bold">{day.day} {day.isToday ? <span className="rounded-md bg-yellow-200 px-1 text-[10px] text-yellow-900">วันนี้</span> : null}</td><Amount value={day.purchaseAmount} /><Amount value={day.saleAmount} /><Amount value={day.cogs} /><Amount value={day.gp} signed /><Amount value={day.expenseAmount} /><Amount value={day.receiptAmount} /><Amount value={day.paymentAmount} /><Amount value={day.netCash} signed /><Amount value={day.arIncrease} /><Amount value={day.apIncrease} /></tr>)}</tbody></table></div>
 }
 
 function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<Mode, 'combined'> }) {
@@ -215,7 +215,7 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
 }
 
 function CashDayModal({ day, onClose }: { day: CashDay; onClose: () => void }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b p-4"><h2 className="font-bold text-slate-800">รายการวันที่ {day.date}</h2><button className="rounded bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><div className="space-y-3 overflow-y-auto p-4"><div className="grid grid-cols-3 gap-3"><Metric label="เงินเข้า" value={money(day.cashIn)} tone="emerald" /><Metric label="เงินออก" value={money(day.cashOut)} tone="red" /><Metric label="ยอดปลายวัน" value={money(day.ending)} tone={day.ending >= 0 ? 'blue' : 'red'} /></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-100"><tr>{['ประเภท', 'รายละเอียด', 'บัญชี', 'Ref', 'เข้า', 'ออก'].map((header) => <th key={header} className="p-2 text-left">{header}</th>)}</tr></thead><tbody>{day.entries.map((entry) => <tr key={entry.id} className="border-t"><td className="p-2">{entry.type}</td><td className="p-2">{entry.description}</td><td className="p-2">{entry.account}</td><td className="p-2">{entry.refNo}</td><td className="p-2 text-right text-emerald-700">{money(entry.in)}</td><td className="p-2 text-right text-red-700">{money(entry.out)}</td></tr>)}{day.entries.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={6}>ไม่มีรายการ</td></tr> : null}</tbody></table></div></div></div></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-md bg-white shadow-2xl"><div className="flex items-center justify-between border-b p-4"><h2 className="font-bold text-slate-800">รายการวันที่ {day.date}</h2><button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><div className="space-y-3 overflow-y-auto p-4"><div className="grid grid-cols-3 gap-3"><Metric label="เงินเข้า" value={money(day.cashIn)} tone="emerald" /><Metric label="เงินออก" value={money(day.cashOut)} tone="red" /><Metric label="ยอดปลายวัน" value={money(day.ending)} tone={day.ending >= 0 ? 'blue' : 'red'} /></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-100"><tr>{['ประเภท', 'รายละเอียด', 'บัญชี', 'Ref', 'เข้า', 'ออก'].map((header) => <th key={header} className="p-2 text-left">{header}</th>)}</tr></thead><tbody>{day.entries.map((entry) => <tr key={entry.id} className="border-t"><td className="p-2">{entry.type}</td><td className="p-2">{entry.description}</td><td className="p-2">{entry.account}</td><td className="p-2">{entry.refNo}</td><td className="p-2 text-right text-emerald-700">{money(entry.in)}</td><td className="p-2 text-right text-red-700">{money(entry.out)}</td></tr>)}{day.entries.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={6}>ไม่มีรายการ</td></tr> : null}</tbody></table></div></div></div></div>
 }
 
 function Metric({ label, tone, value }: { label: string; tone: string; value: string }) {
@@ -227,21 +227,21 @@ function Metric({ label, tone, value }: { label: string; tone: string; value: st
     red: 'bg-red-50 text-red-700',
     slate: 'bg-white text-slate-700',
   }
-  return <div className={`rounded-xl p-3 shadow ${map[tone] ?? map.slate}`}><div className="text-xs opacity-75">{label}</div><div className="break-words text-xl font-bold">{value}</div></div>
+  return <div className={`rounded-md p-3 shadow ${map[tone] ?? map.slate}`}><div className="text-xs opacity-75">{label}</div><div className="break-words text-xl font-bold">{value}</div></div>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="overflow-hidden rounded-xl bg-white shadow"><div className="border-b bg-slate-50 p-3 text-sm font-bold text-slate-700">{title}</div><div className="p-3">{children}</div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow"><div className="border-b bg-slate-50 p-3 text-sm font-bold text-slate-700">{title}</div><div className="p-3">{children}</div></div>
 }
 
 function Legend({ color, text }: { color: string; text: string }) {
-  return <span className="inline-flex items-center gap-1"><span className={`h-3 w-3 rounded ${color}`} />{text}</span>
+  return <span className="inline-flex items-center gap-1"><span className={`h-3 w-3 rounded-md ${color}`} />{text}</span>
 }
 
 function ModeButton({ active, mode, onClick }: { active: boolean; mode: Mode; onClick: () => void }) {
   const label: Record<Mode, string> = { combined: 'Combined', expense: 'Expense', purchase: 'Purchase', sales: 'Sales' }
   const activeClass: Record<Mode, string> = { combined: 'bg-purple-600 text-white', expense: 'bg-red-600 text-white', purchase: 'bg-blue-600 text-white', sales: 'bg-emerald-600 text-white' }
-  return <button className={`rounded-lg px-3 py-2 text-sm font-bold ${active ? activeClass[mode] : 'bg-white text-slate-600 shadow-sm'}`} type="button" onClick={onClick} onPointerDown={onClick}>{label[mode]}</button>
+  return <button className={`rounded-md px-3 py-2 text-sm font-bold ${active ? activeClass[mode] : 'bg-white text-slate-600 shadow-sm'}`} type="button" onClick={onClick} onPointerDown={onClick}>{label[mode]}</button>
 }
 
 function Amount({ signed = false, value }: { signed?: boolean; value: number }) {
@@ -250,9 +250,9 @@ function Amount({ signed = false, value }: { signed?: boolean; value: number }) 
 }
 
 function Notice({ text }: { text?: string }) {
-  return <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Read-only baseline</b><span className="ml-2">{text ?? 'ไม่มี write action ใน baseline นี้'}</span></div>
+  return <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Read-only baseline</b><span className="ml-2">{text ?? 'ไม่มี write action ใน baseline นี้'}</span></div>
 }
 
 function ErrorBox({ text }: { text: string }) {
-  return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{text}</div>
+  return <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{text}</div>
 }

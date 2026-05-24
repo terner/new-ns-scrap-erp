@@ -82,7 +82,24 @@ export async function GET() {
 
     const [accounts, suppliers, bills, payments, whtRatePercent] = await Promise.all([
       listDailyAccounts(),
-      prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, bank_account: true, id: true, name: true } }),
+      prisma.suppliers.findMany({
+        orderBy: [{ name: 'asc' }],
+        select: {
+          active: true,
+          bank_account: true,
+          id: true,
+          name: true,
+          supplier_bank_accounts: {
+            orderBy: [{ is_primary: 'desc' }, { created_at: 'asc' }],
+            select: {
+              account_no: true,
+              active: true,
+              bank_name: true,
+              payment_method: true,
+            },
+          },
+        },
+      }),
       prisma.purchase_bills.findMany({
         orderBy: [{ date: 'desc' }],
         select: { date: true, doc_no: true, id: true, paid_amount: true, payable_balance: true, status: true, supplier_id: true, total_amount: true },
@@ -129,6 +146,12 @@ export async function GET() {
       suppliers: suppliers.map((supplier) => ({
         active: supplier.active,
         bankAccount: supplier.bank_account,
+        bankAccounts: (supplier.supplier_bank_accounts ?? []).map((account) => ({
+          accountNo: account.account_no,
+          active: account.active,
+          bankName: account.bank_name,
+          paymentMethod: account.payment_method,
+        })),
         id: supplier.id,
         name: supplier.name,
       })),

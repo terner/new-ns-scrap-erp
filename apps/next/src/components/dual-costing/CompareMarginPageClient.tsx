@@ -50,18 +50,18 @@ export function CompareMarginPageClient() {
 
   return (
     <section>
-      <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+      <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
         เปรียบเทียบ <strong>Deal Margin</strong> (จาก PO Sell + Match Log) กับ <strong>Stock Margin</strong> (จากบิลขายจริง + WAC)
       </div>
 
-      {error ? <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         <MarginCard label="Deal Cost (จากการจองดีล)" tone="deal" totals={data?.dealTotals} />
         <MarginCard label="Stock Cost (จากบิลขายจริง + WAC)" tone="stock" totals={data?.stockTotals} />
       </div>
 
-      <div className="mb-4 rounded-xl bg-white p-6 shadow">
+      <div className="mb-4 rounded-md bg-white p-6 shadow">
         <h3 className="mb-3 font-semibold">⚖️ ส่วนต่าง Deal vs Stock</h3>
         <div className="grid grid-cols-1 gap-3 text-center md:grid-cols-3">
           <DiffCard label="Revenue Diff" goodWhenPositive value={data?.diff.revenue ?? 0} />
@@ -73,10 +73,10 @@ export function CompareMarginPageClient() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-slate-200 bg-white/70 p-3 text-xs text-slate-500">
+      <div className="mt-4 flex flex-wrap items-end justify-between gap-3 rounded-md border border-slate-200 bg-white/70 p-3 text-xs text-slate-500">
         <div className="flex flex-wrap gap-2">
-          <input className="rounded border border-slate-200 bg-white px-2 py-1.5" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-          <input className="rounded border border-slate-200 bg-white px-2 py-1.5" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          <input className="rounded-md border border-slate-200 bg-white px-2 py-1.5" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          <input className="rounded-md border border-slate-200 bg-white px-2 py-1.5" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
         </div>
         <div className="flex flex-wrap gap-3">
           <span>Deal rows: <strong className="text-slate-700">{data?.dealTotals.rows ?? 0}</strong></span>
@@ -84,7 +84,7 @@ export function CompareMarginPageClient() {
         </div>
       </div>
 
-      {isLoading ? <div className="mt-4 rounded-lg bg-white p-4 text-sm text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
+      {isLoading ? <div className="mt-4 rounded-md bg-white p-4 text-sm text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
     </section>
   )
 }
@@ -92,7 +92,7 @@ export function CompareMarginPageClient() {
 function MarginCard({ label, tone, totals }: { label: string; tone: 'deal' | 'stock'; totals?: Totals }) {
   const classes = tone === 'deal' ? 'from-purple-600 to-pink-700' : 'from-emerald-600 to-teal-700'
   return (
-    <div className={`rounded-2xl bg-gradient-to-br ${classes} p-6 text-white shadow`}>
+    <div className={`rounded-md bg-gradient-to-br ${classes} p-6 text-white shadow`}>
       <div className="mb-2 text-sm opacity-80">{tone === 'deal' ? '💎 ' : '📊 '}{label}</div>
       <div className="space-y-2 text-sm">
         <div className="flex justify-between"><span>{tone === 'deal' ? 'Total Revenue (PO Sell)' : 'Total Revenue (Sales Bills)'}</span><span className="font-bold">{formatMoney(totals?.revenue ?? 0)}</span></div>
@@ -106,5 +106,5 @@ function MarginCard({ label, tone, totals }: { label: string; tone: 'deal' | 'st
 
 function DiffCard({ goodWhenPositive = false, label, prominent = false, value }: { goodWhenPositive?: boolean; label: string; prominent?: boolean; value: number }) {
   const good = goodWhenPositive ? value >= 0 : value <= 0
-  return <div className="rounded bg-slate-50 p-4"><div className="text-xs text-slate-500">{label}</div><div className={`${prominent ? 'text-2xl' : 'text-xl'} font-bold ${good ? 'text-emerald-600' : 'text-red-600'}`}>{formatMoney(value)}</div></div>
+  return <div className="rounded-md bg-slate-50 p-4"><div className="text-xs text-slate-500">{label}</div><div className={`${prominent ? 'text-2xl' : 'text-xl'} font-bold ${good ? 'text-emerald-600' : 'text-red-600'}`}>{formatMoney(value)}</div></div>
 }

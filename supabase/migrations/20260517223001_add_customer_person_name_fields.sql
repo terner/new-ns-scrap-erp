@@ -8,7 +8,6 @@ alter table public.customers
   add column if not exists contact_title text,
   add column if not exists contact_first_name text,
   add column if not exists contact_last_name text;
-
 comment on column public.customers.name_title is 'Title/prefix for individual customer name.';
 comment on column public.customers.first_name is 'First name for individual customer.';
 comment on column public.customers.last_name is 'Last name for individual customer.';

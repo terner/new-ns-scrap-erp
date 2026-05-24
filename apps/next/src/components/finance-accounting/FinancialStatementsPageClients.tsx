@@ -79,7 +79,7 @@ export function PlStatementPageClient() {
         <QuickButton onClick={() => setFrom(monthStart())}>เดือนนี้</QuickButton>
         <DateInput label="จาก" value={from} onChange={setFrom} /><DateInput label="ถึง" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={mode} onChange={(event) => setMode(event.target.value)}>
+        <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={mode} onChange={(event) => setMode(event.target.value)}>
           <option value="ALL">All (Stock+Trading)</option><option value="STOCK">Stock Only</option><option value="TRADING">Trading Only</option>
         </select>
         <DisabledButton>📥 Excel</DisabledButton>
@@ -119,7 +119,7 @@ export function BalanceSheetPageClient() {
       <FilterPanel>
         <DateInput label="As of" value={asOf} onChange={setAsOf} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <span className={`rounded-full px-3 py-2 text-xs font-bold ${data?.balanceCheck.balanced ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{data?.balanceCheck.balanced ? 'BALANCED' : `OFF BY ${money(data?.balanceCheck.difference)}`}</span>
+        <span className={`rounded-md-full px-3 py-2 text-xs font-bold ${data?.balanceCheck.balanced ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{data?.balanceCheck.balanced ? 'BALANCED' : `OFF BY ${money(data?.balanceCheck.difference)}`}</span>
         <DisabledButton>📥 Excel</DisabledButton>
       </FilterPanel>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -197,67 +197,67 @@ function money(value?: number) {
 
 function Hero({ subtitle, title, tone }: { subtitle: string; title: string; tone: 'bs' | 'cf' | 'pl' }) {
   const tones = { bs: 'from-blue-700 to-indigo-800', cf: 'from-cyan-600 to-sky-700', pl: 'from-emerald-600 to-teal-700' }
-  return <div className={`rounded-xl bg-gradient-to-r ${tones[tone]} p-5 text-white shadow`}><h1 className="text-xl font-bold md:text-2xl">{title}</h1><p className="mt-1 text-sm text-white/85">{subtitle}</p></div>
+  return <div className={`rounded-md bg-gradient-to-r ${tones[tone]} p-5 text-white shadow`}><h1 className="text-xl font-bold md:text-2xl">{title}</h1><p className="mt-1 text-sm text-white/85">{subtitle}</p></div>
 }
 
 function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
-  return <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Management statement / read baseline</b><span className="ml-2">รายงานเพื่อผู้บริหารจากข้อมูลธุรกรรม ยังไม่ใช่งบการเงินตามบัญชี GL</span>{sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}</div>
+  return <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Management statement / read baseline</b><span className="ml-2">รายงานเพื่อผู้บริหารจากข้อมูลธุรกรรม ยังไม่ใช่งบการเงินตามบัญชี GL</span>{sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}</div>
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
 }
 
 function DateInput({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
-  return <label className="flex items-center gap-2 text-xs text-slate-600"><span>{label}</span><input className="rounded-lg border border-slate-200 px-3 py-2 text-sm" type="date" value={value} onChange={(event) => onChange(event.target.value)} /></label>
+  return <label className="flex items-center gap-2 text-xs text-slate-600"><span>{label}</span><input className="rounded-md border border-slate-200 px-3 py-2 text-sm" type="date" value={value} onChange={(event) => onChange(event.target.value)} /></label>
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function Segment({ active = false, children }: { active?: boolean; children: ReactNode }) {
-  return <span className={`rounded-lg px-3 py-2 text-xs font-semibold ${active ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{children}</span>
+  return <span className={`rounded-md px-3 py-2 text-xs font-semibold ${active ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{children}</span>
 }
 
 function QuickButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={onClick}>{children}</button>
+  return <button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={onClick}>{children}</button>
 }
 
 function DisabledButton({ children }: { children: ReactNode }) {
-  return <button className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-bold text-white opacity-50" disabled type="button">{children}</button>
+  return <button className="rounded-md bg-slate-800 px-3 py-2 text-sm font-bold text-white opacity-50" disabled type="button">{children}</button>
 }
 
 function MegaCard({ footer, label, tone, value }: { footer: string; label: string; tone: 'bs' | 'cf' | 'pl'; value: string }) {
   const tones = { bs: 'from-blue-700 via-indigo-700 to-violet-800', cf: 'from-cyan-600 via-sky-700 to-blue-800', pl: 'from-emerald-600 via-teal-700 to-cyan-700' }
-  return <div className={`rounded-2xl bg-gradient-to-br ${tones[tone]} p-6 text-white shadow-lg lg:col-span-2`}><div className="text-sm uppercase opacity-80">{label}</div><div className="mt-2 text-4xl font-bold md:text-5xl">{value}</div><div className="mt-4 border-t border-white/20 pt-3 text-sm text-white/85">{footer}</div></div>
+  return <div className={`rounded-md bg-gradient-to-br ${tones[tone]} p-6 text-white shadow-lg lg:col-span-2`}><div className="text-sm uppercase opacity-80">{label}</div><div className="mt-2 text-4xl font-bold md:text-5xl">{value}</div><div className="mt-4 border-t border-white/20 pt-3 text-sm text-white/85">{footer}</div></div>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl bg-white p-4 shadow"><h2 className="mb-3 text-sm font-bold text-slate-700">{title}</h2>{children}</div>
+  return <div className="rounded-md bg-white p-4 shadow"><h2 className="mb-3 text-sm font-bold text-slate-700">{title}</h2>{children}</div>
 }
 
 function StatCard({ label, tone, value }: { label: string; tone: 'blue' | 'cyan' | 'emerald' | 'purple' | 'red'; value: string }) {
   const color = { blue: 'text-blue-700', cyan: 'text-cyan-700', emerald: 'text-emerald-700', purple: 'text-purple-700', red: 'text-red-700' }[tone]
-  return <div className="rounded-xl bg-white p-4 shadow"><div className={`text-xs ${color}`}>{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
+  return <div className="rounded-md bg-white p-4 shadow"><div className={`text-xs ${color}`}>{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
 }
 
 function SplitCard({ cogs, label, revenue, tone }: { cogs: number; label: string; revenue: number; tone: 'emerald' | 'purple' }) {
   const color = tone === 'emerald' ? 'from-emerald-50 text-emerald-800' : 'from-purple-50 text-purple-800'
-  return <div className={`rounded-xl bg-gradient-to-br ${color} to-white p-4 shadow`}><div className="text-sm font-bold">{label}</div><div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><div>Revenue</div><b>{money(revenue)}</b></div><div><div>COGS</div><b>{money(cogs)}</b></div><div><div>Gross</div><b>{money(revenue - cogs)}</b></div></div></div>
+  return <div className={`rounded-md bg-gradient-to-br ${color} to-white p-4 shadow`}><div className="text-sm font-bold">{label}</div><div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><div>Revenue</div><b>{money(revenue)}</b></div><div><div>COGS</div><b>{money(cogs)}</b></div><div><div>Gross</div><b>{money(revenue - cogs)}</b></div></div></div>
 }
 
 function Waterfall({ rows }: { rows: Array<[string, number]> }) {
   const max = Math.max(...rows.map((row) => Math.abs(row[1])), 1)
-  return <div className="space-y-2">{rows.map(([label, value]) => <div key={label} className="text-xs"><div className="mb-1 flex justify-between gap-2"><span>{label}</span><b className={value < 0 ? 'text-red-700' : 'text-slate-800'}>{money(value)}</b></div><div className="h-3 rounded-full bg-slate-100"><div className={`h-3 rounded-full ${value < 0 ? 'bg-red-400' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} /></div></div>)}</div>
+  return <div className="space-y-2">{rows.map(([label, value]) => <div key={label} className="text-xs"><div className="mb-1 flex justify-between gap-2"><span>{label}</span><b className={value < 0 ? 'text-red-700' : 'text-slate-800'}>{money(value)}</b></div><div className="h-3 rounded-md-full bg-slate-100"><div className={`h-3 rounded-md-full ${value < 0 ? 'bg-red-400' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} /></div></div>)}</div>
 }
 
 function StatementTable({ isLoading, onDrill, rows, title = 'Statement' }: { isLoading: boolean; onDrill: (line: StatementLine) => void | undefined; rows: StatementLine[]; title?: string }) {
-  return <div className="overflow-hidden rounded-xl bg-white shadow"><div className="border-b bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{title}</div><div className="max-h-[62vh] overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-100 text-slate-600"><tr><Th>รายการ</Th><Th>Section</Th><Th align="right">จำนวนเงิน</Th><Th align="center">Drill</Th></tr></thead><tbody><LoadingOrEmpty colSpan={4} isLoading={isLoading} rows={rows.length} />{rows.map((line) => <tr key={`${line.section}-${line.label}`} className={`border-t hover:bg-slate-50 ${line.tone === 'total' ? 'bg-slate-50 font-bold' : ''}`}><Td><span className={line.level ? 'pl-5' : ''}>{line.label}</span></Td><Td><span className="rounded bg-slate-100 px-2 py-1 text-slate-500">{line.section}</span></Td><Td align="right"><span className={line.amount < 0 ? 'font-semibold text-red-700' : line.tone === 'good' ? 'font-semibold text-emerald-700' : 'font-semibold text-slate-900'}>{money(line.amount)}</span></Td><Td align="center">{line.details?.length ? <button className="font-semibold text-blue-600 hover:underline" type="button" onClick={() => onDrill(line)}>🔍 {line.details.length}</button> : <span className="text-slate-300">-</span>}</Td></tr>)}</tbody></table></div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow"><div className="border-b bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{title}</div><div className="max-h-[62vh] overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-100 text-slate-600"><tr><Th>รายการ</Th><Th>Section</Th><Th align="right">จำนวนเงิน</Th><Th align="center">Drill</Th></tr></thead><tbody><LoadingOrEmpty colSpan={4} isLoading={isLoading} rows={rows.length} />{rows.map((line) => <tr key={`${line.section}-${line.label}`} className={`border-t hover:bg-slate-50 ${line.tone === 'total' ? 'bg-slate-50 font-bold' : ''}`}><Td><span className={line.level ? 'pl-5' : ''}>{line.label}</span></Td><Td><span className="rounded-md bg-slate-100 px-2 py-1 text-slate-500">{line.section}</span></Td><Td align="right"><span className={line.amount < 0 ? 'font-semibold text-red-700' : line.tone === 'good' ? 'font-semibold text-emerald-700' : 'font-semibold text-slate-900'}>{money(line.amount)}</span></Td><Td align="center">{line.details?.length ? <button className="font-semibold text-blue-600 hover:underline" type="button" onClick={() => onDrill(line)}>🔍 {line.details.length}</button> : <span className="text-slate-300">-</span>}</Td></tr>)}</tbody></table></div></div>
 }
 
 function DrillModal({ onClose, rows, title }: { onClose: () => void; rows: DetailRow[]; title: string }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"><div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-xl"><div className="flex items-center justify-between border-b p-4"><h2 className="text-lg font-bold text-slate-800">🔍 {title}</h2><button className="rounded bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><div className="max-h-[65vh] overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-100"><tr><Th>วันที่</Th><Th>เลขที่</Th><Th>รายละเอียด</Th><Th align="right">จำนวนเงิน</Th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.refNo}-${index}`} className="border-t"><Td>{row.date}</Td><Td><span className="font-mono text-blue-700">{row.refNo}</span></Td><Td>{row.description}</Td><Td align="right"><span className={row.amount < 0 ? 'text-red-700' : 'text-slate-800'}>{money(row.amount)}</span></Td></tr>)}</tbody></table></div></div></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"><div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-md bg-white shadow-xl"><div className="flex items-center justify-between border-b p-4"><h2 className="text-lg font-bold text-slate-800">🔍 {title}</h2><button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><div className="max-h-[65vh] overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-100"><tr><Th>วันที่</Th><Th>เลขที่</Th><Th>รายละเอียด</Th><Th align="right">จำนวนเงิน</Th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.refNo}-${index}`} className="border-t"><Td>{row.date}</Td><Td><span className="font-mono text-blue-700">{row.refNo}</span></Td><Td>{row.description}</Td><Td align="right"><span className={row.amount < 0 ? 'text-red-700' : 'text-slate-800'}>{money(row.amount)}</span></Td></tr>)}</tbody></table></div></div></div>
 }
 
 function LoadingOrEmpty({ colSpan, isLoading, rows }: { colSpan: number; isLoading: boolean; rows: number }) {
@@ -277,5 +277,5 @@ function Td({ align = 'left', children }: { align?: 'center' | 'left' | 'right';
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
+  return <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
 }

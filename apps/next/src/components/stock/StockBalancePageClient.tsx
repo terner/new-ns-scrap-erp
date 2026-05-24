@@ -146,11 +146,11 @@ export function StockBalancePageClient() {
 
   return (
     <section>
-      <div className="mb-4 rounded-xl bg-gradient-to-r from-blue-700 to-cyan-700 p-5 text-white shadow">
+      <div className="mb-4 rounded-md bg-gradient-to-r from-blue-700 to-cyan-700 p-5 text-white shadow">
         <h1 className="text-2xl font-bold">📦 สต๊อกคงเหลือ / Stock Balance</h1>
         <p className="mt-1 text-sm opacity-80">แยกตามหมวดสินค้า (ทองแดง/ทองเหลือง/เหล็ก) และสถานะ RM/WIP/FG</p>
       </div>
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-5">
         <Metric label="น้ำหนักสต๊อกรวม" value={`${formatMoney(summary.qty)} กก.`} tone="blue" />
         <Metric label="มูลค่าสต๊อกรวม" value={formatMoney(summary.value)} tone="emerald" />
@@ -162,38 +162,38 @@ export function StockBalancePageClient() {
         {byStatus.map((item) => <StatusCard key={item.status} item={item} />)}
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex overflow-hidden rounded-lg border">
+        <div className="flex overflow-hidden rounded-md border">
           <button className={`px-4 py-2 text-sm ${viewMode === 'summary' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`} type="button" onClick={() => setViewMode('summary')}>📊 Matrix (กลุ่ม × สถานะ)</button>
           <button className={`border-l px-4 py-2 text-sm ${viewMode === 'detail' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`} type="button" onClick={() => setViewMode('detail')}>📄 รายสินค้า</button>
         </div>
-        <select className="rounded-lg border px-3 py-2 text-sm" value={group} onChange={(event) => setGroup(event.target.value)}>
+        <select className="rounded-md border px-3 py-2 text-sm" value={group} onChange={(event) => setGroup(event.target.value)}>
           <option value="">ทุกหมวด</option>{groupOptions.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select className="rounded-lg border px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <select className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="">ทุกสถานะ</option><option value="RM">📦 RM</option><option value="WIP">⚙️ WIP</option><option value="FG">✅ FG</option>
         </select>
-        <select className="rounded-lg border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setBranchId(event.target.value); setWarehouseId('') }}>
+        <select className="rounded-md border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setBranchId(event.target.value); setWarehouseId('') }}>
           <option value="">ทุกสาขา</option>{data?.reference.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
         <div className="min-w-56">
-          <select className="w-full rounded-lg border px-3 py-2 text-sm" value={productId} onChange={(event) => setProductId(event.target.value)}>
+          <select className="w-full rounded-md border px-3 py-2 text-sm" value={productId} onChange={(event) => setProductId(event.target.value)}>
             <option value="">🔍 พิมพ์/เลือกสินค้า — กดเพื่อดูรายละเอียด</option>
             {data?.reference.products.map((item) => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ${item.name}` : item.name}</option>)}
           </select>
         </div>
-        {productId ? <button className="rounded bg-slate-100 px-2 py-1.5 text-xs hover:bg-slate-200" type="button" onClick={() => setProductId('')}>✕ ล้าง</button> : null}
-        <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportXlsx}>📥 Export .xlsx</button>
+        {productId ? <button className="rounded-md bg-slate-100 px-2 py-1.5 text-xs hover:bg-slate-200" type="button" onClick={() => setProductId('')}>✕ ล้าง</button> : null}
+        <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportXlsx}>📥 Export .xlsx</button>
       </div>
       {productId && selectedProductInfo ? (
         <ProductPanel averageCost={selectedProductInfo.qty > 0 ? selectedProductInfo.value / selectedProductInfo.qty : 0} info={selectedProductInfo} rows={selectedProductRows} onClose={() => setProductId('')} onOpen={setDetailRow} />
       ) : null}
-      <div className="mb-3 rounded-lg bg-white p-3 shadow">
+      <div className="mb-3 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-56 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="ค้นหารหัส/ชื่อสินค้า/Lot/สาขา/คลัง/หมวด" type="search" value={q} onChange={(event) => setQ(event.target.value)} />
-          <select className="rounded-lg border px-3 py-2 text-sm" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>
+          <input className="min-w-56 flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหารหัส/ชื่อสินค้า/Lot/สาขา/คลัง/หมวด" type="search" value={q} onChange={(event) => setQ(event.target.value)} />
+          <select className="rounded-md border px-3 py-2 text-sm" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>
             <option value="">ทุกคลัง</option>{data?.reference.warehouses.filter((item) => !branchId || item.branchId === branchId).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-          <button className="rounded bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => void loadData()}>Refresh</button>
+          <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => void loadData()}>Refresh</button>
           <span className="text-xs text-slate-500">พบ {filteredRows.length} รายการ / ติดลบ {summary.negativeRows} รายการ</span>
         </div>
       </div>
@@ -205,7 +205,7 @@ export function StockBalancePageClient() {
       ) : <DetailTable isLoading={isLoading} onOpen={setDetailRow} rows={filteredRows} />}
       {detailRow ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10">
-          <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+          <div className="w-full max-w-xl rounded-md bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-5 py-4"><h3 className="font-bold">รายละเอียดสต๊อก</h3><button className="text-2xl text-slate-400" type="button" onClick={() => setDetailRow(null)}>&times;</button></div>
             <div className="space-y-2 p-5 text-sm">
               <Info label="สินค้า" value={`${detailRow.productCode} ${detailRow.productName}`} />
@@ -248,7 +248,7 @@ function Metric({ label, sub, tone, value }: { label: string; sub?: string; tone
           ? 'text-red-700'
           : 'text-slate-900'
   return (
-    <div className={`rounded-xl p-4 shadow ${panel}`}>
+    <div className={`rounded-md p-4 shadow ${panel}`}>
       <div className={`text-xs ${tone === 'emeraldPanel' ? 'text-emerald-700' : tone === 'redPanel' ? 'text-red-700' : 'text-slate-500'}`}>{label}</div>
       <div className={`mt-1 text-2xl font-bold ${color}`}>{value}</div>
       {sub ? <div className="mt-1 text-xs text-slate-500">{sub}</div> : null}
@@ -263,7 +263,7 @@ function StatusCard({ item }: { item: StatusSummary }) {
       ? { border: 'border-amber-500', icon: '⚙️', label: 'WIP (กำลังผลิต)', text: 'text-amber-700', bg: 'bg-amber-50' }
       : { border: 'border-blue-500', icon: '📦', label: 'RM (วัตถุดิบ)', text: 'text-blue-700', bg: 'bg-blue-50' }
   return (
-    <div className={`rounded-xl border-l-4 p-4 shadow ${meta.bg} ${meta.border}`}>
+    <div className={`rounded-md border-l-4 p-4 shadow ${meta.bg} ${meta.border}`}>
       <div className={`text-xs ${meta.text}`}>{meta.icon} {meta.label} — {item.count} รายการ</div>
       <div className={`text-xl font-bold ${meta.text}`}>{formatMoney(item.qty)} กก.</div>
       <div className="text-sm text-slate-600">มูลค่า {formatMoney(item.value)}</div>
@@ -279,7 +279,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
   rows: BalanceRow[]
 }) {
   return (
-    <div className="mb-3 rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 p-4 shadow">
+    <div className="mb-3 rounded-md border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 p-4 shadow">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-xl font-bold text-indigo-700">📦 {info.product.name}</h3>
@@ -288,12 +288,12 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
         <button className="text-sm text-slate-500 hover:text-slate-800" type="button" onClick={onClose}>✕ ปิด</button>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded bg-white p-3 shadow"><div className="text-xs text-slate-500">📊 คงเหลือ</div><div className={`text-2xl font-bold ${info.qty > 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(info.qty)} <span className="text-sm font-normal">กก.</span></div></div>
-        <div className="rounded bg-white p-3 shadow"><div className="text-xs text-slate-500">💰 มูลค่ารวม (WAC)</div><div className="text-2xl font-bold text-blue-700">{formatMoney(info.value)} <span className="text-sm font-normal">บาท</span></div></div>
-        <div className="rounded bg-white p-3 shadow"><div className="text-xs text-slate-500">⚖ ราคาเฉลี่ย/กก.</div><div className="text-2xl font-bold text-amber-700">{formatMoney(averageCost)} <span className="text-sm font-normal">บ./กก.</span></div></div>
-        <div className="rounded bg-white p-3 shadow"><div className="text-xs text-slate-500">✅ พร้อมขาย</div><div className="text-2xl font-bold text-emerald-600">{formatMoney(info.available)} <span className="text-sm font-normal">กก.</span></div></div>
+        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">📊 คงเหลือ</div><div className={`text-2xl font-bold ${info.qty > 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(info.qty)} <span className="text-sm font-normal">กก.</span></div></div>
+        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">💰 มูลค่ารวม (WAC)</div><div className="text-2xl font-bold text-blue-700">{formatMoney(info.value)} <span className="text-sm font-normal">บาท</span></div></div>
+        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">⚖ ราคาเฉลี่ย/กก.</div><div className="text-2xl font-bold text-amber-700">{formatMoney(averageCost)} <span className="text-sm font-normal">บ./กก.</span></div></div>
+        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">✅ พร้อมขาย</div><div className="text-2xl font-bold text-emerald-600">{formatMoney(info.available)} <span className="text-sm font-normal">กก.</span></div></div>
       </div>
-      <div className="mt-3 rounded-xl bg-white shadow">
+      <div className="mt-3 rounded-md bg-white shadow">
         <div className="flex items-center justify-between border-b bg-slate-50 p-3">
           <h4 className="font-bold text-slate-700">📜 รายการสต๊อกของสินค้านี้ ({rows.length} รายการ)</h4>
           <span className="text-xs text-slate-500">กด Detail เพื่อดู row ปัจจุบัน</span>
@@ -312,7 +312,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                   <td className="p-2 font-mono">{row.lotNo || '-'}</td>
                   <td className={`p-2 text-right font-medium ${row.qty < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(row.qty)}</td>
                   <td className="p-2 text-right">{formatMoney(row.value)}</td>
-                  <td className="p-2 text-center"><button className="rounded bg-blue-50 px-2 py-1 text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
+                  <td className="p-2 text-center"><button className="rounded-md bg-blue-50 px-2 py-1 text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
                 </tr>
               ))}
               {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={7}>ยังไม่มีรายการ</td></tr> : null}
@@ -333,11 +333,11 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
   const maxGroup = Math.max(1, ...matrixRows.map((row) => row.rmVal + row.wipVal + row.fgVal))
   return (
     <div className="mb-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div className="rounded-2xl bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <h3 className="mb-2 font-bold text-slate-800">🥧 สัดส่วน Stock RM/WIP/FG (มูลค่า)</h3>
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-[180px] w-[180px] items-center justify-center rounded-full" style={{ background: totalValue > 0 ? `conic-gradient(#3b82f6 0deg ${rmDeg}deg, #f59e0b ${rmDeg}deg ${rmDeg + wipDeg}deg, #10b981 ${rmDeg + wipDeg}deg 360deg)` : '#e5e7eb' }}>
-            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white text-center">
+          <div className="flex h-[180px] w-[180px] items-center justify-center rounded-md-full" style={{ background: totalValue > 0 ? `conic-gradient(#3b82f6 0deg ${rmDeg}deg, #f59e0b ${rmDeg}deg ${rmDeg + wipDeg}deg, #10b981 ${rmDeg + wipDeg}deg 360deg)` : '#e5e7eb' }}>
+            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-md-full bg-white text-center">
               <span className="text-xs text-slate-500">รวม</span>
               <span className="text-xs font-bold text-slate-900">{formatMoney(totalValue)}</span>
             </div>
@@ -350,7 +350,7 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
           </div>
         </div>
       </div>
-      <div className="rounded-2xl bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <h3 className="mb-2 font-bold text-slate-800">📊 Top หมวดสินค้า (มูลค่าสต๊อก)</h3>
         {matrixRows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีข้อมูล</div> : null}
         <div className="space-y-2">
@@ -360,7 +360,7 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
             return (
               <div key={row.group}>
                 <div className="mb-0.5 flex justify-between text-sm"><span className="font-medium">{row.group} <span className="text-xs text-slate-400">({formatMoney(row.rmQty + row.wipQty + row.fgQty)} กก.)</span></span><span className="font-mono font-bold">{formatMoney(value)}</span></div>
-                <div className="h-2 w-full rounded-full bg-slate-100"><div className={`h-2 rounded-full bg-gradient-to-r ${colors[index % colors.length]}`} style={{ width: `${Math.max(2, value / maxGroup * 100)}%` }} /></div>
+                <div className="h-2 w-full rounded-md-full bg-slate-100"><div className={`h-2 rounded-md-full bg-gradient-to-r ${colors[index % colors.length]}`} style={{ width: `${Math.max(2, value / maxGroup * 100)}%` }} /></div>
               </div>
             )
           })}
@@ -371,13 +371,13 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
 }
 
 function LegendRow({ color, label, value }: { color: string; label: string; value: number }) {
-  return <div className="flex justify-between"><span className="flex items-center gap-2"><span className={`h-3 w-3 rounded ${color}`} />{label}</span><span className="font-bold">{formatMoney(value)}</span></div>
+  return <div className="flex justify-between"><span className="flex items-center gap-2"><span className={`h-3 w-3 rounded-md ${color}`} />{label}</span><span className="font-bold">{formatMoney(value)}</span></div>
 }
 
 function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: { byStatus: StatusSummary[]; isLoading: boolean; matrixRows: MatrixRow[]; totalQty: number; totalValue: number }) {
   const valueFor = (status: string) => byStatus.find((item) => item.status === status) ?? { count: 0, qty: 0, status, value: 0 }
   return (
-    <div className="overflow-x-auto rounded-xl bg-white shadow">
+    <div className="overflow-x-auto rounded-md bg-white shadow">
       <table className="w-full min-w-[980px] text-sm">
         <thead className="bg-slate-100"><tr><th className="p-2 text-left">หมวดสินค้า</th><th className="bg-blue-50 p-2 text-right">📦 RM (กก.)</th><th className="bg-blue-50 p-2 text-right">RM มูลค่า</th><th className="bg-amber-50 p-2 text-right">⚙️ WIP (กก.)</th><th className="bg-amber-50 p-2 text-right">WIP มูลค่า</th><th className="bg-emerald-50 p-2 text-right">✅ FG (กก.)</th><th className="bg-emerald-50 p-2 text-right">FG มูลค่า</th><th className="p-2 text-right">รวม กก.</th><th className="p-2 text-right">รวมมูลค่า</th></tr></thead>
         <tbody>
@@ -409,7 +409,7 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: 
 
 function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: (row: BalanceRow) => void; rows: BalanceRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-xl bg-white shadow">
+    <div className="overflow-x-auto rounded-md bg-white shadow">
       <table className="w-full min-w-[1120px] text-sm">
         <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-left">หมวด</th><th className="p-2 text-center">สถานะ</th><th className="p-2 text-left">สาขา</th><th className="p-2 text-right">คงเหลือ (กก.)</th><th className="p-2 text-right">ต้นทุน/กก.</th><th className="p-2 text-right">มูลค่า</th><th className="bg-emerald-50 p-2 text-right">✅ พร้อมขาย</th><th className="bg-red-50 p-2 text-right">⚠ ไม่พร้อมขาย</th><th className="p-2 text-center">Action</th></tr></thead>
         <tbody>
@@ -425,7 +425,7 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
               <td className="p-2 text-right font-bold text-emerald-700">{formatMoney(row.value)}</td>
               <td className="p-2 text-right text-emerald-700">{row.notAvailable ? '-' : formatMoney(row.qty)}</td>
               <td className={`p-2 text-right ${row.notAvailable ? 'font-medium text-red-600' : 'text-slate-400'}`}>{row.notAvailable ? formatMoney(row.qty) : '-'}</td>
-              <td className="p-2 text-center"><button className="rounded bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
+              <td className="p-2 text-center"><button className="rounded-md bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
             </tr>
           ))}
           {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>ไม่มีสต๊อก</td></tr> : null}
@@ -438,5 +438,5 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
 
 function StatusBadge({ status }: { status: string }) {
   const className = status === 'FG' ? 'bg-emerald-100 text-emerald-700' : status === 'WIP' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-  return <span className={`rounded px-2 py-0.5 text-xs ${className}`}>{status || '-'}</span>
+  return <span className={`rounded-md px-2 py-0.5 text-xs ${className}`}>{status || '-'}</span>
 }

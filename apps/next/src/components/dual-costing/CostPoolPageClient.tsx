@@ -101,12 +101,12 @@ export function CostPoolPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
         <strong>💰 Cost Pool</strong> — ต้นทุนที่ <b>เหลือรอขาย</b> (ไม่ใช่ Stock จริง) ใช้สำหรับ <b>Match กับ PO Sell</b> เท่านั้น<br />
         <span className="text-xs">⚠ Cost Pool ≠ Stock จริง — Stock ใช้ WAC ลง P/L · Pool ใช้ต้นทุนจริงต่อ lot สำหรับ Match Deal</span>
       </div>
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-3">
         {costTypeCards.map((card) => {
@@ -132,34 +132,34 @@ export function CostPoolPageClient() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-          <select aria-label="สินค้า" className="rounded-lg border px-3 py-2 text-sm" value={productId} onChange={(event) => setProductId(event.target.value)}>
+          <select aria-label="สินค้า" className="rounded-md border px-3 py-2 text-sm" value={productId} onChange={(event) => setProductId(event.target.value)}>
             <option value="all">ทุกสินค้า</option>
             {(data?.filters.products ?? []).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
           </select>
-          <select aria-label="Cost Type" className="rounded-lg border bg-amber-50 px-3 py-2 text-sm font-medium" value={costType} onChange={(event) => setCostType(event.target.value)}>
+          <select aria-label="Cost Type" className="rounded-md border bg-amber-50 px-3 py-2 text-sm font-medium" value={costType} onChange={(event) => setCostType(event.target.value)}>
             <option value="all">ทุก Cost Type</option>
             {(data?.filters.costTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <select aria-label="Source Type" className="rounded-lg border px-3 py-2 text-sm" value={sourceType} onChange={(event) => setSourceType(event.target.value)}>
+          <select aria-label="Source Type" className="rounded-md border px-3 py-2 text-sm" value={sourceType} onChange={(event) => setSourceType(event.target.value)}>
             <option value="all">ทุก Source</option>
             {(data?.filters.sourceTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <select aria-label="สถานะ" className="rounded-lg border px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <select aria-label="สถานะ" className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="all">ทุกสถานะ</option>
             {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <select aria-label="เรียงลำดับ" className="rounded-lg border px-3 py-2 text-sm" value={sort} onChange={(event) => setSort(event.target.value)}>
+          <select aria-label="เรียงลำดับ" className="rounded-md border px-3 py-2 text-sm" value={sort} onChange={(event) => setSort(event.target.value)}>
             <option value="FIFO">เรียง FIFO</option>
             <option value="LIFO">เรียง LIFO</option>
             <option value="Cheap">ต้นทุนถูกก่อน</option>
             <option value="Expensive">ต้นทุนแพงก่อน</option>
           </select>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-emerald-700"><input checked={availableOnly} className="h-4 w-4" type="checkbox" onChange={(event) => setAvailableOnly(event.target.checked)} /> แสดงเฉพาะ Available</label>
-          {(fromDate || toDate || search) ? <button className="rounded-lg border px-3 py-2 text-sm" type="button" onClick={resetFilters}>ล้าง</button> : null}
-          <a className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
+          {(fromDate || toDate || search) ? <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={resetFilters}>ล้าง</button> : null}
+          <a className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100"><tr><th className="p-2 text-left">Cost Type</th><th className="p-2 text-left">Source</th><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Counterparty</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">Original</th><th className="p-2 text-right">Matched</th><th className="bg-emerald-50 p-2 text-right">Available</th><th className="p-2 text-right">฿/หน่วย</th><th className="bg-emerald-50 p-2 text-right">Available Value</th><th className="p-2 text-center">สถานะ</th></tr></thead>
           <tbody>
@@ -167,8 +167,8 @@ export function CostPoolPageClient() {
             {!isLoading && !error && (data?.rows.length ?? 0) === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={12}>Cost Pool ว่าง — ไม่มี lot ตามตัวกรอง</td></tr> : null}
             {!isLoading && (data?.rows ?? []).map((row) => (
               <tr key={row.costPoolId} className="border-t">
-                <td className="p-2"><span className={`rounded px-2 py-0.5 text-[10px] font-medium ${costTypeBadgeClass(row.costType)}`}>{row.costType}</span></td>
-                <td className="p-2"><span className={`rounded px-2 py-0.5 text-[10px] ${sourceBadgeClass(row.sourceType)}`}>{row.sourceType}</span></td>
+                <td className="p-2"><span className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${costTypeBadgeClass(row.costType)}`}>{row.costType}</span></td>
+                <td className="p-2"><span className={`rounded-md px-2 py-0.5 text-[10px] ${sourceBadgeClass(row.sourceType)}`}>{row.sourceType}</span></td>
                 <td className="p-2 font-mono text-xs">{row.sourceNo}</td>
                 <td className="p-2 text-xs">{row.date}</td>
                 <td className="p-2 text-xs">{row.counterparty}</td>
@@ -178,7 +178,7 @@ export function CostPoolPageClient() {
                 <td className="bg-emerald-50/30 p-2 text-right font-bold text-emerald-700">{formatMoney(row.availableQty)}</td>
                 <td className="p-2 text-right">{formatMoney(row.unitCost)}</td>
                 <td className="bg-emerald-50/30 p-2 text-right font-medium text-emerald-700">{formatMoney(row.availableValue)}</td>
-                <td className="p-2 text-center"><span className={`rounded px-2 py-0.5 text-[10px] ${statusBadgeClass(row.status)}`}>{row.status}</span></td>
+                <td className="p-2 text-center"><span className={`rounded-md px-2 py-0.5 text-[10px] ${statusBadgeClass(row.status)}`}>{row.status}</span></td>
               </tr>
             ))}
           </tbody>
@@ -192,7 +192,7 @@ function Metric({ label, tone = 'normal', value }: { label: string; tone?: 'ambe
   const toneClass = { amber: 'text-amber-700', emerald: 'text-emerald-700', normal: 'text-slate-900' }[tone]
   const bgClass = tone === 'emerald' ? 'bg-emerald-50' : 'bg-white'
   const labelClass = tone === 'amber' ? 'text-amber-600' : tone === 'emerald' ? 'text-emerald-600' : 'text-slate-500'
-  return <div className={`rounded-xl p-3 shadow ${bgClass}`}><div className={`text-xs ${labelClass}`}>{label}</div><div className={`mt-1 text-base font-bold ${toneClass}`}>{value}</div></div>
+  return <div className={`rounded-md p-3 shadow ${bgClass}`}><div className={`text-xs ${labelClass}`}>{label}</div><div className={`mt-1 text-base font-bold ${toneClass}`}>{value}</div></div>
 }
 
 const costTypeCards = [
@@ -222,7 +222,7 @@ function CostTypeCard({
     purple: 'border-purple-500 bg-purple-50 text-purple-700',
   }[tone]
   return (
-    <div className={`rounded-lg border-l-4 p-3 ${classes}`}>
+    <div className={`rounded-md border-l-4 p-3 ${classes}`}>
       <div className="text-xs font-bold">{label}</div>
       <div className="mt-1 text-lg font-bold">{formatMoney(availableQty)} กก.</div>
       <div className="text-xs">{formatMoney(availableValue)} ฿ · {count} lots · {costType}</div>

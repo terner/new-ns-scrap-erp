@@ -97,24 +97,24 @@ export function TradingDashboardPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-gradient-to-r from-violet-700 to-fuchsia-700 p-5 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-violet-700 to-fuchsia-700 p-5 text-white shadow">
         <h1 className="flex items-center gap-2 text-2xl font-bold">🔄 Trading Dashboard</h1>
         <p className="mt-1 text-sm opacity-80">รายการ Trading (ซื้อมาขายไป) แยกออกจาก Stock — ไม่กระทบ Stock On Hand / WAC</p>
       </div>
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <label className="text-sm" htmlFor="trading-from">From</label>
-        <input id="trading-from" className="rounded border px-2 py-1.5 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+        <input id="trading-from" className="rounded-md border px-2 py-1.5 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
         <label className="text-sm" htmlFor="trading-to">To</label>
-        <input id="trading-to" className="rounded border px-2 py-1.5 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-        <button className="rounded border px-3 py-1.5 text-sm hover:bg-slate-50" type="button" onClick={() => void loadData()}>รีเฟรช</button>
+        <input id="trading-to" className="rounded-md border px-2 py-1.5 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        <button className="rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50" type="button" onClick={() => void loadData()}>รีเฟรช</button>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-700 to-purple-800 p-6 text-white shadow-lg lg:col-span-2">
-          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
+        <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-violet-600 via-fuchsia-700 to-purple-800 p-6 text-white shadow-lg lg:col-span-2">
+          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-md-full bg-white/10" />
           <div className="relative">
             <div className="text-sm uppercase tracking-wider opacity-80">🔄 Trading Performance</div>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -130,7 +130,7 @@ export function TradingDashboardPageClient() {
           </div>
         </div>
 
-        <div className="space-y-3 rounded-2xl bg-white p-4 shadow">
+        <div className="space-y-3 rounded-md bg-white p-4 shadow">
           <div className="text-xs font-bold text-slate-700">💰 ฐานะการเงิน Trading</div>
           <SideFinance label="📥 Trading AR (ลูกหนี้)" tone="emerald" value={summary?.tradingAR ?? 0} />
           <SideFinance label="📤 Trading AP (เจ้าหนี้)" tone="red" value={summary?.tradingAP ?? 0} />
@@ -152,12 +152,12 @@ export function TradingDashboardPageClient() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl bg-white p-5 shadow-lg lg:col-span-2">
+        <div className="rounded-md bg-white p-5 shadow-lg lg:col-span-2">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-bold text-slate-800">📈 Trading Trend ในช่วงที่เลือก</h3>
             <div className="flex gap-3 text-xs">
-              <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-rose-500" /> ซื้อ Trading</span>
-              <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-violet-500" /> ขาย Trading</span>
+              <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-md bg-rose-500" /> ซื้อ Trading</span>
+              <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-md bg-violet-500" /> ขาย Trading</span>
             </div>
           </div>
           <svg aria-label="Trading Trend" className="h-[220px] w-full" preserveAspectRatio="none" viewBox="0 0 800 220">
@@ -181,12 +181,12 @@ export function TradingDashboardPageClient() {
           </svg>
         </div>
 
-        <div className="rounded-2xl bg-white p-5 shadow-lg">
+        <div className="rounded-md bg-white p-5 shadow-lg">
           <h3 className="mb-3 font-bold text-slate-800">🥧 สถานะ Matching</h3>
           <div className="flex flex-col items-center gap-4 sm:flex-row">
             <div
               aria-label="Matching status"
-              className="h-[180px] w-[180px] shrink-0 rounded-full"
+              className="h-[180px] w-[180px] shrink-0 rounded-md-full"
               style={{ background: donutBackground(summary?.matchedCOGS ?? 0, summary?.unmatchedSalesAmount ?? 0) }}
             />
             <div className="w-full flex-1 space-y-2 text-sm">
@@ -200,7 +200,7 @@ export function TradingDashboardPageClient() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-5 shadow-lg">
+        <div className="rounded-md bg-white p-5 shadow-lg">
           <h3 className="mb-3 font-bold text-slate-800">🏆 Top สินค้า Trading (กำไร)</h3>
           {isLoading ? <Empty text="กำลังโหลดข้อมูล" /> : null}
           {!isLoading && !(data?.productList.length ?? 0) ? <Empty text="ไม่มีข้อมูล" /> : null}
@@ -211,8 +211,8 @@ export function TradingDashboardPageClient() {
                   <span className="truncate font-medium">{row.productName}</span>
                   <span className={`font-mono font-bold ${row.gp >= 0 ? 'text-purple-700' : 'text-red-600'}`}>{formatMoney(row.gp)}</span>
                 </div>
-                <div className="h-2 w-full rounded-full bg-slate-100">
-                  <div className={`h-2 rounded-full bg-gradient-to-r ${row.gp >= 0 ? 'from-violet-500 to-fuchsia-500' : 'from-red-500 to-rose-600'}`} style={{ width: `${Math.min(100, (Math.abs(row.gp) / maxProductGp) * 100)}%` }} />
+                <div className="h-2 w-full rounded-md-full bg-slate-100">
+                  <div className={`h-2 rounded-md-full bg-gradient-to-r ${row.gp >= 0 ? 'from-violet-500 to-fuchsia-500' : 'from-red-500 to-rose-600'}`} style={{ width: `${Math.min(100, (Math.abs(row.gp) / maxProductGp) * 100)}%` }} />
                 </div>
               </div>
             ))}
@@ -225,7 +225,7 @@ export function TradingDashboardPageClient() {
         <BillTable empty="ไม่มี Trading Sales" headerTone="blue" matchedLabel="COGS Matched" partyLabel="Customer" rows={data?.sales ?? []} title="📤 Trading Sales" />
       </div>
 
-      <div className="rounded-xl bg-white shadow">
+      <div className="rounded-md bg-white shadow">
         <div className="border-b bg-slate-50 p-3 font-bold">📊 Trading by Product</div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -287,7 +287,7 @@ function SideFinance({ label, suffix = '', tone, value }: { label: string; suffi
     red: 'border-red-500 bg-red-50 text-red-700',
   }
   return (
-    <div className={`rounded-lg border-l-4 p-3 ${tones[tone]}`}>
+    <div className={`rounded-md border-l-4 p-3 ${tones[tone]}`}>
       <div className="text-xs text-slate-600">{label}</div>
       <div className="text-2xl font-bold">{formatMoney(value)}{suffix}</div>
     </div>
@@ -306,7 +306,7 @@ function Kpi({ label, note, rawValue, tone = 'white', value }: { label: string; 
     yellow: 'border-yellow-500 bg-yellow-50 text-yellow-700',
   }
   return (
-    <div className={`rounded-xl border-l-4 p-3 shadow ${tones[tone]}`}>
+    <div className={`rounded-md border-l-4 p-3 shadow ${tones[tone]}`}>
       <div className="text-xs">{label}</div>
       <div className="text-lg font-bold">{rawValue ?? formatMoney(value ?? 0)}</div>
       {note ? <div className="text-xs text-slate-600">{note}</div> : null}
@@ -325,7 +325,7 @@ function Legend({ label, tone, value }: { label: string; tone: 'amber' | 'emeral
   const color = tone === 'emerald' ? 'bg-emerald-500 text-emerald-700' : 'bg-amber-500 text-amber-700'
   return (
     <div className="flex justify-between gap-3">
-      <span className="flex items-center gap-2"><span className={`h-3 w-3 rounded ${color.split(' ')[0]}`} />{label}</span>
+      <span className="flex items-center gap-2"><span className={`h-3 w-3 rounded-md ${color.split(' ')[0]}`} />{label}</span>
       <span className={`font-bold ${color.split(' ')[1]}`}>{formatMoney(value)}</span>
     </div>
   )
@@ -338,7 +338,7 @@ function Empty({ text }: { text: string }) {
 function BillTable({ empty, headerTone, matchedLabel, partyLabel, rows, title }: { empty: string; headerTone: 'blue' | 'emerald'; matchedLabel: string; partyLabel: string; rows: BillSummaryRow[]; title: string }) {
   const headerClass = headerTone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
   return (
-    <div className="rounded-xl bg-white shadow">
+    <div className="rounded-md bg-white shadow">
       <div className={`border-b p-3 font-bold ${headerClass}`}>{title}</div>
       <div className="max-h-72 overflow-x-auto">
         <table className="w-full text-xs">

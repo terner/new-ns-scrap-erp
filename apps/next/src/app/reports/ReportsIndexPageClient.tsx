@@ -257,24 +257,24 @@ export function ReportsIndexPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-gradient-to-r from-slate-700 to-blue-700 p-4 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-slate-700 to-blue-700 p-4 text-white shadow">
         <h1 className="text-xl font-bold">📊 รายงานสรุป</h1>
         <p className="mt-1 text-sm opacity-90">รายงานรวมซื้อ/ขายตามช่องทาง Supplier สินค้า และลูกค้า ตามรูปแบบ legacy</p>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="rounded-lg border px-3 py-2 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
-          <input className="rounded-lg border px-3 py-2 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
+          <input className="rounded-md border px-3 py-2 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
+          <input className="rounded-md border px-3 py-2 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
           <span className="text-xs text-slate-500">เว้นว่างเพื่อดูทุกช่วงเวลา</span>
-          <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={exportActiveTab} type="button">
+          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={exportActiveTab} type="button">
             Export CSV รายงานนี้
           </button>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {legacyTabs.map((item) => (
             <button
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${legacyTab === item.k ? 'bg-blue-600 text-white shadow' : 'border bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold ${legacyTab === item.k ? 'bg-blue-600 text-white shadow' : 'border bg-white text-slate-700 hover:bg-slate-50'}`}
               key={item.k}
               onClick={() => setLegacyTab(item.k)}
               type="button"
@@ -286,27 +286,27 @@ export function ReportsIndexPageClient() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="rounded-xl bg-blue-50 p-4 shadow">
+        <div className="rounded-md bg-blue-50 p-4 shadow">
           <div className="text-xs font-semibold text-blue-700">จำนวนรายการ</div>
           <div className="text-2xl font-bold text-blue-800">{numberFormat(summary.count)}</div>
         </div>
-        <div className="rounded-xl bg-emerald-50 p-4 shadow">
+        <div className="rounded-md bg-emerald-50 p-4 shadow">
           <div className="text-xs font-semibold text-emerald-700">น้ำหนักรวม</div>
           <div className="text-2xl font-bold text-emerald-800">{numberFormat(summary.weight, 2)}</div>
         </div>
-        <div className="rounded-xl bg-purple-50 p-4 shadow">
+        <div className="rounded-md bg-purple-50 p-4 shadow">
           <div className="text-xs font-semibold text-purple-700">มูลค่ารวม</div>
           <div className="text-2xl font-bold text-purple-800">{currency(summary.amount)}</div>
         </div>
-        <div className="rounded-xl bg-amber-50 p-4 shadow">
+        <div className="rounded-md bg-amber-50 p-4 shadow">
           <div className="text-xs font-semibold text-amber-700">กำไร / ต้นทุน</div>
           <div className="text-2xl font-bold text-amber-800">{currency(summary.profit || summary.cost)}</div>
         </div>
       </div>
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -344,19 +344,19 @@ export function ReportsIndexPageClient() {
         </table>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow">
+      <div className="rounded-md border border-slate-200 bg-white p-4 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <div>
             <h2 className="text-base font-bold text-slate-900">รายงานอื่นในระบบ</h2>
             <p className="text-xs text-slate-500">ส่วนนี้คงไว้เป็นทางลัดไปยังรายงาน Next ที่เปิดใช้งานแล้ว</p>
           </div>
-          <input className="ml-auto min-w-52 rounded-lg border px-3 py-2 text-sm" onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อรายงาน / module / path" value={query} />
+          <input className="ml-auto min-w-52 rounded-md border px-3 py-2 text-sm" onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อรายงาน / module / path" value={query} />
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
           {catalogTabs.map((item) => (
             <button
-              className={`rounded-lg px-3 py-1.5 text-sm ${catalogTab === item.k ? 'bg-slate-700 text-white' : 'border bg-white text-slate-700'}`}
+              className={`rounded-md px-3 py-1.5 text-sm ${catalogTab === item.k ? 'bg-slate-700 text-white' : 'border bg-white text-slate-700'}`}
               key={item.k}
               onClick={() => setCatalogTab(item.k)}
               type="button"
@@ -367,12 +367,12 @@ export function ReportsIndexPageClient() {
         </div>
 
         <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">รายงานที่พบ</div><div className="text-xl font-bold text-blue-700">{catalogSummary.count.toLocaleString('th-TH')}</div></div>
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Read / Design</div><div className="text-xl font-bold text-emerald-700">{catalogSummary.readOnly.toLocaleString('th-TH')}</div></div>
-          <div className="rounded-lg bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Accounting / Finance</div><div className="text-xl font-bold text-purple-700">{catalogSummary.accounting.toLocaleString('th-TH')}</div></div>
+          <div className="rounded-md bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">รายงานที่พบ</div><div className="text-xl font-bold text-blue-700">{catalogSummary.count.toLocaleString('th-TH')}</div></div>
+          <div className="rounded-md bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Read / Design</div><div className="text-xl font-bold text-emerald-700">{catalogSummary.readOnly.toLocaleString('th-TH')}</div></div>
+          <div className="rounded-md bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Accounting / Finance</div><div className="text-xl font-bold text-purple-700">{catalogSummary.accounting.toLocaleString('th-TH')}</div></div>
         </div>
 
-        <div className="mt-3 overflow-x-auto rounded-lg border">
+        <div className="mt-3 overflow-x-auto rounded-md border">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-slate-100">
               <tr>
@@ -391,9 +391,9 @@ export function ReportsIndexPageClient() {
                     <div className="font-mono text-xs text-slate-500">{report.href}</div>
                   </td>
                   <td className="p-2 text-slate-700">{report.owner}</td>
-                  <td className="p-2"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(report.status)}`}>{report.status}</span></td>
+                  <td className="p-2"><span className={`rounded-md-full px-2 py-1 text-xs font-semibold ${statusClass(report.status)}`}>{report.status}</span></td>
                   <td className="p-2 text-slate-600">{report.summary}</td>
-                  <td className="p-2 text-right"><Link className="rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700" href={report.href} prefetch={false}>เปิดรายงาน</Link></td>
+                  <td className="p-2 text-right"><Link className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700" href={report.href} prefetch={false}>เปิดรายงาน</Link></td>
                 </tr>
               ))}
               {!filtered.length ? (

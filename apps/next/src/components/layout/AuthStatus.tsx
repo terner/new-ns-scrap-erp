@@ -45,12 +45,12 @@ export function AuthStatus() {
   }
 
   if (isLoading) {
-    return <span className="rounded-lg px-3 py-1.5 text-sm text-slate-400">กำลังตรวจ session</span>
+    return <span className="rounded-md px-3 py-1.5 text-sm text-slate-400">กำลังตรวจ session</span>
   }
 
   if (!session) {
     return (
-      <Link className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100" href="/login">
+      <Link className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100" href="/login">
         Login
       </Link>
     )
@@ -59,7 +59,7 @@ export function AuthStatus() {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <span className="hidden max-w-48 truncate text-sm text-slate-600 sm:inline">{session.user.email}</span>
-      <button className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={logout}>
+      <button className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={logout}>
         Logout
       </button>
     </div>

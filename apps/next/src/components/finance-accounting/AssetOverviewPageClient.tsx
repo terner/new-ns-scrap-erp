@@ -52,23 +52,23 @@ export function AssetOverviewPageClient() {
   const summary = data?.summary ?? {}
 
   return (
-    <section className="min-h-full rounded-xl bg-[#0b1220] p-[18px] text-[#e6ecff]">
+    <section className="min-h-full rounded-md bg-[#0b1220] p-[18px] text-[#e6ecff]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="m-0 text-lg font-bold text-[#e6ecff]">💎 Net Worth / Track Asset</h2>
           <p className="mt-1 text-xs text-[#8a96b8]">Management overview · assets, debt, liquidity, AR aging</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input className="rounded-lg border border-[#1f2c4a] bg-[#0e1729] px-3 py-2 text-sm font-bold text-[#e6ecff]" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
-          <select className="rounded-lg border border-[#1f2c4a] bg-[#0e1729] px-3 py-2 text-sm text-[#e6ecff]" value={branchId} onChange={(event) => setBranchId(event.target.value)}>
+          <input className="rounded-md border border-[#1f2c4a] bg-[#0e1729] px-3 py-2 text-sm font-bold text-[#e6ecff]" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
+          <select className="rounded-md border border-[#1f2c4a] bg-[#0e1729] px-3 py-2 text-sm text-[#e6ecff]" value={branchId} onChange={(event) => setBranchId(event.target.value)}>
             <option value="ALL">ทุกสาขา</option>
             {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
-          <button className="rounded-lg bg-[#1f2c4a] px-3 py-2 text-sm text-white opacity-60" disabled type="button">Export</button>
+          <button className="rounded-md bg-[#1f2c4a] px-3 py-2 text-sm text-white opacity-60" disabled type="button">Export</button>
         </div>
       </div>
 
-      {error ? <div className="mb-3 rounded-lg border border-[#ff6b6b] bg-[#3b1f1f] p-3 text-sm text-[#ffb4b4]">{error}</div> : null}
+      {error ? <div className="mb-3 rounded-md border border-[#ff6b6b] bg-[#3b1f1f] p-3 text-sm text-[#ffb4b4]">{error}</div> : null}
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
         <DarkKpi label="Total Asset" value={summary.totalAsset} />
@@ -77,10 +77,10 @@ export function AssetOverviewPageClient() {
         <DarkKpi danger={(summary.cashNeededToday ?? 0) > (summary.totalCash ?? 0)} label="เงินที่ต้องใช้วันนี้" value={summary.cashNeededToday} />
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border-l-4 border-[#ffcc4d] bg-[#1a2440] p-3 text-xs text-[#c6d0ee]">
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border-l-4 border-[#ffcc4d] bg-[#1a2440] p-3 text-xs text-[#c6d0ee]">
         <span className="font-bold text-[#ffcc4d]">Read-only baseline</span>
         <span>{data?.sourceState.limitations[0] ?? 'Management view only; no posting/write action enabled.'}</span>
-        <Link className="ml-auto rounded-lg bg-[#1f2c4a] px-3 py-1.5 text-white" href="/finance-accounting/financial-dashboard">Financial Dashboard</Link>
+        <Link className="ml-auto rounded-md bg-[#1f2c4a] px-3 py-1.5 text-white" href="/finance-accounting/financial-dashboard">Financial Dashboard</Link>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
@@ -105,7 +105,7 @@ export function AssetOverviewPageClient() {
 }
 
 function DarkKpi({ danger = false, label, up = false, value }: { danger?: boolean; label: string; up?: boolean; value: unknown }) {
-  return <div className="rounded-[14px] border border-[#1f2c4a] bg-[#111a2e] p-4"><div className="text-xs text-[#8a96b8]">{label}</div><div className={`mt-1 break-words text-[22px] font-semibold ${danger ? 'text-[#ff6b6b]' : up ? 'text-[#2ecc71]' : 'text-[#e6ecff]'}`}>{money(value)}</div><div className={`mt-1 text-xs ${danger ? 'text-[#ff6b6b]' : up ? 'text-[#2ecc71]' : 'text-[#8a96b8]'}`}>{danger ? 'cash pressure' : up ? 'assets - liabilities' : 'management value'}</div></div>
+  return <div className="rounded-md-[14px] border border-[#1f2c4a] bg-[#111a2e] p-4"><div className="text-xs text-[#8a96b8]">{label}</div><div className={`mt-1 break-words text-[22px] font-semibold ${danger ? 'text-[#ff6b6b]' : up ? 'text-[#2ecc71]' : 'text-[#e6ecff]'}`}>{money(value)}</div><div className={`mt-1 text-xs ${danger ? 'text-[#ff6b6b]' : up ? 'text-[#2ecc71]' : 'text-[#8a96b8]'}`}>{danger ? 'cash pressure' : up ? 'assets - liabilities' : 'management value'}</div></div>
 }
 
 /*
@@ -115,11 +115,11 @@ function DarkKpi({ danger = false, label, up = false, value }: { danger?: boolea
 */
 
 function PendingSaleBlock({ summary }: { summary: Record<string, number> }) {
-  return <div className="mb-4 rounded-[14px] border border-[#5d4321] border-l-4 border-l-[#f59e0b] bg-[#151f35] p-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-bold text-[#ffcc4d]"><span className="text-2xl">📦</span> ต้นทุนรอเปิดบิล (Pending Sale) - เงินค้างใน Stock ที่เบิกออกไปแล้ว</h3><Link className="rounded-lg bg-[#9a6b12] px-3 py-1.5 text-xs font-bold text-white" href="/sales/stock-issue">ดูทั้งหมด</Link></div><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Mini label="⏰ จำนวนใบ" tone="amber" value={money(summary.count)} /><Mini label="⚖ น้ำหนัก" tone="blue" value={`${money(summary.qty)} กก.`} /><Mini label="💰 ต้นทุน (เงินที่ค้าง)" tone="red" value={money(summary.cost)} /><Mini label="📈 ยอดขายคาด" tone="emerald" value={money(summary.est)} /></div></div>
+  return <div className="mb-4 rounded-md-[14px] border border-[#5d4321] border-l-4 border-l-[#f59e0b] bg-[#151f35] p-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-bold text-[#ffcc4d]"><span className="text-2xl">📦</span> ต้นทุนรอเปิดบิล (Pending Sale) - เงินค้างใน Stock ที่เบิกออกไปแล้ว</h3><Link className="rounded-md bg-[#9a6b12] px-3 py-1.5 text-xs font-bold text-white" href="/sales/stock-issue">ดูทั้งหมด</Link></div><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Mini label="⏰ จำนวนใบ" tone="amber" value={money(summary.count)} /><Mini label="⚖ น้ำหนัก" tone="blue" value={`${money(summary.qty)} กก.`} /><Mini label="💰 ต้นทุน (เงินที่ค้าง)" tone="red" value={money(summary.cost)} /><Mini label="📈 ยอดขายคาด" tone="emerald" value={money(summary.est)} /></div></div>
 }
 
 function TradingPendingBlock({ summary }: { summary: Record<string, number> }) {
-  return <div className="mb-4 rounded-[14px] border border-[#4c2f78] border-l-4 border-l-[#a855f7] bg-[#151f35] p-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-bold text-[#c4a3ff]"><span className="text-2xl">🔄</span> Trading Pending รับเงิน - Trading ซื้อจ่ายแล้ว แต่ Sales ยังไม่เปิด</h3><Link className="rounded-lg bg-[#6d3dc2] px-3 py-1.5 text-xs font-bold text-white" href="/trading/matching">Trading Matching</Link></div><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Mini label="📋 บิลซื้อ" tone="purple" value={`${money(summary.billCount)} ใบ`} /><Mini label="💸 จ่ายไปแล้ว" tone="blue" value={money(summary.paidAmount)} /><Mini label="✓ Match แล้ว" tone="emerald" value={money(summary.matchedAmount)} /><Mini label="⏳ Pending รับเงิน" tone="purpleStrong" value={money(summary.pendingAmount)} /></div></div>
+  return <div className="mb-4 rounded-md-[14px] border border-[#4c2f78] border-l-4 border-l-[#a855f7] bg-[#151f35] p-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 text-sm font-bold text-[#c4a3ff]"><span className="text-2xl">🔄</span> Trading Pending รับเงิน - Trading ซื้อจ่ายแล้ว แต่ Sales ยังไม่เปิด</h3><Link className="rounded-md bg-[#6d3dc2] px-3 py-1.5 text-xs font-bold text-white" href="/trading/matching">Trading Matching</Link></div><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Mini label="📋 บิลซื้อ" tone="purple" value={`${money(summary.billCount)} ใบ`} /><Mini label="💸 จ่ายไปแล้ว" tone="blue" value={money(summary.paidAmount)} /><Mini label="✓ Match แล้ว" tone="emerald" value={money(summary.matchedAmount)} /><Mini label="⏳ Pending รับเงิน" tone="purpleStrong" value={money(summary.pendingAmount)} /></div></div>
 }
 
 function Mini({ label, tone, value }: { label: string; tone: string; value: string }) {
@@ -131,12 +131,12 @@ function Mini({ label, tone, value }: { label: string; tone: string; value: stri
     purpleStrong: 'border-[#7c3aed] text-[#c4a3ff]',
     red: 'border-[#7f2d2d] text-[#ff6b6b]',
   }
-  return <div className={`rounded-lg border bg-[#0e1729] p-3 ${map[tone] ?? map.blue}`}><div className="text-xs text-[#8a96b8]">{label}</div><div className="break-words text-2xl font-bold">{value}</div></div>
+  return <div className={`rounded-md border bg-[#0e1729] p-3 ${map[tone] ?? map.blue}`}><div className="text-xs text-[#8a96b8]">{label}</div><div className="break-words text-2xl font-bold">{value}</div></div>
 }
 
 function DonutPanel({ empty, items, title, total, tone }: { empty?: string; items: Array<{ color: string; name: string; val: number }>; title: string; total: number; tone: string }) {
   const gradient = conic(items, total)
-  return <div className="mb-4 rounded-[14px] border border-[#1f2c4a] bg-[#111a2e] p-5"><h3 className={`mb-3 font-bold ${tone === 'red' ? 'text-[#ff6b6b]' : 'text-[#2ecc71]'}`}>{title}</h3><div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full p-9" style={{ background: gradient }}><div className="flex h-full w-full items-center justify-center rounded-full bg-[#0b1220] text-center text-xs font-bold text-[#e6ecff]">รวม<br />{money(total)}</div></div><div className="mt-3 space-y-1 text-xs text-[#c6d0ee]">{items.map((item) => <div key={item.name} className="flex justify-between gap-2"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded" style={{ background: item.color }} />{item.name}</span><span className={`font-mono font-bold ${tone === 'red' ? 'text-[#ff6b6b]' : 'text-[#2ecc71]'}`}>{money(item.val)}</span></div>)}{items.length === 0 ? <div className="py-3 text-center font-semibold text-[#2ecc71]">{empty ?? 'ไม่มีข้อมูล'}</div> : null}</div></div>
+  return <div className="mb-4 rounded-md-[14px] border border-[#1f2c4a] bg-[#111a2e] p-5"><h3 className={`mb-3 font-bold ${tone === 'red' ? 'text-[#ff6b6b]' : 'text-[#2ecc71]'}`}>{title}</h3><div className="mx-auto flex h-40 w-40 items-center justify-center rounded-md-full p-9" style={{ background: gradient }}><div className="flex h-full w-full items-center justify-center rounded-md-full bg-[#0b1220] text-center text-xs font-bold text-[#e6ecff]">รวม<br />{money(total)}</div></div><div className="mt-3 space-y-1 text-xs text-[#c6d0ee]">{items.map((item) => <div key={item.name} className="flex justify-between gap-2"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-md" style={{ background: item.color }} />{item.name}</span><span className={`font-mono font-bold ${tone === 'red' ? 'text-[#ff6b6b]' : 'text-[#2ecc71]'}`}>{money(item.val)}</span></div>)}{items.length === 0 ? <div className="py-3 text-center font-semibold text-[#2ecc71]">{empty ?? 'ไม่มีข้อมูล'}</div> : null}</div></div>
 }
 
 function conic(items: Array<{ color: string; val: number }>, total: number) {
@@ -152,7 +152,7 @@ function conic(items: Array<{ color: string; val: number }>, total: number) {
 
 function ArAging({ aging, total }: { aging: Record<string, number>; total: number }) {
   const max = Math.max(1, ...Object.values(aging))
-  return <div className="rounded-[14px] border border-[#1f2c4a] bg-[#111a2e] p-5"><h3 className="mb-3 font-bold text-[#7dd3fc]">📥 AR Aging - อายุลูกหนี้</h3><div className="space-y-2">{Object.entries(aging).map(([key, amount]) => <div key={key}><div className="mb-1 flex justify-between text-xs text-[#c6d0ee]"><span className="font-medium">{agingLabel(key)}</span><span className="font-mono font-bold">{money(amount)}</span></div><div className="h-3 rounded-full bg-[#1f2c4a]"><div className="h-3 rounded-full bg-[#06b6d4]" style={{ width: `${Math.min(100, amount / max * 100)}%` }} /></div></div>)}</div><div className="mt-3 flex justify-between border-t border-[#1f2c4a] pt-2 text-sm font-bold"><span>รวม AR</span><span className="text-[#7dd3fc]">{money(total)}</span></div></div>
+  return <div className="rounded-md-[14px] border border-[#1f2c4a] bg-[#111a2e] p-5"><h3 className="mb-3 font-bold text-[#7dd3fc]">📥 AR Aging - อายุลูกหนี้</h3><div className="space-y-2">{Object.entries(aging).map(([key, amount]) => <div key={key}><div className="mb-1 flex justify-between text-xs text-[#c6d0ee]"><span className="font-medium">{agingLabel(key)}</span><span className="font-mono font-bold">{money(amount)}</span></div><div className="h-3 rounded-md-full bg-[#1f2c4a]"><div className="h-3 rounded-md-full bg-[#06b6d4]" style={{ width: `${Math.min(100, amount / max * 100)}%` }} /></div></div>)}</div><div className="mt-3 flex justify-between border-t border-[#1f2c4a] pt-2 text-sm font-bold"><span>รวม AR</span><span className="text-[#7dd3fc]">{money(total)}</span></div></div>
 }
 
 function agingLabel(key: string) {
@@ -182,7 +182,7 @@ function Panel({ children, heading, tone, total }: { children: ReactNode; headin
     emerald: 'text-[#2ecc71]',
     red: 'text-[#ff6b6b]',
   }
-  return <div className="overflow-hidden rounded-[14px] border border-[#1f2c4a] bg-[#111a2e]"><div className={`flex justify-between border-b border-[#1f2c4a] bg-[#151f35] px-4 py-3 font-semibold ${map[tone]}`}><span>{heading}</span><span>{money(total as number)}</span></div>{children}</div>
+  return <div className="overflow-hidden rounded-md-[14px] border border-[#1f2c4a] bg-[#111a2e]"><div className={`flex justify-between border-b border-[#1f2c4a] bg-[#151f35] px-4 py-3 font-semibold ${map[tone]}`}><span>{heading}</span><span>{money(total as number)}</span></div>{children}</div>
 }
 
 function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {

@@ -93,12 +93,12 @@ export function PendingSalesPageClient() {
     <section className="space-y-3">
       <Hero tone="from-amber-600 to-orange-600" title="⏰ รายการรอขาย / Pending Sales — เทียบกับ LME" subtitle="สรุปสินค้าที่รอขาย · เปรียบเทียบกับราคา LME · กำไร/ขาดทุน · Cost Pool vs Stock" />
       <LmeCard config={data?.lmeConfig} products={data?.productRows ?? []} />
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <Segment active={mode === 'pending'} color="amber" onClick={() => setMode('pending')}>⏳ ยังรอขาย</Segment>
         <Segment active={mode === 'sold'} color="emerald" onClick={() => setMode('sold')}>✅ ขายแล้ว</Segment>
         <Segment active={mode === 'all'} color="blue" onClick={() => setMode('all')}>📋 ทั้งหมด</Segment>
         <select className="control" value={customerId} onChange={(event) => setCustomerId(event.target.value)}><option value="">ทุก Customer</option>{(data?.customers ?? []).map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select>
-        <span className="flex-1" /><button className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" type="button" onClick={exportPendingSales}>📥 Export CSV</button>
+        <span className="flex-1" /><button className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" type="button" onClick={exportPendingSales}>📥 Export CSV</button>
       </div>
       <MetalChips groups={data?.metalGroups ?? []} selected={selectedGroups} setSelected={setSelectedGroups} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -148,15 +148,15 @@ export function SalesPlanPageClient() {
   }
   return (
     <section className="space-y-3">
-      <Hero action={<button className="rounded-lg bg-white px-4 py-2 font-bold text-amber-700 opacity-70" disabled type="button">+ เพิ่มรายการ</button>} tone="from-amber-700 to-orange-600" title="📋 วางแผนการขาย (Sales Plan) — ทองแดง / ทองเหลือง" subtitle="เสนอ % LME + ช่องทางขาย → กด 🔒 Lock เพื่อยืนยันราคา → ตู้ในรอขายลดลงอัตโนมัติ" />
-      <div className="grid grid-cols-2 gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm md:grid-cols-5">
+      <Hero action={<button className="rounded-md bg-white px-4 py-2 font-bold text-amber-700 opacity-70" disabled type="button">+ เพิ่มรายการ</button>} tone="from-amber-700 to-orange-600" title="📋 วางแผนการขาย (Sales Plan) — ทองแดง / ทองเหลือง" subtitle="เสนอ % LME + ช่องทางขาย → กด 🔒 Lock เพื่อยืนยันราคา → ตู้ในรอขายลดลงอัตโนมัติ" />
+      <div className="grid grid-cols-2 gap-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm md:grid-cols-5">
         <LmeStat label="🥉 ทองแดง LME" value={`${money(data?.lmeConfig.lmeCopperUSD)} USD/MT`} />
         <LmeStat label="🌟 ทองเหลือง LME" value={`${money(data?.lmeConfig.lmeBrassUSD)} USD/MT`} />
         <LmeStat label="💱 USD/THB" value={money(data?.lmeConfig.fxRate)} />
         <LmeStat label="📦 กก./ตู้" value={`${money(data?.lmeConfig.kgPerContainer)} กก.`} />
         <div className="text-xs text-slate-500">แก้ที่หน้า รายการรอขาย — Tab LME Config</div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <label className="text-sm">เดือน</label>
         <input className="control" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
         <select className="control" value={filterGroup} onChange={(event) => setFilterGroup(event.target.value)}>
@@ -170,36 +170,36 @@ export function SalesPlanPageClient() {
           <option value="domestic">🇹🇭 ในประเทศ</option>
         </select>
         <span className="flex-1" />
-        <button className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={exportPlan} type="button">📥 Export CSV</button>
+        <button className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700" onClick={exportPlan} type="button">📥 Export CSV</button>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <div className="rounded-xl bg-white p-3 shadow">
+        <div className="rounded-md bg-white p-3 shadow">
           <div className="text-xs text-slate-500">รายการแผน</div>
           <div className="text-xl font-bold">{money(s.plansCount)}</div>
           <div className="text-xs text-slate-400">🔒 {money(s.lockedCount)} / ⏳ {money(s.pendingCount)}</div>
         </div>
-        <div className="rounded-xl bg-white p-3 shadow">
+        <div className="rounded-md bg-white p-3 shadow">
           <div className="text-xs text-slate-500">จำนวนตู้รวม</div>
           <div className="text-xl font-bold text-blue-700">{money(s.totalContainers)}</div>
           <div className="text-xs text-slate-400">🔒 ล็อก {money(s.lockedContainers)}</div>
         </div>
-        <div className="rounded-xl bg-white p-3 shadow">
+        <div className="rounded-md bg-white p-3 shadow">
           <div className="text-xs text-slate-500">น้ำหนักรวม</div>
           <div className="text-xl font-bold text-blue-700">{money(s.totalKg)} กก.</div>
           <div className="text-xs text-slate-400">เฉลี่ย {money(s.avgPctLme)}% LME</div>
         </div>
-        <div className="rounded-xl border-l-4 border-emerald-500 bg-emerald-50 p-3 shadow">
+        <div className="rounded-md border-l-4 border-emerald-500 bg-emerald-50 p-3 shadow">
           <div className="text-xs text-emerald-700">💰 กำไรล็อกแล้ว (สินค้านี้)</div>
           <div className={`text-xl font-bold ${num(s.totalLockedProfit) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{money(s.totalLockedProfit)}</div>
           <div className="text-xs text-slate-500">เฉพาะที่ล็อกราคาแล้ว</div>
         </div>
-        <div className="rounded-xl border-l-4 border-amber-500 bg-amber-50 p-3 shadow">
+        <div className="rounded-md border-l-4 border-amber-500 bg-amber-50 p-3 shadow">
           <div className="text-xs text-amber-700">📈 กำไรคาดการณ์ (ถ้าขายตามแผน)</div>
           <div className={`text-xl font-bold ${num(s.totalProjectedProfit) >= 0 ? 'text-amber-700' : 'text-red-600'}`}>{money(s.totalProjectedProfit)}</div>
           <div className="text-xs text-slate-500">รอขาย × ราคาเสนอที่ดีสุด</div>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <div className="border-b bg-amber-50 p-2 text-xs text-amber-700">📝 ตารางวางแผน — ปลดล็อก = อยู่ในขั้นเสนอ / ล็อก = ราคายืนยันแล้ว ตู้จะถูกหักจากรอขาย</div>
         <table className="w-full min-w-[1120px] text-sm">
           <thead className="bg-slate-100">
@@ -221,25 +221,25 @@ export function SalesPlanPageClient() {
           <tbody>
             {(data?.planRows ?? []).map((row) => (
               <tr className="border-t hover:bg-amber-50/30" key={text(row.id)}>
-                <td className="p-1"><select className="w-full rounded border px-2 py-1 text-sm" disabled value={text(row.productId)}><option>{text(row.productName) || '-เลือก-'}</option></select></td>
-                <td className="p-1"><select className="w-full rounded border px-1 py-1 text-xs" disabled value={text(row.channel)}><option>{text(row.channel) || 'ส่งออก'}</option></select></td>
-                <td className="p-1"><select className="w-full rounded border px-2 py-1 text-sm" disabled value={text(row.customerId)}><option>{text(row.customerName) || '-เลือก-'}</option></select></td>
-                <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right" disabled type="number" value={num(row.containers)} /></td>
-                <td className="p-1"><input className="w-full rounded border px-1 py-1 text-right text-xs" disabled type="number" value={num(row.kgPerContainer)} /></td>
+                <td className="p-1"><select className="w-full rounded-md border px-2 py-1 text-sm" disabled value={text(row.productId)}><option>{text(row.productName) || '-เลือก-'}</option></select></td>
+                <td className="p-1"><select className="w-full rounded-md border px-1 py-1 text-xs" disabled value={text(row.channel)}><option>{text(row.channel) || 'ส่งออก'}</option></select></td>
+                <td className="p-1"><select className="w-full rounded-md border px-2 py-1 text-sm" disabled value={text(row.customerId)}><option>{text(row.customerName) || '-เลือก-'}</option></select></td>
+                <td className="p-1"><input className="w-full rounded-md border px-1 py-1 text-right" disabled type="number" value={num(row.containers)} /></td>
+                <td className="p-1"><input className="w-full rounded-md border px-1 py-1 text-right text-xs" disabled type="number" value={num(row.kgPerContainer)} /></td>
                 <td className="p-1 text-right font-medium">{money(row.totalKg)}</td>
-                <td className="p-1"><input className="w-full rounded border bg-amber-50 px-1 py-1 text-right font-bold" disabled type="number" value={num(row.sellPctLme)} /></td>
+                <td className="p-1"><input className="w-full rounded-md border bg-amber-50 px-1 py-1 text-right font-bold" disabled type="number" value={num(row.sellPctLme)} /></td>
                 <td className="p-1 text-right text-xs text-slate-500">{money(row.lme)}</td>
                 <td className="p-1 text-right text-xs text-slate-500">{money(row.fx)}</td>
                 <td className="bg-emerald-50 p-1 text-right font-bold text-emerald-700">{money(row.sellPrice)}</td>
-                <td className="p-1 text-center"><button className="w-full rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 opacity-70" disabled type="button">⏳ Pending — กดล็อก</button></td>
-                <td className="p-1 text-right"><button className="rounded px-2 text-red-500 opacity-50" disabled type="button">×</button></td>
+                <td className="p-1 text-center"><button className="w-full rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 opacity-70" disabled type="button">⏳ Pending — กดล็อก</button></td>
+                <td className="p-1 text-right"><button className="rounded-md px-2 text-red-500 opacity-50" disabled type="button">×</button></td>
               </tr>
             ))}
             {!(data?.planRows ?? []).length ? <tr><td className="py-8 text-center text-slate-400" colSpan={12}>ยังไม่มีรายการในเดือนนี้ - กด + เพิ่มรายการ</td></tr> : null}
           </tbody>
         </table>
       </div>
-      <div className="overflow-hidden rounded-xl bg-white shadow">
+      <div className="overflow-hidden rounded-md bg-white shadow">
         <div className="flex items-center justify-between border-b bg-indigo-50 p-3">
           <div>
             <h3 className="font-bold text-indigo-700">📊 วิเคราะห์ขาย vs รายการรอขาย — ผู้บริหารตัดสินใจ</h3>
@@ -262,7 +262,7 @@ export function SalesPlanPageClient() {
                   <td className="p-2 text-right text-xs">{num(row.bestPlanPct) > 0 ? `${money(row.bestPlanPct)}%` : '-'}</td>
                   <td className={`bg-emerald-50 p-2 text-right font-bold ${num(row.projectedProfit) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{num(row.bestPlanPrice) > 0 ? money(row.projectedProfit) : '-'}</td>
                   <td className={`bg-emerald-50 p-2 text-right text-xs ${num(row.projectedMarginPct) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{num(row.bestPlanPrice) > 0 ? `${money(row.projectedMarginPct)}%` : '-'}</td>
-                  <td className="p-2 text-center text-xs"><span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-700">{text(row.recommendation)}</span></td>
+                  <td className="p-2 text-center text-xs"><span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-700">{text(row.recommendation)}</span></td>
                 </tr>
               ))}
               {!analysisRows.length ? <tr><td className="py-8 text-center text-slate-400" colSpan={11}>ไม่มีสต๊อกทองแดง/ทองเหลืองให้วิเคราะห์</td></tr> : null}
@@ -271,10 +271,10 @@ export function SalesPlanPageClient() {
           </table>
         </div>
       </div>
-      <div className="overflow-hidden rounded-xl bg-white shadow">
+      <div className="overflow-hidden rounded-md bg-white shadow">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-yellow-50 p-3">
           <h3 className="font-bold text-yellow-700">📦 ตู้รอขาย คงเหลือหลังหักล็อกราคา — เดือน {(month || data?.filters.month) ?? ''}</h3>
-          <div className="text-sm"><span className="mr-2 rounded bg-yellow-100 px-2 py-0.5 text-yellow-700">รวม {money(remainingKgTotal)} กก.</span><span className="rounded bg-emerald-100 px-2 py-0.5 text-emerald-700">มูลค่า WAC {money(remainingValueTotal)}</span></div>
+          <div className="text-sm"><span className="mr-2 rounded-md bg-yellow-100 px-2 py-0.5 text-yellow-700">รวม {money(remainingKgTotal)} กก.</span><span className="rounded-md bg-emerald-100 px-2 py-0.5 text-emerald-700">มูลค่า WAC {money(remainingValueTotal)}</span></div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-sm">
@@ -300,14 +300,14 @@ export function SalesCommissionPageClient() {
   const sales = (data?.salesRows ?? []).find((row) => text(row.id) === selectedSales)
   const billRows = (data?.billRows ?? []).filter((row) => text(row.salesId) === selectedSales)
   if (selectedSales && sales) {
-    return <section className="space-y-4"><Hero action={<button className="rounded bg-white/20 px-3 py-2 text-sm" type="button" onClick={() => setSelectedSales('')}>← กลับ</button>} tone="from-blue-700 to-indigo-700" title={text(sales.name)} subtitle={`${text(sales.code)} · ${text(sales.phone) || '-'}`} /><div className="grid grid-cols-3 gap-3"><Metric label="จำนวนบิลรับซื้อ" value={money(billRows.length)} tone="blue" /><Metric label="น้ำหนักรวม" value={`${money(sales.qty)} กก.`} tone="amber" /><Metric label="ยอดรับซื้อรวม" value={money(sales.purchaseAmt)} tone="blue" /></div><Panel title="🏭 Supplier ในความดูแล"><SimpleTable headers={['Supplier', 'บิล', 'น้ำหนัก', 'ยอดรับซื้อ', 'ราคาเฉลี่ย/กก.', '% ของ Total']} rows={billRows.map((row) => [text(row.supplierName), '1', money(row.qty), money(row.amount), money(row.price), `${money(num(row.amount) / Math.max(1, num(sales.purchaseAmt)) * 100)}%`])} /></Panel><Panel title="📊 รายการสินค้าละเอียด"><SimpleTable headers={['วันที่', 'เลขที่บิล', 'Supplier', 'สินค้า', 'น้ำหนัก', 'ราคาซื้อ', 'ราคาหน้าใบ', 'ยอดรวม']} rows={billRows.map((row) => [text(row.date), text(row.docNo), text(row.supplierName), text(row.productName), money(row.qty), money(row.price), money(row.facePrice), money(row.amount)])} /></Panel></section>
+    return <section className="space-y-4"><Hero action={<button className="rounded-md bg-white/20 px-3 py-2 text-sm" type="button" onClick={() => setSelectedSales('')}>← กลับ</button>} tone="from-blue-700 to-indigo-700" title={text(sales.name)} subtitle={`${text(sales.code)} · ${text(sales.phone) || '-'}`} /><div className="grid grid-cols-3 gap-3"><Metric label="จำนวนบิลรับซื้อ" value={money(billRows.length)} tone="blue" /><Metric label="น้ำหนักรวม" value={`${money(sales.qty)} กก.`} tone="amber" /><Metric label="ยอดรับซื้อรวม" value={money(sales.purchaseAmt)} tone="blue" /></div><Panel title="🏭 Supplier ในความดูแล"><SimpleTable headers={['Supplier', 'บิล', 'น้ำหนัก', 'ยอดรับซื้อ', 'ราคาเฉลี่ย/กก.', '% ของ Total']} rows={billRows.map((row) => [text(row.supplierName), '1', money(row.qty), money(row.amount), money(row.price), `${money(num(row.amount) / Math.max(1, num(sales.purchaseAmt)) * 100)}%`])} /></Panel><Panel title="📊 รายการสินค้าละเอียด"><SimpleTable headers={['วันที่', 'เลขที่บิล', 'Supplier', 'สินค้า', 'น้ำหนัก', 'ราคาซื้อ', 'ราคาหน้าใบ', 'ยอดรวม']} rows={billRows.map((row) => [text(row.date), text(row.docNo), text(row.supplierName), text(row.productName), money(row.qty), money(row.price), money(row.facePrice), money(row.amount)])} /></Panel></section>
   }
   return (
     <section className="space-y-4">
       <Hero tone="from-blue-700 to-indigo-700" title="💼 Sales Tracking — ผลงานพนักงาน" subtitle="ผูก Sales กับ Supplier · ดึงยอดบิลรับซื้อ · กดการ์ดเพื่อดูรายละเอียด" />
-      <div className="rounded-2xl bg-white p-4 shadow"><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-slate-500">📅 ช่วงเวลา:</span>{['วันนี้', '7 วัน', 'เดือนนี้', 'ไตรมาส', 'ปีนี้'].map((p) => <button key={p} className="rounded bg-slate-100 px-3 py-1.5 text-xs font-bold" disabled type="button">{p}</button>)}<input className="control" type="date" value={data?.filters.dateFrom ?? ''} readOnly /><span>→</span><input className="control" type="date" value={data?.filters.dateTo ?? ''} readOnly /><button className="btn-disabled ml-auto" disabled type="button">📥 Export CSV</button></div><div className="mt-2 text-xs"><span className="chip">📋 บิลซื้อ <b>{money(data?.totals.bills)}</b></span></div></div>
+      <div className="rounded-md bg-white p-4 shadow"><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-slate-500">📅 ช่วงเวลา:</span>{['วันนี้', '7 วัน', 'เดือนนี้', 'ไตรมาส', 'ปีนี้'].map((p) => <button key={p} className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-bold" disabled type="button">{p}</button>)}<input className="control" type="date" value={data?.filters.dateFrom ?? ''} readOnly /><span>→</span><input className="control" type="date" value={data?.filters.dateTo ?? ''} readOnly /><button className="btn-disabled ml-auto" disabled type="button">📥 Export CSV</button></div><div className="mt-2 text-xs"><span className="chip">📋 บิลซื้อ <b>{money(data?.totals.bills)}</b></span></div></div>
       <div className="grid gap-4 md:grid-cols-2"><BigCard label="📦 น้ำหนักรับซื้อรวม" tone="from-amber-500 to-orange-600" value={`${money(data?.totals.qty)} กก.`} /><BigCard label="💰 ยอดรับซื้อรวม" tone="from-blue-600 to-indigo-700" value={money(data?.totals.purchaseAmt)} /></div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{(data?.salesRows ?? []).map((row) => <button key={text(row.id)} className="rounded-2xl border-l-4 border-blue-500 bg-white p-5 text-left shadow-lg hover:bg-blue-50" type="button" onClick={() => setSelectedSales(text(row.id))}><div className="font-bold">{text(row.name)}</div><div className="text-xs text-slate-500">{text(row.code)} · {text(row.phone)}</div><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><Mini label="บิล" value={money(row.billCount)} /><Mini label="Supplier" value={money(row.supplierCount)} /></div><Metric label="น้ำหนักรับซื้อ" value={`${money(row.qty)} กก.`} tone="amber" /><Metric label="ยอดรับซื้อรวม" value={money(row.purchaseAmt)} tone="blue" /><Metric label="ค่าคอมเดือนนี้" value={money(row.commission)} tone={row.eligible ? 'emerald' : 'slate'} /></button>)}</div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{(data?.salesRows ?? []).map((row) => <button key={text(row.id)} className="rounded-md border-l-4 border-blue-500 bg-white p-5 text-left shadow-lg hover:bg-blue-50" type="button" onClick={() => setSelectedSales(text(row.id))}><div className="font-bold">{text(row.name)}</div><div className="text-xs text-slate-500">{text(row.code)} · {text(row.phone)}</div><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><Mini label="บิล" value={money(row.billCount)} /><Mini label="Supplier" value={money(row.supplierCount)} /></div><Metric label="น้ำหนักรับซื้อ" value={`${money(row.qty)} กก.`} tone="amber" /><Metric label="ยอดรับซื้อรวม" value={money(row.purchaseAmt)} tone="blue" /><Metric label="ค่าคอมเดือนนี้" value={money(row.commission)} tone={row.eligible ? 'emerald' : 'slate'} /></button>)}</div>
       <Panel title={`🏭 ผูก Supplier กับพนักงานขาย (${data?.suppliers.length ?? 0} ราย)`}><div className="mb-3 flex gap-2"><input className="control" placeholder="ค้นหา Supplier" readOnly /><select className="control"><option>ทุก Sales</option></select></div><SimpleTable headers={['รหัส', 'ชื่อ Supplier', 'โทร', 'พนักงานขายที่รับผิดชอบ']} rows={(data?.suppliers ?? []).slice(0, 200).map((row) => [text(row.code), text(row.name), text(row.phone), text((data?.salesRows ?? []).find((sale) => text(sale.id) === text(row.salesId))?.name ?? '(ไม่ได้กำหนด)')])} /></Panel>
       <Notice text={data?.sourceState.limitations[0]} />{error ? <ErrorBox text={error} /> : null}
     </section>
@@ -315,14 +315,14 @@ export function SalesCommissionPageClient() {
 }
 
 function Hero({ action, subtitle, title, tone }: { action?: ReactNode; subtitle: string; title: string; tone: string }) {
-  return <div className={`rounded-xl bg-gradient-to-r ${tone} p-4 text-white shadow`}><div className="flex items-start justify-between gap-3"><div><h1 className="text-xl font-bold">{title}</h1><p className="mt-1 text-sm opacity-80">{subtitle}</p></div>{action}</div></div>
+  return <div className={`rounded-md bg-gradient-to-r ${tone} p-4 text-white shadow`}><div className="flex items-start justify-between gap-3"><div><h1 className="text-xl font-bold">{title}</h1><p className="mt-1 text-sm opacity-80">{subtitle}</p></div>{action}</div></div>
 }
 
 function LmeCard({ config, products }: { config?: LmeConfig; products: AnyRow[] }) {
   const lmeProducts = products.filter((row) => text(row.metalGroup).includes('ทองแดง') || text(row.metalGroup).includes('ทองเหลือง') || text(row.metalGroup).toLowerCase().includes('copper') || text(row.metalGroup).toLowerCase().includes('brass'))
   return (
     <>
-      <div className="rounded-xl bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-bold text-slate-700">📊 LME Reference Pricing</h3>
           <button className="btn-disabled" disabled title="รอ schema/audit สำหรับบันทึก LME config" type="button">💾 บันทึก</button>
@@ -335,7 +335,7 @@ function LmeCard({ config, products }: { config?: LmeConfig; products: AnyRow[] 
         </div>
         <div className="mt-2 text-xs text-slate-400">⏰ อัปเดตล่าสุด: {config?.updatedAt ?? '-'} โดย {config?.updatedBy ?? '-'}</div>
       </div>
-      <details className="rounded-xl bg-white shadow">
+      <details className="rounded-md bg-white shadow">
         <summary className="cursor-pointer p-3 font-bold text-slate-700">📋 ตั้งค่าผู้ซื้อซื้อที่ LME กี่ % ต่อสินค้า — เฉพาะ 🥉 ทองแดง / 🌟 ทองเหลือง ({lmeProducts.length} รายการ)</summary>
         <div className="overflow-x-auto p-3">
           <table className="w-full min-w-[820px] text-sm">
@@ -350,7 +350,7 @@ function LmeCard({ config, products }: { config?: LmeConfig; products: AnyRow[] 
                     <td className="p-2">{text(row.productName)}</td>
                     <td className="p-2 text-xs">{text(row.metalGroup) || '-'}</td>
                     <td className="p-2 text-right text-xs text-slate-500">{base ? money(base) : '-'}</td>
-                    <td className="p-2 text-right"><input className="w-24 rounded border border-slate-300 px-2 py-1 text-right" disabled type="number" value={num(row.lmeBuyPercent)} readOnly />%</td>
+                    <td className="p-2 text-right"><input className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right" disabled type="number" value={num(row.lmeBuyPercent)} readOnly />%</td>
                     <td className="p-2 text-right font-bold text-blue-700">{num(row.lmeTarget) ? money(row.lmeTarget) : '-'}</td>
                     <td className="p-2 text-right">{money(row.wac)}</td>
                     <td className={`p-2 text-right text-xs ${diff <= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{num(row.lmeTarget) ? money(diff) : '-'}</td>
@@ -371,7 +371,7 @@ function PendingSummary({ mode, onSelect, rows }: { mode: string; onSelect: (id:
 }
 
 function PendingDetails({ details, name, onBack }: { details: AnyRow[]; name: string; onBack: () => void }) {
-  return <div className="space-y-3"><div className="flex justify-between rounded border-l-4 border-blue-500 bg-blue-50 p-3"><div><div className="text-xs text-slate-500">เลือกสินค้า</div><div className="font-bold text-blue-700">{name}</div></div><button className="text-sm text-slate-600" type="button" onClick={onBack}>← กลับสรุปทั้งหมด</button></div><SimpleTable headers={['เลขที่ PO', 'วันที่', 'Customer', 'จำนวน', 'ราคา', 'ขายแล้ว', 'รอขาย', 'มูลค่ารอ', 'วันส่ง']} rows={details.map((row) => [text(row.docNo), text(row.date), text(row.customerName), money(row.itemQty), money(row.itemPrice), money(row.matched), money(row.remaining), money(row.remainValue), text(row.deliveryDate)])} /></div>
+  return <div className="space-y-3"><div className="flex justify-between rounded-md border-l-4 border-blue-500 bg-blue-50 p-3"><div><div className="text-xs text-slate-500">เลือกสินค้า</div><div className="font-bold text-blue-700">{name}</div></div><button className="text-sm text-slate-600" type="button" onClick={onBack}>← กลับสรุปทั้งหมด</button></div><SimpleTable headers={['เลขที่ PO', 'วันที่', 'Customer', 'จำนวน', 'ราคา', 'ขายแล้ว', 'รอขาย', 'มูลค่ารอ', 'วันส่ง']} rows={details.map((row) => [text(row.docNo), text(row.date), text(row.customerName), money(row.itemQty), money(row.itemPrice), money(row.matched), money(row.remaining), money(row.remainValue), text(row.deliveryDate)])} /></div>
 }
 
 function PendingSaleInventory({ rows, totals }: { rows: AnyRow[]; totals: Record<string, number> }) {
@@ -385,20 +385,20 @@ function PendingSaleInventory({ rows, totals }: { rows: AnyRow[]; totals: Record
   return (
     <div className="space-y-3">
       <Hero tone="from-indigo-600 to-purple-700" title="📋 ตารางรอขาย" subtitle="เฉพาะ ทองแดง / ทองเหลือง · รอขายจริง = STOCK + PO ซื้อรอส่ง − ล๊อกขายรอส่ง" />
-      <div className="rounded-xl bg-indigo-50 p-3 text-xs text-indigo-900 shadow">
+      <div className="rounded-md bg-indigo-50 p-3 text-xs text-indigo-900 shadow">
         <b>รอขาย</b> = ของใน Cost Pool ที่ยังไม่ถูก Allocate · <b>ล๊อกขายรอส่ง</b> = PO Sell ที่ยังไม่ส่งของ · <b>PO ซื้อรอส่ง</b> = PO Buy ที่ยังไม่ matched · <b>STOCK</b> = ของในคลังตามจริง
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <div className="rounded-xl border-l-4 border-emerald-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">💰 รอขาย (Cost Pool)</div><div className="text-lg font-bold text-emerald-700">{money(totals.totalPendingSaleQty)} กก.</div><div className="text-xs text-slate-400">≈ {money(totals.totalPendingSaleValue)} ฿</div></div>
-        <div className="rounded-xl border-l-4 border-pink-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">🔒 ล๊อกขายรอส่ง</div><div className="text-lg font-bold text-pink-700">{money(totals.totalLockedSell)} กก.</div><div className="text-xs text-slate-400">PO Sell (Open)</div></div>
-        <div className="rounded-xl border-l-4 border-purple-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">📦 PO ซื้อรอส่ง</div><div className="text-lg font-bold text-purple-700">{money(totals.totalLockedBuy)} กก.</div><div className="text-xs text-slate-400">PO Buy (Open)</div></div>
-        <div className="rounded-xl border-l-4 border-blue-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">🏷 STOCK</div><div className="text-lg font-bold text-blue-700">{money(totals.totalStock)} กก.</div><div className="text-xs text-slate-400">ของจริงในคลัง</div></div>
-        <div className={`rounded-xl border-l-4 bg-white p-3 shadow ${num(totals.totalRealPending) < 0 ? 'border-red-600' : 'border-slate-400'}`}><div className="text-xs text-slate-500">⚖ รอขายจริง (รวม)</div><div className={`text-lg font-bold ${num(totals.totalRealPending) < 0 ? 'text-red-600' : 'text-slate-700'}`}>{money(totals.totalRealPending)} กก.</div><div className={`text-xs ${num(totals.shortageCount) > 0 ? 'font-bold text-red-500' : 'text-slate-400'}`}>{num(totals.shortageCount) > 0 ? `⚠ ขาด ${money(totals.shortageCount)} รายการ` : '✓ ครบทุกรายการ'}</div></div>
+        <div className="rounded-md border-l-4 border-emerald-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">💰 รอขาย (Cost Pool)</div><div className="text-lg font-bold text-emerald-700">{money(totals.totalPendingSaleQty)} กก.</div><div className="text-xs text-slate-400">≈ {money(totals.totalPendingSaleValue)} ฿</div></div>
+        <div className="rounded-md border-l-4 border-pink-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">🔒 ล๊อกขายรอส่ง</div><div className="text-lg font-bold text-pink-700">{money(totals.totalLockedSell)} กก.</div><div className="text-xs text-slate-400">PO Sell (Open)</div></div>
+        <div className="rounded-md border-l-4 border-purple-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">📦 PO ซื้อรอส่ง</div><div className="text-lg font-bold text-purple-700">{money(totals.totalLockedBuy)} กก.</div><div className="text-xs text-slate-400">PO Buy (Open)</div></div>
+        <div className="rounded-md border-l-4 border-blue-500 bg-white p-3 shadow"><div className="text-xs text-slate-500">🏷 STOCK</div><div className="text-lg font-bold text-blue-700">{money(totals.totalStock)} กก.</div><div className="text-xs text-slate-400">ของจริงในคลัง</div></div>
+        <div className={`rounded-md border-l-4 bg-white p-3 shadow ${num(totals.totalRealPending) < 0 ? 'border-red-600' : 'border-slate-400'}`}><div className="text-xs text-slate-500">⚖ รอขายจริง (รวม)</div><div className={`text-lg font-bold ${num(totals.totalRealPending) < 0 ? 'text-red-600' : 'text-slate-700'}`}>{money(totals.totalRealPending)} กก.</div><div className={`text-xs ${num(totals.shortageCount) > 0 ? 'font-bold text-red-500' : 'text-slate-400'}`}>{num(totals.shortageCount) > 0 ? `⚠ ขาด ${money(totals.shortageCount)} รายการ` : '✓ ครบทุกรายการ'}</div></div>
       </div>
-      <div className="overflow-hidden rounded-xl bg-white shadow">
+      <div className="overflow-hidden rounded-md bg-white shadow">
         <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-4 py-3">
           <h3 className="text-sm font-bold text-amber-900">🟡 ตารางรอขาย — ทองแดง / ทองเหลือง ({rows.length} รายการ)</h3>
-          <button className="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-700" type="button" onClick={exportRows}>📥 Export CSV</button>
+          <button className="rounded-md bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-700" type="button" onClick={exportRows}>📥 Export CSV</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-xs">
@@ -432,20 +432,20 @@ function PoolStock({ data }: { data: PendingPayload | null }) {
 }
 
 function SimpleTable({ empty = 'ไม่มีข้อมูล', headers, rowClick, rows }: { empty?: string; headers: string[]; rowClick?: (index: number) => void; rows: string[][] }) {
-  return <div className="overflow-x-auto rounded-xl bg-white shadow"><table className="min-w-[760px] w-full text-xs"><thead className="bg-slate-100"><tr>{headers.map((h) => <th key={h} className="p-2 text-left">{h}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className={`border-t hover:bg-amber-50/30 ${rowClick ? 'cursor-pointer' : ''}`} onClick={() => rowClick?.(index)}>{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`p-2 ${cellIndex > 1 ? 'text-right' : ''}`}>{cell}</td>)}</tr>)}{rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={headers.length}>{empty}</td></tr> : null}</tbody></table></div>
+  return <div className="overflow-x-auto rounded-md bg-white shadow"><table className="min-w-[760px] w-full text-xs"><thead className="bg-slate-100"><tr>{headers.map((h) => <th key={h} className="p-2 text-left">{h}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className={`border-t hover:bg-amber-50/30 ${rowClick ? 'cursor-pointer' : ''}`} onClick={() => rowClick?.(index)}>{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className={`p-2 ${cellIndex > 1 ? 'text-right' : ''}`}>{cell}</td>)}</tr>)}{rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={headers.length}>{empty}</td></tr> : null}</tbody></table></div>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="overflow-hidden rounded-xl bg-white shadow"><div className="border-b bg-amber-50 p-2 text-xs font-bold text-amber-700">{title}</div><div className="p-3">{children}</div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow"><div className="border-b bg-amber-50 p-2 text-xs font-bold text-amber-700">{title}</div><div className="p-3">{children}</div></div>
 }
 
 function Segment({ active, children, color, onClick }: { active: boolean; children: ReactNode; color: 'amber' | 'blue' | 'emerald'; onClick: () => void }) {
   const activeClass = color === 'amber' ? 'bg-amber-600 text-white' : color === 'emerald' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'
-  return <button className={`rounded-lg px-4 py-2 text-sm font-medium ${active ? activeClass : 'bg-white text-slate-600 shadow'}`} type="button" onClick={onClick}>{children}</button>
+  return <button className={`rounded-md px-4 py-2 text-sm font-medium ${active ? activeClass : 'bg-white text-slate-600 shadow'}`} type="button" onClick={onClick}>{children}</button>
 }
 
 function MetalChips({ groups, selected, setSelected }: { groups: string[]; selected: string[]; setSelected: (groups: string[]) => void }) {
-  return <div className="rounded-xl bg-white p-3 shadow"><div className="mb-2 flex justify-between gap-3"><h4 className="text-sm font-semibold text-slate-700">📂 หมวดสินค้า ({selected.length === 0 ? 'แสดงทุกหมวด' : `เลือก ${selected.length} หมวด`})</h4><div className="flex gap-2"><button className="chip" type="button" onClick={() => setSelected([])}>เลือกทั้งหมด</button><button className="chip" type="button" onClick={() => setSelected(['__NONE__'])}>ไม่เลือก</button></div></div><div className="flex flex-wrap gap-2">{groups.map((group) => <button key={group} className={`rounded-lg border-2 px-3 py-1.5 text-xs ${selected.includes(group) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white text-slate-600'}`} type="button" onClick={() => setSelected(selected.includes(group) ? selected.filter((item) => item !== group) : selected.filter((item) => item !== '__NONE__').concat(group))}>{group}</button>)}</div></div>
+  return <div className="rounded-md bg-white p-3 shadow"><div className="mb-2 flex justify-between gap-3"><h4 className="text-sm font-semibold text-slate-700">📂 หมวดสินค้า ({selected.length === 0 ? 'แสดงทุกหมวด' : `เลือก ${selected.length} หมวด`})</h4><div className="flex gap-2"><button className="chip" type="button" onClick={() => setSelected([])}>เลือกทั้งหมด</button><button className="chip" type="button" onClick={() => setSelected(['__NONE__'])}>ไม่เลือก</button></div></div><div className="flex flex-wrap gap-2">{groups.map((group) => <button key={group} className={`rounded-md border-2 px-3 py-1.5 text-xs ${selected.includes(group) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white text-slate-600'}`} type="button" onClick={() => setSelected(selected.includes(group) ? selected.filter((item) => item !== group) : selected.filter((item) => item !== '__NONE__').concat(group))}>{group}</button>)}</div></div>
 }
 
 function LmeStat({ label, value }: { label: string; value: string }) {
@@ -453,26 +453,26 @@ function LmeStat({ label, value }: { label: string; value: string }) {
 }
 
 function LmeInput({ label, value }: { label: string; value?: number }) {
-  return <label className="block text-xs text-slate-600">{label}<input className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-right text-sm font-bold" readOnly value={money(value)} /></label>
+  return <label className="block text-xs text-slate-600">{label}<input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm font-bold" readOnly value={money(value)} /></label>
 }
 
 function Metric({ label, tone, value }: { label: string; tone: string; value: string }) {
   const map: Record<string, string> = { amber: 'bg-amber-50 text-amber-700', blue: 'bg-blue-50 text-blue-700', emerald: 'bg-emerald-50 text-emerald-700', purple: 'bg-purple-50 text-purple-700', red: 'bg-red-50 text-red-700', slate: 'bg-slate-50 text-slate-700' }
-  return <div className={`rounded-xl p-3 shadow ${map[tone] ?? map.slate}`}><div className="text-xs opacity-75">{label}</div><div className="text-xl font-bold">{value}</div></div>
+  return <div className={`rounded-md p-3 shadow ${map[tone] ?? map.slate}`}><div className="text-xs opacity-75">{label}</div><div className="text-xl font-bold">{value}</div></div>
 }
 
 function BigCard({ label, tone, value }: { label: string; tone: string; value: string }) {
-  return <div className={`rounded-2xl bg-gradient-to-br ${tone} p-6 text-white shadow-xl`}><div className="text-sm opacity-80">{label}</div><div className="break-words font-mono text-3xl font-bold">{value}</div></div>
+  return <div className={`rounded-md bg-gradient-to-br ${tone} p-6 text-white shadow-xl`}><div className="text-sm opacity-80">{label}</div><div className="break-words font-mono text-3xl font-bold">{value}</div></div>
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
-  return <div className="rounded bg-slate-50 p-2 text-center"><div className="text-slate-500">{label}</div><div className="font-bold text-slate-700">{value}</div></div>
+  return <div className="rounded-md bg-slate-50 p-2 text-center"><div className="text-slate-500">{label}</div><div className="font-bold text-slate-700">{value}</div></div>
 }
 
 function Notice({ text: value }: { text?: string }) {
-  return <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Read/design baseline</b><span className="ml-2">{value ?? 'ไม่มี write action ใน baseline นี้'}</span></div>
+  return <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Read/design baseline</b><span className="ml-2">{value ?? 'ไม่มี write action ใน baseline นี้'}</span></div>
 }
 
 function ErrorBox({ text: value }: { text: string }) {
-  return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{value}</div>
+  return <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{value}</div>
 }

@@ -14,6 +14,8 @@ import {
   type SupplierFormValues,
 } from '@/lib/supplier'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
+import { FormSelectField } from '@/components/ui/FormSelectField'
+import { PhoneInput } from '@/components/ui/PhoneInput'
 import { getErrorMessage } from '@/lib/api-client'
 import { formatAccountNoDisplay, formatPhoneDisplay, sanitizeAccountNoInput, sanitizePhoneInput } from '@/lib/format'
 import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
@@ -68,6 +70,10 @@ const emptySupplierForm: SupplierFormValues = {
   salesName: null,
   marketScope: 'ในประเทศ',
   active: true,
+}
+
+type SupplierFormState = Omit<SupplierFormValues, 'marketScope'> & {
+  marketScope: SupplierFormValues['marketScope'] | ''
 }
 
 const personTitleOptions = ['นาย', 'นาง', 'นางสาว', 'คุณ']
@@ -423,17 +429,17 @@ export function SuppliersPageClient() {
   return (
     <section className="space-y-4">
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <div className="font-bold">โหลดหรือบันทึกข้อมูลผู้ขายไม่ได้</div>
           <div className="mt-1">{error}</div>
         </div>
       ) : null}
 
-      <div className="rounded-xl bg-white p-3 shadow">
+      <div className="rounded-md bg-white p-3 shadow">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="grid w-full gap-2 md:grid-cols-2 xl:max-w-5xl xl:grid-cols-[minmax(0,1fr)_170px_170px_190px]">
             <input
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-md border px-3 py-2 text-sm"
               onChange={(event) => {
                 setPage(1)
                 setSearch(event.target.value)
@@ -444,7 +450,7 @@ export function SuppliersPageClient() {
             />
             <select
               aria-label="กรองประเภทผู้ขาย"
-              className="rounded-lg border px-3 py-2 text-sm"
+              className="rounded-md border px-3 py-2 text-sm"
               value={supplierTypeFilter}
               onChange={(event) => {
                 setPage(1)
@@ -457,7 +463,7 @@ export function SuppliersPageClient() {
             </select>
             <select
               aria-label="กรองในประเทศหรือต่างประเทศ"
-              className="rounded-lg border px-3 py-2 text-sm"
+              className="rounded-md border px-3 py-2 text-sm"
               value={marketScopeFilter}
               onChange={(event) => {
                 setPage(1)
@@ -470,7 +476,7 @@ export function SuppliersPageClient() {
             </select>
             <select
               aria-label="กรองผู้ดูแล"
-              className="rounded-lg border px-3 py-2 text-sm"
+              className="rounded-md border px-3 py-2 text-sm"
               value={salespersonFilter}
               onChange={(event) => {
                 setPage(1)
@@ -484,7 +490,7 @@ export function SuppliersPageClient() {
             </select>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <label className={`cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm font-bold text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
+            <label className={`cursor-pointer rounded-md bg-blue-600 px-3 py-2 text-sm font-bold text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
               {isImporting ? 'กำลัง Import...' : 'Import Excel'}
               <input
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -497,10 +503,10 @@ export function SuppliersPageClient() {
                 }}
               />
             </label>
-            <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
+            <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
               {isExporting ? 'กำลัง Export...' : '📊 Export Excel'}
             </button>
-            <button className="rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={() => void openCreateForm()}>
+            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={() => void openCreateForm()}>
               + เพิ่มรายการ
             </button>
           </div>
@@ -515,7 +521,7 @@ export function SuppliersPageClient() {
           <div className="flex flex-wrap items-center gap-2">
             <select
               aria-label="จำนวนรายการต่อหน้า"
-              className="rounded border border-slate-300 px-2 py-1"
+              className="rounded-md border border-slate-300 px-2 py-1"
               value={pageSize}
               onChange={(event) => {
                 setPage(1)
@@ -528,7 +534,7 @@ export function SuppliersPageClient() {
               <option value={100}>100 / หน้า</option>
             </select>
             <button
-              className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
+              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50"
               disabled={page <= 1 || isLoading}
               type="button"
               onClick={() => {
@@ -541,7 +547,7 @@ export function SuppliersPageClient() {
               หน้า {currentPage.toLocaleString('th-TH')} / {totalPages.toLocaleString('th-TH')}
             </span>
             <button
-              className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
+              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50"
               disabled={page >= totalPages || isLoading}
               type="button"
               onClick={() => {
@@ -576,10 +582,10 @@ export function SuppliersPageClient() {
         </div>
       ) : null}
 
-      {isLoading ? <div className="rounded-xl bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูลผู้ขาย</div> : null}
+      {isLoading ? <div className="rounded-md bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูลผู้ขาย</div> : null}
 
       {!isLoading ? (
-        <div className="overflow-x-auto rounded-xl bg-white shadow">
+        <div className="overflow-x-auto rounded-md bg-white shadow">
           <table className="w-full text-sm">
             <thead className="bg-slate-100">
               <tr>
@@ -711,7 +717,7 @@ function CopyAccountButton({ accountKey, accountNo, copied, label, onCopy }: Cop
   return (
     <button
       aria-label={`คัดลอกเลขบัญชี ${label}`}
-      className={`inline-flex h-6 w-6 items-center justify-center rounded border text-slate-600 transition hover:bg-slate-100 ${copied ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-white'}`}
+      className={`inline-flex h-6 w-6 items-center justify-center rounded-md border text-slate-600 transition hover:bg-slate-100 ${copied ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-white'}`}
       title={copied ? 'คัดลอกแล้ว' : 'คัดลอกเลขบัญชี'}
       type="button"
       onClick={(event) => {
@@ -736,7 +742,7 @@ function CopyAccountButton({ accountKey, accountNo, copied, label, onCopy }: Cop
 
 function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving, provinces, salespersons, subdistricts, onCancel, onSubmit }: SupplierFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [form, setForm] = useState<SupplierFormValues>(() => (supplier ? supplierToForm(supplier) : emptySupplierForm))
+  const [form, setForm] = useState<SupplierFormState>(() => (supplier ? supplierToForm(supplier) : emptySupplierForm))
 
   useEffect(() => {
     setForm(supplier ? supplierToForm(supplier) : emptySupplierForm)
@@ -784,7 +790,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
     return options.length ? options : supplierPaymentMethodValues.map((value) => ({ value, label: value }))
   }, [form.bankAccounts, paymentMethods])
 
-  function update<K extends keyof SupplierFormValues>(key: K, value: SupplierFormValues[K]) {
+  function update<K extends keyof SupplierFormState>(key: K, value: SupplierFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
@@ -840,7 +846,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
     }))
   }
 
-  function updateSupplierType(value: SupplierFormValues['type']) {
+  function updateSupplierType(value: SupplierFormState['type']) {
     setForm((current) => ({
       ...current,
       type: value,
@@ -851,12 +857,12 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
     }))
   }
 
-  function updateMarketScope(value: SupplierFormValues['marketScope']) {
+  function updateMarketScope(value: SupplierFormValues['marketScope'] | '') {
     setForm((current) => ({
       ...current,
       marketScope: value,
-      countryCode: value === 'ในประเทศ' ? 'TH' : null,
-      addressCountry: value === 'ในประเทศ' ? 'ไทย' : current.addressCountry === 'ไทย' ? null : current.addressCountry,
+      countryCode: value === 'ในประเทศ' ? 'TH' : value === 'ต่างประเทศ' ? null : current.countryCode,
+      addressCountry: value === 'ในประเทศ' ? 'ไทย' : value === 'ต่างประเทศ' ? (current.addressCountry === 'ไทย' ? null : current.addressCountry) : current.addressCountry,
       addressLine1: value === 'ในประเทศ' ? current.addressLine1 : current.addressLine1 ?? current.address,
       addressLine2: value === 'ในประเทศ' ? current.addressLine2 : current.addressLine2,
       addressCity: value === 'ในประเทศ' ? current.addressCity : current.addressCity,
@@ -891,7 +897,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
   }
 
   return (
-    <form className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
+    <form className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-bold text-slate-900">{form.id ? 'แก้ไขผู้ขาย' : 'เพิ่มผู้ขาย'}</h3>
         <ActiveToggle checked={form.active} onChange={(checked) => update('active', checked)} />
@@ -907,8 +913,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
             </SelectField>
             {form.type === 'บุคคล' ? (
               <>
-                <SelectField required error={errors.nameTitle} label="คำนำหน้าชื่อ" value={form.nameTitle ?? ''} onChange={(value) => update('nameTitle', value || null)}>
-                  <option value="">เลือกคำนำหน้า</option>
+                <SelectField required error={errors.nameTitle} label="คำนำหน้าชื่อ" placeholder="เลือกคำนำหน้า" value={form.nameTitle ?? ''} onChange={(value) => update('nameTitle', value || null)}>
                   {personTitleOptions.map((title) => <option key={title} value={title}>{title}</option>)}
                 </SelectField>
                 <TextField required error={errors.firstName} label="ชื่อ" value={form.firstName ?? ''} onChange={(value) => update('firstName', value || null)} />
@@ -918,9 +923,12 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
               <TextField required className="md:col-span-2" error={errors.name} label="ชื่อบริษัท/ร้านค้า" value={form.name ?? ''} onChange={(value) => update('name', value || null)} />
             )}
             <TextField error={errors.taxId} label="เลขผู้เสียภาษี" value={form.taxId ?? ''} onChange={(value) => update('taxId', value || null)} />
-            <TextField error={errors.phone} label="โทรศัพท์" value={form.phone ?? ''} onChange={(value) => update('phone', value)} />
-            <SelectField required error={errors.salesId} label="ผู้ดูแล" value={form.salesId ?? ''} onChange={updateSalesperson}>
-              <option value="">เลือกผู้ดูแล</option>
+            <label className="block text-sm font-medium">
+              โทรศัพท์
+              <PhoneInput className="mt-1.5 w-full" error={Boolean(errors.phone)} value={form.phone ?? ''} onChange={(value) => update('phone', value)} />
+              {errors.phone ? <span className="mt-1 block text-xs text-red-700">{errors.phone}</span> : null}
+            </label>
+            <SelectField required error={errors.salesId} label="ผู้ดูแล" placeholder="เลือกผู้ดูแล" value={form.salesId ?? ''} onChange={updateSalesperson}>
               {salespersons.map((salesperson) => <option key={salesperson.id} value={salesperson.id}>{salesperson.name}</option>)}
             </SelectField>
           </div>
@@ -929,26 +937,24 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
         <section>
           <h4 className="mb-3 text-sm font-bold text-slate-700">ที่อยู่</h4>
           <div className="grid gap-4 md:grid-cols-4">
-            <SelectField required className="md:col-span-2" label="ประเทศ/ตลาด" value={form.marketScope} onChange={(value) => updateMarketScope(value as SupplierFormValues['marketScope'])}>
+            <SelectField required className="md:col-span-2" error={errors.marketScope} label="ประเทศ/ตลาด" placeholder="เลือกประเทศ/ตลาด" value={form.marketScope} onChange={(value) => updateMarketScope(value as SupplierFormValues['marketScope'] | '')}>
               <option value="ในประเทศ">ในประเทศ</option>
               <option value="ต่างประเทศ">ต่างประเทศ</option>
             </SelectField>
             {form.marketScope === 'ในประเทศ' ? (
               <>
                 <TextField error={errors.addressPostalCode} label="รหัสไปรษณีย์" value={form.addressPostalCode ?? ''} onChange={updatePostalCode} />
-                <SelectField error={errors.addressProvince} label="จังหวัด" value={form.addressProvince ?? ''} onChange={(value) => {
+                <SelectField error={errors.addressProvince} label="จังหวัด" placeholder="เลือกจังหวัด" value={form.addressProvince ?? ''} onChange={(value) => {
                   setForm((current) => ({ ...current, addressProvince: value || null, addressDistrict: null, addressSubdistrict: null, addressCountry: value ? 'ไทย' : current.addressCountry, countryCode: value ? 'TH' : current.countryCode }))
                 }}>
-                  <option value="">เลือกจังหวัด</option>
                   {provinceOptions.map((province) => <option key={province.code} value={province.nameTh}>{province.nameTh}</option>)}
                 </SelectField>
-                <SelectField disabled={!selectedProvince && filteredDistricts.length === 0} error={errors.addressDistrict} label="อำเภอ/เขต" value={form.addressDistrict ?? ''} onChange={(value) => {
+                <SelectField disabled={!selectedProvince && filteredDistricts.length === 0} error={errors.addressDistrict} label="อำเภอ/เขต" placeholder="เลือกอำเภอ/เขต" value={form.addressDistrict ?? ''} onChange={(value) => {
                   setForm((current) => ({ ...current, addressDistrict: value || null, addressSubdistrict: null }))
                 }}>
-                  <option value="">เลือกอำเภอ/เขต</option>
                   {filteredDistricts.map((district) => <option key={district.code} value={district.nameTh}>{district.nameTh}</option>)}
                 </SelectField>
-                <SelectField disabled={filteredSubdistricts.length === 0} error={errors.addressSubdistrict} label="ตำบล/แขวง" value={form.addressSubdistrict ?? ''} onChange={(value) => {
+                <SelectField disabled={filteredSubdistricts.length === 0} error={errors.addressSubdistrict} label="ตำบล/แขวง" placeholder="เลือกตำบล/แขวง" value={form.addressSubdistrict ?? ''} onChange={(value) => {
                   const subdistrict = filteredSubdistricts.find((item) => item.nameTh === value)
                   const province = subdistrict ? provinces.find((item) => item.code === subdistrict.provinceCode) : null
                   const district = subdistrict ? districts.find((item) => item.code === subdistrict.districtCode) : null
@@ -962,7 +968,6 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
                     countryCode: value ? 'TH' : current.countryCode,
                   }))
                 }}>
-                  <option value="">เลือกตำบล/แขวง</option>
                   {filteredSubdistricts.map((subdistrict) => <option key={subdistrict.code} value={subdistrict.nameTh}>{subdistrict.nameTh}</option>)}
                 </SelectField>
                 <TextField error={errors.addressNo} label="บ้านเลขที่" value={form.addressNo ?? ''} onChange={(value) => update('addressNo', value || null)} />
@@ -987,7 +992,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-sm font-bold text-slate-700">ข้อมูลบัญชีและสาขา</h4>
-            <button className="rounded border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={addBankAccount}>
+            <button className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={addBankAccount}>
               + เพิ่มบัญชี
             </button>
           </div>
@@ -995,15 +1000,14 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
             {form.bankAccounts.map((account, index) => {
               const isTransfer = account.paymentMethod === 'เงินโอน'
               return (
-                <div key={`${account.id ?? 'new'}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div key={`${account.id ?? 'new'}-${index}`} className="rounded-md border border-slate-200 bg-slate-50 p-3">
                   <div className="grid gap-4 md:grid-cols-5">
                     <SelectField required error={errors[`bankAccounts.${index}.paymentMethod`]} label="ช่องทางการชำระเงิน" value={account.paymentMethod} onChange={(value) => updateBankAccount(index, 'paymentMethod', value as SupplierBankAccountForm['paymentMethod'])}>
                       {paymentMethodOptions.map((paymentMethod) => <option key={paymentMethod.value} value={paymentMethod.value}>{paymentMethod.label}</option>)}
                     </SelectField>
                     {isTransfer ? (
                       <>
-                        <SelectField required error={errors[`bankAccounts.${index}.bankName`]} label="ธนาคารรับเงิน" value={account.bankName ?? ''} onChange={(value) => updateBankAccount(index, 'bankName', value || null)}>
-                          <option value="">เลือกธนาคาร</option>
+                        <SelectField required error={errors[`bankAccounts.${index}.bankName`]} label="ธนาคารรับเงิน" placeholder="เลือกธนาคาร" value={account.bankName ?? ''} onChange={(value) => updateBankAccount(index, 'bankName', value || null)}>
                           {bankNameOptions.map((bankName) => <option key={bankName} value={bankName}>{bankName}</option>)}
                         </SelectField>
                         <TextField required error={errors[`bankAccounts.${index}.accountNo`]} label="เลขที่บัญชีรับเงิน" value={account.accountNo ?? ''} onChange={(value) => updateBankAccount(index, 'accountNo', value || null)} />
@@ -1029,10 +1033,10 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
       </div>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
-        <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onCancel}>
+        <button className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
-        <button className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60" disabled={isSaving} type="submit">
+        <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60" disabled={isSaving} type="submit">
           {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>
@@ -1057,13 +1061,16 @@ function TextField({ className = '', error, label, readOnly = false, required = 
   const isAccountNoField = label === 'เลขบัญชี' || label === 'เลขที่บัญชีรับเงิน'
   const isTaxIdField = label === 'เลขผู้เสียภาษี'
   const isThaiPostalCodeField = label === 'รหัสไปรษณีย์'
+  const isNumberField = type === 'number'
+  const placeholder = isEmailField ? 'example@company.com' : `กรอก${label}`
 
   return (
     <label className={`block text-sm font-medium ${className}`}>
       {label}{required ? <span className="ml-1 text-red-600">*</span> : null}
       <input
-        className={`mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 ${readOnly ? 'bg-slate-50' : ''}`}
+        className={`mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 ${isNumberField ? '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none' : ''} ${readOnly ? 'bg-slate-50' : ''}`}
         inputMode={isEmailField ? 'email' : isPhoneField ? 'tel' : isAccountNoField || isTaxIdField ? 'numeric' : undefined}
+        placeholder={readOnly ? undefined : placeholder}
         readOnly={readOnly}
         required={required}
         type={type}
@@ -1094,25 +1101,12 @@ type SelectFieldProps = {
   disabled?: boolean
   error?: string
   label: string
+  placeholder?: string
   required?: boolean
   value: string
   onChange: (value: string) => void
 }
 
-function SelectField({ children, className = '', disabled = false, error, label, required = false, value, onChange }: SelectFieldProps) {
-  return (
-    <label className={`block text-sm font-medium ${className}`}>
-      {label}{required ? <span className="ml-1 text-red-600">*</span> : null}
-      <select
-        className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 disabled:bg-slate-100"
-        disabled={disabled}
-        required={required}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {children}
-      </select>
-      {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}
-    </label>
-  )
+function SelectField({ children, className = '', disabled = false, error, label, placeholder, required = false, value, onChange }: SelectFieldProps) {
+  return <FormSelectField className={className} disabled={disabled} error={error} label={label} placeholder={placeholder} required={required} value={value} onChange={onChange}>{children}</FormSelectField>
 }

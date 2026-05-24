@@ -1,0 +1,22 @@
+[
+  {
+    "appName": "live",
+    "clicked": true,
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "screenshot": "reports/frontend-visual-audit/ar-final/ar-live-desktop.png",
+    "text": "📥 📥 ลูกหนี้คงเหลือรวม 0.00 📋 บิลค้าง: 0 ใบ ⚠ เกินกำหนด: 0.00 (0%) 📊 Aging Buckets ✓ Current 0.00 1-30 วัน 0.00 31-60 วัน 0.00 61-90 วัน 0.00 ⚠ >90 วัน 0.00 👥 Top 5 ลูกหนี้ ✅ ไม่มีลูกหนี้ ทุก Customer บริษัท เหล็กไทยส่งออก จำกัด โรงหลอมเหล็กกรุงเทพ จำกัด Asia Metal Co., Ltd. ทุกช่องทาง ส่งออก ภายในประเทศ ทุกอายุหนี้ Current 1-30 31-60 61-90 >90 Export CSV Customer บิล วันที่ Due อายุ(วัน) ยอด รับแล้ว ค้างรับ Channel ไม่มีลูกหนี้คงค้าง"
+  },
+  {
+    "appName": "vue",
+    "clicked": true,
+    "consoleMessages": [],
+    "screenshot": "reports/frontend-visual-audit/ar-final/ar-vue-desktop.png",
+    "text": "📥 📥 ลูกหนี้คงเหลือรวม 0.00 📋 บิลค้าง: 0 ใบ ⚠ เกินกำหนด: 0.00 (0%) 📊 Aging Buckets ✓ Current 0.00 1-30 วัน 0.00 31-60 วัน 0.00 61-90 วัน 0.00 ⚠ >90 วัน 0.00 👥 Top 5 ลูกหนี้ ✅ ไม่มีลูกหนี้ ทุก Customer บริษัท เหล็กไทยส่งออก จำกัด โรงหลอมเหล็กกรุงเทพ จำกัด Asia Metal Co., Ltd. ทุกช่องทาง ส่งออก ภายในประเทศ ทุกอายุหนี้ Current 1-30 31-60 61-90 >90 Export CSV Customer บิล วันที่ Due อายุ(วัน) ยอด รับแล้ว ค้างรับ Channel ไม่มีลูกหนี้คงค้าง"
+  }
+]

@@ -17,23 +17,18 @@ create table if not exists public.app_users (
   created_by text,
   updated_by text
 );
-
 comment on table public.app_users is 'Application user profiles linked to Supabase auth.users. Does not store passwords.';
 comment on column public.app_users.auth_user_id is 'Supabase Auth user id. Nullable to preserve app user/audit row if auth user is removed.';
 comment on column public.app_users.legacy_user_id is 'Reference to legacy public.users.id during migration only.';
 comment on column public.app_users.legacy_profile_id is 'Reference to legacy public.user_profiles.id during migration only.';
-
 create unique index if not exists app_users_username_lower_key
   on public.app_users (lower(username));
-
 create unique index if not exists app_users_email_lower_key
   on public.app_users (lower(email))
   where email is not null;
-
 create index if not exists idx_app_users_auth_user_id on public.app_users(auth_user_id);
 create index if not exists idx_app_users_active on public.app_users(active);
 create index if not exists idx_app_users_legacy_user_id on public.app_users(legacy_user_id);
-
 create table if not exists public.app_roles (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
@@ -54,13 +49,10 @@ create table if not exists public.app_roles (
   updated_by text,
   constraint app_roles_branch_scope_chk check (branch_scope in ('all', 'own', 'custom'))
 );
-
 comment on table public.app_roles is 'Normalized application roles for Next permission model.';
 comment on column public.app_roles.legacy_role_id is 'Reference to legacy role id/code during migration only.';
-
 create index if not exists idx_app_roles_active on public.app_roles(active);
 create index if not exists idx_app_roles_legacy_role_id on public.app_roles(legacy_role_id);
-
 create table if not exists public.app_permissions (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
@@ -73,13 +65,10 @@ create table if not exists public.app_permissions (
   updated_at timestamptz not null default now(),
   constraint app_permissions_code_chk check (code = module || '.' || resource || '.' || action)
 );
-
 comment on table public.app_permissions is 'Action-level permission catalog. Example: master.customers.view.';
-
 create index if not exists idx_app_permissions_module on public.app_permissions(module);
 create index if not exists idx_app_permissions_resource on public.app_permissions(resource);
 create index if not exists idx_app_permissions_active on public.app_permissions(active);
-
 create table if not exists public.app_role_permissions (
   role_id uuid not null references public.app_roles(id) on delete cascade,
   permission_id uuid not null references public.app_permissions(id) on delete cascade,
@@ -87,10 +76,8 @@ create table if not exists public.app_role_permissions (
   created_by text,
   primary key (role_id, permission_id)
 );
-
 create index if not exists idx_app_role_permissions_permission_id
   on public.app_role_permissions(permission_id);
-
 create table if not exists public.app_user_roles (
   user_id uuid not null references public.app_users(id) on delete cascade,
   role_id uuid not null references public.app_roles(id) on delete restrict,
@@ -98,9 +85,7 @@ create table if not exists public.app_user_roles (
   created_by text,
   primary key (user_id, role_id)
 );
-
 create index if not exists idx_app_user_roles_role_id on public.app_user_roles(role_id);
-
 create table if not exists public.app_user_branch_access (
   user_id uuid not null references public.app_users(id) on delete cascade,
   branch_id text not null references public.branches(id) on delete restrict,
@@ -108,10 +93,8 @@ create table if not exists public.app_user_branch_access (
   created_by text,
   primary key (user_id, branch_id)
 );
-
 create index if not exists idx_app_user_branch_access_branch_id
   on public.app_user_branch_access(branch_id);
-
 create or replace function public.app_set_updated_at()
 returns trigger
 language plpgsql
@@ -121,29 +104,24 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists app_users_set_updated_at on public.app_users;
 create trigger app_users_set_updated_at
 before update on public.app_users
 for each row execute function public.app_set_updated_at();
-
 drop trigger if exists app_roles_set_updated_at on public.app_roles;
 create trigger app_roles_set_updated_at
 before update on public.app_roles
 for each row execute function public.app_set_updated_at();
-
 drop trigger if exists app_permissions_set_updated_at on public.app_permissions;
 create trigger app_permissions_set_updated_at
 before update on public.app_permissions
 for each row execute function public.app_set_updated_at();
-
 alter table public.app_users enable row level security;
 alter table public.app_roles enable row level security;
 alter table public.app_permissions enable row level security;
 alter table public.app_role_permissions enable row level security;
 alter table public.app_user_roles enable row level security;
 alter table public.app_user_branch_access enable row level security;
-
 insert into public.app_roles (
   code,
   name,
@@ -165,7 +143,6 @@ insert into public.app_roles (
   ('poopae', 'Poopae', 'Role พิเศษตาม legacy baseline', false, 'all', true, true, true, true, true, 'R-POOPAE'),
   ('warehouse', 'คลัง', 'คลังสินค้าและ production เฉพาะสาขาตัวเอง', false, 'own', false, false, false, false, false, 'R-WAREHOUSE')
 on conflict (code) do nothing;
-
 insert into public.app_permissions (code, module, resource, action, description) values
   ('system.users.manage', 'system', 'users', 'manage', 'จัดการผู้ใช้'),
   ('system.roles.manage', 'system', 'roles', 'manage', 'จัดการ role และ permission'),
@@ -195,14 +172,12 @@ insert into public.app_permissions (code, module, resource, action, description)
   ('production.operations.view', 'production', 'operations', 'view', 'ดูงาน production'),
   ('reports.reports.view', 'reports', 'reports', 'view', 'ดูรายงาน')
 on conflict (code) do nothing;
-
 insert into public.app_role_permissions (role_id, permission_id)
 select r.id, p.id
 from public.app_roles r
 cross join public.app_permissions p
 where r.code in ('admin', 'owner')
 on conflict do nothing;
-
 insert into public.app_role_permissions (role_id, permission_id)
 select r.id, p.id
 from public.app_roles r
@@ -227,7 +202,6 @@ join public.app_permissions p on p.code in (
 )
 where r.code in ('accountant', 'account_expense')
 on conflict do nothing;
-
 insert into public.app_role_permissions (role_id, permission_id)
 select r.id, p.id
 from public.app_roles r
@@ -247,7 +221,6 @@ join public.app_permissions p on p.code in (
 )
 where r.code = 'coordinator'
 on conflict do nothing;
-
 insert into public.app_role_permissions (role_id, permission_id)
 select r.id, p.id
 from public.app_roles r
@@ -260,7 +233,6 @@ join public.app_permissions p on p.code in (
 )
 where r.code = 'warehouse'
 on conflict do nothing;
-
 insert into public.app_role_permissions (role_id, permission_id)
 select r.id, p.id
 from public.app_roles r

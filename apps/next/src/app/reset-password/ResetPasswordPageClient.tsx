@@ -73,9 +73,9 @@ export function ResetPasswordPageClient() {
 
   return (
     <section className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+      <div className="w-full max-w-md rounded-md bg-white p-8 shadow-xl">
         <div className="mb-6 text-center">
-          <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white">
+          <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white">
             NS
           </div>
           <h1 className="text-2xl font-bold text-slate-800">ตั้งรหัสผ่านใหม่</h1>
@@ -83,13 +83,13 @@ export function ResetPasswordPageClient() {
         </div>
 
         {!isSupabaseReady ? (
-          <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             ยังไม่ได้ตั้งค่า Supabase dev ใน environment
           </div>
         ) : null}
 
         {isSupabaseReady && !isSessionReady ? (
-          <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             ลิงก์ reset password ยังไม่พร้อมหรือหมดอายุ กรุณาขอลิงก์ใหม่
           </div>
         ) : null}
@@ -100,7 +100,7 @@ export function ResetPasswordPageClient() {
             <span className="relative mt-1 block">
               <input
                 autoComplete="new-password"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-12 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 pr-12 outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isLoading || !isSessionReady}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="อย่างน้อย 8 ตัวอักษร"
@@ -109,7 +109,7 @@ export function ResetPasswordPageClient() {
               />
               <button
                 aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
-                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50"
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-md-r-md text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50"
                 disabled={isLoading}
                 onClick={() => setShowPassword((current) => !current)}
                 type="button"
@@ -123,7 +123,7 @@ export function ResetPasswordPageClient() {
             ยืนยัน Password ใหม่
             <input
               autoComplete="new-password"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isLoading || !isSessionReady}
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
@@ -132,11 +132,11 @@ export function ResetPasswordPageClient() {
             />
           </label>
 
-          {error ? <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-          {message ? <p className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
+          {error ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+          {message ? <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
 
           <button
-            className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 py-2.5 font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+            className="w-full rounded-md bg-gradient-to-r from-blue-600 to-indigo-700 py-2.5 font-medium text-white transition hover:opacity-90 disabled:opacity-60"
             disabled={isLoading || !isSupabaseReady || !isSessionReady}
             type="submit"
           >

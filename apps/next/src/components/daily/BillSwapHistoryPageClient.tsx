@@ -69,9 +69,9 @@ export function BillSwapHistoryPageClient() {
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 p-5 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-rose-600 to-pink-600 p-5 text-white shadow">
         <h1 className="text-2xl font-bold">📜 ประวัติเปลี่ยน Supplier ในบิลซื้อ — ราคาก่อน VAT</h1>
         <p className="mt-1 text-sm opacity-80">Track การเปลี่ยนราคาต่อรายการสินค้า — ส่วนต่างไม่รวม VAT</p>
       </div>
@@ -83,12 +83,12 @@ export function BillSwapHistoryPageClient() {
         <Kpi label="ส่วนต่างรวม (ก่อน VAT)" value={formatMoney(totals.diff)} tone={totals.diff >= 0 ? 'emerald' : 'red'} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">
-        <input className="min-w-[240px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="🔍 ค้นหาชื่อ Supplier / สินค้า / บิล..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
+        <input className="min-w-[240px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="🔍 ค้นหาชื่อ Supplier / สินค้า / บิล..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
         <div className="text-sm text-slate-600">พบ <span className="font-semibold text-slate-900">{filteredRows.length}</span> รายการ</div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full min-w-[1120px] text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -153,5 +153,5 @@ function Kpi({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' |
     slate: 'bg-slate-50 text-slate-800',
     white: 'bg-white text-slate-900',
   }
-  return <div className={`rounded-lg p-3 shadow ${tones[tone]}`}><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
+  return <div className={`rounded-md p-3 shadow ${tones[tone]}`}><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
 }

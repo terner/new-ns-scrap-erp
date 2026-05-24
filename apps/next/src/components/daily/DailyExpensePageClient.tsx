@@ -256,40 +256,40 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       {dashboardOnly ? (
         <>
-          <div className="rounded-xl bg-gradient-to-r from-rose-700 to-orange-600 p-5 text-white shadow">
+          <div className="rounded-md bg-gradient-to-r from-rose-700 to-orange-600 p-5 text-white shadow">
             <h1 className="text-2xl font-bold">Dashboard ค่าใช้จ่าย</h1>
             <p className="mt-1 text-sm opacity-90">สรุปแต่ละหมวดเทียบเดือนย้อนหลัง และตรวจหาความผิดปกติเทียบค่าเฉลี่ย</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm shadow">
+          <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 text-sm shadow">
             <span className="text-slate-600">ดูย้อนหลัง:</span>
             {[3, 6, 12].map((months) => (
-              <button key={months} className={`rounded px-3 py-1.5 text-xs ${periodMonths === months ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => setPeriodMonths(months)}>
+              <button key={months} className={`rounded-md px-3 py-1.5 text-xs ${periodMonths === months ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => setPeriodMonths(months)}>
                 {months} เดือน
               </button>
             ))}
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded-xl bg-white p-3 shadow"><div className="text-xs text-slate-500">รวม {periodMonths} เดือน</div><div className="text-2xl font-bold">{formatMoney(dashboard.total)}</div></div>
-            <div className="rounded-xl bg-blue-50 p-3 shadow"><div className="text-xs text-blue-700">เฉลี่ย/เดือน</div><div className="text-2xl font-bold text-blue-700">{formatMoney(dashboard.avg)}</div></div>
-            <div className="rounded-xl bg-amber-50 p-3 shadow"><div className="text-xs text-amber-700">เดือนนี้</div><div className="text-2xl font-bold text-amber-700">{formatMoney(dashboard.latest)}</div></div>
-            <div className={`rounded-xl p-3 shadow ${Math.abs(dashboard.vsAvg) > 20 ? dashboard.vsAvg > 0 ? 'bg-red-50' : 'bg-emerald-50' : 'bg-slate-50'}`}>
+            <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">รวม {periodMonths} เดือน</div><div className="text-2xl font-bold">{formatMoney(dashboard.total)}</div></div>
+            <div className="rounded-md bg-blue-50 p-3 shadow"><div className="text-xs text-blue-700">เฉลี่ย/เดือน</div><div className="text-2xl font-bold text-blue-700">{formatMoney(dashboard.avg)}</div></div>
+            <div className="rounded-md bg-amber-50 p-3 shadow"><div className="text-xs text-amber-700">เดือนนี้</div><div className="text-2xl font-bold text-amber-700">{formatMoney(dashboard.latest)}</div></div>
+            <div className={`rounded-md p-3 shadow ${Math.abs(dashboard.vsAvg) > 20 ? dashboard.vsAvg > 0 ? 'bg-red-50' : 'bg-emerald-50' : 'bg-slate-50'}`}>
               <div className={`text-xs ${dashboard.vsAvg > 20 ? 'text-red-700' : dashboard.vsAvg < -20 ? 'text-emerald-700' : 'text-slate-700'}`}>เทียบเฉลี่ย</div>
               <div className={`text-2xl font-bold ${dashboard.vsAvg > 20 ? 'text-red-700' : dashboard.vsAvg < -20 ? 'text-emerald-700' : 'text-slate-700'}`}>{dashboard.vsAvg > 0 ? '+' : ''}{dashboard.vsAvg.toFixed(1)}%</div>
             </div>
           </div>
 
           {dashboard.anomalies.length > 0 ? (
-            <div className="rounded-xl border-2 border-red-300 bg-gradient-to-r from-red-50 to-amber-50 p-4">
+            <div className="rounded-md border-2 border-red-300 bg-gradient-to-r from-red-50 to-amber-50 p-4">
               <h3 className="mb-2 font-bold text-red-700">ตรวจพบความผิดปกติ {dashboard.anomalies.length} หมวด</h3>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {dashboard.anomalies.map((item) => (
-                  <div key={item.id} className={`rounded border p-3 ${item.anomaly === 'high' ? 'border-red-300 bg-red-50' : 'border-amber-300 bg-amber-50'}`}>
+                  <div key={item.id} className={`rounded-md border p-3 ${item.anomaly === 'high' ? 'border-red-300 bg-red-50' : 'border-amber-300 bg-amber-50'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className={`font-bold ${item.anomaly === 'high' ? 'text-red-700' : 'text-amber-700'}`}>{item.anomaly === 'high' ? 'สูงผิดปกติ' : 'ต่ำผิดปกติ'}: {item.name}</div>
@@ -302,10 +302,10 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">ไม่พบความผิดปกติ ค่าใช้จ่ายแต่ละหมวดอยู่ในช่วงค่าเฉลี่ย</div>
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">ไม่พบความผิดปกติ ค่าใช้จ่ายแต่ละหมวดอยู่ในช่วงค่าเฉลี่ย</div>
           )}
 
-          <div className="overflow-x-auto rounded-xl bg-white shadow">
+          <div className="overflow-x-auto rounded-md bg-white shadow">
             <table className="w-full text-xs">
               <thead className="bg-slate-100">
                 <tr>
@@ -330,7 +330,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     <td className="bg-blue-50 p-2 text-right text-blue-700">{formatMoney(item.avg)}</td>
                     <td className="bg-rose-50 p-2 text-right font-bold text-rose-700">{formatMoney(item.total)}</td>
                     <td className="p-2 text-center">
-                      {item.anomaly === 'high' ? <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">สูง</span> : item.anomaly === 'low' ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">ต่ำ</span> : <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">ปกติ</span>}
+                      {item.anomaly === 'high' ? <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs text-red-700">สูง</span> : item.anomaly === 'low' ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-700">ต่ำ</span> : <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">ปกติ</span>}
                     </td>
                   </tr>
                 ))}
@@ -350,42 +350,42 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </table>
           </div>
 
-          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
             <b>หมายเหตุ:</b> ความผิดปกติ = เดือนนี้มากกว่า 1.5 เท่าของค่าเฉลี่ยและเกิน 5,000 บาท หรือ น้อยกว่า 30% ของค่าเฉลี่ย
           </div>
         </>
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-[280px] flex-1 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            <div className="min-w-[280px] flex-1 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
               <strong>ค่าใช้จ่าย Expense Voucher</strong> — บันทึกใบแจ้งหนี้ก่อน จ่ายภายหลังก็ได้ พร้อม VAT/WHT และวันครบกำหนด
             </div>
-            <button className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-blue-700" type="button" onClick={openCreateForm}>เพิ่มค่าใช้จ่าย</button>
+            <button className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-blue-700" type="button" onClick={openCreateForm}>เพิ่มค่าใช้จ่าย</button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 p-4 text-white shadow">
+            <div className="rounded-md bg-gradient-to-br from-purple-500 to-fuchsia-600 p-4 text-white shadow">
               <div className="text-xs opacity-90">ค่าใช้จ่ายเดือนนี้</div>
               <div className="text-2xl font-bold">{formatMoney(summary.monthlyTotal)}</div>
               <div className="mt-1 text-xs opacity-80">{summary.monthlyCount} รายการ · Net Pay</div>
             </div>
-            <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow">
+            <div className="rounded-md border-2 border-amber-300 bg-amber-50 p-4 shadow">
               <div className="text-xs text-amber-700">รอจ่าย</div>
               <div className="text-2xl font-bold text-amber-700">{formatMoney(summary.pendingTotal)}</div>
               <div className="mt-1 text-xs text-amber-600">ยอดค้างตามสถานะ</div>
             </div>
-            <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4 shadow">
+            <div className="rounded-md border-2 border-emerald-300 bg-emerald-50 p-4 shadow">
               <div className="text-xs text-emerald-700">จ่ายแล้ว</div>
               <div className="text-2xl font-bold text-emerald-700">{formatMoney(summary.paidTotal)}</div>
               <div className="mt-1 text-xs text-emerald-600">รายการที่ปิดจ่ายแล้ว</div>
             </div>
-            <div className="rounded-xl bg-white p-4 shadow">
+            <div className="rounded-md bg-white p-4 shadow">
               <div className="mb-1 text-xs text-slate-600">6 เดือนล่าสุด</div>
               <div className="flex h-[52px] items-end gap-1">
                 {summary.trend.map((item) => {
                   const max = Math.max(1, ...summary.trend.map((trend) => trend.total))
                   const height = Math.max(4, (item.total / max) * 44)
-                  return <div key={item.month} className="flex flex-1 flex-col items-center gap-1"><div className="w-full rounded-t bg-purple-400" style={{ height }} /><span className="text-[10px] text-slate-400">{item.month.slice(5)}</span></div>
+                  return <div key={item.month} className="flex flex-1 flex-col items-center gap-1"><div className="w-full rounded-md-t bg-purple-400" style={{ height }} /><span className="text-[10px] text-slate-400">{item.month.slice(5)}</span></div>
                 })}
               </div>
             </div>
@@ -396,47 +396,47 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             <ExpenseRankingPanel color="blue" emptyText="ยังไม่มีข้อมูลเดือนนี้" label="Top 5 ผู้รับเงิน (เดือนนี้)" rows={summary.topPayees} />
           </div>
 
-          <div className="rounded-xl bg-white p-3 shadow">
+          <div className="rounded-md bg-white p-3 shadow">
             <div className="flex flex-wrap items-center gap-2">
-              <input className="min-w-[220px] flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="ค้นหาเลข Voucher / ผู้รับ / อ้างอิง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <input className="min-w-[220px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหาเลข Voucher / ผู้รับ / อ้างอิง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
               <label className="text-xs text-slate-500">วันที่:</label>
-              <input className="rounded-lg border px-2 py-2 text-sm" title="จากวันที่" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              <input className="rounded-md border px-2 py-2 text-sm" title="จากวันที่" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
               <span className="text-slate-400">→</span>
-              <input className="rounded-lg border px-2 py-2 text-sm" title="ถึงวันที่" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-              <select className="rounded-lg border px-3 py-2 text-sm" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+              <input className="rounded-md border px-2 py-2 text-sm" title="ถึงวันที่" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+              <select className="rounded-md border px-3 py-2 text-sm" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
                 <option value="">ทุกหมวด</option>
                 {categories.filter((category) => category.active !== false).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
-              <input className="w-44 rounded-lg border px-3 py-2 text-sm" placeholder="ผู้รับ/Supplier..." type="search" value={payeeFilter} onChange={(event) => setPayeeFilter(event.target.value)} />
-              <select className="rounded-lg border px-3 py-2 text-sm" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+              <input className="w-44 rounded-md border px-3 py-2 text-sm" placeholder="ผู้รับ/Supplier..." type="search" value={payeeFilter} onChange={(event) => setPayeeFilter(event.target.value)} />
+              <select className="rounded-md border px-3 py-2 text-sm" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
                 <option value="">ทุกบัญชี</option>
                 {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
               </select>
-              <div className="flex gap-1 rounded-lg border p-0.5">
+              <div className="flex gap-1 rounded-md border p-0.5">
                 {[
                   ['pending', 'รอจ่าย', 'amber'],
                   ['paid', 'จ่ายแล้ว', 'emerald'],
                   ['all', 'ทั้งหมด', 'slate'],
                 ].map(([value, label, tone]) => (
-                  <button key={value} className={`rounded px-2 py-1 text-xs ${paidStatus === value ? tone === 'amber' ? 'bg-amber-500 text-white' : tone === 'emerald' ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`} type="button" onClick={() => setPaidStatus(value)}>
+                  <button key={value} className={`rounded-md px-2 py-1 text-xs ${paidStatus === value ? tone === 'amber' ? 'bg-amber-500 text-white' : tone === 'emerald' ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`} type="button" onClick={() => setPaidStatus(value)}>
                     {label}
                   </button>
                 ))}
               </div>
               {search || dateFrom || dateTo || categoryId || payeeFilter || accountId || paidStatus !== 'all' ? (
-                <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setCategoryId(''); setPayeeFilter(''); setAccountId(''); setPaidStatus('all') }}>ล้าง</button>
+                <button className="rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setCategoryId(''); setPayeeFilter(''); setAccountId(''); setPaidStatus('all') }}>ล้าง</button>
               ) : null}
-              <button className="ml-auto rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300" disabled title="รอออกแบบ export field contract ก่อนเปิดใช้งาน" type="button">Export Excel ({filteredRows.length})</button>
+              <button className="ml-auto rounded-md bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:bg-slate-300" disabled title="รอออกแบบ export field contract ก่อนเปิดใช้งาน" type="button">Export Excel ({filteredRows.length})</button>
             </div>
             <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600">
-              <span className="rounded bg-blue-50 px-2 py-1">พบ <b className="text-blue-700">{filteredRows.length}</b> Voucher</span>
-              <span className="rounded bg-amber-50 px-2 py-1">รวม Net Pay <b className="text-amber-700">{formatMoney(filteredRows.reduce((sum, row) => sum + row.netAmount, 0))}</b></span>
+              <span className="rounded-md bg-blue-50 px-2 py-1">พบ <b className="text-blue-700">{filteredRows.length}</b> Voucher</span>
+              <span className="rounded-md bg-amber-50 px-2 py-1">รวม Net Pay <b className="text-amber-700">{formatMoney(filteredRows.reduce((sum, row) => sum + row.netAmount, 0))}</b></span>
             </div>
           </div>
 
           {formOpen ? (
             <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-              <form noValidate className="w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-xl" onSubmit={saveForm}>
+              <form noValidate className="w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
                 <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
                   <h3 className="font-bold">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
                   <button className="text-2xl text-slate-400" type="button" onClick={() => setFormOpen(false)}>&times;</button>
@@ -455,7 +455,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   <TextField error={fieldErrors.taxInvoiceNo} label="เลขใบกำกับภาษี" value={form.taxInvoiceNo ?? ''} onChange={(value) => setForm({ ...form, taxInvoiceNo: value })} />
                   <label className="block text-sm font-medium">
                     สถานะ
-                    <select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2" value={form.paidStatus} onChange={(event) => setForm({ ...form, paidStatus: event.target.value as 'pending' | 'paid' })}>
+                    <select className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2" value={form.paidStatus} onChange={(event) => setForm({ ...form, paidStatus: event.target.value as 'pending' | 'paid' })}>
                       <option value="pending">รอจ่าย</option>
                       <option value="paid">จ่ายแล้ว</option>
                     </select>
@@ -465,14 +465,14 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 border-t px-5 py-4">
-                  <button className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-                  <button className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+                  <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+                  <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
                 </div>
               </form>
             </div>
           ) : null}
 
-          <div className="overflow-x-auto rounded-xl bg-white shadow">
+          <div className="overflow-x-auto rounded-md bg-white shadow">
             <table className="w-full text-sm">
               <thead className="bg-slate-100">
                 <tr>
@@ -500,14 +500,14 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       <td className="p-2 font-mono text-xs text-slate-600">{row.refDocNo || '-'}</td>
                       <td className="p-2"><div className="font-medium">{row.payee}</div><div className="text-xs text-slate-500">{row.categoryName}</div></td>
                       <td className="p-2">{row.accountName}</td>
-                      <td className="p-2 text-center"><span className={`rounded-full px-2 py-0.5 text-xs ${row.paidStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.paidStatus === 'paid' ? 'จ่ายแล้ว' : 'รอจ่าย'}</span></td>
+                      <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs ${row.paidStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.paidStatus === 'paid' ? 'จ่ายแล้ว' : 'รอจ่าย'}</span></td>
                       <td className={`bg-red-50/60 p-2 text-right text-base font-bold ${row.paidStatus === 'pending' ? 'text-amber-700' : 'text-red-700'}`}>{formatMoney(row.netAmount)}</td>
                       <td className="whitespace-nowrap p-2 text-right text-xs text-slate-600">
                         <div>ยอด: <b>{formatMoney(row.amount)}</b></div>
                         {row.vat > 0 ? <div className="text-emerald-700">+VAT: {formatMoney(row.vat)}</div> : null}
                         {row.wht > 0 ? <div className="text-amber-700">-WHT: {formatMoney(row.wht)}</div> : null}
                       </td>
-                      <td className="p-2 text-center"><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>จัดการ</button></td>
+                      <td className="p-2 text-center"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>จัดการ</button></td>
                     </tr>
                   )
                 })}
@@ -527,7 +527,7 @@ function ExpenseRankingPanel({ color, emptyText, label, rows, total }: { color: 
   const denominator = rows[0]?.total || 1
 
   return (
-    <div className="rounded-xl bg-white p-4 shadow">
+    <div className="rounded-md bg-white p-4 shadow">
       <div className="mb-3 text-sm font-bold text-slate-700">{label}</div>
       {rows.length === 0 ? <div className="text-xs text-slate-400">{emptyText}</div> : null}
       <div className="space-y-1.5">
@@ -539,7 +539,7 @@ function ExpenseRankingPanel({ color, emptyText, label, rows, total }: { color: 
               <span className={`font-bold ${textClass}`}>{formatMoney(item.total)}</span>
               {total ? <span className="w-12 text-right text-xs text-slate-400">{((item.total / total) * 100).toFixed(0)}%</span> : null}
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2 overflow-hidden rounded-md-full bg-slate-100">
               <div className={`h-full ${barClass}`} style={{ width: `${Math.max(3, (item.total / denominator) * 100)}%` }} />
             </div>
           </div>
@@ -566,7 +566,7 @@ function TextField(props: { error?: string; label: string; onChange?: (value: st
   return (
     <label className="block text-sm font-medium">
       {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
-      <input className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'} ${props.readOnly ? 'bg-slate-50' : ''}`} readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange?.(event.target.value)} />
+      <input className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'} ${props.readOnly ? 'bg-slate-50' : ''}`} readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange?.(event.target.value)} />
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
   )
@@ -576,7 +576,7 @@ function SelectField(props: { error?: string; label: string; onChange: (value: s
   return (
     <label className="block text-sm font-medium">
       {props.label}
-      <select className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
+      <select className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
         <option value="">ไม่ระบุ</option>
         {props.options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
       </select>

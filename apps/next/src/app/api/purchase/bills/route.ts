@@ -100,7 +100,7 @@ function billItemsJson(row: PurchaseBillRow) {
   return row.purchase_bill_items.map(billItemJson)
 }
 
-function billJson(row: PurchaseBillRow) {
+function billJson(row: PurchaseBillRow, paymentDocNos: string[] = []) {
   const items = billItemsJson(row)
   return {
     branchId: row.branch_id ?? '',
@@ -114,9 +114,9 @@ function billJson(row: PurchaseBillRow) {
     id: row.id,
     items,
     itemCount: items.length,
-    licensePlate: row.license_plate ?? '',
     note: row.note ?? row.notes ?? '',
     paidAmount: toNumber(row.paid_amount),
+    paymentDocNos,
     payableBalance: toNumber(row.payable_balance),
     poBuyId: row.po_buy_id ?? '',
     purchaseSource: row.purchase_source ?? 'SPOT_BUY',
@@ -355,9 +355,26 @@ async function rowsPayload(query: BillQuery, includePaging = true) {
       where,
     }),
   ])
+  const billIds = rows.map((row) => row.id)
+  const payments = billIds.length > 0 ? await prisma.payments.findMany({
+    orderBy: [{ created_at: 'asc' }],
+    select: { bill_id: true, doc_no: true, status: true },
+    where: {
+      bill_id: { in: billIds },
+      NOT: { status: 'cancelled' },
+    },
+  }) : []
+  const paymentDocNosByBillId = new Map<string, string[]>()
+  payments.forEach((payment) => {
+    const billId = payment.bill_id ?? ''
+    if (!billId || !payment.doc_no) return
+    const current = paymentDocNosByBillId.get(billId) ?? []
+    if (!current.includes(payment.doc_no)) current.push(payment.doc_no)
+    paymentDocNosByBillId.set(billId, current)
+  })
 
   return {
-    rows: rows.map(billJson),
+    rows: rows.map((row) => billJson(row, paymentDocNosByBillId.get(row.id) ?? [])),
     totalAmount: toNumber(totals._sum.total_amount),
     totalRows,
   }
@@ -488,7 +505,7 @@ export async function POST(request: Request) {
               doc_no: docNo,
               has_vat: values.hasVat,
               id,
-              license_plate: values.licensePlate,
+              license_plate: null,
               note: values.note ?? values.notes,
               notes: values.notes,
               paid_amount: 0,
@@ -674,7 +691,7 @@ export async function PATCH(request: Request) {
           discount: values.discountTotal,
           discount_total: values.discountTotal,
           has_vat: values.hasVat,
-          license_plate: values.licensePlate,
+          license_plate: null,
           note: values.note ?? values.notes,
           notes: values.notes,
           paid_amount: paidAmount,

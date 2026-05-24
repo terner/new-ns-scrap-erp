@@ -1,0 +1,22 @@
+[
+  {
+    "appName": "live",
+    "clicked": true,
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "screenshot": "reports/frontend-visual-audit/ar-menu-flow/ar-live-desktop.png",
+    "text": "📥 📥 ลูกหนี้คงเหลือรวม 0.00 📋 บิลค้าง: 0 ใบ ⚠ เกินกำหนด: 0.00 (0%) 📊 Aging Buckets ✓ Current 0.00 1-30 วัน 0.00 31-60 วัน 0.00 61-90 วัน 0.00 ⚠ >90 วัน 0.00 👥 Top 5 ลูกหนี้ ✅ ไม่มีลูกหนี้ ทุก Customer บริษัท เหล็กไทยส่งออก จำกัด โรงหลอมเหล็กกรุงเทพ จำกัด Asia Metal Co., Ltd. ทุกช่องทาง ส่งออก ภายในประเทศ ทุกอายุหนี้ Current 1-30 31-60 61-90 >90 Export CSV Customer บิล วันที่ Due อายุ(วัน) ยอด รับแล้ว ค้างรับ Channel ไม่มีลูกหนี้คงค้าง"
+  },
+  {
+    "appName": "vue",
+    "clicked": true,
+    "consoleMessages": [],
+    "screenshot": "reports/frontend-visual-audit/ar-menu-flow/ar-vue-desktop.png",
+    "text": "📦 เงินค้างใน Pending Sale (ยังไม่เป็น AR) — เบิกออกแล้วยังไม่เปิดบิลขาย 📦 2 ใบ 💰 ต้นทุน: 156,000 📈 ยอดคาด: 192,500 📥 📥 ลูกหนี้คงเหลือรวม 704,400 📋 บิลค้าง: 3 ใบ · ⚠ เกินกำหนด: 404,400 📊 Aging Buckets Current 300,000 1-30 185,500 31-60 218,900 61-90 0 >90 0 👥 Top 5 ลูกหนี้ 1 Asia Metal Co., Ltd. 1 บิล 300,000 2 Shanghai Steel Trading 1 บิล 218,900 ⚠ เกิน: 218,900 3 บริษัท ตัวอย่าง จำกัด 1 บิล 185,500 ⚠ เกิน: 185,500 ทุก Customer Asia Metal Co., Ltd. บริษัท ตัวอย่าง จำกัด Shanghai Steel Trading ทุกช่องทาง Export ขายหน้าโรงงาน Trading ทุกอายุหนี้ Current 1-30 31-60 61-90 >90 Export CSV Customer บิล วันที่ Due อายุ(วัน) ยอด รับแล้ว ค้างรับ Channel Asia Metal Co., Ltd. SB2605-0001 2026-05-01 2026-05-31 -15 425,000 125,000 300,000 Export บริษัท ตัวอย่าง จำกัด SB2604-0038 2026-04-10 2026-05-10 6 185,500 0 185,500 ขายหน้าโรงงาน Shanghai Steel Trading SB2602-0012 2026-02-15 2026-03-17 60 318,900 100,000 218,900 Trading"
+  }
+]

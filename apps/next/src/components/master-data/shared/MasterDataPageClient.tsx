@@ -13,7 +13,9 @@ import {
   type MasterDataRecord,
 } from '@/lib/master-data'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
-import { formatPhoneDisplay, sanitizeAccountNoInput, sanitizePhoneInput } from '@/lib/format'
+import { FormSelectField } from '@/components/ui/FormSelectField'
+import { PhoneInput } from '@/components/ui/PhoneInput'
+import { formatPhoneDisplay, sanitizeAccountNoInput } from '@/lib/format'
 
 type SortKey = keyof MasterDataRecord
 
@@ -42,6 +44,7 @@ function recordToForm(record: MasterDataRecord): MasterDataFormValues {
     stockEffect: record.stockEffect,
     availableForSale: record.availableForSale,
     bankName: record.bankName,
+    bankBranch: record.bankBranch,
     accountNo: record.accountNo,
     currency: record.currency,
     openingBalance: record.openingBalance,
@@ -264,17 +267,17 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
   return (
     <section className="space-y-4">
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <div className="font-bold">โหลดหรือบันทึกข้อมูลไม่ได้</div>
           <div className="mt-1">{error}</div>
         </div>
       ) : null}
 
-      <div className="rounded-lg bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="w-full md:max-w-md">
             <input
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-md border px-3 py-2 text-sm"
               onChange={(event) => {
                 setSearch(event.target.value)
                 setPage(1)
@@ -286,7 +289,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
             {config.description ? <div className="mt-2 text-xs text-slate-500">{config.description}</div> : null}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button className="rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={openCreateForm}>
+            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={openCreateForm}>
               + {config.createLabel}
             </button>
           </div>
@@ -311,7 +314,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
         </div>
       ) : null}
 
-      {isLoading ? <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
+      {isLoading ? <div className="rounded-md bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
 
       {!isLoading ? (
         <div className="space-y-2">
@@ -320,7 +323,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
             <div className="flex flex-wrap items-center gap-2">
               <select
                 aria-label="จำนวนรายการต่อหน้า"
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-md border border-slate-300 px-2 py-1"
                 value={pageSize}
                 onChange={(event) => {
                   setPageSize(Number(event.target.value))
@@ -331,13 +334,13 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                   <option key={size} value={size}>{size} / หน้า</option>
                 ))}
               </select>
-              <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+              <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
               <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-              <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+              <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-lg bg-white shadow">
+          <div className="overflow-x-auto rounded-md bg-white shadow">
             <table className="w-full text-sm">
               <thead className="bg-slate-100">
                 <tr>
@@ -442,7 +445,7 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
   }
 
   return (
-    <form noValidate className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
+    <form noValidate className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-bold text-slate-900">{form.id ? `แก้ไข${config.entityName}` : config.createLabel}</h3>
         {supportsActive ? <ActiveToggle checked={form.active} onChange={(checked) => update('active', checked)} /> : null}
@@ -468,10 +471,10 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
       </div>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
-        <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onCancel}>
+        <button className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
-        <button className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60" disabled={isSaving} type="submit">
+        <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60" disabled={isSaving} type="submit">
           {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>
@@ -491,47 +494,54 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
   const isPhoneField = field.key === 'phone'
   const isAccountNoField = field.key === 'accountNo'
   const inputType = field.type === 'number' ? 'number' : isEmailField ? 'email' : 'text'
+  const inputPlaceholder = isEmailField ? 'example@company.com' : `กรอก${field.label}`
 
   if (field.type === 'select') {
     return (
-      <label className="block text-sm font-medium">
-        {field.label}{field.required ? <span className="text-red-600"> *</span> : null}
-        <select
-          aria-invalid={Boolean(error)}
-          aria-required={field.required}
-          className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none focus:border-slate-700 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-          value={String(value ?? '')}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {!field.required ? <option value="">เลือก</option> : null}
-          {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-        {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}
-      </label>
+      <FormSelectField
+        error={error}
+        label={field.label}
+        placeholder="เลือก"
+        required={field.required}
+        value={String(value ?? '')}
+        onChange={onChange}
+      >
+        {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </FormSelectField>
     )
   }
 
   return (
     <label className="block text-sm font-medium">
       {field.label}{field.required ? <span className="text-red-600"> *</span> : null}
-      <input
-        aria-invalid={Boolean(error)}
-        aria-required={field.required}
-        className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none focus:border-slate-700 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-        inputMode={isEmailField ? 'email' : isPhoneField ? 'tel' : isAccountNoField ? 'numeric' : undefined}
-        type={inputType}
-        value={String(value ?? '')}
-        onChange={(event) => {
-          const nextValue = isEmailField
-            ? event.target.value.replace(/[^\x20-\x7E]/g, '')
-            : isPhoneField
-              ? sanitizePhoneInput(event.target.value)
+      {isPhoneField ? (
+        <PhoneInput
+          aria-invalid={Boolean(error)}
+          aria-required={field.required}
+          className="mt-1.5 w-full"
+          error={Boolean(error)}
+          value={String(value ?? '')}
+          onChange={onChange}
+        />
+      ) : (
+        <input
+          aria-invalid={Boolean(error)}
+          aria-required={field.required}
+          className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none focus:border-slate-700 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+          inputMode={isEmailField ? 'email' : isAccountNoField ? 'numeric' : undefined}
+          placeholder={inputPlaceholder}
+          type={inputType}
+          value={String(value ?? '')}
+          onChange={(event) => {
+            const nextValue = isEmailField
+              ? event.target.value.replace(/[^\x20-\x7E]/g, '')
               : isAccountNoField
                 ? sanitizeAccountNoInput(event.target.value)
                 : event.target.value
-          onChange(nextValue)
-        }}
-      />
+            onChange(nextValue)
+          }}
+        />
+      )}
       {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}
     </label>
   )

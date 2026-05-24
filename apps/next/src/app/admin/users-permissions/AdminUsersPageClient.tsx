@@ -372,7 +372,7 @@ export function AdminUsersPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border bg-white p-4 shadow">
+      <div className="rounded-md border bg-white p-4 shadow">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Users & Permissions</h2>
@@ -380,13 +380,13 @@ export function AdminUsersPageClient() {
           </div>
           <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <input
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 md:w-72"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 md:w-72"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="ค้นหา"
               type="search"
               value={search}
             />
-            <button className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={!data} type="button" onClick={openAddUser}>
+            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={!data} type="button" onClick={openAddUser}>
               เพิ่มผู้ใช้
             </button>
           </div>
@@ -394,15 +394,15 @@ export function AdminUsersPageClient() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ผู้ใช้ Active</div><div className="mt-1 text-2xl font-bold text-emerald-700">{userSummary.active}</div></div>
-        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">จำกัดสาขา</div><div className="mt-1 text-2xl font-bold text-blue-700">{userSummary.branchScoped}</div></div>
-        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ยังไม่ link Auth</div><div className="mt-1 text-2xl font-bold text-amber-700">{userSummary.pendingAuth}</div></div>
-        <div className="rounded-lg border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ต้องเปลี่ยน Password</div><div className="mt-1 text-2xl font-bold text-purple-700">{userSummary.mustChange}</div></div>
+        <div className="rounded-md border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ผู้ใช้ Active</div><div className="mt-1 text-2xl font-bold text-emerald-700">{userSummary.active}</div></div>
+        <div className="rounded-md border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">จำกัดสาขา</div><div className="mt-1 text-2xl font-bold text-blue-700">{userSummary.branchScoped}</div></div>
+        <div className="rounded-md border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ยังไม่ link Auth</div><div className="mt-1 text-2xl font-bold text-amber-700">{userSummary.pendingAuth}</div></div>
+        <div className="rounded-md border bg-white p-3 shadow-sm"><div className="text-xs text-slate-500">ต้องเปลี่ยน Password</div><div className="mt-1 text-2xl font-bold text-purple-700">{userSummary.mustChange}</div></div>
       </div>
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-          <form className="mt-10 w-full max-w-2xl overflow-hidden rounded-lg border bg-white shadow-xl" onSubmit={saveUser}>
+          <form className="mt-10 w-full max-w-2xl overflow-hidden rounded-md border bg-white shadow-xl" onSubmit={saveUser}>
             <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
               <h3 className="text-lg font-bold text-slate-900">{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้'}</h3>
               <ActiveToggle checked={form.active} onChange={(checked) => setForm((current) => ({ ...current, active: checked }))} />
@@ -411,18 +411,18 @@ export function AdminUsersPageClient() {
             <div className="grid gap-4 px-5 py-5 md:grid-cols-2">
               <label className="text-sm font-medium text-slate-700">
                 Username *
-                <input className="mt-1 w-full rounded border px-3 py-2" value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} />
+                <input className="mt-1 w-full rounded-md border px-3 py-2" value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} />
               </label>
               <label className="text-sm font-medium text-slate-700">
                 Email *
-                <input className="mt-1 w-full rounded border px-3 py-2" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+                <input className="mt-1 w-full rounded-md border px-3 py-2" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
               </label>
               <label className="md:col-span-2 text-sm font-medium text-slate-700">
                 ชื่อผู้ใช้ *
-                <input className="mt-1 w-full rounded border px-3 py-2" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
+                <input className="mt-1 w-full rounded-md border px-3 py-2" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
               </label>
 
-              <fieldset className="rounded border p-3">
+              <fieldset className="rounded-md border p-3">
                 <legend className="px-1 text-sm font-bold text-slate-700">Roles *</legend>
                 <div className="mt-2 grid gap-2">
                   {data?.roles.filter((role) => role.active).map((role) => (
@@ -435,7 +435,7 @@ export function AdminUsersPageClient() {
                 </div>
               </fieldset>
 
-              <fieldset className="rounded border p-3">
+              <fieldset className="rounded-md border p-3">
                 <legend className="px-1 text-sm font-bold text-slate-700">สาขาที่เข้าถึง</legend>
                 <div className="mt-2 grid gap-2">
                   {data?.branches.map((branch) => (
@@ -454,12 +454,12 @@ export function AdminUsersPageClient() {
                 บังคับเปลี่ยน password หลังเข้าสู่ระบบ
               </label>
 
-              {formError ? <p className="md:col-span-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p> : null}
+              {formError ? <p className="md:col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p> : null}
             </div>
 
             <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-4">
-              <button className="rounded px-4 py-2 text-sm text-slate-600" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-              <button className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={isSaving} type="submit">
+              <button className="rounded-md px-4 py-2 text-sm text-slate-600" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={isSaving} type="submit">
                 {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
               </button>
             </div>
@@ -467,7 +467,7 @@ export function AdminUsersPageClient() {
         </div>
       ) : null}
 
-      <div className="rounded-xl border bg-white shadow">
+      <div className="rounded-md border bg-white shadow">
         <div className="flex border-b">
           <button
             className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'users' ? 'border-slate-700 text-slate-900' : 'border-transparent text-slate-500'}`}
@@ -485,8 +485,8 @@ export function AdminUsersPageClient() {
           </button>
         </div>
 
-        {error ? <div className="m-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
-        {notice ? <div className="m-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</div> : null}
+        {error ? <div className="m-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
+        {notice ? <div className="m-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</div> : null}
         {isLoading ? <div className="p-6 text-center text-sm text-slate-500">กำลังโหลดข้อมูล</div> : null}
 
         {!isLoading && tab === 'users' ? (
@@ -518,7 +518,7 @@ export function AdminUsersPageClient() {
                     </td>
                     <td className="p-2 text-center">
                       <button
-                        className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
                         disabled={!user.email || !user.active || actionUserId === user.id}
                         type="button"
                         onClick={() => void sendUserInvite(user)}
@@ -571,7 +571,7 @@ export function AdminUsersPageClient() {
                     </td>
                     <td className="max-w-[320px] p-2 text-slate-600">{role.description || '-'}</td>
                     <td className="p-2">
-                      <span className={`rounded px-2 py-0.5 text-xs ${role.isSystem ? 'bg-slate-200 text-slate-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`rounded-md px-2 py-0.5 text-xs ${role.isSystem ? 'bg-slate-200 text-slate-700' : 'bg-blue-100 text-blue-700'}`}>
                         {role.isSystem ? 'SYSTEM' : 'CUSTOM'}
                       </span>
                     </td>
@@ -583,7 +583,7 @@ export function AdminUsersPageClient() {
                     <RoleCheck enabled={role.canSeeFinancials} />
                     <RoleCheck enabled={role.canEditOpeningBalance} />
                     <td className="p-2 text-center">
-                      <span className={`rounded px-2 py-0.5 text-xs ${role.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                      <span className={`rounded-md px-2 py-0.5 text-xs ${role.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                         {role.active ? 'ใช้งาน' : 'ปิด'}
                       </span>
                     </td>
@@ -606,7 +606,7 @@ export function AdminUsersPageClient() {
 function RoleCheck({ enabled }: { enabled: boolean }) {
   return (
     <td className="p-2 text-center">
-      <span className={`inline-flex size-6 items-center justify-center rounded-full text-xs font-bold ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-300'}`}>
+      <span className={`inline-flex size-6 items-center justify-center rounded-md-full text-xs font-bold ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-300'}`}>
         {enabled ? '✓' : '—'}
       </span>
     </td>

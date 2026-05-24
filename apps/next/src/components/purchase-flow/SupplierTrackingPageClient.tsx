@@ -78,25 +78,25 @@ export function SupplierTrackingPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-700 p-4 text-white shadow-xl">
+      <div className="rounded-md bg-gradient-to-r from-blue-700 to-indigo-700 p-4 text-white shadow-xl">
         <h1 className="text-xl font-bold">🏭 Supplier Tracking 360°</h1>
         <p className="mt-1 text-sm opacity-90">วิเคราะห์ผู้ขายจากบิลรับซื้อและรายการจ่ายเงิน Supplier</p>
       </div>
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="rounded-xl bg-white p-3 shadow">
+      <div className="rounded-md bg-white p-3 shadow">
         <div className="grid gap-2 md:grid-cols-6">
-          <input className="rounded border px-3 py-2 text-sm" type="number" value={year} onChange={(event) => setYear(event.target.value)} />
-          <select className="rounded border px-3 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
+          <input className="rounded-md border px-3 py-2 text-sm" type="number" value={year} onChange={(event) => setYear(event.target.value)} />
+          <select className="rounded-md border px-3 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
             <option value="">ทั้งปี</option>
             {months.map((value, index) => <option key={value} value={value}>{monthLabels[index]}</option>)}
           </select>
-          <select className="rounded border px-3 py-2 text-sm md:col-span-2" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+          <select className="rounded-md border px-3 py-2 text-sm md:col-span-2" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
             <option value="">Supplier ทั้งหมด</option>
             {(data?.rows ?? []).map((row) => <option key={row.id} value={row.id}>{row.code ? `${row.code} - ${row.supplierName}` : row.supplierName}</option>)}
           </select>
-          <input className="rounded border px-3 py-2 text-sm" placeholder="ค้นหา Supplier" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <a className="rounded bg-blue-700 px-4 py-2 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>
+          <input className="rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา Supplier" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <a className="rounded-md bg-blue-700 px-4 py-2 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>
         </div>
       </div>
 
@@ -107,18 +107,18 @@ export function SupplierTrackingPageClient() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl bg-white p-4 shadow lg:col-span-2">
+        <div className="rounded-md bg-white p-4 shadow lg:col-span-2">
           <div className="mb-3 text-sm font-semibold text-slate-700">ยอดซื้อรายเดือน {data?.year ?? year}</div>
           <div className="grid grid-cols-12 items-end gap-2">
             {(data?.monthly ?? []).map((item, index) => (
               <div key={item.month} className="flex min-h-40 flex-col items-center justify-end gap-1">
-                <div className="w-full rounded-t bg-blue-500" style={{ height: `${Math.max(4, (item.amount / maxMonthAmount) * 128)}px` }} />
+                <div className="w-full rounded-md-t bg-blue-500" style={{ height: `${Math.max(4, (item.amount / maxMonthAmount) * 128)}px` }} />
                 <div className="text-[10px] text-slate-500">{monthLabels[index]}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <div className="mb-3 text-sm font-bold text-slate-700">🏆 Top 5 Supplier</div>
           <BarList rows={topFive.map((row) => ({ label: row.supplierName, value: row.purchaseAmount }))} />
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
@@ -128,7 +128,7 @@ export function SupplierTrackingPageClient() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 shadow">
+      <div className="flex flex-wrap gap-2 rounded-md bg-white p-2 shadow">
         <Tab active={view === 'list'} label="รายการ" onClick={() => setView('list')} />
         <Tab active={view === 'top10'} label="Top 10" onClick={() => setView('top10')} />
         <Tab active={view === 'yearCompare'} label="รายปี" onClick={() => setView('yearCompare')} />
@@ -148,7 +148,7 @@ export function SupplierTrackingPageClient() {
 
       {view === 'list' ? (
         <>
-          <div className="overflow-x-auto rounded-xl bg-white shadow">
+          <div className="overflow-x-auto rounded-md bg-white shadow">
             <table className="w-full min-w-[960px] text-sm">
               <thead className="bg-slate-100">
                 <tr>
@@ -182,7 +182,7 @@ export function SupplierTrackingPageClient() {
               </tbody>
             </table>
           </div>
-          <div className="overflow-x-auto rounded-xl bg-white shadow">
+          <div className="overflow-x-auto rounded-md bg-white shadow">
             <div className="border-b bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">Product breakdown จากบิลรับซื้อ</div>
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">Supplier</th><th className="p-2 text-right">บิล</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
@@ -209,29 +209,29 @@ export function SupplierTrackingPageClient() {
 
 function SummaryCard({ color, label, value }: { color: 'blue' | 'indigo' | 'red'; label: string; value: string }) {
   const gradient = color === 'red' ? 'from-red-500 to-rose-600' : color === 'indigo' ? 'from-indigo-500 to-violet-600' : 'from-blue-500 to-indigo-600'
-  return <div className={`rounded-2xl bg-gradient-to-br ${gradient} p-5 text-white shadow-xl`}><div className="text-xs opacity-80">{label}</div><div className="mt-1 font-mono text-3xl font-bold">{value}</div></div>
+  return <div className={`rounded-md bg-gradient-to-br ${gradient} p-5 text-white shadow-xl`}><div className="text-xs opacity-80">{label}</div><div className="mt-1 font-mono text-3xl font-bold">{value}</div></div>
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg bg-slate-50 p-2"><div className="text-slate-500">{label}</div><div className="font-mono font-bold text-slate-900">{value}</div></div>
+  return <div className="rounded-md bg-slate-50 p-2"><div className="text-slate-500">{label}</div><div className="font-mono font-bold text-slate-900">{value}</div></div>
 }
 
 function Tab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button className={active ? 'rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white' : 'rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600'} type="button" onClick={onClick}>{label}</button>
+  return <button className={active ? 'rounded-md bg-blue-700 px-4 py-2 text-sm font-bold text-white' : 'rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600'} type="button" onClick={onClick}>{label}</button>
 }
 
 function BarList({ rows }: { rows: { label: string; value: number }[] }) {
   const max = Math.max(1, ...rows.map((row) => row.value))
-  return <div className="space-y-2">{rows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีข้อมูล</div> : rows.map((row, index) => <div key={row.label}><div className="mb-1 flex justify-between text-xs"><span>{index + 1}. {row.label}</span><b>{formatMoney(row.value)}</b></div><div className="h-2 rounded bg-slate-100"><div className="h-2 rounded bg-blue-500" style={{ width: `${Math.min(100, row.value / max * 100)}%` }} /></div></div>)}</div>
+  return <div className="space-y-2">{rows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีข้อมูล</div> : rows.map((row, index) => <div key={row.label}><div className="mb-1 flex justify-between text-xs"><span>{index + 1}. {row.label}</span><b>{formatMoney(row.value)}</b></div><div className="h-2 rounded-md bg-slate-100"><div className="h-2 rounded-md bg-blue-500" style={{ width: `${Math.min(100, row.value / max * 100)}%` }} /></div></div>)}</div>
 }
 
 function TopPanel({ rows, title }: { rows: { label: string; value: number }[]; title: string }) {
-  return <div className="overflow-hidden rounded-2xl bg-white shadow"><div className="border-b bg-blue-50 p-3 font-bold text-blue-700">{title}</div><table className="w-full text-sm"><tbody>{rows.map((row, index) => <tr key={row.label} className="border-t"><td className="p-2 font-bold">{index + 1}</td><td className="p-2">{row.label}</td><td className="p-2 text-right font-semibold">{formatMoney(row.value)}</td></tr>)}</tbody></table></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow"><div className="border-b bg-blue-50 p-3 font-bold text-blue-700">{title}</div><table className="w-full text-sm"><tbody>{rows.map((row, index) => <tr key={row.label} className="border-t"><td className="p-2 font-bold">{index + 1}</td><td className="p-2">{row.label}</td><td className="p-2 text-right font-semibold">{formatMoney(row.value)}</td></tr>)}</tbody></table></div>
 }
 
 function YearCompare({ monthly }: { monthly: SupplierTrackingPayload['monthly'] }) {
   return (
-    <div className="overflow-x-auto rounded-2xl bg-white shadow">
+    <div className="overflow-x-auto rounded-md bg-white shadow">
       <table className="w-full min-w-[680px] text-sm">
         <thead className="bg-slate-100"><tr><th className="p-2 text-left">เดือน</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
         <tbody>{monthly.map((row, index) => <tr key={row.month} className="border-t"><td className="p-2">{monthLabels[index]}</td><td className="p-2 text-right">{formatMoney(row.qty)}</td><td className="p-2 text-right font-semibold text-blue-700">{formatMoney(row.amount)}</td><td className="p-2 text-right">{formatMoney(row.qty > 0 ? row.amount / row.qty : 0)}</td></tr>)}</tbody>

@@ -51,10 +51,8 @@ create table if not exists public.app_audit_logs (
   constraint app_audit_logs_outcome_chk check (outcome in ('success', 'failure', 'blocked')),
   constraint app_audit_logs_severity_chk check (severity in ('debug', 'info', 'warning', 'error', 'critical'))
 );
-
 comment on table public.app_audit_logs is 'Append-only audit stream for security, permission, data-change, approval, import/export, and other trace-critical events.';
 comment on column public.app_audit_logs.metadata is 'Non-secret contextual metadata. Do not store passwords, tokens, service keys, or raw sensitive exports.';
-
 create table if not exists public.app_activity_logs (
   id uuid primary key default gen_random_uuid(),
   occurred_at timestamptz not null default now(),
@@ -92,10 +90,8 @@ create table if not exists public.app_activity_logs (
   )),
   constraint app_activity_logs_status_chk check (status in ('success', 'failure', 'blocked'))
 );
-
 comment on table public.app_activity_logs is 'Append-only activity stream for user/session/page/action telemetry that is useful for support and usage review but is not the primary audit record.';
 comment on column public.app_activity_logs.metadata is 'Non-secret contextual metadata. Do not store passwords, tokens, service keys, or raw sensitive exports.';
-
 create index if not exists idx_app_audit_logs_occurred_at on public.app_audit_logs(occurred_at desc);
 create index if not exists idx_app_audit_logs_actor_app_user_id on public.app_audit_logs(actor_app_user_id);
 create index if not exists idx_app_audit_logs_actor_auth_user_id on public.app_audit_logs(actor_auth_user_id);
@@ -104,7 +100,6 @@ create index if not exists idx_app_audit_logs_action on public.app_audit_logs(ac
 create index if not exists idx_app_audit_logs_target on public.app_audit_logs(target_type, target_id);
 create index if not exists idx_app_audit_logs_entity on public.app_audit_logs(entity_table, entity_id);
 create index if not exists idx_app_audit_logs_metadata_gin on public.app_audit_logs using gin (metadata);
-
 create index if not exists idx_app_activity_logs_occurred_at on public.app_activity_logs(occurred_at desc);
 create index if not exists idx_app_activity_logs_actor_app_user_id on public.app_activity_logs(actor_app_user_id);
 create index if not exists idx_app_activity_logs_actor_auth_user_id on public.app_activity_logs(actor_auth_user_id);
@@ -113,7 +108,6 @@ create index if not exists idx_app_activity_logs_activity_type on public.app_act
 create index if not exists idx_app_activity_logs_route_path on public.app_activity_logs(route_path);
 create index if not exists idx_app_activity_logs_target on public.app_activity_logs(target_type, target_id);
 create index if not exists idx_app_activity_logs_metadata_gin on public.app_activity_logs using gin (metadata);
-
 create or replace function public.app_prevent_log_update_delete()
 returns trigger
 language plpgsql
@@ -123,27 +117,22 @@ begin
   raise exception 'app log tables are append-only and do not allow %', tg_op;
 end;
 $$;
-
 drop trigger if exists app_audit_logs_append_only on public.app_audit_logs;
 create trigger app_audit_logs_append_only
 before update or delete on public.app_audit_logs
 for each row execute function public.app_prevent_log_update_delete();
-
 drop trigger if exists app_activity_logs_append_only on public.app_activity_logs;
 create trigger app_activity_logs_append_only
 before update or delete on public.app_activity_logs
 for each row execute function public.app_prevent_log_update_delete();
-
 alter table public.app_audit_logs enable row level security;
 alter table public.app_activity_logs enable row level security;
-
 drop policy if exists app_audit_logs_select_audit on public.app_audit_logs;
 create policy app_audit_logs_select_audit
 on public.app_audit_logs
 for select
 to authenticated
 using (public.has_app_permission('system.audit.view'));
-
 drop policy if exists app_activity_logs_select_activity on public.app_activity_logs;
 create policy app_activity_logs_select_activity
 on public.app_activity_logs
@@ -153,12 +142,10 @@ using (
   public.has_app_permission('system.activity.view')
   or public.has_app_permission('system.audit.view')
 );
-
 revoke all on table public.app_audit_logs from anon;
 revoke all on table public.app_activity_logs from anon;
 grant select on table public.app_audit_logs to authenticated;
 grant select on table public.app_activity_logs to authenticated;
-
 insert into public.app_permissions (code, module, resource, action, description)
 values
   ('system.activity.view', 'system', 'activity', 'view', 'ดู activity log')
@@ -167,7 +154,6 @@ set
   description = excluded.description,
   active = true,
   updated_at = now();
-
 insert into public.app_role_permissions (role_id, permission_id, created_by)
 select existing_audit_roles.role_id, activity_permission.id, 'migration:20260520132541'
 from public.app_role_permissions existing_audit_roles
@@ -177,7 +163,6 @@ join public.app_permissions audit_permission
 cross join public.app_permissions activity_permission
 where activity_permission.code = 'system.activity.view'
 on conflict do nothing;
-
 insert into public.app_audit_logs (
   occurred_at,
   event_key,
@@ -220,5 +205,4 @@ where not exists (
     and existing.actor_auth_user_id is not distinct from public.app_auth_events.actor_auth_user_id
     and existing.metadata = public.app_auth_events.metadata
 );
-
 comment on table public.app_auth_events is 'Legacy auth-event table kept for compatibility. New writes should use app_audit_logs/app_activity_logs.';

@@ -88,43 +88,43 @@ export function CashPositionPageClient() {
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-xl ${netCash >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-700' : 'bg-gradient-to-br from-red-500 to-rose-700'}`}>
+        <div className={`relative overflow-hidden rounded-md p-5 text-white shadow-xl ${netCash >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-700' : 'bg-gradient-to-br from-red-500 to-rose-700'}`}>
           <div className="absolute right-3 top-2 text-7xl opacity-15">{netCash >= 0 ? '💰' : '⚠️'}</div>
           <div className="text-xs opacity-90">Net Cash Position</div>
           <div className="mt-1 text-4xl font-bold">{formatMoney(netCash)}</div>
           <div className="mt-3 text-sm opacity-90">= Cash + Bank + FCD + AR − AP − OD ใช้</div>
         </div>
 
-        <div className="rounded-2xl bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <div className="mb-2 text-sm font-bold text-slate-700">🥧 องค์ประกอบเงิน (Liquid)</div>
-          <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-full p-6" style={{ background: donut }}>
-            <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-center text-xs font-bold text-slate-700">
+          <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-md-full p-6" style={{ background: donut }}>
+            <div className="flex h-full w-full flex-col items-center justify-center rounded-md-full bg-white text-center text-xs font-bold text-slate-700">
               <span className="text-[10px] font-normal text-slate-500">รวม</span>
               <span>{formatMoney(liquidTotal)}</span>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap justify-center gap-2 text-xs">
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-emerald-500" />💵 Cash</span>
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-blue-500" />🏦 Bank</span>
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-indigo-500" />💱 FCD</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-md bg-emerald-500" />💵 Cash</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-md bg-blue-500" />🏦 Bank</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-md bg-indigo-500" />💱 FCD</span>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <div className="mb-2 text-sm font-bold text-slate-700">⚖ AR vs AP</div>
           <div className="space-y-3 text-sm">
             <div>
               <div className="mb-1 flex justify-between"><span className="text-emerald-600">📥 ลูกหนี้ (AR)</span><span className="font-bold text-emerald-700">{formatMoney(arTotal)}</span></div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-emerald-500" style={{ width: '100%' }} /></div>
+              <div className="h-3 overflow-hidden rounded-md-full bg-slate-100"><div className="h-full bg-emerald-500" style={{ width: '100%' }} /></div>
             </div>
             <div>
               <div className="mb-1 flex justify-between"><span className="text-red-600">📤 เจ้าหนี้ (AP)</span><span className="font-bold text-red-700">{formatMoney(apTotal)}</span></div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-red-500" style={{ width: arTotal > 0 ? `${Math.min(100, (apTotal / arTotal) * 100)}%` : '0%' }} /></div>
+              <div className="h-3 overflow-hidden rounded-md-full bg-slate-100"><div className="h-full bg-red-500" style={{ width: arTotal > 0 ? `${Math.min(100, (apTotal / arTotal) * 100)}%` : '0%' }} /></div>
             </div>
-            <div className={`rounded-lg p-2 text-center ${arTotal >= apTotal ? 'bg-emerald-50' : 'bg-red-50'}`}>
+            <div className={`rounded-md p-2 text-center ${arTotal >= apTotal ? 'bg-emerald-50' : 'bg-red-50'}`}>
               <div className="text-xs text-slate-500">Net (AR − AP)</div>
               <div className={`text-xl font-bold ${arTotal >= apTotal ? 'text-emerald-700' : 'text-red-700'}`}>{formatMoney(arTotal - apTotal)}</div>
             </div>
@@ -133,7 +133,7 @@ export function CashPositionPageClient() {
       </div>
 
       {topAccounts.length > 0 ? (
-        <div className="rounded-xl bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <div className="mb-3 text-sm font-bold text-slate-700">🏆 Top บัญชีที่มียอด</div>
           <div className="space-y-2">
             {topAccounts.map((account, index) => (
@@ -143,7 +143,7 @@ export function CashPositionPageClient() {
                   <span className="flex-1 truncate"><b>{account.name}</b> <span className="text-xs text-slate-400">· {account.type}</span></span>
                   <span className={`w-32 text-right font-bold ${account.type === 'OD' ? 'text-amber-700' : account.type === 'เงินสด' ? 'text-emerald-700' : 'text-blue-700'}`}>{formatMoney(account.balance)}</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full ${accountBarClass(account.type)}`} style={{ width: topBalance > 0 ? `${(account.balance / topBalance) * 100}%` : '0%' }} /></div>
+                <div className="h-2 overflow-hidden rounded-md-full bg-slate-100"><div className={`h-full ${accountBarClass(account.type)}`} style={{ width: topBalance > 0 ? `${(account.balance / topBalance) * 100}%` : '0%' }} /></div>
               </div>
             ))}
           </div>
@@ -154,22 +154,22 @@ export function CashPositionPageClient() {
         <Metric border="border-emerald-500" label="💵 เงินสดรวม" value={formatMoney(cashTotal)} valueClassName="text-emerald-600" />
         <Metric border="border-blue-500" label="🏦 ธนาคารรวม" value={formatMoney(bankTotal)} valueClassName="text-blue-600" />
         <Metric border="border-indigo-500" label="💱 FCD (THB equiv.)" value={formatMoney(fcdTotal)} valueClassName="text-indigo-600" />
-        <div className="rounded-xl border-l-4 border-amber-500 bg-white p-4 shadow">
+        <div className="rounded-md border-l-4 border-amber-500 bg-white p-4 shadow">
           <div className="text-xs text-amber-600">⚠ OD ใช้ไป</div>
           <div className="text-2xl font-bold text-amber-600">{formatMoney(odUsedTotal)}</div>
           <div className="text-xs text-slate-500">เหลือใช้ {formatMoney(odAvailTotal)}</div>
         </div>
-        <div className="col-span-2 rounded-xl bg-emerald-50 p-4 shadow"><div className="text-xs text-emerald-600">📥 ลูกหนี้รวม (เงินที่จะได้รับ)</div><div className="text-2xl font-bold text-emerald-700">{formatMoney(arTotal)}</div></div>
-        <div className="col-span-2 rounded-xl bg-red-50 p-4 shadow"><div className="text-xs text-red-600">📤 เจ้าหนี้รวม (เงินที่ต้องจ่าย)</div><div className="text-2xl font-bold text-red-700">{formatMoney(apTotal)}</div></div>
+        <div className="col-span-2 rounded-md bg-emerald-50 p-4 shadow"><div className="text-xs text-emerald-600">📥 ลูกหนี้รวม (เงินที่จะได้รับ)</div><div className="text-2xl font-bold text-emerald-700">{formatMoney(arTotal)}</div></div>
+        <div className="col-span-2 rounded-md bg-red-50 p-4 shadow"><div className="text-xs text-red-600">📤 เจ้าหนี้รวม (เงินที่ต้องจ่าย)</div><div className="text-2xl font-bold text-red-700">{formatMoney(apTotal)}</div></div>
       </div>
 
-      <div className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg">
+      <div className="rounded-md bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white shadow-lg">
         <div className="text-sm opacity-80">Net Cash Position (สภาพคล่องสุทธิ)</div>
         <div className="text-4xl font-bold">{formatMoney(netCash)}</div>
         <div className="mt-2 text-xs opacity-70">= เงินสด + ธนาคาร + FCD + ลูกหนี้ - เจ้าหนี้ - OD ใช้ไป</div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <h3 className="border-b px-4 py-3 font-semibold">รายละเอียดบัญชีเงินทั้งหมด</h3>
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
@@ -181,7 +181,7 @@ export function CashPositionPageClient() {
               <tr key={row.id} className="border-t">
                 <td className="p-2 font-mono text-xs">{row.code}</td>
                 <td className="p-2">{row.name}</td>
-                <td className="p-2"><span className={`rounded px-2 py-0.5 text-xs ${typeClass(row.type)}`}>{row.type}</span></td>
+                <td className="p-2"><span className={`rounded-md px-2 py-0.5 text-xs ${typeClass(row.type)}`}>{row.type}</span></td>
                 <td className="p-2">{row.bankName || '-'}</td>
                 <td className="p-2 font-mono text-xs">{row.accountNo || '-'}</td>
                 <td className="p-2">{row.currency}</td>
@@ -197,5 +197,5 @@ export function CashPositionPageClient() {
 }
 
 function Metric({ border, label, value, valueClassName }: { border: string; label: string; value: string; valueClassName: string }) {
-  return <div className={`rounded-xl border-l-4 bg-white p-4 shadow ${border}`}><div className="text-xs text-slate-500">{label}</div><div className={`text-2xl font-bold ${valueClassName}`}>{value}</div></div>
+  return <div className={`rounded-md border-l-4 bg-white p-4 shadow ${border}`}><div className="text-xs text-slate-500">{label}</div><div className={`text-2xl font-bold ${valueClassName}`}>{value}</div></div>
 }

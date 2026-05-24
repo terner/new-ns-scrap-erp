@@ -85,22 +85,22 @@ export function CustomerAdvancePageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+      <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
         <strong>Customer Advance</strong> = รับเงินล่วงหน้าจากลูกค้าก่อนออกบิลขาย — เป็นหนี้สิน (Liability) ของบริษัท
       </div>
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Metric label="Advance คงเหลือรวม (Liability)" value={formatMoney(data?.summary.totalRemainingThb ?? 0)} tone="emerald" />
         <Metric label="จำนวนรายการ Active" value={`${data?.summary.activeCount ?? 0}`} />
         <div className="flex items-end justify-end gap-2">
-          <a className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50" href={exportHref}>Export XLSX</a>
-          <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white opacity-60" disabled type="button">+ รับล่วงหน้าใหม่</button>
+          <a className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50" href={exportHref}>Export XLSX</a>
+          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white opacity-60" disabled type="button">+ รับล่วงหน้าใหม่</button>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -146,7 +146,7 @@ export function CustomerAdvancePageClient() {
 
 function Metric({ label, tone, value }: { label: string; tone?: 'emerald'; value: string }) {
   const color = tone === 'emerald' ? 'text-emerald-700' : 'text-slate-900'
-  return <div className="rounded-lg bg-white p-3 shadow"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-lg font-bold ${color}`}>{value}</div></div>
+  return <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-lg font-bold ${color}`}>{value}</div></div>
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -157,5 +157,5 @@ function StatusBadge({ status }: { status: string }) {
       : status === 'Fully Used'
         ? 'bg-emerald-100 text-emerald-700'
         : 'bg-slate-200 text-slate-500'
-  return <span className={`rounded px-2 py-0.5 text-xs ${color}`}>{status}</span>
+  return <span className={`rounded-md px-2 py-0.5 text-xs ${color}`}>{status}</span>
 }

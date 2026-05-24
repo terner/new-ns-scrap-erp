@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
+import { PhoneInput } from '@/components/ui/PhoneInput'
 import { ApiError, getErrorMessage, readJsonResponse } from '@/lib/api-client'
 import { companyProfileSchema, emptyCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
 import { formatPhoneDisplay, sanitizePhoneInput } from '@/lib/format'
@@ -295,41 +296,45 @@ export function CompanyProfilePageClient() {
 
   return (
     <section className="space-y-3">
-      <div className="rounded-xl bg-gradient-to-r from-blue-700 to-cyan-600 p-4 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-4 text-white shadow">
         <h1 className="text-xl font-bold">🏢 ข้อมูลบริษัท</h1>
         <p className="mt-1 text-sm opacity-90">ข้อมูลที่จะแสดงในใบรับสินค้า / ใบส่งของ — บันทึกครั้งเดียวใช้ได้ทุกใบ</p>
       </div>
 
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
-      {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
+      {message ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div> : null}
 
-      <div className="grid grid-cols-1 gap-3 rounded-xl bg-white p-4 text-sm shadow md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 rounded-md bg-white p-4 text-sm shadow md:grid-cols-2">
         <TextField error={fieldErrors.name} label="ชื่อบริษัท (ไทย) *" value={form.name} onChange={(value) => update('name', value)} />
         <TextField error={fieldErrors.nameEn} label="ชื่อบริษัท (อังกฤษ)" value={form.nameEn ?? ''} onChange={(value) => update('nameEn', value || null)} />
         <TextField error={fieldErrors.taxId} inputMode="numeric" label="เลขประจำตัวผู้เสียภาษี (13 หลัก)" value={form.taxId ?? ''} onChange={(value) => update('taxId', sanitizeDigits(value, 13) || null)} />
         <TextField error={fieldErrors.branchCode} inputMode="numeric" label="รหัสสาขา (5 หลัก, ใส่ 00000 ถ้าสำนักงานใหญ่)" value={form.branchCode} onChange={(value) => update('branchCode', sanitizeDigits(value, 5))} />
         <label className="md:col-span-2">
           <span className="mb-1 block text-xs font-bold text-slate-700">ที่อยู่ (ตามใบทะเบียนพาณิชย์) *</span>
-          <textarea className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" rows={2} value={form.address} onChange={(event) => update('address', event.target.value)} />
+          <textarea className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" rows={2} value={form.address} onChange={(event) => update('address', event.target.value)} />
           {fieldErrors.address ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.address}</span> : null}
         </label>
-        <TextField error={fieldErrors.phone} inputMode="tel" label="โทรศัพท์ *" value={form.phone} onChange={(value) => update('phone', sanitizePhoneInput(value))} />
+        <label>
+          <span className="mb-1 block text-xs font-bold text-slate-700">โทรศัพท์ *</span>
+          <PhoneInput className="w-full" error={Boolean(fieldErrors.phone)} value={form.phone} onChange={(value) => update('phone', sanitizePhoneInput(value))} />
+          {fieldErrors.phone ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.phone}</span> : null}
+        </label>
         <TextField error={fieldErrors.fax} inputMode="tel" label="แฟกซ์" value={form.fax ?? ''} onChange={(value) => update('fax', sanitizePhoneInput(value) || null)} />
         <TextField error={fieldErrors.email} inputMode="email" label="อีเมล" type="email" value={form.email ?? ''} onChange={(value) => update('email', sanitizeEmail(value) || null)} />
         <TextField error={fieldErrors.website} inputMode="url" label="เว็บไซต์" value={form.website ?? ''} onBlur={() => update('website', normalizeWebsite(form.website ?? ''))} onChange={(value) => update('website', sanitizeEmail(value) || null)} />
         <TextField className="md:col-span-2" error={fieldErrors.bankInfo} label="ข้อมูลธนาคาร / เลขบัญชี (สำหรับใบส่งของ)" placeholder="เช่น KBank 123-4-56789-0 บริษัท นิวโซลูชั่นส์ (ไทยแลนด์) จำกัด" value={form.bankInfo ?? ''} onChange={(value) => update('bankInfo', value || null)} />
         <TextField className="md:col-span-2" error={fieldErrors.footerNote} label="ข้อความท้ายเอกสาร" placeholder="เช่น ขอขอบคุณที่ใช้บริการ" value={form.footerNote ?? ''} onChange={(value) => update('footerNote', value || null)} />
 
-        <div className="rounded border border-slate-300 bg-slate-50 p-3 md:col-span-2">
+        <div className="rounded-md border border-slate-300 bg-slate-50 p-3 md:col-span-2">
           <label className="mb-2 block text-xs font-bold text-slate-700">โลโก้บริษัท (สำหรับพิมพ์ในใบ — แนะนำไฟล์เล็กกว่า 200KB)</label>
           <div className="flex flex-wrap items-start gap-3">
             {form.logoUrl ? (
-              <div className="rounded border border-slate-300 bg-white p-2">
+              <div className="rounded-md border border-slate-300 bg-white p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img alt="โลโก้บริษัท" className="max-h-20 max-w-[200px]" src={form.logoUrl} />
               </div>
             ) : (
-              <div className="rounded border border-dashed border-slate-300 bg-white p-4 text-xs text-slate-400">ยังไม่มีโลโก้</div>
+              <div className="rounded-md border border-dashed border-slate-300 bg-white p-4 text-xs text-slate-400">ยังไม่มีโลโก้</div>
             )}
             <div className="flex flex-col gap-2">
               <input accept="image/*" className="text-xs" type="file" onChange={(event) => uploadLogo(event.target.files?.[0])} />
@@ -340,15 +345,15 @@ export function CompanyProfilePageClient() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl bg-slate-50 p-4">
-        <button className="rounded-lg bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void save()}>
+      <div className="flex flex-wrap gap-2 rounded-md bg-slate-50 p-4">
+        <button className="rounded-md bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void save()}>
           {isSaving ? 'กำลังบันทึก...' : '💾 บันทึก'}
         </button>
-        <button className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void previewReceipt()}>👁 ดูตัวอย่างใบรับสินค้า</button>
-        <button className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void previewDelivery()}>👁 ดูตัวอย่างใบส่งของ</button>
+        <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void previewReceipt()}>👁 ดูตัวอย่างใบรับสินค้า</button>
+        <button className="rounded-md bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void previewDelivery()}>👁 ดูตัวอย่างใบส่งของ</button>
       </div>
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
         💡 <b>วิธีใช้:</b> หลังบันทึกข้อมูลบริษัทแล้ว — ไปหน้าบิลซื้อ/บิลขาย → กดปุ่ม &quot;🖨 ใบรับ&quot; หรือ &quot;🖨 ใบส่ง&quot; ในแต่ละบิล → จะเปิดหน้าต่างใหม่พร้อมพิมพ์ (Ctrl+P) หรือ Save as PDF ได้เลย
       </div>
     </section>
@@ -379,7 +384,7 @@ function TextField({
   return (
     <label className={className}>
       <span className="mb-1 block text-xs font-bold text-slate-700">{label}</span>
-      <input className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" inputMode={inputMode} placeholder={placeholder} type={type} value={value} onBlur={onBlur} onChange={(event) => onChange(event.target.value)} />
+      <input className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" inputMode={inputMode} placeholder={placeholder} type={type} value={value} onBlur={onBlur} onChange={(event) => onChange(event.target.value)} />
       {error ? <span className="mt-1 block text-xs text-red-600">{error}</span> : null}
     </label>
   )

@@ -5,7 +5,6 @@ update public.customers
 set type = null
 where type is not null
   and btrim(type) = '';
-
 update public.customers
 set type = case
   when type in ('บริษัท', 'นิติบุคคล', '法人') then 'นิติบุคคล'
@@ -14,7 +13,6 @@ set type = case
   else type
 end
 where type is not null;
-
 update public.customers
 set type = case
   when name ~* '(บริษัท|บจก\.?|บจ\.?|จำกัด|หจก\.?|ห้างหุ้นส่วน|corporation|co\.?[, ]*ltd|company|limited|ltd\.?|dmcc)' then 'นิติบุคคล'
@@ -22,13 +20,10 @@ set type = case
 end
 where type is null
    or btrim(type) = '';
-
 alter table public.customers
   add column if not exists market_scope text not null default 'ในประเทศ';
-
 comment on column public.customers.type is 'Customer legal type: บุคคล or นิติบุคคล.';
 comment on column public.customers.market_scope is 'Customer market scope: ในประเทศ or ต่างประเทศ.';
-
 do $$
 begin
   if not exists (
@@ -53,7 +48,6 @@ begin
       check (market_scope in ('ในประเทศ', 'ต่างประเทศ'));
   end if;
 end $$;
-
 create index if not exists idx_customers_type on public.customers(type);
 create index if not exists idx_customers_market_scope on public.customers(market_scope);
 create index if not exists idx_customers_active on public.customers(active);

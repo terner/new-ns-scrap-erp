@@ -106,50 +106,50 @@ export function StockLedgerPageClient() {
 
   return (
     <section>
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <select className="min-w-[260px] max-w-md flex-1 rounded-lg border px-3 py-2 text-sm" value={productId} onChange={(event) => { setPage(1); setProductId(event.target.value) }}>
+        <select className="min-w-[260px] max-w-md flex-1 rounded-md border px-3 py-2 text-sm" value={productId} onChange={(event) => { setPage(1); setProductId(event.target.value) }}>
           <option value="">🔍 พิมพ์รหัส/ชื่อสินค้า — เลือกดูสต๊อก...</option>
           {(data?.reference.products ?? []).filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ${item.name}` : item.name}</option>)}
         </select>
-        <select className="rounded-lg border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setPage(1); setBranchId(event.target.value) }}>
+        <select className="rounded-md border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setPage(1); setBranchId(event.target.value) }}>
           <option value="">🏢 ทุกสาขา</option>
           {(data?.reference.branches ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
-        <select className="rounded-lg border px-3 py-2 text-sm" value={movementType} onChange={(event) => { setPage(1); setMovementType(event.target.value) }}>
+        <select className="rounded-md border px-3 py-2 text-sm" value={movementType} onChange={(event) => { setPage(1); setMovementType(event.target.value) }}>
           <option value="">⚙ ทุกประเภท</option>
           {(data?.movementTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <input className="rounded-lg border px-3 py-2 text-sm" title="จากวันที่" type="date" value={fromDate} onChange={(event) => { setPage(1); setFromDate(event.target.value) }} />
+        <input className="rounded-md border px-3 py-2 text-sm" title="จากวันที่" type="date" value={fromDate} onChange={(event) => { setPage(1); setFromDate(event.target.value) }} />
         <span className="text-slate-400">→</span>
-        <input className="rounded-lg border px-3 py-2 text-sm" title="ถึงวันที่" type="date" value={toDate} onChange={(event) => { setPage(1); setToDate(event.target.value) }} />
-        {productId || branchId || movementType || fromDate || toDate || negativeOnly ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={() => { setBranchId(''); setFromDate(''); setMovementType(''); setNegativeOnly(false); setPage(1); setProductId(''); setSearch(''); setToDate('') }}>✕ ล้าง</button> : null}
-        <div className="inline-flex overflow-hidden rounded-lg border border-slate-300 text-xs" title="โหมดคำนวณ Running Balance">
+        <input className="rounded-md border px-3 py-2 text-sm" title="ถึงวันที่" type="date" value={toDate} onChange={(event) => { setPage(1); setToDate(event.target.value) }} />
+        {productId || branchId || movementType || fromDate || toDate || negativeOnly ? <button className="rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={() => { setBranchId(''); setFromDate(''); setMovementType(''); setNegativeOnly(false); setPage(1); setProductId(''); setSearch(''); setToDate('') }}>✕ ล้าง</button> : null}
+        <div className="inline-flex overflow-hidden rounded-md border border-slate-300 text-xs" title="โหมดคำนวณ Running Balance">
           <button className={`px-3 py-2 font-bold ${balanceMode === 'product' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`} title="คำนวณยอดต่อสินค้าเท่านั้น (ตรงกับหน้า Stock Balance + Drilldown)" type="button" onClick={() => { setPage(1); setBalanceMode('product') }}>📦 ต่อสินค้า</button>
           <button className={`border-l border-slate-300 px-3 py-2 font-bold ${balanceMode === 'warehouse' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`} title="คำนวณยอดต่อสินค้า × สาขา × คลัง" type="button" onClick={() => { setPage(1); setBalanceMode('warehouse') }}>🏢 ต่อคลัง</button>
         </div>
-        <button className={negativeOnly ? 'flex items-center gap-1.5 rounded bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-md' : 'flex items-center gap-1.5 rounded bg-red-100 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-200'} type="button" onClick={() => { setPage(1); setNegativeOnly(!negativeOnly) }}>
-          <span>⚠ ติดลบ</span><span className={negativeOnly ? 'rounded bg-white px-1.5 py-0.5 text-[10px] text-red-700' : 'rounded bg-red-600 px-1.5 py-0.5 text-[10px] text-white'}>{data?.summary.negativeCount ?? 0}</span>
+        <button className={negativeOnly ? 'flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-md' : 'flex items-center gap-1.5 rounded-md bg-red-100 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-200'} type="button" onClick={() => { setPage(1); setNegativeOnly(!negativeOnly) }}>
+          <span>⚠ ติดลบ</span><span className={negativeOnly ? 'rounded-md bg-white px-1.5 py-0.5 text-[10px] text-red-700' : 'rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] text-white'}>{data?.summary.negativeCount ?? 0}</span>
         </button>
-        <button className="rounded bg-purple-100 px-3 py-2 text-xs font-bold text-purple-700 opacity-60" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ล้าง Dup</button>
-        <button className="rounded bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700 opacity-60" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🗑 ล้าง Orphan</button>
-        <button className="rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white" type="button" onClick={exportXlsx}>📥 .xlsx</button>
-        <span className="ml-auto rounded bg-slate-100 px-3 py-1.5 text-xs text-slate-500">📊 พบ <b>{rows.length}</b> รายการ</span>
+        <button className="rounded-md bg-purple-100 px-3 py-2 text-xs font-bold text-purple-700 opacity-60" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ล้าง Dup</button>
+        <button className="rounded-md bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700 opacity-60" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🗑 ล้าง Orphan</button>
+        <button className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-bold text-white" type="button" onClick={exportXlsx}>📥 .xlsx</button>
+        <span className="ml-auto rounded-md bg-slate-100 px-3 py-1.5 text-xs text-slate-500">📊 พบ <b>{rows.length}</b> รายการ</span>
       </div>
       {movementType ? (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           <span className="text-base">⚠</span>
           <div><b>คุณกำลังกรองประเภท {movementType}</b> — ⚖️ <b>คงเหลือ</b> เป็นยอดสะสมจากทุกประเภท เพื่อให้ตรง ledger running balance</div>
         </div>
       ) : null}
-      <div className="mb-3 rounded-lg bg-white p-3 shadow">
+      <div className="mb-3 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-64 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="ค้นหาเลขเอกสาร / สินค้า / คู่ค้า / สาขา" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <button className="rounded bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => void loadData()}>Refresh</button>
+          <input className="min-w-64 flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหาเลขเอกสาร / สินค้า / คู่ค้า / สาขา" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => void loadData()}>Refresh</button>
           <span className="text-xs text-slate-500">เข้า {formatMoney(data?.summary.qtyIn ?? 0)} / ออก {formatMoney(data?.summary.qtyOut ?? 0)}</span>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full min-w-[1200px] text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -174,7 +174,7 @@ export function StockLedgerPageClient() {
                 <td className="whitespace-nowrap p-2">{row.date}</td>
                 <td className="whitespace-nowrap p-2"><span className="font-mono text-xs text-slate-500">{row.refNo || '-'}</span></td>
                 <td className="p-2"><Counterparty name={row.counterpartyName} refType={row.refType} /></td>
-                <td className="whitespace-nowrap p-2"><span className={`rounded px-2 py-0.5 text-xs font-medium ${row.qtyIn > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{row.movementType}</span></td>
+                <td className="whitespace-nowrap p-2"><span className={`rounded-md px-2 py-0.5 text-xs font-medium ${row.qtyIn > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{row.movementType}</span></td>
                 <td className="p-2"><span className="font-medium">{row.productCode ? `${row.productCode} · ` : ''}{row.productName}</span>{row.lotNo && row.lotNo !== 'OPENING' ? <span className="ml-1 text-xs text-slate-400">[{row.lotNo}]</span> : null}</td>
                 <td className="p-2 text-right font-mono text-emerald-600">{row.qtyIn ? formatMoney(row.qtyIn) : '-'}</td>
                 <td className="p-2 text-right font-mono text-red-600">{row.qtyOut ? formatMoney(row.qtyOut) : '-'}</td>
@@ -182,7 +182,7 @@ export function StockLedgerPageClient() {
                 <td className="p-2 text-right font-mono text-slate-500">{formatMoney(row.unitCost)}</td>
                 <td className="p-2 text-right font-mono text-emerald-700">{row.valueIn ? formatMoney(row.valueIn) : '-'}</td>
                 <td className="p-2 text-right font-mono text-red-700">{row.valueOut ? formatMoney(row.valueOut) : '-'}</td>
-                <td className="p-2 text-center"><button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => setSelectedRow(row)}>จัดการ</button></td>
+                <td className="p-2 text-center"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => setSelectedRow(row)}>จัดการ</button></td>
               </tr>
             ))}
             {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>ยังไม่มี Stock Movement</td></tr> : null}
@@ -192,9 +192,9 @@ export function StockLedgerPageClient() {
       <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
         <span>พบทั้งหมด <span className="font-semibold text-slate-900">{data?.total ?? 0}</span> รายการ</span>
         <div className="flex items-center gap-2">
-          <button className="rounded border px-3 py-1 disabled:opacity-40" disabled={page <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          <button className="rounded-md border px-3 py-1 disabled:opacity-40" disabled={page <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
           <span className="px-1">หน้า {page} / {totalPages}</span>
-          <button className="rounded border px-3 py-1 disabled:opacity-40" disabled={page >= totalPages} type="button" onClick={() => setPage((value) => value + 1)}>ถัดไป</button>
+          <button className="rounded-md border px-3 py-1 disabled:opacity-40" disabled={page >= totalPages} type="button" onClick={() => setPage((value) => value + 1)}>ถัดไป</button>
         </div>
       </div>
       {selectedRow ? <StockLedgerDetailModal row={selectedRow} onClose={() => setSelectedRow(null)} /> : null}
@@ -207,7 +207,7 @@ function Counterparty({ name, refType }: { name: string; refType: string }) {
     const isSupplier = refType === 'PB' || refType === 'PB-CANCEL'
     return (
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${isSupplier ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{isSupplier ? 'ผู้ขาย' : 'ผู้ซื้อ'}</span>
+        <span className={`whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isSupplier ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{isSupplier ? 'ผู้ขาย' : 'ผู้ซื้อ'}</span>
         <span className={`text-sm font-semibold ${isSupplier ? 'text-emerald-800' : 'text-blue-800'}`}>{name}</span>
       </div>
     )
@@ -222,13 +222,13 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="รายละเอียด Stock Ledger">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-md bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">📋 รายละเอียด Stock Ledger</h2>
             <p className="mt-1 text-xs text-slate-500">อ่านอย่างเดียวจากรายการ ledger ที่แสดงในตาราง</p>
           </div>
-          <button className="rounded bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={onClose}>ปิด</button>
+          <button className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={onClose}>ปิด</button>
         </div>
 
         <div className="grid gap-4 p-5 md:grid-cols-2">
@@ -277,7 +277,7 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
 
 function DetailPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-md border border-slate-200 bg-white p-4">
       <div className="mb-3 text-sm font-bold text-slate-800">{title}</div>
       <div className="space-y-2">{children}</div>
     </div>

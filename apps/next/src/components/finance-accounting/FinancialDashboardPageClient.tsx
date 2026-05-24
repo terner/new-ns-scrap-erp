@@ -31,18 +31,18 @@ export function FinancialDashboardPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-gradient-to-r from-violet-700 to-purple-700 p-5 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-violet-700 to-purple-700 p-5 text-white shadow">
         <h1 className="text-xl font-bold md:text-2xl">💼 Financial Dashboard</h1>
         <p className="mt-1 text-sm opacity-80">รายเดือน {data?.filters.monthStart.slice(0, 7) ?? asOf.slice(0, 7)} · KPI ครบ 19 ตัว + Analysis 7 มุมมอง</p>
       </div>
-      <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+      <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
         <b>Financial Dashboard read baseline</b><span className="ml-2">management dashboard จาก operational helpers ยังไม่ใช่ GL/statutory report</span>
         {data ? <div className="mt-1 text-xs text-amber-800">{data.sourceState.limitations[0]}</div> : null}
       </div>
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">
-        <label className="flex items-center gap-2 text-sm"><span>As of</span><input className="rounded border px-2 py-1.5 text-sm" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /></label>
-        <select className="rounded border bg-white px-2 py-1.5 text-sm" value={branchId} onChange={(event) => setBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
+        <label className="flex items-center gap-2 text-sm"><span>As of</span><input className="rounded-md border px-2 py-1.5 text-sm" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /></label>
+        <select className="rounded-md border bg-white px-2 py-1.5 text-sm" value={branchId} onChange={(event) => setBranchId(event.target.value)}><option value="">ทุกสาขา</option>{(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -55,7 +55,7 @@ export function FinancialDashboardPageClient() {
         </Panel>
         <Panel title="🥧 องค์ประกอบสินทรัพย์">
           <Donut rows={data?.assetComp ?? []} total={assetTotal} />
-          <div className="mt-3 space-y-1 text-xs">{(data?.assetComp ?? []).map((row) => <div key={row.name} className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded" style={{ background: row.color }} />{row.name}</span><span className="font-mono font-bold">{money(row.value)}</span></div>)}</div>
+          <div className="mt-3 space-y-1 text-xs">{(data?.assetComp ?? []).map((row) => <div key={row.name} className="flex justify-between"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-md" style={{ background: row.color }} />{row.name}</span><span className="font-mono font-bold">{money(row.value)}</span></div>)}</div>
         </Panel>
         <Panel className="lg:col-span-3" title="💸 เงินที่ต้องจ่าย vs เงินที่จะได้รับ (วันนี้ / 7 วัน / 30 วัน)">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">{(data?.cashPeriods ?? []).map((period) => <CashPeriod key={period.label} period={period} />)}</div>
@@ -126,11 +126,11 @@ function money(value?: number) {
 }
 
 function Panel({ children, className = '', title }: { children: ReactNode; className?: string; title: string }) {
-  return <div className={`rounded-2xl bg-white p-5 shadow-lg ${className}`}><h3 className="mb-3 font-bold text-slate-800">{title}</h3>{children}</div>
+  return <div className={`rounded-md bg-white p-5 shadow-lg ${className}`}><h3 className="mb-3 font-bold text-slate-800">{title}</h3>{children}</div>
 }
 
 function Legend({ color, label }: { color: string; label: string }) {
-  return <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded ${color}`} />{label}</span>
+  return <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-md ${color}`} />{label}</span>
 }
 
 function Donut({ rows, total }: { rows: Payload['assetComp']; total: number }) {
@@ -145,15 +145,15 @@ function Donut({ rows, total }: { rows: Payload['assetComp']; total: number }) {
 function CashPeriod({ period }: { period: { cashIn: number; label: string; need: number } }) {
   const max = Math.max(period.need, period.cashIn, 1)
   const net = period.cashIn - period.need
-  return <div className="rounded-xl bg-slate-50 p-4"><div className="mb-2 text-xs text-slate-500">{period.label}</div><Bar amount={period.need} color="from-red-500 to-orange-500" label="📤 ต้องจ่าย" max={max} tone="text-red-700" /><Bar amount={period.cashIn} color="from-emerald-500 to-teal-500" label="📥 จะได้รับ" max={max} tone="text-emerald-700" /><div className={`flex justify-between border-t pt-2 text-sm font-bold ${net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><span>{net >= 0 ? 'เกินดุล' : 'ขาดดุล'}</span><span>{money(net)}</span></div></div>
+  return <div className="rounded-md bg-slate-50 p-4"><div className="mb-2 text-xs text-slate-500">{period.label}</div><Bar amount={period.need} color="from-red-500 to-orange-500" label="📤 ต้องจ่าย" max={max} tone="text-red-700" /><Bar amount={period.cashIn} color="from-emerald-500 to-teal-500" label="📥 จะได้รับ" max={max} tone="text-emerald-700" /><div className={`flex justify-between border-t pt-2 text-sm font-bold ${net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><span>{net >= 0 ? 'เกินดุล' : 'ขาดดุล'}</span><span>{money(net)}</span></div></div>
 }
 
 function Bar({ amount, color, label, max, tone }: { amount: number; color: string; label: string; max: number; tone: string }) {
-  return <div className="mb-2"><div className="mb-1 flex justify-between text-xs"><span>{label}</span><span className={`font-bold ${tone}`}>{money(amount)}</span></div><div className="h-3 w-full rounded-full bg-slate-100"><div className={`h-3 rounded-full bg-gradient-to-r ${color}`} style={{ width: `${Math.min(100, amount / max * 100)}%` }} /></div></div>
+  return <div className="mb-2"><div className="mb-1 flex justify-between text-xs"><span>{label}</span><span className={`font-bold ${tone}`}>{money(amount)}</span></div><div className="h-3 w-full rounded-md-full bg-slate-100"><div className={`h-3 rounded-md-full bg-gradient-to-r ${color}`} style={{ width: `${Math.min(100, amount / max * 100)}%` }} /></div></div>
 }
 
 function Section({ border, children, subtitle, title }: { border: string; children: ReactNode; subtitle?: string; title: string }) {
-  return <div className={`overflow-hidden rounded-2xl border-l-4 ${border} bg-white shadow`}><div className="border-b bg-slate-50 px-4 py-2"><h3 className="font-bold text-slate-800">{title} {subtitle ? <span className="text-xs font-normal text-slate-500">{subtitle}</span> : null}</h3></div><div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div></div>
+  return <div className={`overflow-hidden rounded-md border-l-4 ${border} bg-white shadow`}><div className="border-b bg-slate-50 px-4 py-2"><h3 className="font-bold text-slate-800">{title} {subtitle ? <span className="text-xs font-normal text-slate-500">{subtitle}</span> : null}</h3></div><div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div></div>
 }
 
 function toneClass(tone: string) {
@@ -162,15 +162,15 @@ function toneClass(tone: string) {
 }
 
 function Card({ label, note, tone, value }: { label: string; note?: string; tone: string; value: string }) {
-  return <div className={`rounded-xl border-l-4 p-3 ${toneClass(tone)}`}><div className="text-xs text-slate-600">{label}</div><div className="text-lg font-bold">{value}</div>{note ? <div className="mt-1 text-xs text-slate-500">{note}</div> : null}</div>
+  return <div className={`rounded-md border-l-4 p-3 ${toneClass(tone)}`}><div className="text-xs text-slate-600">{label}</div><div className="text-lg font-bold">{value}</div>{note ? <div className="mt-1 text-xs text-slate-500">{note}</div> : null}</div>
 }
 
 function WideRow({ label, note, tone, value }: { label: string; note: string; tone: string; value: string }) {
-  return <div className={`flex items-center justify-between rounded-xl p-3 ${toneClass(tone)}`}><div><div className="text-xs text-slate-600">{label}</div><div className="text-[10px] text-slate-500">{note}</div></div><div className="text-2xl font-bold">{value}</div></div>
+  return <div className={`flex items-center justify-between rounded-md p-3 ${toneClass(tone)}`}><div><div className="text-xs text-slate-600">{label}</div><div className="text-[10px] text-slate-500">{note}</div></div><div className="text-2xl font-bold">{value}</div></div>
 }
 
 function InsightCard({ insight }: { insight: Payload['insights'][number] }) {
   const tone = insight.type === 'danger' ? 'red' : insight.type === 'warn' ? 'amber' : 'emerald'
   const value = typeof insight.value === 'number' ? money(insight.value) : insight.value
-  return <div className={`rounded-lg border-l-4 p-3 ${toneClass(tone)}`}><div className="mb-1 text-xs font-semibold text-slate-600">{insight.title}</div><div className="mb-1 text-lg font-bold">{value}</div><div className="text-[11px] leading-tight text-slate-500">{insight.detail}</div></div>
+  return <div className={`rounded-md border-l-4 p-3 ${toneClass(tone)}`}><div className="mb-1 text-xs font-semibold text-slate-600">{insight.title}</div><div className="mb-1 text-lg font-bold">{value}</div><div className="text-[11px] leading-tight text-slate-500">{insight.detail}</div></div>
 }

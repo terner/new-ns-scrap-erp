@@ -31,6 +31,14 @@ type PurchaseItem = {
   unit?: string
 }
 
+type TimelineEvent = {
+  amount?: number
+  date: string
+  details: string[]
+  title: string
+  tone?: 'amber' | 'blue' | 'emerald' | 'rose' | 'slate'
+}
+
 function money(value: number | null | undefined) {
   return (value ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
 }
@@ -56,6 +64,24 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
 
   if (!bill) notFound()
 
+  const paymentRows = await prisma.payments.findMany({
+    include: { accounts: true },
+    orderBy: [{ created_at: 'asc' }, { date: 'asc' }],
+    where: {
+      bill_id: id,
+      NOT: { status: 'cancelled' },
+    },
+  })
+  const voucherIds = [...new Set(paymentRows.map((payment) => payment.voucher_id).filter((voucherId): voucherId is string => Boolean(voucherId)))]
+  const bankStatementRows = voucherIds.length > 0 ? await prisma.bank_statement.findMany({
+    include: { accounts: true },
+    orderBy: [{ created_at: 'asc' }, { date: 'asc' }],
+    where: {
+      ref_id: { in: voucherIds },
+      ref_type: 'PMT',
+    },
+  }) : []
+
   const items = purchaseBillItemRows(bill) as PurchaseItem[]
   const supplierName = bill.suppliers?.name ?? bill.supplier_id ?? '-'
   const subtotal = toNumber(bill.subtotal)
@@ -64,12 +90,107 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
   const totalAmount = toNumber(bill.total_amount)
   const payableBalance = toNumber(bill.payable_balance)
   const paidAmount = toNumber(bill.paid_amount)
+  const paymentEvents = Array.from(paymentRows.reduce((map, payment) => {
+    const key = payment.voucher_id ?? payment.doc_no ?? payment.id
+    const current = map.get(key) ?? {
+      accountNames: new Set<string>(),
+      amount: 0,
+      bankFee: 0,
+      date: toDateOnly(payment.date),
+      docNo: payment.doc_no,
+      notes: payment.notes ?? '',
+      voucherId: payment.voucher_id ?? payment.id,
+      withholdingTax: 0,
+    }
+    current.amount += toNumber(payment.amount)
+    current.bankFee += toNumber(payment.bank_fee ?? payment.fee)
+    current.withholdingTax += toNumber(payment.withholding_tax)
+    map.set(key, current)
+    return map
+  }, new Map<string, {
+    accountNames: Set<string>
+    amount: number
+    bankFee: number
+    date: string
+    docNo: string
+    notes: string
+    voucherId: string
+    withholdingTax: number
+  }>()).values()).map((event) => {
+    bankStatementRows
+      .filter((row) => row.ref_id === event.voucherId)
+      .forEach((row) => event.accountNames.add(row.accounts?.name ?? row.account_id ?? '-'))
+    return event
+  })
+
+  const timeline: TimelineEvent[] = [
+    {
+      date: bill.date ? toDateOnly(bill.date) : '-',
+      details: [
+        `เลขที่บิล ${bill.doc_no}`,
+        `ผู้ขาย ${supplierName}`,
+        `ยอดสุทธิ ${money(totalAmount)}`,
+        `ผู้ทำ ${bill.created_by ?? '-'}`,
+      ],
+      title: 'สร้างบิลรับซื้อ',
+      tone: 'blue',
+    },
+    ...paymentEvents.map((event) => ({
+      amount: event.amount,
+      date: event.date,
+      details: [
+        `เลขที่การชำระเงิน ${event.docNo}`,
+        `ยอดจ่าย ${money(event.amount)}`,
+        `WHT ${money(event.withholdingTax)}`,
+        `Fee ${money(event.bankFee)}`,
+        `บัญชี ${event.accountNames.size > 0 ? Array.from(event.accountNames).join(', ') : '-'}`,
+        `หมายเหตุ ${event.notes || '-'}`,
+      ],
+      title: 'ชำระเงิน',
+      tone: 'emerald' as const,
+    })),
+  ]
+
+  if (bill.updated_at && bill.updated_by && bill.updated_by !== bill.created_by) {
+    timeline.push({
+      date: toDateOnly(bill.updated_at),
+      details: [
+        `ผู้แก้ไข ${bill.updated_by}`,
+        `ยอดชำระแล้ว ${money(paidAmount)}`,
+        `คงเหลือ ${money(payableBalance)}`,
+      ],
+      title: 'แก้ไขบิลล่าสุด',
+      tone: 'amber',
+    })
+  }
+
+  if (String(bill.status ?? '').toLowerCase().includes('cancel')) {
+    timeline.push({
+      date: bill.cancelled_at ? toDateOnly(bill.cancelled_at) : (bill.updated_at ? toDateOnly(bill.updated_at) : '-'),
+      details: [
+        `ผู้ยกเลิก ${bill.cancelled_by ?? bill.updated_by ?? '-'}`,
+        `หมายเหตุ ${bill.cancel_note ?? '-'}`,
+      ],
+      title: 'ยกเลิกบิล',
+      tone: 'rose',
+    })
+  } else if (payableBalance <= 0.01 && paidAmount > 0) {
+    timeline.push({
+      date: bill.updated_at ? toDateOnly(bill.updated_at) : '-',
+      details: [
+        `ยอดชำระแล้ว ${money(paidAmount)}`,
+        `สถานะ ${bill.status ?? 'paid'}`,
+      ],
+      title: 'ชำระครบ',
+      tone: 'slate',
+    })
+  }
 
   return (
     <div className="space-y-4">
       <PageTitleOverride breadcrumbLabel={bill.doc_no} title={`รายละเอียดบิลรับซื้อ - ${bill.doc_no}`} />
       <div className="flex flex-wrap justify-start gap-2">
-        <Link className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50" href="/purchase/bills">กลับรายการ</Link>
+        <Link className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50" href="/purchase/bills">กลับรายการ</Link>
       </div>
 
       <section className="grid gap-3 md:grid-cols-4">
@@ -79,7 +200,7 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
         <Summary label="สถานะ" value={bill.status ?? '-'} />
       </section>
 
-      <section className="rounded-lg bg-white p-4 shadow">
+      <section className="rounded-md bg-white p-4 shadow">
         <h2 className="mb-3 text-base font-bold text-slate-800">ข้อมูลบิล</h2>
         <div className="grid gap-3 text-sm md:grid-cols-3">
           <Info label="เลขที่บิล" mono value={bill.doc_no} />
@@ -88,14 +209,13 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
           <Info label="รหัสผู้ขาย" mono value={bill.supplier_id ?? '-'} />
           <Info label="สาขา/คลัง" value={bill.branches?.name ?? '-'} />
           <Info label="ประเภทบิล" value={bill.transaction_mode ?? 'STOCK'} />
-          <Info label="ทะเบียนรถ" value={bill.license_plate ?? '-'} />
           <Info label="ผู้ทำ" value={bill.created_by ?? '-'} />
         </div>
       </section>
 
-      <section className="rounded-lg bg-white p-4 shadow">
+      <section className="rounded-md bg-white p-4 shadow">
         <h2 className="mb-3 text-base font-bold text-slate-800">รายการสินค้า</h2>
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-md border">
           <table className="w-full min-w-[980px] text-sm">
             <thead className="bg-slate-100">
               <tr>
@@ -132,7 +252,7 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <h2 className="mb-3 text-base font-bold text-slate-800">VAT / ยอดรวม</h2>
           <div className="space-y-2 text-sm">
             <Line label="ยอดก่อนส่วนลด" value={money(subtotal)} />
@@ -141,7 +261,7 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
             <Line strong label="ยอดสุทธิ" value={money(totalAmount)} />
           </div>
         </div>
-        <div className="rounded-lg bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <h2 className="mb-3 text-base font-bold text-slate-800">ใบกำกับภาษี / หมายเหตุ</h2>
           <div className="grid gap-3 text-sm md:grid-cols-2">
             <Info label="ได้รับใบกำกับภาษี" value={bill.vat_invoice_received ? 'ได้รับแล้ว' : 'ยังไม่ได้รับ'} />
@@ -151,13 +271,46 @@ export default async function PurchaseBillDetailPage({ params }: PageProps) {
           </div>
         </div>
       </section>
+
+      <section className="rounded-md bg-white p-4 shadow">
+        <h2 className="mb-3 text-base font-bold text-slate-800">Timeline บิลรับซื้อ</h2>
+        <div className="space-y-4">
+          {timeline.map((event, index) => (
+            <div key={`${event.title}-${event.date}-${index}`} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <span className={`mt-1 h-3 w-3 rounded-md-full ${
+                  event.tone === 'blue'
+                    ? 'bg-blue-500'
+                    : event.tone === 'emerald'
+                      ? 'bg-emerald-500'
+                      : event.tone === 'amber'
+                        ? 'bg-amber-500'
+                        : event.tone === 'rose'
+                          ? 'bg-rose-500'
+                          : 'bg-slate-500'
+                }`} />
+                {index < timeline.length - 1 ? <span className="mt-1 h-full w-px bg-slate-200" /> : null}
+              </div>
+              <div className="flex-1 rounded-md border border-slate-200 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-semibold text-slate-900">{event.title}</div>
+                  <div className="font-mono text-xs text-slate-500">{event.date}</div>
+                </div>
+                <div className="mt-2 space-y-1 text-sm text-slate-700">
+                  {event.details.map((detail) => <div key={detail}>{detail}</div>)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
 
 function Summary({ label, tone = 'slate', value }: { label: string; tone?: 'emerald' | 'red' | 'slate'; value: string }) {
   const color = tone === 'red' ? 'text-red-700' : tone === 'emerald' ? 'text-emerald-700' : 'text-slate-900'
-  return <div className="rounded-lg bg-white p-4 shadow"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
+  return <div className="rounded-md bg-white p-4 shadow"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
 }
 
 function Info({ label, mono = false, value }: { label: string; mono?: boolean; value: string }) {

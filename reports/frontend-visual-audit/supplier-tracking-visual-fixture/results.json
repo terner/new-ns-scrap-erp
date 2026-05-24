@@ -1,0 +1,76 @@
+[
+  {
+    "appName": "live-menu",
+    "startUrl": "https://sirimasth.github.io/ns-scrap-erp/",
+    "currentUrl": "https://sirimasth.github.io/ns-scrap-erp/",
+    "clicked": true,
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "visibleText": [
+      "☰",
+      "Supplier Tracking",
+      "☁️✓☁️ Auto-Sync ONล่าสุด: เพิ่งสด",
+      "ออกจากระบบ",
+      "🏭 Supplier Tracking 360°",
+      "ปี",
+      "เดือน",
+      "📥 Export CSV",
+      "📋 รายการ",
+      "🏆 Top 10",
+      "📅 รายปี",
+      "Code",
+      "Supplier",
+      "บิล",
+      "น้ำหนัก",
+      "ยอดซื้อ",
+      "ราคาเฉลี่ย",
+      "จ่ายแล้ว",
+      "เจ้าหนี้",
+      "% Paid",
+      "📥 Export Excel",
+      "✕"
+    ],
+    "screenshots": [
+      "reports/frontend-visual-audit/supplier-tracking-visual-fixture/supplierTracking-live-menu-desktop.png",
+      "reports/frontend-visual-audit/supplier-tracking-visual-fixture/supplierTracking-live-menu-mobile.png"
+    ]
+  },
+  {
+    "appName": "vue-menu",
+    "startUrl": "http://localhost:5174/",
+    "currentUrl": "http://localhost:5174/tracking/supplier",
+    "clicked": true,
+    "consoleMessages": [],
+    "visibleText": [
+      "☰",
+      "Supplier Tracking",
+      "ออกจากระบบ",
+      "🏭 Supplier Tracking 360°",
+      "ปี",
+      "เดือน",
+      "📥 Export CSV",
+      "📈 ยอดซื้อรายเดือน (ปี 2026) — รวม 906,000.00",
+      "📋 รายการ",
+      "🏆 Top 10",
+      "📅 รายปี",
+      "Code",
+      "Supplier",
+      "บิล",
+      "น้ำหนัก",
+      "ยอดซื้อ",
+      "ราคาเฉลี่ย",
+      "จ่ายแล้ว",
+      "เจ้าหนี้",
+      "% Paid"
+    ],
+    "screenshots": [
+      "reports/frontend-visual-audit/supplier-tracking-visual-fixture/supplierTracking-vue-menu-desktop.png",
+      "reports/frontend-visual-audit/supplier-tracking-visual-fixture/supplierTracking-vue-menu-mobile.png"
+    ]
+  }
+]

@@ -13,12 +13,10 @@ begin
   end if;
 end;
 $$;
-
 alter index if exists public.directors_active_idx rename to director_employees_active_idx;
 alter index if exists public.machines_branch_id_idx rename to production_machines_branch_id_idx;
 alter index if exists public.machines_active_idx rename to production_machines_active_idx;
 alter index if exists public.remittance_purposes_active_idx rename to overseas_remittance_purposes_active_idx;
-
 do $$
 begin
   if exists (select 1 from pg_trigger where tgname = 'set_directors_updated_at' and tgrelid = 'public.director_employees'::regclass) then

@@ -1,0 +1,1153 @@
+auth	audit_log_entries	1	instance_id	uuid
+auth	audit_log_entries	2	id	uuid
+auth	audit_log_entries	3	payload	json
+auth	audit_log_entries	4	created_at	timestamp with time zone
+auth	audit_log_entries	5	ip_address	character varying
+auth	custom_oauth_providers	1	id	uuid
+auth	custom_oauth_providers	2	provider_type	text
+auth	custom_oauth_providers	3	identifier	text
+auth	custom_oauth_providers	4	name	text
+auth	custom_oauth_providers	5	client_id	text
+auth	custom_oauth_providers	6	client_secret	text
+auth	custom_oauth_providers	7	acceptable_client_ids	ARRAY
+auth	custom_oauth_providers	8	scopes	ARRAY
+auth	custom_oauth_providers	9	pkce_enabled	boolean
+auth	custom_oauth_providers	10	attribute_mapping	jsonb
+auth	custom_oauth_providers	11	authorization_params	jsonb
+auth	custom_oauth_providers	12	enabled	boolean
+auth	custom_oauth_providers	13	email_optional	boolean
+auth	custom_oauth_providers	14	issuer	text
+auth	custom_oauth_providers	15	discovery_url	text
+auth	custom_oauth_providers	16	skip_nonce_check	boolean
+auth	custom_oauth_providers	17	cached_discovery	jsonb
+auth	custom_oauth_providers	18	discovery_cached_at	timestamp with time zone
+auth	custom_oauth_providers	19	authorization_url	text
+auth	custom_oauth_providers	20	token_url	text
+auth	custom_oauth_providers	21	userinfo_url	text
+auth	custom_oauth_providers	22	jwks_uri	text
+auth	custom_oauth_providers	23	created_at	timestamp with time zone
+auth	custom_oauth_providers	24	updated_at	timestamp with time zone
+auth	flow_state	1	id	uuid
+auth	flow_state	2	user_id	uuid
+auth	flow_state	3	auth_code	text
+auth	flow_state	4	code_challenge_method	USER-DEFINED
+auth	flow_state	5	code_challenge	text
+auth	flow_state	6	provider_type	text
+auth	flow_state	7	provider_access_token	text
+auth	flow_state	8	provider_refresh_token	text
+auth	flow_state	9	created_at	timestamp with time zone
+auth	flow_state	10	updated_at	timestamp with time zone
+auth	flow_state	11	authentication_method	text
+auth	flow_state	12	auth_code_issued_at	timestamp with time zone
+auth	flow_state	13	invite_token	text
+auth	flow_state	14	referrer	text
+auth	flow_state	15	oauth_client_state_id	uuid
+auth	flow_state	16	linking_target_id	uuid
+auth	flow_state	17	email_optional	boolean
+auth	identities	1	provider_id	text
+auth	identities	2	user_id	uuid
+auth	identities	3	identity_data	jsonb
+auth	identities	4	provider	text
+auth	identities	5	last_sign_in_at	timestamp with time zone
+auth	identities	6	created_at	timestamp with time zone
+auth	identities	7	updated_at	timestamp with time zone
+auth	identities	8	email	text
+auth	identities	9	id	uuid
+auth	instances	1	id	uuid
+auth	instances	2	uuid	uuid
+auth	instances	3	raw_base_config	text
+auth	instances	4	created_at	timestamp with time zone
+auth	instances	5	updated_at	timestamp with time zone
+auth	mfa_amr_claims	1	session_id	uuid
+auth	mfa_amr_claims	2	created_at	timestamp with time zone
+auth	mfa_amr_claims	3	updated_at	timestamp with time zone
+auth	mfa_amr_claims	4	authentication_method	text
+auth	mfa_amr_claims	5	id	uuid
+auth	mfa_challenges	1	id	uuid
+auth	mfa_challenges	2	factor_id	uuid
+auth	mfa_challenges	3	created_at	timestamp with time zone
+auth	mfa_challenges	4	verified_at	timestamp with time zone
+auth	mfa_challenges	5	ip_address	inet
+auth	mfa_challenges	6	otp_code	text
+auth	mfa_challenges	7	web_authn_session_data	jsonb
+auth	mfa_factors	1	id	uuid
+auth	mfa_factors	2	user_id	uuid
+auth	mfa_factors	3	friendly_name	text
+auth	mfa_factors	4	factor_type	USER-DEFINED
+auth	mfa_factors	5	status	USER-DEFINED
+auth	mfa_factors	6	created_at	timestamp with time zone
+auth	mfa_factors	7	updated_at	timestamp with time zone
+auth	mfa_factors	8	secret	text
+auth	mfa_factors	9	phone	text
+auth	mfa_factors	10	last_challenged_at	timestamp with time zone
+auth	mfa_factors	11	web_authn_credential	jsonb
+auth	mfa_factors	12	web_authn_aaguid	uuid
+auth	mfa_factors	13	last_webauthn_challenge_data	jsonb
+auth	oauth_authorizations	1	id	uuid
+auth	oauth_authorizations	2	authorization_id	text
+auth	oauth_authorizations	3	client_id	uuid
+auth	oauth_authorizations	4	user_id	uuid
+auth	oauth_authorizations	5	redirect_uri	text
+auth	oauth_authorizations	6	scope	text
+auth	oauth_authorizations	7	state	text
+auth	oauth_authorizations	8	resource	text
+auth	oauth_authorizations	9	code_challenge	text
+auth	oauth_authorizations	10	code_challenge_method	USER-DEFINED
+auth	oauth_authorizations	11	response_type	USER-DEFINED
+auth	oauth_authorizations	12	status	USER-DEFINED
+auth	oauth_authorizations	13	authorization_code	text
+auth	oauth_authorizations	14	created_at	timestamp with time zone
+auth	oauth_authorizations	15	expires_at	timestamp with time zone
+auth	oauth_authorizations	16	approved_at	timestamp with time zone
+auth	oauth_authorizations	17	nonce	text
+auth	oauth_client_states	1	id	uuid
+auth	oauth_client_states	2	provider_type	text
+auth	oauth_client_states	3	code_verifier	text
+auth	oauth_client_states	4	created_at	timestamp with time zone
+auth	oauth_clients	1	id	uuid
+auth	oauth_clients	3	client_secret_hash	text
+auth	oauth_clients	4	registration_type	USER-DEFINED
+auth	oauth_clients	5	redirect_uris	text
+auth	oauth_clients	6	grant_types	text
+auth	oauth_clients	7	client_name	text
+auth	oauth_clients	8	client_uri	text
+auth	oauth_clients	9	logo_uri	text
+auth	oauth_clients	10	created_at	timestamp with time zone
+auth	oauth_clients	11	updated_at	timestamp with time zone
+auth	oauth_clients	12	deleted_at	timestamp with time zone
+auth	oauth_clients	13	client_type	USER-DEFINED
+auth	oauth_clients	14	token_endpoint_auth_method	text
+auth	oauth_consents	1	id	uuid
+auth	oauth_consents	2	user_id	uuid
+auth	oauth_consents	3	client_id	uuid
+auth	oauth_consents	4	scopes	text
+auth	oauth_consents	5	granted_at	timestamp with time zone
+auth	oauth_consents	6	revoked_at	timestamp with time zone
+auth	one_time_tokens	1	id	uuid
+auth	one_time_tokens	2	user_id	uuid
+auth	one_time_tokens	3	token_type	USER-DEFINED
+auth	one_time_tokens	4	token_hash	text
+auth	one_time_tokens	5	relates_to	text
+auth	one_time_tokens	6	created_at	timestamp without time zone
+auth	one_time_tokens	7	updated_at	timestamp without time zone
+auth	refresh_tokens	1	instance_id	uuid
+auth	refresh_tokens	2	id	bigint
+auth	refresh_tokens	3	token	character varying
+auth	refresh_tokens	4	user_id	character varying
+auth	refresh_tokens	5	revoked	boolean
+auth	refresh_tokens	6	created_at	timestamp with time zone
+auth	refresh_tokens	7	updated_at	timestamp with time zone
+auth	refresh_tokens	8	parent	character varying
+auth	refresh_tokens	9	session_id	uuid
+auth	saml_providers	1	id	uuid
+auth	saml_providers	2	sso_provider_id	uuid
+auth	saml_providers	3	entity_id	text
+auth	saml_providers	4	metadata_xml	text
+auth	saml_providers	5	metadata_url	text
+auth	saml_providers	6	attribute_mapping	jsonb
+auth	saml_providers	7	created_at	timestamp with time zone
+auth	saml_providers	8	updated_at	timestamp with time zone
+auth	saml_providers	9	name_id_format	text
+auth	saml_relay_states	1	id	uuid
+auth	saml_relay_states	2	sso_provider_id	uuid
+auth	saml_relay_states	3	request_id	text
+auth	saml_relay_states	4	for_email	text
+auth	saml_relay_states	5	redirect_to	text
+auth	saml_relay_states	7	created_at	timestamp with time zone
+auth	saml_relay_states	8	updated_at	timestamp with time zone
+auth	saml_relay_states	9	flow_state_id	uuid
+auth	schema_migrations	1	version	character varying
+auth	sessions	1	id	uuid
+auth	sessions	2	user_id	uuid
+auth	sessions	3	created_at	timestamp with time zone
+auth	sessions	4	updated_at	timestamp with time zone
+auth	sessions	5	factor_id	uuid
+auth	sessions	6	aal	USER-DEFINED
+auth	sessions	7	not_after	timestamp with time zone
+auth	sessions	8	refreshed_at	timestamp without time zone
+auth	sessions	9	user_agent	text
+auth	sessions	10	ip	inet
+auth	sessions	11	tag	text
+auth	sessions	12	oauth_client_id	uuid
+auth	sessions	13	refresh_token_hmac_key	text
+auth	sessions	14	refresh_token_counter	bigint
+auth	sessions	15	scopes	text
+auth	sso_domains	1	id	uuid
+auth	sso_domains	2	sso_provider_id	uuid
+auth	sso_domains	3	domain	text
+auth	sso_domains	4	created_at	timestamp with time zone
+auth	sso_domains	5	updated_at	timestamp with time zone
+auth	sso_providers	1	id	uuid
+auth	sso_providers	2	resource_id	text
+auth	sso_providers	3	created_at	timestamp with time zone
+auth	sso_providers	4	updated_at	timestamp with time zone
+auth	sso_providers	5	disabled	boolean
+auth	users	1	instance_id	uuid
+auth	users	2	id	uuid
+auth	users	3	aud	character varying
+auth	users	4	role	character varying
+auth	users	5	email	character varying
+auth	users	6	encrypted_password	character varying
+auth	users	7	email_confirmed_at	timestamp with time zone
+auth	users	8	invited_at	timestamp with time zone
+auth	users	9	confirmation_token	character varying
+auth	users	10	confirmation_sent_at	timestamp with time zone
+auth	users	11	recovery_token	character varying
+auth	users	12	recovery_sent_at	timestamp with time zone
+auth	users	13	email_change_token_new	character varying
+auth	users	14	email_change	character varying
+auth	users	15	email_change_sent_at	timestamp with time zone
+auth	users	16	last_sign_in_at	timestamp with time zone
+auth	users	17	raw_app_meta_data	jsonb
+auth	users	18	raw_user_meta_data	jsonb
+auth	users	19	is_super_admin	boolean
+auth	users	20	created_at	timestamp with time zone
+auth	users	21	updated_at	timestamp with time zone
+auth	users	22	phone	text
+auth	users	23	phone_confirmed_at	timestamp with time zone
+auth	users	24	phone_change	text
+auth	users	25	phone_change_token	character varying
+auth	users	26	phone_change_sent_at	timestamp with time zone
+auth	users	27	confirmed_at	timestamp with time zone
+auth	users	28	email_change_token_current	character varying
+auth	users	29	email_change_confirm_status	smallint
+auth	users	30	banned_until	timestamp with time zone
+auth	users	31	reauthentication_token	character varying
+auth	users	32	reauthentication_sent_at	timestamp with time zone
+auth	users	33	is_sso_user	boolean
+auth	users	34	deleted_at	timestamp with time zone
+auth	users	35	is_anonymous	boolean
+auth	webauthn_challenges	1	id	uuid
+auth	webauthn_challenges	2	user_id	uuid
+auth	webauthn_challenges	3	challenge_type	text
+auth	webauthn_challenges	4	session_data	jsonb
+auth	webauthn_challenges	5	created_at	timestamp with time zone
+auth	webauthn_challenges	6	expires_at	timestamp with time zone
+auth	webauthn_credentials	1	id	uuid
+auth	webauthn_credentials	2	user_id	uuid
+auth	webauthn_credentials	3	credential_id	bytea
+auth	webauthn_credentials	4	public_key	bytea
+auth	webauthn_credentials	5	attestation_type	text
+auth	webauthn_credentials	6	aaguid	uuid
+auth	webauthn_credentials	7	sign_count	bigint
+auth	webauthn_credentials	8	transports	jsonb
+auth	webauthn_credentials	9	backup_eligible	boolean
+auth	webauthn_credentials	10	backed_up	boolean
+auth	webauthn_credentials	11	friendly_name	text
+auth	webauthn_credentials	12	created_at	timestamp with time zone
+auth	webauthn_credentials	13	updated_at	timestamp with time zone
+auth	webauthn_credentials	14	last_used_at	timestamp with time zone
+extensions	pg_stat_statements	1	userid	oid
+extensions	pg_stat_statements	2	dbid	oid
+extensions	pg_stat_statements	3	toplevel	boolean
+extensions	pg_stat_statements	4	queryid	bigint
+extensions	pg_stat_statements	5	query	text
+extensions	pg_stat_statements	6	plans	bigint
+extensions	pg_stat_statements	7	total_plan_time	double precision
+extensions	pg_stat_statements	8	min_plan_time	double precision
+extensions	pg_stat_statements	9	max_plan_time	double precision
+extensions	pg_stat_statements	10	mean_plan_time	double precision
+extensions	pg_stat_statements	11	stddev_plan_time	double precision
+extensions	pg_stat_statements	12	calls	bigint
+extensions	pg_stat_statements	13	total_exec_time	double precision
+extensions	pg_stat_statements	14	min_exec_time	double precision
+extensions	pg_stat_statements	15	max_exec_time	double precision
+extensions	pg_stat_statements	16	mean_exec_time	double precision
+extensions	pg_stat_statements	17	stddev_exec_time	double precision
+extensions	pg_stat_statements	18	rows	bigint
+extensions	pg_stat_statements	19	shared_blks_hit	bigint
+extensions	pg_stat_statements	20	shared_blks_read	bigint
+extensions	pg_stat_statements	21	shared_blks_dirtied	bigint
+extensions	pg_stat_statements	22	shared_blks_written	bigint
+extensions	pg_stat_statements	23	local_blks_hit	bigint
+extensions	pg_stat_statements	24	local_blks_read	bigint
+extensions	pg_stat_statements	25	local_blks_dirtied	bigint
+extensions	pg_stat_statements	26	local_blks_written	bigint
+extensions	pg_stat_statements	27	temp_blks_read	bigint
+extensions	pg_stat_statements	28	temp_blks_written	bigint
+extensions	pg_stat_statements	29	shared_blk_read_time	double precision
+extensions	pg_stat_statements	30	shared_blk_write_time	double precision
+extensions	pg_stat_statements	31	local_blk_read_time	double precision
+extensions	pg_stat_statements	32	local_blk_write_time	double precision
+extensions	pg_stat_statements	33	temp_blk_read_time	double precision
+extensions	pg_stat_statements	34	temp_blk_write_time	double precision
+extensions	pg_stat_statements	35	wal_records	bigint
+extensions	pg_stat_statements	36	wal_fpi	bigint
+extensions	pg_stat_statements	37	wal_bytes	numeric
+extensions	pg_stat_statements	38	jit_functions	bigint
+extensions	pg_stat_statements	39	jit_generation_time	double precision
+extensions	pg_stat_statements	40	jit_inlining_count	bigint
+extensions	pg_stat_statements	41	jit_inlining_time	double precision
+extensions	pg_stat_statements	42	jit_optimization_count	bigint
+extensions	pg_stat_statements	43	jit_optimization_time	double precision
+extensions	pg_stat_statements	44	jit_emission_count	bigint
+extensions	pg_stat_statements	45	jit_emission_time	double precision
+extensions	pg_stat_statements	46	jit_deform_count	bigint
+extensions	pg_stat_statements	47	jit_deform_time	double precision
+extensions	pg_stat_statements	48	stats_since	timestamp with time zone
+extensions	pg_stat_statements	49	minmax_stats_since	timestamp with time zone
+extensions	pg_stat_statements_info	1	dealloc	bigint
+extensions	pg_stat_statements_info	2	stats_reset	timestamp with time zone
+public	accounts	1	id	text
+public	accounts	2	code	text
+public	accounts	3	name	text
+public	accounts	4	type	text
+public	accounts	5	bank_name	text
+public	accounts	6	account_no	text
+public	accounts	7	currency	text
+public	accounts	8	opening_balance	numeric
+public	accounts	9	od_limit	numeric
+public	accounts	10	branch_id	text
+public	accounts	11	active	boolean
+public	accounts	12	created_at	timestamp with time zone
+public	accounts	13	updated_at	timestamp with time zone
+public	accounts	14	updated_by	text
+public	accounts	15	version	integer
+public	accounts	16	bank	text
+public	assets	1	id	text
+public	assets	2	code	text
+public	assets	3	name	text
+public	assets	4	category	text
+public	assets	5	branch_id	text
+public	assets	6	department	text
+public	assets	7	location	text
+public	assets	8	responsible_person	text
+public	assets	9	purchase_date	date
+public	assets	10	acquisition_type	text
+public	assets	11	supplier_id	text
+public	assets	12	purchase_bill_id	text
+public	assets	13	original_cost	numeric
+public	assets	14	vat_amount	numeric
+public	assets	15	net_asset_cost	numeric
+public	assets	16	salvage_value	numeric
+public	assets	17	useful_life_months	integer
+public	assets	18	depreciation_method	text
+public	assets	19	asset_status	text
+public	assets	20	serial_no	text
+public	assets	21	license_plate	text
+public	assets	22	chassis_no	text
+public	assets	23	engine_no	text
+public	assets	24	insurance_policy_no	text
+public	assets	25	warranty_expire_date	date
+public	assets	26	notes	text
+public	assets	27	created_by	text
+public	assets	28	created_at	timestamp with time zone
+public	audit_logs	1	id	uuid
+public	audit_logs	2	user_id	uuid
+public	audit_logs	3	username	text
+public	audit_logs	4	action	text
+public	audit_logs	5	table_name	text
+public	audit_logs	6	before_data	jsonb
+public	audit_logs	7	after_data	jsonb
+public	audit_logs	8	ip_address	text
+public	audit_logs	9	created_at	timestamp with time zone
+public	bank_statement	1	id	text
+public	bank_statement	2	date	date
+public	bank_statement	3	account_id	text
+public	bank_statement	4	ref_type	text
+public	bank_statement	5	ref_id	text
+public	bank_statement	6	ref_no	text
+public	bank_statement	7	description	text
+public	bank_statement	8	amount_in	numeric
+public	bank_statement	9	amount_out	numeric
+public	bank_statement	10	cash_flow_category	text
+public	bank_statement	11	created_at	timestamp with time zone
+public	bank_statement	12	created_by	text
+public	bank_statement	13	desc	text
+public	bank_statement	14	type	text
+public	bank_statement	15	balance	numeric
+public	bank_statement	16	note	text
+public	bank_statement	17	updated_at	timestamp with time zone
+public	bank_statement	18	updated_by	text
+public	bank_statement	19	version	integer
+public	bill_swap_history	1	id	uuid
+public	bill_swap_history	2	bill_id	text
+public	bill_swap_history	3	swap_date	timestamp with time zone
+public	bill_swap_history	4	before_supplier_id	text
+public	bill_swap_history	5	after_supplier_id	text
+public	bill_swap_history	6	item_index	integer
+public	bill_swap_history	7	before_price	numeric
+public	bill_swap_history	8	after_price	numeric
+public	bill_swap_history	9	before_amount	numeric
+public	bill_swap_history	10	after_amount	numeric
+public	bill_swap_history	11	reason	text
+public	bill_swap_history	12	changed_by	text
+public	branches	1	id	text
+public	branches	2	code	text
+public	branches	3	name	text
+public	branches	4	address	text
+public	branches	5	phone	text
+public	branches	6	active	boolean
+public	branches	7	created_at	timestamp with time zone
+public	branches	8	updated_at	timestamp with time zone
+public	currencies	1	code	text
+public	currencies	2	name	text
+public	currencies	3	symbol	text
+public	currencies	4	rate_to_thb	numeric
+public	currencies	5	updated_at	timestamp with time zone
+public	customers	1	id	text
+public	customers	2	code	text
+public	customers	3	name	text
+public	customers	4	tax_id	text
+public	customers	5	phone	text
+public	customers	6	email	text
+public	customers	7	address	text
+public	customers	8	bank_name	text
+public	customers	9	bank_account	text
+public	customers	10	credit_term	integer
+public	customers	11	branch_id	text
+public	customers	12	notes	text
+public	customers	13	active	boolean
+public	customers	14	created_at	timestamp with time zone
+public	customers	15	updated_at	timestamp with time zone
+public	customers	16	sales_id	text
+public	customers	17	updated_by	text
+public	customers	18	version	integer
+public	customers	19	contact	text
+public	customers	20	type	text
+public	customers	21	credit_limit	numeric
+public	deletion_log	1	id	text
+public	deletion_log	2	table_name	text
+public	deletion_log	3	row_id	text
+public	deletion_log	4	deleted_at	timestamp with time zone
+public	deletion_log	5	deleted_by	text
+public	deletion_tombstones	1	id	text
+public	deletion_tombstones	2	table_name	text
+public	deletion_tombstones	3	record_id	text
+public	deletion_tombstones	4	deleted_at	timestamp with time zone
+public	deletion_tombstones	5	deleted_by	text
+public	deletion_tombstones	6	reason	text
+public	depreciations	1	id	text
+public	depreciations	2	asset_id	text
+public	depreciations	3	date	date
+public	depreciations	4	amount	numeric
+public	depreciations	5	accumulated	numeric
+public	depreciations	6	nbv	numeric
+public	depreciations	7	created_at	timestamp with time zone
+public	equity	1	id	uuid
+public	equity	2	paid_up_capital	numeric
+public	equity	3	retained_earnings	numeric
+public	equity	4	owner_equity_adjustment	numeric
+public	equity	5	updated_at	timestamp with time zone
+public	expense_categories	1	id	text
+public	expense_categories	2	name	text
+public	expense_categories	3	parent_id	text
+public	expense_categories	4	active	boolean
+public	expenses	1	id	text
+public	expenses	2	doc_no	text
+public	expenses	3	date	date
+public	expenses	4	category_id	text
+public	expenses	5	payee	text
+public	expenses	6	amount	numeric
+public	expenses	7	vat	numeric
+public	expenses	8	wht	numeric
+public	expenses	9	net_amount	numeric
+public	expenses	10	account_id	text
+public	expenses	11	branch_id	text
+public	expenses	12	tax_invoice_no	text
+public	expenses	13	notes	text
+public	expenses	14	status	text
+public	expenses	15	approved_by	text
+public	expenses	16	approved_at	timestamp with time zone
+public	expenses	17	paid_at	timestamp with time zone
+public	expenses	18	created_by	text
+public	expenses	19	created_at	timestamp with time zone
+public	expenses	20	vat_amount	numeric
+public	expenses	21	wht_amount	numeric
+public	expenses	22	description	text
+public	expenses	23	items	jsonb
+public	expenses	24	paid_status	text
+public	expenses	25	voucher_id	text
+public	expenses	26	due_date	date
+public	expenses	27	ref_doc_no	text
+public	expenses	28	wht_pct	numeric
+public	expenses	29	updated_at	timestamp with time zone
+public	expenses	30	payee_bank	text
+public	expenses	31	payee_account_no	text
+public	expenses	32	payee_account_name	text
+public	expenses	33	updated_by	text
+public	expenses	34	version	integer
+public	fx_gain_loss	1	id	text
+public	fx_gain_loss	2	date	date
+public	fx_gain_loss	3	ref_type	text
+public	fx_gain_loss	4	ref_id	text
+public	fx_gain_loss	5	currency	text
+public	fx_gain_loss	6	amount_fc	numeric
+public	fx_gain_loss	7	rate_book	numeric
+public	fx_gain_loss	8	rate_settlement	numeric
+public	fx_gain_loss	9	gain_loss	numeric
+public	fx_gain_loss	10	notes	text
+public	fx_gain_loss	11	created_at	timestamp with time zone
+public	grade_adjustments	1	id	text
+public	grade_adjustments	2	doc_no	text
+public	grade_adjustments	3	date	date
+public	grade_adjustments	4	product_id	text
+public	grade_adjustments	5	warehouse_id	text
+public	grade_adjustments	6	qty_diff	numeric
+public	grade_adjustments	7	value_diff	numeric
+public	grade_adjustments	8	reason	text
+public	grade_adjustments	9	approved_by	text
+public	grade_adjustments	10	notes	text
+public	grade_adjustments	11	created_at	timestamp with time zone
+public	grade_adjustments	12	updated_at	timestamp with time zone
+public	grade_adjustments	13	updated_by	text
+public	grade_adjustments	14	version	integer
+public	historical_monthly	1	id	text
+public	historical_monthly	2	year	integer
+public	historical_monthly	3	month	integer
+public	historical_monthly	4	metric_type	text
+public	historical_monthly	5	category_id	text
+public	historical_monthly	6	amount	numeric
+public	historical_monthly	7	note	text
+public	historical_monthly	8	created_by	text
+public	historical_monthly	9	created_at	timestamp with time zone
+public	historical_monthly	10	updated_by	text
+public	historical_monthly	11	updated_at	timestamp with time zone
+public	loan_payments	1	id	text
+public	loan_payments	2	doc_no	text
+public	loan_payments	3	date	date
+public	loan_payments	4	loan_id	text
+public	loan_payments	5	schedule_id	text
+public	loan_payments	6	principal_amount	numeric
+public	loan_payments	7	interest_amount	numeric
+public	loan_payments	8	total_amount	numeric
+public	loan_payments	9	account_id	text
+public	loan_payments	10	status	text
+public	loan_payments	11	notes	text
+public	loan_payments	12	created_at	timestamp with time zone
+public	loan_schedules	1	id	text
+public	loan_schedules	2	loan_id	text
+public	loan_schedules	3	installment_no	integer
+public	loan_schedules	4	due_date	date
+public	loan_schedules	5	principal_amount	numeric
+public	loan_schedules	6	interest_amount	numeric
+public	loan_schedules	7	total_due_amount	numeric
+public	loan_schedules	8	paid_amount	numeric
+public	loan_schedules	9	payment_status	text
+public	loan_schedules	10	paid_date	date
+public	loan_schedules	11	notes	text
+public	loans	1	id	text
+public	loans	2	contract_no	text
+public	loans	3	loan_type	text
+public	loans	4	lender_name	text
+public	loans	5	start_date	date
+public	loans	6	end_date	date
+public	loans	7	principal_amount	numeric
+public	loans	8	interest_rate	numeric
+public	loans	9	term_months	integer
+public	loans	10	installment_amount	numeric
+public	loans	11	status	text
+public	loans	12	notes	text
+public	loans	13	created_at	timestamp with time zone
+public	opening_balance	1	id	text
+public	opening_balance	2	data	jsonb
+public	opening_balance	3	updated_at	timestamp with time zone
+public	opening_balance	4	updated_by	text
+public	overseas_recipients	1	id	text
+public	overseas_recipients	2	name	text
+public	overseas_recipients	3	country	text
+public	overseas_recipients	4	bank_name	text
+public	overseas_recipients	5	account_no	text
+public	overseas_recipients	6	swift	text
+public	overseas_recipients	7	currency	text
+public	overseas_recipients	8	active	boolean
+public	payments	1	id	text
+public	payments	2	doc_no	text
+public	payments	3	date	date
+public	payments	4	bill_id	text
+public	payments	5	supplier_id	text
+public	payments	6	account_id	text
+public	payments	7	amount	numeric
+public	payments	8	withholding_tax	numeric
+public	payments	9	fee	numeric
+public	payments	10	net_amount	numeric
+public	payments	11	branch_id	text
+public	payments	12	vat_type	text
+public	payments	13	lines	jsonb
+public	payments	14	notes	text
+public	payments	15	status	text
+public	payments	16	created_by	text
+public	payments	17	created_at	timestamp with time zone
+public	payments	18	voucher_id	text
+public	payments	19	bank_fee	numeric
+public	payments	20	discount	numeric
+public	payments	21	method	text
+public	payments	22	updated_at	timestamp with time zone
+public	payments	23	updated_by	text
+public	payments	24	version	integer
+public	payments	25	idempotency_key	text
+public	po_buys	1	id	text
+public	po_buys	2	doc_no	text
+public	po_buys	3	date	date
+public	po_buys	4	supplier_id	text
+public	po_buys	5	expected_delivery	date
+public	po_buys	6	total_amount	numeric
+public	po_buys	7	cut_amount	numeric
+public	po_buys	8	remaining_amount	numeric
+public	po_buys	9	status	text
+public	po_buys	10	items	jsonb
+public	po_buys	11	notes	text
+public	po_buys	12	created_at	timestamp with time zone
+public	po_buys	13	product_id	text
+public	po_buys	14	branch_id	text
+public	po_buys	15	channel_id	text
+public	po_buys	16	warehouse_id	text
+public	po_buys	17	delivery_date	date
+public	po_buys	18	qty	numeric
+public	po_buys	19	unit_price	numeric
+public	po_buys	20	remaining_qty	numeric
+public	po_buys	21	purpose	text
+public	po_buys	22	note	text
+public	po_buys	23	cost_deducted	boolean
+public	po_buys	24	cost_deducted_at	timestamp with time zone
+public	po_buys	25	cost_deducted_by	text
+public	po_buys	26	created_by	text
+public	po_buys	27	updated_at	timestamp with time zone
+public	po_buys	28	require_delivery	boolean
+public	po_buys	29	is_opening_pool	boolean
+public	po_buys	30	updated_by	text
+public	po_buys	31	version	integer
+public	po_sells	1	id	text
+public	po_sells	2	doc_no	text
+public	po_sells	3	date	date
+public	po_sells	4	customer_id	text
+public	po_sells	5	expected_delivery	date
+public	po_sells	6	total_amount	numeric
+public	po_sells	7	cut_amount	numeric
+public	po_sells	8	remaining_amount	numeric
+public	po_sells	9	status	text
+public	po_sells	10	items	jsonb
+public	po_sells	11	notes	text
+public	po_sells	12	created_at	timestamp with time zone
+public	po_sells	13	product_id	text
+public	po_sells	14	branch_id	text
+public	po_sells	15	channel_id	text
+public	po_sells	16	warehouse_id	text
+public	po_sells	17	delivery_date	date
+public	po_sells	18	qty	numeric
+public	po_sells	19	unit_price	numeric
+public	po_sells	20	remaining_qty	numeric
+public	po_sells	21	purpose	text
+public	po_sells	22	note	text
+public	po_sells	23	created_by	text
+public	po_sells	24	updated_at	timestamp with time zone
+public	po_sells	25	require_delivery	boolean
+public	po_sells	26	updated_by	text
+public	po_sells	27	version	integer
+public	production_inputs	1	id	text
+public	production_inputs	2	order_id	text
+public	production_inputs	3	date	date
+public	production_inputs	4	product_id	text
+public	production_inputs	5	qty	numeric
+public	production_inputs	6	unit_cost	numeric
+public	production_inputs	7	total_cost	numeric
+public	production_inputs	8	source	text
+public	production_inputs	9	notes	text
+public	production_inputs	10	created_at	timestamp with time zone
+public	production_inputs	11	updated_at	timestamp with time zone
+public	production_inputs	12	updated_by	text
+public	production_inputs	13	version	integer
+public	production_orders	1	id	text
+public	production_orders	2	doc_no	text
+public	production_orders	3	date	date
+public	production_orders	4	product_id	text
+public	production_orders	5	qty_planned	numeric
+public	production_orders	6	branch_id	text
+public	production_orders	7	warehouse_id	text
+public	production_orders	8	status	text
+public	production_orders	9	total_input_cost	numeric
+public	production_orders	10	total_output_value	numeric
+public	production_orders	11	variance	numeric
+public	production_orders	12	closed_at	timestamp with time zone
+public	production_orders	13	closed_by	text
+public	production_orders	14	notes	text
+public	production_orders	15	created_at	timestamp with time zone
+public	production_orders	16	updated_at	timestamp with time zone
+public	production_orders	17	updated_by	text
+public	production_orders	18	version	integer
+public	production_outputs	1	id	text
+public	production_outputs	2	order_id	text
+public	production_outputs	3	date	date
+public	production_outputs	4	product_id	text
+public	production_outputs	5	qty	numeric
+public	production_outputs	6	unit_cost	numeric
+public	production_outputs	7	total_cost	numeric
+public	production_outputs	8	output_type	text
+public	production_outputs	9	notes	text
+public	production_outputs	10	created_at	timestamp with time zone
+public	production_outputs	11	updated_at	timestamp with time zone
+public	production_outputs	12	updated_by	text
+public	production_outputs	13	version	integer
+public	products	1	id	text
+public	products	2	code	text
+public	products	3	name	text
+public	products	4	unit	text
+public	products	5	metal_group	text
+public	products	6	item_status	text
+public	products	7	std_price	numeric
+public	products	8	std_cost	numeric
+public	products	9	active	boolean
+public	products	10	created_at	timestamp with time zone
+public	products	11	updated_at	timestamp with time zone
+public	products	12	updated_by	text
+public	products	13	version	integer
+public	products	14	type	text
+public	products	15	grade	text
+public	products	16	target_margin_pct	numeric
+public	purchase_bills	1	id	text
+public	purchase_bills	2	doc_no	text
+public	purchase_bills	3	date	date
+public	purchase_bills	4	ref_no	text
+public	purchase_bills	5	tax_invoice_no	text
+public	purchase_bills	6	supplier_id	text
+public	purchase_bills	7	branch_id	text
+public	purchase_bills	8	channel_id	text
+public	purchase_bills	9	warehouse_id	text
+public	purchase_bills	10	transaction_mode	text
+public	purchase_bills	11	vat_type	text
+public	purchase_bills	12	subtotal	numeric
+public	purchase_bills	13	discount	numeric
+public	purchase_bills	14	vat_amount	numeric
+public	purchase_bills	15	total_amount	numeric
+public	purchase_bills	16	paid_amount	numeric
+public	purchase_bills	17	payable_balance	numeric
+public	purchase_bills	18	status	text
+public	purchase_bills	19	items	jsonb
+public	purchase_bills	20	notes	text
+public	purchase_bills	21	created_by	text
+public	purchase_bills	22	created_at	timestamp with time zone
+public	purchase_bills	23	updated_at	timestamp with time zone
+public	purchase_bills	24	sales_id	text
+public	purchase_bills	25	license_plate	text
+public	purchase_bills	26	contact_phone	text
+public	purchase_bills	27	contact_name	text
+public	purchase_bills	28	vat_invoice_received	boolean
+public	purchase_bills	29	vat_invoice_no	text
+public	purchase_bills	30	vat_invoice_date	date
+public	purchase_bills	31	vat_invoice_received_at	timestamp with time zone
+public	purchase_bills	32	purchase_source	text
+public	purchase_bills	33	po_buy_id	text
+public	purchase_bills	34	purchase_type	text
+public	purchase_bills	35	discount_total	numeric
+public	purchase_bills	36	has_vat	boolean
+public	purchase_bills	37	note	text
+public	purchase_bills	38	updated_by	text
+public	purchase_bills	39	has_wht	boolean
+public	purchase_bills	40	wht_amount	numeric
+public	purchase_bills	41	total_cost	numeric
+public	purchase_bills	42	swap_history	jsonb
+public	purchase_bills	43	total_commission	numeric
+public	purchase_bills	44	commission_pct	numeric
+public	purchase_bills	45	deduction_qty	numeric
+public	purchase_bills	46	deduction_amount	numeric
+public	purchase_bills	47	version	integer
+public	purchase_channels	1	id	text
+public	purchase_channels	2	name	text
+public	purchase_channels	3	active	boolean
+public	purchase_channels	4	code	text
+public	receipt_vouchers	1	id	text
+public	receipt_vouchers	2	doc_no	text
+public	receipt_vouchers	3	date	date
+public	receipt_vouchers	4	purchase_bill_id	text
+public	receipt_vouchers	5	purchase_bill_doc_no	text
+public	receipt_vouchers	6	seller_name	text
+public	receipt_vouchers	7	seller_tax_id	text
+public	receipt_vouchers	8	seller_address	text
+public	receipt_vouchers	9	seller_phone	text
+public	receipt_vouchers	10	license_plate	text
+public	receipt_vouchers	11	sales_person	text
+public	receipt_vouchers	12	items	jsonb
+public	receipt_vouchers	13	total_qty	numeric
+public	receipt_vouchers	14	total_amount	numeric
+public	receipt_vouchers	15	amount_in_words	text
+public	receipt_vouchers	16	note	text
+public	receipt_vouchers	17	payer_signer_name	text
+public	receipt_vouchers	18	receiver_signer_name	text
+public	receipt_vouchers	19	payment_method	text
+public	receipt_vouchers	20	created_by	text
+public	receipt_vouchers	21	created_at	timestamp with time zone
+public	receipt_vouchers	22	updated_by	text
+public	receipt_vouchers	23	updated_at	timestamp with time zone
+public	receipts	1	id	text
+public	receipts	2	doc_no	text
+public	receipts	3	date	date
+public	receipts	4	bill_id	text
+public	receipts	5	customer_id	text
+public	receipts	6	account_id	text
+public	receipts	7	amount	numeric
+public	receipts	8	withholding_tax	numeric
+public	receipts	9	fee	numeric
+public	receipts	10	net_amount	numeric
+public	receipts	11	branch_id	text
+public	receipts	12	vat_type	text
+public	receipts	13	lines	jsonb
+public	receipts	14	notes	text
+public	receipts	15	status	text
+public	receipts	16	created_by	text
+public	receipts	17	created_at	timestamp with time zone
+public	receipts	18	voucher_id	text
+public	receipts	19	bank_fee	numeric
+public	receipts	20	discount	numeric
+public	receipts	21	method	text
+public	receipts	22	updated_at	timestamp with time zone
+public	receipts	23	updated_by	text
+public	receipts	24	version	integer
+public	receipts	25	idempotency_key	text
+public	roles	1	id	text
+public	roles	2	name	text
+public	roles	3	desc	text
+public	roles	4	is_system	boolean
+public	roles	5	menus	jsonb
+public	roles	6	actions	jsonb
+public	roles	7	see_cost	boolean
+public	roles	8	see_profit	boolean
+public	roles	9	see_cash	boolean
+public	roles	10	see_financials	boolean
+public	roles	11	see_opening	boolean
+public	roles	12	branch_scope	text
+public	roles	13	created_at	timestamp with time zone
+public	roles	14	updated_at	timestamp with time zone
+public	roles	15	updated_by	text
+public	roles	16	version	integer
+public	roles_config	1	role	text
+public	roles_config	2	permissions	jsonb
+public	roles_config	3	description	text
+public	sales_bills	1	id	text
+public	sales_bills	2	doc_no	text
+public	sales_bills	3	date	date
+public	sales_bills	4	ref_no	text
+public	sales_bills	5	customer_id	text
+public	sales_bills	6	branch_id	text
+public	sales_bills	7	channel_id	text
+public	sales_bills	8	warehouse_id	text
+public	sales_bills	9	transaction_mode	text
+public	sales_bills	10	vat_type	text
+public	sales_bills	11	credit_term	integer
+public	sales_bills	12	subtotal	numeric
+public	sales_bills	13	discount	numeric
+public	sales_bills	14	vat_amount	numeric
+public	sales_bills	15	total_amount	numeric
+public	sales_bills	16	received_amount	numeric
+public	sales_bills	17	receivable_balance	numeric
+public	sales_bills	18	cogs_amount	numeric
+public	sales_bills	19	gross_profit	numeric
+public	sales_bills	20	status	text
+public	sales_bills	21	items	jsonb
+public	sales_bills	22	notes	text
+public	sales_bills	23	created_by	text
+public	sales_bills	24	created_at	timestamp with time zone
+public	sales_bills	25	updated_at	timestamp with time zone
+public	sales_bills	26	license_plate	text
+public	sales_bills	27	contact_phone	text
+public	sales_bills	28	contact_name	text
+public	sales_bills	29	trading_from_purchase_id	text
+public	sales_bills	30	trading_from_purchase_ids	jsonb
+public	sales_bills	31	sales_source	text
+public	sales_bills	32	po_sell_id	text
+public	sales_bills	33	vat_invoice_issued	boolean
+public	sales_bills	34	vat_invoice_no	text
+public	sales_bills	35	vat_invoice_date	date
+public	sales_bills	36	discount_total	numeric
+public	sales_bills	37	has_vat	boolean
+public	sales_bills	38	salesman	text
+public	sales_bills	39	note	text
+public	sales_bills	40	from_p_sale_id	text
+public	sales_bills	41	from_p_sale_no	text
+public	sales_bills	42	has_wht	boolean
+public	sales_bills	43	wht_amount	numeric
+public	sales_bills	44	paid_amount	numeric
+public	sales_bills	45	total_cost	numeric
+public	sales_bills	46	updated_by	text
+public	sales_bills	47	total_commission	numeric
+public	sales_bills	48	commission_pct	numeric
+public	sales_bills	49	version	integer
+public	sales_bills	50	due_date	date
+public	sales_bills	51	bill_date	date
+public	sales_bills	52	sales_id	text
+public	sales_bills	53	payment_type	text
+public	sales_bills	54	is_opening	boolean
+public	sales_channels	1	id	text
+public	sales_channels	2	name	text
+public	sales_channels	3	active	boolean
+public	sales_channels	4	code	text
+public	salespersons	1	id	text
+public	salespersons	2	code	text
+public	salespersons	3	name	text
+public	salespersons	4	phone	text
+public	salespersons	5	email	text
+public	salespersons	6	commission_pct	numeric
+public	salespersons	7	base_salary	numeric
+public	salespersons	8	active	boolean
+public	salespersons	9	note	text
+public	salespersons	10	created_at	timestamp with time zone
+public	salespersons	11	updated_at	timestamp with time zone
+public	salespersons	12	updated_by	text
+public	salespersons	13	version	integer
+public	stock_adjustments	1	id	text
+public	stock_adjustments	2	doc_no	text
+public	stock_adjustments	3	date	date
+public	stock_adjustments	4	branch_id	text
+public	stock_adjustments	5	warehouse_id	text
+public	stock_adjustments	6	product_id	text
+public	stock_adjustments	7	lot_no	text
+public	stock_adjustments	8	system_qty	numeric
+public	stock_adjustments	9	counted_qty	numeric
+public	stock_adjustments	10	diff_qty	numeric
+public	stock_adjustments	11	adjust_type	text
+public	stock_adjustments	12	reason	text
+public	stock_adjustments	13	remark	text
+public	stock_adjustments	14	unit_cost_used	numeric
+public	stock_adjustments	15	value_note	numeric
+public	stock_adjustments	16	status	text
+public	stock_adjustments	17	stock_ledger_id	text
+public	stock_adjustments	18	created_by	text
+public	stock_adjustments	19	created_at	timestamp with time zone
+public	stock_adjustments	20	reversed_at	timestamp with time zone
+public	stock_adjustments	21	reversed_by	text
+public	stock_adjustments	22	updated_at	timestamp with time zone
+public	stock_adjustments	23	updated_by	text
+public	stock_adjustments	24	version	integer
+public	stock_issues	1	id	text
+public	stock_issues	2	doc_no	text
+public	stock_issues	3	date	date
+public	stock_issues	4	customer_id	text
+public	stock_issues	5	branch_id	text
+public	stock_issues	6	warehouse_id	text
+public	stock_issues	7	total_cost	numeric
+public	stock_issues	8	total_est_amount	numeric
+public	stock_issues	9	status	text
+public	stock_issues	10	converted_to_bill_id	text
+public	stock_issues	11	items	jsonb
+public	stock_issues	12	notes	text
+public	stock_issues	13	created_by	text
+public	stock_issues	14	created_at	timestamp with time zone
+public	stock_ledger	1	id	text
+public	stock_ledger	2	date	date
+public	stock_ledger	3	product_id	text
+public	stock_ledger	4	warehouse_id	text
+public	stock_ledger	5	branch_id	text
+public	stock_ledger	6	movement_type	text
+public	stock_ledger	7	ref_id	text
+public	stock_ledger	8	ref_no	text
+public	stock_ledger	9	qty_in	numeric
+public	stock_ledger	10	qty_out	numeric
+public	stock_ledger	11	value_in	numeric
+public	stock_ledger	12	value_out	numeric
+public	stock_ledger	13	unit_cost	numeric
+public	stock_ledger	14	notes	text
+public	stock_ledger	15	created_at	timestamp with time zone
+public	stock_ledger	16	purchase_channel_id	text
+public	stock_ledger	17	sales_channel_id	text
+public	stock_ledger	18	lot_no	text
+public	stock_ledger	19	created_by	text
+public	stock_ledger	20	not_available_for_sale	boolean
+public	stock_ledger	21	output_category	text
+public	stock_ledger	22	output_product_id	text
+public	stock_ledger	23	ref_type	text
+public	stock_ledger	24	return_customer_id	text
+public	stock_ledger	25	return_reason	text
+public	stock_ledger	26	source_input_id	text
+public	stock_ledger	27	source_input_product_id	text
+public	stock_ledger	28	note	text
+public	stock_ledger	29	paid	boolean
+public	stock_ledger	30	updated_at	timestamp with time zone
+public	stock_ledger	31	updated_by	text
+public	stock_ledger	32	version	integer
+public	stock_ledger	33	is_opening	boolean
+public	suppliers	1	id	text
+public	suppliers	2	code	text
+public	suppliers	3	name	text
+public	suppliers	4	tax_id	text
+public	suppliers	5	phone	text
+public	suppliers	6	email	text
+public	suppliers	7	address	text
+public	suppliers	8	bank_name	text
+public	suppliers	9	bank_account	text
+public	suppliers	10	bank_account_name	text
+public	suppliers	11	sales_rep	text
+public	suppliers	12	credit_term	integer
+public	suppliers	13	branch_id	text
+public	suppliers	14	notes	text
+public	suppliers	15	active	boolean
+public	suppliers	16	created_at	timestamp with time zone
+public	suppliers	17	updated_at	timestamp with time zone
+public	suppliers	18	sales_id	text
+public	suppliers	19	updated_by	text
+public	suppliers	20	version	integer
+public	suppliers	21	type	text
+public	suppliers	22	contact	text
+public	suppliers	23	credit_limit	numeric
+public	trading_deals	1	id	text
+public	trading_deals	2	deal_no	text
+public	trading_deals	3	date	date
+public	trading_deals	4	purchase_bill_id	text
+public	trading_deals	5	purchase_bill_no	text
+public	trading_deals	6	sales_bill_id	text
+public	trading_deals	7	sales_bill_no	text
+public	trading_deals	8	product_id	text
+public	trading_deals	9	supplier_id	text
+public	trading_deals	10	customer_id	text
+public	trading_deals	11	matched_qty	numeric
+public	trading_deals	12	matched_purchase_amount	numeric
+public	trading_deals	13	matched_sales_amount	numeric
+public	trading_deals	14	ex_vat	boolean
+public	trading_deals	15	status	text
+public	trading_deals	16	notes	text
+public	trading_deals	17	created_by	text
+public	trading_deals	18	cancelled_at	timestamp with time zone
+public	trading_deals	19	created_at	timestamp with time zone
+public	trading_deals	20	note	text
+public	trading_deals	21	updated_at	timestamp with time zone
+public	trading_deals	22	updated_by	text
+public	trading_deals	23	version	integer
+public	trading_deals	24	cancelled_by	text
+public	trading_deals	25	cancelled_reason	text
+public	transfers	1	id	text
+public	transfers	2	doc_no	text
+public	transfers	3	date	date
+public	transfers	4	from_account_id	text
+public	transfers	5	to_account_id	text
+public	transfers	6	amount	numeric
+public	transfers	7	fee	numeric
+public	transfers	8	notes	text
+public	transfers	9	status	text
+public	transfers	10	created_by	text
+public	transfers	11	created_at	timestamp with time zone
+public	transfers	12	bank_fee	numeric
+public	transfers	13	updated_at	timestamp with time zone
+public	transfers	14	updated_by	text
+public	transfers	15	version	integer
+public	transfers	16	idempotency_key	text
+public	user_profiles	1	id	uuid
+public	user_profiles	2	user_id	uuid
+public	user_profiles	3	username	text
+public	user_profiles	4	display_name	text
+public	user_profiles	5	email	text
+public	user_profiles	6	role	text
+public	user_profiles	7	branch_ids	ARRAY
+public	user_profiles	8	active	boolean
+public	user_profiles	9	created_at	timestamp with time zone
+public	users	1	id	text
+public	users	2	code	text
+public	users	3	username	text
+public	users	4	email	text
+public	users	5	name	text
+public	users	6	password	text
+public	users	7	role_id	text
+public	users	8	branch_id	text
+public	users	9	active	boolean
+public	users	10	created_at	timestamp with time zone
+public	users	11	updated_at	timestamp with time zone
+public	users	12	password_changed_at	timestamp with time zone
+public	users	13	must_change_pwd	boolean
+public	users	14	updated_by	text
+public	users	15	version	integer
+public	warehouses	1	id	text
+public	warehouses	2	code	text
+public	warehouses	3	name	text
+public	warehouses	4	branch_id	text
+public	warehouses	5	active	boolean
+public	warehouses	6	created_at	timestamp with time zone
+realtime	messages	3	topic	text
+realtime	messages	4	extension	text
+realtime	messages	5	payload	jsonb
+realtime	messages	6	event	text
+realtime	messages	7	private	boolean
+realtime	messages	8	updated_at	timestamp without time zone
+realtime	messages	9	inserted_at	timestamp without time zone
+realtime	messages	10	id	uuid
+realtime	schema_migrations	1	version	bigint
+realtime	schema_migrations	2	inserted_at	timestamp without time zone
+realtime	subscription	1	id	bigint
+realtime	subscription	2	subscription_id	uuid
+realtime	subscription	4	entity	regclass
+realtime	subscription	5	filters	ARRAY
+realtime	subscription	7	claims	jsonb
+realtime	subscription	8	claims_role	regrole
+realtime	subscription	9	created_at	timestamp without time zone
+realtime	subscription	10	action_filter	text
+storage	buckets	1	id	text
+storage	buckets	2	name	text
+storage	buckets	3	owner	uuid
+storage	buckets	4	created_at	timestamp with time zone
+storage	buckets	5	updated_at	timestamp with time zone
+storage	buckets	6	public	boolean
+storage	buckets	7	avif_autodetection	boolean
+storage	buckets	8	file_size_limit	bigint
+storage	buckets	9	allowed_mime_types	ARRAY
+storage	buckets	10	owner_id	text
+storage	buckets	11	type	USER-DEFINED
+storage	buckets_analytics	1	name	text
+storage	buckets_analytics	2	type	USER-DEFINED
+storage	buckets_analytics	3	format	text
+storage	buckets_analytics	4	created_at	timestamp with time zone
+storage	buckets_analytics	5	updated_at	timestamp with time zone
+storage	buckets_analytics	6	id	uuid
+storage	buckets_analytics	7	deleted_at	timestamp with time zone
+storage	buckets_vectors	1	id	text
+storage	buckets_vectors	2	type	USER-DEFINED
+storage	buckets_vectors	3	created_at	timestamp with time zone
+storage	buckets_vectors	4	updated_at	timestamp with time zone
+storage	migrations	1	id	integer
+storage	migrations	2	name	character varying
+storage	migrations	3	hash	character varying
+storage	migrations	4	executed_at	timestamp without time zone
+storage	objects	1	id	uuid
+storage	objects	2	bucket_id	text
+storage	objects	3	name	text
+storage	objects	4	owner	uuid
+storage	objects	5	created_at	timestamp with time zone
+storage	objects	6	updated_at	timestamp with time zone
+storage	objects	7	last_accessed_at	timestamp with time zone
+storage	objects	8	metadata	jsonb
+storage	objects	9	path_tokens	ARRAY
+storage	objects	10	version	text
+storage	objects	11	owner_id	text
+storage	objects	12	user_metadata	jsonb
+storage	s3_multipart_uploads	1	id	text
+storage	s3_multipart_uploads	2	in_progress_size	bigint
+storage	s3_multipart_uploads	3	upload_signature	text
+storage	s3_multipart_uploads	4	bucket_id	text
+storage	s3_multipart_uploads	5	key	text
+storage	s3_multipart_uploads	6	version	text
+storage	s3_multipart_uploads	7	owner_id	text
+storage	s3_multipart_uploads	8	created_at	timestamp with time zone
+storage	s3_multipart_uploads	9	user_metadata	jsonb
+storage	s3_multipart_uploads	10	metadata	jsonb
+storage	s3_multipart_uploads_parts	1	id	uuid
+storage	s3_multipart_uploads_parts	2	upload_id	text
+storage	s3_multipart_uploads_parts	3	size	bigint
+storage	s3_multipart_uploads_parts	4	part_number	integer
+storage	s3_multipart_uploads_parts	5	bucket_id	text
+storage	s3_multipart_uploads_parts	6	key	text
+storage	s3_multipart_uploads_parts	7	etag	text
+storage	s3_multipart_uploads_parts	8	owner_id	text
+storage	s3_multipart_uploads_parts	9	version	text
+storage	s3_multipart_uploads_parts	10	created_at	timestamp with time zone
+storage	vector_indexes	1	id	text
+storage	vector_indexes	2	name	text
+storage	vector_indexes	3	bucket_id	text
+storage	vector_indexes	4	data_type	text
+storage	vector_indexes	5	dimension	integer
+storage	vector_indexes	6	distance_metric	text
+storage	vector_indexes	7	metadata_configuration	jsonb
+storage	vector_indexes	8	created_at	timestamp with time zone
+storage	vector_indexes	9	updated_at	timestamp with time zone
+vault	decrypted_secrets	1	id	uuid
+vault	decrypted_secrets	2	name	text
+vault	decrypted_secrets	3	description	text
+vault	decrypted_secrets	4	secret	text
+vault	decrypted_secrets	5	decrypted_secret	text
+vault	decrypted_secrets	6	key_id	uuid
+vault	decrypted_secrets	7	nonce	bytea
+vault	decrypted_secrets	8	created_at	timestamp with time zone
+vault	decrypted_secrets	9	updated_at	timestamp with time zone
+vault	secrets	1	id	uuid
+vault	secrets	2	name	text
+vault	secrets	3	description	text
+vault	secrets	4	secret	text
+vault	secrets	5	key_id	uuid
+vault	secrets	6	nonce	bytea
+vault	secrets	7	created_at	timestamp with time zone
+vault	secrets	8	updated_at	timestamp with time zone
+

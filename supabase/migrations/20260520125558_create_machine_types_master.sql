@@ -5,10 +5,8 @@ create table if not exists public.production_machine_types (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists idx_production_machine_types_active
   on public.production_machine_types (active);
-
 insert into public.production_machine_types (id, name, active)
 select
   'MT-' || lpad(row_number() over (order by type)::text, 3, '0') as id,
@@ -22,7 +20,6 @@ from (
 on conflict (name) do update
 set active = excluded.active,
     updated_at = now();
-
 insert into public.production_machine_types (id, name, active)
 values
   ('MT-SORTING', 'Sorting', true),

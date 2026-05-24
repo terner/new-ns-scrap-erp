@@ -14,7 +14,7 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - Update docs at every meaningful checkpoint as if the session can close at any time.
 - Use a sub agent by default for Playwright/browser QA work; the main agent still defines scope and integrates findings.
 - Split large refactors into reviewable batches with one clear module, transform, or behavior change per batch.
-- During clone/migration batches, treat the legacy/Vue screen as the visual baseline first. Preserve card layout, colors, banners, tables, button placement, labels, spacing, and density unless a difference is documented and approved. When the Vue clone is simplified or inconsistent, use `old-apps/legacy/` as the stronger visual and behavior reference.
+- During clone/migration batches, use `docs/design.md` as the active design convention source and keep legacy/Vue parity unless a difference is documented and approved.
 - After a batch is validated, committed, and pushed, immediately start the next batch from `docs/migration/00-current-work.md` and the relevant tracker unless the user pauses, redirects, or the next step requires explicit approval for high-risk work.
 
 ## Required Reading
@@ -22,6 +22,7 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 Before substantial work, read:
 - `docs/migration/00-current-work.md`
 - `docs/migration/00-doc-index.md`
+- `docs/design.md`
 - `REQUIREMENTS_TARGET_SYSTEM.md`
 - `docs/migration/README.md`
 - `docs/migration/09-implementation-tasklist.md`

@@ -84,7 +84,7 @@ export function AssetRegisterPageClient() {
       {error ? <ErrorBox message={error} /> : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-5 text-white shadow">
+        <div className="rounded-md bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-5 text-white shadow">
           <div className="text-sm opacity-90">Net Book Value</div>
           <div className="mt-2 text-3xl font-bold">{formatMoney(data?.summary.nbv)} ฿</div>
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -115,12 +115,12 @@ export function AssetRegisterPageClient() {
       </div>
 
       <FilterPanel>
-        <input className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="ค้นหา รหัส / ชื่อ / สถานที่ / สาขา" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
+        <input className="min-w-0 flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm" placeholder="ค้นหา รหัส / ชื่อ / สถานที่ / สาขา" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="all">ทุกหมวด</option>
           {(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="all">ทุกสถานะ</option>
           {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
@@ -181,11 +181,11 @@ export function DepreciationPageClient() {
       />
       {error ? <ErrorBox message={error} /> : null}
       <FilterPanel>
-        <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
+        <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
           {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((item) => <option key={item} value={item}>เดือน {item}</option>)}
         </select>
-        <input className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-sm" value={year} onChange={(event) => setYear(event.target.value)} />
-        <input className="rounded-lg border border-slate-200 px-3 py-2 text-sm" readOnly value={periodDate} />
+        <input className="w-28 rounded-md border border-slate-200 px-3 py-2 text-sm" value={year} onChange={(event) => setYear(event.target.value)} />
+        <input className="rounded-md border border-slate-200 px-3 py-2 text-sm" readOnly value={periodDate} />
         <Chip tone="blue">Asset ที่คิดค่าเสื่อม {data?.pendingAssets.length ?? 0}</Chip>
         <Chip tone="emerald">Run แล้วงวดนี้ 0</Chip>
         <Chip tone="amber">รอ Run {data?.pendingAssets.length ?? 0}</Chip>
@@ -256,37 +256,37 @@ function Hero({ actions, subtitle, title, tone }: { actions: ReactNode; subtitle
     depreciation: 'from-red-600 to-rose-600',
     disposal: 'from-slate-700 to-zinc-700',
   }
-  return <div className={`flex flex-col gap-4 rounded-xl bg-gradient-to-r ${tones[tone]} p-5 text-white shadow md:flex-row md:items-center md:justify-between`}><div><h1 className="text-xl font-bold md:text-2xl">{title}</h1><p className="mt-1 text-sm text-white/85">{subtitle}</p></div><div className="flex flex-wrap gap-2">{actions}</div></div>
+  return <div className={`flex flex-col gap-4 rounded-md bg-gradient-to-r ${tones[tone]} p-5 text-white shadow md:flex-row md:items-center md:justify-between`}><div><h1 className="text-xl font-bold md:text-2xl">{title}</h1><p className="mt-1 text-sm text-white/85">{subtitle}</p></div><div className="flex flex-wrap gap-2">{actions}</div></div>
 }
 
 function DisabledButton({ children, strong = false }: { children: ReactNode; strong?: boolean }) {
-  return <button className={`${strong ? 'bg-white text-slate-800' : 'bg-white/15 text-white'} rounded-lg px-3 py-2 text-sm font-medium shadow-sm opacity-60`} disabled type="button">{children}</button>
+  return <button className={`${strong ? 'bg-white text-slate-800' : 'bg-white/15 text-white'} rounded-md px-3 py-2 text-sm font-medium shadow-sm opacity-60`} disabled type="button">{children}</button>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl bg-white p-4 shadow"><h2 className="mb-3 font-semibold text-slate-900">{title}</h2>{children}</div>
+  return <div className="rounded-md bg-white p-4 shadow"><h2 className="mb-3 font-semibold text-slate-900">{title}</h2>{children}</div>
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
 }
 
 function TableShell({ children, title }: { children: ReactNode; title?: string }) {
-  return <div className="overflow-hidden rounded-xl bg-white shadow">{title ? <h2 className="border-b border-slate-100 px-4 py-3 font-semibold text-slate-900">{title}</h2> : null}<div className="max-h-[60vh] overflow-auto">{children}</div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow">{title ? <h2 className="border-b border-slate-100 px-4 py-3 font-semibold text-slate-900">{title}</h2> : null}<div className="max-h-[60vh] overflow-auto">{children}</div></div>
 }
 
 function StatCard({ label, tone, value }: { label: string; tone?: 'amber' | 'emerald' | 'red'; value: number | string }) {
   const color = tone === 'amber' ? 'text-amber-700' : tone === 'emerald' ? 'text-emerald-700' : tone === 'red' ? 'text-red-700' : 'text-slate-900'
-  return <div className="rounded-xl bg-white p-4 shadow"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
+  return <div className="rounded-md bg-white p-4 shadow"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
 }
 
 function MiniStat({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg bg-slate-50 p-2"><div className="text-xs text-slate-500">{label}</div><div className="font-semibold text-slate-900">{value}</div></div>
+  return <div className="rounded-md bg-slate-50 p-2"><div className="text-xs text-slate-500">{label}</div><div className="font-semibold text-slate-900">{value}</div></div>
 }
 
 function Bar({ label, max, value }: { label: string; max: number; value: number }) {
   const width = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0
-  return <div><div className="mb-1 flex justify-between text-xs"><span className="text-slate-600">{label}</span><span className="font-medium text-slate-900">{formatMoney(value)}</span></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-amber-500" style={{ width: `${width}%` }} /></div></div>
+  return <div><div className="mb-1 flex justify-between text-xs"><span className="text-slate-600">{label}</span><span className="font-medium text-slate-900">{formatMoney(value)}</span></div><div className="h-2 rounded-md-full bg-slate-100"><div className="h-2 rounded-md-full bg-amber-500" style={{ width: `${width}%` }} /></div></div>
 }
 
 function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: DepreciationPayload['pendingAssets'] }) {
@@ -311,12 +311,12 @@ function Td({ align = 'left', children, strong = false }: { align?: 'center' | '
 
 function Chip({ children, tone }: { children: ReactNode; tone: 'amber' | 'blue' | 'emerald' }) {
   const color = tone === 'blue' ? 'bg-blue-50 text-blue-700' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${color}`}>{children}</span>
+  return <span className={`rounded-md-full px-3 py-1 text-xs font-semibold ${color}`}>{children}</span>
 }
 
 function StatusPill({ status }: { status: string }) {
   const color = status === 'Active' ? 'bg-emerald-50 text-emerald-700' : status === 'Fully Depreciated' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-700'
-  return <span className={`rounded-full px-2 py-1 text-xs font-medium ${color}`}>{status}</span>
+  return <span className={`rounded-md-full px-2 py-1 text-xs font-medium ${color}`}>{status}</span>
 }
 
 function EmptyText({ children }: { children: ReactNode }) {
@@ -324,5 +324,5 @@ function EmptyText({ children }: { children: ReactNode }) {
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
+  return <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
 }

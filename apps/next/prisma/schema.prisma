@@ -504,6 +504,7 @@ model accounts {
   name                                          String
   type                                          String
   bank_name                                     String?
+  bank_branch                                   String?
   account_no                                    String?
   currency                                      String?                 @default("THB")
   opening_balance                               Decimal?                @default(0) @db.Decimal

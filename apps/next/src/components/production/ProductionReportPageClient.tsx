@@ -185,12 +185,12 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
 
     return (
       <section className="space-y-4">
-        {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
         <div className="flex flex-wrap gap-2">
-          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-          <button className="rounded-lg border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
-          <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCostCsv}>Export CSV</button>
+          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
+          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCostCsv}>Export CSV</button>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-7">
           <CostCard label="RM Cost" tone="red" value={costTotals.rm} />
@@ -199,13 +199,13 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           <CostCard label="Machine" value={costTotals.machine} />
           <CostCard label="Fuel" value={costTotals.fuel} />
           <CostCard label="Other Process" value={costTotals.otherProc + costTotals.maintenance} />
-          <div className="rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 text-white shadow">
+          <div className="rounded-md bg-gradient-to-br from-blue-600 to-indigo-700 p-3 text-white shadow">
             <div className="opacity-80">Total / Cost per Kg</div>
             <div className="text-base font-bold">{formatMoney(costTotals.total)}</div>
             <div className="text-xs opacity-80">{formatMoney(costTotals.outputQty > 0 ? costTotals.total / costTotals.outputQty : 0)} ฿/กก.</div>
           </div>
         </div>
-        <div className="overflow-x-auto rounded-xl bg-white shadow">
+        <div className="overflow-x-auto rounded-md bg-white shadow">
           <table className="w-full text-sm">
             <thead className="bg-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
             <tbody>
@@ -231,9 +231,9 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
     const machineUtil = data?.machineUtil ?? []
     return (
       <section className="space-y-4">
-        {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-        <div className="rounded-2xl bg-gradient-to-r from-purple-700 to-pink-600 p-5 text-white shadow-lg">
+        <div className="rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-5 text-white shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-3xl font-bold">Production Dashboard</h1>
@@ -247,10 +247,10 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                 ['last90', '90 วัน'],
                 ['month', 'เดือนนี้'],
                 ['year', 'ปีนี้'],
-              ].map(([value, label]) => <button key={value} className="rounded bg-white/20 px-3 py-1.5 text-xs hover:bg-white/30" type="button" onClick={() => applyDashboardRange(value as Parameters<typeof applyDashboardRange>[0])}>{label}</button>)}
-              <input className="rounded px-2 py-1 text-xs text-slate-900" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              ].map(([value, label]) => <button key={value} className="rounded-md bg-white/20 px-3 py-1.5 text-xs hover:bg-white/30" type="button" onClick={() => applyDashboardRange(value as Parameters<typeof applyDashboardRange>[0])}>{label}</button>)}
+              <input className="rounded-md px-2 py-1 text-xs text-slate-900" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
               <span className="text-xs">→</span>
-              <input className="rounded px-2 py-1 text-xs text-slate-900" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+              <input className="rounded-md px-2 py-1 text-xs text-slate-900" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
             </div>
           </div>
         </div>
@@ -268,14 +268,14 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-2xl bg-white p-4 shadow-lg">
+          <div className="rounded-md bg-white p-4 shadow-lg">
             <h3 className="mb-3 font-bold text-slate-700">สถานะใบสั่งผลิต</h3>
             <div className="space-y-2">
               {byStatus.map((item) => <StatusBar key={item.status} count={item.count} max={Math.max(1, ...byStatus.map((row) => row.count))} status={item.status} />)}
               {!byStatus.length ? <div className="py-6 text-center text-sm text-slate-400">ยังไม่มีข้อมูล</div> : null}
             </div>
           </div>
-          <div className="overflow-hidden rounded-2xl bg-white shadow-lg lg:col-span-2">
+          <div className="overflow-hidden rounded-md bg-white shadow-lg lg:col-span-2">
             <div className="border-b bg-emerald-50 p-3"><h3 className="font-bold text-emerald-700">Top 10 สินค้าที่ผลิตมากสุด</h3></div>
             <table className="w-full text-sm">
               <thead className="bg-slate-50"><tr><th className="w-8 p-2 text-left">#</th><th className="p-2 text-left">Code</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">รอบ</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ต้นทุนรวม</th><th className="p-2 text-right">ต้นทุน/กก.</th></tr></thead>
@@ -287,7 +287,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
+        <div className="overflow-hidden rounded-md bg-white shadow-lg">
           <div className="border-b bg-indigo-50 p-3"><h3 className="font-bold text-indigo-700">Machine Utilization (ปริมาณผลิตต่อเครื่อง)</h3></div>
           <table className="w-full text-sm">
             <thead className="bg-slate-50"><tr><th className="p-2 text-left">เครื่องจักร</th><th className="p-2 text-right">รอบที่ใช้</th><th className="p-2 text-right">น้ำหนักผลิต</th></tr></thead>
@@ -305,22 +305,22 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="rounded-lg bg-white p-4 shadow">
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      <div className="rounded-md bg-white p-4 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-          <input className="rounded-lg border px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-          <button className="rounded-lg border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
-          {config.exportable ? <button className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" type="button" onClick={exportCsv}>Export CSV</button> : null}
+          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <input className="rounded-md border px-3 py-2 text-sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
+          {config.exportable ? <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" type="button" onClick={exportCsv}>Export CSV</button> : null}
         </div>
       </div>
       {mode === 'yieldLoss' ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           แสดง Yield/Loss + <b>P&amp;L Impact</b> — Output ขาดเกิน Normal = Loss สีแดง · Output เกินคาด = Gain สีเขียว · Net P&amp;L = Gain - Loss
         </div>
       ) : null}
       {mode === 'machine' ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
           <b>Machine Utilization</b> = ชั่วโมงประมาณการ / (8 ชม./วัน x จำนวนวัน) | <b>Yield Diff</b> = Actual Yield - Normal Yield
         </div>
       ) : null}
@@ -335,7 +335,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
         </div>
       ) : null}
       {mode === 'report' ? (
-        <div className="overflow-hidden rounded-xl bg-white shadow">
+        <div className="overflow-hidden rounded-md bg-white shadow">
           <h3 className="border-b px-4 py-3 font-semibold">📦 ผลผลิตแยกตามสินค้า</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -348,7 +348,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           </div>
         </div>
       ) : null}
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm table-zebra">
           <thead className="bg-slate-100">
             <tr>{config.columns.map((column) => <th key={column.key} className="whitespace-nowrap p-2 text-left">{column.label}</th>)}</tr>
@@ -369,7 +369,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
 }
 
 function Metric({ label, type, value }: { label: string; type?: 'money' | 'number' | 'percent'; value: number }) {
-  return <div className="rounded-lg bg-white p-3 shadow"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-lg font-bold text-slate-900">{formatCell(value, type)}</div></div>
+  return <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-lg font-bold text-slate-900">{formatCell(value, type)}</div></div>
 }
 
 function ImpactCard({ label, tone, value }: { label: string; tone: 'gain' | 'loss' | 'netBad' | 'netGood'; value: number }) {
@@ -380,7 +380,7 @@ function ImpactCard({ label, tone, value }: { label: string; tone: 'gain' | 'los
     netGood: 'border-blue-300 bg-blue-50 text-blue-700',
   }
   const prefix = tone === 'gain' || tone === 'netGood' ? '+' : tone === 'loss' ? '-' : ''
-  return <div className={`rounded-xl border-2 p-4 shadow ${classes[tone]}`}><div className="text-xs font-semibold">{label}</div><div className="mt-1 text-2xl font-bold">{prefix}{formatMoney(Math.abs(value))} ฿</div></div>
+  return <div className={`rounded-md border-2 p-4 shadow ${classes[tone]}`}><div className="text-xs font-semibold">{label}</div><div className="mt-1 text-2xl font-bold">{prefix}{formatMoney(Math.abs(value))} ฿</div></div>
 }
 
 function DashboardKpi({ label, note, tone, value }: { label: string; note: string; tone: 'amber' | 'blue' | 'emerald' | 'purple'; value: string }) {
@@ -390,20 +390,20 @@ function DashboardKpi({ label, note, tone, value }: { label: string; note: strin
     emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     purple: 'border-purple-200 bg-purple-50 text-purple-700',
   }
-  return <div className={`rounded-xl border p-3 ${classes[tone]}`}><div className="text-xs opacity-90">{label}</div><div className="text-2xl font-bold">{value}</div><div className="text-xs opacity-80">{note}</div></div>
+  return <div className={`rounded-md border p-3 ${classes[tone]}`}><div className="text-xs opacity-90">{label}</div><div className="text-2xl font-bold">{value}</div><div className="text-xs opacity-80">{note}</div></div>
 }
 
 function ChartPanel({ rows, title, type }: { rows: Array<{ input: number; label: string; loss: number; output: number }>; title: string; type: 'bar' | 'line' }) {
   const max = Math.max(1, ...rows.flatMap((row) => [row.input, row.output, row.loss]))
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-lg">
+    <div className="rounded-md bg-white p-4 shadow-lg">
       <h3 className="mb-2 font-bold text-slate-700">{title}</h3>
       <div className="flex h-[300px] items-end gap-2 overflow-x-auto border-b border-slate-100 pb-8">
         {rows.map((row) => (
           <div key={row.label} className="relative flex min-w-10 flex-1 items-end justify-center gap-1">
-            <div className={`${type === 'line' ? 'rounded-t' : 'rounded-t'} w-2 bg-blue-500`} style={{ height: `${Math.max(2, (row.input / max) * 240)}px` }} title={`Input ${formatMoney(row.input)}`} />
-            <div className="w-2 rounded-t bg-emerald-500" style={{ height: `${Math.max(2, (row.output / max) * 240)}px` }} title={`Output ${formatMoney(row.output)}`} />
-            {type === 'line' ? <div className="w-2 rounded-t bg-red-500" style={{ height: `${Math.max(2, (row.loss / max) * 240)}px` }} title={`Loss ${formatMoney(row.loss)}`} /> : null}
+            <div className={`${type === 'line' ? 'rounded-md-t' : 'rounded-md-t'} w-2 bg-blue-500`} style={{ height: `${Math.max(2, (row.input / max) * 240)}px` }} title={`Input ${formatMoney(row.input)}`} />
+            <div className="w-2 rounded-md-t bg-emerald-500" style={{ height: `${Math.max(2, (row.output / max) * 240)}px` }} title={`Output ${formatMoney(row.output)}`} />
+            {type === 'line' ? <div className="w-2 rounded-md-t bg-red-500" style={{ height: `${Math.max(2, (row.loss / max) * 240)}px` }} title={`Loss ${formatMoney(row.loss)}`} /> : null}
             <span className="absolute -bottom-6 text-[10px] text-slate-400">{row.label}</span>
           </div>
         ))}
@@ -418,13 +418,13 @@ function StatusBar({ count, max, status }: { count: number; max: number; status:
   return (
     <div className="text-sm">
       <div className="mb-1 flex justify-between"><span>{status}</span><b>{count}</b></div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-purple-500" style={{ width: `${Math.max(4, (count / max) * 100)}%` }} /></div>
+      <div className="h-2 overflow-hidden rounded-md-full bg-slate-100"><div className="h-full rounded-md-full bg-purple-500" style={{ width: `${Math.max(4, (count / max) * 100)}%` }} /></div>
     </div>
   )
 }
 
 function CostCard({ label, tone, value }: { label: string; tone?: 'red'; value: number }) {
-  return <div className="rounded-xl bg-white p-3 shadow"><div className="text-slate-500">{label}</div><div className={`text-base font-bold ${tone === 'red' ? 'text-red-700' : 'text-slate-900'}`}>{formatMoney(value)}</div></div>
+  return <div className="rounded-md bg-white p-3 shadow"><div className="text-slate-500">{label}</div><div className={`text-base font-bold ${tone === 'red' ? 'text-red-700' : 'text-slate-900'}`}>{formatMoney(value)}</div></div>
 }
 
 function costBreakdown(row: Row) {

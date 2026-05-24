@@ -20,6 +20,5 @@ as $$
   order by au.created_at desc
   limit 1;
 $$;
-
 grant execute on function public.lookup_app_login_email(text) to anon;
 grant execute on function public.lookup_app_login_email(text) to authenticated;

@@ -186,9 +186,9 @@ export function DailyPettyAdvancePageClient() {
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="rounded-xl bg-gradient-to-r from-purple-700 to-pink-600 p-5 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-5 text-white shadow">
         <h1 className="text-2xl font-bold">🏦 เงินสำรองจ่าย / กู้กรรมการ</h1>
         <p className="mt-1 text-sm opacity-90">ติดตามเงินที่จ่ายล่วงหน้าให้กรรมการ/พนักงานไปใช้จ่าย — รายละเอียดบิลที่จ่ายแต่ละก้อน + การคืนเงิน</p>
       </div>
@@ -202,11 +202,11 @@ export function DailyPettyAdvancePageClient() {
       </div>
 
       {topRecipients.length ? (
-        <div className="rounded-xl bg-white p-4 shadow">
+        <div className="rounded-md bg-white p-4 shadow">
           <div className="mb-2 font-bold text-slate-700">👥 Top 10 ผู้รับเงินที่ค้างคืน</div>
           <div className="grid gap-2 text-sm md:grid-cols-2">
             {topRecipients.map((recipient) => (
-              <div key={recipient.name} className="flex justify-between rounded border border-slate-200 bg-slate-50 p-2">
+              <div key={recipient.name} className="flex justify-between rounded-md border border-slate-200 bg-slate-50 p-2">
                 <div><b>{recipient.name}</b> · <span className="text-xs text-slate-500">{recipient.count} ครั้ง</span></div>
                 <div className={recipient.remaining > 0 ? 'font-bold text-red-700' : 'text-emerald-600'}>{formatMoney(recipient.remaining)} ค้าง</div>
               </div>
@@ -215,27 +215,27 @@ export function DailyPettyAdvancePageClient() {
         </div>
       ) : null}
 
-      <div className="rounded-xl bg-white p-3 shadow">
+      <div className="rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-56 flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="🔍 ค้นหา..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <select className="rounded-lg border px-2 py-2 text-sm" value={type} onChange={(event) => setType(event.target.value)}>
+          <input className="min-w-56 flex-1 rounded-md border px-3 py-2 text-sm" placeholder="🔍 ค้นหา..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <select className="rounded-md border px-2 py-2 text-sm" value={type} onChange={(event) => setType(event.target.value)}>
             <option value="">ทุกประเภท</option>
             <option value="DIRECTOR_LOAN">👔 กู้กรรมการ</option>
             <option value="PETTY_CASH">💵 เงินสำรองจ่าย</option>
           </select>
-          <select className="rounded-lg border px-2 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <select className="rounded-md border px-2 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">ทุกสถานะ</option>
             <option value="active">⏰ ค้างคืน</option>
             <option value="closed">✓ ปิดแล้ว</option>
             <option value="cancelled">⊘ ยกเลิก</option>
           </select>
-          <button className="ml-auto rounded-lg bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700" type="button" onClick={openCreateForm}>+ จ่ายล่วงหน้าใหม่</button>
+          <button className="ml-auto rounded-md bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700" type="button" onClick={openCreateForm}>+ จ่ายล่วงหน้าใหม่</button>
         </div>
       </div>
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form noValidate className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl" onSubmit={saveForm}>
+          <form noValidate className="w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
             <div className="flex items-center justify-between border-b bg-purple-50 px-5 py-4">
               <h3 className="font-bold">{form.id ? '✏️ แก้ไข' : '+ จ่ายเงินสำรอง/กู้'}</h3>
               <button className="text-2xl text-slate-400" type="button" onClick={() => setFormOpen(false)}>&times;</button>
@@ -245,7 +245,7 @@ export function DailyPettyAdvancePageClient() {
               <TextField error={fieldErrors.date} label="วันที่" required type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
               <label className="block text-sm font-medium">
                 ประเภท <span className="text-red-600">*</span>
-                <select className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as 'DIRECTOR_LOAN' | 'PETTY_CASH' })}>
+                <select className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as 'DIRECTOR_LOAN' | 'PETTY_CASH' })}>
                   <option value="DIRECTOR_LOAN">👔 กู้กรรมการ</option>
                   <option value="PETTY_CASH">💵 เงินสำรองจ่าย</option>
                 </select>
@@ -258,8 +258,8 @@ export function DailyPettyAdvancePageClient() {
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t px-5 py-4">
-              <button className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-              <button className="rounded-lg bg-purple-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : '💾 บันทึก + จ่ายเงิน'}</button>
+              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-purple-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : '💾 บันทึก + จ่ายเงิน'}</button>
             </div>
           </form>
         </div>
@@ -267,18 +267,18 @@ export function DailyPettyAdvancePageClient() {
 
       {returningRow ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form className="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl" onSubmit={saveReturn}>
+          <form className="w-full max-w-md overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveReturn}>
             <div className="border-b bg-emerald-50 px-5 py-4 font-bold text-emerald-800">💵 คืนเงิน — {returningRow.docNo} / {returningRow.recipientName}</div>
             <div className="space-y-3 p-5 text-sm">
-              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">ยอดจ่ายล่วงหน้า: <b>{formatMoney(returningRow.amount)}</b> · ใช้ไปแล้ว: <b>{formatMoney(returningRow.spent)}</b> · คืนแล้ว: <b>{formatMoney(returningRow.returned)}</b> · <span className="font-bold text-red-700">คงค้าง: {formatMoney(returningRow.remaining)}</span></div>
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">ยอดจ่ายล่วงหน้า: <b>{formatMoney(returningRow.amount)}</b> · ใช้ไปแล้ว: <b>{formatMoney(returningRow.spent)}</b> · คืนแล้ว: <b>{formatMoney(returningRow.returned)}</b> · <span className="font-bold text-red-700">คงค้าง: {formatMoney(returningRow.remaining)}</span></div>
               <TextField label="วันที่คืน" required type="date" value={returnForm.date} onChange={(value) => setReturnForm({ ...returnForm, date: value })} />
               <TextField label="จำนวนเงินคืน" required type="number" value={returnForm.amount} onChange={(value) => setReturnForm({ ...returnForm, amount: value })} />
               <SelectField error={undefined} label="บัญชีรับคืน" value={returnForm.accountId} onChange={(value) => setReturnForm({ ...returnForm, accountId: value })} options={accounts.filter((account) => account.active)} />
               <TextField label="หมายเหตุ" value={returnForm.notes} onChange={(value) => setReturnForm({ ...returnForm, notes: value })} />
             </div>
             <div className="flex justify-end gap-2 border-t px-5 py-4">
-              <button className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setReturningRow(null)}>ยกเลิก</button>
-              <button className="rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">บันทึกคืนเงิน</button>
+              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100" type="button" onClick={() => setReturningRow(null)}>ยกเลิก</button>
+              <button className="rounded-md bg-emerald-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSaving} type="submit">บันทึกคืนเงิน</button>
             </div>
           </form>
         </div>
@@ -290,7 +290,7 @@ export function DailyPettyAdvancePageClient() {
 
       {detailRow ? <DetailModal row={detailRow} onClose={() => setDetailRow(null)} /> : null}
 
-      <div className="overflow-x-auto rounded-xl bg-white shadow">
+      <div className="overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -312,7 +312,7 @@ export function DailyPettyAdvancePageClient() {
               <tr key={row.id} className="border-t hover:bg-purple-50">
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
                 <td className="p-2">{row.date}</td>
-                <td className="p-2"><span className={`rounded px-2 py-0.5 text-xs ${row.type === 'DIRECTOR_LOAN' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>{row.type === 'DIRECTOR_LOAN' ? '👔 กู้กรรมการ' : '💵 เงินสำรองจ่าย'}</span></td>
+                <td className="p-2"><span className={`rounded-md px-2 py-0.5 text-xs ${row.type === 'DIRECTOR_LOAN' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>{row.type === 'DIRECTOR_LOAN' ? '👔 กู้กรรมการ' : '💵 เงินสำรองจ่าย'}</span></td>
                 <td className="p-2 font-medium">{row.recipientName}</td>
                 <td className="p-2 text-right">{formatMoney(row.amount)}</td>
                 <td className="p-2 text-right text-blue-700">{row.spent > 0 ? <button className="hover:underline" type="button" onClick={() => setDetailRow(row)}>{formatMoney(row.spent)}</button> : '-'}</td>
@@ -321,8 +321,8 @@ export function DailyPettyAdvancePageClient() {
                 <td className="p-2 text-center"><StatusBadge status={row.status} /></td>
                 <td className="space-x-1 whitespace-nowrap p-2 text-right">
                   <button className="text-xs text-blue-600 hover:underline" title="ดูรายละเอียด" type="button" onClick={() => setDetailRow(row)}>🔍</button>
-                  {row.status === 'active' && row.remaining > 0 ? <button className="rounded bg-emerald-600 px-2 py-1 text-xs text-white" type="button" onClick={() => { setReturningRow(row); setReturnForm({ accountId: row.accountId, amount: String(Math.max(0, row.remaining)), date: todayDateInput(), notes: '' }) }}>💵 คืนเงิน</button> : null}
-                  {row.status === 'active' ? <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>จัดการ</button> : null}
+                  {row.status === 'active' && row.remaining > 0 ? <button className="rounded-md bg-emerald-600 px-2 py-1 text-xs text-white" type="button" onClick={() => { setReturningRow(row); setReturnForm({ accountId: row.accountId, amount: String(Math.max(0, row.remaining)), date: todayDateInput(), notes: '' }) }}>💵 คืนเงิน</button> : null}
+                  {row.status === 'active' ? <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>จัดการ</button> : null}
                   <button className="text-xs text-red-300" disabled type="button">🗑</button>
                 </td>
               </tr>
@@ -339,7 +339,7 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: PettyAdvanceR
   const returns = row.returns ?? []
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4" onClick={onClose}>
-      <div className="mx-auto my-4 max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="mx-auto my-4 max-w-4xl overflow-hidden rounded-md bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between border-b bg-purple-50 px-5 py-3">
           <div>
             <h3 className="text-lg font-bold">📋 รายละเอียด {row.docNo} — {row.recipientName}</h3>
@@ -349,15 +349,15 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: PettyAdvanceR
         </div>
         <div className="space-y-4 p-5 text-sm">
           <div className="grid gap-2 md:grid-cols-4">
-            <div className="rounded bg-blue-50 p-2 text-center"><div className="text-xs text-blue-700">จ่ายล่วงหน้า</div><div className="font-bold">{formatMoney(row.amount)}</div></div>
-            <div className="rounded bg-amber-50 p-2 text-center"><div className="text-xs text-amber-700">ใช้ไปแล้ว</div><div className="font-bold">{formatMoney(row.spent)}</div></div>
-            <div className="rounded bg-emerald-50 p-2 text-center"><div className="text-xs text-emerald-700">คืนแล้ว</div><div className="font-bold">{formatMoney(row.returned)}</div></div>
-            <div className="rounded bg-red-50 p-2 text-center"><div className="text-xs text-red-700">คงค้าง</div><div className="font-bold">{formatMoney(row.remaining)}</div></div>
+            <div className="rounded-md bg-blue-50 p-2 text-center"><div className="text-xs text-blue-700">จ่ายล่วงหน้า</div><div className="font-bold">{formatMoney(row.amount)}</div></div>
+            <div className="rounded-md bg-amber-50 p-2 text-center"><div className="text-xs text-amber-700">ใช้ไปแล้ว</div><div className="font-bold">{formatMoney(row.spent)}</div></div>
+            <div className="rounded-md bg-emerald-50 p-2 text-center"><div className="text-xs text-emerald-700">คืนแล้ว</div><div className="font-bold">{formatMoney(row.returned)}</div></div>
+            <div className="rounded-md bg-red-50 p-2 text-center"><div className="text-xs text-red-700">คงค้าง</div><div className="font-bold">{formatMoney(row.remaining)}</div></div>
           </div>
 
           <div>
             <div className="mb-2 font-bold text-purple-700">📝 บิลค่าใช้จ่ายที่จ่ายจากเงินก้อนนี้</div>
-            <div className="rounded border border-slate-200 py-4 text-center text-slate-400">ยังไม่มีบิลที่ link อยู่ใน payload ปัจจุบัน</div>
+            <div className="rounded-md border border-slate-200 py-4 text-center text-slate-400">ยังไม่มีบิลที่ link อยู่ใน payload ปัจจุบัน</div>
           </div>
 
           <div>
@@ -376,11 +376,11 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: PettyAdvanceR
                   ))}
                 </tbody>
               </table>
-            ) : <div className="rounded border border-slate-200 py-4 text-center text-slate-400">ยังไม่มีประวัติคืนเงิน</div>}
+            ) : <div className="rounded-md border border-slate-200 py-4 text-center text-slate-400">ยังไม่มีประวัติคืนเงิน</div>}
           </div>
         </div>
         <div className="flex justify-end border-t bg-slate-50 px-5 py-3">
-          <button className="rounded bg-slate-300 px-4 py-2 text-sm" type="button" onClick={onClose}>ปิด</button>
+          <button className="rounded-md bg-slate-300 px-4 py-2 text-sm" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
     </div>
@@ -388,9 +388,9 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: PettyAdvanceR
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === 'active') return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">⏰ ค้างคืน</span>
-  if (status === 'closed') return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">✓ ปิดแล้ว</span>
-  return <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-500">⊘ ยกเลิก</span>
+  if (status === 'active') return <span className="rounded-md-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">⏰ ค้างคืน</span>
+  if (status === 'closed') return <span className="rounded-md-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">✓ ปิดแล้ว</span>
+  return <span className="rounded-md-full bg-slate-200 px-2 py-0.5 text-xs text-slate-500">⊘ ยกเลิก</span>
 }
 
 function SummaryCard({ label, tone, value }: { label: string; tone?: 'amber' | 'blue' | 'emerald' | 'red'; value: string }) {
@@ -403,14 +403,14 @@ function SummaryCard({ label, tone, value }: { label: string; tone?: 'amber' | '
         : tone === 'red'
           ? 'bg-red-50 text-red-800'
           : 'bg-white text-slate-900'
-  return <div className={`rounded-xl p-3 shadow ${className}`}><div className="text-xs opacity-80">{label}</div><div className="text-xl font-bold">{value}</div></div>
+  return <div className={`rounded-md p-3 shadow ${className}`}><div className="text-xs opacity-80">{label}</div><div className="text-xl font-bold">{value}</div></div>
 }
 
 function TextField(props: { error?: string; label: string; onChange?: (value: string) => void; readOnly?: boolean; required?: boolean; type?: string; value: string }) {
   return (
     <label className="block text-sm font-medium">
       {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
-      <input className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'} ${props.readOnly ? 'bg-slate-50' : ''}`} readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange?.(event.target.value)} />
+      <input className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'} ${props.readOnly ? 'bg-slate-50' : ''}`} readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange?.(event.target.value)} />
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
   )
@@ -420,7 +420,7 @@ function SelectField(props: { error?: string; label: string; onChange: (value: s
   return (
     <label className="block text-sm font-medium">
       {props.label} <span className="text-red-600">*</span>
-      <select className={`mt-1.5 w-full rounded-lg border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
+      <select className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
         <option value="">ไม่ระบุ</option>
         {props.options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
       </select>

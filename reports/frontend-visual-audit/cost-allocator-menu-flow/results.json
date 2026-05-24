@@ -1,0 +1,24 @@
+[
+  {
+    "appName": "live",
+    "clicked": true,
+    "currentUrl": "https://sirimasth.github.io/ns-scrap-erp/",
+    "consoleMessages": [
+      "warning: cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
+      "warning: [loadDB] ⚠ localStorage ว่าง — load seed (PUSH BLOCKED). รอ pull cloud ก่อน",
+      "warning: [loadDB] ⏰ pull cloud timeout 10s — auto-skip → continue offline mode",
+      "error: Failed to load resource: the server responded with a status of 400 ()",
+      "warning: Supabase login failed, trying local: Invalid login credentials"
+    ],
+    "screenshot": "reports/frontend-visual-audit/cost-allocator-menu-flow/costAllocator-live-desktop.png",
+    "text": "Cost Allocator (Dual Costing) — สำหรับทองแดง · ทองเหลือง เท่านั้น 💡 หมวดอื่นใช้ WAC อัตโนมัติ ไม่ต้องผ่าน Cost Allocator · ⓪ แหล่งขาย → ① สินค้า → ② รายการขาย → Match ต้นทุน Cost Pool ⓪ เลือกแหล่งขายที่จะ Allocate ต้นทุน 📋 PO Sell (มี PO ขาย) 🛒 Spot Sell (บิลขายไม่มี PO — ทองแดง/ทองเหลือง) ① เลือกสินค้าที่ต้องการ Match ต้นทุน — เลือกสินค้า —"
+  },
+  {
+    "appName": "vue",
+    "clicked": true,
+    "currentUrl": "http://localhost:5174/dual-costing/cost-allocator",
+    "consoleMessages": [],
+    "screenshot": "reports/frontend-visual-audit/cost-allocator-menu-flow/costAllocator-vue-desktop.png",
+    "text": "Cost Allocator — เลือกสินค้า → เลือกPO ขาย → Auto/Manual Match ต้นทุนจาก Cost Pool ① เลือกสินค้าที่ต้องการ Match ต้นทุน — เลือกสินค้า — CU-A - Copper Scrap A · ทองแดง BR-I - Brass Ingot · ทองเหลือง"
+  }
+]

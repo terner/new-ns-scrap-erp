@@ -267,17 +267,17 @@ export function ProductsPageClient() {
   return (
     <section className="space-y-4">
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <div className="font-bold">โหลดหรือบันทึกข้อมูลสินค้าไม่ได้</div>
           <div className="mt-1">{error}</div>
         </div>
       ) : null}
 
-      <div className="rounded-xl bg-white p-3 shadow">
+      <div className="rounded-md bg-white p-3 shadow">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="grid w-full gap-2 md:grid-cols-2 xl:max-w-4xl xl:grid-cols-[minmax(0,1fr)_170px_190px_130px]">
             <input
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-md border px-3 py-2 text-sm"
               onChange={(event) => {
                 setPage(1)
                 setSearch(event.target.value)
@@ -288,7 +288,7 @@ export function ProductsPageClient() {
             />
             <select
               aria-label="กรองประเภทสินค้า"
-              className="rounded-lg border px-3 py-2 text-sm"
+              className="rounded-md border px-3 py-2 text-sm"
               value={productTypeFilter}
               onChange={(event) => {
                 setPage(1)
@@ -300,7 +300,7 @@ export function ProductsPageClient() {
             </select>
             <select
               aria-label="กรองประเภทคลังที่จะรับเข้า"
-              className="rounded-lg border px-3 py-2 text-sm"
+              className="rounded-md border px-3 py-2 text-sm"
               value={itemStatusFilter}
               onChange={(event) => {
                 setPage(1)
@@ -312,7 +312,7 @@ export function ProductsPageClient() {
             </select>
             <select
               aria-label="กรองสถานะใช้งาน"
-              className="rounded-lg border px-3 py-2 text-sm"
+              className="rounded-md border px-3 py-2 text-sm"
               value={activeFilter}
               onChange={(event) => {
                 setPage(1)
@@ -325,13 +325,13 @@ export function ProductsPageClient() {
             </select>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700" type="button" onClick={resetFilters}>
+            <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700" type="button" onClick={resetFilters}>
               ล้างตัวกรอง
             </button>
-            <button className="rounded bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
+            <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
               {isExporting ? 'กำลัง Export...' : '📊 Export Excel'}
             </button>
-            <label className={`cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm font-bold text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
+            <label className={`cursor-pointer rounded-md bg-blue-600 px-3 py-2 text-sm font-bold text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
               {isImporting ? 'กำลัง Import...' : 'Import Excel'}
               <input
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -344,7 +344,7 @@ export function ProductsPageClient() {
                 }}
               />
             </label>
-            <button className="rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={openCreateForm}>
+            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={openCreateForm}>
               + เพิ่มสินค้า
             </button>
           </div>
@@ -359,7 +359,7 @@ export function ProductsPageClient() {
           <div className="flex flex-wrap items-center gap-2">
             <select
               aria-label="จำนวนรายการต่อหน้า"
-              className="rounded border border-slate-300 px-2 py-1"
+              className="rounded-md border border-slate-300 px-2 py-1"
               value={pageSize}
               onChange={(event) => {
                 setPage(1)
@@ -371,13 +371,13 @@ export function ProductsPageClient() {
               <option value={50}>50 / หน้า</option>
               <option value={100}>100 / หน้า</option>
             </select>
-            <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page <= 1 || isLoading} type="button" onClick={() => setPage(Math.max(1, page - 1))}>
+            <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page <= 1 || isLoading} type="button" onClick={() => setPage(Math.max(1, page - 1))}>
               ก่อนหน้า
             </button>
             <span className="px-1">
               หน้า {currentPage.toLocaleString('th-TH')} / {totalPages.toLocaleString('th-TH')}
             </span>
-            <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page >= totalPages || isLoading} type="button" onClick={() => setPage(Math.min(totalPages, currentPage + 1))}>
+            <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={page >= totalPages || isLoading} type="button" onClick={() => setPage(Math.min(totalPages, currentPage + 1))}>
               ถัดไป
             </button>
           </div>
@@ -402,10 +402,10 @@ export function ProductsPageClient() {
         </div>
       ) : null}
 
-      {isLoading ? <div className="rounded-xl bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูลสินค้า</div> : null}
+      {isLoading ? <div className="rounded-md bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูลสินค้า</div> : null}
 
       {!isLoading ? (
-        <div className="overflow-x-auto rounded-xl bg-white shadow">
+        <div className="overflow-x-auto rounded-md bg-white shadow">
           <table className="w-full text-sm">
             <thead className="bg-slate-100">
               <tr>
@@ -508,7 +508,7 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
   }
 
   return (
-    <form className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
+    <form className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-bold text-slate-900">{form.id ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า'}</h3>
         <ActiveToggle checked={form.active} onChange={(checked) => update('active', checked)} />
@@ -540,10 +540,10 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
       </div>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
-        <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onCancel}>
+        <button className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
-        <button className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60" disabled={isSaving} type="submit">
+        <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60" disabled={isSaving} type="submit">
           {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>
@@ -560,7 +560,7 @@ function StockStatusBadge({ value }: { value: Product['itemStatus'] }) {
         ? 'bg-red-50 text-red-700'
         : 'bg-blue-50 text-blue-700'
 
-  return <span className={`inline-flex min-w-[112px] justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${className}`}>{value} · {stockStatusLabel(value)}</span>
+  return <span className={`inline-flex min-w-[112px] justify-center rounded-md-full px-2 py-0.5 text-xs font-semibold ${className}`}>{value} · {stockStatusLabel(value)}</span>
 }
 
 type SelectFieldProps = {
@@ -576,7 +576,7 @@ function SelectField({ children, error, label, value, onChange }: SelectFieldPro
     <label className="block text-sm font-medium">
       {label}
       <select
-        className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700"
+        className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -603,7 +603,7 @@ function TextField({ className = '', error, label, list, readOnly = false, type 
     <label className={`block text-sm font-medium ${className}`}>
       {label}
       <input
-        className={`mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 ${readOnly ? 'bg-slate-50' : ''}`}
+        className={`mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 ${readOnly ? 'bg-slate-50' : ''}`}
         list={list}
         min={type === 'number' ? 0 : undefined}
         readOnly={readOnly}

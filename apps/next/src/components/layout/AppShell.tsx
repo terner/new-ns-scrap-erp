@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { AuthStatus } from '@/components/layout/AuthStatus'
+import { SELECTED_BRANCH_KEY } from '@/lib/branch-selection'
 import { breadcrumbsForPath, pageTitleForPath } from '@/lib/navigation'
 
 type AppShellProps = {
@@ -17,7 +18,6 @@ type BranchOption = {
   name: string
 }
 
-const SELECTED_BRANCH_KEY = 'ns-scrap-erp-selected-branch-id'
 const PAGE_TITLE_EVENT = 'ns-scrap-erp-page-title'
 
 export function AppShell({ children }: AppShellProps) {
@@ -130,7 +130,7 @@ export function AppShell({ children }: AppShellProps) {
     <div className="flex h-screen overflow-hidden bg-slate-100 text-slate-900">
       <aside className={`${sidebarOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} w-64 flex-shrink-0 flex-col bg-slate-900 text-slate-200 lg:relative lg:flex`}>
         <div className="flex items-center gap-3 border-b border-slate-700 p-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white">NS</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white">NS</div>
           <div>
             <div className="font-bold text-white">NS Scrap ERP</div>
             <div className="text-xs text-slate-400">ระบบบริหารจัดการ</div>
@@ -152,7 +152,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <select aria-label="เลือกสาขา" className="hidden rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm sm:block" value={selectedBranchId} onChange={(event) => handleBranchChange(event.target.value)}>
+            <select aria-label="เลือกสาขา" className="hidden rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm sm:block" value={selectedBranchId} onChange={(event) => handleBranchChange(event.target.value)}>
               <option value="all">ทุกสาขา</option>
               {branches.map((branch) => (
                 <option key={branch.id} value={branch.id}>

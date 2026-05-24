@@ -38,15 +38,15 @@ export function TaxVatWhtPageClient() {
       {error ? <ErrorBox message={error} /> : null}
       <FilterPanel>
         <label className="text-sm">งวด</label>
-        <select className="rounded border px-2 py-1.5 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>{MONTHS.map((item) => <option key={item} value={item}>เดือน {item}</option>)}</select>
-        <select className="rounded border px-2 py-1.5 text-sm" value={year} onChange={(event) => setYear(event.target.value)}>{YEARS.map((item) => <option key={item} value={String(item)}>ปี {item}</option>)}</select>
+        <select className="rounded-md border px-2 py-1.5 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>{MONTHS.map((item) => <option key={item} value={item}>เดือน {item}</option>)}</select>
+        <select className="rounded-md border px-2 py-1.5 text-sm" value={year} onChange={(event) => setYear(event.target.value)}>{YEARS.map((item) => <option key={item} value={String(item)}>ปี {item}</option>)}</select>
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
         <span className="text-xs text-slate-500">ช่วง {data?.filters.periodStart ?? `${year}-${month}-01`} ถึง {data?.filters.periodEnd ?? '-'}</span>
         <DisabledButton>📥 Excel</DisabledButton>
       </FilterPanel>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600 via-pink-700 to-fuchsia-800 p-6 text-white shadow-lg">
+        <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-rose-600 via-pink-700 to-fuchsia-800 p-6 text-white shadow-lg">
           <div className="text-sm uppercase tracking-wider opacity-80">🧾 VAT Payable งวด {year}-{month}</div>
           <div className="mt-2 text-4xl font-bold md:text-5xl">{money(data?.summary.vatPayable)}</div>
           <div className="mt-1 text-sm opacity-90">บาท · {(data?.summary.vatPayable ?? 0) >= 0 ? 'ต้องนำส่ง' : 'ภาษีซื้อรอใช้เครดิต'}</div>
@@ -105,27 +105,27 @@ function money(value?: number) {
 }
 
 function Hero() {
-  return <div className="rounded-xl bg-gradient-to-r from-rose-600 to-pink-700 p-5 text-white shadow"><h1 className="text-xl font-bold md:text-2xl">🧾 Tax / VAT / WHT</h1><p className="mt-1 text-sm opacity-80">VAT ซื้อ-ขาย · VAT Payable · WHT ถูกหัก / หักไว้ · Tax Calendar 6 เดือน · เอกสารภาษีไม่ครบ</p></div>
+  return <div className="rounded-md bg-gradient-to-r from-rose-600 to-pink-700 p-5 text-white shadow"><h1 className="text-xl font-bold md:text-2xl">🧾 Tax / VAT / WHT</h1><p className="mt-1 text-sm opacity-80">VAT ซื้อ-ขาย · VAT Payable · WHT ถูกหัก / หักไว้ · Tax Calendar 6 เดือน · เอกสารภาษีไม่ครบ</p></div>
 }
 
 function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
-  return <div className="rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Tax read/design baseline</b><span className="ml-2">สรุปจาก transaction fields ยังไม่ใช่แบบยื่นภาษีหรือบัญชีภาษีปิดงวด</span>{sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}</div>
+  return <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Tax read/design baseline</b><span className="ml-2">สรุปจาก transaction fields ยังไม่ใช่แบบยื่นภาษีหรือบัญชีภาษีปิดงวด</span>{sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}</div>
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded border bg-white px-2 py-1.5 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="rounded-md border bg-white px-2 py-1.5 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function DisabledButton({ children }: { children: ReactNode }) {
-  return <button className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-bold text-white opacity-50" disabled type="button">{children}</button>
+  return <button className="rounded-md bg-slate-800 px-3 py-2 text-sm font-bold text-white opacity-50" disabled type="button">{children}</button>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-2xl bg-white p-4 shadow"><div className="mb-2 text-xs font-bold text-slate-700">{title}</div>{children}</div>
+  return <div className="rounded-md bg-white p-4 shadow"><div className="mb-2 text-xs font-bold text-slate-700">{title}</div>{children}</div>
 }
 
 function MiniHero({ label, tone, value }: { label: string; tone: 'blue' | 'emerald'; value: string }) {
@@ -141,27 +141,27 @@ function Donut({ input, net, output }: { input: number; net: number; output: num
 
 function WhtBox({ label, tone, value }: { label: string; tone: 'amber' | 'purple' | 'red'; value: string }) {
   const color = tone === 'amber' ? 'border-amber-500 bg-amber-50 text-amber-700' : tone === 'purple' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-red-500 bg-red-50 text-red-700'
-  return <div className={`rounded-lg border-l-4 p-3 ${color}`}><div className="text-[11px]">{label}</div><div className="text-2xl font-bold">{value}</div></div>
+  return <div className={`rounded-md border-l-4 p-3 ${color}`}><div className="text-[11px]">{label}</div><div className="text-2xl font-bold">{value}</div></div>
 }
 
 function CalendarBars({ max, row }: { max: number; row: TaxPayload['taxCalendar'][number] }) {
   const height = (value: number) => `${Math.max(4, Math.abs(value) / max * 112)}px`
-  return <div className="min-w-24 rounded-lg bg-slate-50 p-2 text-center text-xs"><div className="flex h-32 items-end justify-center gap-1"><span className="w-5 rounded-t bg-emerald-500" style={{ height: height(row.vOut) }} /><span className="w-5 rounded-t bg-blue-500" style={{ height: height(row.vIn) }} /><span className={`w-5 rounded-t ${row.vatPayable >= 0 ? 'bg-red-500' : 'bg-emerald-700'}`} style={{ height: height(row.vatPayable) }} /></div><div className="mt-1 font-bold text-slate-600">{row.periodLabel.slice(5)}</div></div>
+  return <div className="min-w-24 rounded-md bg-slate-50 p-2 text-center text-xs"><div className="flex h-32 items-end justify-center gap-1"><span className="w-5 rounded-md-t bg-emerald-500" style={{ height: height(row.vOut) }} /><span className="w-5 rounded-md-t bg-blue-500" style={{ height: height(row.vIn) }} /><span className={`w-5 rounded-md-t ${row.vatPayable >= 0 ? 'bg-red-500' : 'bg-emerald-700'}`} style={{ height: height(row.vatPayable) }} /></div><div className="mt-1 font-bold text-slate-600">{row.periodLabel.slice(5)}</div></div>
 }
 
 function StatCard({ label, sub, tone, value }: { label: string; sub?: string; tone: 'amber' | 'blue' | 'emerald' | 'purple' | 'red'; value: string }) {
   const color = { amber: 'border-amber-500 text-amber-700', blue: 'border-blue-500 text-blue-700', emerald: 'border-emerald-500 text-emerald-700', purple: 'border-purple-500 text-purple-700', red: 'border-red-500 text-red-700' }[tone]
-  return <div className={`rounded-xl border-l-4 bg-white p-3 shadow ${color}`}><div className="text-xs text-slate-500">{label}</div><div className="text-lg font-bold">{value}</div>{sub ? <div className="text-xs text-slate-400">{sub}</div> : null}</div>
+  return <div className={`rounded-md border-l-4 bg-white p-3 shadow ${color}`}><div className="text-xs text-slate-500">{label}</div><div className="text-lg font-bold">{value}</div>{sub ? <div className="text-xs text-slate-400">{sub}</div> : null}</div>
 }
 
 function TaxTable({ hasDoc = false, isLoading, rows, title, tone, valueKey }: { hasDoc?: boolean; isLoading: boolean; rows: TaxItem[]; title: string; tone: 'amber' | 'blue' | 'emerald' | 'purple'; valueKey: 'vat' | 'wht' }) {
   const heading = { amber: 'bg-amber-50 text-amber-700', blue: 'bg-blue-50 text-blue-700', emerald: 'bg-emerald-50 text-emerald-700', purple: 'bg-purple-50 text-purple-700' }[tone]
   const valueColor = { amber: 'text-amber-700', blue: 'text-blue-700', emerald: 'text-emerald-700', purple: 'text-purple-700' }[tone]
-  return <div className="overflow-hidden rounded-xl bg-white shadow"><div className={`border-b p-3 font-bold ${heading}`}>{title}</div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>วันที่</Th><Th>เลขที่</Th><Th>คู่ค้า</Th><Th align="right">ฐาน</Th><Th align="right">{valueKey === 'vat' ? 'VAT' : 'WHT'}</Th>{hasDoc ? <Th align="center">เอกสาร</Th> : null}</tr></thead><tbody><LoadingOrEmpty colSpan={hasDoc ? 6 : 5} isLoading={isLoading} rows={rows.length} />{rows.map((item) => <tr key={`${item.source}-${item.no}`} className="border-t"><Td>{item.date}</Td><Td><span className="font-mono text-xs">{item.no}</span></Td><Td>{item.party}</Td><Td align="right">{money(item.base)}</Td><Td align="right"><span className={`font-bold ${valueColor}`}>{money(item[valueKey])}</span></Td>{hasDoc ? <Td align="center">{item.hasDoc ? '✓' : '✗ ขาด'}</Td> : null}</tr>)}</tbody></table></div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow"><div className={`border-b p-3 font-bold ${heading}`}>{title}</div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>วันที่</Th><Th>เลขที่</Th><Th>คู่ค้า</Th><Th align="right">ฐาน</Th><Th align="right">{valueKey === 'vat' ? 'VAT' : 'WHT'}</Th>{hasDoc ? <Th align="center">เอกสาร</Th> : null}</tr></thead><tbody><LoadingOrEmpty colSpan={hasDoc ? 6 : 5} isLoading={isLoading} rows={rows.length} />{rows.map((item) => <tr key={`${item.source}-${item.no}`} className="border-t"><Td>{item.date}</Td><Td><span className="font-mono text-xs">{item.no}</span></Td><Td>{item.party}</Td><Td align="right">{money(item.base)}</Td><Td align="right"><span className={`font-bold ${valueColor}`}>{money(item[valueKey])}</span></Td>{hasDoc ? <Td align="center">{item.hasDoc ? '✓' : '✗ ขาด'}</Td> : null}</tr>)}</tbody></table></div></div>
 }
 
 function CalendarTable({ rows }: { rows: TaxPayload['taxCalendar'] }) {
-  return <div className="overflow-hidden rounded-xl bg-white shadow"><div className="border-b bg-slate-100 p-3 font-bold text-slate-700">📅 Tax Calendar — 6 เดือนล่าสุด</div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50"><tr><Th>งวด</Th><Th align="right">VAT ขาย</Th><Th align="right">VAT ซื้อ</Th><Th align="right">VAT Payable</Th><Th>VAT Due (PP30)</Th><Th align="right">WHT หักไว้</Th><Th align="right">WHT ถูกหัก</Th><Th>WHT Due (ภงด.)</Th></tr></thead><tbody>{rows.map((row) => <tr key={row.periodLabel} className="border-t hover:bg-slate-50"><Td><b>{row.periodLabel}</b></Td><Td align="right"><span className="text-emerald-700">{money(row.vOut)}</span></Td><Td align="right"><span className="text-blue-700">{money(row.vIn)}</span></Td><Td align="right"><span className="font-bold text-red-700">{money(row.vatPayable)}</span></Td><Td>{row.vatDue}</Td><Td align="right"><span className="text-amber-700">{money(row.wC)}</span></Td><Td align="right"><span className="text-purple-700">{money(row.wW)}</span></Td><Td>{row.whtDue}</Td></tr>)}</tbody></table></div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow"><div className="border-b bg-slate-100 p-3 font-bold text-slate-700">📅 Tax Calendar — 6 เดือนล่าสุด</div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50"><tr><Th>งวด</Th><Th align="right">VAT ขาย</Th><Th align="right">VAT ซื้อ</Th><Th align="right">VAT Payable</Th><Th>VAT Due (PP30)</Th><Th align="right">WHT หักไว้</Th><Th align="right">WHT ถูกหัก</Th><Th>WHT Due (ภงด.)</Th></tr></thead><tbody>{rows.map((row) => <tr key={row.periodLabel} className="border-t hover:bg-slate-50"><Td><b>{row.periodLabel}</b></Td><Td align="right"><span className="text-emerald-700">{money(row.vOut)}</span></Td><Td align="right"><span className="text-blue-700">{money(row.vIn)}</span></Td><Td align="right"><span className="font-bold text-red-700">{money(row.vatPayable)}</span></Td><Td>{row.vatDue}</Td><Td align="right"><span className="text-amber-700">{money(row.wC)}</span></Td><Td align="right"><span className="text-purple-700">{money(row.wW)}</span></Td><Td>{row.whtDue}</Td></tr>)}</tbody></table></div></div>
 }
 
 function LoadingOrEmpty({ colSpan, isLoading, rows }: { colSpan: number; isLoading: boolean; rows: number }) {
@@ -181,5 +181,5 @@ function Td({ align = 'left', children }: { align?: 'center' | 'left' | 'right';
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
+  return <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{message}</div>
 }

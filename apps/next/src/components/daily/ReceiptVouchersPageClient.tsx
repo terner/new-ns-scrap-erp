@@ -80,16 +80,16 @@ export function ReceiptVouchersPageClient() {
   return (
     <>
       <section className="space-y-4 print:hidden">
-        {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-        <div className="rounded-lg border-l-4 border-blue-400 bg-blue-50 p-3 shadow-sm">
+        <div className="rounded-md border-l-4 border-blue-400 bg-blue-50 p-3 shadow-sm">
           <h2 className="text-xl font-bold text-slate-900">🧾 ใบสำคัญรับเงิน (Receipt Voucher)</h2>
           <p className="mt-1 text-sm text-slate-600">ใช้ออกให้ Supplier บุคคลธรรมดาเซ็นรับเงิน (กรณีไม่มีใบเสร็จของ Supplier) — ดึงข้อมูลจากบิลซื้อ + แก้ไขส่วนที่ขาดได้ + พิมพ์ออกได้</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <input className="min-w-[260px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="🔍 ค้นเลขที่ / ชื่อผู้รับ / เลขบิลซื้อ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white opacity-60" disabled type="button">+ สร้างใบสำคัญรับเงิน</button>
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+          <input className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="🔍 ค้นเลขที่ / ชื่อผู้รับ / เลขบิลซื้อ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white opacity-60" disabled type="button">+ สร้างใบสำคัญรับเงิน</button>
         </div>
 
         <div className="grid gap-3 md:grid-cols-4">
@@ -99,7 +99,7 @@ export function ReceiptVouchersPageClient() {
           <Kpi label="มีบิลอ้างอิง" value={filteredRows.filter((row) => row.purchaseBillDocNo).length.toLocaleString('th-TH')} tone="violet" />
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[980px] text-sm">
             <thead className="bg-slate-100">
               <tr>
@@ -126,7 +126,7 @@ export function ReceiptVouchersPageClient() {
                   <td className="p-2 text-right font-semibold text-emerald-700">{formatMoney(row.totalAmount)}</td>
                   <td className="space-x-2 whitespace-nowrap p-2 text-right">
                     <button className="text-xs font-semibold text-purple-600 hover:underline" type="button" onClick={() => setPrintingRow(row)}>🖨 พิมพ์</button>
-                    <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60" disabled type="button">จัดการ</button>
+                    <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60" disabled type="button">จัดการ</button>
                     <button className="text-xs text-red-400" disabled type="button">🗑 ลบ</button>
                   </td>
                 </tr>
@@ -157,7 +157,7 @@ function Kpi({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' |
     slate: 'border-slate-200 bg-white text-slate-800',
     violet: 'border-violet-200 bg-violet-50 text-violet-700',
   }
-  return <div className={`rounded-lg border p-3 shadow-sm ${tones[tone]}`}><div className="text-xs font-semibold text-slate-500">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
+  return <div className={`rounded-md border p-3 shadow-sm ${tones[tone]}`}><div className="text-xs font-semibold text-slate-500">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
 }
 
 function PrintPreview({ onClose, row }: { onClose: () => void; row: ReceiptVoucherRow }) {
@@ -167,8 +167,8 @@ function PrintPreview({ onClose, row }: { onClose: () => void; row: ReceiptVouch
       <div className="flex items-center justify-between bg-slate-800 p-2 text-white print:hidden">
         <span className="text-sm">พรีวิวพิมพ์ — ใบสำคัญรับเงิน {row.docNo}</span>
         <div className="flex gap-2">
-          <button className="rounded bg-blue-500 px-3 py-1 text-xs" type="button" onClick={() => window.print()}>🖨 พิมพ์</button>
-          <button className="rounded bg-red-500 px-3 py-1 text-xs" type="button" onClick={onClose}>ปิด</button>
+          <button className="rounded-md bg-blue-500 px-3 py-1 text-xs" type="button" onClick={() => window.print()}>🖨 พิมพ์</button>
+          <button className="rounded-md bg-red-500 px-3 py-1 text-xs" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
       <div className="mx-auto max-w-[210mm] bg-white p-8 text-black" style={{ fontFamily: "'Sarabun', 'TH Sarabun New', Arial, sans-serif", fontSize: '14px' }}>

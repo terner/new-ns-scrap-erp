@@ -125,13 +125,13 @@ export function ChangePasswordPageClient() {
 
   return (
     <div className="mx-auto max-w-xl space-y-3">
-      <div className="rounded-xl bg-gradient-to-r from-purple-700 to-pink-600 p-4 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-4 text-white shadow">
         <h1 className="text-xl font-bold">🔒 เปลี่ยน Password ของฉัน</h1>
         <p className="mt-1 text-sm opacity-90">เพื่อความปลอดภัย — แนะนำให้เปลี่ยน password ทุก 3-6 เดือน</p>
       </div>
 
-      <form className="space-y-3 rounded-xl bg-white p-5 shadow" onSubmit={submit}>
-        <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+      <form className="space-y-3 rounded-md bg-white p-5 shadow" onSubmit={submit}>
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
           {isFetchingUser ? 'กำลังโหลดผู้ใช้...' : <>👤 <b>{user?.name ?? '-'}</b> · @{user?.username ?? '-'} · {user?.email || '-'}</>}
         </div>
 
@@ -142,7 +142,7 @@ export function ChangePasswordPageClient() {
         ) : null}
 
         {!isSupabaseReady ? (
-          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             ยังไม่ได้ตั้งค่า Supabase dev ใน environment
           </div>
         ) : null}
@@ -151,7 +151,7 @@ export function ChangePasswordPageClient() {
           Password เดิม *
           <input
             autoComplete="current-password"
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
             disabled={isLoading || isFetchingUser}
             onChange={(event) => setCurrentPassword(event.target.value)}
             type={showPassword ? 'text' : 'password'}
@@ -164,7 +164,7 @@ export function ChangePasswordPageClient() {
           Password ใหม่ * (อย่างน้อย 8 ตัว มีตัวใหญ่ ตัวเล็ก และตัวเลข)
           <input
             autoComplete="new-password"
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
             disabled={isLoading || isFetchingUser}
             onChange={(event) => setPassword(event.target.value)}
             type={showPassword ? 'text' : 'password'}
@@ -177,7 +177,7 @@ export function ChangePasswordPageClient() {
           ยืนยัน Password ใหม่ *
           <input
             autoComplete="new-password"
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
             disabled={isLoading || isFetchingUser}
             onChange={(event) => setConfirmPassword(event.target.value)}
             type={showPassword ? 'text' : 'password'}
@@ -191,11 +191,11 @@ export function ChangePasswordPageClient() {
           แสดง password
         </label>
 
-        {error ? <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
-        {message ? <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div> : null}
+        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+        {message ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div> : null}
 
         <button
-          className="w-full rounded-lg bg-purple-600 py-2.5 font-bold text-white hover:bg-purple-700 disabled:opacity-60"
+          className="w-full rounded-md bg-purple-600 py-2.5 font-bold text-white hover:bg-purple-700 disabled:opacity-60"
           disabled={isLoading || isFetchingUser || !isSupabaseReady}
           type="submit"
         >
@@ -205,7 +205,7 @@ export function ChangePasswordPageClient() {
         <div className="text-center text-xs text-slate-500">ใช้ Supabase Auth เป็น source of truth; ระบบไม่เก็บ password ในตารางของแอป</div>
       </form>
 
-      <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
         💡 <b>คำแนะนำ Password:</b> ใช้ทั้งตัวอักษร + ตัวเลข + อักขระพิเศษ (เช่น Ns@2026!) · ห้ามใช้ password เดียวกับเว็บอื่น · อย่าจดไว้ในที่ที่คนอื่นเห็น
       </div>
     </div>

@@ -74,7 +74,7 @@ function DisabledActionButton({ children, tone = 'slate' }: { children: string; 
     violet: 'bg-violet-100 text-violet-700',
   }[tone]
   return (
-    <button className={`rounded-lg px-4 py-2.5 text-sm font-bold ${color} opacity-70`} disabled type="button">
+    <button className={`rounded-md px-4 py-2.5 text-sm font-bold ${color} opacity-70`} disabled type="button">
       {children}
     </button>
   )
@@ -95,12 +95,12 @@ export function MigrationToolsPageClient() {
 
   return (
     <section className="space-y-3">
-      <div className="rounded-xl bg-gradient-to-r from-purple-700 to-pink-600 p-4 text-white shadow">
+      <div className="rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-4 text-white shadow">
         <h1 className="text-xl font-bold">💾 Backup / Restore — สำรองข้อมูล</h1>
         <p className="mt-1 text-sm opacity-90">สำคัญมาก — หน้านี้เป็น safe baseline สำหรับตรวจสถานะและแผนกู้คืนเท่านั้น</p>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <h2 className="mb-2 font-bold text-slate-700">📊 สถานะ Storage (browser localStorage)</h2>
         <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
           <div><div className="text-xs text-slate-500">ขนาดรวม</div><div className="text-lg font-bold text-emerald-700">{storageInfo.sizeMB} MB</div></div>
@@ -109,22 +109,22 @@ export function MigrationToolsPageClient() {
           <div><div className="text-xs text-slate-500">Snapshots/Backups</div><div className="text-sm font-medium">{storageInfo.snapshotCount} รายการ</div></div>
           <div>
             <div className="text-xs text-slate-500">Auto-backup รายวัน</div>
-            <button className="rounded bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600" disabled type="button">⚪ ปิด</button>
+            <button className="rounded-md bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600" disabled type="button">⚪ ปิด</button>
           </div>
         </div>
-        <div className="mt-3 h-2 w-full rounded-full bg-slate-200">
-          <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${storageInfo.pctUsed}%` }} />
+        <div className="mt-3 h-2 w-full rounded-md-full bg-slate-200">
+          <div className={`h-2 rounded-md-full transition-all ${barColor}`} style={{ width: `${storageInfo.pctUsed}%` }} />
         </div>
-        <div className="mt-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-800">
+        <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-2 text-xs text-blue-800">
           Safe baseline: อ่าน localStorage ได้เท่านั้น ยังไม่ล้าง snapshot, ไม่ restore, ไม่ sync cloud และไม่ reset ข้อมูล
         </div>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <h2 className="mb-2 font-bold text-slate-700">📋 จำนวน Records ในระบบ</h2>
         <div className="grid grid-cols-3 gap-2 text-sm md:grid-cols-6">
           {recordStats.map(([label, value]) => (
-            <div className="rounded bg-slate-50 p-2" key={label}>
+            <div className="rounded-md bg-slate-50 p-2" key={label}>
               <div className="text-xs text-slate-500">{label}</div>
               <div className="font-bold">{value.toLocaleString('th-TH')}</div>
             </div>
@@ -133,7 +133,7 @@ export function MigrationToolsPageClient() {
         <p className="mt-2 text-xs text-slate-500">Record count wiring จะทำใน SYS2 hardening หลังออกแบบ source/API ที่ไม่กระทบ performance</p>
       </div>
 
-      <div className="rounded-xl border-l-4 border-emerald-500 bg-white p-4 shadow">
+      <div className="rounded-md border-l-4 border-emerald-500 bg-white p-4 shadow">
         <h2 className="mb-2 font-bold text-emerald-700">📤 Export Backup (สำคัญที่สุด)</h2>
         <p className="mb-3 text-sm text-slate-600">ดาวน์โหลดข้อมูลทั้งหมดเป็น JSON file → เก็บใน Google Drive / OneDrive / USB / Email หาตัวเอง</p>
         <DisabledActionButton tone="emerald">💾 Export Backup ตอนนี้</DisabledActionButton>
@@ -143,17 +143,17 @@ export function MigrationToolsPageClient() {
         </div>
       </div>
 
-      <div className="rounded-xl border-l-4 border-blue-500 bg-white p-4 shadow">
+      <div className="rounded-md border-l-4 border-blue-500 bg-white p-4 shadow">
         <h2 className="mb-2 font-bold text-blue-700">📥 Restore จากไฟล์ Backup</h2>
         <p className="mb-3 text-sm text-slate-600">ใช้เมื่อต้องการกู้ข้อมูลกลับ หรือย้ายข้อมูลจากเครื่องอื่น</p>
         <input className="mb-2 text-sm" disabled type="file" />
-        <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3">
+        <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3">
           <h3 className="mb-2 font-bold text-blue-700">📄 ตัวอย่างข้อมูลในไฟล์</h3>
           <DisabledActionButton tone="blue">✅ ยืนยัน Restore (เขียนทับข้อมูลปัจจุบัน)</DisabledActionButton>
         </div>
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow">
+      <div className="rounded-md bg-white p-4 shadow">
         <h2 className="mb-2 font-bold text-slate-700">🗂 Snapshot อัตโนมัติ (Browser นี้ — เก็บ 7 วันล่าสุด)</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -167,13 +167,13 @@ export function MigrationToolsPageClient() {
         </div>
       </div>
 
-      <div className="rounded-xl border-2 border-cyan-400 bg-gradient-to-br from-cyan-50 to-blue-50 p-4">
+      <div className="rounded-md border-2 border-cyan-400 bg-gradient-to-br from-cyan-50 to-blue-50 p-4">
         <h2 className="mb-2 flex items-center gap-2 font-bold text-cyan-700">☁️ Migrate ไป Supabase Cloud</h2>
         <p className="mb-3 text-sm text-slate-700">Upload ข้อมูลจาก LocalStorage → Supabase Cloud ต้องมี dry-run, audit, rollback, และ branch/environment guard ก่อน</p>
         <div className="mb-3 grid grid-cols-1 gap-2 text-xs md:grid-cols-3">
-          <div className="rounded border-l-4 border-emerald-500 bg-white p-2"><div className="text-slate-500">📊 Records ทั้งหมด</div><div className="text-lg font-bold text-emerald-700">0</div></div>
-          <div className="rounded border-l-4 border-blue-500 bg-white p-2"><div className="text-slate-500">🌐 Supabase Status</div><div className="text-sm font-bold text-amber-700">design only</div></div>
-          <div className="rounded border-l-4 border-amber-500 bg-white p-2"><div className="text-slate-500">⏱ เวลาประมาณการ</div><div className="text-sm font-bold text-slate-700">deferred</div></div>
+          <div className="rounded-md border-l-4 border-emerald-500 bg-white p-2"><div className="text-slate-500">📊 Records ทั้งหมด</div><div className="text-lg font-bold text-emerald-700">0</div></div>
+          <div className="rounded-md border-l-4 border-blue-500 bg-white p-2"><div className="text-slate-500">🌐 Supabase Status</div><div className="text-sm font-bold text-amber-700">design only</div></div>
+          <div className="rounded-md border-l-4 border-amber-500 bg-white p-2"><div className="text-slate-500">⏱ เวลาประมาณการ</div><div className="text-sm font-bold text-slate-700">deferred</div></div>
         </div>
         <div className="flex flex-wrap gap-2">
           <DisabledActionButton tone="cyan">☁️ ⬆ Push (LocalStorage → Cloud)</DisabledActionButton>
@@ -182,23 +182,23 @@ export function MigrationToolsPageClient() {
         </div>
       </div>
 
-      <div className="rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
+      <div className="rounded-md border-2 border-orange-300 bg-orange-50 p-4">
         <h2 className="mb-2 font-bold text-orange-700">🧹 Reset Transactions — เริ่มคีย์ข้อมูลจริง (Go-Live)</h2>
         <p className="mb-2 text-sm text-orange-700">ลบเฉพาะ transaction โดยเก็บ Master Data ทั้งหมด ต้องแยก batch ออกแบบ confirmation, backup, audit, และ rollback ก่อน</p>
-        <div className="mb-3 grid grid-cols-1 gap-3 rounded bg-white p-3 text-xs md:grid-cols-2">
+        <div className="mb-3 grid grid-cols-1 gap-3 rounded-md bg-white p-3 text-xs md:grid-cols-2">
           <div><div className="mb-1 font-bold text-red-600">❌ จะถูกลบถ้าอนุมัติในอนาคต:</div><ul className="space-y-0.5 text-red-700"><li>• บิลซื้อ + บิลขาย + ใบสำคัญรับเงิน</li><li>• Payment + Receipt + Transfer</li><li>• ค่าใช้จ่าย + เงินสำรองจ่าย</li><li>• Stock Ledger + Stock Issues</li></ul></div>
           <div><div className="mb-1 font-bold text-emerald-600">✅ จะถูกเก็บไว้:</div><ul className="space-y-0.5 text-emerald-700"><li>• Suppliers ทั้งหมด</li><li>• Customers ทั้งหมด</li><li>• Products ทั้งหมด</li><li>• Users + Roles + Permissions</li></ul></div>
         </div>
         <DisabledActionButton tone="orange">🧹 Reset Transactions (เก็บ Master)</DisabledActionButton>
       </div>
 
-      <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4">
+      <div className="rounded-md border-2 border-red-300 bg-red-50 p-4">
         <h2 className="mb-2 font-bold text-red-700">⚠️ Danger Zone — Reset ทั้งหมด (รวม Master Data)</h2>
         <p className="mb-3 text-sm text-red-600">ลบข้อมูลทั้งหมดรวม Master Data และกลับไปใช้ค่าเริ่มต้น เป็น destructive action ที่ยังไม่อนุมัติในระบบ Next</p>
         <DisabledActionButton tone="red">🚨 Reset ข้อมูลทั้งหมด (รวม Suppliers/Customers/Products)</DisabledActionButton>
       </div>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm">
         <h3 className="font-bold text-amber-700">📘 คู่มือ Backup ที่แนะนำ</h3>
         <ul className="mt-2 space-y-1 text-amber-800">
           <li>1. ทุกวัน: ก่อนปิดเครื่อง ให้ใช้ export ที่ผ่านการออกแบบแล้วเท่านั้น</li>
@@ -210,10 +210,10 @@ export function MigrationToolsPageClient() {
         </ul>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow">
+      <div className="rounded-md border border-slate-200 bg-white p-4 text-sm shadow">
         <h3 className="font-bold text-slate-700">Deferred destructive actions</h3>
         <div className="mt-2 flex flex-wrap gap-2">
-          {destructiveActions.map((action) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600" key={action}>{action}</span>)}
+          {destructiveActions.map((action) => <span className="rounded-md-full bg-slate-100 px-3 py-1 text-xs text-slate-600" key={action}>{action}</span>)}
         </div>
       </div>
     </section>

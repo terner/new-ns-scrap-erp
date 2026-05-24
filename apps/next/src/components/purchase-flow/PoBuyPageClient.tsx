@@ -1,6 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download } from 'lucide-react'
+import { Button as UiButton } from '@/components/ui/Button'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
+import { Input as UiInput } from '@/components/ui/Input'
+import { SearchCombobox } from '@/components/ui/SearchCombobox'
+import { Select as UiSelect } from '@/components/ui/Select'
+import { TableNumberCell } from '@/components/ui/TableNumberCell'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
 
@@ -124,6 +134,17 @@ function formatDateTime(value?: string) {
     timeZone: 'Asia/Bangkok',
     year: '2-digit',
   })
+}
+
+function ExportButton({ href }: { href: string }) {
+  return (
+    <UiButton asChild className="ml-auto gap-2" variant="export">
+      <a href={href}>
+        <Download className="h-4 w-4 shrink-0" />
+        <span>ส่งออก Excel</span>
+      </a>
+    </UiButton>
+  )
 }
 
 export function PoBuyPageClient() {
@@ -302,7 +323,7 @@ export function PoBuyPageClient() {
       if (fromDate && row.date < fromDate) return false
       if (toDate && row.date > toDate) return false
       if (!query) return true
-      return `${row.docNo} ${row.supplierName} ${row.productName} ${row.status} ${row.notes}`.toLowerCase().includes(query)
+      return `${row.docNo} ${row.supplierName} ${row.productName} ${row.status}`.toLowerCase().includes(query)
     })
     return [...filteredRows].sort((left, right) => {
       const leftValue = poBuySortValue(left, sortKey)
@@ -367,10 +388,10 @@ export function PoBuyPageClient() {
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <div className="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 p-4 text-white shadow">
+        <div className="rounded-md bg-gradient-to-br from-blue-500 to-indigo-700 p-4 text-white shadow">
           <div className="text-xs opacity-80">📋 PO ทั้งหมด</div>
           <div className="text-2xl font-bold">{data?.summary.totalRows ?? 0}</div>
           <div className="mt-1 text-xs opacity-80">มูลค่ารวม {formatMoney(data?.summary.totalAmount ?? 0)}</div>
@@ -382,36 +403,33 @@ export function PoBuyPageClient() {
         <Metric box color="red" label="💰 มูลค่ารอรับ" sublabel={`${data?.summary.totalRows ?? 0} PO`} value={formatMoney(data?.summary.remainingAmount ?? 0)} />
       </div>
 
-      <div className="space-y-2 rounded-xl bg-white p-3 shadow">
+      <div className="space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-[260px] flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="🔍 ค้นหาเลข PO / ชื่อ Supplier / ชื่อสินค้า / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <UiInput className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลข PO / ชื่อ Supplier / ชื่อสินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-xs text-slate-500">วันที่:</label>
-          <input aria-label="วันที่เริ่มต้น" className="rounded-lg border px-2 py-2 text-sm" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          <DatePickerInput id="po-buy-date-from" value={fromDate} onChange={setFromDate} />
           <span className="text-slate-400">→</span>
-          <input aria-label="วันที่สิ้นสุด" className="rounded-lg border px-2 py-2 text-sm" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-          {hasFilters ? <button className="rounded bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200" type="button" onClick={resetFilters}>✕ ล้าง</button> : null}
-          <a className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700" href={exportHref}>Export Excel</a>
-          <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ PO Buy ใหม่</button>
+          <DatePickerInput id="po-buy-date-to" value={toDate} onChange={setToDate} />
+          {hasFilters ? <UiButton size="xs" type="button" variant="secondary" onClick={resetFilters}>✕ ล้าง</UiButton> : null}
+          <ExportButton href={exportHref} />
+          <UiButton type="button" onClick={openCreateForm}>+ PO Buy ใหม่</UiButton>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">สถานะ:</span>
-          <button className={`rounded border px-3 py-1 text-xs font-medium ${status === 'all' ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`} type="button" onClick={() => setStatus('all')}>ทั้งหมด</button>
-          {['Open', 'Partially Received', 'Received', 'Cancelled'].map((item) => (
-            <button key={item} className={`rounded border px-3 py-1 text-xs font-medium ${status === item ? statusButtonClass(item, true) : statusButtonClass(item, false)}`} type="button" onClick={() => setStatus(item)}>{item === 'Partially Received' ? 'Partial' : item}</button>
-          ))}
-          <select aria-label="สถานะ" className="rounded-lg border px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="all">ทุกสถานะ</option>
-            {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
+          <PoBuySegment current={status} label="ทุกสถานะ" value="all" onClick={setStatus} />
+          <PoBuySegment current={status} label="เปิดอยู่" value="Open" onClick={setStatus} />
+          <PoBuySegment current={status} label="บางส่วน" value="Partially Received" onClick={setStatus} />
+          <PoBuySegment current={status} label="รับครบ" value="Received" onClick={setStatus} />
+          <PoBuySegment current={status} label="ยกเลิก" value="Cancelled" onClick={setStatus} />
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <UiSelect
             aria-label="จำนวนรายการต่อหน้า"
-            className="rounded border border-slate-300 px-2 py-1"
+            className="h-9 w-auto min-w-[96px] px-2"
             value={pageSize}
             onChange={(event) => setPageSize(Number(event.target.value))}
           >
@@ -419,44 +437,42 @@ export function PoBuyPageClient() {
             <option value={25}>25 / หน้า</option>
             <option value={50}>50 / หน้า</option>
             <option value={100}>100 / หน้า</option>
-          </select>
-          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          </UiSelect>
+          <UiButton className="font-normal" disabled={currentPage <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</UiButton>
           <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-          <button className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+          <UiButton className="font-normal" disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</UiButton>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg bg-white shadow">
-        <table className="w-full min-w-[1240px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-2 text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></th><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><th className="w-16 p-2 text-center font-semibold text-slate-700">หมายเหตุ</th><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><th className="p-2 text-right font-semibold text-slate-700">จัดการ</th></tr></thead>
-          <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</td></tr> : null}
-            {!isLoading && pageRows.map((row, index) => (
-              <tr key={row.id} className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
-                <td className="p-2 text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></td>
-                <td className="w-36 whitespace-nowrap p-2 font-mono">{row.docNo}</td>
-                <td className="w-28 whitespace-nowrap p-2">{row.date}</td>
-                <td className="w-36 p-2">{row.supplierName}</td>
-                <td className="p-2">
+      <Table className="min-w-[1240px]">
+        <TableHeader><tr><TableHead className="text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></TableHead><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><TableHead className="w-16 text-center font-semibold text-slate-700">หมายเหตุ</TableHead><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><TableHead className="text-right font-semibold text-slate-700">จัดการ</TableHead></tr></TableHeader>
+        <TableBody>
+          {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+          {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</TableCell></TableRow> : null}
+          {!isLoading && pageRows.map((row, index) => (
+            <TableRow key={row.id} className={`cursor-pointer border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
+                <TableCell className="text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></TableCell>
+                <TableCell className="w-36 whitespace-nowrap font-mono">{row.docNo}</TableCell>
+                <TableCell className="w-28 whitespace-nowrap">{row.date}</TableCell>
+                <TableCell className="w-36">{row.supplierName}</TableCell>
+                <TableCell>
                   <PoBuyTruncatedText text={row.productName} />
-                </td>
-                <PoBuyNumberCell value={formatMoney(row.qty)} />
-                <PoBuyNumberCell strong value={formatMoney(row.totalAmount)} widthClass="w-32 max-w-32" />
-                <PoBuyNumberCell tone="amber" value={formatMoney(row.remainingQty)} />
-                <td className="w-28 whitespace-nowrap p-2">{row.expectedDelivery || '-'}</td>
-                <td className="p-2 text-center"><PoBuyNoteIndicator note={row.notes} poNo={row.docNo} /></td>
-                <td className="w-28 whitespace-nowrap p-2 text-center"><span className={`rounded-full px-2 py-0.5 ${statusBadge(row.status)}`}>{row.status}</span></td>
-                <td className="w-28 whitespace-nowrap p-2 text-xs text-slate-600"><div className="truncate">{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></td>
-                <td className="whitespace-nowrap p-2 text-right">
-                  <button className="mr-2 rounded border border-slate-300 px-2 py-1 hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
-                  <button className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </TableCell>
+                <TableNumberCell value={formatMoney(row.qty)} />
+                <TableNumberCell strong value={formatMoney(row.totalAmount)} widthClass="w-32 max-w-32" />
+                <TableNumberCell tone="amber" value={formatMoney(row.remainingQty)} />
+                <TableCell className="w-28 whitespace-nowrap">{row.expectedDelivery || '-'}</TableCell>
+                <TableCell className="text-center"><PoBuyNoteIndicator note={row.notes} poNo={row.docNo} /></TableCell>
+                <TableCell className="w-28 whitespace-nowrap text-center"><span className={`rounded-full px-2 py-0.5 ${statusBadge(row.status)}`}>{row.status}</span></TableCell>
+                <TableCell className="w-28 whitespace-nowrap text-xs text-slate-600"><div className="truncate">{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></TableCell>
+                <TableCell className="whitespace-nowrap text-right">
+                  <UiButton className="mr-2 font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</UiButton>
+                  <UiButton className="font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</UiButton>
+                </TableCell>
+              </TableRow>
+          ))}
+        </TableBody>
+      </Table>
       {showForm ? (
         <PoBuyFormModal
           branches={data?.options.branches ?? []}
@@ -502,7 +518,7 @@ export function PoBuyPageClient() {
 
 function Metric({ box, color, label, sublabel, value }: { box?: boolean; color: 'amber' | 'blue' | 'emerald' | 'red'; label: string; sublabel: string; value: string }) {
   const colorClass = color === 'red' ? 'border-red-300 bg-red-50 text-red-700' : color === 'amber' ? `${box ? 'border-amber-300 bg-amber-50' : 'border-amber-500 bg-white'} text-amber-700` : color === 'emerald' ? 'border-emerald-500 bg-white text-emerald-700' : 'border-blue-500 bg-white text-blue-700'
-  return <div className={`rounded-xl p-4 shadow ${box ? 'border-2' : 'border-l-4'} ${colorClass}`}><div className="text-xs">{label}</div><div className="text-2xl font-bold">{value}</div><div className="text-xs text-slate-400">{sublabel}</div></div>
+  return <div className={`rounded-md p-4 shadow ${box ? 'border-2' : 'border-l-4'} ${colorClass}`}><div className="text-xs">{label}</div><div className="text-2xl font-bold">{value}</div><div className="text-xs text-slate-400">{sublabel}</div></div>
 }
 
 function PoBuyNoteIndicator({ note, poNo }: { note: string; poNo: string }) {
@@ -510,58 +526,39 @@ function PoBuyNoteIndicator({ note, poNo }: { note: string; poNo: string }) {
   if (!text) return <span className="text-slate-300">-</span>
 
   return (
-    <span className="group relative inline-flex">
-      <button
-        aria-label={`ดูหมายเหตุ ${poNo}`}
-        className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-semibold leading-none text-slate-600 hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
-        type="button"
-        onClick={(event) => event.stopPropagation()}
-      >
-        i
-      </button>
-      <span className="pointer-events-none absolute right-0 top-8 z-20 hidden w-72 whitespace-pre-wrap rounded border border-amber-200 bg-amber-50 p-3 text-left text-xs leading-relaxed text-amber-950 shadow-lg group-hover:block group-focus-within:block">
-        {text}
-      </span>
-    </span>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            aria-label={`ดูหมายเหตุ ${poNo}`}
+            className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-semibold leading-none text-slate-600 hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            type="button"
+            onClick={(event) => event.stopPropagation()}
+          >
+            i
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="w-72 whitespace-pre-wrap p-3 text-left leading-relaxed">
+          {text}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
 function PoBuyTruncatedText({ text }: { text: string }) {
+  if (!text) return <span>-</span>
   return (
-    <span className="group relative block min-w-0" tabIndex={0}>
-      <span className="block truncate">{text || '-'}</span>
-      {text ? (
-        <span className="pointer-events-none absolute left-0 top-6 z-20 hidden w-80 whitespace-normal rounded border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed text-amber-950 shadow-lg group-hover:block group-focus:block">
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="block min-w-0 truncate" tabIndex={0}>{text}</span>
+        </TooltipTrigger>
+        <TooltipContent align="start" className="w-80 whitespace-normal p-2 leading-relaxed">
           {text}
-        </span>
-      ) : null}
-    </span>
-  )
-}
-
-function PoBuyNumberCell({
-  strong,
-  tone,
-  value,
-  widthClass = 'w-28 max-w-28',
-}: {
-  strong?: boolean
-  tone?: 'amber'
-  value: string
-  widthClass?: string
-}) {
-  const colorClass = tone === 'amber' ? 'text-amber-700' : strong ? 'text-slate-900' : 'text-slate-700'
-  const weightClass = strong ? 'font-medium' : ''
-
-  return (
-    <td className={`p-2 text-right tabular-nums ${colorClass} ${weightClass}`}>
-      <span className={`group relative ml-auto block ${widthClass}`} tabIndex={0}>
-        <span className="block truncate">{value}</span>
-        <span className="pointer-events-none absolute right-0 top-6 z-20 hidden whitespace-nowrap rounded border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed text-amber-950 shadow-lg group-hover:block group-focus:block">
-          {value}
-        </span>
-      </span>
-    </td>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -583,17 +580,19 @@ function PoBuyCancelModal({
   row: PoBuyRow
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40 p-0 md:items-center md:justify-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="po-buy-cancel-title">
-      <div className="w-full rounded-t-lg bg-white shadow-xl md:max-w-lg md:rounded-lg">
-        <div className="border-b p-4">
-          <h2 id="po-buy-cancel-title" className="font-semibold">ยกเลิก PO Buy {row.docNo}</h2>
-          <p className="mt-1 text-sm text-slate-500">{row.supplierName}</p>
-        </div>
+    <Dialog open onOpenChange={(open) => {
+      if (!open && !isSaving) onClose()
+    }}>
+      <DialogContent className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
+        <DialogHeader className="border-b">
+          <DialogTitle id="po-buy-cancel-title">ยกเลิก PO Buy {row.docNo}</DialogTitle>
+          <DialogDescription>{row.supplierName}</DialogDescription>
+        </DialogHeader>
         <div className="space-y-2 p-4 text-sm">
           <label className="block text-xs font-medium text-slate-600" htmlFor="po-buy-cancel-note">หมายเหตุการยกเลิก *</label>
           <textarea
             id="po-buy-cancel-note"
-            className="w-full rounded border px-3 py-2"
+            className="w-full rounded-md border px-3 py-2"
             maxLength={500}
             rows={3}
             value={note}
@@ -601,12 +600,12 @@ function PoBuyCancelModal({
           />
           {error ? <div className="text-xs text-red-600">{error}</div> : null}
         </div>
-        <div className="flex justify-end gap-2 border-t bg-slate-50 px-4 py-3">
-          <button className="px-4 py-2 text-sm" disabled={isSaving} type="button" onClick={onClose}>ปิด</button>
-          <button className="rounded-lg bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={onSubmit}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</button>
-        </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ปิด</UiButton>
+          <UiButton className="bg-red-600 font-normal hover:bg-red-700" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</UiButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -653,11 +652,29 @@ function PoBuySortHeader({
   )
 }
 
-function statusButtonClass(status: string, active: boolean) {
-  if (status === 'Open') return active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white hover:bg-blue-50'
-  if (status === 'Partially Received') return active ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300 bg-white hover:bg-amber-50'
-  if (status === 'Received') return active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white hover:bg-emerald-50'
-  return active ? 'border-slate-500 bg-slate-500 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
+function PoBuySegment({
+  current,
+  label,
+  onClick,
+  value,
+}: {
+  current: string
+  label: string
+  onClick: (value: string) => void
+  value: string
+}) {
+  const active = current === value
+  const className = value === 'Open'
+    ? active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white hover:bg-blue-50'
+    : value === 'Partially Received'
+      ? active ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300 bg-white hover:bg-amber-50'
+      : value === 'Received'
+        ? active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white hover:bg-emerald-50'
+        : value === 'Cancelled'
+          ? active ? 'border-slate-500 bg-slate-500 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
+          : active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
+
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${className}`} type="button" onClick={() => onClick(value)}>{label}</button>
 }
 
 function statusBadge(status: string) {
@@ -679,97 +696,21 @@ function SupplierSearchCombobox({
   value: string
   onChange: (supplierId: string) => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const selectedSupplier = useMemo(() => options.find((supplier) => supplier.id === value) ?? null, [options, value])
-  const selectedLabel = selectedSupplier ? optionLabel(selectedSupplier) : ''
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState(selectedLabel)
-
-  useEffect(() => {
-    setQuery(selectedLabel)
-  }, [selectedLabel])
-
-  const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    const rows = normalizedQuery
-      ? options.filter((supplier) => searchableText(supplier).includes(normalizedQuery))
-      : options
-    return rows.slice(0, 80)
-  }, [options, query])
-
-  const selectSupplier = (supplier: Option) => {
-    onChange(supplier.id)
-    setQuery(optionLabel(supplier))
-    setOpen(false)
-    inputRef.current?.focus()
-  }
-
   return (
-    <div className="relative">
-      <label className="mb-1 block text-xs" htmlFor="po-buy-supplier-search">Supplier *</label>
-      <input
-        ref={inputRef}
-        aria-autocomplete="list"
-        aria-controls="po-buy-supplier-options"
-        aria-expanded={open}
-        aria-invalid={Boolean(error)}
-        className={`w-full rounded border px-2 py-1.5 outline-none focus:border-blue-600 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-        id="po-buy-supplier-search"
-        placeholder="🔍 พิมพ์ชื่อ Supplier..."
-        role="combobox"
-        type="search"
-        value={query}
-        onBlur={() => {
-          window.setTimeout(() => {
-            const exactMatch = options.find((supplier) => optionLabel(supplier).toLowerCase() === query.trim().toLowerCase())
-            if (exactMatch) {
-              onChange(exactMatch.id)
-              setQuery(optionLabel(exactMatch))
-            } else if (selectedSupplier) {
-              setQuery(optionLabel(selectedSupplier))
-            }
-            setOpen(false)
-          }, 120)
-        }}
-        onChange={(event) => {
-          const nextQuery = event.target.value
-          setQuery(nextQuery)
-          setOpen(true)
-          if (value && nextQuery !== selectedLabel) onChange('')
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            setOpen(false)
-            return
-          }
-          if (event.key === 'Enter' && open && filteredOptions[0]) {
-            event.preventDefault()
-            selectSupplier(filteredOptions[0])
-          }
-        }}
-      />
-      {open ? (
-        <div id="po-buy-supplier-options" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-xl" role="listbox">
-          {filteredOptions.length > 0 ? filteredOptions.map((supplier) => (
-            <button
-              key={supplier.id}
-              className={`block w-full px-3 py-2 text-left hover:bg-blue-50 ${supplier.id === value ? 'bg-blue-100 text-blue-800' : ''}`}
-              role="option"
-              type="button"
-              aria-selected={supplier.id === value}
-              onMouseDown={(event) => {
-                event.preventDefault()
-                selectSupplier(supplier)
-              }}
-            >
-              <span className="block font-medium">{supplier.name}</span>
-              <span className="block text-xs text-slate-500">{supplier.code ? `${supplier.code} · ` : ''}{supplier.id}</span>
-            </button>
-          )) : <div className="px-3 py-2 text-sm text-slate-500">ไม่พบ Supplier ที่ตรงกับคำค้นหา</div>}
-        </div>
-      ) : null}
-    </div>
+    <SearchCombobox
+      error={error}
+      inputId="po-buy-supplier-search"
+      label="Supplier *"
+      options={options.map((supplier) => ({
+        description: `${supplier.code ? `${supplier.code} · ` : ''}${supplier.id}`,
+        id: supplier.id,
+        label: optionLabel(supplier),
+        searchText: searchableText(supplier),
+      }))}
+      placeholder="🔍 พิมพ์ชื่อ Supplier..."
+      value={value}
+      onChange={onChange}
+    />
   )
 }
 
@@ -812,12 +753,13 @@ function PoBuyFormModal({
   const fieldError = (name: string) => errors[name] ? <div className="mt-1 text-xs text-red-600">{errors[name]}</div> : null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="po-buy-form-title">
-      <div className="mx-auto my-4 max-w-2xl rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b px-5 py-3">
-          <h3 id="po-buy-form-title" className="font-semibold">{heading}</h3>
-          <button className="text-2xl text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>×</button>
-        </div>
+    <Dialog open onOpenChange={(open) => {
+      if (!open && !isSaving) onClose()
+    }}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-md p-0" hideClose>
+        <DialogHeader className="border-b px-5 py-3">
+          <DialogTitle id="po-buy-form-title">{heading}</DialogTitle>
+        </DialogHeader>
         <div className="space-y-3 p-5 text-sm">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -831,15 +773,15 @@ function PoBuyFormModal({
             </div>
             <div>
               <label className="mb-1 block text-xs">สาขา/คลัง *</label>
-              <select className="w-full rounded border px-2 py-1.5" value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
+              <UiSelect className="h-9 w-full px-2 py-1.5" value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
                 <option value="">เลือกสาขา/คลัง</option>
                 {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-              </select>
+              </UiSelect>
               {fieldError('branchId')}
             </div>
             <div>
               <label className="mb-1 block text-xs">วันส่งมอบ *</label>
-              <input className="w-full rounded border px-2 py-1.5" required type="date" value={form.expectedDelivery} onChange={(event) => onUpdate('expectedDelivery', event.target.value)} />
+              <UiInput className="h-9 w-full px-2 py-1.5" required type="date" value={form.expectedDelivery} onChange={(event) => onUpdate('expectedDelivery', event.target.value)} />
               {fieldError('expectedDelivery')}
             </div>
           </div>
@@ -847,70 +789,69 @@ function PoBuyFormModal({
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="font-medium">📋 รายการสินค้า ({form.items.length})</label>
-              <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700" type="button" onClick={onAddItem}>+ เพิ่มรายการ</button>
+              <UiButton className="bg-emerald-600 font-normal hover:bg-emerald-700" size="xs" type="button" variant="default" onClick={onAddItem}>+ เพิ่มรายการ</UiButton>
             </div>
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100">
-                  <tr><th className="p-2 text-left">สินค้า / Grade *</th><th className="w-32 p-2 text-right">จำนวน (กก.) *</th><th className="w-32 p-2 text-right">ราคา/หน่วย *</th><th className="w-32 p-2 text-right">มูลค่ารวม</th><th className="w-8 p-2" /></tr>
-                </thead>
-                <tbody>
-                  {form.items.map((item, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="p-1 align-top">
-                        <select className="w-full rounded border px-2 py-1.5" value={item.productId} onChange={(event) => onUpdateItem(index, 'productId', event.target.value)}>
+            <Table>
+              <TableHeader>
+                <tr><TableHead>สินค้า / Grade *</TableHead><TableHead className="w-32 text-right">จำนวน (กก.) *</TableHead><TableHead className="w-32 text-right">ราคา/หน่วย *</TableHead><TableHead className="w-32 text-right">มูลค่ารวม</TableHead><TableHead className="w-8" /></tr>
+              </TableHeader>
+              <TableBody>
+                {form.items.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="p-1 align-top">
+                        <UiSelect className="h-9 w-full px-2 py-1.5" value={item.productId} onChange={(event) => onUpdateItem(index, 'productId', event.target.value)}>
                           <option value="">🔍 พิมพ์รหัส/ชื่อสินค้า...</option>
                           {activeProducts.map((product) => <option key={product.id} value={product.id}>{optionLabel(product)}</option>)}
-                        </select>
+                        </UiSelect>
                         {fieldError(`items.${index}.productId`)}
-                      </td>
-                      <td className="p-1 align-top">
-                        <input className="w-full rounded border px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.qty} onChange={(event) => onUpdateItem(index, 'qty', Number(event.target.value))} />
+                      </TableCell>
+                      <TableCell className="p-1 align-top">
+                        <UiInput className="h-9 w-full px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.qty} onChange={(event) => onUpdateItem(index, 'qty', Number(event.target.value))} />
                         {fieldError(`items.${index}.qty`)}
-                      </td>
-                      <td className="p-1 align-top">
-                        <input className="w-full rounded border px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.unitPrice} onChange={(event) => onUpdateItem(index, 'unitPrice', Number(event.target.value))} />
+                      </TableCell>
+                      <TableCell className="p-1 align-top">
+                        <UiInput className="h-9 w-full px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.unitPrice} onChange={(event) => onUpdateItem(index, 'unitPrice', Number(event.target.value))} />
                         {fieldError(`items.${index}.unitPrice`)}
-                      </td>
-                      <td className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</td>
-                      <td className="p-1 text-center">{form.items.length > 1 ? <button className="px-2 text-red-500" type="button" onClick={() => onRemoveItem(index)}>×</button> : null}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-slate-50 font-bold">
-                  <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.totalCost)}</td><td /></tr>
-                </tfoot>
-              </table>
-            </div>
+                      </TableCell>
+                      <TableCell className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</TableCell>
+                      <TableCell className="p-1 text-center">{form.items.length > 1 ? <UiButton className="h-8 w-8 px-0 text-red-500" size="icon" type="button" variant="ghost" onClick={() => onRemoveItem(index)}>×</UiButton> : null}</TableCell>
+                    </TableRow>
+                ))}
+              </TableBody>
+              <tfoot className="bg-slate-50 font-bold">
+                <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.totalCost)}</td><td /></tr>
+              </tfoot>
+            </Table>
             {fieldError('items')}
           </div>
 
           <div>
             <label className="mb-1 block text-xs">หมายเหตุ</label>
-            <textarea className="w-full rounded border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
+            <textarea className="w-full rounded-md border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
             {fieldError('notes')}
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
-          <button className="px-4 py-2 text-sm" disabled={isSaving} type="button" onClick={onClose}>ยกเลิก</button>
-          <button className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</button>
-        </div>
-      </div>
-    </div>
+        <DialogFooter className="px-5">
+          <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ยกเลิก</UiButton>
+          <UiButton className="bg-blue-600 font-normal hover:bg-blue-700" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</UiButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40 p-0 md:items-center md:justify-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="po-buy-detail-title">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-lg bg-white shadow-xl md:max-w-3xl md:rounded-lg">
-        <div className="flex items-center justify-between border-b p-4">
+    <Dialog open onOpenChange={(open) => {
+      if (!open) onClose()
+    }}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-md p-0" hideClose>
+        <DialogHeader className="border-b p-4">
           <div>
-            <h2 id="po-buy-detail-title" className="font-semibold">รายละเอียด {row.docNo}</h2>
-            <p className="text-sm text-slate-500">{row.supplierName}</p>
+            <DialogTitle id="po-buy-detail-title">รายละเอียด {row.docNo}</DialogTitle>
+            <DialogDescription>{row.supplierName}</DialogDescription>
           </div>
-          <button className="rounded-lg border px-3 py-1.5 text-sm" type="button" onClick={onClose}>ปิด</button>
-        </div>
+        </DialogHeader>
         <div className="grid gap-3 p-4 md:grid-cols-3">
           <Detail label="วันที่สร้างเอกสาร" value={row.date || '-'} />
           <Detail label="วันที่กำหนดส่ง" value={row.expectedDelivery || '-'} />
@@ -920,34 +861,35 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
         </div>
         {row.notes.trim() ? (
           <div className="px-4 pb-4">
-            <div className="rounded-lg bg-slate-50 p-3 text-sm">
+            <div className="rounded-md bg-slate-50 p-3 text-sm">
               <div className="text-xs text-slate-500">หมายเหตุ</div>
               <div className="mt-1 whitespace-pre-wrap text-slate-700">{row.notes}</div>
             </div>
           </div>
         ) : null}
         <div className="px-4 pb-4">
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">คงเหลือ</th><th className="p-2 text-right">ราคา</th></tr></thead>
-              <tbody>
+          <Table>
+            <TableHeader><tr><TableHead>สินค้า</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">คงเหลือ</TableHead><TableHead className="text-right">ราคา</TableHead></tr></TableHeader>
+            <TableBody>
                 {row.items.map((item, index) => (
-                  <tr key={`${item.productId}-${index}`} className="border-t">
-                    <td className="p-2">{item.productName || '-'}</td>
-                    <td className="p-2 text-right">{formatMoney(item.qty)}</td>
-                    <td className="p-2 text-right">{formatMoney(item.remainingQty)}</td>
-                    <td className="p-2 text-right">{formatMoney(item.unitPrice)}</td>
-                  </tr>
+                  <TableRow key={`${item.productId}-${index}`}>
+                    <TableCell>{item.productName || '-'}</TableCell>
+                    <TableCell className="text-right">{formatMoney(item.qty)}</TableCell>
+                    <TableCell className="text-right">{formatMoney(item.remainingQty)}</TableCell>
+                    <TableCell className="text-right">{formatMoney(item.unitPrice)}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+            </TableBody>
+          </Table>
         </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <UiButton className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</UiButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg bg-slate-50 p-3"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 font-medium">{value}</div></div>
+  return <div className="rounded-md bg-slate-50 p-3"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 font-medium">{value}</div></div>
 }
