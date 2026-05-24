@@ -219,9 +219,17 @@ export function serializeAuthContext(context: AppAuthContext) {
       email: context.authUser.email,
       id: context.authUser.id,
     },
+    email: context.authUser.email,
     fallbackRole: context.fallbackRole,
     isAdmin: context.isAdmin,
+    mustChangePassword: context.appUser?.mustChangePassword ?? false,
     permissions: Array.from(context.permissionCodes).sort(),
     roles: context.roles,
+    user: context.appUser
+      ? {
+        displayName: context.appUser.displayName,
+        username: context.appUser.username,
+      }
+      : null,
   }
 }

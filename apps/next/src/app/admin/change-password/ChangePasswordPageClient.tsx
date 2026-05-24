@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { changePasswordSchema } from '@/lib/auth'
 import { getSupabaseClient } from '@/lib/supabase'
 
@@ -24,7 +25,21 @@ function issueMap(issues: { message: string; path: PropertyKey[] }[]) {
   return next
 }
 
+function safeRedirectPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+
+  try {
+    const parsed = new URL(value, window.location.origin)
+    if (parsed.origin !== window.location.origin) return null
+    if (['/login', '/forgot-password', '/reset-password', '/admin/change-password'].includes(parsed.pathname)) return null
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return null
+  }
+}
+
 export function ChangePasswordPageClient() {
+  const router = useRouter()
   const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -117,10 +132,22 @@ export function ChangePasswordPageClient() {
       return
     }
 
+    await fetch('/api/auth/password-changed', {
+      cache: 'no-store',
+      credentials: 'include',
+      method: 'POST',
+    }).catch(() => undefined)
+
     setCurrentPassword('')
     setPassword('')
     setConfirmPassword('')
+    setUser((current) => current ? { ...current, mustChangePassword: false } : current)
     setMessage('เปลี่ยน Password สำเร็จ')
+
+    const redirectTo = safeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
+    if (redirectTo) {
+      setTimeout(() => router.replace(redirectTo), 600)
+    }
   }
 
   return (

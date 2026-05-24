@@ -15,6 +15,7 @@ export function ResetPasswordPageClient() {
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSessionReady, setIsSessionReady] = useState(false)
+  const [sessionEmail, setSessionEmail] = useState('')
   const supabase = getSupabaseClient()
   const isSupabaseReady = Boolean(supabase)
 
@@ -26,10 +27,12 @@ export function ResetPasswordPageClient() {
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
       setIsSessionReady(Boolean(data.session))
+      setSessionEmail(data.session?.user.email ?? '')
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSessionReady(Boolean(session))
+      setSessionEmail(session?.user.email ?? '')
     })
 
     return () => {
@@ -67,6 +70,11 @@ export function ResetPasswordPageClient() {
     setPassword('')
     setConfirmPassword('')
     setMessage('ตั้งรหัสผ่านใหม่สำเร็จ กำลังพาไปหน้าเข้าสู่ระบบ')
+    await fetch('/api/auth/password-changed', {
+      cache: 'no-store',
+      credentials: 'include',
+      method: 'POST',
+    }).catch(() => undefined)
     await supabase.auth.signOut()
     setTimeout(() => router.push('/login'), 800)
   }
@@ -95,6 +103,7 @@ export function ResetPasswordPageClient() {
         ) : null}
 
         <form className="space-y-4" onSubmit={submit}>
+          <input autoComplete="username" className="hidden" readOnly type="text" value={sessionEmail} />
           <label className="block text-sm font-medium text-slate-700">
             Password ใหม่
             <span className="relative mt-1 block">

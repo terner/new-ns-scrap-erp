@@ -6,7 +6,7 @@ import { forgotPasswordSchema } from '@/lib/auth'
 import { getSupabaseClient } from '@/lib/supabase'
 
 export function ForgotPasswordPageClient() {
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -18,7 +18,7 @@ export function ForgotPasswordPageClient() {
     setError(null)
     setMessage(null)
 
-    const parsed = forgotPasswordSchema.safeParse({ email })
+    const parsed = forgotPasswordSchema.safeParse({ identifier })
 
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง')
@@ -31,16 +31,24 @@ export function ForgotPasswordPageClient() {
     }
 
     setIsLoading(true)
-    const redirectTo = `${window.location.origin}/reset-password`
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(parsed.data.email, { redirectTo })
+    const response = await fetch('/api/auth/forgot-password', {
+      body: JSON.stringify({
+        identifier: parsed.data.identifier,
+        redirectTo: `${window.location.origin}/reset-password`,
+      }),
+      cache: 'no-store',
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    })
+    const payload = await response.json().catch(() => null)
     setIsLoading(false)
 
-    if (resetError) {
-      setError(`ส่งอีเมล reset password ไม่สำเร็จ: ${resetError.message}`)
+    if (!response.ok) {
+      setError(typeof payload?.error === 'string' ? payload.error : 'ส่งอีเมล reset password ไม่สำเร็จ')
       return
     }
 
-    setMessage('ส่งลิงก์ reset password แล้ว กรุณาตรวจสอบอีเมล')
+    setMessage('ถ้าพบบัญชีในระบบ ระบบจะส่งลิงก์ reset password ไปที่อีเมลที่ผูกไว้')
   }
 
   return (
@@ -62,15 +70,15 @@ export function ForgotPasswordPageClient() {
 
         <form className="space-y-4" onSubmit={submit}>
           <label className="block text-sm font-medium text-slate-700">
-            Email
+            Email / Username
             <input
-              autoComplete="email"
+              autoComplete="username"
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isLoading}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@example.com"
-              type="email"
-              value={email}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder="name@example.com หรือ username"
+              type="text"
+              value={identifier}
             />
           </label>
 

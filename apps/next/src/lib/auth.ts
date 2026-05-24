@@ -8,7 +8,7 @@ export const loginSchema = z.object({
 export type LoginFormData = z.infer<typeof loginSchema>
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().trim().min(1, 'กรุณากรอกอีเมล').email('รูปแบบอีเมลไม่ถูกต้อง'),
+  identifier: z.string().trim().min(1, 'กรุณากรอก email หรือ username'),
 })
 
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>

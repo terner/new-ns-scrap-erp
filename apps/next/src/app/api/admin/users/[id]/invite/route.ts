@@ -20,11 +20,18 @@ type AdminUserInviteRouteProps = {
 }
 
 function resolveRedirectTo(request: Request, requestedRedirectTo: string | undefined) {
+  const origin = request.headers.get('origin') ?? new URL(request.url).origin
   if (requestedRedirectTo) {
-    return requestedRedirectTo
+    try {
+      const parsed = new URL(requestedRedirectTo)
+      if (parsed.origin === origin && parsed.pathname === '/reset-password') {
+        return parsed.toString()
+      }
+    } catch {
+      // Fall back to the canonical reset URL below.
+    }
   }
 
-  const origin = request.headers.get('origin') ?? new URL(request.url).origin
   return new URL('/reset-password', origin).toString()
 }
 

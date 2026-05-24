@@ -510,6 +510,14 @@ At every checkpoint, update docs as if a new session will start from only the re
 
 ## Known Carry-over Work
 
+- 2026-05-24 auth flow hardening checkpoint:
+  - Login now sanitizes `redirect` before navigation.
+  - Forgot password accepts email or username through `/api/auth/forgot-password`, resolves username server-side, uses a same-origin `/reset-password` redirect, and records a non-secret reset request audit event.
+  - Reset/change password now call `/api/auth/password-changed` after Supabase password update to clear `app_users.must_change_password` and write an auth audit event.
+  - `must_change_password` is enforced by proxy when the app-user flag is readable and by `AppShell` for normal UI navigation; `/admin/change-password` redirects back to the intended safe path after success.
+  - Admin invite/reset `redirectTo` is now restricted to same-origin `/reset-password`.
+  - Validation run: `git diff --check`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`; all passed.
+  - Browser smoke run on `localhost:3100`: `/login`, `/forgot-password`, `/reset-password`, `/admin/change-password`; forgot username-not-found submit returns the generic success message.
 - `reports/` is untracked/local and must not be committed unless explicitly approved.
 - Production write flow is not complete:
   - create/edit production order

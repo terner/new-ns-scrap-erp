@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { permissionForPath } from '@/lib/navigation'
 
-const publicPaths = new Set(['/login', '/forgot-password', '/reset-password', '/api/health'])
+const publicPaths = new Set(['/login', '/forgot-password', '/reset-password', '/api/auth/forgot-password', '/api/health'])
 
 function isPublicPath(pathname: string) {
   return publicPaths.has(pathname) || pathname.startsWith('/_next') || pathname.startsWith('/favicon')
@@ -21,6 +21,10 @@ function jsonError(message: string, status: number) {
 
 function metadataRole(user: { app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }) {
   return String(user.app_metadata?.role ?? user.user_metadata?.role ?? '').toLowerCase()
+}
+
+function isPasswordChangeAllowedPath(pathname: string) {
+  return pathname === '/admin/change-password' || pathname === '/api/auth/me' || pathname === '/api/auth/password-changed'
 }
 
 export async function proxy(request: NextRequest) {
@@ -62,6 +66,25 @@ export async function proxy(request: NextRequest) {
 
   if (!user) {
     return pathname.startsWith('/api/') ? jsonError('กรุณาเข้าสู่ระบบ', 401) : loginRedirect(request)
+  }
+
+  const { data: currentAppUserId } = await supabase.rpc('current_app_user_id')
+  if (currentAppUserId && !isPasswordChangeAllowedPath(pathname)) {
+    const { data: appUser } = await supabase
+      .from('app_users')
+      .select('must_change_password')
+      .eq('id', currentAppUserId)
+      .maybeSingle<{ must_change_password: boolean }>()
+
+    if (appUser?.must_change_password === true) {
+      if (pathname.startsWith('/api/')) {
+        return jsonError('ต้องเปลี่ยน password ก่อนใช้งาน', 403)
+      }
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/admin/change-password'
+      redirectUrl.searchParams.set('redirect', `${request.nextUrl.pathname}${request.nextUrl.search}`)
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
   const requiredPermission = permissionForPath(pathname)

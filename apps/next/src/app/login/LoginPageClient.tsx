@@ -13,6 +13,19 @@ type LoginPageClientProps = {
   }
 }
 
+function safeRedirectPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
+
+  try {
+    const parsed = new URL(value, window.location.origin)
+    if (parsed.origin !== window.location.origin) return '/'
+    if (['/login', '/forgot-password', '/reset-password'].includes(parsed.pathname)) return '/'
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return '/'
+  }
+}
+
 export function LoginPageClient({ devLogin }: LoginPageClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -86,7 +99,7 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
     }
 
     setPassword('')
-    router.push(searchParams.get('redirect') || '/')
+    router.push(safeRedirectPath(searchParams.get('redirect')))
     router.refresh()
   }
 

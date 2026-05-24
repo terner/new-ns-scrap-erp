@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { AuthStatus } from '@/components/layout/AuthStatus'
 import { SELECTED_BRANCH_KEY } from '@/lib/branch-selection'
@@ -21,6 +21,7 @@ type BranchOption = {
 const PAGE_TITLE_EVENT = 'ns-scrap-erp-page-title'
 
 export function AppShell({ children }: AppShellProps) {
+  const router = useRouter()
   const pathname = usePathname()
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('all')
@@ -108,6 +109,30 @@ export function AppShell({ children }: AppShellProps) {
       // Activity logging is best-effort and must not block normal navigation.
     })
   }, [isAuthPage, pathname, title])
+
+  useEffect(() => {
+    if (isAuthPage || pathname === '/admin/change-password') return
+
+    let mounted = true
+    async function enforcePasswordChange() {
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' })
+        const payload = await response.json().catch(() => null)
+        if (!mounted || !response.ok) return
+        if (payload?.appUser?.mustChangePassword === true) {
+          router.replace(`/admin/change-password?redirect=${encodeURIComponent(pathname)}`)
+        }
+      } catch {
+        // Auth enforcement is handled by the proxy; this guard only redirects active sessions.
+      }
+    }
+
+    void enforcePasswordChange()
+
+    return () => {
+      mounted = false
+    }
+  }, [isAuthPage, pathname, router])
 
   function handleBranchChange(value: string) {
     setSelectedBranchId(value)
