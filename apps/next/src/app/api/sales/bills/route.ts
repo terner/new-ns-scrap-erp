@@ -21,7 +21,7 @@ type BillQuery = {
   search?: string
   sortDirection: Prisma.SortOrder
   sortKey: string
-  status?: string
+  statuses?: string[]
 }
 
 type SalesBillRow = Prisma.sales_billsGetPayload<{
@@ -43,7 +43,10 @@ function parseBillQuery(url: URL, includePaging = true): BillQuery {
     search: url.searchParams.get('search')?.trim() || undefined,
     sortDirection: url.searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc',
     sortKey: url.searchParams.get('sortKey') || 'date',
-    status: url.searchParams.get('status') || undefined,
+    statuses: url.searchParams.get('status')
+      ?.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean) || undefined,
   }
 }
 
@@ -85,7 +88,7 @@ function billWhere(query: BillQuery): Prisma.sales_billsWhereInput {
     }
   }
   if (query.filterMode) where.transaction_mode = query.filterMode
-  if (query.status) where.status = query.status
+  if (query.statuses?.length) where.status = { in: query.statuses }
   if (query.search) {
     where.OR = [
       { doc_no: { contains: query.search, mode: 'insensitive' } },

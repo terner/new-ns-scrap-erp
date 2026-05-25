@@ -685,6 +685,7 @@ model branches {
   stock_ledger           stock_ledger[]
   suppliers              suppliers[]
   warehouses             warehouses[]
+  weight_tickets         weight_tickets[]
 
   @@schema("public")
 }
@@ -758,6 +759,7 @@ model customers {
   sales_bills         sales_bills[]
   stock_issues        stock_issues[]
   trading_deals       trading_deals[]
+  weight_tickets      weight_tickets[]
 
   @@index([name], map: "idx_customers_name")
   @@index([active], map: "idx_customers_active")
@@ -931,6 +933,7 @@ model impurities {
   active     Boolean  @default(true)
   created_at DateTime @default(now()) @db.Timestamptz(6)
   updated_at DateTime @default(now()) @db.Timestamptz(6)
+  weight_ticket_lines weight_ticket_lines[]
 
   @@index([active])
   @@schema("public")
@@ -1462,6 +1465,7 @@ model products {
   purchase_bill_items purchase_bill_items[]
   stock_ledger       stock_ledger[]
   trading_deals      trading_deals[]
+  weight_ticket_lines weight_ticket_lines[]
 
   @@index([metal_group], map: "idx_products_metal_group")
   @@index([item_status], map: "idx_products_status")
@@ -1508,7 +1512,7 @@ model purchase_bills {
   total_amount            Decimal            @db.Decimal
   paid_amount             Decimal?           @default(0) @db.Decimal
   payable_balance         Decimal?           @default(0) @db.Decimal
-  status                  String?            @default("open")
+  status                  String?            @default("unpaid")
   notes                   String?
   cancel_note             String?
   cancelled_at            DateTime?          @db.Timestamptz(6)
@@ -1786,6 +1790,75 @@ model salespersons {
   @@schema("public")
 }
 
+model weight_tickets {
+  id                  String               @id
+  doc_no              String               @unique
+  doc_type            String
+  status              String               @default("received")
+  document_date       DateTime             @db.Date
+  branch_id           String
+  supplier_id         String?
+  customer_id         String?
+  party_name          String
+  vehicle_no          String
+  remark              String?
+  entered_by          String?
+  image_count         Int                  @default(0)
+  vehicle_image_count Int                  @default(0)
+  vehicle_image_names String[]             @default([])
+  gross_weight        Decimal              @default(0) @db.Decimal
+  deduct_weight       Decimal              @default(0) @db.Decimal
+  net_weight          Decimal              @default(0) @db.Decimal
+  cancel_note         String?
+  cancelled_at        DateTime?            @db.Timestamptz(6)
+  cancelled_by        String?
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  created_by          String?
+  updated_at          DateTime             @default(now()) @db.Timestamptz(6)
+  updated_by          String?
+  branches            branches             @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customers           customers?           @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  suppliers           suppliers?           @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  weight_ticket_lines weight_ticket_lines[]
+
+  @@index([branch_id], map: "idx_weight_tickets_branch")
+  @@index([customer_id], map: "idx_weight_tickets_customer")
+  @@index([doc_no], map: "idx_weight_tickets_doc_no")
+  @@index([doc_type], map: "idx_weight_tickets_doc_type")
+  @@index([document_date(sort: Desc)], map: "idx_weight_tickets_date")
+  @@index([status], map: "idx_weight_tickets_status")
+  @@index([supplier_id], map: "idx_weight_tickets_supplier")
+  @@schema("public")
+}
+
+model weight_ticket_lines {
+  id               String         @id
+  weight_ticket_id String
+  line_no          Int
+  product_id       String
+  product_name     String
+  gross_weight     Decimal        @default(0) @db.Decimal
+  deduct_weight    Decimal        @default(0) @db.Decimal
+  net_weight       Decimal        @default(0) @db.Decimal
+  deduction_mode   String
+  deduction_value  Decimal?       @default(0) @db.Decimal
+  impurity_id      String?
+  impurity_name    String?
+  note             String?
+  image_count      Int            @default(0)
+  image_names      String[]       @default([])
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  impurities       impurities?    @relation(fields: [impurity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products         products       @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  weight_tickets   weight_tickets @relation(fields: [weight_ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([impurity_id], map: "idx_weight_ticket_lines_impurity")
+  @@index([product_id], map: "idx_weight_ticket_lines_product")
+  @@index([weight_ticket_id], map: "idx_weight_ticket_lines_ticket")
+  @@unique([weight_ticket_id, line_no], map: "uq_weight_ticket_lines_ticket_line")
+  @@schema("public")
+}
+
 model stock_adjustments {
   id              String    @id
   doc_no          String?
@@ -1933,6 +2006,7 @@ model suppliers {
   supplier_bank_accounts   supplier_bank_accounts[]
   branches                 branches?                @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   trading_deals            trading_deals[]
+  weight_tickets           weight_tickets[]
 
   @@index([branch_id], map: "idx_suppliers_branch")
   @@index([name], map: "idx_suppliers_name")

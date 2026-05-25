@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import {
   emptyMasterDataForm,
@@ -147,6 +148,23 @@ export function SystemSettingsPageClient() {
 
   return (
     <section className="space-y-4">
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">ข้อมูลบริษัทสำหรับใบพิมพ์</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              จัดการชื่อบริษัท ที่อยู่ เลขภาษี โลโก้ และข้อความท้ายเอกสารสำหรับใบพิมพ์จากจุดเดียว
+            </p>
+          </div>
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
+            href="/admin/company-profile"
+          >
+            เปิดหน้าข้อมูลบริษัท
+          </Link>
+        </div>
+      </section>
+
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}

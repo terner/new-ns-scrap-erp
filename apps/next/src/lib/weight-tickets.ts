@@ -1,3 +1,6 @@
+import { z } from 'zod'
+import { readJsonResponse } from '@/lib/api-client'
+
 export type WeightTicketType = 'WTI' | 'WTO'
 export type DeductionMode = 'none' | 'kg' | 'percent'
 export type WeightTicketStatus = 'received' | 'delivered' | 'partially_billed' | 'billed' | 'cancelled'
@@ -12,7 +15,7 @@ export type WeightTicketLine = {
   productId: string
 }
 
-export type StoredWeightTicketLine = WeightTicketLine & {
+export type WeightTicketRecordLine = WeightTicketLine & {
   deductionWeight: number
   grossWeightValue: number
   imageCount: number
@@ -22,9 +25,13 @@ export type StoredWeightTicketLine = WeightTicketLine & {
   productName: string
 }
 
-export type StoredWeightTicket = {
+export type WeightTicketRecord = {
   branchId: string
   branchName: string
+  canCancel: boolean
+  canEdit: boolean
+  cancelNote: string
+  cancelledAt: string | null
   createdAt: string
   documentDate: string
   documentNo: string
@@ -32,7 +39,7 @@ export type StoredWeightTicket = {
   id: string
   imageCount: number
   imageNames: string[]
-  lines: StoredWeightTicketLine[]
+  lines: WeightTicketRecordLine[]
   partyId: string
   partyName: string
   remark: string
@@ -43,8 +50,13 @@ export type StoredWeightTicket = {
     netWeight: number
   }
   type: WeightTicketType
-  vehicleImageCount?: number
-  vehicleImageNames?: string[]
+  timeline: WeightTicketTimelineEvent[]
+  updatedAt: string | null
+  updatedBy: string
+  usedInPurchaseBillCount: number
+  usedInSalesBillCount: number
+  vehicleImageCount: number
+  vehicleImageNames: string[]
   vehicleNo: string
 }
 
@@ -55,44 +67,160 @@ export type OptionItem = {
   label: string
 }
 
-export const weightTicketStorageKey = 'ns-scrap-erp.weight-tickets.v1'
+export type WeightTicketSortBy = 'createdAt' | 'documentNo' | 'partyName' | 'netWeight'
+export type WeightTicketSortDir = 'asc' | 'desc'
 
-export const branchOptions: OptionItem[] = [
-  { code: '01', description: 'สาขารับซื้อและคลังวัตถุดิบ', id: 'BR001', label: 'สมุทรสาคร' },
-  { code: '02', description: 'สาขาผลิตและคลังสินค้า', id: 'BR002', label: 'นครสวรรค์' },
-]
-
-export const supplierOptions: OptionItem[] = [
-  { description: 'Supplier · ซื้อสด', id: 'SUP-001', label: 'บริษัท รุ่งเศษโลหะ' },
-  { description: 'Supplier · ตาม PO', id: 'SUP-002', label: 'หจก. โชคไพบูลย์รีไซเคิล' },
-  { description: 'Supplier · หน้างาน', id: 'SUP-003', label: 'คุณสมชาย รถคอก' },
-]
-
-export const customerOptions: OptionItem[] = [
-  { description: 'Customer · ส่งขายตรง', id: 'CUS-001', label: 'บริษัท ไทยเมททัลเทรด' },
-  { description: 'Customer · โรงหล่อ', id: 'CUS-002', label: 'โรงหล่อสยามอินดัสเทรียล' },
-  { description: 'Customer · ลานปลายทาง', id: 'CUS-003', label: 'บริษัท ยูไนเต็ดคอปเปอร์' },
-]
-
-export const productOptions: OptionItem[] = [
-  { description: 'RM · ทองแดงเบอร์ 1', id: 'PROD-CU1', label: 'ทองแดงเบอร์ 1' },
-  { description: 'RM · ทองแดงเบอร์ 2', id: 'PROD-CU2', label: 'ทองแดงเบอร์ 2' },
-  { description: 'RM · ทองเหลืองป่น', id: 'PROD-BRASS', label: 'ทองเหลืองป่น' },
-  { description: 'FG · อินกอตทองแดง', id: 'PROD-INGOT', label: 'อินกอตทองแดง' },
-]
-
-export const statusLabels: Record<WeightTicketStatus, string> = {
-  billed: 'ออกบิลแล้ว',
-  cancelled: 'ยกเลิก',
-  delivered: 'ส่งของแล้ว',
-  partially_billed: 'ออกบิลบางส่วน',
-  received: 'รับของแล้ว',
+export type StoredImageAsset = {
+  fileName: string
+  rawValue: string
+  url: string | null
 }
 
-export const typeLabels: Record<WeightTicketType, string> = {
-  WTI: 'ใบรับของ WTI',
-  WTO: 'ใบส่งของ WTO',
+export type WeightTicketTimelineEvent = {
+  action: string
+  actorName: string
+  eventKey: string
+  id: string
+  metadata: Record<string, unknown>
+  occurredAt: string
+  outcome: 'blocked' | 'failure' | 'success'
 }
+
+const typeEnum = z.enum(['WTI', 'WTO'])
+const statusEnum = z.enum(['received', 'delivered', 'partially_billed', 'billed', 'cancelled'])
+const deductionModeEnum = z.enum(['none', 'kg', 'percent'])
+const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
+
+const blankToEmpty = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
+
+const attachmentValueSchema = z.string().trim().min(1).max(4_000_000, 'ข้อมูลรูปภาพใหญ่เกินไป')
+
+const weightTicketLinePayloadSchema = z.object({
+  deductionMode: deductionModeEnum,
+  deductionValue: z.coerce.number().finite().min(0).default(0),
+  grossWeight: z.coerce.number().finite().gt(0, 'กรอกน้ำหนักมากกว่า 0'),
+  id: z.string().trim().min(1).max(80),
+  imageNames: z.array(attachmentValueSchema).min(1, 'รูปภาพสินค้าอย่างน้อย 1 รูป'),
+  impurityId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
+  note: z.preprocess(blankToEmpty, z.string().max(160, 'หมายเหตุรายการยาวเกินไป').default('')),
+  productId: z.string().trim().min(1, 'เลือกสินค้า'),
+}).superRefine((value, ctx) => {
+  if (value.deductionMode !== 'none' && !value.impurityId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'เลือกสิ่งเจือปน',
+      path: ['impurityId'],
+    })
+  }
+  if (value.deductionMode === 'percent' && value.deductionValue > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'หัก % ต้องไม่เกิน 100',
+      path: ['deductionValue'],
+    })
+  }
+  if (value.deductionMode === 'kg' && value.deductionValue > value.grossWeight) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'น้ำหนักหักต้องไม่เกินน้ำหนักรวม',
+      path: ['deductionValue'],
+    })
+  }
+})
+
+export const weightTicketFormSchema = z.object({
+  branchId: z.string().trim().min(1, 'เลือกสาขา'),
+  id: z.string().trim().max(80).optional(),
+  lines: z.array(weightTicketLinePayloadSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
+  partyId: z.string().trim().min(1, 'เลือกคู่ค้า'),
+  remark: z.preprocess(blankToEmpty, z.string().max(500, 'หมายเหตุยาวเกินไป').default('')),
+  type: typeEnum,
+  vehicleImageNames: z.array(attachmentValueSchema).default([]),
+  vehicleNo: z
+    .string()
+    .trim()
+    .min(2, 'กรอกทะเบียนรถ')
+    .max(24, 'ทะเบียนรถยาวเกินไป')
+    .regex(/^[\p{L}\p{M}\p{N}\s.-]+$/u, 'ทะเบียนรถมีรูปแบบไม่ถูกต้อง'),
+})
+
+const weightTicketRecordLineSchema = z.object({
+  deductionMode: deductionModeEnum,
+  deductionValue: z.string(),
+  deductionWeight: z.number(),
+  grossWeight: z.string(),
+  grossWeightValue: z.number(),
+  id: z.string(),
+  imageCount: z.number().int().nonnegative(),
+  imageNames: z.array(z.string()),
+  impurityId: z.string(),
+  impurityName: z.string(),
+  netWeight: z.number(),
+  note: z.string(),
+  productId: z.string(),
+  productName: z.string(),
+})
+
+const weightTicketTimelineSchema = z.object({
+  action: z.string(),
+  actorName: z.string(),
+  eventKey: z.string(),
+  id: z.string(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  occurredAt: z.string(),
+  outcome: z.enum(['blocked', 'failure', 'success']),
+})
+
+export const weightTicketRecordSchema = z.object({
+  branchId: z.string(),
+  branchName: z.string(),
+  canCancel: z.boolean(),
+  canEdit: z.boolean(),
+  cancelNote: z.string().default(''),
+  cancelledAt: z.string().nullable(),
+  createdAt: z.string(),
+  documentDate: z.string(),
+  documentNo: z.string(),
+  enteredBy: z.string(),
+  id: z.string(),
+  imageCount: z.number().int().nonnegative(),
+  imageNames: z.array(z.string()),
+  lines: z.array(weightTicketRecordLineSchema),
+  partyId: z.string(),
+  partyName: z.string(),
+  remark: z.string(),
+  status: statusEnum,
+  totals: z.object({
+    deductionWeight: z.number(),
+    grossWeight: z.number(),
+    netWeight: z.number(),
+  }),
+  timeline: z.array(weightTicketTimelineSchema).default([]),
+  type: typeEnum,
+  updatedAt: z.string().nullable(),
+  updatedBy: z.string(),
+  usedInPurchaseBillCount: z.number().int().nonnegative(),
+  usedInSalesBillCount: z.number().int().nonnegative(),
+  vehicleImageCount: z.number().int().nonnegative(),
+  vehicleImageNames: z.array(z.string()),
+  vehicleNo: z.string(),
+})
+
+const weightTicketListResultSchema = z.object({
+  rows: z.array(weightTicketRecordSchema),
+  totalRows: z.number().int().nonnegative(),
+})
+
+export const weightTicketCancelSchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(1, 'กรอกหมายเหตุการยกเลิก')
+    .max(500, 'หมายเหตุการยกเลิกยาวเกินไป')
+    .regex(generalTextPattern, 'หมายเหตุการยกเลิกมีรูปแบบไม่ถูกต้อง'),
+})
+
+export type WeightTicketFormValues = z.infer<typeof weightTicketFormSchema>
 
 export function createWeightTicketLine(id = crypto.randomUUID()): WeightTicketLine {
   return {
@@ -137,7 +265,42 @@ export function formatDateDisplay(value: string) {
   return `${day}/${month}/${year}`
 }
 
-export function calculateLineTotals(line: WeightTicketLine) {
+export function encodeStoredImageAsset(fileName: string, dataUrl: string) {
+  return JSON.stringify({ dataUrl, fileName })
+}
+
+export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
+  const trimmed = rawValue.trim()
+
+  if (trimmed.startsWith('data:image/')) {
+    return {
+      fileName: 'รูปภาพแนบ',
+      rawValue,
+      url: trimmed,
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as { dataUrl?: unknown; fileName?: unknown }
+    if (typeof parsed.fileName === 'string' && typeof parsed.dataUrl === 'string' && parsed.dataUrl.startsWith('data:image/')) {
+      return {
+        fileName: parsed.fileName,
+        rawValue,
+        url: parsed.dataUrl,
+      }
+    }
+  } catch {
+    // fallback to filename-only payload
+  }
+
+  return {
+    fileName: trimmed,
+    rawValue,
+    url: null,
+  }
+}
+
+export function calculateLineTotals(line: Pick<WeightTicketLine, 'deductionMode' | 'deductionValue' | 'grossWeight'>) {
   const grossWeight = Math.max(0, toNumber(line.grossWeight))
   const rawDeduction = line.deductionMode === 'percent'
     ? grossWeight * Math.max(0, toNumber(line.deductionValue)) / 100
@@ -152,7 +315,7 @@ export function calculateLineTotals(line: WeightTicketLine) {
   }
 }
 
-export function calculateTicketTotals(lines: WeightTicketLine[]) {
+export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'deductionMode' | 'deductionValue' | 'grossWeight'>>) {
   return lines.reduce((summary, line) => {
     const totals = calculateLineTotals(line)
     summary.grossWeight += totals.grossWeight
@@ -166,141 +329,81 @@ export function findOptionLabel(options: OptionItem[], id: string) {
   return options.find((option) => option.id === id)?.label ?? id
 }
 
-export function getPartyOptions(type: WeightTicketType) {
-  return type === 'WTI' ? supplierOptions : customerOptions
+export const statusLabels: Record<WeightTicketStatus, string> = {
+  billed: 'ออกบิลแล้ว',
+  cancelled: 'ยกเลิก',
+  delivered: 'ส่งของแล้ว',
+  partially_billed: 'ออกบิลบางส่วน',
+  received: 'รับของแล้ว',
 }
 
-export function getBranchCode(branchId: string, branches: OptionItem[] = branchOptions) {
-  const branch = branches.find((option) => option.id === branchId)
-  const rawCode = String(branch?.code ?? '').trim()
-  const digits = rawCode.replace(/\D/g, '')
-  if (digits) return digits.slice(-2).padStart(2, '0')
-
-  const matchedDigits = branchId.match(/\d+/g)?.join('') ?? ''
-  if (matchedDigits) return matchedDigits.slice(-2).padStart(2, '0')
-  return '00'
+export const typeLabels: Record<WeightTicketType, string> = {
+  WTI: 'ใบรับของ WTI',
+  WTO: 'ใบส่งของ WTO',
 }
 
-export function currentDocumentDate() {
-  return new Date().toISOString().slice(0, 10)
+export async function listWeightTickets(params: {
+  branchId?: string
+  dateFrom?: string
+  dateTo?: string
+  page?: number
+  pageSize?: number
+  search?: string
+  sortBy?: WeightTicketSortBy
+  sortDir?: WeightTicketSortDir
+  status?: WeightTicketStatus | 'all'
+  type?: WeightTicketType | 'all'
+} = {}) {
+  const query = new URLSearchParams()
+  if (params.branchId && params.branchId !== 'all') query.set('branchId', params.branchId)
+  if (params.dateFrom) query.set('dateFrom', params.dateFrom)
+  if (params.dateTo) query.set('dateTo', params.dateTo)
+  if (params.page) query.set('page', String(params.page))
+  if (params.pageSize) query.set('pageSize', String(params.pageSize))
+  if (params.search) query.set('search', params.search)
+  if (params.sortBy) query.set('sortBy', params.sortBy)
+  if (params.sortDir) query.set('sortDir', params.sortDir)
+  if (params.status && params.status !== 'all') query.set('status', params.status)
+  if (params.type && params.type !== 'all') query.set('type', params.type)
+
+  const response = await fetch(`/api/daily/weight-tickets?${query.toString()}`, { cache: 'no-store' })
+  return readJsonResponse(response, weightTicketListResultSchema, 'โหลดรายการใบรับ-ส่งของไม่ได้')
 }
 
-export function currentCreatedTime() {
-  return new Date().toTimeString().slice(0, 5)
+export async function getWeightTicket(id: string) {
+  const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(id)}`, { cache: 'no-store' })
+  return readJsonResponse(response, weightTicketRecordSchema, 'โหลดใบรับ-ส่งของไม่ได้')
 }
 
-export function documentPeriod(date = new Date()) {
-  const year = String(date.getFullYear()).slice(-2)
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  return `${year}${month}`
-}
-
-export function generateDocumentNo(type: WeightTicketType, branchId: string, existingTickets: StoredWeightTicket[], branches: OptionItem[] = branchOptions) {
-  const branchCode = getBranchCode(branchId, branches)
-  const period = documentPeriod()
-  const prefix = `${type}${branchCode}${period}-`
-  const maxSequence = existingTickets
-    .filter((ticket) => ticket.documentNo.startsWith(prefix))
-    .reduce((max, ticket) => {
-      const sequence = Number(ticket.documentNo.slice(prefix.length))
-      return Number.isFinite(sequence) ? Math.max(max, sequence) : max
-    }, 0)
-  return `${prefix}${String(maxSequence + 1).padStart(4, '0')}`
-}
-
-export function loadStoredWeightTickets() {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(weightTicketStorageKey)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed as StoredWeightTicket[] : []
-  } catch {
-    return []
+function payloadFromForm(values: WeightTicketFormValues) {
+  return {
+    ...values,
+    lines: values.lines.map((line) => ({
+      ...line,
+      deductionValue: line.deductionMode === 'none' ? 0 : Number(line.deductionValue),
+      grossWeight: Number(line.grossWeight),
+    })),
   }
 }
 
-export function saveStoredWeightTicket(ticket: StoredWeightTicket) {
-  if (typeof window === 'undefined') return
-  const current = loadStoredWeightTickets()
-  window.localStorage.setItem(weightTicketStorageKey, JSON.stringify([ticket, ...current]))
+export async function saveWeightTicket(values: WeightTicketFormValues) {
+  const parsed = weightTicketFormSchema.parse(values)
+  const method = parsed.id ? 'PUT' : 'POST'
+  const path = parsed.id ? `/api/daily/weight-tickets/${encodeURIComponent(parsed.id)}` : '/api/daily/weight-tickets'
+  const response = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payloadFromForm(parsed)),
+  })
+  return readJsonResponse(response, weightTicketRecordSchema, parsed.id ? 'แก้ไขใบรับ-ส่งของไม่ได้' : 'บันทึกใบรับ-ส่งของไม่ได้')
 }
 
-export const sampleWeightTickets: StoredWeightTicket[] = [
-  {
-    branchId: 'BR001',
-    branchName: 'สมุทรสาคร',
-    createdAt: '2026-05-25T08:42:00.000+07:00',
-    documentDate: '2026-05-25',
-    documentNo: 'WTI012605-0001',
-    enteredBy: 'อ้อม · เครื่องชั่ง A',
-    id: 'sample-wti-1',
-    imageCount: 2,
-    imageNames: ['vehicle-front.jpg', 'copper-pile.jpg'],
-    lines: [
-      {
-        deductionMode: 'percent',
-        deductionValue: '1.5',
-        deductionWeight: 7.5,
-        grossWeight: '500',
-        grossWeightValue: 500,
-        id: 'sample-wti-line-1',
-        imageCount: 2,
-        imageNames: ['vehicle-front.jpg', 'copper-pile.jpg'],
-        impurityId: 'IMP-001',
-        impurityName: 'ดิน/ฝุ่น',
-        netWeight: 492.5,
-        note: 'หักสิ่งเจือปนตามสภาพสินค้า',
-        productId: 'PROD-CU1',
-        productName: 'ทองแดงเบอร์ 1',
-      },
-    ],
-    partyId: 'SUP-001',
-    partyName: 'บริษัท รุ่งเศษโลหะ',
-    remark: 'ตัวอย่างใบรับของจาก flow ใหม่',
-    status: 'received',
-    totals: { deductionWeight: 7.5, grossWeight: 500, netWeight: 492.5 },
-    type: 'WTI',
-    vehicleImageCount: 1,
-    vehicleImageNames: ['vehicle-front.jpg'],
-    vehicleNo: '83-5476',
-  },
-  {
-    branchId: 'BR001',
-    branchName: 'สมุทรสาคร',
-    createdAt: '2026-05-25T11:15:00.000+07:00',
-    documentDate: '2026-05-25',
-    documentNo: 'WTO012605-0001',
-    enteredBy: 'กวาง · หัวหน้าคลัง',
-    id: 'sample-wto-1',
-    imageCount: 1,
-    imageNames: ['outbound-truck.jpg'],
-    lines: [
-      {
-        deductionMode: 'none',
-        deductionValue: '',
-        deductionWeight: 0,
-        grossWeight: '320',
-        grossWeightValue: 320,
-        id: 'sample-wto-line-1',
-        imageCount: 1,
-        imageNames: ['outbound-truck.jpg'],
-        impurityId: '',
-        impurityName: '',
-        netWeight: 320,
-        note: '',
-        productId: 'PROD-INGOT',
-        productName: 'อินกอตทองแดง',
-      },
-    ],
-    partyId: 'CUS-001',
-    partyName: 'บริษัท ไทยเมททัลเทรด',
-    remark: 'ตัวอย่างใบส่งของขาออก',
-    status: 'delivered',
-    totals: { deductionWeight: 0, grossWeight: 320, netWeight: 320 },
-    type: 'WTO',
-    vehicleImageCount: 1,
-    vehicleImageNames: ['outbound-truck.jpg'],
-    vehicleNo: '70-1122',
-  },
-]
+export async function cancelWeightTicket(id: string, note: string) {
+  const values = weightTicketCancelSchema.parse({ note })
+  const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(values),
+  })
+  return readJsonResponse(response, weightTicketRecordSchema, 'ยกเลิกใบรับ-ส่งของไม่ได้')
+}

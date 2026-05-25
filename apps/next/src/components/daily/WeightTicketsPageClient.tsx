@@ -2,34 +2,34 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { CheckCircle2, ImagePlus, Plus, Trash2, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
+import { getErrorMessage } from '@/lib/api-client'
 import { listImpurities } from '@/lib/impurity'
 import { cn } from '@/lib/utils'
 import {
-  branchOptions,
   calculateLineTotals,
   calculateTicketTotals,
   createWeightTicketLine,
-  currentDocumentDate,
-  findOptionLabel,
+  decodeStoredImageAsset,
+  encodeStoredImageAsset,
   formatWeight,
-  generateDocumentNo,
-  getPartyOptions,
-  loadStoredWeightTickets,
+  getWeightTicket,
   normalizeDecimalInput,
   normalizeVehicleNo,
-  productOptions,
-  saveStoredWeightTicket,
+  saveWeightTicket,
   type DeductionMode,
   type OptionItem,
-  type StoredWeightTicket,
+  type WeightTicketRecord,
   type WeightTicketLine,
   type WeightTicketType,
 } from '@/lib/weight-tickets'
@@ -37,6 +37,7 @@ import {
 type AttachmentPreview = {
   fileName: string
   id: string
+  rawValue: string
   url: string
 }
 
@@ -64,7 +65,7 @@ function createFormWeightTicketLine(id?: string): FormWeightTicketLine {
 function initialForm(): FormState {
   return {
     branchId: '',
-    lines: [createFormWeightTicketLine('line-1')],
+    lines: [createFormWeightTicketLine()],
     partyId: '',
     remark: '',
     type: 'WTI',
@@ -85,20 +86,80 @@ function getLineImpurityId(line: FormWeightTicketLine) {
   return line.impurityId ?? ''
 }
 
-export function WeightTicketsPageClient() {
+function createAttachmentPreview(fileName: string): AttachmentPreview {
+  const parsed = decodeStoredImageAsset(fileName)
+  return {
+    fileName: parsed.fileName,
+    id: makeFileId(),
+    rawValue: parsed.rawValue,
+    url: parsed.url ?? '',
+  }
+}
+
+async function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error(`อ่านไฟล์ ${file.name} ไม่สำเร็จ`))
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.readAsDataURL(file)
+  })
+}
+
+async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPreview> {
+  const dataUrl = await fileToDataUrl(file)
+  return {
+    fileName: file.name,
+    id: makeFileId(),
+    rawValue: encodeStoredImageAsset(file.name, dataUrl),
+    url: dataUrl,
+  }
+}
+
+function ticketToFormState(ticket: WeightTicketRecord): FormState {
+  return {
+    branchId: ticket.branchId,
+    lines: ticket.lines.map((line) => ({
+      deductionMode: line.deductionMode,
+      deductionValue: line.deductionValue,
+      grossWeight: line.grossWeight,
+      id: line.id,
+      imageFiles: line.imageNames.map(createAttachmentPreview),
+      impurityId: line.impurityId,
+      note: line.note,
+      productId: line.productId,
+    })),
+    partyId: ticket.partyId,
+    remark: ticket.remark,
+    type: ticket.type,
+    vehicleImageFiles: ticket.vehicleImageNames.map(createAttachmentPreview),
+    vehicleNo: ticket.vehicleNo,
+  }
+}
+
+export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }) {
+  const router = useRouter()
+  const editingTicketId = ticketId.trim()
   const [form, setForm] = useState<FormState>(initialForm)
-  const [branches, setBranches] = useState<OptionItem[]>(branchOptions)
-  const [suppliers, setSuppliers] = useState<OptionItem[]>(getPartyOptions('WTI'))
-  const [customers, setCustomers] = useState<OptionItem[]>(getPartyOptions('WTO'))
-  const [products, setProducts] = useState<OptionItem[]>(productOptions)
+  const [branches, setBranches] = useState<OptionItem[]>([])
+  const [suppliers, setSuppliers] = useState<OptionItem[]>([])
+  const [customers, setCustomers] = useState<OptionItem[]>([])
+  const [products, setProducts] = useState<OptionItem[]>([])
   const [impurities, setImpurities] = useState<OptionItem[]>([])
-  const [savedTicket, setSavedTicket] = useState<StoredWeightTicket | null>(null)
+  const [loadedTicket, setLoadedTicket] = useState<WeightTicketRecord | null>(null)
+  const [savedTicket, setSavedTicket] = useState<WeightTicketRecord | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingTicket, setIsLoadingTicket] = useState(Boolean(editingTicketId))
+  const [loadError, setLoadError] = useState('')
   const [previewImage, setPreviewImage] = useState<AttachmentPreview | null>(null)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [activeLineId, setActiveLineId] = useState(form.lines[0]?.id ?? '')
 
   const partyOptions = form.type === 'WTI' ? suppliers : customers
   const totals = useMemo(() => calculateTicketTotals(form.lines), [form.lines])
+  const activeLine = useMemo(
+    () => form.lines.find((line) => line.id === activeLineId) ?? form.lines[0] ?? null,
+    [activeLineId, form.lines],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -106,10 +167,10 @@ export function WeightTicketsPageClient() {
     async function loadOptionData() {
       try {
         const [branchResponse, supplierResponse, customerResponse, productResponse] = await Promise.all([
-          fetch('/api/branches'),
-          fetch('/api/master-data/suppliers?all=1'),
-          fetch('/api/master-data/customers?all=1'),
-          fetch('/api/master-data/products?all=1&active=active'),
+          fetch('/api/branches', { cache: 'no-store' }),
+          fetch('/api/master-data/suppliers?all=1', { cache: 'no-store' }),
+          fetch('/api/master-data/customers?all=1', { cache: 'no-store' }),
+          fetch('/api/master-data/products?all=1&active=active', { cache: 'no-store' }),
         ])
 
         if (branchResponse.ok) {
@@ -149,9 +210,9 @@ export function WeightTicketsPageClient() {
           const data = await productResponse.json() as { rows?: Array<{ code?: string | null; id: string; itemStatus?: string | null; name: string; unit?: string | null }> }
           const nextProducts = (data.rows ?? []).map((product) => ({
             code: product.code ?? undefined,
-            description: [product.itemStatus, product.unit].filter(Boolean).join(' · ') || product.code || undefined,
+            description: product.itemStatus || undefined,
             id: product.id,
-            label: product.name,
+            label: `${product.code ? `${product.code} - ` : ''}${product.name}${product.unit ? ` - ${product.unit}` : ''}`,
           }))
           if (!cancelled && nextProducts.length) setProducts(nextProducts)
         }
@@ -162,8 +223,8 @@ export function WeightTicketsPageClient() {
             .filter((impurity) => impurity.active)
             .map((impurity) => ({ id: impurity.id, label: impurity.name })))
         }
-      } catch {
-        // Keep fallback prototype options if a protected master-data endpoint is unavailable.
+      } catch (caught) {
+        if (!cancelled) setLoadError(getErrorMessage(caught, 'โหลดข้อมูลอ้างอิงสำหรับใบรับ-ส่งของไม่ได้'))
       }
     }
 
@@ -173,6 +234,49 @@ export function WeightTicketsPageClient() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!editingTicketId) {
+      setIsLoadingTicket(false)
+      setLoadedTicket(null)
+      return
+    }
+
+    let cancelled = false
+
+    async function loadTicket() {
+      setIsLoadingTicket(true)
+      setLoadError('')
+      try {
+        const ticket = await getWeightTicket(editingTicketId)
+        if (cancelled) return
+        setLoadedTicket(ticket)
+        setForm(ticketToFormState(ticket))
+        setSavedTicket(null)
+        setActiveLineId(ticket.lines[0]?.id ?? '')
+        setTouched({})
+      } catch (caught) {
+        if (!cancelled) setLoadError(getErrorMessage(caught, 'โหลดใบรับ-ส่งของที่ต้องการแก้ไขไม่ได้'))
+      } finally {
+        if (!cancelled) setIsLoadingTicket(false)
+      }
+    }
+
+    void loadTicket()
+    return () => {
+      cancelled = true
+    }
+  }, [editingTicketId])
+
+  useEffect(() => {
+    if (form.lines.length === 0) {
+      setActiveLineId('')
+      return
+    }
+    if (!form.lines.some((line) => line.id === activeLineId)) {
+      setActiveLineId(form.lines[0]?.id ?? '')
+    }
+  }, [activeLineId, form.lines])
 
   const errors = useMemo(() => {
     const next: Record<string, string> = {}
@@ -234,34 +338,32 @@ export function WeightTicketsPageClient() {
   }
 
   function addLine() {
-    setForm((current) => ({ ...current, lines: [...current.lines, createFormWeightTicketLine()] }))
+    const nextLine = createFormWeightTicketLine()
+    setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
+    setActiveLineId(nextLine.id)
   }
 
   function removeLine(lineId: string) {
-    setForm((current) => ({
-      ...current,
-      lines: current.lines.length === 1 ? current.lines : current.lines.filter((line) => line.id !== lineId),
-    }))
+    setForm((current) => {
+      if (current.lines.length === 1) return current
+      const nextLines = current.lines.filter((line) => line.id !== lineId)
+      return {
+        ...current,
+        lines: nextLines,
+      }
+    })
   }
 
-  function appendLineImages(lineId: string, files: FileList | null) {
+  async function appendLineImages(lineId: string, files: FileList | null) {
     if (!files?.length) return
-    const nextFiles = Array.from(files).map((file) => ({
-      fileName: file.name,
-      id: makeFileId(),
-      url: URL.createObjectURL(file),
-    }))
+    const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
     updateLine(lineId, (line) => ({ ...line, imageFiles: [...getLineImages(line), ...nextFiles] }))
     markTouched(`line-${lineId}-images`)
   }
 
-  function appendVehicleImages(files: FileList | null) {
+  async function appendVehicleImages(files: FileList | null) {
     if (!files?.length) return
-    const nextFiles = Array.from(files).map((file) => ({
-      fileName: file.name,
-      id: makeFileId(),
-      url: URL.createObjectURL(file),
-    }))
+    const nextFiles = await Promise.all(Array.from(files).map(createAttachmentPreviewFromFile))
     setForm((current) => ({ ...current, vehicleImageFiles: [...current.vehicleImageFiles, ...nextFiles] }))
   }
 
@@ -270,34 +372,6 @@ export function WeightTicketsPageClient() {
       ...current,
       vehicleImageFiles: current.vehicleImageFiles.filter((file) => file.id !== fileId),
     }))
-  }
-
-  function resetForm() {
-    setForm(initialForm())
-    setSavedTicket(null)
-    setTouched({})
-    setIsSaving(false)
-  }
-
-  async function resolveEnteredBy() {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (!response.ok) return 'ผู้ใช้ปัจจุบัน'
-      const data = await response.json() as {
-        appUser?: { displayName?: string | null; email?: string | null; username?: string | null } | null
-        authUser?: { email?: string | null }
-        user?: { displayName?: string | null; username?: string | null } | null
-      }
-      return data.appUser?.displayName
-        || data.user?.displayName
-        || data.appUser?.username
-        || data.user?.username
-        || data.appUser?.email
-        || data.authUser?.email
-        || 'ผู้ใช้ปัจจุบัน'
-    } catch {
-      return 'ผู้ใช้ปัจจุบัน'
-    }
   }
 
   async function saveTicket() {
@@ -317,55 +391,36 @@ export function WeightTicketsPageClient() {
     if (Object.keys(errors).length > 0) return
 
     setIsSaving(true)
-    const existingTickets = loadStoredWeightTickets()
-    const documentNo = generateDocumentNo(form.type, form.branchId, existingTickets, branches)
-    const documentDate = currentDocumentDate()
-    const enteredBy = await resolveEnteredBy()
-    const storedLines = form.lines.map((line) => {
-      const { imageFiles = [], ...lineData } = line
-      const lineTotals = calculateLineTotals(line)
-      const impurityId = getLineImpurityId(line)
-      return {
-        ...lineData,
-        deductionWeight: lineTotals.deductionWeight,
-        grossWeightValue: lineTotals.grossWeight,
-        imageCount: imageFiles.length,
-        imageNames: imageFiles.map((file) => file.fileName),
-        impurityId,
-        impurityName: impurityId ? findOptionLabel(impurities, impurityId) : '',
-        netWeight: lineTotals.netWeight,
-        productName: findOptionLabel(products, line.productId),
-      }
-    })
-    const lineImageNames = form.lines.flatMap((line) => getLineImages(line).map((file) => file.fileName))
-    const vehicleImageNames = form.vehicleImageFiles.map((file) => file.fileName)
-    const imageNames = [...vehicleImageNames, ...lineImageNames]
-    const ticket: StoredWeightTicket = {
-      branchId: form.branchId,
-      branchName: findOptionLabel(branches, form.branchId),
-      createdAt: new Date().toISOString(),
-      documentDate,
-      documentNo,
-      enteredBy,
-      id: crypto.randomUUID(),
-      imageCount: imageNames.length,
-      imageNames,
-      lines: storedLines,
-      partyId: form.partyId,
-      partyName: findOptionLabel(partyOptions, form.partyId),
-      remark: form.remark.trim(),
-      status: form.type === 'WTI' ? 'received' : 'delivered',
-      totals,
-      type: form.type,
-      vehicleImageCount: vehicleImageNames.length,
-      vehicleImageNames,
-      vehicleNo: form.vehicleNo.trim(),
-    }
-    saveStoredWeightTicket(ticket)
-    window.setTimeout(() => {
+    try {
+      const ticket = await saveWeightTicket({
+        branchId: form.branchId,
+        id: editingTicketId || undefined,
+        lines: form.lines.map((line) => ({
+          deductionMode: line.deductionMode,
+          deductionValue: Number(line.deductionValue || 0),
+          grossWeight: Number(line.grossWeight || 0),
+          id: line.id,
+          imageNames: getLineImages(line).map((file) => file.rawValue),
+          impurityId: getLineImpurityId(line),
+          note: line.note,
+          productId: line.productId,
+        })),
+        partyId: form.partyId,
+        remark: form.remark.trim(),
+        type: form.type,
+        vehicleImageNames: form.vehicleImageFiles.map((file) => file.rawValue),
+        vehicleNo: form.vehicleNo.trim(),
+      })
+      setLoadError('')
+      setLoadedTicket(ticket)
       setSavedTicket(ticket)
+      setForm(ticketToFormState(ticket))
+      router.push('/daily/weight-ticket-list')
+    } catch (caught) {
+      setLoadError(getErrorMessage(caught, editingTicketId ? 'แก้ไขใบรับ-ส่งของไม่ได้' : 'บันทึกใบรับ-ส่งของไม่ได้'))
+    } finally {
       setIsSaving(false)
-    }, 250)
+    }
   }
 
   return (
@@ -379,50 +434,61 @@ export function WeightTicketsPageClient() {
               </div>
               <h2 className="mt-2 text-lg font-semibold text-slate-900">ชั่งสินค้า / รับ-ส่งของ</h2>
               <p className="mt-1 text-sm text-slate-600">
-                ระบบจะออกเลขเอกสาร วันที่ เวลา และผู้กรอกหลังบันทึก
+                {editingTicketId ? 'แก้ไขได้จนกว่าจะถูกนำไปใช้กับบิลรับซื้อหรือบิลขาย' : 'ระบบจะออกเลขเอกสาร วันที่ เวลา และผู้กรอกหลังบันทึก'}
               </p>
             </div>
-            <div className="inline-flex rounded-md bg-white p-1 shadow-sm ring-1 ring-slate-200">
-              {([
-                { icon: <Truck className="size-4" />, label: 'ใบรับของ WTI', value: 'WTI' },
-                { icon: <Truck className="size-4 rotate-180" />, label: 'ใบส่งของ WTO', value: 'WTO' },
-              ] as const).map((option) => {
-                const active = form.type === option.value
-                return (
-                  <button
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm transition',
-                      active ? `${ticketTheme.button} text-white` : 'text-slate-600 hover:bg-slate-100',
-                    )}
-                    key={option.value}
-                    type="button"
-                    onClick={() => setForm((current) => ({ ...current, partyId: '', type: option.value }))}
-                  >
-                    {option.icon}
-                    {option.label}
-                  </button>
-                )
-              })}
+            <div className="lg:min-w-[24rem]">
+              <div className="inline-flex rounded-md bg-white p-1 shadow-sm ring-1 ring-slate-200">
+                {([
+                  { icon: <Truck className="size-4" />, label: 'ใบรับของ WTI', value: 'WTI' },
+                  { icon: <Truck className="size-4 rotate-180" />, label: 'ใบส่งของ WTO', value: 'WTO' },
+                ] as const).map((option) => {
+                  const active = form.type === option.value
+                  return (
+                    <button
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm transition',
+                        active ? `${ticketTheme.button} text-white` : 'text-slate-600 hover:bg-slate-100',
+                      )}
+                      key={option.value}
+                      type="button"
+                      onClick={() => setForm((current) => ({ ...current, partyId: '', type: option.value }))}
+                    >
+                      {option.icon}
+                      {option.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </Card>
       </div>
+
+      {loadError ? (
+        <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {loadError}
+        </div>
+      ) : null}
 
       <div>
         <div className="space-y-5">
           <Card className="p-5">
             <SectionHeader title="ข้อมูลหัวเอกสาร" subtitle="ผู้ใช้เลือกเฉพาะข้อมูลหน้างาน ส่วนวันที่ เวลา และผู้กรอกเป็นข้อมูลระบบ" />
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <SearchCombobox
+              <BranchSelectCombobox
+                branches={branches.map((branch) => ({
+                  id: branch.id,
+                  name: branch.label,
+                }))}
                 error={showError('branchId')}
                 inputId="weight-ticket-branch"
                 label="สาขา*"
-                options={branches}
                 placeholder="เลือกสาขา"
                 value={form.branchId}
                 onChange={(value) => {
                   markTouched('branchId')
-                  updateForm('branchId', value)
+                  updateForm('branchId', value ?? '')
                 }}
               />
               <SearchCombobox
@@ -456,7 +522,7 @@ export function WeightTicketsPageClient() {
                       multiple
                       type="file"
                       onChange={(event) => {
-                        appendVehicleImages(event.target.files)
+                        void appendVehicleImages(event.target.files)
                         event.target.value = ''
                       }}
                     />
@@ -467,9 +533,13 @@ export function WeightTicketsPageClient() {
                     ) : null}
                     {form.vehicleImageFiles.map((file) => (
                       <div className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5 text-xs ring-1 ring-slate-200" key={file.id}>
-                        <button className="min-w-0 truncate text-left text-slate-700 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
-                          {file.fileName}
-                        </button>
+                        {file.url ? (
+                          <button className="min-w-0 truncate text-left text-slate-700 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
+                            {file.fileName}
+                          </button>
+                        ) : (
+                          <span className="min-w-0 truncate text-left text-slate-700">{file.fileName}</span>
+                        )}
                         <button className="shrink-0 text-slate-500 hover:text-red-600" type="button" onClick={() => removeVehicleImage(file.id)}>
                           ลบ
                         </button>
@@ -483,13 +553,64 @@ export function WeightTicketsPageClient() {
 
           <Card className="p-5">
             <SectionHeader title="สินค้าและน้ำหนัก" subtitle="เลือกสินค้า กรอกน้ำหนัก และเลือกวิธีหักสิ่งเจือปนต่อรายการ" />
+            <div className="mt-4 grid items-start gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+              <div className="space-y-3 xl:max-h-[calc(100vh-16rem)] xl:overflow-hidden">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-slate-700">รายการทั้งหมด {form.lines.length} รายการ</div>
+                  <Button size="xs" type="button" onClick={addLine}>
+                    <Plus className="mr-1 size-3" />
+                    เพิ่ม
+                  </Button>
+                </div>
+                <div className="space-y-2 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-1">
+                  {form.lines.map((line, index) => {
+                    const lineTotals = calculateLineTotals(line)
+                    const hasError = Boolean(
+                      errors[`line-${line.id}-product`]
+                      || errors[`line-${line.id}-gross`]
+                      || errors[`line-${line.id}-images`]
+                      || errors[`line-${line.id}-impurity`]
+                      || errors[`line-${line.id}-deduction`],
+                    )
+                    const active = activeLine?.id === line.id
 
-            <div className="mt-4 space-y-4">
-              {form.lines.map((line, index) => {
+                    return (
+                      <button
+                        className={cn(
+                          'block w-full rounded-md border px-3 py-3 text-left transition',
+                          active ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
+                        )}
+                        key={line.id}
+                        type="button"
+                        onClick={() => setActiveLineId(line.id)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-xs text-slate-500">รายการ {index + 1}</div>
+                            <div className="mt-1 line-clamp-1 text-sm font-medium text-slate-900">
+                              {products.find((option) => option.id === line.productId)?.label || line.productId || 'ยังไม่ได้เลือกสินค้า'}
+                            </div>
+                          </div>
+                          {hasError ? <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700">ไม่ครบ</span> : null}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                          <div>สุทธิ {formatWeight(lineTotals.netWeight)} กก.</div>
+                          <div className="text-right">{getLineImages(line).length} รูป</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {activeLine ? (() => {
+                const line = activeLine
+                const index = form.lines.findIndex((entry) => entry.id === line.id)
                 const lineTotals = calculateLineTotals(line)
+
                 return (
-                  <div className="rounded-md border border-slate-200 bg-slate-50 p-4" key={line.id}>
-                    <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-4 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto">
+                    <div className="mb-4 flex items-center justify-between gap-3">
                       <div className="inline-flex rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">รายการ {index + 1}</div>
                       <Button disabled={form.lines.length === 1} size="xs" type="button" variant="outline" onClick={() => removeLine(line.id)}>
                         <Trash2 className="mr-1 size-3" />
@@ -591,7 +712,7 @@ export function WeightTicketsPageClient() {
                             multiple
                             type="file"
                             onChange={(event) => {
-                              appendLineImages(line.id, event.target.files)
+                              void appendLineImages(line.id, event.target.files)
                               event.target.value = ''
                             }}
                           />
@@ -603,9 +724,13 @@ export function WeightTicketsPageClient() {
                           <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={file.id}>
                             <div className="truncate text-sm font-medium text-slate-800">{file.fileName}</div>
                             <div className="mt-3 flex items-center justify-between gap-2">
-                              <button className="min-w-0 truncate text-left text-xs text-slate-500 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
-                                เปิดรูปภาพ
-                              </button>
+                              {file.url ? (
+                                <button className="min-w-0 truncate text-left text-xs text-slate-500 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
+                                  เปิดรูปภาพ
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400">รูปเดิม</span>
+                              )}
                               <Button
                                 size="xs"
                                 type="button"
@@ -632,13 +757,7 @@ export function WeightTicketsPageClient() {
                     </FieldBlock>
                   </div>
                 )
-              })}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Button className="w-full sm:w-auto" type="button" onClick={addLine}>
-                <Plus className="mr-2 size-4" />
-                เพิ่มสินค้า
-              </Button>
+              })() : null}
             </div>
           </Card>
 
@@ -658,28 +777,26 @@ export function WeightTicketsPageClient() {
         <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             {savedTicket ? (
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
+              <div className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
                 <CheckCircle2 className="size-4" />
                 บันทึก {savedTicket.documentNo} แล้ว
-              </span>
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-sm sm:flex sm:flex-wrap sm:items-center sm:gap-x-5">
-                <FooterMetric label="รายการ" value={`${form.lines.length} รายการ`} />
-                <FooterMetric label="น้ำหนักรวม" value={`${formatWeight(totals.grossWeight)} กก.`} />
-                <FooterMetric label="หัก" value={`${formatWeight(totals.deductionWeight)} กก.`} />
-                <FooterMetric emphasis label="สุทธิ" value={`${formatWeight(totals.netWeight)} กก.`} />
+                <MetricInline label="รายการ" value={`${form.lines.length} รายการ`} />
+                <MetricInline label="น้ำหนักรวม" value={`${formatWeight(totals.grossWeight)} กก.`} />
+                <MetricInline label="หัก" value={`${formatWeight(totals.deductionWeight)} กก.`} />
+                <MetricInline emphasis label="สุทธิ" value={`${formatWeight(totals.netWeight)} กก.`} />
               </div>
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={resetForm}>ล้างฟอร์ม</Button>
-            {savedTicket ? (
-              <Button asChild variant="outline">
-                <Link href="/daily/weight-ticket-list">ดูในรายการ</Link>
-              </Button>
-            ) : null}
-            <Button className={ticketTheme.button} disabled={isSaving} type="button" onClick={saveTicket}>
-              {isSaving ? 'กำลังบันทึก...' : `บันทึก${form.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}`}
+            <Button className={ticketTheme.button} disabled={isLoadingTicket || isSaving} type="button" onClick={saveTicket}>
+              {isSaving
+                ? 'กำลังบันทึก...'
+                : editingTicketId
+                  ? `บันทึกการแก้ไข${form.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}`
+                  : `บันทึก${form.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}`}
             </Button>
           </div>
         </div>
@@ -694,7 +811,14 @@ export function WeightTicketsPageClient() {
                 <DialogDescription>{previewImage.fileName}</DialogDescription>
               </DialogHeader>
               <div className="overflow-hidden rounded-md bg-slate-950">
-                <img alt={previewImage.fileName} className="max-h-[70vh] w-full object-contain" src={previewImage.url} />
+                <Image
+                  alt={previewImage.fileName}
+                  className="max-h-[70vh] w-full object-contain"
+                  height={1200}
+                  src={previewImage.url}
+                  unoptimized
+                  width={1600}
+                />
               </div>
             </>
           ) : null}
@@ -746,7 +870,7 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function FooterMetric({ emphasis = false, label, value }: { emphasis?: boolean; label: string; value: string }) {
+function MetricInline({ emphasis = false, label, value }: { emphasis?: boolean; label: string; value: string }) {
   return (
     <div className="min-w-0">
       <div className="text-[11px] font-medium text-slate-500">{label}</div>

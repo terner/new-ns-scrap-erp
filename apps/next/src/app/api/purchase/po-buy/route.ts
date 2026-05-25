@@ -158,7 +158,10 @@ export async function GET(request: Request) {
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
     const selectedIds = new Set((url.searchParams.get('ids') ?? '').split(',').map((id) => id.trim()).filter(Boolean))
-    const activeStatusFilter = statusFilter && statusFilter !== 'all' ? statusFilter : null
+    const activeStatusFilters = (statusFilter ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value && value !== 'all')
 
     const poRows = await prisma.po_buys.findMany({
       include: { suppliers: true },
@@ -208,7 +211,7 @@ export async function GET(request: Request) {
       }
     })
       .filter((row) => selectedIds.size === 0 || selectedIds.has(row.id))
-      .filter((row) => !activeStatusFilter || row.status === activeStatusFilter)
+      .filter((row) => activeStatusFilters.length === 0 || activeStatusFilters.includes(row.status))
       .filter((row) => dateInRange(row.date, from, to))
       .filter((row) => {
         if (!q) return true
@@ -229,7 +232,7 @@ export async function GET(request: Request) {
         RemainingAmount: row.remainingAmount,
         RemainingQty: row.remainingQty,
         Status: row.status,
-        Supplier: row.supplierName,
+        Seller: row.supplierName,
         TotalAmount: row.totalAmount,
         UpdatedAt: row.updatedAt || row.createdAt,
         UpdatedBy: row.updatedBy || row.createdBy,
@@ -274,7 +277,7 @@ export async function POST(request: Request) {
 
     if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['เลือกสาขา'] } }, { status: 400 })
     if (!/^\d{2}$/.test(branch.code)) return NextResponse.json({ code: 'BAD_REQUEST', error: 'รหัสสาขาต้องเป็นตัวเลข 2 หลักเพื่อออกเลข PO', fieldErrors: { branchId: ['รหัสสาขาต้องเป็นตัวเลข 2 หลัก'] } }, { status: 400 })
-    if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'Supplier ไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือก Supplier'] } }, { status: 400 })
+    if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ผู้ขายไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือกผู้ขาย'] } }, { status: 400 })
     if (values.expectedDelivery < issuedDate) {
       return NextResponse.json({
         code: 'BAD_REQUEST',
@@ -368,7 +371,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขได้เฉพาะ PO Buy ที่ยังไม่ถูกตัดรับสินค้า' }, { status: 400 })
     }
     if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['เลือกสาขา'] } }, { status: 400 })
-    if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'Supplier ไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือก Supplier'] } }, { status: 400 })
+    if (!supplier) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ผู้ขายไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือกผู้ขาย'] } }, { status: 400 })
 
     const issuedDate = bangkokDateInput(existing.created_at ?? new Date())
     if (values.expectedDelivery < issuedDate) {

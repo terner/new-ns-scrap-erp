@@ -29,6 +29,18 @@ type PurchaseBillRow = Prisma.purchase_billsGetPayload<{
   }
 }>
 
+type WeightTicketOptionRow = Prisma.weight_ticketsGetPayload<{
+  include: {
+    branches: true
+    suppliers: true
+    weight_ticket_lines: {
+      orderBy: {
+        line_no: 'asc'
+      }
+    }
+  }
+}>
+
 type BillQuery = {
   dateFrom?: string
   dateTo?: string
@@ -39,7 +51,7 @@ type BillQuery = {
   search?: string
   sortDirection: Prisma.SortOrder
   sortKey: string
-  status?: string
+  statuses?: string[]
 }
 
 function branchBillCode(branchCode: string | null | undefined) {
@@ -77,6 +89,9 @@ function bangkokDateInput(value: Date) {
 }
 
 function billItemJson(row: PurchaseBillRow['purchase_bill_items'][number]) {
+  const snapshot = row.source_snapshot && typeof row.source_snapshot === 'object'
+    ? row.source_snapshot as Record<string, unknown>
+    : {}
   return {
     amount: toNumber(row.amount),
     deductWeight: toNumber(row.deduct_weight),
@@ -91,6 +106,9 @@ function billItemJson(row: PurchaseBillRow['purchase_bill_items'][number]) {
     productId: row.product_id ?? '',
     productName: row.product_name ?? row.product_id ?? '',
     qty: toNumber(row.qty),
+    receiptLineId: typeof snapshot.receiptLineId === 'string' ? snapshot.receiptLineId : null,
+    receiptTicketDocNo: typeof snapshot.receiptTicketDocNo === 'string' ? snapshot.receiptTicketDocNo : null,
+    receiptTicketId: typeof snapshot.receiptTicketId === 'string' ? snapshot.receiptTicketId : null,
     salesPrice: toNumber(row.sales_price),
     unit: row.unit ?? 'กก.',
   }
@@ -122,7 +140,7 @@ function billJson(row: PurchaseBillRow, paymentDocNos: string[] = []) {
     purchaseSource: row.purchase_source ?? 'SPOT_BUY',
     refNo: row.ref_no ?? '',
     salesId: row.sales_id ?? '',
-    status: row.status ?? 'open',
+    status: row.status ?? 'unpaid',
     supplierId: row.supplier_id ?? '',
     supplierName: row.suppliers?.name ?? row.supplier_id ?? '-',
     totalAmount: toNumber(row.total_amount),
@@ -171,6 +189,9 @@ function buildBillItems(values: PurchaseBillFormValues, productById: Map<string,
       productId: item.productId,
       productName: product?.name ?? item.productId,
       qty: item.qty,
+      receiptLineId: item.receiptLineId,
+      receiptTicketDocNo: item.receiptTicketDocNo,
+      receiptTicketId: item.receiptTicketId,
       salesPrice: item.salesPrice,
       unit: product?.unit ?? 'กก.',
     }
@@ -188,16 +209,266 @@ function billItemCreateRows(billId: string, items: ReturnType<typeof buildBillIt
     line_no: index + 1,
     lot_no: item.lotNo,
     note: item.note,
-    po_buy_id: item.poBuyId,
-    price: item.price,
-    product_code: item.productCode,
-    product_id: item.productId,
-    product_name: item.productName,
+      po_buy_id: item.poBuyId,
+      price: item.price,
+      product_code: item.productCode,
+      product_id: item.productId,
+      product_name: item.productName,
     purchase_bill_id: billId,
-    qty: item.qty,
-    sales_price: item.salesPrice,
-    source_snapshot: item as Prisma.InputJsonValue,
-    unit: item.unit,
+      qty: item.qty,
+      sales_price: item.salesPrice,
+      source_snapshot: {
+        grossWeight: item.grossWeight,
+        itemStatus: item.itemStatus,
+        poBuyId: item.poBuyId,
+        productId: item.productId,
+        productName: item.productName,
+        qty: item.qty,
+        receiptLineId: item.receiptLineId ?? null,
+        receiptTicketDocNo: item.receiptTicketDocNo ?? null,
+        receiptTicketId: item.receiptTicketId ?? null,
+      } as Prisma.InputJsonValue,
+      unit: item.unit,
+    }))
+}
+
+function receiptLineUsageKey(ticketId: string, lineId: string) {
+  return `${ticketId}::${lineId}`
+}
+
+async function buildWeightTicketUsageMap(ticketIds: string[]) {
+  if (ticketIds.length === 0) return new Map<string, number>()
+  const rows = await prisma.purchase_bills.findMany({
+    select: {
+      purchase_bill_items: {
+        select: {
+          qty: true,
+          source_snapshot: true,
+        },
+      },
+    },
+    where: {
+      NOT: { status: 'cancelled' },
+    },
+  })
+  const usageMap = new Map<string, number>()
+  rows.forEach((bill) => {
+    bill.purchase_bill_items.forEach((item) => {
+      const snapshot = item.source_snapshot && typeof item.source_snapshot === 'object'
+        ? item.source_snapshot as Record<string, unknown>
+        : {}
+      const ticketId = typeof snapshot.receiptTicketId === 'string' ? snapshot.receiptTicketId : ''
+      const lineId = typeof snapshot.receiptLineId === 'string' ? snapshot.receiptLineId : ''
+      if (!ticketId || !lineId || !ticketIds.includes(ticketId)) return
+      const key = receiptLineUsageKey(ticketId, lineId)
+      usageMap.set(key, (usageMap.get(key) ?? 0) + toNumber(item.qty))
+    })
+  })
+  return usageMap
+}
+
+function derivePurchaseSource(items: Array<{ poBuyId?: string | null }>, fallback: PurchaseBillFormValues['purchaseSource']) {
+  const poCount = items.filter((item) => Boolean(item.poBuyId)).length
+  if (poCount === 0) return 'SPOT_BUY' as const
+  if (poCount === items.length) return 'PO_RECEIPT' as const
+  return fallback === 'MIXED' || poCount > 0 ? 'MIXED' as const : 'SPOT_BUY' as const
+}
+
+async function loadReceiptAvailability(ticketId: string, excludeBillId?: string) {
+  const [ticket, bills] = await Promise.all([
+    prisma.weight_tickets.findUnique({
+      include: {
+        branches: true,
+        suppliers: true,
+        weight_ticket_lines: { orderBy: { line_no: 'asc' } },
+      },
+      where: { id: ticketId },
+    }),
+    prisma.purchase_bills.findMany({
+      include: {
+        purchase_bill_items: {
+          select: {
+            qty: true,
+            source_snapshot: true,
+          },
+        },
+      },
+      where: {
+        NOT: { status: 'cancelled' },
+      },
+    }),
+  ])
+
+  const usageMap = new Map<string, number>()
+  bills.forEach((bill) => {
+    if (excludeBillId && bill.id === excludeBillId) return
+    bill.purchase_bill_items.forEach((item) => {
+      const snapshot = item.source_snapshot && typeof item.source_snapshot === 'object'
+        ? item.source_snapshot as Record<string, unknown>
+        : {}
+      const sourceTicketId = typeof snapshot.receiptTicketId === 'string' ? snapshot.receiptTicketId : ''
+      const lineId = typeof snapshot.receiptLineId === 'string' ? snapshot.receiptLineId : ''
+      if (sourceTicketId !== ticketId || !lineId) return
+      const key = receiptLineUsageKey(sourceTicketId, lineId)
+      usageMap.set(key, (usageMap.get(key) ?? 0) + toNumber(item.qty))
+    })
+  })
+
+  return { ticket, usageMap }
+}
+
+function receiptLineMap(ticket: NonNullable<Awaited<ReturnType<typeof loadReceiptAvailability>>['ticket']>) {
+  return new Map(ticket.weight_ticket_lines.map((line) => [line.id, line]))
+}
+
+function extractReferencedReceiptTicketIdsFromValues(values: PurchaseBillFormValues) {
+  return [...new Set(values.items.map((item) => item.receiptTicketId).filter((value): value is string => Boolean(value)))]
+}
+
+function extractReferencedReceiptTicketIdsFromBillItems(items: Array<{ source_snapshot: Prisma.JsonValue | null }>) {
+  return [...new Set(items.map((item) => {
+    const snapshot = item.source_snapshot && typeof item.source_snapshot === 'object'
+      ? item.source_snapshot as Record<string, unknown>
+      : {}
+    return typeof snapshot.receiptTicketId === 'string' ? snapshot.receiptTicketId : ''
+  }).filter(Boolean))]
+}
+
+async function validateStockReceiptSelection(values: PurchaseBillFormValues, excludeBillId?: string) {
+  if (!values.receiptTicketId) {
+    return { error: 'เลือกใบรับของ' as const }
+  }
+
+  const { ticket, usageMap } = await loadReceiptAvailability(values.receiptTicketId, excludeBillId)
+  if (!ticket || ticket.doc_type !== 'WTI' || ticket.cancelled_at) {
+    return { error: 'ใบรับของที่เลือกไม่ถูกต้อง' as const }
+  }
+  if (ticket.branch_id !== values.branchId) {
+    return { error: 'ใบรับของต้องอยู่สาขาเดียวกับบิลรับซื้อ' as const }
+  }
+  if ((ticket.supplier_id ?? '') !== values.supplierId) {
+    return { error: 'ใบรับของต้องเป็นผู้ขายเดียวกับบิลรับซื้อ' as const }
+  }
+
+  const lineById = receiptLineMap(ticket)
+  const requestedQtyByLine = new Map<string, number>()
+  for (const item of values.items) {
+    if (item.receiptTicketId !== ticket.id || !item.receiptLineId) {
+      return { error: 'รายการ Stock ต้องอ้างอิงรายการจากใบรับของเดียวกัน' as const }
+    }
+    const line = lineById.get(item.receiptLineId)
+    if (!line) {
+      return { error: 'มีรายการอ้างอิงใบรับของที่ไม่ถูกต้อง' as const }
+    }
+    if (line.product_id !== item.productId) {
+      return { error: 'สินค้าในบิลไม่ตรงกับสินค้าในใบรับของ' as const }
+    }
+    requestedQtyByLine.set(item.receiptLineId, (requestedQtyByLine.get(item.receiptLineId) ?? 0) + item.qty)
+  }
+
+  for (const [lineId, requestedQty] of requestedQtyByLine.entries()) {
+    const line = lineById.get(lineId)
+    if (!line) continue
+    const availableQty = Math.max(0, toNumber(line.net_weight) - (usageMap.get(receiptLineUsageKey(ticket.id, lineId)) ?? 0))
+    if (requestedQty > availableQty + 0.0001) {
+      return { error: `จำนวนเกินน้ำหนักคงเหลือของ ${line.product_name}` as const }
+    }
+  }
+
+  return { ticket, usageMap }
+}
+
+function weightTicketOptionJson(row: WeightTicketOptionRow, usageMap: Map<string, number>) {
+  const lines = row.weight_ticket_lines.map((line) => {
+    const sourceNetWeight = toNumber(line.net_weight)
+    const usedQty = usageMap.get(receiptLineUsageKey(row.id, line.id)) ?? 0
+    const remainingQty = Math.max(0, sourceNetWeight - usedQty)
+    return {
+      deductWeight: toNumber(line.deduct_weight),
+      grossWeight: toNumber(line.gross_weight),
+      id: line.id,
+      lineNo: line.line_no,
+      netWeight: sourceNetWeight,
+      note: line.note ?? '',
+      productId: line.product_id,
+      productName: line.product_name,
+      remainingQty,
+      usedQty,
+    }
+  }).filter((line) => line.remainingQty > 0.0001)
+
+  return {
+    branchId: row.branch_id,
+    branchName: row.branches.name,
+    documentDate: toDateOnly(row.document_date),
+    documentNo: row.doc_no,
+    id: row.id,
+    lines,
+    partyName: row.party_name,
+    status: row.status,
+    supplierId: row.supplier_id ?? '',
+    vehicleNo: row.vehicle_no,
+  }
+}
+
+async function refreshWeightTicketStatuses(tx: Prisma.TransactionClient, ticketIds: string[]) {
+  const uniqueTicketIds = [...new Set(ticketIds.filter(Boolean))]
+  if (uniqueTicketIds.length === 0) return
+
+  const ticketRows = await tx.weight_tickets.findMany({
+    include: {
+      weight_ticket_lines: {
+        orderBy: { line_no: 'asc' },
+      },
+    },
+    where: {
+      doc_type: 'WTI',
+      id: { in: uniqueTicketIds },
+    },
+  })
+
+  const billRows = await tx.purchase_bills.findMany({
+    include: {
+      purchase_bill_items: {
+        select: {
+          qty: true,
+          source_snapshot: true,
+        },
+      },
+    },
+    where: {
+      NOT: { status: 'cancelled' },
+    },
+  })
+
+  const qtyByTicketId = new Map<string, number>()
+  billRows.forEach((bill) => {
+    bill.purchase_bill_items.forEach((item) => {
+      const snapshot = item.source_snapshot && typeof item.source_snapshot === 'object'
+        ? item.source_snapshot as Record<string, unknown>
+        : {}
+      const ticketId = typeof snapshot.receiptTicketId === 'string' ? snapshot.receiptTicketId : ''
+      if (!ticketId || !uniqueTicketIds.includes(ticketId)) return
+      qtyByTicketId.set(ticketId, (qtyByTicketId.get(ticketId) ?? 0) + toNumber(item.qty))
+    })
+  })
+
+  await Promise.all(ticketRows.map(async (ticket) => {
+    const totalQty = ticket.weight_ticket_lines.reduce((sum, line) => sum + toNumber(line.net_weight), 0)
+    const billedQty = qtyByTicketId.get(ticket.id) ?? 0
+    const nextStatus = billedQty <= 0.0001
+      ? 'received'
+      : billedQty + 0.0001 < totalQty
+        ? 'partially_billed'
+        : 'billed'
+    if (ticket.status === nextStatus) return
+    await tx.weight_tickets.update({
+      data: {
+        status: nextStatus,
+        updated_at: new Date(),
+      },
+      where: { id: ticket.id },
+    })
   }))
 }
 
@@ -226,11 +497,11 @@ async function nextPurchaseBillDocNo(tx: Prisma.TransactionClient, date: string,
 }
 
 async function optionsPayload() {
-  const [branches, poBuys, products, salespersons, suppliers, warehouses, vatRatePercent] = await Promise.all([
+  const [branches, poBuys, products, salespersons, suppliers, warehouses, vatRatePercent, weightTickets] = await Promise.all([
     prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.po_buys.findMany({
       orderBy: [{ doc_no: 'desc' }],
-      select: { doc_no: true, id: true, remaining_amount: true, remaining_qty: true, status: true, supplier_id: true },
+      select: { doc_no: true, id: true, product_id: true, remaining_amount: true, remaining_qty: true, status: true, supplier_id: true, unit_price: true },
       take: 500,
       where: { status: { notIn: ['closed', 'Closed', 'cancelled', 'Cancelled'] } },
     }),
@@ -239,7 +510,22 @@ async function optionsPayload() {
     prisma.suppliers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true, sales_id: true } }),
     prisma.warehouses.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, branch_id: true, id: true, name: true } }),
     activeVatRatePercent(new Date()),
+    prisma.weight_tickets.findMany({
+      include: {
+        branches: true,
+        suppliers: true,
+        weight_ticket_lines: { orderBy: { line_no: 'asc' } },
+      },
+      orderBy: [{ document_date: 'desc' }, { doc_no: 'desc' }],
+      take: 300,
+      where: {
+        cancelled_at: null,
+        doc_type: 'WTI',
+        status: { in: ['received', 'partially_billed'] },
+      },
+    }),
   ])
+  const usageMap = await buildWeightTicketUsageMap(weightTickets.map((ticket) => ticket.id))
 
   return {
     branches,
@@ -248,10 +534,15 @@ async function optionsPayload() {
       id: po.id,
       label: `${po.doc_no}${po.remaining_qty ? ` · คงเหลือ ${toNumber(po.remaining_qty).toLocaleString('th-TH')} กก.` : po.remaining_amount ? ` · คงเหลือ ${toNumber(po.remaining_amount).toLocaleString('th-TH')}` : ''}`,
       name: po.doc_no,
+      product_id: po.product_id,
       remainingQty: toNumber(po.remaining_qty),
       supplier_id: po.supplier_id,
+      unitPrice: toNumber(po.unit_price),
     })),
     products,
+    receipts: weightTickets
+      .map((ticket) => weightTicketOptionJson(ticket, usageMap))
+      .filter((ticket) => ticket.lines.length > 0),
     salespersons,
     suppliers,
     vatRatePercent,
@@ -274,7 +565,11 @@ function parseBillQuery(url: URL, includePaging = true): BillQuery {
     search: url.searchParams.get('search')?.trim() || undefined,
     sortDirection,
     sortKey: url.searchParams.get('sortKey') || 'date',
-    status: url.searchParams.get('status') || undefined,
+    statuses: url.searchParams.get('status')
+      ?.split(',')
+      .map((value) => value.trim().toLowerCase())
+      .map((value) => value === 'open' ? 'unpaid' : value)
+      .filter(Boolean) || undefined,
   }
 }
 
@@ -289,7 +584,7 @@ function billWhere(query: BillQuery): Prisma.purchase_billsWhereInput {
   }
   if (query.filterMode) where.transaction_mode = query.filterMode
   if (query.filterSource) where.purchase_source = query.filterSource
-  if (query.status) where.status = query.status
+  if (query.statuses?.length) where.status = { in: query.statuses }
   if (query.search) {
     where.OR = [
       { doc_no: { contains: query.search, mode: 'insensitive' } },
@@ -474,7 +769,15 @@ export async function POST(request: Request) {
     const missingProduct = values.items.find((item) => !productById.has(item.productId))
     if (missingProduct) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
 
+    if (values.transactionMode === 'STOCK') {
+      const receiptValidation = await validateStockReceiptSelection(values)
+      if ('error' in receiptValidation) {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: receiptValidation.error }, { status: 400 })
+      }
+    }
+
     const items = buildBillItems(values, productById)
+    const purchaseSource = derivePurchaseSource(items, values.purchaseSource)
     const branchWarehouses = values.transactionMode === 'STOCK'
       ? await prisma.warehouses.findMany({
         orderBy: [{ code: 'asc' }, { name: 'asc' }],
@@ -511,10 +814,10 @@ export async function POST(request: Request) {
               paid_amount: 0,
               payable_balance: totals.totalAmount,
               po_buy_id: values.poBuyId,
-              purchase_source: values.purchaseSource,
+              purchase_source: purchaseSource,
               ref_no: values.refNo,
               sales_id: supplierSalesId,
-              status: 'open',
+              status: 'unpaid',
               subtotal: totals.subtotal,
               supplier_id: values.supplierId,
               total_amount: totals.totalAmount,
@@ -561,6 +864,7 @@ export async function POST(request: Request) {
                 warehouse_id: warehouseByStatus.get(item.itemStatus)?.id ?? purchaseWarehouseId,
               })),
             })
+            await refreshWeightTicketStatuses(tx, extractReferencedReceiptTicketIdsFromValues(values))
           }
 
           return createdBill
@@ -591,11 +895,15 @@ export async function PATCH(request: Request) {
     if (raw?.action === 'cancel') {
       const values = purchaseBillCancelSchema.parse(raw)
       const actor = currentActor(context)
-      const [existingBill, payments] = await Promise.all([
+      const [existingBill, payments, existingBillItems] = await Promise.all([
         prisma.purchase_bills.findUnique({ where: { id: values.id } }),
         prisma.payments.findMany({
           select: { amount: true, discount: true, status: true, withholding_tax: true },
           where: { bill_id: values.id, NOT: { status: 'cancelled' } },
+        }),
+        prisma.purchase_bill_items.findMany({
+          select: { source_snapshot: true },
+          where: { purchase_bill_id: values.id },
         }),
       ])
 
@@ -622,6 +930,7 @@ export async function PATCH(request: Request) {
           where: { id: values.id },
         })
         await tx.stock_ledger.deleteMany({ where: { ref_id: values.id, ref_type: 'PB' } })
+        await refreshWeightTicketStatuses(tx, extractReferencedReceiptTicketIdsFromBillItems(existingBillItems))
         return bill
       })
 
@@ -633,7 +942,7 @@ export async function PATCH(request: Request) {
 
     const productIds = [...new Set(values.items.map((item) => item.productId))]
     const poBuyIds = [...new Set([values.poBuyId, ...values.items.map((item) => item.poBuyId)].filter(Boolean) as string[])]
-    const [existingBill, supplier, branch, poBuys, products, payments] = await Promise.all([
+    const [existingBill, supplier, branch, poBuys, products, payments, existingBillItems] = await Promise.all([
       prisma.purchase_bills.findUnique({ where: { id } }),
       prisma.suppliers.findFirst({ select: { id: true, sales_id: true }, where: { active: true, id: values.supplierId } }),
       prisma.branches.findFirst({ where: { active: true, id: values.branchId } }),
@@ -642,6 +951,10 @@ export async function PATCH(request: Request) {
       prisma.payments.findMany({
         select: { amount: true, discount: true, status: true, withholding_tax: true },
         where: { bill_id: id, NOT: { status: 'cancelled' } },
+      }),
+      prisma.purchase_bill_items.findMany({
+        select: { source_snapshot: true },
+        where: { purchase_bill_id: id },
       }),
     ])
 
@@ -667,7 +980,15 @@ export async function PATCH(request: Request) {
     const missingProduct = values.items.find((item) => !productById.has(item.productId))
     if (missingProduct) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
 
+    if (values.transactionMode === 'STOCK') {
+      const receiptValidation = await validateStockReceiptSelection(values, id)
+      if ('error' in receiptValidation) {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: receiptValidation.error }, { status: 400 })
+      }
+    }
+
     const items = buildBillItems(values, productById)
+    const purchaseSource = derivePurchaseSource(items, values.purchaseSource)
     const branchWarehouses = values.transactionMode === 'STOCK'
       ? await prisma.warehouses.findMany({
         orderBy: [{ code: 'asc' }, { name: 'asc' }],
@@ -682,7 +1003,7 @@ export async function PATCH(request: Request) {
 
     const paidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
     const payableBalance = Math.max(0, totals.totalAmount - paidAmount)
-    const status = paidAmount <= 0 ? 'open' : payableBalance <= 0.01 ? 'paid' : 'partial'
+    const status = paidAmount <= 0 ? 'unpaid' : payableBalance <= 0.01 ? 'paid' : 'partial'
 
     const updatedBill = await prisma.$transaction(async (tx) => {
       const bill = await tx.purchase_bills.update({
@@ -697,7 +1018,7 @@ export async function PATCH(request: Request) {
           paid_amount: paidAmount,
           payable_balance: payableBalance,
           po_buy_id: values.poBuyId,
-          purchase_source: values.purchaseSource,
+          purchase_source: purchaseSource,
           ref_no: values.refNo,
           sales_id: supplierSalesId,
           status,
@@ -751,6 +1072,11 @@ export async function PATCH(request: Request) {
           })),
         })
       }
+
+      await refreshWeightTicketStatuses(tx, [
+        ...extractReferencedReceiptTicketIdsFromValues(values),
+        ...extractReferencedReceiptTicketIdsFromBillItems(existingBillItems),
+      ])
 
       return bill
     })

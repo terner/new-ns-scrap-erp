@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import { Download } from 'lucide-react'
 import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
@@ -84,6 +85,7 @@ type PoBuyRow = {
 type FieldErrors = Record<string, string>
 type PoBuySortDirection = 'asc' | 'desc'
 type PoBuySortKey = 'date' | 'docNo' | 'expectedDelivery' | 'itemCount' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
+type PoBuyStatusKey = 'cancelled' | 'open' | 'partial' | 'received'
 
 function blankItem(): PoBuyFormItem {
   return { productId: '', qty: 0, unitPrice: 0 }
@@ -137,6 +139,22 @@ function formatDateTime(value?: string) {
   })
 }
 
+function poBuyStatusKey(status: string): PoBuyStatusKey {
+  const normalized = status.trim().toLowerCase()
+  if (normalized.includes('cancel')) return 'cancelled'
+  if (normalized.includes('partial')) return 'partial'
+  if (normalized.includes('received')) return 'received'
+  return 'open'
+}
+
+function poBuyStatusLabel(status: string) {
+  const key = poBuyStatusKey(status)
+  if (key === 'cancelled') return 'ยกเลิก'
+  if (key === 'partial') return 'รับบางส่วน'
+  if (key === 'received') return 'รับครบ'
+  return 'ยังไม่รับ'
+}
+
 function ExportButton({ href }: { href: string }) {
   return (
     <UiButton asChild className="ml-auto gap-2" variant="export">
@@ -169,7 +187,7 @@ export function PoBuyPageClient() {
   const [showForm, setShowForm] = useState(false)
   const [sortDirection, setSortDirection] = useState<PoBuySortDirection>('desc')
   const [sortKey, setSortKey] = useState<PoBuySortKey>('date')
-  const [status, setStatus] = useState('all')
+  const [statuses, setStatuses] = useState<string[]>([])
   const [toDate, setToDate] = useState('')
 
   const loadData = useCallback(async () => {
@@ -320,7 +338,7 @@ export function PoBuyPageClient() {
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     const filteredRows = (data?.rows ?? []).filter((row) => {
-      if (status !== 'all' && row.status !== status) return false
+      if (statuses.length > 0 && !statuses.includes(row.status)) return false
       if (fromDate && row.date < fromDate) return false
       if (toDate && row.date > toDate) return false
       if (!query) return true
@@ -334,29 +352,29 @@ export function PoBuyPageClient() {
         : String(leftValue).localeCompare(String(rightValue), 'th')
       return sortDirection === 'asc' ? result : -result
     })
-  }, [data?.rows, fromDate, search, sortDirection, sortKey, status, toDate])
+  }, [data?.rows, fromDate, search, sortDirection, sortKey, statuses, toDate])
 
   useEffect(() => {
     setPage(1)
-  }, [fromDate, pageSize, search, sortDirection, sortKey, status, toDate])
+  }, [fromDate, pageSize, search, sortDirection, sortKey, statuses, toDate])
 
-  const openRows = (data?.rows ?? []).filter((row) => row.status.toLowerCase().includes('open'))
-  const partialRows = (data?.rows ?? []).filter((row) => row.status.toLowerCase().includes('partial'))
-  const receivedRows = (data?.rows ?? []).filter((row) => row.status.toLowerCase().includes('received'))
+  const openRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'open')
+  const partialRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'partial')
+  const receivedRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'received')
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ format: 'xlsx' })
     if (search.trim()) params.set('q', search.trim())
-    if (status !== 'all') params.set('status', status)
+    if (statuses.length > 0) params.set('status', statuses.join(','))
     if (fromDate) params.set('from', fromDate)
     if (toDate) params.set('to', toDate)
     if (selectedPoIds.length > 0) params.set('ids', selectedPoIds.join(','))
     return `/api/purchase/po-buy?${params.toString()}`
-  }, [fromDate, search, selectedPoIds, status, toDate])
+  }, [fromDate, search, selectedPoIds, statuses, toDate])
 
   const resetFilters = () => {
     setFromDate('')
     setSearch('')
-    setStatus('all')
+    setStatuses([])
     setToDate('')
   }
 
@@ -369,7 +387,7 @@ export function PoBuyPageClient() {
     setSortDirection(nextKey === 'date' ? 'desc' : 'asc')
   }
 
-  const hasFilters = status !== 'all' || fromDate || toDate || search.trim()
+  const hasFilters = statuses.length > 0 || fromDate || toDate || search.trim()
   const totalRows = rows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -397,16 +415,16 @@ export function PoBuyPageClient() {
           <div className="text-2xl font-bold">{data?.summary.totalRows ?? 0}</div>
           <div className="mt-1 text-xs opacity-80">มูลค่ารวม {formatMoney(data?.summary.totalAmount ?? 0)}</div>
         </div>
-        <Metric color="blue" label="🆕 Open" sublabel="รอรับ 100%" value={`${openRows.length || data?.summary.open || 0}`} />
-        <Metric color="amber" label="⚙ Partial" sublabel="รับบางส่วน" value={`${partialRows.length}`} />
-        <Metric color="emerald" label="✓ Received" sublabel="รับครบแล้ว" value={`${receivedRows.length}`} />
+        <Metric color="blue" label="🆕 ยังไม่รับ" sublabel="รอรับ 100%" value={`${openRows.length || data?.summary.open || 0}`} />
+        <Metric color="amber" label="⚙ รับบางส่วน" sublabel="รับแล้วบางส่วน" value={`${partialRows.length}`} />
+        <Metric color="emerald" label="✓ รับครบ" sublabel="รับครบแล้ว" value={`${receivedRows.length}`} />
         <Metric box color="amber" label="⏳ น้ำหนักรอรับ" sublabel={`${data?.summary.totalRows ?? 0} PO`} value={formatMoney(data?.summary.remainingQty ?? 0)} />
         <Metric box color="red" label="💰 มูลค่ารอรับ" sublabel={`${data?.summary.totalRows ?? 0} PO`} value={formatMoney(data?.summary.remainingAmount ?? 0)} />
       </div>
 
       <div className="space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <UiInput className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลข PO / ชื่อ Supplier / ชื่อสินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <UiInput className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลข PO / ชื่อผู้ขาย / ชื่อสินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-xs text-slate-500">วันที่:</label>
           <DatePickerInput id="po-buy-date-from" value={fromDate} onChange={setFromDate} />
           <span className="text-slate-400">→</span>
@@ -417,11 +435,35 @@ export function PoBuyPageClient() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">สถานะ:</span>
-          <PoBuySegment current={status} label="ทุกสถานะ" value="all" onClick={setStatus} />
-          <PoBuySegment current={status} label="เปิดอยู่" value="Open" onClick={setStatus} />
-          <PoBuySegment current={status} label="บางส่วน" value="Partially Received" onClick={setStatus} />
-          <PoBuySegment current={status} label="รับครบ" value="Received" onClick={setStatus} />
-          <PoBuySegment current={status} label="ยกเลิก" value="Cancelled" onClick={setStatus} />
+          <PoBuySegment
+            active={statuses.length === 0}
+            label="ทุกสถานะ"
+            onClick={() => setStatuses([])}
+          />
+          <PoBuySegment
+            active={statuses.includes('Open')}
+            label="ยังไม่รับ"
+            onClick={() => toggleStatusFilter('Open', setStatuses)}
+            tone="open"
+          />
+          <PoBuySegment
+            active={statuses.includes('Partially Received')}
+            label="บางส่วน"
+            onClick={() => toggleStatusFilter('Partially Received', setStatuses)}
+            tone="partial"
+          />
+          <PoBuySegment
+            active={statuses.includes('Received')}
+            label="รับครบ"
+            onClick={() => toggleStatusFilter('Received', setStatuses)}
+            tone="received"
+          />
+          <PoBuySegment
+            active={statuses.includes('Cancelled')}
+            label="ยกเลิก"
+            onClick={() => toggleStatusFilter('Cancelled', setStatuses)}
+            tone="cancelled"
+          />
         </div>
       </div>
 
@@ -446,7 +488,7 @@ export function PoBuyPageClient() {
       </div>
 
       <Table className="min-w-[1240px]">
-        <TableHeader><tr><TableHead className="text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></TableHead><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="Supplier" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการ" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><TableHead className="w-16 text-center font-semibold text-slate-700">หมายเหตุ</TableHead><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><TableHead className="text-right font-semibold text-slate-700">จัดการ</TableHead></tr></TableHeader>
+        <TableHeader><tr><TableHead className="text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></TableHead><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่ PO ซื้อ" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="ผู้ขาย" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการสินค้า" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><TableHead className="w-16 text-center font-semibold text-slate-700">หมายเหตุ</TableHead><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><TableHead className="text-right font-semibold text-slate-700">จัดการ</TableHead></tr></TableHeader>
         <TableBody>
           {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
           {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</TableCell></TableRow> : null}
@@ -464,7 +506,7 @@ export function PoBuyPageClient() {
                 <TableNumberCell tone="amber" value={formatMoney(row.remainingQty)} />
                 <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.expectedDelivery)}</TableCell>
                 <TableCell className="text-center"><PoBuyNoteIndicator note={row.notes} poNo={row.docNo} /></TableCell>
-                <TableCell className="w-28 whitespace-nowrap text-center"><span className={`rounded-full px-2 py-0.5 ${statusBadge(row.status)}`}>{row.status}</span></TableCell>
+                <TableCell className="w-28 whitespace-nowrap text-center"><span className={`rounded-full px-2 py-0.5 ${statusBadge(row.status)}`}>{poBuyStatusLabel(row.status)}</span></TableCell>
                 <TableCell className="w-28 whitespace-nowrap text-xs text-slate-600"><div className="truncate">{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></TableCell>
                 <TableCell className="whitespace-nowrap text-right">
                   <UiButton className="mr-2 font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</UiButton>
@@ -584,7 +626,7 @@ function PoBuyCancelModal({
     <Dialog open onOpenChange={(open) => {
       if (!open && !isSaving) onClose()
     }}>
-      <DialogContent className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
+      <DialogContent aria-labelledby="po-buy-cancel-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
         <DialogHeader className="border-b">
           <DialogTitle id="po-buy-cancel-title">ยกเลิก PO Buy {row.docNo}</DialogTitle>
           <DialogDescription>{row.supplierName}</DialogDescription>
@@ -654,35 +696,38 @@ function PoBuySortHeader({
 }
 
 function PoBuySegment({
-  current,
+  active,
   label,
   onClick,
-  value,
+  tone = 'default',
 }: {
-  current: string
+  active: boolean
   label: string
-  onClick: (value: string) => void
-  value: string
+  onClick: () => void
+  tone?: 'cancelled' | 'default' | 'open' | 'partial' | 'received'
 }) {
-  const active = current === value
-  const className = value === 'Open'
+  const className = tone === 'open'
     ? active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white hover:bg-blue-50'
-    : value === 'Partially Received'
+    : tone === 'partial'
       ? active ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300 bg-white hover:bg-amber-50'
-      : value === 'Received'
+      : tone === 'received'
         ? active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white hover:bg-emerald-50'
-        : value === 'Cancelled'
+        : tone === 'cancelled'
           ? active ? 'border-slate-500 bg-slate-500 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
           : active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
 
-  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${className}`} type="button" onClick={() => onClick(value)}>{label}</button>
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${className}`} type="button" onClick={onClick}>{label}</button>
+}
+
+function toggleStatusFilter(value: string, setStatuses: Dispatch<SetStateAction<string[]>>) {
+  setStatuses((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value])
 }
 
 function statusBadge(status: string) {
-  const normalized = status.toLowerCase()
-  if (normalized.includes('received')) return 'bg-emerald-100 text-emerald-700'
-  if (normalized.includes('partial')) return 'bg-amber-100 text-amber-700'
-  if (normalized.includes('cancel')) return 'bg-slate-100 text-slate-500'
+  const normalized = poBuyStatusKey(status)
+  if (normalized === 'received') return 'bg-emerald-100 text-emerald-700'
+  if (normalized === 'partial') return 'bg-amber-100 text-amber-700'
+  if (normalized === 'cancelled') return 'bg-slate-100 text-slate-500'
   return 'bg-blue-100 text-blue-700'
 }
 
@@ -701,14 +746,14 @@ function SupplierSearchCombobox({
     <SearchCombobox
       error={error}
       inputId="po-buy-supplier-search"
-      label="Supplier *"
+      label="ผู้ขาย *"
       options={options.map((supplier) => ({
         description: `${supplier.code ? `${supplier.code} · ` : ''}${supplier.id}`,
         id: supplier.id,
         label: optionLabel(supplier),
         searchText: searchableText(supplier),
       }))}
-      placeholder="พิมพ์ชื่อ Supplier..."
+      placeholder="พิมพ์ชื่อผู้ขาย..."
       value={value}
       onChange={onChange}
     />
@@ -757,7 +802,7 @@ function PoBuyFormModal({
     <Dialog open onOpenChange={(open) => {
       if (!open && !isSaving) onClose()
     }}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-md p-0" hideClose>
+      <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-md p-0" hideClose>
         <DialogHeader className="border-b px-5 py-3">
           <DialogTitle id="po-buy-form-title">{heading}</DialogTitle>
         </DialogHeader>
@@ -846,7 +891,7 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
     }}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-md p-0" hideClose>
+      <DialogContent aria-labelledby="po-buy-detail-title" className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-md p-0" hideClose>
         <DialogHeader className="border-b p-4">
           <div>
             <DialogTitle id="po-buy-detail-title">รายละเอียด {row.docNo}</DialogTitle>
@@ -856,7 +901,7 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
         <div className="grid gap-3 p-4 md:grid-cols-3">
           <Detail label="วันที่สร้างเอกสาร" value={formatDateDisplay(row.date)} />
           <Detail label="วันที่กำหนดส่ง" value={formatDateDisplay(row.expectedDelivery)} />
-          <Detail label="สถานะ" value={row.status} />
+          <Detail label="สถานะ" value={poBuyStatusLabel(row.status)} />
           <Detail label="Qty" value={formatMoney(row.qty)} />
           <Detail label="คงเหลือ" value={formatMoney(row.remainingQty)} />
         </div>

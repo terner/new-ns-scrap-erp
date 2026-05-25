@@ -22,6 +22,7 @@ type NormalizedItem = {
 }
 
 type ComboboxContextValue = {
+  disabled: boolean
   filteredItems: NormalizedItem[]
   inputId?: string
   open: boolean
@@ -61,12 +62,14 @@ function normalizeItem(item: PrimitiveItem): NormalizedItem {
 
 export function Combobox({
   children,
+  disabled = false,
   inputId,
   items,
   value,
   onValueChange,
 }: {
   children: React.ReactNode
+  disabled?: boolean
   inputId?: string
   items: PrimitiveItem[]
   onValueChange?: (value: string) => void
@@ -102,6 +105,7 @@ export function Combobox({
   }, [normalizedItems, onValueChange])
 
   const contextValue = React.useMemo<ComboboxContextValue>(() => ({
+    disabled,
     filteredItems,
     inputId,
     open,
@@ -110,7 +114,7 @@ export function Combobox({
     selectedValue: value,
     setOpen,
     setQuery,
-  }), [filteredItems, inputId, open, query, selectValue, value])
+  }), [disabled, filteredItems, inputId, open, query, selectValue, value])
 
   return <ComboboxContext.Provider value={contextValue}>{children}</ComboboxContext.Provider>
 }
@@ -127,7 +131,7 @@ export function ComboboxInput({
   inputGroupClassName?: string
   withDropdownButton?: boolean
 }) {
-  const { filteredItems, inputId, open, query, selectValue, selectedValue, setOpen, setQuery } = useComboboxContext('ComboboxInput')
+  const { disabled, filteredItems, inputId, open, query, selectValue, selectedValue, setOpen, setQuery } = useComboboxContext('ComboboxInput')
   const inputRef = React.useRef<HTMLInputElement>(null)
   const selectedItem = React.useMemo(() => filteredItems.find((item) => item.value === selectedValue) ?? null, [filteredItems, selectedValue])
   const selectedLabel = selectedItem?.label ?? query
@@ -145,6 +149,7 @@ export function ComboboxInput({
         withDropdownButton ? 'w-full rounded-md-none border-0 bg-transparent pr-8 shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent' : undefined,
       )}
       data-slot={withDropdownButton ? 'input-group-control' : undefined}
+      disabled={disabled || props.disabled}
       id={inputId}
       placeholder={placeholder}
       role="combobox"
@@ -152,6 +157,7 @@ export function ComboboxInput({
       value={query}
       {...props}
       onBlur={() => {
+        if (disabled) return
         window.setTimeout(() => {
           const exactMatch = filteredItems.find((item) => item.label.toLowerCase() === query.trim().toLowerCase())
           if (exactMatch) {
@@ -163,6 +169,7 @@ export function ComboboxInput({
         }, 120)
       }}
       onChange={(event) => {
+        if (disabled) return
         const nextQuery = event.target.value
         setQuery(nextQuery)
         setOpen(true)
@@ -171,16 +178,19 @@ export function ComboboxInput({
         }
       }}
       onClick={() => {
+        if (disabled) return
         setOpen(true)
         if (!isSelectedValueQuery) return
         requestAnimationFrame(() => inputRef.current?.select())
       }}
       onFocus={() => {
+        if (disabled) return
         setOpen(true)
         if (!isSelectedValueQuery) return
         requestAnimationFrame(() => inputRef.current?.select())
       }}
       onKeyDown={(event) => {
+        if (disabled) return
         if (event.key === 'Escape') {
           setOpen(false)
           return
@@ -209,15 +219,17 @@ export function ComboboxInput({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          'absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md border-0 p-0 text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-100',
+          'absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md border-0 p-0 text-slate-500 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50',
           buttonClassName,
         )}
+        disabled={disabled}
         data-placeholder=""
         data-size="icon-xs"
         data-slot="input-group-button"
         tabIndex={0}
         type="button"
         onMouseDown={(event) => {
+          if (disabled) return
           event.preventDefault()
           setOpen(!open)
           inputRef.current?.focus()

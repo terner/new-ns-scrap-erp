@@ -19,6 +19,11 @@ function optionLabel(option: Option) {
   return option.code ? `${option.code} - ${option.name}` : option.name
 }
 
+function productOptionLabel(option: Option) {
+  const prefix = option.code ? `${option.code} - ` : ''
+  return option.unit ? `${prefix}${option.name} - ${option.unit}` : `${prefix}${option.name}`
+}
+
 function searchableOptionText(option: Option) {
   return `${option.code ?? ''} ${option.name} ${option.id}`.toLowerCase()
 }
@@ -48,9 +53,11 @@ export function InputField({
   placeholder,
   type = 'text',
   value,
+  errorKey,
 }: {
   className?: string
   error?: string
+  errorKey?: string
   inputClassName?: string
   label: string
   onChange: (value: string) => void
@@ -61,9 +68,11 @@ export function InputField({
   return (
     <Field className={className} error={error} label={label}>
       {type === 'date' ? (
-        <DatePickerInput className={inputClassName ?? 'w-full'} value={value} onChange={onChange} />
+        <div data-error-key={errorKey}>
+          <DatePickerInput className={inputClassName ?? 'w-full'} value={value} onChange={onChange} />
+        </div>
       ) : (
-        <Input className={inputClassName} placeholder={placeholder} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+        <Input data-error-key={errorKey} className={inputClassName} placeholder={placeholder} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
       )}
     </Field>
   )
@@ -79,10 +88,12 @@ export function SelectField({
   options,
   placeholder = 'เลือก',
   value,
+  errorKey,
 }: {
   allowEmpty?: boolean
   className?: string
   error?: string
+  errorKey?: string
   hideCode?: boolean
   label: string
   onChange: (value: string) => void
@@ -92,23 +103,25 @@ export function SelectField({
 }) {
   if (!allowEmpty) {
     return (
-      <FormSelectField
-        className={className}
-        error={error}
-        label={label}
-        placeholder={placeholder}
-        required
-        value={value}
-        onChange={onChange}
-      >
-        {options.map((option) => <option key={option.id} value={option.id}>{!hideCode && option.code ? `${option.code} — ` : ''}{option.name}</option>)}
-      </FormSelectField>
+      <div data-error-key={errorKey}>
+        <FormSelectField
+          className={className}
+          error={error}
+          label={label}
+          placeholder={placeholder}
+          required
+          value={value}
+          onChange={onChange}
+        >
+          {options.map((option) => <option key={option.id} value={option.id}>{!hideCode && option.code ? `${option.code} — ` : ''}{option.name}</option>)}
+        </FormSelectField>
+      </div>
     )
   }
 
   return (
     <Field className={className} error={error} label={label}>
-      <Select className="w-full" value={value} onChange={(event) => onChange(event.target.value)}>
+      <Select data-error-key={errorKey} className="w-full" value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">{placeholder}</option>
         {options.map((option) => <option key={option.id} value={option.id}>{!hideCode && option.code ? `${option.code} — ` : ''}{option.name}</option>)}
       </Select>
@@ -118,13 +131,17 @@ export function SelectField({
 
 export function SupplierSearchCombobox({
   className = '',
+  disabled = false,
   error,
+  errorKey,
   options,
   value,
   onChange,
 }: {
   className?: string
+  disabled?: boolean
   error?: string
+  errorKey?: string
   options: Option[]
   value: string
   onChange: (supplierId: string) => void
@@ -132,7 +149,9 @@ export function SupplierSearchCombobox({
   return (
     <div className={`relative ${className}`}>
       <SearchCombobox
+        disabled={disabled}
         error={error}
+        errorKey={errorKey}
         inputId="purchase-bill-supplier-search"
         label="ผู้ขาย *"
         options={options.map((supplier) => ({
@@ -154,7 +173,9 @@ export function ProductSearchCombobox({
   options,
   value,
   onChange,
+  errorKey,
 }: {
+  errorKey?: string
   inputId: string
   options: Option[]
   value: string
@@ -162,12 +183,13 @@ export function ProductSearchCombobox({
 }) {
   return (
     <SearchCombobox
+      errorKey={errorKey}
       inputId={inputId}
       label="สินค้า *"
       options={options.map((product) => ({
-        description: product.unit ? `(${product.unit})` : undefined,
+        description: undefined,
         id: product.id,
-        label: optionLabel(product),
+        label: productOptionLabel(product),
         searchText: searchableOptionText(product),
       }))}
       placeholder="ค้นหารหัสหรือชื่อสินค้า"

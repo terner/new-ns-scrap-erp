@@ -38,6 +38,9 @@ export const purchaseBillItemSchema = z.object({
   price: money('ราคา').default(0),
   productId: z.string().trim().min(1, 'เลือกสินค้า'),
   qty: positiveMoney('จำนวน/น้ำหนัก'),
+  receiptLineId: optionalSafeId('รายการใบรับของ'),
+  receiptTicketDocNo: optionalDocNo('เลขที่ใบรับของ'),
+  receiptTicketId: optionalSafeId('ใบรับของ'),
   salesPrice: money('ราคาหน้าใบ').default(0),
 }).refine((value) => !value.grossWeight || value.grossWeight >= value.deductWeight, {
   message: 'น้ำหนักหักต้องไม่เกินน้ำหนักรวม',
@@ -54,6 +57,7 @@ export const purchaseBillFormSchema = z.object({
   poBuyId: optionalSafeId('Quick Load PO'),
   purchaseSource: z.enum(['SPOT_BUY', 'PO_RECEIPT', 'MIXED']).default('SPOT_BUY'),
   refNo: optionalDocNo('เลขที่อ้างอิง'),
+  receiptTicketId: optionalSafeId('ใบรับของ'),
   salesId: optionalSafeId('เซลที่ดูแล'),
   supplierId: z.string().trim().min(1, 'เลือกผู้ขาย'),
   transactionMode: z.enum(['STOCK', 'TRADING']).default('STOCK'),
@@ -71,6 +75,34 @@ export const purchaseBillFormSchema = z.object({
 }).refine((value) => !value.vatInvoiceReceived || Boolean(value.vatInvoiceDate), {
   message: 'กรอกวันที่ใบกำกับภาษีเมื่อระบุว่าได้รับแล้ว',
   path: ['vatInvoiceDate'],
+}).superRefine((value, ctx) => {
+  if (value.transactionMode === 'STOCK' && !value.receiptTicketId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'เลือกใบรับของ',
+      path: ['receiptTicketId'],
+    })
+  }
+
+  if (value.transactionMode === 'STOCK') {
+    value.items.forEach((item, index) => {
+      if (!item.receiptTicketId || !item.receiptLineId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'รายการ Stock ต้องมาจากใบรับของ',
+          path: ['items', index, 'receiptLineId'],
+        })
+      }
+
+      if (item.qty > 0 && item.price <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `รายการที่ ${index + 1} ต้องกรอกราคา/กก. ให้มากกว่า 0`,
+          path: ['items'],
+        })
+      }
+    })
+  }
 })
 
 export const purchaseBillCancelSchema = z.object({

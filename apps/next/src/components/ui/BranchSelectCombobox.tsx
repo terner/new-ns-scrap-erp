@@ -10,7 +10,9 @@ type BranchOption = {
 export function BranchSelectCombobox({
   branches,
   className,
+  disabled = false,
   error,
+  errorKey,
   inputId,
   label,
   placeholder,
@@ -20,7 +22,9 @@ export function BranchSelectCombobox({
 }: {
   branches: BranchOption[]
   className?: string
+  disabled?: boolean
   error?: string
+  errorKey?: string
   inputId: string
   label: string
   placeholder: string
@@ -32,10 +36,11 @@ export function BranchSelectCombobox({
   const labelText = hasInlineRequired ? label.trim().slice(0, -1).trimEnd() : label
 
   return (
-    <div className={`${className ?? ''} ${widthClassName ?? ''}`.trim() || undefined}>
+    <div className={`${className ?? ''} ${widthClassName ?? ''}`.trim() || undefined} data-error-key={errorKey}>
       <label className="mb-1 block text-xs" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label>
       <div className="relative">
         <Combobox
+          disabled={disabled}
           inputId={inputId}
           items={branches.map((branch) => branch.name)}
           value={branches.find((branch) => branch.id === value)?.name}

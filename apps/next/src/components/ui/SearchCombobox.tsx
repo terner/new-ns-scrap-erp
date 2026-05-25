@@ -12,7 +12,9 @@ export type SearchComboboxOption = {
 }
 
 export function SearchCombobox({
+  disabled = false,
   error,
+  errorKey,
   inputId,
   label,
   options,
@@ -20,7 +22,9 @@ export function SearchCombobox({
   value,
   onChange,
 }: {
+  disabled?: boolean
   error?: string
+  errorKey?: string
   inputId: string
   label: string
   options: SearchComboboxOption[]
@@ -53,6 +57,7 @@ export function SearchCombobox({
   }, [isSelectedValueQuery, options, query])
 
   const selectOption = (option: SearchComboboxOption) => {
+    if (disabled) return
     onChange(option.id)
     setQuery(option.label)
     setOpen(false)
@@ -60,7 +65,7 @@ export function SearchCombobox({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" data-error-key={errorKey}>
       <label className="mb-1 block text-xs" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label>
       <Input
         ref={inputRef}
@@ -69,6 +74,7 @@ export function SearchCombobox({
         aria-expanded={open}
         aria-invalid={Boolean(error)}
         className={`h-9 w-full rounded-md border px-2 py-1.5 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+        disabled={disabled}
         id={inputId}
         placeholder={placeholder}
         role="combobox"
@@ -76,10 +82,12 @@ export function SearchCombobox({
         type="search"
         value={query}
         onClick={() => {
+          if (disabled) return
           if (!isSelectedValueQuery) return
           requestAnimationFrame(() => inputRef.current?.select())
         }}
         onBlur={() => {
+          if (disabled) return
           window.setTimeout(() => {
             const exactMatch = options.find((option) => option.label.toLowerCase() === query.trim().toLowerCase())
             if (exactMatch) {
@@ -92,12 +100,14 @@ export function SearchCombobox({
           }, 120)
         }}
         onChange={(event) => {
+          if (disabled) return
           const nextQuery = event.target.value
           setQuery(nextQuery)
           setOpen(true)
           if (value && nextQuery !== selectedLabel) onChange('')
         }}
         onFocus={() => {
+          if (disabled) return
           setOpen(true)
           if (!isSelectedValueQuery) return
           requestAnimationFrame(() => inputRef.current?.select())

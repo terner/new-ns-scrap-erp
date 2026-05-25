@@ -277,8 +277,16 @@ export const navigationItems: NavigationItem[] = [
   { href: '/master-data/beneficiaries', icon: '🌏', label: 'ผู้รับเงินต่างประเทศ', section: 'master-data' },
   { href: '/master-data/payment-methods', icon: '🪪', label: 'วิธีจ่าย/รับเงิน', section: 'master-data' },
   { href: '/master-data/remittance-purposes', icon: '🎯', label: 'วัตถุประสงค์โอน', section: 'master-data' },
-  { href: '/admin/system-settings', icon: '⚙️', label: 'ตั้งค่าระบบ', section: 'admin' },
-  { href: '/admin/company-profile', icon: '🏢', label: 'ข้อมูลบริษัท (สำหรับใบพิมพ์)', section: 'admin' },
+  {
+    href: '/admin/system-settings',
+    icon: '⚙️',
+    label: 'ตั้งค่าระบบ',
+    section: 'admin',
+    children: [
+      { href: '/admin/system-settings', icon: '🧾', label: 'VAT / WHT', pageTitle: 'ตั้งค่าระบบ', section: 'admin' },
+      { href: '/admin/company-profile', icon: '🏢', label: 'ข้อมูลบริษัท (สำหรับใบพิมพ์)', section: 'admin' },
+    ],
+  },
   { href: '/admin/transaction-ledger', icon: '📒', label: 'Transaction Ledger (เช็คเงินเข้า-ออก)', section: 'admin' },
   { href: '/admin/migration-tools', icon: '💾', label: 'Backup / Restore (สำคัญ)', section: 'admin' },
   { href: '/admin/audit', icon: '🔍', label: 'Audit & Activity Log', section: 'admin' },
