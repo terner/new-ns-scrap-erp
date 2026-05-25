@@ -247,7 +247,8 @@ export function WeightTicketListPageClient() {
                 <DetailMetric label="สาขา" value={selectedTicket.branchName} />
                 <DetailMetric label="ทะเบียนรถ" value={selectedTicket.vehicleNo} />
                 <DetailMetric label="วันที่" value={formatDateDisplay(selectedTicket.documentDate)} />
-                <DetailMetric label="รูปภาพ" value={`${selectedTicket.imageCount} รูป`} />
+                <DetailMetric label="รูปภาพรถ" value={`${selectedTicket.vehicleImageCount ?? 0} รูป`} />
+                <DetailMetric label="รูปภาพสินค้า" value={`${selectedTicket.lines.reduce((sum, line) => sum + (line.imageCount ?? 0), 0)} รูป`} />
               </div>
               <div className="overflow-hidden rounded-md border border-slate-200">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">

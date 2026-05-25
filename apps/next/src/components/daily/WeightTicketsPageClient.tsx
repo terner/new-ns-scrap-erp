@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CheckCircle2, ImagePlus, Plus, Trash2, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
@@ -49,6 +50,7 @@ type FormState = {
   partyId: string
   remark: string
   type: WeightTicketType
+  vehicleImageFiles: AttachmentPreview[]
   vehicleNo: string
 }
 
@@ -66,6 +68,7 @@ function initialForm(): FormState {
     partyId: '',
     remark: '',
     type: 'WTI',
+    vehicleImageFiles: [],
     vehicleNo: '',
   }
 }
@@ -91,6 +94,7 @@ export function WeightTicketsPageClient() {
   const [impurities, setImpurities] = useState<OptionItem[]>([])
   const [savedTicket, setSavedTicket] = useState<StoredWeightTicket | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [previewImage, setPreviewImage] = useState<AttachmentPreview | null>(null)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
 
   const partyOptions = form.type === 'WTI' ? suppliers : customers
@@ -251,6 +255,23 @@ export function WeightTicketsPageClient() {
     markTouched(`line-${lineId}-images`)
   }
 
+  function appendVehicleImages(files: FileList | null) {
+    if (!files?.length) return
+    const nextFiles = Array.from(files).map((file) => ({
+      fileName: file.name,
+      id: makeFileId(),
+      url: URL.createObjectURL(file),
+    }))
+    setForm((current) => ({ ...current, vehicleImageFiles: [...current.vehicleImageFiles, ...nextFiles] }))
+  }
+
+  function removeVehicleImage(fileId: string) {
+    setForm((current) => ({
+      ...current,
+      vehicleImageFiles: current.vehicleImageFiles.filter((file) => file.id !== fileId),
+    }))
+  }
+
   function resetForm() {
     setForm(initialForm())
     setSavedTicket(null)
@@ -316,7 +337,9 @@ export function WeightTicketsPageClient() {
         productName: findOptionLabel(products, line.productId),
       }
     })
-    const imageNames = form.lines.flatMap((line) => getLineImages(line).map((file) => file.fileName))
+    const lineImageNames = form.lines.flatMap((line) => getLineImages(line).map((file) => file.fileName))
+    const vehicleImageNames = form.vehicleImageFiles.map((file) => file.fileName)
+    const imageNames = [...vehicleImageNames, ...lineImageNames]
     const ticket: StoredWeightTicket = {
       branchId: form.branchId,
       branchName: findOptionLabel(branches, form.branchId),
@@ -334,6 +357,8 @@ export function WeightTicketsPageClient() {
       status: form.type === 'WTI' ? 'received' : 'delivered',
       totals,
       type: form.type,
+      vehicleImageCount: vehicleImageNames.length,
+      vehicleImageNames,
       vehicleNo: form.vehicleNo.trim(),
     }
     saveStoredWeightTicket(ticket)
@@ -387,7 +412,7 @@ export function WeightTicketsPageClient() {
         <div className="space-y-5">
           <Card className="p-5">
             <SectionHeader title="ข้อมูลหัวเอกสาร" subtitle="ผู้ใช้เลือกเฉพาะข้อมูลหน้างาน ส่วนวันที่ เวลา และผู้กรอกเป็นข้อมูลระบบ" />
-            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SearchCombobox
                 error={showError('branchId')}
                 inputId="weight-ticket-branch"
@@ -419,6 +444,39 @@ export function WeightTicketsPageClient() {
                   onBlur={() => markTouched('vehicleNo')}
                   onChange={(event) => updateForm('vehicleNo', normalizeVehicleNo(event.target.value))}
                 />
+              </FieldBlock>
+              <FieldBlock label="รูปภาพรถส่งของ">
+                <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                  <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100">
+                    <ImagePlus className="size-4" />
+                    อัปโหลดรูปภาพรถ
+                    <input
+                      accept="image/*"
+                      className="hidden"
+                      multiple
+                      type="file"
+                      onChange={(event) => {
+                        appendVehicleImages(event.target.files)
+                        event.target.value = ''
+                      }}
+                    />
+                  </label>
+                  <div className="mt-2 space-y-2">
+                    {form.vehicleImageFiles.length === 0 ? (
+                      <div className="text-xs text-slate-400">ยังไม่มีรูปภาพรถ</div>
+                    ) : null}
+                    {form.vehicleImageFiles.map((file) => (
+                      <div className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5 text-xs ring-1 ring-slate-200" key={file.id}>
+                        <button className="min-w-0 truncate text-left text-slate-700 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
+                          {file.fileName}
+                        </button>
+                        <button className="shrink-0 text-slate-500 hover:text-red-600" type="button" onClick={() => removeVehicleImage(file.id)}>
+                          ลบ
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </FieldBlock>
             </div>
           </Card>
@@ -498,16 +556,17 @@ export function WeightTicketsPageClient() {
                           }}
                         />
                       ) : null}
-                      <FieldBlock error={showError(`line-${line.id}-deduction`)} label={line.deductionMode === 'percent' ? 'ค่าหัก %' : 'น้ำหนักหัก กก.'}>
-                        <Input
-                          disabled={line.deductionMode === 'none'}
-                          inputMode="decimal"
-                          placeholder={line.deductionMode === 'percent' ? '0.00' : '0.00'}
-                          value={line.deductionValue}
-                          onBlur={() => markTouched(`line-${line.id}-deduction`)}
-                          onChange={(event) => updateLine(line.id, (current) => ({ ...current, deductionValue: normalizeDecimalInput(event.target.value) }))}
-                        />
-                      </FieldBlock>
+                      {line.deductionMode !== 'none' ? (
+                        <FieldBlock error={showError(`line-${line.id}-deduction`)} label={line.deductionMode === 'percent' ? 'ค่าหัก %' : 'น้ำหนักหัก กก.'}>
+                          <Input
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            value={line.deductionValue}
+                            onBlur={() => markTouched(`line-${line.id}-deduction`)}
+                            onChange={(event) => updateLine(line.id, (current) => ({ ...current, deductionValue: normalizeDecimalInput(event.target.value) }))}
+                          />
+                        </FieldBlock>
+                      ) : null}
                     </div>
                     <div className="mt-4 grid gap-2 sm:grid-cols-3">
                       <MiniMetric label="Gross" value={`${formatWeight(lineTotals.grossWeight)} กก.`} />
@@ -544,7 +603,9 @@ export function WeightTicketsPageClient() {
                           <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={file.id}>
                             <div className="truncate text-sm font-medium text-slate-800">{file.fileName}</div>
                             <div className="mt-3 flex items-center justify-between gap-2">
-                              <span className="text-xs text-slate-500">แนบกับรายการ {index + 1}</span>
+                              <button className="min-w-0 truncate text-left text-xs text-slate-500 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
+                                เปิดรูปภาพ
+                              </button>
                               <Button
                                 size="xs"
                                 type="button"
@@ -623,6 +684,22 @@ export function WeightTicketsPageClient() {
           </div>
         </div>
       </div>
+
+      <Dialog open={Boolean(previewImage)} onOpenChange={(open) => setPreviewImage(open ? previewImage : null)}>
+        <DialogContent className="max-w-4xl">
+          {previewImage ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>รูปภาพแนบ</DialogTitle>
+                <DialogDescription>{previewImage.fileName}</DialogDescription>
+              </DialogHeader>
+              <div className="overflow-hidden rounded-md bg-slate-950">
+                <img alt={previewImage.fileName} className="max-h-[70vh] w-full object-contain" src={previewImage.url} />
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

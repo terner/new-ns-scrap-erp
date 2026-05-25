@@ -43,6 +43,8 @@ export type StoredWeightTicket = {
     netWeight: number
   }
   type: WeightTicketType
+  vehicleImageCount?: number
+  vehicleImageNames?: string[]
   vehicleNo: string
 }
 
@@ -259,6 +261,8 @@ export const sampleWeightTickets: StoredWeightTicket[] = [
     status: 'received',
     totals: { deductionWeight: 7.5, grossWeight: 500, netWeight: 492.5 },
     type: 'WTI',
+    vehicleImageCount: 1,
+    vehicleImageNames: ['vehicle-front.jpg'],
     vehicleNo: '83-5476',
   },
   {
@@ -295,6 +299,8 @@ export const sampleWeightTickets: StoredWeightTicket[] = [
     status: 'delivered',
     totals: { deductionWeight: 0, grossWeight: 320, netWeight: 320 },
     type: 'WTO',
+    vehicleImageCount: 1,
+    vehicleImageNames: ['outbound-truck.jpg'],
     vehicleNo: '70-1122',
   },
 ]
