@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Printer, Search, Share2, SquarePen, XCircle } from 'lucide-react'
 import { getErrorMessage } from '@/lib/api-client'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
@@ -26,6 +26,7 @@ import {
   type WeightTicketSortBy,
   type WeightTicketSortDir,
   type WeightTicketType,
+  weightTicketStatusBadgeClass,
 } from '@/lib/weight-tickets'
 
 type TypeFilter = WeightTicketType
@@ -43,8 +44,7 @@ const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; value
   WTO: [
     { label: 'ทุกสถานะ', values: [] },
     { label: 'ส่งของแล้ว', values: ['delivered'] },
-    { label: 'ออกบิลบางส่วน', values: ['partially_billed'] },
-    { label: 'ออกบิลแล้ว', values: ['billed'] },
+    { label: 'ออกบิลแล้ว', values: ['partially_billed', 'billed'] },
     { label: 'ยกเลิก', values: ['cancelled'] },
   ],
 }
@@ -122,11 +122,13 @@ function SegmentMulti({
 
 export function WeightTicketListPageClient() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialTypeFilter = searchParams.get('type') === 'WTO' ? 'WTO' : 'WTI'
   const [tickets, setTickets] = useState<WeightTicketRecord[]>([])
   const [totalRows, setTotalRows] = useState(0)
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [query, setQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('WTI')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(initialTypeFilter)
   const [statusFilter, setStatusFilter] = useState<StatusFilter[]>([])
   const [sortBy, setSortBy] = useState<WeightTicketSortBy>('createdAt')
   const [sortDir, setSortDir] = useState<WeightTicketSortDir>('desc')
@@ -392,18 +394,17 @@ export function WeightTicketListPageClient() {
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.branchName}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.vehicleNo}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-slate-900">{formatWeight(ticket.totals.netWeight)} กก.</td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    <span className={cn(
-                      'rounded-md px-2 py-1 text-xs font-medium',
-                      ticket.status === 'cancelled'
-                        ? 'bg-rose-100 text-rose-700'
-                        : ticket.status === 'billed'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-slate-100 text-slate-700',
-                    )}
-                    >
-                      {displayWeightTicketStatus(ticket.type, ticket.status)}
-                    </span>
+                  <td className="box-border h-[39px] w-[140px] px-3 py-2">
+                    <div className="flex min-h-[23px] flex-col items-start justify-center">
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 text-xs font-medium',
+                        weightTicketStatusBadgeClass(ticket.type, ticket.status),
+                      )}
+                      >
+                        <span className="size-1.5 rounded-full bg-current" />
+                        {displayWeightTicketStatus(ticket.type, ticket.status)}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-3 py-3 text-slate-600">
                     <div className="truncate">{ticket.updatedBy}</div>
@@ -485,15 +486,29 @@ export function WeightTicketListPageClient() {
           <DialogHeader>
             <DialogTitle>ยกเลิกใบรับ-ส่งของ</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 px-4 pb-4">
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
-              {cancelTicket?.documentNo}
+              <div className="font-mono text-sm text-slate-900">{cancelTicket?.documentNo}</div>
+              {cancelTicket ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-xs text-slate-500">สถานะเอกสาร:</span>
+                  <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', weightTicketStatusBadgeClass(cancelTicket.type, cancelTicket.status))}>
+                    <span className="size-1.5 rounded-full bg-current" />
+                    {displayWeightTicketStatus(cancelTicket.type, cancelTicket.status)}
+                  </span>
+                </div>
+              ) : null}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">
                 เหตุผลการยกเลิก<span className="ml-1 text-red-600">*</span>
               </label>
-              <Input placeholder="ระบุเหตุผลการยกเลิก" value={cancelNote} onChange={(event) => setCancelNote(event.target.value)} />
+              <textarea
+                className="block min-h-[88px] w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 sm:text-sm"
+                placeholder="ระบุเหตุผลการยกเลิก"
+                value={cancelNote}
+                onChange={(event) => setCancelNote(event.target.value)}
+              />
               {cancelError ? <div className="mt-1 text-xs text-red-600">{cancelError}</div> : null}
             </div>
           </div>

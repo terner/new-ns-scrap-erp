@@ -101,7 +101,7 @@ export function enteredByLabel(context: AppAuthContext) {
     ?? context.appUser?.username
     ?? context.appUser?.email
     ?? context.authUser.email
-    ?? 'ผู้ใช้ปัจจุบัน'
+    ?? context.authUser.id
 }
 
 export function defaultTicketStatus(type: WeightTicketType): WeightTicketStatus {
@@ -175,7 +175,9 @@ export function buildWeightTicketLineRows(
       deduction_mode: line.deductionMode,
       deduction_value: line.deductionMode === 'none' ? 0 : Number(line.deductionValue),
       gross_weight: lineTotals.grossWeight,
-      id: line.id || `WTL-${randomUUID()}`,
+      // Client line ids such as `line-1` are UI-only and must never become
+      // persistent DB primary keys, otherwise new documents collide.
+      id: `WTL-${randomUUID()}`,
       image_count: line.imageNames.length,
       image_names: line.imageNames,
       impurity_id: impurity?.id ?? null,

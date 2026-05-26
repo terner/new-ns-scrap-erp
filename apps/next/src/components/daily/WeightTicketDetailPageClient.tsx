@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/Input'
 import { PageTitleOverride } from '@/components/layout/PageTitleOverride'
 import { openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, typeLabels } from '@/lib/weight-tickets'
+import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
 
 function formatDateTime(value?: string | null) {
@@ -291,14 +291,11 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                   <div className="text-xs text-slate-500">สถานะเอกสาร</div>
                   <div className="mt-1">
                     <span className={cn(
-                      'inline-flex rounded-md px-2.5 py-1 text-xs font-medium',
-                      ticket.status === 'cancelled'
-                        ? 'bg-rose-100 text-rose-700'
-                        : ticket.status === 'billed'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-slate-100 text-slate-700',
+                      'inline-flex items-center gap-1.5 text-xs font-medium',
+                      weightTicketStatusBadgeClass(ticket.type, ticket.status),
                     )}
                     >
+                      <span className="size-1.5 rounded-full bg-current" />
                       {displayWeightTicketStatus(ticket.type, ticket.status)}
                     </span>
                   </div>
@@ -352,12 +349,17 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
         {ticket.canCancel ? (
           <Card className="p-5">
             <SectionTitle subtitle="ยกเลิกได้จนกว่าจะถูกนำไปใช้ออกบิล" title="ยกเลิกเอกสาร" />
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-3 px-1">
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">
                   เหตุผลการยกเลิก<span className="ml-1 text-red-600">*</span>
                 </label>
-                <Input placeholder="ระบุเหตุผลการยกเลิก" value={cancelNote} onChange={(event) => setCancelNote(event.target.value)} />
+                <textarea
+                  className="block min-h-[88px] w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                  placeholder="ระบุเหตุผลการยกเลิก"
+                  value={cancelNote}
+                  onChange={(event) => setCancelNote(event.target.value)}
+                />
                 {cancelError ? <div className="mt-1 text-xs text-red-600">{cancelError}</div> : null}
               </div>
               <Button disabled={isCanceling} type="button" variant="outline" onClick={handleCancelTicket}>

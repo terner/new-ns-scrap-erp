@@ -273,8 +273,9 @@ export function decodeStoredImageAsset(rawValue: string): StoredImageAsset {
   const trimmed = rawValue.trim()
 
   if (trimmed.startsWith('data:image/')) {
+    const mimeType = trimmed.slice('data:'.length, trimmed.indexOf(';') > -1 ? trimmed.indexOf(';') : undefined)
     return {
-      fileName: 'รูปภาพแนบ',
+      fileName: mimeType || trimmed.slice(0, 32),
       rawValue,
       url: trimmed,
     }
@@ -344,7 +345,26 @@ export function displayWeightTicketStatus(type: WeightTicketType, status: Weight
     return 'รับของแล้ว'
   }
 
+  if (type === 'WTO') {
+    if (status === 'cancelled') return 'ยกเลิก'
+    if (status === 'delivered') return 'ส่งของแล้ว'
+    return 'ออกบิลแล้ว'
+  }
+
   return statusLabels[status]
+}
+
+export function weightTicketStatusBadgeClass(type: WeightTicketType, status: WeightTicketStatus) {
+  if (status === 'cancelled') return 'text-rose-700'
+  if (type === 'WTI') {
+    if (status === 'billed') return 'text-blue-700'
+    return 'text-emerald-700'
+  }
+  if (type === 'WTO') {
+    if (status === 'delivered') return 'text-amber-700'
+    return 'text-blue-700'
+  }
+  return 'text-slate-700'
 }
 
 export const typeLabels: Record<WeightTicketType, string> = {

@@ -415,7 +415,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
       setLoadedTicket(ticket)
       setSavedTicket(ticket)
       setForm(ticketToFormState(ticket))
-      router.push('/daily/weight-ticket-list')
+      router.push(`/daily/weight-ticket-list?type=${ticket.type}`)
     } catch (caught) {
       setLoadError(getErrorMessage(caught, editingTicketId ? 'แก้ไขใบรับ-ส่งของไม่ได้' : 'บันทึกใบรับ-ส่งของไม่ได้'))
     } finally {
