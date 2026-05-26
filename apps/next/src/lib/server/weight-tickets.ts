@@ -13,7 +13,7 @@ export type WeightTicketQuery = {
   search?: string
   sortBy: 'createdAt' | 'documentNo' | 'netWeight' | 'partyName'
   sortDir: 'asc' | 'desc'
-  status?: string
+  statuses: string[]
   type?: string
 }
 
@@ -53,7 +53,10 @@ export function parseWeightTicketQuery(url: URL): WeightTicketQuery {
     search: url.searchParams.get('search')?.trim() || undefined,
     sortBy: sortBy === 'documentNo' || sortBy === 'partyName' || sortBy === 'netWeight' ? sortBy : 'createdAt',
     sortDir: sortDir === 'asc' ? 'asc' : 'desc',
-    status: url.searchParams.get('status') || undefined,
+    statuses: (url.searchParams.get('status') ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
     type: url.searchParams.get('type') || undefined,
   }
 }
@@ -132,7 +135,7 @@ export function weightTicketWhere(query: WeightTicketQuery, scopedBranchIds: str
 
   const where: Prisma.weight_ticketsWhereInput = andWhere.length ? { AND: andWhere } : {}
   if (query.type) where.doc_type = query.type
-  if (query.status) where.status = query.status
+  if (query.statuses.length > 0) where.status = { in: query.statuses }
   if (query.dateFrom || query.dateTo) {
     where.document_date = {
       ...(query.dateFrom ? { gte: normalizeDate(query.dateFrom) } : {}),

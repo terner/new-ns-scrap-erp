@@ -337,6 +337,16 @@ export const statusLabels: Record<WeightTicketStatus, string> = {
   received: 'รับของแล้ว',
 }
 
+export function displayWeightTicketStatus(type: WeightTicketType, status: WeightTicketStatus) {
+  if (type === 'WTI') {
+    if (status === 'billed') return 'ออกบิลแล้ว'
+    if (status === 'cancelled') return 'ยกเลิก'
+    return 'รับของแล้ว'
+  }
+
+  return statusLabels[status]
+}
+
 export const typeLabels: Record<WeightTicketType, string> = {
   WTI: 'ใบรับของ WTI',
   WTO: 'ใบส่งของ WTO',
@@ -351,7 +361,7 @@ export async function listWeightTickets(params: {
   search?: string
   sortBy?: WeightTicketSortBy
   sortDir?: WeightTicketSortDir
-  status?: WeightTicketStatus | 'all'
+  status?: WeightTicketStatus[] | 'all'
   type?: WeightTicketType | 'all'
 } = {}) {
   const query = new URLSearchParams()
@@ -363,7 +373,7 @@ export async function listWeightTickets(params: {
   if (params.search) query.set('search', params.search)
   if (params.sortBy) query.set('sortBy', params.sortBy)
   if (params.sortDir) query.set('sortDir', params.sortDir)
-  if (params.status && params.status !== 'all') query.set('status', params.status)
+  if (params.status && params.status !== 'all' && params.status.length > 0) query.set('status', params.status.join(','))
   if (params.type && params.type !== 'all') query.set('type', params.type)
 
   const response = await fetch(`/api/daily/weight-tickets?${query.toString()}`, { cache: 'no-store' })

@@ -9,10 +9,10 @@ import { CheckCircle2, ImagePlus, Plus, Trash2, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Card } from '@/components/ui/Card'
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxList } from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
-import { Select } from '@/components/ui/Select'
 import { getErrorMessage } from '@/lib/api-client'
 import { listImpurities } from '@/lib/impurity'
 import { cn } from '@/lib/utils'
@@ -65,7 +65,7 @@ function createFormWeightTicketLine(id?: string): FormWeightTicketLine {
 function initialForm(): FormState {
   return {
     branchId: '',
-    lines: [createFormWeightTicketLine()],
+    lines: [createFormWeightTicketLine('line-1')],
     partyId: '',
     remark: '',
     type: 'WTI',
@@ -532,13 +532,18 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                       <div className="text-xs text-slate-400">ยังไม่มีรูปภาพรถ</div>
                     ) : null}
                     {form.vehicleImageFiles.map((file) => (
-                      <div className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5 text-xs ring-1 ring-slate-200" key={file.id}>
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5 text-xs ring-1 ring-slate-200" key={file.id}>
                         {file.url ? (
-                          <button className="min-w-0 truncate text-left text-slate-700 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
+                          <button
+                            className="min-w-0 flex-1 truncate text-left text-slate-700 hover:text-blue-700 hover:underline"
+                            title={file.fileName}
+                            type="button"
+                            onClick={() => setPreviewImage(file)}
+                          >
                             {file.fileName}
                           </button>
                         ) : (
-                          <span className="min-w-0 truncate text-left text-slate-700">{file.fileName}</span>
+                          <span className="min-w-0 flex-1 truncate text-left text-slate-700" title={file.fileName}>{file.fileName}</span>
                         )}
                         <button className="shrink-0 text-slate-500 hover:text-red-600" type="button" onClick={() => removeVehicleImage(file.id)}>
                           ลบ
@@ -646,10 +651,15 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                         />
                       </FieldBlock>
                       <FieldBlock label="หักสิ่งเจือปน">
-                        <Select
+                        <SimpleDropdown
+                          options={[
+                            { label: 'ไม่หัก', value: 'none' },
+                            { label: 'หัก', value: 'kg' },
+                            { label: 'หัก %', value: 'percent' },
+                          ]}
                           value={line.deductionMode}
-                          onChange={(event) => {
-                            const deductionMode = event.target.value as DeductionMode
+                          onChange={(value) => {
+                            const deductionMode = value as DeductionMode
                             updateLine(line.id, (current) => ({
                               ...current,
                               deductionMode,
@@ -657,11 +667,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                               impurityId: deductionMode === 'none' ? '' : getLineImpurityId(current),
                             }))
                           }}
-                        >
-                          <option value="none">ไม่หัก</option>
-                          <option value="kg">หัก</option>
-                          <option value="percent">หัก %</option>
-                        </Select>
+                        />
                       </FieldBlock>
                       {line.deductionMode !== 'none' ? (
                         <SearchCombobox
@@ -722,7 +728,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                         {getLineImages(line).length === 0 ? <div className="rounded-md bg-slate-50 px-4 py-5 text-center text-sm text-slate-400">ยังไม่มีรูปภาพรายการนี้</div> : null}
                         {getLineImages(line).map((file) => (
                           <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={file.id}>
-                            <div className="truncate text-sm font-medium text-slate-800">{file.fileName}</div>
+                            <div className="truncate text-sm font-medium text-slate-800" title={file.fileName}>{file.fileName}</div>
                             <div className="mt-3 flex items-center justify-between gap-2">
                               {file.url ? (
                                 <button className="min-w-0 truncate text-left text-xs text-slate-500 hover:text-blue-700 hover:underline" type="button" onClick={() => setPreviewImage(file)}>
@@ -747,14 +753,17 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                         ))}
                       </div>
                     </div>
-                    <FieldBlock label="หมายเหตุรายการ">
-                      <Input
-                        className="mt-3"
-                        placeholder="เช่น ของเปียก มีเศษปน หรือรายละเอียดหน้างาน"
-                        value={line.note}
-                        onChange={(event) => updateLine(line.id, (current) => ({ ...current, note: event.target.value.slice(0, 160) }))}
-                      />
-                    </FieldBlock>
+                    <div className="mt-4">
+                      <FieldBlock label="หมายเหตุรายการ">
+                        <textarea
+                          className="min-h-[88px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                          placeholder="เช่น ของเปียก มีเศษปน หรือรายละเอียดหน้างาน"
+                          rows={3}
+                          value={line.note}
+                          onChange={(event) => updateLine(line.id, (current) => ({ ...current, note: event.target.value.slice(0, 160) }))}
+                        />
+                      </FieldBlock>
+                    </div>
                   </div>
                 )
               })() : null}
@@ -833,6 +842,61 @@ function SectionHeader({ subtitle, title }: { subtitle: string; title: string })
     <div>
       <h3 className="text-base font-semibold text-slate-900">{title}</h3>
       <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+    </div>
+  )
+}
+
+function SimpleDropdown({
+  options,
+  value,
+  onChange,
+}: {
+  options: Array<{ label: string; value: string }>
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="relative">
+      <Combobox
+        items={options.map((option) => ({ label: option.label, value: option.value }))}
+        value={value}
+        onValueChange={onChange}
+      >
+        <ComboboxInput
+          className="h-10 rounded-md py-2 pl-4 text-sm text-slate-900"
+          inputGroupClassName="h-10 rounded-md border-slate-300 bg-white"
+          placeholder=""
+          readOnly
+          withDropdownButton
+        />
+        <ComboboxContent>
+          <ComboboxEmpty>ไม่พบข้อมูลที่ตรงกับคำค้นหา</ComboboxEmpty>
+          <ComboboxList>
+            {(item) => {
+              const option = typeof item === 'string' ? { label: item, value: item } : item
+              const active = option.value === value
+              return (
+                <button
+                  key={option.value}
+                  aria-selected={active}
+                  className={cn(
+                    'block w-full rounded-md px-4 py-2 text-left text-sm hover:bg-blue-50',
+                    active ? 'bg-blue-100 text-blue-800' : 'text-slate-700',
+                  )}
+                  role="option"
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    onChange(option.value)
+                  }}
+                >
+                  <span className="block font-medium">{option.label}</span>
+                </button>
+              )
+            }}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
     </div>
   )
 }

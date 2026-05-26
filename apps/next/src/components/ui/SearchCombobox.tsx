@@ -32,6 +32,10 @@ export function SearchCombobox({
   value: string
   onChange: (optionId: string) => void
 }) {
+  const shouldAutoSelectText = () => {
+    if (typeof window === 'undefined') return true
+    return !window.matchMedia('(pointer: coarse)').matches
+  }
   const hasInlineRequired = label.trim().endsWith('*')
   const labelText = hasInlineRequired ? label.trim().slice(0, -1).trimEnd() : label
   const inputRef = useRef<HTMLInputElement>(null)
@@ -61,19 +65,19 @@ export function SearchCombobox({
     onChange(option.id)
     setQuery(option.label)
     setOpen(false)
-    inputRef.current?.focus()
+    if (shouldAutoSelectText()) inputRef.current?.focus()
   }
 
   return (
     <div className="relative" data-error-key={errorKey}>
-      <label className="mb-1 block text-xs" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label>
+      <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label>
       <Input
         ref={inputRef}
         aria-autocomplete="list"
         aria-controls={`${inputId}-options`}
         aria-expanded={open}
         aria-invalid={Boolean(error)}
-        className={`h-9 w-full rounded-md border px-2 py-1.5 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+        className={`h-10 w-full rounded-md border px-3 py-2 text-base sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
         disabled={disabled}
         id={inputId}
         placeholder={placeholder}
@@ -84,6 +88,7 @@ export function SearchCombobox({
         onClick={() => {
           if (disabled) return
           if (!isSelectedValueQuery) return
+          if (!shouldAutoSelectText()) return
           requestAnimationFrame(() => inputRef.current?.select())
         }}
         onBlur={() => {
@@ -110,6 +115,7 @@ export function SearchCombobox({
           if (disabled) return
           setOpen(true)
           if (!isSelectedValueQuery) return
+          if (!shouldAutoSelectText()) return
           requestAnimationFrame(() => inputRef.current?.select())
         }}
         onKeyDown={(event) => {
@@ -124,7 +130,7 @@ export function SearchCombobox({
         }}
       />
       {open ? (
-        <div id={`${inputId}-options`} className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-xl" role="listbox">
+        <div id={`${inputId}-options`} className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-base shadow-xl sm:text-sm" role="listbox">
           {filteredOptions.length > 0 ? filteredOptions.map((option) => (
             <button
               key={option.id}
@@ -138,9 +144,9 @@ export function SearchCombobox({
               }}
             >
               <span className="block font-medium">{option.label}</span>
-              {option.description ? <span className="block text-xs text-slate-500">{option.description}</span> : null}
+              {option.description ? <span className="block text-sm text-slate-500 sm:text-xs">{option.description}</span> : null}
             </button>
-          )) : <div className="px-3 py-2 text-sm text-slate-500">ไม่พบข้อมูลที่ตรงกับคำค้นหา</div>}
+          )) : <div className="px-3 py-2 text-base text-slate-500 sm:text-sm">ไม่พบข้อมูลที่ตรงกับคำค้นหา</div>}
         </div>
       ) : null}
     </div>

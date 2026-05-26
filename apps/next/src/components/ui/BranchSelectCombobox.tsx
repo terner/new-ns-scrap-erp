@@ -8,11 +8,13 @@ type BranchOption = {
 }
 
 export function BranchSelectCombobox({
+  allOptionLabel = 'ทุกสาขา',
   branches,
   className,
   disabled = false,
   error,
   errorKey,
+  includeAllOption = false,
   inputId,
   label,
   placeholder,
@@ -20,38 +22,49 @@ export function BranchSelectCombobox({
   widthClassName,
   onChange,
 }: {
+  allOptionLabel?: string
   branches: BranchOption[]
   className?: string
   disabled?: boolean
   error?: string
   errorKey?: string
+  includeAllOption?: boolean
   inputId: string
-  label: string
+  label?: string
   placeholder: string
   value: string | null | undefined
   widthClassName?: string
   onChange: (branchId: string | null) => void
 }) {
-  const hasInlineRequired = label.trim().endsWith('*')
-  const labelText = hasInlineRequired ? label.trim().slice(0, -1).trimEnd() : label
+  const safeLabel = label?.trim() ?? ''
+  const hasInlineRequired = safeLabel.endsWith('*')
+  const labelText = hasInlineRequired ? safeLabel.slice(0, -1).trimEnd() : safeLabel
+  const options = includeAllOption
+    ? [{ id: '__all__', name: allOptionLabel }, ...branches]
+    : branches
+  const selectedName = value ? branches.find((branch) => branch.id === value)?.name : includeAllOption ? allOptionLabel : undefined
 
   return (
     <div className={`${className ?? ''} ${widthClassName ?? ''}`.trim() || undefined} data-error-key={errorKey}>
-      <label className="mb-1 block text-xs" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label>
+      {safeLabel ? <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label> : null}
       <div className="relative">
         <Combobox
           disabled={disabled}
           inputId={inputId}
-          items={branches.map((branch) => branch.name)}
-          value={branches.find((branch) => branch.id === value)?.name}
+          items={options.map((branch) => branch.name)}
+          value={selectedName}
           onValueChange={(branchName) => {
+            if (includeAllOption && branchName === allOptionLabel) {
+              onChange(null)
+              return
+            }
             const branch = branches.find((item) => item.name === branchName)
             onChange(branch?.id ?? null)
           }}
         >
           <ComboboxInput
-            className={error ? 'h-9 rounded-md border-red-400 bg-red-50 px-2.5 py-1.5 text-sm' : 'h-9 rounded-md px-2.5 py-1.5 text-sm'}
-            inputGroupClassName={error ? 'h-9 rounded-md border-red-400 ring-red-100' : 'h-9 rounded-md border-slate-300'}
+            className={error ? 'h-10 rounded-md border-red-400 bg-red-50 px-3 py-2 text-sm' : 'h-10 rounded-md px-3 py-2 text-sm'}
+            inputGroupClassName={error ? 'h-10 rounded-md border-red-400 ring-red-100' : 'h-10 rounded-md border-slate-300'}
             placeholder={placeholder}
             readOnly
             withDropdownButton

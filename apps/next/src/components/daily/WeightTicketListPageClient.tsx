@@ -3,44 +3,51 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Plus, Printer, Search, Share2, SquarePen, XCircle } from 'lucide-react'
+import { Plus, Printer, Search, Share2, SquarePen, XCircle } from 'lucide-react'
 import { getErrorMessage } from '@/lib/api-client'
+import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 import { cn } from '@/lib/utils'
 import {
   cancelWeightTicket,
+  displayWeightTicketStatus,
   formatWeight,
   listWeightTickets,
-  statusLabels,
   type OptionItem,
   type WeightTicketRecord,
   type WeightTicketStatus,
   type WeightTicketSortBy,
   type WeightTicketSortDir,
   type WeightTicketType,
-  typeLabels,
 } from '@/lib/weight-tickets'
 
-type TypeFilter = 'all' | WeightTicketType
-type StatusFilter = 'all' | WeightTicketStatus
+type TypeFilter = WeightTicketType
+type StatusFilter = WeightTicketStatus
 
 const pageSize = 10
 
-const statusOptions: { label: string; value: StatusFilter }[] = [
-  { label: 'ทุกสถานะ', value: 'all' },
-  { label: statusLabels.received, value: 'received' },
-  { label: statusLabels.delivered, value: 'delivered' },
-  { label: statusLabels.partially_billed, value: 'partially_billed' },
-  { label: statusLabels.billed, value: 'billed' },
-  { label: statusLabels.cancelled, value: 'cancelled' },
-]
+const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; values: StatusFilter[] }>> = {
+  WTI: [
+    { label: 'ทุกสถานะ', values: [] },
+    { label: 'รับของแล้ว', values: ['received', 'partially_billed'] },
+    { label: 'ออกบิลแล้ว', values: ['billed'] },
+    { label: 'ยกเลิก', values: ['cancelled'] },
+  ],
+  WTO: [
+    { label: 'ทุกสถานะ', values: [] },
+    { label: 'ส่งของแล้ว', values: ['delivered'] },
+    { label: 'ออกบิลบางส่วน', values: ['partially_billed'] },
+    { label: 'ออกบิลแล้ว', values: ['billed'] },
+    { label: 'ยกเลิก', values: ['cancelled'] },
+  ],
+}
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'
@@ -56,20 +63,59 @@ function formatDateTime(value?: string | null) {
 }
 
 function SortHeader({
-  active,
+  activeKey,
+  align,
   direction,
   label,
-  onClick,
+  onSort,
+  sortKey,
 }: {
-  active: boolean
+  activeKey: WeightTicketSortBy
+  align: 'center' | 'left' | 'right'
   direction: WeightTicketSortDir
   label: string
-  onClick: () => void
+  onSort: (key: WeightTicketSortBy) => void
+  sortKey: WeightTicketSortBy
 }) {
+  const active = activeKey === sortKey
+  const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
   return (
-    <button className="inline-flex items-center gap-1 hover:text-slate-900" type="button" onClick={onClick}>
-      <span>{label}</span>
-      {active ? direction === 'desc' ? <ArrowDown className="size-3" /> : <ArrowUp className="size-3" /> : null}
+    <th className={`p-2 ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
+      <button className={`inline-flex w-full items-center gap-1 rounded-md px-1 py-0.5 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
+        <span>{label}</span>
+        <span className={`text-[10px] ${active ? 'text-slate-900' : 'text-slate-400'}`}>{active ? direction === 'asc' ? '▲' : '▼' : '↕'}</span>
+      </button>
+    </th>
+  )
+}
+
+function SegmentMulti({
+  current,
+  label,
+  onClick,
+  values,
+}: {
+  current: string[]
+  label: string
+  onClick: (value: string[]) => void
+  values: string[]
+}) {
+  const active = values.length === 0
+    ? current.length === 0
+    : values.every((value) => current.includes(value))
+  return (
+    <button
+      className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+      type="button"
+      onClick={() => {
+        if (values.length === 0) {
+          onClick([])
+          return
+        }
+        onClick(active ? current.filter((item) => !values.includes(item)) : Array.from(new Set([...current, ...values])))
+      }}
+    >
+      {label}
     </button>
   )
 }
@@ -80,8 +126,8 @@ export function WeightTicketListPageClient() {
   const [totalRows, setTotalRows] = useState(0)
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [query, setQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('WTI')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter[]>([])
   const [sortBy, setSortBy] = useState<WeightTicketSortBy>('createdAt')
   const [sortDir, setSortDir] = useState<WeightTicketSortDir>('desc')
   const [branchFilter, setBranchFilter] = useState('all')
@@ -98,7 +144,8 @@ export function WeightTicketListPageClient() {
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const safePage = Math.min(page, totalPages)
-  const activeFilters = Boolean(query || typeFilter !== 'all' || statusFilter !== 'all' || branchFilter !== 'all' || dateFrom || dateTo)
+  const activeFilters = Boolean(query || statusFilter.length > 0 || branchFilter !== 'all' || dateFrom || dateTo)
+  const statusOptions = useMemo(() => statusOptionsByType[typeFilter], [typeFilter])
 
   useEffect(() => {
     let cancelled = false
@@ -166,8 +213,7 @@ export function WeightTicketListPageClient() {
 
   function clearFilters() {
     setQuery('')
-    setTypeFilter('all')
-    setStatusFilter('all')
+    setStatusFilter([])
     setSortBy('createdAt')
     setSortDir('desc')
     setBranchFilter('all')
@@ -227,8 +273,24 @@ export function WeightTicketListPageClient() {
         </Button>
       </div>
 
+      <Tabs
+        className="gap-0"
+        value={typeFilter}
+        onValueChange={(value) => {
+          const nextType = value as WeightTicketType
+          setTypeFilter(nextType)
+          setStatusFilter([])
+          setPage(1)
+        }}
+      >
+        <TabsList className="w-full" variant="line">
+          <TabsTrigger value="WTI" variant="line">ใบรับของ WTI</TabsTrigger>
+          <TabsTrigger value="WTO" variant="line">ใบส่งของ WTO</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Card className="p-4">
-        <div className="grid gap-3 xl:grid-cols-[minmax(16rem,1fr)_10rem_10rem_12rem_11rem_11rem_auto]">
+        <div className="space-y-3">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
@@ -241,21 +303,42 @@ export function WeightTicketListPageClient() {
               }}
             />
           </label>
-          <Select value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value as TypeFilter); setPage(1) }}>
-            <option value="all">ทุกประเภท</option>
-            <option value="WTI">ใบรับของ WTI</option>
-            <option value="WTO">ใบส่งของ WTO</option>
-          </Select>
-          <Select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); setPage(1) }}>
-            {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </Select>
-          <Select value={branchFilter} onChange={(event) => { setBranchFilter(event.target.value); setPage(1) }}>
-            <option value="all">ทุกสาขา</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}
-          </Select>
-          <DatePickerInput value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} />
-          <DatePickerInput value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} />
-          <Button disabled={!activeFilters} type="button" variant="secondary" onClick={clearFilters}>ล้างตัวกรอง</Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-xs text-slate-500">วันที่:</label>
+            <DatePickerInput value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} />
+            <span className="text-slate-400">→</span>
+            <DatePickerInput value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} />
+            <BranchSelectCombobox
+              allOptionLabel="ทุกสาขา"
+              branches={branches.map((branch) => ({ id: branch.id, name: branch.label }))}
+              className="w-[12rem]"
+              includeAllOption
+              inputId="weight-ticket-branch-filter"
+              label=""
+              placeholder="เลือกสาขา"
+              value={branchFilter === 'all' ? null : branchFilter}
+              onChange={(branchId) => {
+                setBranchFilter(branchId ?? 'all')
+                setPage(1)
+              }}
+            />
+            <Button disabled={!activeFilters} type="button" variant="secondary" onClick={clearFilters}>ล้างตัวกรอง</Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">สถานะเอกสาร:</span>
+            {statusOptions.map((option) => (
+              <SegmentMulti
+                current={statusFilter}
+                key={`${typeFilter}-${option.label}`}
+                label={option.label}
+                onClick={(values) => {
+                  setStatusFilter(values as WeightTicketStatus[])
+                  setPage(1)
+                }}
+                values={option.values}
+              />
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -271,26 +354,17 @@ export function WeightTicketListPageClient() {
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600">
+            <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
               <tr>
-                <th className="px-3 py-3 text-left">
-                  <SortHeader active={sortBy === 'documentNo'} direction={sortDir} label="เลขที่" onClick={() => toggleSort('documentNo')} />
-                </th>
-                <th className="px-3 py-3 text-left">ประเภท</th>
-                <th className="px-3 py-3 text-left">
-                  <SortHeader active={sortBy === 'createdAt'} direction={sortDir} label="วันที่/เวลา" onClick={() => toggleSort('createdAt')} />
-                </th>
-                <th className="px-3 py-3 text-left">
-                  <SortHeader active={sortBy === 'partyName'} direction={sortDir} label="ผู้ขาย/ลูกค้า" onClick={() => toggleSort('partyName')} />
-                </th>
-                <th className="px-3 py-3 text-left">สาขา</th>
-                <th className="px-3 py-3 text-left">ทะเบียนรถ</th>
-                <th className="px-3 py-3 text-right">
-                  <SortHeader active={sortBy === 'netWeight'} direction={sortDir} label="น้ำหนักสุทธิ" onClick={() => toggleSort('netWeight')} />
-                </th>
-                <th className="px-3 py-3 text-left">สถานะ</th>
-                <th className="px-3 py-3 text-left">อัปเดตล่าสุด</th>
-                <th className="px-3 py-3 text-right">Action</th>
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="เลขที่" onSort={toggleSort} sortKey="documentNo" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="วันที่/เวลา" onSort={toggleSort} sortKey="createdAt" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label={typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} onSort={toggleSort} sortKey="partyName" />
+                <th className="px-3 py-3 text-left font-semibold text-slate-700">สาขา</th>
+                <th className="px-3 py-3 text-left font-semibold text-slate-700">ทะเบียนรถ</th>
+                <SortHeader activeKey={sortBy} align="right" direction={sortDir} label="น้ำหนักสุทธิ" onSort={toggleSort} sortKey="netWeight" />
+                <th className="px-3 py-3 text-left font-semibold text-slate-700">สถานะ</th>
+                <th className="px-3 py-3 text-left font-semibold text-slate-700">อัปเดตล่าสุด</th>
+                <th className="px-3 py-3 text-right font-semibold text-slate-700">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -313,11 +387,6 @@ export function WeightTicketListPageClient() {
                   onClick={() => router.push(`/daily/weight-ticket-list/${encodeURIComponent(ticket.documentNo)}`)}
                 >
                   <td className="whitespace-nowrap px-3 py-3 font-mono text-slate-900">{ticket.documentNo}</td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    <span className={cn('rounded-md px-2 py-1 text-xs font-semibold', ticket.type === 'WTI' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800')}>
-                      {typeLabels[ticket.type]}
-                    </span>
-                  </td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDateTime(ticket.createdAt)}</td>
                   <td className="px-3 py-3 text-slate-900">{ticket.partyName}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.branchName}</td>
@@ -333,7 +402,7 @@ export function WeightTicketListPageClient() {
                           : 'bg-slate-100 text-slate-700',
                     )}
                     >
-                      {statusLabels[ticket.status]}
+                      {displayWeightTicketStatus(ticket.type, ticket.status)}
                     </span>
                   </td>
                   <td className="px-3 py-3 text-slate-600">

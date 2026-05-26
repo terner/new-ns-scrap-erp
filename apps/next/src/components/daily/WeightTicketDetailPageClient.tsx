@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/Input'
 import { PageTitleOverride } from '@/components/layout/PageTitleOverride'
 import { openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, decodeStoredImageAsset, formatWeight, getWeightTicket, statusLabels, type WeightTicketRecord, typeLabels } from '@/lib/weight-tickets'
+import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, typeLabels } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
 
 function formatDateTime(value?: string | null) {
@@ -299,7 +299,7 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                           : 'bg-slate-100 text-slate-700',
                     )}
                     >
-                      {statusLabels[ticket.status]}
+                      {displayWeightTicketStatus(ticket.type, ticket.status)}
                     </span>
                   </div>
                 </div>
