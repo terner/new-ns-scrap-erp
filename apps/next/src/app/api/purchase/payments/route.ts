@@ -5,6 +5,7 @@ import { supplierPaymentFormSchema } from '@/lib/daily'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, listDailyAccounts, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { getActivePaymentMethods } from '@/lib/server/payment-methods'
 import { prisma } from '@/lib/server/prisma'
 import { activeWhtRatePercent } from '@/lib/server/tax-settings'
 
@@ -97,7 +98,7 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const [accounts, suppliers, approvals, payments, whtRatePercent] = await Promise.all([
+    const [accounts, suppliers, approvals, payments, paymentMethods, whtRatePercent] = await Promise.all([
       listDailyAccounts(),
       prisma.suppliers.findMany({
         orderBy: [{ name: 'asc' }],
@@ -140,6 +141,7 @@ export async function GET() {
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 5000,
       }),
+      getActivePaymentMethods(),
       activeWhtRatePercent(new Date()),
     ])
 
@@ -208,6 +210,7 @@ export async function GET() {
         status: payment.status ?? 'active',
         withholdingTax: toNumber(payment.withholding_tax),
       })),
+      paymentMethods,
       settings: { whtRatePercent },
       suppliers: suppliers.map((supplier: typeof suppliers[number]) => ({
         active: supplier.active,

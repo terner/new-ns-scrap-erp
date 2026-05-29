@@ -10,39 +10,45 @@ type AccountRow = Awaited<ReturnType<typeof prisma.accounts.findMany>>[number] &
   branches?: { name: string } | null
 }
 
-const accountTypeSchema = z.enum(['cash', 'bank'])
+const accountTypeSchema = z.string().trim().min(1, 'เลือกประเภท')
 const accountSubtypeSchema = z.enum(['cash', 'savings', 'current', 'fcd', 'od'])
 
 function accountTypeLabel(type: string | null | undefined) {
-  if (type === 'cash') return 'เงินสด'
-  if (type === 'bank') return 'เงินโอน'
-  return type ?? null
+  return type ? String(type) : null
 }
 
-function normalizeAccountSubtype(row: { currency?: string | null; od_limit?: unknown; subtype?: string | null; type?: string | null }) {
+function paymentMethodGroupForName(
+  paymentMethodTypes: Map<string, 'cash' | 'bank'>,
+  paymentMethodName: string | null | undefined,
+) {
+  if (!paymentMethodName) return null
+  return paymentMethodTypes.get(String(paymentMethodName).trim()) ?? null
+}
+
+function normalizeAccountSubtype(
+  row: { currency?: string | null; od_limit?: unknown; subtype?: string | null; type?: string | null },
+  paymentMethodTypes: Map<string, 'cash' | 'bank'>,
+) {
   if (row.subtype === 'savings' || row.subtype === 'current' || row.subtype === 'cash' || row.subtype === 'fcd' || row.subtype === 'od') return row.subtype
   if (row.subtype === 'bank' || row.subtype === 'other') return 'savings'
-  if (row.type === 'cash') return 'cash'
+  if (paymentMethodGroupForName(paymentMethodTypes, row.type) === 'cash') return 'cash'
   if (Number(row.od_limit ?? 0) > 0) return 'od'
   if (String(row.currency ?? 'THB').toUpperCase() !== 'THB') return 'fcd'
-  if (row.type === 'bank' || row.type === 'other') return 'savings'
+  if (paymentMethodGroupForName(paymentMethodTypes, row.type) === 'bank') return 'savings'
   return 'savings'
 }
 
-function accountSubtypeLabel(row: { currency?: string | null; od_limit?: unknown; subtype?: string | null; type?: string | null }) {
-  const subtype = normalizeAccountSubtype(row)
+function accountSubtypeLabel(
+  row: { currency?: string | null; od_limit?: unknown; subtype?: string | null; type?: string | null },
+  paymentMethodTypes: Map<string, 'cash' | 'bank'>,
+) {
+  const subtype = normalizeAccountSubtype(row, paymentMethodTypes)
   if (subtype === 'cash') return 'เงินสด'
   if (subtype === 'savings') return 'ออมทรัพย์'
   if (subtype === 'current') return 'กระแสรายวัน'
   if (subtype === 'fcd') return 'FCD'
   if (subtype === 'od') return 'OD'
   return subtype
-}
-
-function normalizeAccountTypeFromSubtype(type: string, subtype: z.infer<typeof accountSubtypeSchema>) {
-  if (subtype === 'cash') return 'cash'
-  if (subtype === 'savings' || subtype === 'current' || subtype === 'fcd' || subtype === 'od') return 'bank'
-  return type
 }
 
 function validateAccountBusinessRules(values: {
@@ -81,7 +87,7 @@ function validateAccountBusinessRules(values: {
   }
 }
 
-function mapAccount(row: AccountRow) {
+function mapAccount(row: AccountRow, paymentMethodTypes: Map<string, 'cash' | 'bank'>) {
   return {
     id: row.id,
     code: null,
@@ -89,8 +95,8 @@ function mapAccount(row: AccountRow) {
     active: row.active ?? true,
     type: row.type,
     typeLabel: accountTypeLabel(row.type),
-    subtype: normalizeAccountSubtype(row),
-    subtypeLabel: accountSubtypeLabel(row),
+    subtype: normalizeAccountSubtype(row, paymentMethodTypes),
+    subtypeLabel: accountSubtypeLabel(row, paymentMethodTypes),
     phone: null,
     email: null,
     note: null,
@@ -114,6 +120,14 @@ function mapAccount(row: AccountRow) {
   }
 }
 
+async function getPaymentMethodTypes() {
+  const rows = await prisma.payment_methods.findMany({
+    select: { name: true, type: true },
+    where: { active: true },
+  })
+  return new Map(rows.map((row) => [row.name, row.type === 'cash' ? 'cash' : 'bank'] as const))
+}
+
 async function getNextAccountId() {
   const last = await prisma.accounts.findFirst({ where: { id: { startsWith: 'ACC' } }, orderBy: { id: 'desc' }, select: { id: true } })
   return nextSequentialCode(last?.id, 'ACC')
@@ -135,13 +149,36 @@ async function assertActiveBankName(bankName: string | null) {
   }
 }
 
+async function assertActivePaymentMethod(paymentMethodName: string | null) {
+  const paymentMethod = String(paymentMethodName ?? '').trim()
+
+  if (!paymentMethod) {
+    throw new Error('เลือกประเภท')
+  }
+
+  const row = await prisma.payment_methods.findFirst({
+    select: { id: true, type: true },
+    where: {
+      active: true,
+      name: paymentMethod,
+    },
+  })
+
+  if (!row) {
+    throw new Error('ประเภทที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')
+  }
+
+  return row.type === 'cash' ? 'cash' : 'bank'
+}
+
 export async function GET() {
   try {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'master.reference.view')
 
+    const paymentMethodTypes = await getPaymentMethodTypes()
     const rows = await prisma.accounts.findMany({ include: { branches: true }, orderBy: [{ name: 'asc' }, { account_no: 'asc' }] })
-    return masterDataListJson(rows.map(mapAccount))
+    return masterDataListJson(rows.map((row) => mapAccount(row, paymentMethodTypes)))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'โหลดข้อมูลบัญชีเงินไม่ได้', 500)
@@ -155,8 +192,11 @@ export async function POST(request: Request) {
 
     const values = accountMasterDataFormSchema.parse(await request.json())
     const id = values.id || await getNextAccountId()
-    const accountSubtype = accountSubtypeSchema.parse(values.subtype || (values.type || 'bank'))
-    const accountType = accountTypeSchema.parse(normalizeAccountTypeFromSubtype(values.type || 'bank', accountSubtype))
+    const accountType = accountTypeSchema.parse(values.type)
+    const paymentMethodGroup = await assertActivePaymentMethod(accountType)
+    const accountSubtype = paymentMethodGroup === 'cash'
+      ? 'cash'
+      : accountSubtypeSchema.parse(values.subtype || 'savings')
     validateAccountBusinessRules({
       accountNo: values.accountNo,
       bankName: values.bankName,
@@ -199,7 +239,8 @@ export async function POST(request: Request) {
       },
       include: { branches: true },
     })
-    return masterDataJson(mapAccount(row))
+    const paymentMethodTypes = await getPaymentMethodTypes()
+    return masterDataJson(mapAccount(row, paymentMethodTypes))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return errorJson(caught, 'บันทึกข้อมูลบัญชีเงินไม่ได้')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { paymentMethodGroupFromValue, type PaymentMethodGroup } from '@/lib/account-payment-method'
 import { BillSelect, Field, SelectField, SummaryPill } from '@/components/daily/MoneyMovementFieldHelpers'
 import { PaymentLinesSection, PaymentSplitsSection } from '@/components/daily/MoneyMovementFormSections'
 import { Button as UiButton } from '@/components/ui/Button'
@@ -65,6 +66,7 @@ type Payload = {
   accounts: DailyAccountOption[]
   bills: Bill[]
   customers?: Party[]
+  paymentMethods?: Array<{ name: string; type: PaymentMethodGroup }>
   rows: MoneyRow[]
   settings?: { whtRatePercent?: number }
   suppliers?: Party[]
@@ -125,9 +127,12 @@ function sanitizeAccountNo(value: string | null | undefined) {
   return value?.replace(/\D/g, '') || ''
 }
 
-function supplierBankAccountLines(party: Party | undefined) {
+function supplierBankAccountLines(
+  party: Party | undefined,
+  paymentMethods: Array<{ name: string; type: PaymentMethodGroup }>,
+) {
   const lines = (party?.bankAccounts ?? [])
-    .filter((account) => account.active !== false && account.paymentMethod !== 'เงินสด')
+    .filter((account) => account.active !== false && paymentMethodGroupFromValue(account.paymentMethod, paymentMethods) !== 'cash')
     .map((account) => ({
       accountNo: sanitizeAccountNo(account.accountNo),
       bankName: account.bankName?.trim() || '-',
@@ -185,7 +190,7 @@ function initialForm(mode: 'payment' | 'receipt'): MoneyForm {
     docNo: null,
     fee: 0,
     id: null,
-    method: mode === 'payment' ? 'โอน' : null,
+    method: mode === 'payment' ? '' : null,
     notes: null,
     ...(mode === 'payment' ? { lines: [newPaymentLine()], splits: [newPaymentSplit()], supplierId: '' } : { customerId: '' }),
     withholdingTax: 0,
@@ -234,6 +239,7 @@ export function MoneyMovementPageClient({
       : '/api/sales/receipts'
   const partyKey = mode === 'payment' ? 'supplierId' : 'customerId'
   const parties = useMemo(() => (mode === 'payment' ? data.suppliers ?? [] : data.customers ?? []), [data.customers, data.suppliers, mode])
+  const paymentMethods = useMemo(() => data.paymentMethods ?? [], [data.paymentMethods])
   const theme = mode === 'payment' ? paymentTheme : receiptTheme
   const title = mode === 'payment' ? 'จ่ายเงิน Supplier' : 'รับเงิน Customer'
   const subtitle = mode === 'payment' ? 'Payment Voucher' : 'Receipt Voucher'
@@ -297,7 +303,7 @@ export function MoneyMovementPageClient({
       const balance = bill.payableBalance ?? 0
       const status = paymentBillStatus(bill)
       const supplier = supplierMap.get(bill.supplierId ?? '')
-      const supplierBankAccounts = supplierBankAccountLines(supplier)
+      const supplierBankAccounts = supplierBankAccountLines(supplier, paymentMethods)
       const searchHaystack = `${bill.docNo} ${supplierName} ${bill.date ?? ''} ${supplierBankAccounts.map((account) => `${account.bankName} ${account.accountNo}`).join(' ')}`.toLowerCase()
       const matchesSearch = !query || searchHaystack.includes(query)
       const matchesStatus = balance > 0 && status !== 'cancelled'
@@ -321,7 +327,7 @@ export function MoneyMovementPageClient({
           return ageInDays(right.date) - ageInDays(left.date)
       }
     })
-  }, [billSearch, billSort, data.bills, mode, partyMap, supplierMap])
+  }, [billSearch, billSort, data.bills, mode, partyMap, paymentMethods, supplierMap])
 
   const supplierBillTotalRows = supplierBills.length
   const supplierBillTotalPages = Math.max(1, Math.ceil(supplierBillTotalRows / billPageSize))
@@ -415,6 +421,7 @@ export function MoneyMovementPageClient({
         supplierId: bill.supplierId ?? '',
         withholdingTax: withholdingTaxFromCashAmount(paymentCashAmountFromSettlement(settlementAmount, whtRatePercent), whtRatePercent),
       }],
+      method: bill.approvalPaymentMethod ?? '',
       supplierId: bill.supplierId ?? '',
     } as unknown as MoneyForm)
     setMoneyDrafts({})
@@ -610,7 +617,7 @@ export function MoneyMovementPageClient({
       discount: roundMoney(normalizedLines.reduce((sum, line) => sum + (Number(line.discount) || 0), 0)),
       fee: roundMoney(normalizedLines.reduce((sum, line) => sum + (Number(line.fee) || 0), 0)),
       lines: normalizedLines,
-      method: paymentForm.method ?? 'โอน',
+      method: paymentForm.method ?? '',
       splits: normalizedSplits,
       supplierId: normalizedLines[0]?.supplierId ?? paymentForm.supplierId,
       withholdingTax: roundMoney(normalizedLines.reduce((sum, line) => sum + (Number(line.withholdingTax) || 0), 0)),
@@ -779,7 +786,7 @@ export function MoneyMovementPageClient({
                 {!isLoading && supplierBillPageRows.map((bill) => {
                   const balance = bill.payableBalance ?? 0
                   const supplier = supplierMap.get(bill.supplierId ?? '')
-                  const supplierBankAccounts = approvalBankAccountLines(bill).length > 0 ? approvalBankAccountLines(bill) : supplierBankAccountLines(supplier)
+                  const supplierBankAccounts = approvalBankAccountLines(bill).length > 0 ? approvalBankAccountLines(bill) : supplierBankAccountLines(supplier, paymentMethods)
                   return (
                     <TableRow key={bill.id} className="cursor-pointer hover:bg-slate-50" onClick={() => openFormForBill(bill)}>
                       <TableCell className="font-mono text-xs font-semibold text-slate-700">{bill.docNo}</TableCell>
@@ -904,11 +911,11 @@ export function MoneyMovementPageClient({
                 <div className="order-1 max-w-xs">
                   <label className="block">
                     <span className="mb-1 block text-xs">วิธีจ่าย</span>
-                    <UiSelect className="h-9 rounded-md border px-2 py-1.5 text-sm" required value={form.method ?? 'โอน'} onChange={(event) => setForm({ ...form, method: event.target.value })}>
-                      <option value="โอน">โอน</option>
-                      <option value="เงินสด">เงินสด</option>
-                      <option value="เช็ค">เช็ค</option>
-                      <option value="PromptPay">PromptPay</option>
+                    <UiSelect className="h-9 rounded-md border px-2 py-1.5 text-sm" required value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
+                      <option disabled value="">เลือกวิธีจ่าย/รับเงิน</option>
+                      {paymentMethods.map((method) => (
+                        <option key={method.name} value={method.name}>{method.name}</option>
+                      ))}
                     </UiSelect>
                   </label>
                 </div>
@@ -971,7 +978,15 @@ export function MoneyMovementPageClient({
                   <Field label="WHT" type="number" value={String(form.withholdingTax)} onChange={(value) => setForm({ ...form, withholdingTax: Number(value) })} />
                   <Field label="ส่วนลด" type="number" value={String(form.discount)} onChange={(value) => setForm({ ...form, discount: Number(value) })} />
                   <Field label="ค่าธรรมเนียม" type="number" value={String(form.fee)} onChange={(value) => setForm({ ...form, fee: Number(value) })} />
-                  <Field label="วิธี" value={form.method ?? ''} onChange={(value) => setForm({ ...form, method: value })} />
+                  <label className="block">
+                    <span className="mb-1 block text-xs text-slate-600">วิธีจ่าย/รับเงิน</span>
+                    <UiSelect className="h-9 rounded-md border px-2 py-1.5 text-sm" value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
+                      <option value="">ไม่ระบุ</option>
+                      {paymentMethods.map((method) => (
+                        <option key={method.name} value={method.name}>{method.name}</option>
+                      ))}
+                    </UiSelect>
+                  </label>
                   <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
                 </div>
                 <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:grid-cols-4">

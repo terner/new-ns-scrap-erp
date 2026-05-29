@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
-import { normalizeSupplierPaymentMethod, supplierFormSchema, type SupplierPaymentMethod } from '@/lib/supplier'
+import { z } from 'zod'
+import {
+  defaultSupplierPaymentMethodName,
+  legacySupplierPaymentMethodGroup,
+  resolveSupplierPaymentMethodName,
+  supplierFormSchema,
+  throwSupplierBankAccountValidationError,
+  type SupplierPaymentMethod,
+  type SupplierPaymentMethodRecord,
+} from '@/lib/supplier'
 import { supplierBankAccountRows, toSupplierWriteInput } from '@/lib/domain/supplier'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -138,7 +147,14 @@ function splitAccountNumbers(value: string) {
     .filter((part) => part.length >= 2)
 }
 
-function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAccount[] {
+function parseBankAccounts(
+  row: ImportRow,
+  supplierName: string,
+  paymentMethods: SupplierPaymentMethodRecord[],
+): ImportBankAccount[] {
+  const defaultCashMethod = defaultSupplierPaymentMethodName(paymentMethods, 'cash') ?? 'เงินสด'
+  const defaultBankMethod = defaultSupplierPaymentMethodName(paymentMethods, 'bank') ?? 'เงินโอน'
+
   const rawAccountsAll = cellText(row, 'accountsAll')
   if (rawAccountsAll) {
     const accounts: ImportBankAccount[] = []
@@ -148,7 +164,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
       if (text.includes('เงินสด') && splitAccountNumbers(text).length === 0) {
         accounts.push({
           id: null,
-          paymentMethod: 'เงินสด',
+          paymentMethod: defaultCashMethod,
           bankName: null,
           accountNo: null,
           bankAccount: null,
@@ -160,7 +176,8 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
       }
 
       const parts = text.split('//').map((part) => part.trim()).filter(Boolean)
-      const startsWithTransfer = normalizeSupplierPaymentMethod(parts[0]) === 'เงินโอน'
+      const resolvedMethod = resolveSupplierPaymentMethodName(parts[0], paymentMethods)
+      const startsWithTransfer = (resolvedMethod ? legacySupplierPaymentMethodGroup(resolvedMethod) : legacySupplierPaymentMethodGroup(parts[0])) === 'bank'
       const bankName = stripCashMarker(startsWithTransfer ? parts[1] ?? '' : parts[0] ?? '')
       const accountText = startsWithTransfer ? parts[2] ?? text : parts[1] ?? text
       const accountNos = splitAccountNumbers(accountText || text)
@@ -173,7 +190,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
       accountNos.forEach((accountNo, accountIndex) => {
         accounts.push({
           id: null,
-          paymentMethod: 'เงินโอน',
+          paymentMethod: resolvedMethod ?? defaultBankMethod,
           bankName: bankName || null,
           accountNo,
           bankAccount: accountName || null,
@@ -200,7 +217,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
     return rawCombinedText.includes('เงินสด')
       ? [{
         id: null,
-        paymentMethod: 'เงินสด' as const,
+        paymentMethod: defaultCashMethod,
         bankName: null,
         accountNo: null,
         bankAccount: null,
@@ -213,7 +230,7 @@ function parseBankAccounts(row: ImportRow, supplierName: string): ImportBankAcco
 
   return accountNos.map((accountNo, index) => ({
     id: null,
-    paymentMethod: 'เงินโอน' as const,
+    paymentMethod: defaultBankMethod,
     bankName: bankName || null,
     accountNo,
     bankAccount: rawAccountName,
@@ -292,10 +309,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: `Import ได้สูงสุด ${IMPORT_LIMIT.toLocaleString('th-TH')} แถวต่อครั้ง` }, { status: 400 })
     }
 
-    const salespersons = await prisma.salespersons.findMany({
-      select: { code: true, id: true, name: true },
-      where: { active: { not: false } },
-    })
+    const [salespersons, paymentMethods] = await Promise.all([
+      prisma.salespersons.findMany({
+        select: { code: true, id: true, name: true },
+        where: { active: { not: false } },
+      }),
+      prisma.payment_methods.findMany({
+        orderBy: [{ name: 'asc' }],
+        select: { name: true, type: true },
+        where: { active: true },
+      }),
+    ])
     const salespersonLookup = new Map<string, { id: string; name: string }>()
     for (const salesperson of salespersons) {
       for (const key of [salesperson.id, salesperson.code ?? '', salesperson.name]) {
@@ -330,7 +354,7 @@ export async function POST(request: Request) {
       const address = cellText(row, 'address') || null
       const addressLine1 = cellText(row, 'addressLine1') || (marketScope === 'ต่างประเทศ' ? address : null)
       const supplierName = cellText(row, 'name') || null
-      const bankAccounts = parseBankAccounts(row, supplierName ?? '')
+      const bankAccounts = parseBankAccounts(row, supplierName ?? '', paymentMethods)
       const primaryBankAccount = bankAccounts.find((account) => account.isPrimary) ?? bankAccounts[0] ?? null
 
       const values = {
@@ -374,6 +398,16 @@ export async function POST(request: Request) {
       if (!parsed.success) {
         const issue = parsed.error.issues[0]
         issues.push(firstIssueMessage(rowNumber, issue?.message ?? 'ข้อมูลไม่ถูกต้อง'))
+      } else {
+        try {
+          throwSupplierBankAccountValidationError(parsed.data, paymentMethods)
+        } catch (caught) {
+          if (caught instanceof z.ZodError) {
+            issues.push(firstIssueMessage(rowNumber, caught.issues[0]?.message ?? 'ข้อมูลวิธีจ่าย/รับเงินไม่ถูกต้อง'))
+          } else {
+            issues.push(firstIssueMessage(rowNumber, 'ข้อมูลวิธีจ่าย/รับเงินไม่ถูกต้อง'))
+          }
+        }
       }
 
       return parsed.success ? parsed.data : null
@@ -395,7 +429,7 @@ export async function POST(request: Request) {
 
     await prisma.$transaction(async (tx) => {
       for (const row of validRows) {
-        const payload = toSupplierWriteInput(row)
+        const payload = toSupplierWriteInput(row, paymentMethods)
         if (existingBranchById.has(payload.id)) payload.branch_id = existingBranchById.get(payload.id) ?? null
         await tx.suppliers.upsert({
           where: { id: payload.id },
@@ -403,7 +437,7 @@ export async function POST(request: Request) {
           update: payload,
         })
         await tx.supplier_bank_accounts.deleteMany({ where: { supplier_id: payload.id } })
-        const accountRows = supplierBankAccountRows(row, payload.id)
+        const accountRows = supplierBankAccountRows(row, payload.id, paymentMethods)
         if (accountRows.length) await tx.supplier_bank_accounts.createMany({ data: accountRows })
       }
       })

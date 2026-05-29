@@ -646,6 +646,20 @@ model bank_names {
   @@schema("public")
 }
 
+model account_subtypes {
+  id         String   @id
+  code       String   @unique
+  name       String   @unique
+  sort_order Int      @default(0)
+  active     Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([active])
+  @@index([sort_order])
+  @@schema("public")
+}
+
 model bill_swap_history {
   id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   bill_id            String
@@ -1079,10 +1093,12 @@ model production_machine_types {
 model payment_methods {
   id         String   @id
   name       String
+  type       String   @default("bank")
   active     Boolean  @default(true)
   created_at DateTime @default(now()) @db.Timestamptz(6)
   updated_at DateTime @default(now()) @db.Timestamptz(6)
 
+  @@index([type])
   @@index([active])
   @@schema("public")
 }

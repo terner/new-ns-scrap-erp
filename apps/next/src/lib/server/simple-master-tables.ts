@@ -15,7 +15,7 @@ import {
   updateMasterDataStatusSchema,
 } from '@/lib/server/master-data'
 
-type SimpleMasterKind = 'bankNames' | 'directors' | 'machineTypes' | 'machines' | 'productionLines' | 'productionOutputCategories' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes' | 'vatSettings' | 'whtSettings'
+type SimpleMasterKind = 'accountSubtypes' | 'bankNames' | 'directors' | 'machineTypes' | 'machines' | 'productionLines' | 'productionOutputCategories' | 'productTypes' | 'productUnits' | 'paymentMethods' | 'remittancePurposes' | 'vatSettings' | 'whtSettings'
 
 type Delegate = {
   findMany: (args?: unknown) => Promise<unknown[]>
@@ -76,6 +76,30 @@ function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMaster
 }
 
 const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
+  accountSubtypes: {
+    delegate: () => prisma.account_subtypes as Delegate,
+    prefix: 'AST-',
+    orderBy: [{ sort_order: 'asc' }, { code: 'asc' }],
+    map: (row) => {
+      const record = asRecord(row)
+      return {
+        id: record.id,
+        code: record.code,
+        name: record.name,
+        sortOrder: toNumber(record.sort_order as number | null),
+        active: record.active,
+        createdAt: toIso(record.created_at as Date | null),
+        updatedAt: toIso(record.updated_at as Date | null),
+      }
+    },
+    data: (values, id, code) => ({
+      id,
+      code,
+      name: values.name,
+      sort_order: values.sortOrder ?? 0,
+      active: values.active,
+    }),
+  },
   bankNames: {
     delegate: () => prisma.bank_names as Delegate,
     prefix: 'BANK-',
@@ -297,6 +321,8 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         id: record.id,
         code: null,
         name: record.name,
+        type: record.type,
+        typeLabel: record.type === 'cash' ? 'เงินสด' : 'ธนาคาร',
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -305,6 +331,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
     data: (values, id, _code) => ({
       id,
       name: values.name,
+      type: values.type || 'bank',
       active: values.active,
     }),
   },

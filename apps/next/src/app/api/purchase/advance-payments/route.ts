@@ -20,6 +20,13 @@ type AdvancePaymentRow = Prisma.supplier_advance_paymentsGetPayload<{
   }
 }>
 
+type PaymentMethodOption = {
+  active: boolean
+  id: string
+  name: string
+  type: string
+}
+
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     allocated: 'ใช้หักบิลแล้ว',
@@ -54,7 +61,7 @@ function rowJson(row: AdvancePaymentRow) {
     largeScaleDocNo: row.large_scale_doc_no ?? '',
     netWeight: toNumber(row.net_weight),
     outDate: toDateOnly(row.out_date),
-    paymentMethod: row.payment_method,
+    paymentMethod: row.payment_method ?? '',
     plateNo: row.plate_no ?? '',
     pricePerKg: toNumber(row.price_per_kg),
     productName: row.product_name ?? '',
@@ -238,7 +245,7 @@ export async function GET(request: Request) {
       }),
       prisma.payment_methods.findMany({
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
-        select: { active: true, id: true, name: true },
+        select: { active: true, id: true, name: true, type: true },
       }),
       prisma.products.findMany({
         orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }],
@@ -325,7 +332,12 @@ export async function GET(request: Request) {
         totalPages: Math.max(1, Math.ceil(totalRows / pageSize)),
         totalRows,
       },
-      paymentMethods,
+      paymentMethods: paymentMethods.map((method): PaymentMethodOption => ({
+        active: method.active,
+        id: method.id,
+        name: method.name,
+        type: method.type,
+      })),
       products: products.map((product) => ({
         active: product.active,
         code: product.code,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { mapPrismaSupplier } from '@/lib/domain/supplier'
+import { supplierPaymentMethodGroup, type SupplierPaymentMethodRecord } from '@/lib/supplier'
 import { formatAccountNoDisplay, formatPhoneDisplay } from '@/lib/format'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -119,16 +120,16 @@ function supplierSearchWhere(q: string, supplierType: string, marketScope: strin
   return where
 }
 
-function formatBankAccounts(supplier: Supplier) {
+function formatBankAccounts(supplier: Supplier, paymentMethods: SupplierPaymentMethodRecord[]) {
   return supplier.bankAccounts
-    .map((account) => account.paymentMethod === 'เงินสด'
-      ? 'เงินสด'
-      : ['เงินโอน', account.bankName || 'ไม่ระบุ', formatAccountNoDisplay(account.accountNo), account.branchCode ? `สาขา:${account.branchCode}` : null, account.bankAccount].filter(Boolean).join(' // '))
+    .map((account) => supplierPaymentMethodGroup(account.paymentMethod, paymentMethods) === 'cash'
+      ? account.paymentMethod
+      : [account.paymentMethod, account.bankName || 'ไม่ระบุ', formatAccountNoDisplay(account.accountNo), account.branchCode ? `สาขา:${account.branchCode}` : null, account.bankAccount].filter(Boolean).join(' // '))
     .join(' | ')
 }
 
-function formatCellValue(supplier: Supplier, key: SupplierExportKey) {
-  if (key === 'bankAccountsText' || key === 'bankAccounts') return formatBankAccounts(supplier)
+function formatCellValue(supplier: Supplier, key: SupplierExportKey, paymentMethods: SupplierPaymentMethodRecord[]) {
+  if (key === 'bankAccountsText' || key === 'bankAccounts') return formatBankAccounts(supplier, paymentMethods)
   const value = supplier[key] as string | number | boolean | null | undefined
   if (value === null || value === undefined || value === '') return ''
   if (typeof value === 'boolean') return value ? 'ใช้งาน' : 'ปิด'
@@ -138,7 +139,12 @@ function formatCellValue(supplier: Supplier, key: SupplierExportKey) {
   return String(value)
 }
 
-function buildWorkbook(suppliers: Supplier[], total: number, filters: { supplierType: string; marketScope: string; q: string; salesId: string }) {
+function buildWorkbook(
+  suppliers: Supplier[],
+  paymentMethods: SupplierPaymentMethodRecord[],
+  total: number,
+  filters: { supplierType: string; marketScope: string; q: string; salesId: string },
+) {
   const generatedAt = new Date()
   const summaryRows = [
     ['Export ณ', generatedAt.toLocaleString('th-TH')],
@@ -151,7 +157,7 @@ function buildWorkbook(suppliers: Supplier[], total: number, filters: { supplier
   ]
 
   const dataRows = suppliers.map((supplier) => Object.fromEntries(
-    supplierColumns.map((column) => [column.label, formatCellValue(supplier, column.key)]),
+    supplierColumns.map((column) => [column.label, formatCellValue(supplier, column.key, paymentMethods)]),
   ))
   const workbook = XLSX.utils.book_new()
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows)
@@ -174,7 +180,7 @@ export async function GET(request: Request) {
 
     const { supplierType, direction, marketScope, q, salesId, sortColumn } = parseExportParams(request)
     const where = supplierSearchWhere(q, supplierType, marketScope, salesId)
-    const [rows, total] = await Promise.all([
+    const [rows, total, paymentMethods] = await Promise.all([
       prisma.suppliers.findMany({
         include: {
           branches: true,
@@ -187,10 +193,15 @@ export async function GET(request: Request) {
         where,
       }),
       prisma.suppliers.count({ where }),
+      prisma.payment_methods.findMany({
+        orderBy: [{ name: 'asc' }],
+        select: { name: true, type: true },
+        where: { active: true },
+      }),
     ])
 
-    const suppliers = rows.map(mapPrismaSupplier)
-    const body = buildWorkbook(suppliers, total, { supplierType, marketScope, q, salesId })
+    const suppliers = rows.map((row) => mapPrismaSupplier(row, paymentMethods))
+    const body = buildWorkbook(suppliers, paymentMethods, total, { supplierType, marketScope, q, salesId })
     const filename = `suppliers_${new Date().toISOString().slice(0, 10)}.xlsx`
 
     return new NextResponse(new Uint8Array(body), {

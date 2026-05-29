@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { paymentMethodGroupFromRecord, paymentMethodGroupFromValue, type PaymentMethodGroup } from '@/lib/account-payment-method'
+import type { MasterDataRecord } from '@/lib/master-data'
 import { readBlobResponse, readJsonResponse } from '@/lib/api-client'
 
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
@@ -10,16 +12,69 @@ const personNamePattern = /^[\p{L}\p{M}.' -]+$/u
 const accountNoPattern = /^\d{2,40}$/
 const internationalPostalCodePattern = /^[A-Za-z0-9][A-Za-z0-9\s-]{0,31}$/
 
-export const supplierPaymentMethodValues = ['เงินสด', 'เงินโอน'] as const
-export type SupplierPaymentMethod = typeof supplierPaymentMethodValues[number]
+export type SupplierPaymentMethod = string
+export type SupplierPaymentMethodRecord = Pick<MasterDataRecord, 'name' | 'type'>
 
-export function normalizeSupplierPaymentMethod(value: string | null | undefined): SupplierPaymentMethod | null {
-  const normalized = value?.trim()
+function normalizedPaymentMethodText(value: string | null | undefined) {
+  return String(value ?? '').trim()
+}
+
+export function legacySupplierPaymentMethodGroup(value: string | null | undefined): PaymentMethodGroup | null {
+  const normalized = normalizedPaymentMethodText(value)
   if (!normalized) return null
   const lower = normalized.toLowerCase()
-  if (normalized.includes('เงินสด') || lower.includes('cash')) return 'เงินสด'
-  if (normalized.includes('เงินโอน') || normalized.includes('โอนเงิน') || lower.includes('bank transfer')) return 'เงินโอน'
+  if (normalized.includes('เงินสด') || lower.includes('cash')) return 'cash'
+  if (
+    normalized.includes('เงินโอน')
+    || normalized.includes('โอนเงิน')
+    || normalized.includes('พร้อมเพย์')
+    || normalized.includes('เช็ค')
+    || lower.includes('bank transfer')
+    || lower.includes('promptpay')
+    || lower.includes('cheque')
+    || lower.includes('check')
+  ) {
+    return 'bank'
+  }
   return null
+}
+
+export function defaultSupplierPaymentMethodName(
+  paymentMethods: SupplierPaymentMethodRecord[],
+  group: PaymentMethodGroup,
+) {
+  const methodsInGroup = paymentMethods.filter((method) => paymentMethodGroupFromRecord(method) === group)
+  if (!methodsInGroup.length) return null
+
+  const preferred = methodsInGroup.find((method) => legacySupplierPaymentMethodGroup(method.name) === group)
+  return preferred?.name ?? methodsInGroup[0]?.name ?? null
+}
+
+export function resolveSupplierPaymentMethodName(
+  value: string | null | undefined,
+  paymentMethods: SupplierPaymentMethodRecord[],
+) {
+  const normalized = normalizedPaymentMethodText(value)
+  if (!normalized) return null
+
+  const exactMatch = paymentMethods.find((method) => method.name === normalized)
+  if (exactMatch) return exactMatch.name
+
+  const legacyGroup = legacySupplierPaymentMethodGroup(normalized)
+  return legacyGroup ? defaultSupplierPaymentMethodName(paymentMethods, legacyGroup) : null
+}
+
+export function supplierPaymentMethodGroup(
+  value: string | null | undefined,
+  paymentMethods: SupplierPaymentMethodRecord[],
+) {
+  const exactGroup = paymentMethodGroupFromValue(value, paymentMethods)
+  if (exactGroup) return exactGroup
+
+  const resolvedName = resolveSupplierPaymentMethodName(value, paymentMethods)
+  if (resolvedName) return paymentMethodGroupFromValue(resolvedName, paymentMethods)
+
+  return legacySupplierPaymentMethodGroup(value)
 }
 
 const optionalBusinessText = (label: string, maxLength = 160) => z.preprocess(
@@ -106,13 +161,15 @@ const optionalAccountNoSchema = z.preprocess(
 )
 
 const supplierPaymentMethodSchema = z.preprocess(
-  (value) => typeof value === 'string' ? normalizeSupplierPaymentMethod(value) : value,
-  z.enum(supplierPaymentMethodValues, { required_error: 'เลือกช่องทางการชำระเงิน' }),
+  blankToNull,
+  z.string({ required_error: 'เลือกวิธีจ่าย/รับเงิน' })
+    .trim()
+    .min(1, 'เลือกวิธีจ่าย/รับเงิน'),
 )
 
 export const supplierBankAccountSchema = z.object({
   id: z.preprocess(blankToNull, z.string().trim().max(80, 'รหัสบัญชียาวเกินไป').nullable().default(null)),
-  paymentMethod: supplierPaymentMethodSchema.default('เงินสด'),
+  paymentMethod: supplierPaymentMethodSchema,
   bankName: optionalGeneralText('ธนาคารรับเงิน', 120),
   accountNo: optionalAccountNoSchema,
   bankAccount: optionalGeneralText('ชื่อบัญชีรับเงิน', 160),
@@ -252,23 +309,6 @@ export const supplierFormSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกผู้ดูแล', path: ['salesId'] })
   }
 
-  const seenAccountNos = new Set<string>()
-  values.bankAccounts.forEach((account, index) => {
-    if (account.paymentMethod === 'เงินสด') return
-
-    if (!stripCashMarker(account.bankName)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกธนาคารรับเงิน', path: ['bankAccounts', index, 'bankName'] })
-    }
-    if (!account.accountNo) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกเลขที่บัญชีรับเงิน', path: ['bankAccounts', index, 'accountNo'] })
-    }
-    if (!account.accountNo) return
-    if (seenAccountNos.has(account.accountNo)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลขที่บัญชีรับเงินซ้ำ', path: ['bankAccounts', index, 'accountNo'] })
-    }
-    seenAccountNos.add(account.accountNo)
-  })
-
   if (values.marketScope === 'ในประเทศ') {
     if (values.countryCode && values.countryCode !== 'TH') {
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'ผู้ขายในประเทศต้องใช้รหัสประเทศ TH', path: ['countryCode'] })
@@ -291,6 +331,61 @@ export const supplierFormSchema = z.object({
 })
 
 export type SupplierFormValues = z.infer<typeof supplierFormSchema>
+
+type SupplierPaymentMethodIssue = {
+  message: string
+  path: Array<string | number>
+}
+
+export function supplierBankAccountValidationIssues(
+  values: Pick<SupplierFormValues, 'bankAccounts'>,
+  paymentMethods: SupplierPaymentMethodRecord[],
+) {
+  const issues: SupplierPaymentMethodIssue[] = []
+  const seenAccountNos = new Set<string>()
+
+  values.bankAccounts.forEach((account, index) => {
+    const resolvedName = resolveSupplierPaymentMethodName(account.paymentMethod, paymentMethods)
+    const group = supplierPaymentMethodGroup(account.paymentMethod, paymentMethods)
+    if (!resolvedName || !group) {
+      issues.push({ message: 'เลือกวิธีจ่าย/รับเงินที่ถูกต้อง', path: ['bankAccounts', index, 'paymentMethod'] })
+      return
+    }
+
+    if (group === 'cash') return
+
+    if (!stripCashMarker(account.bankName)) {
+      issues.push({ message: 'เลือกธนาคารรับเงิน', path: ['bankAccounts', index, 'bankName'] })
+    }
+    if (!account.accountNo) {
+      issues.push({ message: 'กรอกเลขที่บัญชีรับเงิน', path: ['bankAccounts', index, 'accountNo'] })
+      return
+    }
+    if (seenAccountNos.has(account.accountNo)) {
+      issues.push({ message: 'เลขที่บัญชีรับเงินซ้ำ', path: ['bankAccounts', index, 'accountNo'] })
+      return
+    }
+    seenAccountNos.add(account.accountNo)
+  })
+
+  return issues
+}
+
+export function throwSupplierBankAccountValidationError(
+  values: Pick<SupplierFormValues, 'bankAccounts'>,
+  paymentMethods: SupplierPaymentMethodRecord[],
+) {
+  const issues = supplierBankAccountValidationIssues(values, paymentMethods)
+  if (!issues.length) return
+
+  throw new z.ZodError(
+    issues.map((issue) => ({
+      code: z.ZodIssueCode.custom,
+      message: issue.message,
+      path: issue.path,
+    })),
+  )
+}
 
 export async function listSuppliers(options: SupplierListOptions = {}): Promise<SupplierListResult> {
   const params = new URLSearchParams()

@@ -16,13 +16,17 @@ function hasExpectedDelegates(client: PrismaClient) {
 
   const accountFields = runtimeModels?.accounts?.fields?.map((field) => field.name) ?? []
   const hasAccountSubtypeField = accountFields.includes('subtype')
+  const paymentMethodFields = runtimeModels?.payment_methods?.fields?.map((field) => field.name) ?? []
+  const hasPaymentMethodTypeField = paymentMethodFields.includes('type')
 
   return typeof client.weight_ticket_product_summaries?.createMany === 'function'
     && typeof client.weight_ticket_product_summary_lines?.createMany === 'function'
     && typeof (client as PrismaClient & { payment_approvals?: { findMany?: unknown } }).payment_approvals?.findMany === 'function'
     && typeof (client as PrismaClient & { supplier_advance_payments?: { findMany?: unknown } }).supplier_advance_payments?.findMany === 'function'
     && typeof (client as PrismaClient & { supplier_advance_allocations?: { findMany?: unknown } }).supplier_advance_allocations?.findMany === 'function'
+    && typeof (client as PrismaClient & { account_subtypes?: { findMany?: unknown } }).account_subtypes?.findMany === 'function'
     && hasAccountSubtypeField
+    && hasPaymentMethodTypeField
 }
 
 function createPrismaClient() {

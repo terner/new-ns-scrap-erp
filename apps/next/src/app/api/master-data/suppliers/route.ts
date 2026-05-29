@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { supplierFormSchema } from '@/lib/supplier'
+import { supplierFormSchema, throwSupplierBankAccountValidationError, type SupplierPaymentMethodRecord } from '@/lib/supplier'
 import { mapPrismaSupplier, supplierBankAccountRows, toSupplierWriteInput } from '@/lib/domain/supplier'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { getActivePaymentMethods } from '@/lib/server/payment-methods'
 import { prisma } from '@/lib/server/prisma'
 import { z } from 'zod'
 import type { Prisma } from '../../../../../generated/prisma/client'
@@ -141,7 +142,7 @@ export async function GET(request: Request) {
 
     const { all, direction, marketScope, page, pageSize, q, salesId, sortColumn, supplierType } = parseListParams(request)
     const where = supplierSearchWhere(q, supplierType, marketScope, salesId)
-    const [suppliers, total] = await Promise.all([
+    const [suppliers, total, paymentMethods] = await Promise.all([
       prisma.suppliers.findMany({
         include: supplierInclude,
         orderBy: [{ [sortColumn]: direction }, { id: 'asc' }],
@@ -150,10 +151,11 @@ export async function GET(request: Request) {
         where,
       }),
       prisma.suppliers.count({ where }),
+      getActivePaymentMethods() as Promise<SupplierPaymentMethodRecord[]>,
     ])
 
     return NextResponse.json({
-      rows: suppliers.map(mapPrismaSupplier),
+      rows: suppliers.map((supplier) => mapPrismaSupplier(supplier, paymentMethods)),
       page: all ? 1 : page,
       pageSize,
       total,
@@ -173,8 +175,10 @@ export async function POST(request: Request) {
     const body = await request.json()
     const values = supplierFormSchema.parse(body)
     const salesName = await getActiveSalespersonName(values.salesId)
+    const paymentMethods = await getActivePaymentMethods() as SupplierPaymentMethodRecord[]
+    throwSupplierBankAccountValidationError(values, paymentMethods)
     const code = normalizeSupplierCode(values.code, values.id || await getNextSupplierCode())
-    const payload = toSupplierWriteInput({ ...values, code, salesName })
+    const payload = toSupplierWriteInput({ ...values, code, salesName }, paymentMethods)
 
     const supplier = await prisma.$transaction(async (tx) => {
       await tx.suppliers.upsert({
@@ -186,7 +190,7 @@ export async function POST(request: Request) {
       })
 
       await tx.supplier_bank_accounts.deleteMany({ where: { supplier_id: payload.id } })
-      const accountRows = supplierBankAccountRows({ ...values, code, salesName }, payload.id)
+      const accountRows = supplierBankAccountRows({ ...values, code, salesName }, payload.id, paymentMethods)
       if (accountRows.length) {
         await tx.supplier_bank_accounts.createMany({ data: accountRows })
       }
@@ -197,7 +201,7 @@ export async function POST(request: Request) {
       })
     })
 
-    return NextResponse.json(mapPrismaSupplier(supplier))
+    return NextResponse.json(mapPrismaSupplier(supplier, paymentMethods))
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'บันทึกข้อมูลผู้ขายไม่ได้', 400)

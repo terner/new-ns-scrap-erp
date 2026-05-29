@@ -303,6 +303,16 @@ baseline ปุ่ม export สำหรับ transaction list:
 - read-only field ต้องดูออกว่าแก้ไม่ได้
 - branch dropdown แสดงชื่อ branch only เว้นแต่หน้า branch master/document numbering
 - account/bank field ต้องแสดงข้อมูลตาม pattern ที่ผู้ใช้คุ้นเคย
+  - ถ้าเป็น field `บัญชีที่จ่าย`, `บัญชีรับเงิน`, `บัญชีโอน`, หรือ account selector ที่ใช้ตัดสินใจจ่ายเงินจริง:
+  - option label ต้องแสดง `ชื่อบัญชี` และ `ยอดเงินคงเหลือ`
+  - ใช้ wording `คงเหลือ {จำนวนเงิน}` เป็น baseline กลาง
+  - baseline กลางของ option label คือ `ชื่อบัญชี (คงเหลือ x,xxx.xx)` และห้ามมี `code` หรือ `type` หลงใน control นี้ เว้นแต่มี override ที่บันทึกไว้ชัดเจน
+  - ถ้ามี field `วิธีจ่าย` อยู่ก่อนใน flow เดียวกัน ต้องกรองรายการบัญชีให้เหลือเฉพาะบัญชีที่รองรับวิธีจ่ายนั้น
+  - การกรองต้องอิง `accounts.type` จาก master data `บัญชีเงินบริษัท` เท่านั้น ไม่อิง `payment methods` และไม่ hardcode จากชื่อที่หน้า form
+  - baseline กลาง:
+    - ถ้าเลือก `ประเภท = cash` -> แสดงเฉพาะบัญชีเงินสด
+    - ถ้าเลือก `ประเภท = bank` -> แสดงเฉพาะบัญชีเงินโอน/ธนาคาร
+  - ถ้าเปลี่ยนวิธีจ่ายแล้วบัญชีเดิมไม่เข้ากติกา ต้องล้างค่าบัญชีที่เลือกไว้
 - ใช้ section grouping เฉพาะเมื่อช่วยให้ form อ่านง่ายขึ้นจริง
 
 ### List / Form Navigation Pattern

@@ -4,6 +4,7 @@ import { customerReceiptFormSchema } from '@/lib/daily'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, listDailyAccounts, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { getActivePaymentMethods } from '@/lib/server/payment-methods'
 import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
@@ -13,7 +14,7 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const [accounts, customers, bills, receipts] = await Promise.all([
+    const [accounts, customers, bills, receipts, paymentMethods] = await Promise.all([
       listDailyAccounts(),
       prisma.customers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true } }),
       prisma.sales_bills.findMany({
@@ -26,6 +27,7 @@ export async function GET() {
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 5000,
       }),
+      getActivePaymentMethods(),
     ])
 
     return NextResponse.json({
@@ -38,6 +40,7 @@ export async function GET() {
         totalAmount: toNumber(bill.total_amount),
       })),
       customers,
+      paymentMethods,
       rows: receipts.map((receipt) => ({
         accountId: receipt.account_id ?? '',
         accountName: receipt.accounts?.name ?? '-',

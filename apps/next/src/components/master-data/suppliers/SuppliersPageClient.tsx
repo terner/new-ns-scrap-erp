@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  defaultSupplierPaymentMethodName,
   supplierFormSchema,
   exportSuppliers,
   importSuppliers,
   listSuppliers,
-  normalizeSupplierPaymentMethod,
   saveSupplier,
   setSupplierActive,
-  supplierPaymentMethodValues,
+  supplierBankAccountValidationIssues,
+  supplierPaymentMethodGroup,
   type Supplier,
   type SupplierFormValues,
 } from '@/lib/supplier'
@@ -26,7 +27,7 @@ type SupplierBankAccountForm = SupplierFormValues['bankAccounts'][number]
 
 const emptyBankAccount: SupplierBankAccountForm = {
   id: null,
-  paymentMethod: 'เงินสด',
+  paymentMethod: '',
   bankName: null,
   accountNo: null,
   bankAccount: null,
@@ -78,7 +79,7 @@ type SupplierFormState = Omit<SupplierFormValues, 'marketScope'> & {
 
 const personTitleOptions = ['นาย', 'นาง', 'นางสาว', 'คุณ']
 
-function supplierToForm(supplier: Supplier): SupplierFormValues {
+function supplierToForm(supplier: Supplier, paymentMethods: MasterDataRecord[]): SupplierFormValues {
   const bankAccounts = supplier.bankAccounts.length > 0
     ? supplier.bankAccounts.map((account, index) => ({
       ...account,
@@ -89,7 +90,7 @@ function supplierToForm(supplier: Supplier): SupplierFormValues {
     : supplier.accountNo
       ? [{
         id: null,
-        paymentMethod: 'เงินโอน' as const,
+        paymentMethod: defaultSupplierPaymentMethodName(paymentMethods, 'bank') ?? '',
         bankName: supplier.bankName,
         accountNo: sanitizeAccountNoInput(supplier.accountNo),
         bankAccount: supplier.bankAccount,
@@ -153,8 +154,8 @@ function supplierReceivingLines(supplier: Supplier) {
   }
 
   return accounts.map((account) => {
-    if (account.paymentMethod === 'เงินสด') {
-      return { bankName: 'เงินสด', accountNo: '-', rawAccountNo: null }
+    if (!account.accountNo) {
+      return { bankName: account.paymentMethod || 'เงินสด', accountNo: '-', rawAccountNo: null }
     }
 
     const branchSuffix = account.branchCode ? ` (สาขา ${account.branchCode})` : ''
@@ -742,12 +743,12 @@ function CopyAccountButton({ accountKey, accountNo, copied, label, onCopy }: Cop
 
 function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving, provinces, salespersons, subdistricts, onCancel, onSubmit }: SupplierFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [form, setForm] = useState<SupplierFormState>(() => (supplier ? supplierToForm(supplier) : emptySupplierForm))
+  const [form, setForm] = useState<SupplierFormState>(() => (supplier ? supplierToForm(supplier, paymentMethods) : emptySupplierForm))
 
   useEffect(() => {
-    setForm(supplier ? supplierToForm(supplier) : emptySupplierForm)
+    setForm(supplier ? supplierToForm(supplier, paymentMethods) : emptySupplierForm)
     setErrors({})
-  }, [supplier])
+  }, [paymentMethods, supplier])
 
   const postalCode = form.addressPostalCode?.trim() ?? ''
   const postalSubdistricts = postalCode.length === 5 ? subdistricts.filter((subdistrict) => subdistrict.postalCode === postalCode) : []
@@ -773,21 +774,17 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
     return names
   }, [bankNames, form.bankAccounts, form.bankName])
   const paymentMethodOptions = useMemo(() => {
-    const configuredMethods = new Map<SupplierBankAccountForm['paymentMethod'], string>()
-    paymentMethods.forEach((paymentMethod) => {
-      const value = normalizeSupplierPaymentMethod(paymentMethod.name) ?? normalizeSupplierPaymentMethod(paymentMethod.code)
-      if (value && !configuredMethods.has(value)) configuredMethods.set(value, paymentMethod.name)
-    })
-    const visibleMethods = supplierPaymentMethodValues
-      .filter((paymentMethod) => configuredMethods.has(paymentMethod))
-      .map((paymentMethod) => ({ value: paymentMethod, label: configuredMethods.get(paymentMethod) ?? paymentMethod }))
+    const configuredMethods = paymentMethods.map((paymentMethod) => ({
+      value: paymentMethod.name,
+      label: paymentMethod.name,
+    }))
     const currentMethods = form.bankAccounts
-      .map((account) => normalizeSupplierPaymentMethod(account.paymentMethod))
-      .filter((paymentMethod): paymentMethod is SupplierBankAccountForm['paymentMethod'] => Boolean(paymentMethod))
-      .map((paymentMethod) => ({ value: paymentMethod, label: configuredMethods.get(paymentMethod) ?? paymentMethod }))
-    const options = uniqueValues([...visibleMethods, ...currentMethods].map((option) => option.value))
-      .map((value) => [...visibleMethods, ...currentMethods].find((option) => option.value === value) ?? { value, label: value })
-    return options.length ? options : supplierPaymentMethodValues.map((value) => ({ value, label: value }))
+      .map((account) => account.paymentMethod?.trim())
+      .filter((paymentMethod): paymentMethod is string => Boolean(paymentMethod))
+      .map((paymentMethod) => ({ value: paymentMethod, label: paymentMethod }))
+    const options = uniqueValues([...configuredMethods, ...currentMethods].map((option) => option.value))
+      .map((value) => [...configuredMethods, ...currentMethods].find((option) => option.value === value) ?? { value, label: value })
+    return options
   }, [form.bankAccounts, paymentMethods])
 
   function update<K extends keyof SupplierFormState>(key: K, value: SupplierFormState[K]) {
@@ -799,7 +796,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
       const bankAccounts = current.bankAccounts.map((account, accountIndex) => {
         if (accountIndex !== index) return account
         const nextAccount = { ...account, [key]: value }
-        if (key === 'paymentMethod' && value === 'เงินสด') {
+        if (key === 'paymentMethod' && supplierPaymentMethodGroup(String(value ?? ''), paymentMethods) === 'cash') {
           return { ...nextAccount, bankName: null, accountNo: null, bankAccount: null, branchCode: null }
         }
         return nextAccount
@@ -889,6 +886,12 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
     const parsed = supplierFormSchema.safeParse(form)
     if (!parsed.success) {
       setErrors(Object.fromEntries(parsed.error.issues.map((issue) => [issue.path.join('.'), issue.message])))
+      return
+    }
+
+    const bankAccountIssues = supplierBankAccountValidationIssues(parsed.data, paymentMethods)
+    if (bankAccountIssues.length > 0) {
+      setErrors(Object.fromEntries(bankAccountIssues.map((issue) => [issue.path.join('.'), issue.message])))
       return
     }
 
@@ -998,14 +1001,14 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
           </div>
           <div className="space-y-3">
             {form.bankAccounts.map((account, index) => {
-              const isTransfer = account.paymentMethod === 'เงินโอน'
+              const isBankMethod = supplierPaymentMethodGroup(account.paymentMethod, paymentMethods) === 'bank'
               return (
                 <div key={`${account.id ?? 'new'}-${index}`} className="rounded-md border border-slate-200 bg-slate-50 p-3">
                   <div className="grid gap-4 md:grid-cols-5">
-                    <SelectField required error={errors[`bankAccounts.${index}.paymentMethod`]} label="ช่องทางการชำระเงิน" value={account.paymentMethod} onChange={(value) => updateBankAccount(index, 'paymentMethod', value as SupplierBankAccountForm['paymentMethod'])}>
+                    <SelectField required error={errors[`bankAccounts.${index}.paymentMethod`]} label="วิธีจ่าย/รับเงิน" placeholder="เลือกวิธีจ่าย/รับเงิน" value={account.paymentMethod} onChange={(value) => updateBankAccount(index, 'paymentMethod', value as SupplierBankAccountForm['paymentMethod'])}>
                       {paymentMethodOptions.map((paymentMethod) => <option key={paymentMethod.value} value={paymentMethod.value}>{paymentMethod.label}</option>)}
                     </SelectField>
-                    {isTransfer ? (
+                    {isBankMethod ? (
                       <>
                         <SelectField required error={errors[`bankAccounts.${index}.bankName`]} label="ธนาคารรับเงิน" placeholder="เลือกธนาคาร" value={account.bankName ?? ''} onChange={(value) => updateBankAccount(index, 'bankName', value || null)}>
                           {bankNameOptions.map((bankName) => <option key={bankName} value={bankName}>{bankName}</option>)}

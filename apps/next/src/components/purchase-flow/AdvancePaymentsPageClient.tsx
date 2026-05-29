@@ -17,6 +17,7 @@ type OptionRow = {
   code?: string | null
   id: string
   name: string
+  type?: string | null
   unit?: string | null
 }
 
@@ -106,6 +107,14 @@ const emptyForm = (): FormState => ({
   weightOut: '',
 })
 
+function isCashAccount(account: DailyAccountOption) {
+  return String(account.type ?? '').trim().toLowerCase() === 'cash'
+}
+
+function normalizedAccountType(value: string | null | undefined) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
 export function AdvancePaymentsPageClient() {
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -174,6 +183,20 @@ export function AdvancePaymentsPageClient() {
     searchText: `${product.code ?? ''} ${product.name} ${product.unit ?? ''}`,
   })), [activeProducts])
   const selectedProduct = useMemo(() => activeProducts.find((product) => product.id === form.productId) ?? null, [activeProducts, form.productId])
+  const paymentMethodOptions = useMemo(() => {
+    return (data?.paymentMethods ?? [])
+      .filter((method) => method.active !== false)
+      .map((method) => ({ label: method.name, value: method.name }))
+  }, [data?.paymentMethods])
+  const filteredAccounts = useMemo(() => {
+    const activeAccounts = (data?.accounts ?? []).filter((account) => account.active !== false)
+    if (!form.paymentMethod) return activeAccounts
+    const selectedMethodType = normalizedAccountType(
+      (data?.paymentMethods ?? []).find((method) => method.name === form.paymentMethod)?.type,
+    )
+    if (!selectedMethodType) return []
+    return activeAccounts.filter((account) => normalizedAccountType(account.type) === selectedMethodType)
+  }, [data?.accounts, data?.paymentMethods, form.paymentMethod])
 
   const computedAmount = useMemo(() => {
     const netWeight = Number(form.netWeight)
@@ -212,6 +235,13 @@ export function AdvancePaymentsPageClient() {
       return next
     })
   }
+
+  useEffect(() => {
+    if (!form.fundingAccountId) return
+    const selectedStillVisible = filteredAccounts.some((account) => account.id === form.fundingAccountId)
+    if (selectedStillVisible) return
+    setForm((current) => ({ ...current, fundingAccountId: '' }))
+  }, [filteredAccounts, form.fundingAccountId])
 
   const removeVehiclePhoto = useCallback((fileId: string) => {
     setVehiclePhotoFiles((current) => {
@@ -325,14 +355,15 @@ export function AdvancePaymentsPageClient() {
                   <Field error={fieldErrors.paymentMethod} label="วิธีจ่าย *">
                     <Select className={form.paymentMethod ? '' : 'text-slate-400'} value={form.paymentMethod} onChange={(event) => updateForm('paymentMethod', event.target.value)}>
                       <option disabled value="">เลือกวิธีจ่าย</option>
-                      {(data?.paymentMethods ?? []).map((method) => <option key={method.id} value={method.name}>{method.name}</option>)}
+                      {paymentMethodOptions.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
                     </Select>
                   </Field>
                   <Field error={fieldErrors.fundingAccountId} label="บัญชีที่จ่าย *">
                     <Select className={form.fundingAccountId ? '' : 'text-slate-400'} value={form.fundingAccountId} onChange={(event) => updateForm('fundingAccountId', event.target.value)}>
                       <option disabled value="">เลือกบัญชี</option>
-                      {(data?.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{accountOptionLabel(account)}</option>)}
+                      {filteredAccounts.map((account) => <option key={account.id} value={account.id}>{accountOptionLabel(account)}</option>)}
                     </Select>
+                    {form.paymentMethod && filteredAccounts.length === 0 ? <p className="mt-1 text-xs text-amber-700">ไม่พบบัญชีที่รองรับวิธีจ่ายนี้</p> : null}
                   </Field>
                   <MoneyInputField error={fieldErrors.amount} label="ยอดมัดจำ *" value={form.amount} onChange={(value) => updateForm('amount', value)} />
                 </div>
@@ -568,9 +599,8 @@ function Field({ children, error, label }: { children: React.ReactNode; error?: 
 }
 
 function accountOptionLabel(account: DailyAccountOption) {
-  const codePrefix = account.code ? `${account.code} - ` : ''
-  const typeSuffix = account.type ? ` (${account.type})` : ''
-  return `${codePrefix}${account.name}${typeSuffix}`
+  const balanceSuffix = ` (คงเหลือ ${formatMoney(account.balance ?? 0)})`
+  return `${account.name}${balanceSuffix}`
 }
 
 function productOptionLabel(option: OptionRow) {

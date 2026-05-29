@@ -29,10 +29,18 @@
 ### Finance Domain
 
 - accounts
+- account subtypes / ประเภทบัญชีธนาคาร
 - currencies
 - payment methods
 - expense categories
 - remittance purposes
+
+Finance-domain notes:
+- `payment methods` ต้องเก็บ business classification กลางว่าเป็น `cash` หรือ `bank`
+- `/master-data/accounts` ต้องอิง classification นี้เพื่อกำหนดว่า field `ประเภทบัญชี`, `ธนาคาร`, `เลขที่บัญชี` ต้องแสดงหรือซ่อน
+- `/master-data/suppliers` และ transaction forms ที่มี `วิธีจ่าย/รับเงิน` ต้องดึงตัวเลือกจาก `public.payment_methods.name` โดยตรง และใช้ `payment_methods.type` แค่เพื่อตัดสินว่า field รายละเอียดบัญชีธนาคารต้องแสดงหรือบังคับหรือไม่
+- `/purchase/payments`, `/sales/receipts`, และ `/daily/payment-approval` ต้องใช้ master เดียวกันนี้ด้วย ห้ามคง list วิธีจ่ายหรือ fallback เช่น `เงินโอน` ไว้ใน component/route เอง
+- ห้าม infer cash/bank จากข้อความ display เช่น `เงินสด`, `Cash`, `Bank Transfer`
 
 ### Channel and Classification
 

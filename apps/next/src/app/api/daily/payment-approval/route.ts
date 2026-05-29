@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import type { Prisma } from '../../../../../generated/prisma/client'
 import { z } from 'zod'
+import { defaultPaymentMethodNameByGroup, resolvePaymentMethodName } from '@/lib/account-payment-method'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { getActivePaymentMethods, type ActivePaymentMethod } from '@/lib/server/payment-methods'
 import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
@@ -21,6 +23,7 @@ const approvalRequestSchema = z.object({
 function normalizeSupplierBankAccounts(params: {
   fallbackAccountNo: string | null | undefined
   fallbackBankName: string | null | undefined
+  paymentMethods: ActivePaymentMethod[]
   rows:
     | Array<{
         account_no: string | null
@@ -33,6 +36,7 @@ function normalizeSupplierBankAccounts(params: {
     | null
     | undefined
 }) {
+  const defaultBankMethod = defaultPaymentMethodNameByGroup(params.paymentMethods, 'bank') ?? ''
   const options = (params.rows ?? [])
     .filter((account) => account.active !== false)
     .map((account) => ({
@@ -40,7 +44,7 @@ function normalizeSupplierBankAccounts(params: {
       bankName: account.bank_name ?? '',
       id: account.id,
       isPrimary: account.is_primary ?? false,
-      paymentMethod: account.payment_method ?? 'เงินโอน',
+      paymentMethod: resolvePaymentMethodName(account.payment_method, params.paymentMethods) ?? defaultBankMethod,
     }))
 
   const fallbackAccountNo = String(params.fallbackAccountNo ?? '').trim()
@@ -55,7 +59,7 @@ function normalizeSupplierBankAccounts(params: {
         bankName: fallbackBankName,
         id: `legacy:${fallbackBankName}:${fallbackAccountNo}`,
         isPrimary: options.length === 0,
-        paymentMethod: 'เงินโอน',
+        paymentMethod: defaultBankMethod,
       })
     }
   }
@@ -109,7 +113,7 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const [purchaseBills, expenses, approvals] = await Promise.all([
+    const [purchaseBills, expenses, approvals, paymentMethods] = await Promise.all([
       prisma.purchase_bills.findMany({
         include: {
           suppliers: {
@@ -141,6 +145,7 @@ export async function GET() {
           status: 'approved',
         },
       }),
+      getActivePaymentMethods(),
     ])
 
     const approvalByPurchaseBillId = new Map<string, typeof approvals[number][]>()
@@ -162,6 +167,7 @@ export async function GET() {
         const bankAccounts = normalizeSupplierBankAccounts({
           fallbackAccountNo: bill.suppliers?.bank_account,
           fallbackBankName: bill.suppliers?.bank_name,
+          paymentMethods,
           rows: bill.suppliers?.supplier_bank_accounts,
         })
         const approvedOutstanding = activeApprovals.reduce((sum, approval) => sum + toNumber(approval.approved_amount), 0)
@@ -247,6 +253,7 @@ export async function POST(request: Request) {
 
     const values = approvalRequestSchema.parse(await request.json())
     const actor = context.appUser?.id || context.authUser.id
+    const paymentMethods = await getActivePaymentMethods()
 
     const purchaseBillItems = values.items.filter((item) => item.sourceType === 'purchase_bill')
     const expenseItems = values.items.filter((item) => item.sourceType === 'expense')
@@ -307,6 +314,7 @@ export async function POST(request: Request) {
         const bankAccounts = normalizeSupplierBankAccounts({
           fallbackAccountNo: bill.suppliers?.bank_account,
           fallbackBankName: bill.suppliers?.bank_name,
+          paymentMethods,
           rows: bill.suppliers?.supplier_bank_accounts,
         })
         const selectedBank = bankAccounts.find((account) => account.id === item.bankAccountId)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, type FocusEvent } from 'react'
+import { paymentMethodGroupFromValue, resolvePaymentMethodValueForAccount } from '@/lib/account-payment-method'
 import {
   accountMasterDataFormSchema,
   emptyMasterDataForm,
@@ -26,8 +27,16 @@ type MasterDataPageClientProps = {
 
 const pageSizeOptions = [10, 25, 50, 100]
 
-function recordToForm(record: MasterDataRecord): MasterDataFormValues {
-  const normalizedSubtype = record.type === 'cash'
+function paymentMethodGroupForFormValue(
+  value: string | null | undefined,
+  paymentMethods: MasterDataRecord[],
+) {
+  return paymentMethodGroupFromValue(value, paymentMethods)
+}
+
+function recordToForm(record: MasterDataRecord, paymentMethods: MasterDataRecord[]): MasterDataFormValues {
+  const paymentMethodGroup = paymentMethodGroupForFormValue(record.type, paymentMethods)
+  const normalizedSubtype = paymentMethodGroup === 'cash'
     ? 'cash'
     : (record.subtype ?? 'savings')
 
@@ -36,7 +45,7 @@ function recordToForm(record: MasterDataRecord): MasterDataFormValues {
     code: record.code,
     name: record.name,
     active: record.active,
-    type: record.type,
+    type: resolvePaymentMethodValueForAccount(record, paymentMethods),
     subtype: normalizedSubtype,
     phone: formatPhoneDisplay(record.phone),
     email: record.email,
@@ -119,7 +128,11 @@ function compareRecords(left: MasterDataRecord, right: MasterDataRecord, key: So
   return String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'th', { numeric: true }) * multiplier
 }
 
-function validateMasterDataForm(config: MasterDataPageConfig, values: MasterDataFormValues) {
+function validateMasterDataForm(
+  config: MasterDataPageConfig,
+  values: MasterDataFormValues,
+  paymentMethodRows: MasterDataRecord[],
+) {
   const schema = config.apiPath === '/api/master-data/accounts' ? accountMasterDataFormSchema : masterDataFormSchema
   const parsed = schema.safeParse(values)
   const errors: Record<string, string> = {}
@@ -134,20 +147,21 @@ function validateMasterDataForm(config: MasterDataPageConfig, values: MasterData
       errors.name = 'ชื่อบัญชียาวเกินไป'
     }
 
+    const accountTypeGroup = paymentMethodGroupForFormValue(values.type, paymentMethodRows) ?? 'bank'
+
     if (!values.type) {
       hiddenFieldKeys.add('subtype')
       hiddenFieldKeys.add('bankName')
       hiddenFieldKeys.add('bankBranch')
       hiddenFieldKeys.add('accountNo')
-      hiddenFieldKeys.add('currency')
       hiddenFieldKeys.add('odLimit')
-    } else if (values.type === 'cash') {
+    } else if (accountTypeGroup === 'cash') {
       hiddenFieldKeys.add('subtype')
       hiddenFieldKeys.add('bankName')
       hiddenFieldKeys.add('bankBranch')
       hiddenFieldKeys.add('accountNo')
       hiddenFieldKeys.add('odLimit')
-    } else if (values.type === 'bank' && values.subtype !== 'od') {
+    } else if (accountTypeGroup === 'bank' && values.subtype !== 'od') {
       hiddenFieldKeys.add('odLimit')
     }
   }
@@ -180,8 +194,8 @@ function validateMasterDataForm(config: MasterDataPageConfig, values: MasterData
   }
 
   if (config.apiPath === '/api/master-data/accounts') {
-    const accountType = values.type
-    const accountSubtype = accountType === 'cash' ? 'cash' : values.subtype
+    const accountTypeGroup = paymentMethodGroupForFormValue(values.type, paymentMethodRows) ?? 'bank'
+    const accountSubtype = accountTypeGroup === 'cash' ? 'cash' : values.subtype
     const currency = String(values.currency ?? '').trim().toUpperCase()
     const odLimit = values.odLimit
 
@@ -189,8 +203,8 @@ function validateMasterDataForm(config: MasterDataPageConfig, values: MasterData
       errors.currency = 'กรอกสกุลเงิน'
     }
 
-    if (accountType === 'bank' && !accountSubtype) {
-      errors.subtype = 'เลือกชนิดบัญชี'
+    if (accountTypeGroup === 'bank' && !accountSubtype) {
+      errors.subtype = 'เลือกประเภทบัญชี'
     }
 
     if (accountSubtype === 'cash') {
@@ -225,6 +239,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [records, setRecords] = useState<MasterDataRecord[]>([])
   const [fieldOptions, setFieldOptions] = useState<Partial<Record<keyof MasterDataFormValues, Array<{ label: string; value: string }>>>>({})
+  const [fieldOptionRows, setFieldOptionRows] = useState<Partial<Record<keyof MasterDataFormValues, MasterDataRecord[]>>>({})
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
@@ -246,6 +261,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
         }))),
       ])
       setRecords(rows)
+      setFieldOptionRows(Object.fromEntries(optionResults.map((result) => [result.key, result.rows])))
       setFieldOptions(Object.fromEntries(optionResults.map((result) => [
         result.key,
         result.rows
@@ -381,6 +397,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
             <MasterDataForm
               config={resolvedConfig}
               isSaving={isSaving}
+              paymentMethodRows={fieldOptionRows.type ?? []}
               supportsActive={config.supportsActive !== false}
               record={selectedRecord}
               onCancel={() => {
@@ -486,42 +503,42 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
 type MasterDataFormProps = {
   config: MasterDataPageConfig
   isSaving: boolean
+  paymentMethodRows: MasterDataRecord[]
   record: MasterDataRecord | null
   supportsActive: boolean
   onCancel: () => void
   onSubmit: (values: MasterDataFormValues) => Promise<void>
 }
 
-function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, onSubmit }: MasterDataFormProps) {
+function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsActive, onCancel, onSubmit }: MasterDataFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [form, setForm] = useState<MasterDataFormValues>(() => (record ? recordToForm(record) : emptyMasterDataForm))
+  const [form, setForm] = useState<MasterDataFormValues>(() => (record ? recordToForm(record, paymentMethodRows) : emptyMasterDataForm))
 
   useEffect(() => {
-    setForm(record ? recordToForm(record) : emptyMasterDataForm)
+    setForm(record ? recordToForm(record, paymentMethodRows) : emptyMasterDataForm)
     setErrors({})
-  }, [record])
+  }, [paymentMethodRows, record])
 
   function update<K extends keyof MasterDataFormValues>(key: K, value: MasterDataFormValues[K]) {
     setForm((current) => {
       const next = { ...current, [key]: value }
       if (config.apiPath === '/api/master-data/accounts') {
         const typedNext = next as MasterDataFormValues
+        const nextPaymentMethodGroup = paymentMethodGroupForFormValue(typedNext.type, paymentMethodRows)
         if (key === 'type') {
-          if (value === 'cash') {
+          if (nextPaymentMethodGroup === 'cash') {
             typedNext.subtype = 'cash'
             typedNext.bankName = null
             typedNext.bankBranch = null
             typedNext.accountNo = null
             typedNext.odLimit = null
-          } else if (value === 'bank') {
+          } else {
             if (!typedNext.subtype || typedNext.subtype === 'cash') typedNext.subtype = 'savings'
             if (!typedNext.currency) typedNext.currency = 'THB'
           }
         }
-        if (key === 'subtype') {
-          if (value === 'cash') typedNext.type = 'cash'
-          else if (value === 'savings' || value === 'current' || value === 'fcd' || value === 'od') {
-            typedNext.type = 'bank'
+        if (key === 'subtype' && nextPaymentMethodGroup === 'bank') {
+          if (value === 'savings' || value === 'current' || value === 'fcd' || value === 'od') {
             if (value === 'savings' || value === 'current' || value === 'od') {
               typedNext.currency = 'THB'
             }
@@ -535,7 +552,7 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
         }
       }
       if (Object.keys(errors).length > 0) {
-        setErrors(validateMasterDataForm(config, next).errors)
+        setErrors(validateMasterDataForm(config, next, paymentMethodRows).errors)
       }
       return next
     })
@@ -543,7 +560,7 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const result = validateMasterDataForm(config, form)
+    const result = validateMasterDataForm(config, form, paymentMethodRows)
     if (Object.keys(result.errors).length > 0 || !result.values) {
       setErrors(result.errors)
       return
@@ -563,13 +580,14 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
       <div className="grid max-h-[76vh] gap-4 overflow-y-auto px-5 py-5 md:grid-cols-3">
         {config.fields.filter((field) => {
           if (config.apiPath === '/api/master-data/accounts') {
-            if (!form.type && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'currency', 'odLimit'].includes(String(field.key))) {
+            const accountTypeGroup = paymentMethodGroupForFormValue(form.type, paymentMethodRows)
+            if (!form.type && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
               return false
             }
-            if (form.type === 'cash' && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
+            if (accountTypeGroup === 'cash' && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
               return false
             }
-            if (form.type === 'bank' && field.key === 'odLimit' && form.subtype !== 'od') {
+            if (accountTypeGroup === 'bank' && field.key === 'odLimit' && form.subtype !== 'od') {
               return false
             }
           }

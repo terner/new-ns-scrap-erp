@@ -113,10 +113,10 @@ export const accountsPageConfig: MasterDataPageConfig = {
   entityName: 'บัญชีเงินบริษัท',
   emptyMessage: 'ไม่พบข้อมูลบัญชีเงินบริษัท',
   fields: [
-    { key: 'type', label: 'ประเภท', type: 'select', required: true, options: [{ label: 'เงินสด', value: 'cash' }, { label: 'เงินโอน', value: 'bank' }] },
+    { key: 'type', label: 'วิธีจ่าย/รับเงิน', type: 'select', required: true, optionsApiPath: '/api/master-data/payment-methods' },
     { key: 'branchId', label: 'สาขา', type: 'select', required: true, optionsApiPath: '/api/master-data/branches', optionValueKey: 'id' },
     { key: 'name', label: 'ชื่อบัญชี', required: true },
-    { key: 'subtype', label: 'ชนิดบัญชี', type: 'select', required: true, options: [{ label: 'ออมทรัพย์', value: 'savings' }, { label: 'กระแสรายวัน', value: 'current' }, { label: 'FCD', value: 'fcd' }, { label: 'OD', value: 'od' }] },
+    { key: 'subtype', label: 'ประเภทบัญชี', type: 'select', required: true, options: [{ label: 'ออมทรัพย์', value: 'savings' }, { label: 'กระแสรายวัน', value: 'current' }, { label: 'FCD', value: 'fcd' }, { label: 'OD', value: 'od' }] },
     { key: 'bankName', label: 'ธนาคาร', type: 'select', optionsApiPath: '/api/master-data/bank-names' },
     { key: 'bankBranch', label: 'สาขาธนาคาร' },
     { key: 'accountNo', label: 'เลขที่บัญชี' },
@@ -126,8 +126,8 @@ export const accountsPageConfig: MasterDataPageConfig = {
   ],
   columns: [
     { key: 'name', label: 'ชื่อบัญชีบริษัท' },
-    { key: 'typeLabel', label: 'ประเภท' },
-    { key: 'subtypeLabel', label: 'ชนิดบัญชี' },
+    { key: 'typeLabel', label: 'วิธีจ่าย/รับเงิน' },
+    { key: 'subtypeLabel', label: 'ประเภทบัญชี' },
     { key: 'bankName', label: 'ธนาคาร' },
     { key: 'bankBranch', label: 'สาขาธนาคาร' },
     { key: 'accountNo', label: 'เลขที่บัญชี' },
@@ -380,6 +380,31 @@ export const paymentMethodsPageConfig: MasterDataPageConfig = {
   createLabel: 'เพิ่มวิธีจ่าย/รับเงิน',
   entityName: 'วิธีจ่าย/รับเงิน',
   emptyMessage: 'ไม่พบข้อมูลวิธีจ่าย/รับเงิน',
+  fields: [
+    { key: 'name', label: 'ชื่อ', required: true },
+    {
+      key: 'type',
+      label: 'กลุ่มบัญชี',
+      type: 'select',
+      required: true,
+      options: [
+        { label: 'เงินสด', value: 'cash' },
+        { label: 'ธนาคาร', value: 'bank' },
+      ],
+    },
+  ],
+  columns: [
+    { key: 'name', label: 'ชื่อ' },
+    { key: 'typeLabel', label: 'กลุ่มบัญชี' },
+    statusColumn,
+  ],
+}
+
+export const accountSubtypesPageConfig: MasterDataPageConfig = {
+  apiPath: '/api/master-data/account-subtypes',
+  createLabel: 'เพิ่มประเภทบัญชีธนาคาร',
+  entityName: 'ประเภทบัญชีธนาคาร',
+  emptyMessage: 'ไม่พบข้อมูลประเภทบัญชีธนาคาร',
   fields: [
     { key: 'name', label: 'ชื่อ', required: true },
   ],

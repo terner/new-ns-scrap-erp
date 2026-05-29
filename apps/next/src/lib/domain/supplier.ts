@@ -1,4 +1,12 @@
-import { normalizeSupplierPaymentMethod, supplierFormSchema, supplierSchema, type Supplier, type SupplierFormValues, type SupplierPaymentMethod } from '@/lib/supplier'
+import {
+  resolveSupplierPaymentMethodName,
+  supplierFormSchema,
+  supplierPaymentMethodGroup,
+  supplierSchema,
+  type Supplier,
+  type SupplierFormValues,
+  type SupplierPaymentMethodRecord,
+} from '@/lib/supplier'
 
 type PrismaSupplier = {
   id: string
@@ -52,7 +60,7 @@ type PrismaSupplier = {
 type SupplierBankAccountWriteRow = {
   id: string
   supplier_id: string
-  payment_method: SupplierPaymentMethod
+  payment_method: string
   bank_name: string | null
   account_no: string | null
   account_name: string | null
@@ -74,27 +82,37 @@ function normalizeBankName(value: string | null | undefined) {
   return normalized || null
 }
 
-function primaryBankAccount(values: SupplierFormValues) {
+function primaryBankAccount(values: SupplierFormValues, paymentMethods: SupplierPaymentMethodRecord[]) {
   const accounts = values.bankAccounts
     .map((account) => ({
       ...account,
       bankName: normalizeBankName(account.bankName),
       accountNo: normalizeAccountNo(account.accountNo),
+      paymentMethod: resolveSupplierPaymentMethodName(account.paymentMethod, paymentMethods),
+      paymentMethodGroup: supplierPaymentMethodGroup(account.paymentMethod, paymentMethods),
     }))
-    .filter((account): account is typeof account & { accountNo: string } => account.paymentMethod === 'เงินโอน' && Boolean(account.accountNo))
+    .filter((account): account is typeof account & { accountNo: string; paymentMethod: string } => account.paymentMethodGroup === 'bank' && Boolean(account.accountNo) && Boolean(account.paymentMethod))
   return accounts.find((account) => account.isPrimary) ?? accounts[0] ?? null
 }
 
-export function supplierBankAccountRows(values: SupplierFormValues, supplierId: string) {
+export function supplierBankAccountRows(
+  values: SupplierFormValues,
+  supplierId: string,
+  paymentMethods: SupplierPaymentMethodRecord[],
+) {
   const parsed = supplierFormSchema.parse(values)
   const seenAccountNos = new Set<string>()
   const rows: SupplierBankAccountWriteRow[] = []
   parsed.bankAccounts.forEach((account, index) => {
-    if (account.paymentMethod === 'เงินสด') {
+    const paymentMethod = resolveSupplierPaymentMethodName(account.paymentMethod, paymentMethods)
+    const paymentMethodGroup = supplierPaymentMethodGroup(account.paymentMethod, paymentMethods)
+    if (!paymentMethod || !paymentMethodGroup) return
+
+    if (paymentMethodGroup === 'cash') {
       rows.push({
         id: account.id || `${supplierId}-CASH-${index + 1}`,
         supplier_id: supplierId,
-        payment_method: 'เงินสด',
+        payment_method: paymentMethod,
         bank_name: null,
         account_no: null,
         account_name: null,
@@ -112,7 +130,7 @@ export function supplierBankAccountRows(values: SupplierFormValues, supplierId: 
     rows.push({
       id: account.id || `${supplierId}-${accountNo}`,
       supplier_id: supplierId,
-      payment_method: 'เงินโอน',
+      payment_method: paymentMethod,
       bank_name: normalizeBankName(account.bankName),
       account_no: accountNo,
       account_name: account.bankAccount || null,
@@ -126,7 +144,10 @@ export function supplierBankAccountRows(values: SupplierFormValues, supplierId: 
   return rows
 }
 
-export function mapPrismaSupplier(row: PrismaSupplier): Supplier {
+export function mapPrismaSupplier(
+  row: PrismaSupplier,
+  paymentMethods: SupplierPaymentMethodRecord[] = [],
+): Supplier {
   return supplierSchema.parse({
     id: row.id,
     code: row.code ?? row.id,
@@ -159,7 +180,7 @@ export function mapPrismaSupplier(row: PrismaSupplier): Supplier {
     bankAccount: row.bank_account_name,
     bankAccounts: (row.supplier_bank_accounts ?? []).map((account) => ({
       id: account.id,
-      paymentMethod: normalizeSupplierPaymentMethod(account.payment_method) ?? 'เงินสด',
+      paymentMethod: resolveSupplierPaymentMethodName(account.payment_method, paymentMethods) ?? (String(account.payment_method ?? '').trim() || 'เงินสด'),
       bankName: normalizeBankName(account.bank_name),
       accountNo: normalizeAccountNo(account.account_no),
       bankAccount: account.account_name,
@@ -215,14 +236,17 @@ function domesticAddressLine1(values: SupplierFormValues) {
   ].map((part) => part?.trim()).filter(Boolean).join(' ') || null
 }
 
-export function toSupplierWriteInput(values: SupplierFormValues) {
+export function toSupplierWriteInput(
+  values: SupplierFormValues,
+  paymentMethods: SupplierPaymentMethodRecord[],
+) {
   const parsed = supplierFormSchema.parse(values)
   const code = (parsed.code || parsed.id || '').toUpperCase()
   const personName = [parsed.nameTitle, parsed.firstName, parsed.lastName].map((part) => part?.trim()).filter(Boolean).join(' ')
   const name = parsed.type === 'บุคคล' ? personName || parsed.name : parsed.name
   const isDomestic = parsed.marketScope === 'ในประเทศ'
   const countryCode = isDomestic ? 'TH' : parsed.countryCode?.toUpperCase() ?? null
-  const primaryAccount = primaryBankAccount(parsed) ?? (normalizeAccountNo(parsed.accountNo)
+  const primaryAccount = primaryBankAccount(parsed, paymentMethods) ?? (normalizeAccountNo(parsed.accountNo)
     ? { accountNo: normalizeAccountNo(parsed.accountNo), bankName: normalizeBankName(parsed.bankName), bankAccount: parsed.bankAccount }
     : null)
 
