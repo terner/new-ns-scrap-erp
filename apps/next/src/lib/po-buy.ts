@@ -38,6 +38,12 @@ export const poBuyCancelSchema = z.object({
   note: z.string().trim().min(1, 'กรอกหมายเหตุการยกเลิก').max(500, 'หมายเหตุยาวเกินไป').regex(generalTextPattern, 'หมายเหตุมีรูปแบบไม่ถูกต้อง'),
 })
 
+export const poBuyShortCloseSchema = z.object({
+  id: z.string().trim().min(1, 'ระบุ PO Buy ที่ต้องการปิดรับไม่ครบ').max(80, 'รหัส PO Buy ยาวเกินไป').regex(safeIdPattern, 'รหัส PO Buy มีรูปแบบไม่ถูกต้อง'),
+  note: z.string().trim().min(1, 'กรอกเหตุผลการปิดรับไม่ครบ').max(500, 'เหตุผลยาวเกินไป').regex(generalTextPattern, 'เหตุผลมีรูปแบบไม่ถูกต้อง'),
+})
+
 export type PoBuyFormValues = z.infer<typeof poBuyFormSchema>
 export type PoBuyCancelValues = z.infer<typeof poBuyCancelSchema>
+export type PoBuyShortCloseValues = z.infer<typeof poBuyShortCloseSchema>
 export type PoBuyUpdateValues = z.infer<typeof poBuyUpdateSchema>

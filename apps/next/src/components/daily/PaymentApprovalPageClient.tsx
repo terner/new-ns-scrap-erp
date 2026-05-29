@@ -9,29 +9,103 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
+type SupplierBankAccountOption = {
+  accountNo: string
+  bankName: string
+  id: string
+  isPrimary: boolean
+  paymentMethod: string
+}
+
+type ApprovalApRow = {
+  bankAccount: string
+  bankAccounts: SupplierBankAccountOption[]
+  approvalId: string | null
+  approvalStatus: 'approved' | 'pending'
+  approvedAmount: number
+  bankName: string
+  date: string
+  docNo: string
+  id: string
+  paidAmount: number
+  payableBalance: number
+  supplierName: string
+  totalAmount: number
+}
+
+type ApprovalExpenseRow = {
+  accountName: string
+  approvalId: string | null
+  approvalStatus: 'approved' | 'pending'
+  approvedAmount: number
+  date: string
+  docNo: string
+  dueDate: string
+  id: string
+  payee: string
+  refDocNo: string
+  totalAmount: number
+}
+
 type ApprovalPayload = {
-  apRows: Array<{ bankAccount: string; bankName: string; date: string; docNo: string; id: string; paidAmount: number; payableBalance: number; supplierName: string; totalAmount: number }>
-  expenseRows: Array<{ accountName: string; date: string; docNo: string; dueDate: string; id: string; payee: string; refDocNo: string; totalAmount: number }>
+  apRows: ApprovalApRow[]
+  expenseRows: ApprovalExpenseRow[]
 }
 
 type ApprovalTab = 'ap' | 'expense'
+type ApprovalFilter = 'all' | 'pending' | 'approved'
 type ApprovalSortDirection = 'asc' | 'desc'
 type ApprovalSortKey = 'bankAccount' | 'date' | 'docNo' | 'dueDate' | 'paidAmount' | 'partyName' | 'payableBalance' | 'totalAmount'
+type BankSelectionState = Record<string, string>
 type SelectionState = Record<string, { payAmount: number; selected: boolean }>
 const pageSizeOptions = [10, 25, 50, 100]
+const approvalFilterOptions: Array<{ label: string; value: ApprovalFilter }> = [
+  { label: 'ทั้งหมด', value: 'all' },
+  { label: 'ยังไม่อนุมัติ', value: 'pending' },
+  { label: 'อนุมัติแล้ว', value: 'approved' },
+]
+
+function formatDecimalWithGrouping(value: number) {
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function normalizeMoneyDraft(value: string) {
+  return value.replace(/,/g, '')
+}
+
+function isValidMoneyDraft(value: string) {
+  return /^\d*(\.\d{0,2})?$/.test(value)
+}
+
+function maxPayAmount(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number]) {
+  return 'payableBalance' in row ? row.payableBalance : row.totalAmount
+}
+
+function bankAccountOptionLabel(account: SupplierBankAccountOption) {
+  const bankBits = [account.bankName, account.accountNo].filter(Boolean)
+  if (bankBits.length > 0) return bankBits.join(' / ')
+  return account.paymentMethod || 'ไม่ระบุ'
+}
+
+function fallbackBankLabel(row: ApprovalApRow) {
+  return [row.bankName, row.bankAccount].filter(Boolean).join(' / ')
+}
 
 export function PaymentApprovalPageClient() {
   const [data, setData] = useState<ApprovalPayload>({ apRows: [], expenseRows: [] })
+  const [bankSelection, setBankSelection] = useState<BankSelectionState>({})
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [inputDrafts, setInputDrafts] = useState<Record<string, string>>({})
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [approvedOnly, setApprovedOnly] = useState(false)
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>('pending')
   const [tab, setTab] = useState<ApprovalTab>('ap')
   const [selection, setSelection] = useState<SelectionState>({})
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [isSubmittingApproval, setIsSubmittingApproval] = useState(false)
   const [sortDirection, setSortDirection] = useState<ApprovalSortDirection>('desc')
   const [sortKey, setSortKey] = useState<ApprovalSortKey>('date')
 
@@ -51,26 +125,53 @@ export function PaymentApprovalPageClient() {
     void loadData()
   }, [loadData])
 
+  const availableBankAccounts = useCallback((row: ApprovalApRow) => {
+    return row.bankAccounts.filter((account) => account.accountNo || account.bankName || account.paymentMethod)
+  }, [])
+
+  const currentBankAccount = useCallback((row: ApprovalApRow) => {
+    const accounts = availableBankAccounts(row)
+    const selectedId = bankSelection[row.id]
+    if (selectedId) {
+      const selected = accounts.find((account) => account.id === selectedId)
+      if (selected) return selected
+    }
+    const matchingLegacy = accounts.find((account) => account.accountNo === row.bankAccount && account.bankName === row.bankName)
+    if (matchingLegacy) return matchingLegacy
+    const primary = accounts.find((account) => account.isPrimary)
+    return primary ?? accounts[0] ?? null
+  }, [availableBankAccounts, bankSelection])
+
+  const currentBankLabel = useCallback((row: ApprovalApRow) => {
+    const account = currentBankAccount(row)
+    return account ? bankAccountOptionLabel(account) : fallbackBankLabel(row)
+  }, [currentBankAccount])
+
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase()
     const source = tab === 'ap' ? data.apRows : data.expenseRows
     return source.filter((row) => {
       const rowDate = row.date || ''
       const selected = selection[row.id]?.selected ?? false
-      const haystack = `${row.docNo} ${'supplierName' in row ? row.supplierName : row.payee} ${'bankAccount' in row ? `${row.bankName} ${row.bankAccount}` : `${row.accountName} ${row.refDocNo}`}`.toLowerCase()
+      const bankHaystack =
+        'bankAccount' in row
+          ? `${currentBankLabel(row)} ${row.bankAccounts.map((account) => bankAccountOptionLabel(account)).join(' ')}`
+          : `${row.accountName} ${row.refDocNo}`
+      const haystack = `${row.docNo} ${'supplierName' in row ? row.supplierName : row.payee} ${bankHaystack}`.toLowerCase()
       if (query && !haystack.includes(query)) return false
       if (dateFrom && rowDate < dateFrom) return false
       if (dateTo && rowDate > dateTo) return false
-      if (approvedOnly && !selected) return false
+      if (approvalFilter === 'approved' && row.approvalStatus !== 'approved') return false
+      if (approvalFilter === 'pending' && row.approvalStatus !== 'pending') return false
       return true
     })
-  }, [data.apRows, data.expenseRows, dateFrom, dateTo, approvedOnly, search, selection, tab])
+  }, [approvalFilter, currentBankLabel, data.apRows, data.expenseRows, dateFrom, dateTo, search, selection, tab])
 
   const rows = useMemo(() => {
     const collator = new Intl.Collator('th-TH', { numeric: true, sensitivity: 'base' })
     return [...filteredRows].sort((left, right) => {
-      const leftValue = approvalSortValue(left, sortKey)
-      const rightValue = approvalSortValue(right, sortKey)
+      const leftValue = approvalSortValue(left, sortKey, currentBankLabel)
+      const rightValue = approvalSortValue(right, sortKey, currentBankLabel)
       let base = 0
       if (typeof leftValue === 'number' && typeof rightValue === 'number') {
         base = leftValue - rightValue
@@ -79,7 +180,7 @@ export function PaymentApprovalPageClient() {
       }
       return sortDirection === 'asc' ? base : -base
     })
-  }, [filteredRows, sortDirection, sortKey])
+  }, [currentBankLabel, filteredRows, sortDirection, sortKey])
 
   const totalRows = rows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
@@ -99,12 +200,12 @@ export function PaymentApprovalPageClient() {
         const totalPaid = 'payableBalance' in row ? row.paidAmount : 0
         const totalRemain = 'payableBalance' in row ? row.payableBalance : row.totalAmount
         const selectedRow = selection[row.id]
-        const selectedAmount = selectedRow?.selected ? selectedRow.payAmount : 0
+        const selectedAmount = row.approvalStatus === 'pending' && selectedRow?.selected && !payAmountError(row, selectedRow.payAmount) ? selectedRow.payAmount : 0
         totals.totalFull += totalFull
         totals.totalPaid += totalPaid
         totals.totalRemain += totalRemain
         totals.selectedTotal += selectedAmount
-        if (selectedRow?.selected) totals.selectedCount += 1
+        if (row.approvalStatus === 'pending' && selectedRow?.selected) totals.selectedCount += 1
         return totals
       },
       { selectedCount: 0, selectedTotal: 0, totalFull: 0, totalPaid: 0, totalRemain: 0 },
@@ -112,18 +213,20 @@ export function PaymentApprovalPageClient() {
   }, [filteredRows, selection])
 
   const visibleIds = useMemo(() => pageRows.map((row) => row.id), [pageRows])
-  const visibleSelectedCount = visibleIds.filter((id) => selection[id]?.selected).length
-  const allVisibleSelected = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length
+  const visibleSelectedIds = useMemo(() => pageRows.filter((row) => row.approvalStatus === 'pending').map((row) => row.id), [pageRows])
+  const visibleSelectedCount = visibleSelectedIds.filter((id) => selection[id]?.selected).length
+  const allVisibleSelected = visibleSelectedIds.length > 0 && visibleSelectedCount === visibleSelectedIds.length
 
   useEffect(() => {
     setPage(1)
-  }, [approvedOnly, dateFrom, dateTo, pageSize, search, sortDirection, sortKey, tab])
+  }, [approvalFilter, dateFrom, dateTo, pageSize, search, sortDirection, sortKey, tab])
 
   function defaultPayAmount(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number]) {
     return 'payableBalance' in row ? row.payableBalance : row.totalAmount
   }
 
   function setSelected(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number], selected: boolean) {
+    if (row.approvalStatus !== 'pending') return
     setSelection((current) => ({
       ...current,
       [row.id]: {
@@ -134,6 +237,7 @@ export function PaymentApprovalPageClient() {
   }
 
   function setPayAmount(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number], payAmount: number) {
+    if (row.approvalStatus !== 'pending') return
     setSelection((current) => ({
       ...current,
       [row.id]: {
@@ -143,10 +247,60 @@ export function PaymentApprovalPageClient() {
     }))
   }
 
+  function currentPayAmount(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number]) {
+    return selection[row.id]?.payAmount ?? defaultPayAmount(row)
+  }
+
+  function payAmountError(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number], value: number) {
+    if (!Number.isFinite(value) || value < 0) return 'ยอดที่จะจ่ายต้องมากกว่าหรือเท่ากับ 0'
+    const maxAmount = maxPayAmount(row)
+    if (value > maxAmount + 0.000001) {
+      return 'payableBalance' in row
+        ? `ยอดที่จะจ่ายต้องไม่เกินยอดคงเหลือ ${formatMoney(maxAmount)} บาท`
+        : `ยอดที่จะจ่ายต้องไม่เกินยอดรายการ ${formatMoney(maxAmount)} บาท`
+    }
+    return null
+  }
+
+  function handlePayAmountFocus(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number]) {
+    if (row.approvalStatus !== 'pending') return
+    setInputDrafts((current) => ({
+      ...current,
+      [row.id]: normalizeMoneyDraft(current[row.id] ?? formatDecimalWithGrouping(currentPayAmount(row))),
+    }))
+  }
+
+  function handlePayAmountChange(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number], value: string) {
+    if (row.approvalStatus !== 'pending') return
+    const normalized = normalizeMoneyDraft(value)
+    if (!isValidMoneyDraft(normalized)) return
+    setInputDrafts((current) => ({
+      ...current,
+      [row.id]: normalized,
+    }))
+    const parsed = Number(normalized)
+    if (Number.isFinite(parsed)) setPayAmount(row, parsed)
+  }
+
+  function handlePayAmountBlur(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number]) {
+    setInputDrafts((current) => ({
+      ...current,
+      [row.id]: formatDecimalWithGrouping(currentPayAmount(row)),
+    }))
+  }
+
+  function setBankAccount(row: ApprovalApRow, accountId: string) {
+    if (row.approvalStatus !== 'pending') return
+    setBankSelection((current) => ({
+      ...current,
+      [row.id]: accountId,
+    }))
+  }
+
   function selectAllVisible() {
     setSelection((current) => {
       const next = { ...current }
-      rows.forEach((row) => {
+      rows.filter((row) => row.approvalStatus === 'pending').forEach((row) => {
         next[row.id] = {
           payAmount: current[row.id]?.payAmount ?? defaultPayAmount(row),
           selected: true,
@@ -159,7 +313,7 @@ export function PaymentApprovalPageClient() {
   function clearVisibleSelection() {
     setSelection((current) => {
       const next = { ...current }
-      rows.forEach((row) => {
+      rows.filter((row) => row.approvalStatus === 'pending').forEach((row) => {
         if (next[row.id]) next[row.id] = { ...next[row.id], selected: false }
       })
       return next
@@ -170,7 +324,7 @@ export function PaymentApprovalPageClient() {
     setSearch('')
     setDateFrom('')
     setDateTo('')
-    setApprovedOnly(false)
+    setApprovalFilter('all')
     setSortKey('date')
     setSortDirection('desc')
   }
@@ -182,6 +336,39 @@ export function PaymentApprovalPageClient() {
     }
     setSortKey(nextKey)
     setSortDirection(nextKey === 'partyName' || nextKey === 'bankAccount' ? 'asc' : 'desc')
+  }
+
+  const selectedPendingRows = useMemo(() => {
+    return filteredRows.filter((row): row is ApprovalApRow => 'bankAccount' in row && row.approvalStatus === 'pending' && (selection[row.id]?.selected ?? false))
+  }, [filteredRows, selection])
+
+  const hasInvalidSelectedRows = selectedPendingRows.some((row) => Boolean(payAmountError(row, currentPayAmount(row))))
+  const canApproveSelected = tab === 'ap' && selectedPendingRows.length > 0 && !hasInvalidSelectedRows && !isSubmittingApproval
+
+  async function approveSelected() {
+    if (!canApproveSelected) return
+    setIsSubmittingApproval(true)
+    setError(null)
+    try {
+      await dailyFetchJson('/api/daily/payment-approval', {
+        body: JSON.stringify({
+          items: selectedPendingRows.map((row) => ({
+            approvedAmount: currentPayAmount(row),
+            bankAccountId: currentBankAccount(row)?.id ?? '',
+            sourceId: row.id,
+            sourceType: 'purchase_bill',
+          })),
+        }),
+        method: 'POST',
+      })
+      setSelection({})
+      setInputDrafts({})
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'อนุมัติโอนเงินไม่ได้')
+    } finally {
+      setIsSubmittingApproval(false)
+    }
   }
 
   return (
@@ -206,28 +393,40 @@ export function PaymentApprovalPageClient() {
           </button>
         </div>
 
-        <div className="space-y-2 border-b p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-3 py-3">
+          <div className="text-sm text-slate-600">
+            เลือก <span className="font-semibold text-slate-900">{summary.selectedCount}</span> รายการ ยอดรวม{' '}
+            <span className="font-semibold text-red-700">{formatMoney(summary.selectedTotal)} บาท</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300" disabled={!canApproveSelected} type="button" onClick={() => void approveSelected()}>{isSubmittingApproval ? 'กำลังอนุมัติ...' : 'อนุมัติที่เลือก'}</button>
+            <button className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300" disabled title="รอออกแบบเอกสาร approval sheet ก่อนเปิดใช้งาน" type="button">พิมพ์ใบอนุมัติส่ง Cashier</button>
+          </div>
+        </div>
+
+        <div className="space-y-3 border-b p-3">
           <div className="flex flex-wrap items-center gap-2">
             <Input className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลขที่ / ชื่อ / บัญชี..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <label className="text-xs text-slate-500">วันที่:</label>
             <DatePickerInput id="payment-approval-date-from" value={dateFrom} onChange={setDateFrom} />
             <span className="text-slate-400">→</span>
             <DatePickerInput id="payment-approval-date-to" value={dateTo} onChange={setDateTo} />
-            {(search || dateFrom || dateTo || approvedOnly || sortKey !== 'date' || sortDirection !== 'desc') ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
+            {(search || dateFrom || dateTo || approvalFilter !== 'all' || sortKey !== 'date' || sortDirection !== 'desc') ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1 text-xs text-slate-600">
-              <input checked={approvedOnly} className="h-4 w-4 rounded-md border-slate-300" type="checkbox" onChange={(event) => setApprovedOnly(event.target.checked)} />
-              เฉพาะอนุมัติแล้ว
-            </label>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-y border-amber-200 bg-amber-50 p-3">
-          <div className="text-sm text-amber-700">เลือก <b>{summary.selectedCount}</b> รายการ ยอดรวม <b className="text-red-600">{formatMoney(summary.selectedTotal)} บาท</b></div>
-          <div className="flex flex-wrap gap-2">
-            <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300" disabled title="รอออกแบบ approval write/audit ก่อนเปิดใช้งาน" type="button">อนุมัติที่เลือก</button>
-            <button className="rounded-md bg-slate-700 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300" disabled title="รอออกแบบเอกสาร approval sheet ก่อนเปิดใช้งาน" type="button">พิมพ์ใบอนุมัติส่ง Cashier</button>
+            {approvalFilterOptions.map((option) => {
+              const active = approvalFilter === option.value
+              return (
+                <button
+                  key={option.value}
+                  className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${active ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'}`}
+                  type="button"
+                  onClick={() => setApprovalFilter(option.value)}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -256,12 +455,12 @@ export function PaymentApprovalPageClient() {
                   <TableHead className="w-8"><input checked={allVisibleSelected} className="h-4 w-4 rounded-md border-slate-300" type="checkbox" onChange={(event) => (event.target.checked ? selectAllVisible() : clearVisibleSelection())} /></TableHead>
                   <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขที่บิล" sortKey="docNo" onSort={changeSort} />
                   <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} />
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="Supplier" sortKey="partyName" onSort={changeSort} />
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขบัญชี ธ." sortKey="bankAccount" onSort={changeSort} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ผู้ขาย" sortKey="partyName" onSort={changeSort} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="บัญชีธนาคาร" sortKey="bankAccount" onSort={changeSort} />
                   <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ยอดเต็ม" sortKey="totalAmount" onSort={changeSort} />
                   <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ชำระแล้ว" sortKey="paidAmount" onSort={changeSort} />
                   <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="คงเหลือ" sortKey="payableBalance" onSort={changeSort} />
-                  <TableHead className="text-right">ยอดที่จะจ่าย</TableHead>
+                  <TableHead className="w-36 text-right">ยอดที่จะจ่าย</TableHead>
                   <TableHead className="text-center">สถานะ</TableHead>
                 </tr>
               </TableHeader>
@@ -269,15 +468,30 @@ export function PaymentApprovalPageClient() {
                 {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
                 {!isLoading && apRows.map((row) => {
                   const selectedRow = selection[row.id]
+                  const fieldError = payAmountError(row, currentPayAmount(row))
                   return (
-                    <TableRow key={row.id} className={`hover:bg-slate-50 ${selectedRow?.selected ? 'bg-emerald-50' : ''}`}>
-                      <TableCell><input checked={selectedRow?.selected ?? false} className="h-4 w-4 rounded-md border-slate-300" type="checkbox" onChange={(event) => setSelected(row, event.target.checked)} /></TableCell>
-                      <TableCell className="font-mono text-xs">{row.docNo}</TableCell>
+                    <TableRow key={row.id} className={`border-0 hover:bg-slate-50 ${selectedRow?.selected ? 'bg-emerald-50/60' : ''}`}>
+                      <TableCell><input checked={selectedRow?.selected ?? false} className="h-4 w-4 rounded-md border-slate-300" disabled={row.approvalStatus !== 'pending'} type="checkbox" onChange={(event) => setSelected(row, event.target.checked)} /></TableCell>
+                      <TableCell className="text-xs font-medium whitespace-nowrap">{row.docNo}</TableCell>
                       <TableCell className="text-xs">{formatDateDisplay(row.date)}</TableCell>
                       <TableCell className="font-semibold">{row.supplierName}</TableCell>
                       <TableCell>
-                        {row.bankAccount ? (
-                          <span className="select-all whitespace-nowrap rounded-md bg-yellow-100 px-2 py-1 font-mono text-base font-bold text-blue-900">{[row.bankName, row.bankAccount].filter(Boolean).join(' / ')}</span>
+                        {availableBankAccounts(row).length > 0 ? (
+                          <Select
+                            aria-label={`เลือกบัญชีธนาคารของ ${row.supplierName}`}
+                            className="h-9 min-w-[240px] text-sm"
+                            disabled={row.approvalStatus !== 'pending' || availableBankAccounts(row).length <= 1}
+                            value={currentBankAccount(row)?.id ?? ''}
+                            onChange={(event) => setBankAccount(row, event.target.value)}
+                          >
+                            {availableBankAccounts(row).map((account) => (
+                              <option key={account.id} value={account.id}>
+                                {bankAccountOptionLabel(account)}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : currentBankLabel(row) ? (
+                          <div className="select-all whitespace-nowrap text-sm text-slate-700">{currentBankLabel(row)}</div>
                         ) : (
                           <span className="text-xs text-red-500">ไม่ระบุ</span>
                         )}
@@ -285,10 +499,27 @@ export function PaymentApprovalPageClient() {
                       <TableCell className="text-right">{formatMoney(row.totalAmount)}</TableCell>
                       <TableCell className="text-right text-emerald-700">{formatMoney(row.paidAmount)}</TableCell>
                       <TableCell className="text-right font-bold text-red-700">{formatMoney(row.payableBalance)}</TableCell>
-                      <TableCell className="text-right">
-                        <Input className="w-28 bg-amber-50 px-2 py-1 text-right text-xs" min={0} step="0.01" type="number" value={selectedRow?.payAmount ?? row.payableBalance} onChange={(event) => setPayAmount(row, Number(event.target.value))} />
+                      <TableCell className="w-36 text-right">
+                        <div className="ml-auto w-28">
+                          <Input
+                            className={`bg-amber-50 px-2 py-1 text-right text-xs ${fieldError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            disabled={row.approvalStatus !== 'pending'}
+                            inputMode="decimal"
+                            type="text"
+                            value={inputDrafts[row.id] ?? formatDecimalWithGrouping(currentPayAmount(row))}
+                            onBlur={() => handlePayAmountBlur(row)}
+                            onChange={(event) => handlePayAmountChange(row, event.target.value)}
+                            onFocus={() => handlePayAmountFocus(row)}
+                          />
+                          {fieldError ? <div className="mt-1 text-right text-[11px] text-red-600">{fieldError}</div> : null}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-center text-xs">{selectedRow?.selected ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">เลือกแล้ว</span> : <span className="text-slate-300">-</span>}</TableCell>
+                      <TableCell className="text-center text-xs">
+                        <span className={`inline-flex items-center gap-1 ${row.approvalStatus === 'approved' ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          <span className={`h-2 w-2 rounded-full ${row.approvalStatus === 'approved' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          {row.approvalStatus === 'approved' ? 'อนุมัติแล้ว' : 'ยังไม่อนุมัติ'}
+                        </span>
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -303,10 +534,10 @@ export function PaymentApprovalPageClient() {
                   <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขที่/วันที่" sortKey="docNo" onSort={changeSort} />
                   <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ครบกำหนด" sortKey="dueDate" onSort={changeSort} />
                   <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ผู้รับเงิน" sortKey="partyName" onSort={changeSort} />
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขบัญชี / ธนาคาร" sortKey="bankAccount" onSort={changeSort} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="บัญชี / ธนาคาร" sortKey="bankAccount" onSort={changeSort} />
                   <TableHead>รายละเอียด / อ้างอิง</TableHead>
                   <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ยอดเต็ม" sortKey="totalAmount" onSort={changeSort} />
-                  <TableHead className="text-right">ยอดที่จะจ่าย</TableHead>
+                  <TableHead className="w-36 text-right">ยอดที่จะจ่าย</TableHead>
                   <TableHead className="text-center">สถานะ</TableHead>
                 </tr>
               </TableHeader>
@@ -315,19 +546,37 @@ export function PaymentApprovalPageClient() {
                 {!isLoading && expenseRows.map((row) => {
                   const selectedRow = selection[row.id]
                   const overdue = row.dueDate ? row.dueDate < new Date().toISOString().slice(0, 10) : false
+                  const fieldError = payAmountError(row, currentPayAmount(row))
                   return (
-                    <TableRow key={row.id} className={`hover:bg-slate-50 ${selectedRow?.selected ? 'bg-emerald-50' : ''}`}>
-                      <TableCell><input checked={selectedRow?.selected ?? false} className="h-4 w-4 rounded-md border-slate-300" type="checkbox" onChange={(event) => setSelected(row, event.target.checked)} /></TableCell>
-                      <TableCell className="text-xs"><div className="font-mono font-bold">{row.docNo}</div><div className="text-slate-500">{formatDateDisplay(row.date)}</div></TableCell>
+                    <TableRow key={row.id} className={`border-0 hover:bg-slate-50 ${selectedRow?.selected ? 'bg-emerald-50/60' : ''}`}>
+                      <TableCell><input checked={selectedRow?.selected ?? false} className="h-4 w-4 rounded-md border-slate-300" disabled={row.approvalStatus !== 'pending'} type="checkbox" onChange={(event) => setSelected(row, event.target.checked)} /></TableCell>
+                      <TableCell className="text-xs"><div className="font-medium whitespace-nowrap">{row.docNo}</div><div className="text-slate-500">{formatDateDisplay(row.date)}</div></TableCell>
                       <TableCell className="text-xs">{row.dueDate ? <span className={overdue ? 'font-bold text-red-600' : 'text-slate-700'}>{formatDateDisplay(row.dueDate)}{overdue ? <span className="block text-[10px] text-red-500">เลยกำหนด</span> : null}</span> : <span className="text-slate-300">-</span>}</TableCell>
                       <TableCell className="font-semibold">{row.payee}</TableCell>
-                      <TableCell>{row.accountName ? <span className="whitespace-nowrap rounded-md bg-yellow-100 px-2 py-1 text-xs font-semibold text-blue-900">{row.accountName}</span> : <span className="text-xs text-amber-600">ไม่มี - แก้ที่บิลหรือ Master</span>}</TableCell>
-                      <TableCell className="text-xs">{row.refDocNo ? <div className="font-mono text-slate-700">{row.refDocNo}</div> : <span className="text-slate-300">-</span>}</TableCell>
+                      <TableCell>{row.accountName ? <span className="whitespace-nowrap text-sm text-slate-700">{row.accountName}</span> : <span className="text-xs text-amber-600">ไม่มี - แก้ที่บิลหรือ Master</span>}</TableCell>
+                      <TableCell className="text-xs">{row.refDocNo ? <div className="text-slate-700">{row.refDocNo}</div> : <span className="text-slate-300">-</span>}</TableCell>
                       <TableCell className="text-right font-bold text-red-700">{formatMoney(row.totalAmount)}</TableCell>
-                      <TableCell className="text-right">
-                        <Input className="w-28 bg-amber-50 px-2 py-1 text-right text-xs font-bold" min={0} step="0.01" type="number" value={selectedRow?.payAmount ?? row.totalAmount} onChange={(event) => setPayAmount(row, Number(event.target.value))} />
+                      <TableCell className="w-36 text-right">
+                        <div className="ml-auto w-28">
+                          <Input
+                            className={`bg-amber-50 px-2 py-1 text-right text-xs font-bold ${fieldError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            disabled={row.approvalStatus !== 'pending'}
+                            inputMode="decimal"
+                            type="text"
+                            value={inputDrafts[row.id] ?? formatDecimalWithGrouping(currentPayAmount(row))}
+                            onBlur={() => handlePayAmountBlur(row)}
+                            onChange={(event) => handlePayAmountChange(row, event.target.value)}
+                            onFocus={() => handlePayAmountFocus(row)}
+                          />
+                          {fieldError ? <div className="mt-1 text-right text-[11px] text-red-600">{fieldError}</div> : null}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-center text-xs">{selectedRow?.selected ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">เลือกแล้ว</span> : <span className="text-slate-300">-</span>}</TableCell>
+                      <TableCell className="text-center text-xs">
+                        <span className={`inline-flex items-center gap-1 ${row.approvalStatus === 'approved' ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          <span className={`h-2 w-2 rounded-full ${row.approvalStatus === 'approved' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          {row.approvalStatus === 'approved' ? 'อนุมัติแล้ว' : 'ยังไม่อนุมัติ'}
+                        </span>
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -341,7 +590,11 @@ export function PaymentApprovalPageClient() {
   )
 }
 
-function approvalSortValue(row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number], sortKey: ApprovalSortKey) {
+function approvalSortValue(
+  row: ApprovalPayload['apRows'][number] | ApprovalPayload['expenseRows'][number],
+  sortKey: ApprovalSortKey,
+  currentBankLabel: (row: ApprovalApRow) => string,
+) {
   switch (sortKey) {
     case 'docNo':
       return row.docNo ?? ''
@@ -350,7 +603,7 @@ function approvalSortValue(row: ApprovalPayload['apRows'][number] | ApprovalPayl
     case 'partyName':
       return 'supplierName' in row ? row.supplierName ?? '' : row.payee ?? ''
     case 'bankAccount':
-      return 'bankAccount' in row ? `${row.bankName ?? ''} ${row.bankAccount ?? ''}`.trim() : row.accountName ?? ''
+      return 'bankAccount' in row ? currentBankLabel(row) : row.accountName ?? ''
     case 'totalAmount':
       return row.totalAmount ?? 0
     case 'paidAmount':

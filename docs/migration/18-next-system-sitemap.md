@@ -82,6 +82,7 @@ Status terms:
 |---|---|---|---|---|---|
 | `/purchase/bills` | บิลรับซื้อ | partial write | `GET/POST/PATCH /api/purchase/bills` | `purchase_bills`, `suppliers`, `products`, `stock_ledger` | `finance.cash.view` |
 | `/purchase/bills/[id]` | Purchase bill detail/edit | partial write | `PATCH /api/purchase/bills` | `purchase_bills`, `stock_ledger` | `finance.cash.view` |
+| `/purchase/advance-payments` | จ่ายเงินล่วงหน้า / มัดจำ | partial write baseline | `GET/POST /api/purchase/advance-payments` | `supplier_advance_payments`, `supplier_advance_allocations`, `suppliers`, `branches`, `accounts` | `finance.cash.view` |
 | `/sales/bills` | บิลขาย | read baseline | `GET /api/sales/bills` | `sales_bills`, `customers` | `finance.cash.view` |
 | `/sales/stock-issue` | เบิกออกรอบิล | read baseline | `GET /api/sales/stock-issue` | `stock_issues` | `finance.cash.view` |
 | `/daily/payment-approval` | อนุมัติโอนเงิน | read baseline | `GET /api/daily/payment-approval` | payments/approval source TBD | `finance.cash.view` |

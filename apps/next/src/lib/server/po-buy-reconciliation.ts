@@ -1,0 +1,223 @@
+import { randomUUID } from 'node:crypto'
+import { Prisma } from '../../../generated/prisma/client'
+import { toNumber } from '@/lib/server/daily'
+
+export const PO_BUY_STATUS = {
+  CANCELLED: 'Cancelled',
+  OPEN: 'Open',
+  PARTIAL: 'Partially Received',
+  RECEIVED: 'Received',
+  SHORT_CLOSED: 'Short Closed',
+} as const
+
+type DbClient = Prisma.TransactionClient
+
+type PoBuyRow = Awaited<ReturnType<DbClient['po_buys']['findMany']>>[number]
+
+type DraftPoItem = {
+  productId: string
+  productName: string
+  qty: number
+  raw: Record<string, unknown>
+  unitPrice: number
+}
+
+const EPSILON = 0.0001
+
+function jsonNumber(value: unknown) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(/,/g, ''))
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return toNumber(value as { toNumber: () => number } | null | undefined)
+}
+
+function normalizePoItems(row: PoBuyRow) {
+  if (Array.isArray(row.items) && row.items.length > 0) {
+    const jsonItems = (row.items as unknown[]).filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+    return jsonItems.map((item) => ({
+        productId: typeof item.productId === 'string' ? item.productId : row.product_id ?? '',
+        productName: typeof item.productName === 'string' ? item.productName : row.product_id ?? '',
+        qty: jsonNumber(item.qty),
+        raw: item,
+        unitPrice: jsonNumber(item.unitPrice ?? row.unit_price),
+      }))
+  }
+
+  return [{
+    productId: row.product_id ?? '',
+    productName: row.product_id ?? '',
+    qty: jsonNumber(row.qty),
+    raw: {
+      productId: row.product_id ?? '',
+      productName: row.product_id ?? '',
+      qty: jsonNumber(row.qty),
+      unitPrice: jsonNumber(row.unit_price),
+    },
+    unitPrice: jsonNumber(row.unit_price),
+  }]
+}
+
+function remainingItemsAfterAllocation(items: DraftPoItem[], allocatedQtyByProduct: Map<string, number>, forceZeroRemaining: boolean) {
+  const allocationLeft = new Map(allocatedQtyByProduct)
+  return items.map((item) => {
+    const allocatedForProduct = Math.max(0, allocationLeft.get(item.productId) ?? 0)
+    const consumedOnThisLine = forceZeroRemaining ? item.qty : Math.min(item.qty, allocatedForProduct)
+    const remainingQty = forceZeroRemaining ? 0 : Math.max(0, item.qty - consumedOnThisLine)
+    allocationLeft.set(item.productId, Math.max(0, allocatedForProduct - consumedOnThisLine))
+
+    return {
+      ...item.raw,
+      productId: item.productId,
+      productName: item.productName,
+      qty: item.qty,
+      remainingQty,
+      totalCost: item.qty * item.unitPrice,
+      unitPrice: item.unitPrice,
+    }
+  })
+}
+
+function nextPoStatus(params: {
+  cancelledAt: Date | null
+  hasShortClose: boolean
+  remainingQty: number
+  totalQty: number
+}) {
+  if (params.cancelledAt) return PO_BUY_STATUS.CANCELLED
+  if (params.hasShortClose) return PO_BUY_STATUS.SHORT_CLOSED
+  if (params.remainingQty <= EPSILON) return PO_BUY_STATUS.RECEIVED
+  if (params.remainingQty >= Math.max(0, params.totalQty - EPSILON)) return PO_BUY_STATUS.OPEN
+  return PO_BUY_STATUS.PARTIAL
+}
+
+async function insertStatusLogs(
+  tx: DbClient,
+  entries: Array<{
+    createdBy?: string | null
+    meta?: Prisma.InputJsonValue
+    note?: string | null
+    poBuyId: string
+    status: string
+  }>,
+) {
+  if (entries.length === 0) return
+  await tx.po_buy_status_logs.createMany({
+    data: entries.map((entry) => ({
+      ...(entry.meta !== undefined ? { meta: entry.meta } : {}),
+      created_at: new Date(),
+      created_by: entry.createdBy ?? null,
+      id: `POL-${randomUUID()}`,
+      note: entry.note ?? null,
+      po_buy_id: entry.poBuyId,
+      status: entry.status,
+    })),
+  })
+}
+
+export async function createInitialPoBuyStatusLog(tx: DbClient, params: { actor?: string | null; poBuyId: string }) {
+  await insertStatusLogs(tx, [{
+    createdBy: params.actor ?? null,
+    meta: { reason: 'create' },
+    poBuyId: params.poBuyId,
+    status: PO_BUY_STATUS.OPEN,
+  }])
+}
+
+export async function reconcilePoBuys(
+  tx: DbClient,
+  poBuyIds: string[],
+  options?: {
+    actor?: string | null
+    statusMetaByPoId?: Map<string, Prisma.InputJsonValue>
+    statusNoteByPoId?: Map<string, string>
+  },
+) {
+  const uniquePoIds = [...new Set(poBuyIds.filter(Boolean))]
+  if (uniquePoIds.length === 0) return
+
+  const [poRows, allocations] = await Promise.all([
+    tx.po_buys.findMany({ where: { id: { in: uniquePoIds } } }),
+    tx.purchase_bill_po_allocations.findMany({
+      include: {
+        purchase_bill_items: { select: { product_id: true } },
+        purchase_bills: { select: { status: true } },
+      },
+      where: { po_buy_id: { in: uniquePoIds } },
+    }),
+  ])
+
+  const activeAllocations = allocations.filter((allocation) => String(allocation.purchase_bills.status ?? '').toLowerCase() !== 'cancelled')
+  const allocationsByPo = new Map<string, { amount: number; qtyByProduct: Map<string, number> }>()
+  activeAllocations.forEach((allocation) => {
+    const current = allocationsByPo.get(allocation.po_buy_id) ?? { amount: 0, qtyByProduct: new Map<string, number>() }
+    const productId = allocation.purchase_bill_items.product_id ?? ''
+    current.amount += toNumber(allocation.allocated_amount)
+    current.qtyByProduct.set(productId, (current.qtyByProduct.get(productId) ?? 0) + toNumber(allocation.allocated_qty))
+    allocationsByPo.set(allocation.po_buy_id, current)
+  })
+
+  const logEntries: Array<{
+    createdBy?: string | null
+    meta?: Prisma.InputJsonValue
+    note?: string | null
+    poBuyId: string
+    status: string
+  }> = []
+
+  for (const row of poRows) {
+    if ((row.status ?? '') === PO_BUY_STATUS.CANCELLED) continue
+
+    const normalizedItems = normalizePoItems(row)
+    const totalQty = normalizedItems.reduce((sum, item) => sum + item.qty, 0)
+    const totalAmount = normalizedItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0)
+    const allocated = allocationsByPo.get(row.id) ?? { amount: 0, qtyByProduct: new Map<string, number>() }
+    const hasShortClose = Boolean(row.short_closed_at) && (toNumber(row.short_closed_qty) > EPSILON || toNumber(row.short_closed_amount) > EPSILON)
+    const nextItems = remainingItemsAfterAllocation(normalizedItems, allocated.qtyByProduct, hasShortClose)
+    const remainingQty = hasShortClose ? 0 : nextItems.reduce((sum: number, item) => sum + jsonNumber(item.remainingQty), 0)
+    const remainingAmount = hasShortClose ? 0 : nextItems.reduce((sum: number, item) => sum + jsonNumber(item.remainingQty) * jsonNumber(item.unitPrice), 0)
+    const nextStatus = nextPoStatus({
+      cancelledAt: row.cancelled_at ?? null,
+      hasShortClose,
+      remainingQty,
+      totalQty,
+    })
+    const currentStatus = row.status ?? PO_BUY_STATUS.OPEN
+
+    await tx.po_buys.update({
+      data: {
+        cut_amount: Math.max(0, totalAmount - remainingAmount),
+        items: nextItems,
+        qty: totalQty,
+        remaining_amount: remainingAmount,
+        remaining_qty: remainingQty,
+        status: nextStatus,
+        total_amount: totalAmount,
+        updated_at: new Date(),
+        updated_by: options?.actor ?? row.updated_by ?? row.created_by ?? null,
+        version: { increment: 1 },
+      },
+      where: { id: row.id },
+    })
+
+    if (currentStatus !== nextStatus) {
+      logEntries.push({
+        createdBy: options?.actor ?? row.updated_by ?? row.created_by ?? null,
+        meta: options?.statusMetaByPoId?.get(row.id) ?? {
+          allocatedAmount: allocated.amount,
+          hasShortClose,
+          remainingAmount,
+          remainingQty,
+          totalAmount,
+          totalQty,
+        },
+        note: options?.statusNoteByPoId?.get(row.id) ?? (hasShortClose ? row.short_closed_note : null),
+        poBuyId: row.id,
+        status: nextStatus,
+      })
+    }
+  }
+
+  await insertStatusLogs(tx, logEntries)
+}

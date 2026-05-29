@@ -26,6 +26,77 @@
 - form controls (`button`, `input`, `select`, `textarea`) ต้องใช้ baseline เดียวกับ body
 - print/preview templates ของ active app ต้องใช้ `Noto Sans Thai` เช่นกัน เว้นแต่มีเอกสาร legacy override ที่อนุมัติไว้ชัดเจน
 
+## Sizing Tokens
+
+อ้างอิง baseline จาก:
+- `/purchase/bills`
+- `apps/next/src/components/daily/TransactionBillsPageClient.tsx`
+
+ให้ใช้ค่าพวกนี้เป็น default ก่อนเสมอ ถ้าหน้าใหม่ไม่มีเหตุผลชัดเจนพอที่จะ override
+
+### Filter Row
+
+- filter shell wrapper: `rounded-md bg-white p-3 shadow`
+- filter row gap: `gap-2`
+- search field:
+  - min width: `min-w-[260px]`
+  - height target: `h-9`
+- date range controls:
+  - height target: `h-9`
+  - ใช้คู่ `from -> to` ในแถวเดียวกัน
+- clear filter button:
+  - height target: `h-9`
+  - ใช้ขนาด visual เดียวกับ control row อื่น
+- page action button ใน filter row เช่น `+ สร้างรายการ`, `ส่งออก Excel`:
+  - height target: `h-9`
+
+### Segmented Filter
+
+- label เช่น `ประเภท:` / `สถานะ:` ใช้ `text-xs text-slate-500`
+- segmented button baseline:
+  - `rounded-md border px-3 py-1 text-xs font-medium`
+- active:
+  - `border-slate-700 bg-slate-700 text-white`
+- inactive:
+  - `border-slate-300 bg-white hover:bg-slate-50`
+- segmented filter row gap: `gap-2`
+
+### Pagination Row
+
+- pagination summary row: `flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600`
+- page size selector:
+  - explicit class baseline: `h-9 w-auto px-2 py-1`
+- pagination buttons `ก่อนหน้า` / `ถัดไป`:
+  - rendered height must equal page size selector height
+  - baseline target: `h-9`
+- page indicator:
+  - use `หน้า X / Y`
+  - horizontal padding baseline: `px-1`
+
+### Table
+
+- table container: `overflow-x-auto rounded-md bg-white shadow`
+- table text size baseline: `text-sm`
+- table header background: `bg-slate-100`
+- header cell padding baseline: `p-2`
+- body cell padding baseline: `p-2`
+- empty/loading state cell padding baseline: `p-8`
+
+### KPI / Summary Cards Above Table
+
+- grid baseline: `grid-cols-1 gap-3 md:grid-cols-4`
+- card baseline: `rounded-md bg-white p-3 shadow`
+- label: `text-xs`
+- main value: `text-lg font-bold`
+
+### Form Surface
+
+- form container baseline: `rounded-md bg-white p-4 shadow`
+- side summary panel baseline: `rounded-md border border-slate-200 bg-slate-50 p-4`
+- form grid gap baseline: `gap-3`
+- section spacing baseline: `space-y-4`
+- field label baseline: `mb-1 text-xs font-medium text-slate-600`
+
 ## List Page Pattern
 
 ใช้กับหน้ากลุ่ม transaction และ report list เป็นหลัก
@@ -62,6 +133,28 @@ Rules:
 - clear filter แสดงเมื่อมี active filter เท่านั้น
 - ถ้า filter อยู่ในบริบทเดียวกัน ให้รวมอยู่ card/block เดียว
 - หลีกเลี่ยง dropdown ที่ไม่จำเป็น ถ้า segmented control ชัดกว่า
+
+### Status Segmented Filter
+
+filter `สถานะ` ของ list page ต้องใช้ segmented filter เป็น baseline กลางของระบบ ไม่ใช้ `select` dropdown หรือปุ่ม custom หลายหน้าแบบคนละ style เว้นแต่มี page-specific override ที่บันทึกไว้ชัดเจน
+
+reference baseline:
+- `/purchase/bills`
+
+rules:
+- วาง label `สถานะ:` นำหน้าชุด segmented filter
+- ใช้ปุ่ม segmented style เดียวกันทุกหน้า:
+  - active: `border-slate-700 bg-slate-700 text-white`
+  - inactive: `border-slate-300 bg-white hover:bg-slate-50`
+  - shape/spacing baseline: `rounded-md border px-3 py-1 text-xs font-medium`
+- ถ้ามีตัวเลือก `ทั้งหมด` หรือ `ทุกสถานะ` ให้เป็น segment แรกเสมอ
+- สำหรับ transaction list และ approval queue ให้ถือ `multi-select segmented filter` เป็น default กลางของ status filter
+- behavior ของ multi-select:
+  - กดแต่ละสถานะเพื่อ toggle เข้า/ออกจากชุด filter
+  - `ทั้งหมด` / `ทุกสถานะ` ทำหน้าที่ reset กลับเป็นไม่เลือกสถานะเฉพาะใด ๆ
+  - ใช้ interaction pattern เดียวกับ `/purchase/bills`
+- ถ้าหน้านั้นมีเหตุผลชัดเจนว่าต้องเลือกได้ทีละ 1 สถานะเท่านั้น ค่อยใช้ single-select segmented filter และต้องมีเหตุผลจาก flow/page behavior รองรับ
+- ห้ามใช้สีคนละชุดหรือขนาดคนละ scale สำหรับ status segmented filter โดยไม่มีเหตุผลจาก legacy/design note
 
 ## Table Pattern
 
@@ -126,6 +219,18 @@ Rules:
 - ใช้คำว่า `หน้า X / Y` สำหรับ pagination state
 - transaction/large data ให้ใช้ server-side pagination/filter/sort เป็น default
 - small/medium master data สามารถใช้ frontend pagination หลัง load ครั้งเดียวได้
+
+### Pagination Control Sizing
+
+reference baseline:
+- `/purchase/bills`
+
+rules:
+- ปุ่ม `ก่อนหน้า` และ `ถัดไป` ต้องสูงเท่ากับ dropdown `X / หน้า`
+- baseline ของ page size selector คือ `h-9`
+- ดังนั้นปุ่ม pagination ในแถวเดียวกันต้องใช้ขนาดที่ render ออกมาเท่ากันกับ selector ไม่ดูเตี้ยหรือสูงกว่า
+- ให้ตรวจความสูงจริงใน browser ไม่อิงแค่ชื่อ `size` ของ component เพราะบางปุ่มอาจมี padding/line-height ต่างกัน
+- ถ้าหน้าใดมี pagination row แบบเดียวกัน ต้องยึดสัดส่วนเดียวกับ `/purchase/bills` เป็นค่า default
 
 ## Column Rules
 
@@ -192,11 +297,120 @@ baseline ปุ่ม export สำหรับ transaction list:
 ## Form Pattern
 
 - label ชัด, ไม่ใช้คำย่อที่กำกวม
-- field บังคับใช้ `*`
+- field บังคับใช้ `*` เสมอ
+- `*` ของ field บังคับต้องเป็น `สีแดง` และแยกจากข้อความ label ให้มองออกทันทีว่าเป็น required field
+- ห้าม render `*` เป็นสีเดียวกับ label ปกติ
 - read-only field ต้องดูออกว่าแก้ไม่ได้
 - branch dropdown แสดงชื่อ branch only เว้นแต่หน้า branch master/document numbering
 - account/bank field ต้องแสดงข้อมูลตาม pattern ที่ผู้ใช้คุ้นเคย
 - ใช้ section grouping เฉพาะเมื่อช่วยให้ form อ่านง่ายขึ้นจริง
+
+### List / Form Navigation Pattern
+
+ใช้กับหน้าที่มี `หน้าหลักรายการ` และมี `หน้าเพิ่ม/สร้าง/แก้ไข` อยู่ใน route เดียวกันหรือเป็น flow ต่อเนื่องกัน
+
+Rules:
+- ถ้า user อยู่ในหน้า `create`, `edit`, หรือ `detail-form` ที่มาจากหน้ารายการ:
+  - ต้องมีปุ่ม `กลับไปหน้ารายการ` อยู่ `มุมบนซ้ายเสมอ`
+  - ตำแหน่งคือ `ใต้ breadcrumb` และ `เหนือ card/form surface`
+  - ห้ามวางปุ่มกลับไว้ใน card header เป็น default
+- icon ของปุ่มกลับให้ใช้ `ลูกศรย้อนกลับ` ไม่ใช้ `X`
+- ปุ่มนี้มีหน้าที่เป็น navigation back to list ไม่ใช่ close modal:
+  - label กลางคือ `กลับไปหน้ารายการ`
+  - ใช้ `outline button`
+- ปุ่ม `ปิด` หรือ `ยกเลิก` ภายใน form card ยังมีได้ แต่ถือเป็น action ของ form surface ไม่ใช่ตัวแทนปุ่มกลับหลัก
+- ถ้าหน้านั้นไม่มี list ต้นทางจริง หรือเป็น modal flow ให้ถือเป็น page-specific override
+
+### Select Field Pattern
+
+ใช้กับ `select` และ `required select` ใน form
+
+Rules:
+- ถ้า field เป็น required และยังไม่มีค่าที่เลือก:
+  - placeholder เช่น `เลือกสาขา`, `เลือกบัญชี`, `เลือกวิธีจ่าย` แสดงได้
+  - แต่ placeholder ต้องเป็น `disabled option`
+  - placeholder ต้องไม่เป็นค่าที่ผู้ใช้เลือก submit ได้
+  - ตัว control ตอนอยู่ที่ placeholder ใช้โทนสีอ่อน เช่น `text-slate-400`
+- required select ให้เริ่มต้นที่ placeholder ก่อนเป็น default กลาง และให้ user กดเลือกค่าจริงเอง
+- เมื่อเลือกค่าแล้ว ตัว text กลับเป็นสีปกติของ form control
+- optional select ใช้ empty option ได้เมื่อ flow ต้องการค่า `ไม่ระบุ` หรือ `ทั้งหมด`
+- ถ้า select เป็น branch field:
+  - แสดง `ชื่อสาขา` อย่างเดียวเป็น default
+  - ไม่แสดง `code · name` เว้นแต่เป็นหน้า document numbering / branch master
+- ถ้าหน้าใดต้อง preselect ค่าให้ผู้ใช้ทันที ถือเป็น page-specific override และต้องมีเหตุผลจาก flow บันทึกไว้ชัดเจน
+
+### Product Field Pattern
+
+ใช้กับ field `ชื่อสินค้า`, `สินค้า`, `product`, และ field ที่ผู้ใช้ต้องเลือกสินค้าจาก master data
+
+Rules:
+- ให้ใช้ `searchable combobox` เป็น default กลาง ไม่ใช้ plain `select` เมื่อ user ต้องค้นหาสินค้าจากรายการ master
+- ช่องต้องเปิดมาว่างก่อน แล้วให้ผู้ใช้พิมพ์ค้นหาหรือเลือกเอง เว้นแต่ flow นั้นมีเหตุผลชัดเจนว่าต้อง prefill
+- placeholder กลางคือ `พิมพ์รหัส/ชื่อสินค้า...`
+- source of truth ต้องมาจาก master `สินค้า`
+- label ที่แสดงในรายการใช้ pattern `CODE - NAME` เมื่อมีรหัสสินค้า และใช้ `NAME` อย่างเดียวเมื่อไม่มีรหัส
+- search text ต้องค้นได้อย่างน้อยจาก:
+  - รหัสสินค้า
+  - ชื่อสินค้า
+- ถ้าหน้าใดมี product option น้อยมากและมีเหตุผลเรื่อง workflow จนไม่ต้องค้นหา ค่อยใช้ plain `select` เป็น page-specific override
+
+### Remark / Note Field Pattern
+
+ใช้กับ field `หมายเหตุ`, `เหตุผล`, `รายละเอียดเพิ่มเติม`, `note`, `remark`
+
+Rules:
+- ใช้ `textarea` เป็น default กลางเสมอ ไม่ใช้ single-line input
+- ค่าเริ่มต้นเป็นความสูงที่พิมพ์ได้จริงอย่างน้อย 2 บรรทัด
+- ถ้าหน้านั้นเป็น note สั้นมากก็ยังคงใช้ `textarea` เว้นแต่มีเหตุผลเฉพาะจาก flow
+- placeholder หรือ helper text ควรบอกบริบทของสิ่งที่ต้องการให้กรอก ไม่ใช้ข้อความกว้างเกินไป
+
+### Money Input Pattern
+
+ใช้กับช่องกรอก `จำนวนเงิน`, `ยอดจ่าย`, `ยอดรับ`, `ราคา`, `ต้นทุน`, `VAT`, `WHT`, และ field เงิน/มูลค่าที่แก้ไขได้
+
+Rules:
+- ใช้ `type="text"` ร่วมกับ `inputMode="decimal"` เป็น baseline ถ้าหน้านั้นต้องการ format ตอน blur
+- ต้องกัน input ที่ไม่ใช่ตัวเลขเองใน component/page layer:
+  - อนุญาตเฉพาะตัวเลข `0-9`
+  - อนุญาต `.` ได้ 1 ตัว
+  - จำกัดทศนิยมไม่เกิน 2 ตำแหน่ง เว้นแต่ business rule ของ field นั้นระบุอย่างอื่น
+- ตอน `focus`:
+  - แสดงค่าแบบ draft ที่แก้ไขง่าย
+  - ไม่ต้องใส่ comma คั่นหลักพัน
+- ตอน `blur`:
+  - format เป็นเลขคั่นหลักพัน
+  - บังคับแสดง `2 ตำแหน่ง` สำหรับ field เงินทั่วไป เช่น `1,234.00`
+- ถ้าฟิลด์นั้นต้องห้ามกรอกตัวอักษรและไม่ต้องการ comma หลัง blur สามารถใช้ `type="number"` ได้เป็น page-specific exception
+- ถ้าใช้ `type="number"`:
+  - ซ่อน spinner controls เป็น default
+  - ระบุ `step` ให้ชัด เช่น `0.01`
+- ช่องเงินต้องชิดขวาเสมอ
+- summary/read-only amount field ใช้ `formatMoney(...)` หรือ formatter กลางเดียวกันทั้งหน้า
+
+### Field Input Decision Matrix
+
+ใช้ matrix นี้เป็นตัวตัดสินกลางก่อนเลือกว่าจะทำ field เป็น `text`, `number`, หรือ `money pattern`
+
+| ประเภทข้อมูล | default input pattern | ใช้เมื่อ | หมายเหตุ |
+| --- | --- | --- | --- |
+| ยอดเงิน / ราคา / มูลค่า / VAT / WHT / ยอดจ่าย / ยอดรับ | `money input pattern` | field นั้นเป็นจำนวนเงินหรือราคาที่ผู้ใช้คาดว่าจะเห็น comma และทศนิยมแบบการเงิน | baseline กลางของระบบ |
+| จำนวน / น้ำหนัก / qty / volume / percent ที่ไม่ต้อง format เป็นเงิน | `number exception` | field เป็นค่าตัวเลขเชิงปริมาณ และไม่ต้องแสดง comma + 2 ตำแหน่งตอน blur แบบเงิน | ต้องซ่อน spinner และระบุ `step` |
+| รหัสเอกสาร / เลขที่อ้างอิง / ทะเบียน / เลข PO / เลขใบชั่ง | `text` | แม้จะมีตัวเลข แต่ความหมายคือ identifier ไม่ใช่ quantity/value | ห้ามใช้ `type="number"` |
+| ชื่อ / หมายเหตุ / คำอธิบาย / ข้อความธุรกิจทั่วไป | `text` | ข้อมูลเป็นข้อความที่ผู้ใช้ต้องพิมพ์หรือแก้ไขโดยตรง | ใช้ validation ตาม business/domain |
+| เบอร์โทร / เลขภาษี / เลขบัญชี / เลขที่มีศูนย์นำหน้า | `text` | เป็นเลขเชิงรหัสหรือเลขระบุตัวตน ไม่ใช่ค่าคำนวณ | ห้ามใช้ `type="number"` เพราะจะทำให้รูปแบบเพี้ยน |
+
+Decision rules:
+- ถ้า field มีความหมายเป็น “มูลค่าเงิน” ให้เลือก `money input pattern` ก่อนเสมอ
+- ถ้า field มีความหมายเป็น “ปริมาณ” หรือ “น้ำหนัก” ให้ใช้ `number exception` ได้
+- ถ้า field นั้นแม้จะมีแต่ตัวเลข แต่ไม่ใช่ค่าคำนวณ ให้ใช้ `text`
+- ถ้า page ใดจะ override matrix นี้ ต้องบันทึกเหตุผลไว้ใน `docs/migration/00-current-work.md`
+
+ตัวอย่างที่ใช้บ่อย:
+- `ยอดมัดจำ` -> `money input pattern`
+- `ราคา/กก.` -> `money input pattern`
+- `น้ำหนักเข้า`, `น้ำหนักออก`, `น้ำหนักสุทธิ` -> `number exception`
+- `เลขที่ใบชั่งใหญ่` -> `text`
+- `ทะเบียนรถ` -> `text`
 
 ## Status and Badge Rules
 

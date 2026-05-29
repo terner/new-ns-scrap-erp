@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import * as XLSX from 'xlsx'
-import { poBuyCancelSchema, poBuyFormSchema, poBuyUpdateSchema, type PoBuyFormValues } from '@/lib/po-buy'
+import { poBuyCancelSchema, poBuyFormSchema, poBuyShortCloseSchema, poBuyUpdateSchema, type PoBuyFormValues } from '@/lib/po-buy'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { createInitialPoBuyStatusLog, PO_BUY_STATUS, reconcilePoBuys } from '@/lib/server/po-buy-reconciliation'
 import { prisma } from '@/lib/server/prisma'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Prisma } from '../../../../../generated/prisma/client'
@@ -164,7 +166,10 @@ export async function GET(request: Request) {
       .filter((value) => value && value !== 'all')
 
     const poRows = await prisma.po_buys.findMany({
-      include: { suppliers: true },
+      include: {
+        po_buy_status_logs: { orderBy: [{ created_at: 'desc' }], take: 20 },
+        suppliers: true,
+      },
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
       take: 5000,
     })
@@ -202,7 +207,19 @@ export async function GET(request: Request) {
         qty,
         remainingAmount,
         remainingQty,
+        shortClosedAt: po.short_closed_at?.toISOString() ?? '',
+        shortClosedBy: po.short_closed_by ?? '',
+        shortClosedNote: po.short_closed_note ?? '',
+        shortClosedQty: toNumber(po.short_closed_qty),
         status,
+        statusLogs: po.po_buy_status_logs.map((log) => ({
+          createdAt: log.created_at?.toISOString() ?? '',
+          createdBy: log.created_by ?? '',
+          id: log.id,
+          meta: log.meta,
+          note: log.note ?? '',
+          status: log.status,
+        })),
         supplierId: po.supplier_id ?? '',
         supplierName: po.suppliers?.name ?? po.supplier_id ?? '-',
         totalAmount,
@@ -246,7 +263,10 @@ export async function GET(request: Request) {
       options: await optionsPayload(),
       rows,
       summary: {
-        open: rows.filter((row) => !['Cancelled', 'cancelled', 'Received', 'received'].includes(row.status)).length,
+        open: rows.filter((row) => row.status === PO_BUY_STATUS.OPEN).length,
+        partial: rows.filter((row) => row.status === PO_BUY_STATUS.PARTIAL).length,
+        received: rows.filter((row) => row.status === PO_BUY_STATUS.RECEIVED).length,
+        shortClosed: rows.filter((row) => row.status === PO_BUY_STATUS.SHORT_CLOSED).length,
         remainingAmount: rows.reduce((sum, row) => sum + row.remainingAmount, 0),
         remainingQty: rows.reduce((sum, row) => sum + row.remainingQty, 0),
         totalAmount: rows.reduce((sum, row) => sum + row.totalAmount, 0),
@@ -307,7 +327,7 @@ export async function POST(request: Request) {
       const firstItem = items[0]
       const deliveryDate = normalizeDate(values.expectedDelivery)
 
-      return tx.po_buys.create({
+      const createdRow = await tx.po_buys.create({
         data: {
           branch_id: branch.id,
           channel_id: null,
@@ -337,6 +357,8 @@ export async function POST(request: Request) {
         },
         select: { doc_no: true, id: true },
       })
+      await createInitialPoBuyStatusLog(tx, { actor, poBuyId: createdRow.id })
+      return createdRow
     })
 
     return NextResponse.json({ docNo: created.doc_no, id: created.id }, { status: 201 })
@@ -366,7 +388,7 @@ export async function PUT(request: Request) {
     const existingRemainingQty = toNumber(existing.remaining_qty)
     const existingTotalAmount = toNumber(existing.total_amount)
     const existingRemainingAmount = toNumber(existing.remaining_amount)
-    const isUnreceived = existing.status === 'Open' && existingQty === existingRemainingQty && existingTotalAmount === existingRemainingAmount
+    const isUnreceived = existing.status === PO_BUY_STATUS.OPEN && existingQty === existingRemainingQty && existingTotalAmount === existingRemainingAmount && !existing.short_closed_at
     if (!isUnreceived) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขได้เฉพาะ PO Buy ที่ยังไม่ถูกตัดรับสินค้า' }, { status: 400 })
     }
@@ -435,8 +457,50 @@ export async function PATCH(request: Request) {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const values = poBuyCancelSchema.parse(await request.json())
+    const raw = await request.json()
     const actor = currentActor(context)
+    const action = typeof raw?.action === 'string' ? raw.action : 'cancel'
+
+    if (action === 'shortClose') {
+      const values = poBuyShortCloseSchema.parse(raw)
+      const existing = await prisma.po_buys.findUnique({ where: { id: values.id } })
+      if (!existing) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบ PO Buy ที่ต้องการปิดรับไม่ครบ' }, { status: 404 })
+      if (existing.status === PO_BUY_STATUS.CANCELLED) return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy นี้ถูกยกเลิกแล้ว' }, { status: 400 })
+      if (existing.status === PO_BUY_STATUS.SHORT_CLOSED) return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy นี้ถูกปิดรับไม่ครบแล้ว' }, { status: 400 })
+      if (existing.status === PO_BUY_STATUS.RECEIVED || toNumber(existing.remaining_qty) <= 0.0001) {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy นี้รับครบแล้ว ไม่สามารถปิดรับไม่ครบได้' }, { status: 400 })
+      }
+
+      const shortClosedAt = new Date()
+      const updated = await prisma.$transaction(async (tx) => {
+        const current = await tx.po_buys.findUnique({ where: { id: values.id } })
+        if (!current) throw new Error('NOT_FOUND')
+        const updatedRow = await tx.po_buys.update({
+          where: { id: values.id },
+          data: {
+            short_closed_amount: toNumber(current.remaining_amount),
+            short_closed_at: shortClosedAt,
+            short_closed_by: actor,
+            short_closed_note: values.note,
+            short_closed_qty: toNumber(current.remaining_qty),
+            updated_at: shortClosedAt,
+            updated_by: actor,
+            version: { increment: 1 },
+          },
+          select: { doc_no: true, id: true },
+        })
+        await reconcilePoBuys(tx, [values.id], {
+          actor,
+          statusMetaByPoId: new Map([[values.id, { reason: 'short_close_action' }]]),
+          statusNoteByPoId: new Map([[values.id, values.note]]),
+        })
+        return updatedRow
+      })
+
+      return NextResponse.json({ docNo: updated.doc_no, id: updated.id, status: PO_BUY_STATUS.SHORT_CLOSED })
+    }
+
+    const values = poBuyCancelSchema.parse(raw)
     const existing = await prisma.po_buys.findUnique({ where: { id: values.id } })
     if (!existing) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบ PO Buy ที่ต้องการยกเลิก' }, { status: 404 })
     if (String(existing.status ?? '').toLowerCase().includes('cancel')) {
@@ -447,26 +511,40 @@ export async function PATCH(request: Request) {
     const existingRemainingQty = toNumber(existing.remaining_qty)
     const existingTotalAmount = toNumber(existing.total_amount)
     const existingRemainingAmount = toNumber(existing.remaining_amount)
-    const isUnreceived = existingQty === existingRemainingQty && existingTotalAmount === existingRemainingAmount
+    const isUnreceived = existing.status === PO_BUY_STATUS.OPEN && existingQty === existingRemainingQty && existingTotalAmount === existingRemainingAmount && !existing.short_closed_at
     if (!isUnreceived) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกได้เฉพาะ PO Buy ที่ยังไม่ถูกตัดรับสินค้า' }, { status: 400 })
     }
 
     const cancelledAt = new Date()
-    const updated = await prisma.po_buys.update({
-      where: { id: values.id },
-      data: {
-        cancel_note: values.note,
-        cancelled_at: cancelledAt,
-        cancelled_by: actor,
-        remaining_amount: 0,
-        remaining_qty: 0,
-        status: 'Cancelled',
-        updated_at: cancelledAt,
-        updated_by: actor,
-        version: { increment: 1 },
-      },
-      select: { doc_no: true, id: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.po_buys.update({
+        where: { id: values.id },
+        data: {
+          cancel_note: values.note,
+          cancelled_at: cancelledAt,
+          cancelled_by: actor,
+          remaining_amount: 0,
+          remaining_qty: 0,
+          status: PO_BUY_STATUS.CANCELLED,
+          updated_at: cancelledAt,
+          updated_by: actor,
+          version: { increment: 1 },
+        },
+        select: { doc_no: true, id: true },
+      })
+      await tx.po_buy_status_logs.create({
+        data: {
+          created_at: cancelledAt,
+          created_by: actor,
+          id: `POL-${randomUUID()}`,
+          meta: { reason: 'cancel_action' },
+          note: values.note,
+          po_buy_id: values.id,
+          status: PO_BUY_STATUS.CANCELLED,
+        },
+      })
+      return row
     })
 
     return NextResponse.json({ docNo: updated.doc_no, id: updated.id })

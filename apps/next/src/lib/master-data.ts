@@ -65,6 +65,9 @@ export const masterDataRecordSchema = z.object({
   name: z.string().min(1),
   active: z.boolean().default(true),
   type: nullableString,
+  typeLabel: nullableString,
+  subtypeLabel: nullableString,
+  subtype: nullableString,
   phone: nullableString,
   email: nullableString,
   note: nullableString,
@@ -120,6 +123,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     name: true,
     active: true,
     type: true,
+    subtype: true,
     phone: true,
     email: true,
     note: true,
@@ -180,7 +184,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     bankBranch: optionalBusinessText('สาขาธนาคาร', 160),
     accountNo: optionalAccountNo,
     currency: optionalCode('สกุลเงิน'),
-    openingBalance: nonNegativeNumber('ยอดยกมา'),
+    openingBalance: nonNegativeNumber('ยอดเงินคงเหลือ'),
     odLimit: nonNegativeNumber('วงเงิน OD'),
     branchId: optionalCode('รหัสสาขา'),
     address: optionalGeneralText('ที่อยู่', 500),
@@ -207,9 +211,14 @@ export const masterDataFormSchema = masterDataRecordSchema
     unit: optionalBusinessText('หน่วย', 40),
   })
 
+export const accountMasterDataFormSchema = masterDataFormSchema.extend({
+  name: z.string().trim().min(1, 'กรอกชื่อบัญชี').max(180, 'ชื่อบัญชียาวเกินไป'),
+})
+
 export type MasterDataFormValues = z.infer<typeof masterDataFormSchema>
 
 export type MasterDataFieldType = 'text' | 'number' | 'select'
+export type MasterDataFieldInputFormat = 'money'
 
 export type MasterDataField = {
   key: keyof MasterDataFormValues
@@ -217,6 +226,7 @@ export type MasterDataField = {
   optionsApiPath?: string
   optionValueKey?: keyof MasterDataRecord
   type?: MasterDataFieldType
+  inputFormat?: MasterDataFieldInputFormat
   options?: Array<{ label: string; value: string }>
   required?: boolean
 }
@@ -245,6 +255,7 @@ export const emptyMasterDataForm: MasterDataFormValues = {
   name: '',
   active: true,
   type: null,
+  subtype: null,
   phone: null,
   email: null,
   note: null,

@@ -20,6 +20,11 @@ type PartyBankAccount = {
 }
 type Party = { active: boolean | null; bankAccount?: string | null; bankAccounts?: PartyBankAccount[]; id: string; name: string }
 type Bill = {
+  approvalAccountNo?: string
+  approvalBankName?: string
+  approvalId?: string
+  approvalPaymentMethod?: string
+  approvedAmount?: number
   customerId?: string | null
   date?: string
   docNo: string
@@ -36,6 +41,8 @@ type MoneyRow = {
   accountName: string
   accountNames?: string[]
   accountSummaries?: string[]
+  approvalId?: string
+  approvalIds?: string[]
   amount: number
   billId?: string
   billDocNo?: string
@@ -49,7 +56,9 @@ type MoneyRow = {
   netAmount: number
   notes: string
   partyName: string
+  status?: string
   supplierId?: string
+  voucherId?: string
   withholdingTax?: number
 }
 type Payload = {
@@ -65,10 +74,11 @@ type MoneyForm = SupplierPaymentFormValues | CustomerReceiptFormValues
 type PaymentLine = NonNullable<SupplierPaymentFormValues['lines']>[number] & { billText?: string }
 type PaymentSplit = SupplierPaymentFormValues['splits'][number]
 type HistorySortField = 'accountName' | 'amount' | 'date' | 'docNo' | 'netAmount' | 'partyName'
+type PaymentHistoryStatusFilter = 'active' | 'all' | 'cancelled'
 const pageSizeOptions = [10, 25, 50, 100]
 
 function newPaymentLine(): PaymentLine {
-  return { amount: 0, billId: '', billText: '', discount: 0, fee: 0, id: `PL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, supplierId: '', withholdingTax: 0 }
+  return { amount: 0, approvalId: null, billId: '', billText: '', discount: 0, fee: 0, id: `PL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, supplierId: '', withholdingTax: 0 }
 }
 
 function newPaymentSplit(): PaymentSplit {
@@ -136,6 +146,17 @@ function supplierBankAccountLines(party: Party | undefined) {
   return primary ? [{ accountNo: primary, bankName: '-' }] : []
 }
 
+function approvalBankAccountLines(bill: Bill) {
+  const accountNo = sanitizeAccountNo(bill.approvalAccountNo)
+  if (accountNo || bill.approvalBankName || bill.approvalPaymentMethod) {
+    return [{
+      accountNo,
+      bankName: bill.approvalBankName?.trim() || bill.approvalPaymentMethod?.trim() || '-',
+    }]
+  }
+  return []
+}
+
 const paymentTheme = {
   action: 'bg-rose-600 hover:bg-rose-700',
   banner: 'from-rose-600 via-red-600 to-orange-500',
@@ -195,12 +216,16 @@ export function MoneyMovementPageClient({
   const [billSort, setBillSort] = useState<'age_desc' | 'balance_desc' | 'date_desc' | 'date_asc' | 'doc_desc' | 'supplier_asc'>('age_desc')
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(10)
-  const [historySortField, setHistorySortField] = useState<HistorySortField>('docNo')
+  const [historySortField, setHistorySortField] = useState<HistorySortField>(mode === 'payment' ? 'date' : 'docNo')
   const [historySortDirection, setHistorySortDirection] = useState<'asc' | 'desc'>('desc')
+  const [paymentHistoryStatusFilter, setPaymentHistoryStatusFilter] = useState<PaymentHistoryStatusFilter>('all')
   const [form, setForm] = useState<MoneyForm>(() => initialForm(mode))
   const [isBillLocked, setIsBillLocked] = useState(false)
   const [moneyDrafts, setMoneyDrafts] = useState<Record<string, string>>({})
   const [copiedAccountKey, setCopiedAccountKey] = useState<string | null>(null)
+  const [cancelApprovalReason, setCancelApprovalReason] = useState('')
+  const [cancelApprovalTarget, setCancelApprovalTarget] = useState<Bill | null>(null)
+  const [isCancellingApproval, setIsCancellingApproval] = useState(false)
 
   const apiPath = historyOnly && mode === 'payment'
     ? '/api/purchase/payment-history'
@@ -302,7 +327,6 @@ export function MoneyMovementPageClient({
   const supplierBillTotalPages = Math.max(1, Math.ceil(supplierBillTotalRows / billPageSize))
   const supplierBillCurrentPage = Math.min(billPage, supplierBillTotalPages)
   const supplierBillPageRows = supplierBills.slice((supplierBillCurrentPage - 1) * billPageSize, supplierBillCurrentPage * billPageSize)
-
   useEffect(() => {
     setBillPage(1)
   }, [billSearch, billPageSize, billSort])
@@ -327,9 +351,12 @@ export function MoneyMovementPageClient({
       const matchesAccount = !accountFilter || row.accountId === accountFilter || row.accountName === accountFilter
       const matchesFrom = !dateFrom || row.date >= dateFrom
       const matchesTo = !dateTo || row.date <= dateTo
-      return matchesSearch && matchesAccount && matchesFrom && matchesTo
+      const matchesPaymentStatus = mode !== 'payment'
+        || paymentHistoryStatusFilter === 'all'
+        || (paymentHistoryStatusFilter === 'active' ? row.status !== 'cancelled' : row.status === 'cancelled')
+      return matchesSearch && matchesAccount && matchesFrom && matchesTo && matchesPaymentStatus
     })
-  }, [accountFilter, data.rows, dateFrom, dateTo, search])
+  }, [accountFilter, data.rows, dateFrom, dateTo, mode, paymentHistoryStatusFilter, search])
 
   const historyRows = useMemo(() => {
     return [...rows].sort((left, right) => {
@@ -358,7 +385,7 @@ export function MoneyMovementPageClient({
 
   useEffect(() => {
     setHistoryPage(1)
-  }, [search, dateFrom, dateTo, accountFilter, historyPageSize, historySortField, historySortDirection])
+  }, [search, dateFrom, dateTo, accountFilter, historyPageSize, historySortField, historySortDirection, paymentHistoryStatusFilter])
 
   useEffect(() => {
     if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages)
@@ -382,6 +409,7 @@ export function MoneyMovementPageClient({
       lines: [{
         ...newPaymentLine(),
         amount: paymentCashAmountFromSettlement(settlementAmount, whtRatePercent),
+        approvalId: bill.approvalId ?? null,
         billText: `${bill.docNo} | ${partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'} | ค้าง ${formatMoney(balance)}`,
         billId: bill.id,
         supplierId: bill.supplierId ?? '',
@@ -462,6 +490,7 @@ export function MoneyMovementPageClient({
     return {
       ...newPaymentLine(),
       amount,
+      approvalId: bill.approvalId ?? null,
       billText: `${bill.docNo} | ${partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'} | ค้าง ${formatMoney(bill.payableBalance ?? 0)}`,
       billId: bill.id,
       supplierId: bill.supplierId ?? '',
@@ -507,7 +536,7 @@ export function MoneyMovementPageClient({
     const docNo = rawValue.split('|')[0]?.trim()
     const bill = paymentSelectableBillsForLine(index).find((candidate) => candidate.id === rawValue || candidate.docNo === docNo)
     if (!bill) {
-      updatePaymentLine(index, { amount: 0, billId: '', billText: rawValue, supplierId: '', withholdingTax: 0 })
+      updatePaymentLine(index, { amount: 0, approvalId: null, billId: '', billText: rawValue, supplierId: '', withholdingTax: 0 })
       return
     }
     updatePaymentLine(index, paymentLineFromBill(bill))
@@ -606,6 +635,48 @@ export function MoneyMovementPageClient({
       setError(caught instanceof Error ? caught.message : 'บันทึกข้อมูลไม่ได้')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  function paymentStatusLabel(status: string | undefined) {
+    return status === 'cancelled' ? 'ยกเลิกแล้ว' : 'เสร็จสิ้น'
+  }
+
+  function paymentStatusTone(status: string | undefined) {
+    return status === 'cancelled'
+      ? 'text-slate-500'
+      : 'text-emerald-700'
+  }
+
+  function paymentStatusDot(status: string | undefined) {
+    return status === 'cancelled'
+      ? 'bg-slate-400'
+      : 'bg-emerald-500'
+  }
+
+  async function cancelApprovedPaymentQueue() {
+    if (!cancelApprovalTarget?.approvalId) return
+    if (!cancelApprovalReason.trim()) {
+      setError('กรุณาระบุเหตุผลการยกเลิก')
+      return
+    }
+    setIsCancellingApproval(true)
+    setError(null)
+    try {
+      await dailyFetchJson('/api/purchase/payments/cancel-approved', {
+        body: JSON.stringify({
+          approvalId: cancelApprovalTarget.approvalId,
+          reason: cancelApprovalReason.trim(),
+        }),
+        method: 'POST',
+      })
+      setCancelApprovalTarget(null)
+      setCancelApprovalReason('')
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ยกเลิกรายการรอจ่ายไม่ได้')
+    } finally {
+      setIsCancellingApproval(false)
     }
   }
 
@@ -708,7 +779,7 @@ export function MoneyMovementPageClient({
                 {!isLoading && supplierBillPageRows.map((bill) => {
                   const balance = bill.payableBalance ?? 0
                   const supplier = supplierMap.get(bill.supplierId ?? '')
-                  const supplierBankAccounts = supplierBankAccountLines(supplier)
+                  const supplierBankAccounts = approvalBankAccountLines(bill).length > 0 ? approvalBankAccountLines(bill) : supplierBankAccountLines(supplier)
                   return (
                     <TableRow key={bill.id} className="cursor-pointer hover:bg-slate-50" onClick={() => openFormForBill(bill)}>
                       <TableCell className="font-mono text-xs font-semibold text-slate-700">{bill.docNo}</TableCell>
@@ -776,18 +847,35 @@ export function MoneyMovementPageClient({
                       <TableCell className={`w-40 whitespace-nowrap text-right font-bold tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</TableCell>
                       <TableCell className="w-20 whitespace-nowrap text-right tabular-nums">{ageInDays(bill.date)}</TableCell>
                       <TableCell className="text-center">
-                        <UiButton
-                          className="font-normal"
-                          size="xs"
-                          type="button"
-                          variant="outline"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openFormForBill(bill)
-                          }}
-                        >
-                          ทำจ่าย
-                        </UiButton>
+                        <div className="flex items-center justify-center gap-2">
+                          <UiButton
+                            className="font-normal"
+                            size="xs"
+                            type="button"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openFormForBill(bill)
+                            }}
+                          >
+                            ทำจ่าย
+                          </UiButton>
+                          <UiButton
+                            className="font-normal text-rose-700"
+                            disabled={(bill.paidAmount ?? 0) > 0.01 || !bill.approvalId}
+                            size="xs"
+                            type="button"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setCancelApprovalTarget(bill)
+                              setCancelApprovalReason('')
+                              setError(null)
+                            }}
+                          >
+                            ยกเลิก
+                          </UiButton>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -944,6 +1032,29 @@ export function MoneyMovementPageClient({
                 {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
               </UiSelect>
             </div>
+            {mode === 'payment' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {([
+                  { label: 'ทั้งหมด', value: 'all' },
+                  { label: 'เสร็จสิ้น', value: 'active' },
+                  { label: 'ยกเลิกแล้ว', value: 'cancelled' },
+                ] as Array<{ label: string; value: PaymentHistoryStatusFilter }>).map((option) => {
+                  const active = paymentHistoryStatusFilter === option.value
+                  return (
+                    <UiButton
+                      key={option.value}
+                      className={active ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700' : 'font-normal'}
+                      size="sm"
+                      type="button"
+                      variant={active ? 'default' : 'outline'}
+                      onClick={() => setPaymentHistoryStatusFilter(option.value)}
+                    >
+                      {option.label}
+                    </UiButton>
+                  )
+                })}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
@@ -975,12 +1086,13 @@ export function MoneyMovementPageClient({
                 <TableHead className="w-40 text-right">WHT</TableHead>
                 <TableHead className="w-40 text-right">Bank Fee</TableHead>
                 <TableHead className="w-44 text-right"><button className="font-semibold" type="button" onClick={() => toggleHistorySort('netAmount')}>สุทธิ{historySortLabel('netAmount')}</button></TableHead>
+                {mode === 'payment' ? <TableHead>สถานะ</TableHead> : null}
                 <TableHead>หมายเหตุ</TableHead>
                 <TableHead className="text-center">Action</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
-              {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+              {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={mode === 'payment' ? 12 : 11}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
                 {!isLoading && historyPageRows.map((row) => {
                   const billDocNos = row.billDocNos?.length ? row.billDocNos : [row.billId ? (billMap.get(row.billId)?.docNo ?? row.billDocNo ?? row.billId) : (row.billDocNo ?? '-')]
                   const accountSummaries = row.accountSummaries?.length ? row.accountSummaries : [row.accountName]
@@ -1005,17 +1117,85 @@ export function MoneyMovementPageClient({
                       <TableCell className="w-40 whitespace-nowrap text-right text-amber-700 tabular-nums">{formatMoney(row.withholdingTax)}</TableCell>
                       <TableCell className="w-40 whitespace-nowrap text-right text-slate-600 tabular-nums">{formatMoney(row.fee)}</TableCell>
                       <TableCell className={`w-44 whitespace-nowrap text-right font-bold tabular-nums ${theme.strong}`}>{formatMoney(row.netAmount)}</TableCell>
+                      {mode === 'payment' ? (
+                        <TableCell>
+                          <div className={`inline-flex items-center gap-2 text-sm font-medium ${paymentStatusTone(row.status)}`}>
+                            <span className={`h-2 w-2 rounded-full ${paymentStatusDot(row.status)}`} />
+                            <span>{paymentStatusLabel(row.status)}</span>
+                          </div>
+                        </TableCell>
+                      ) : null}
                       <TableCell className="max-w-56 truncate text-slate-600">{row.notes || '-'}</TableCell>
-                      <TableCell className="text-center">
-                        <UiButton className="font-normal text-slate-400" disabled size="xs" type="button" variant="outline">ดู/พิมพ์</UiButton>
-                      </TableCell>
+                      {mode === 'payment' ? (
+                        <TableCell className="text-center">
+                          <span className="text-xs text-slate-400">ไม่มี action</span>
+                        </TableCell>
+                      ) : (
+                        <TableCell className="text-center">
+                          <UiButton className="font-normal text-slate-400" disabled size="xs" type="button" variant="outline">ดู/พิมพ์</UiButton>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )
                 })}
-              {!isLoading && historyPageRows.length === 0 ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการ</TableCell></TableRow> : null}
+              {!isLoading && historyPageRows.length === 0 ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={mode === 'payment' ? 12 : 11}>ยังไม่มีรายการ</TableCell></TableRow> : null}
             </TableBody>
           </Table>
         </>
+      ) : null}
+
+      {mode === 'payment' && !historyOnly && cancelApprovalTarget ? (
+        <Dialog open onOpenChange={(open) => {
+          if (!open && !isCancellingApproval) {
+            setCancelApprovalTarget(null)
+            setCancelApprovalReason('')
+          }
+        }}>
+          <DialogContent className="max-w-lg p-0" hideClose>
+            <DialogHeader className="border-b px-5 py-4">
+              <DialogTitle className="font-bold text-slate-900">ยกเลิกรายการรอจ่าย</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 px-5 py-4 text-sm">
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-slate-700">
+                <div><span className="font-semibold">เลขที่บิล:</span> {cancelApprovalTarget.docNo}</div>
+                <div><span className="font-semibold">{partyLabel}:</span> {partyMap.get(cancelApprovalTarget.supplierId ?? '') ?? cancelApprovalTarget.supplierId ?? '-'}</div>
+                <div><span className="font-semibold">ยอดค้างจ่าย:</span> {formatMoney(cancelApprovalTarget.payableBalance ?? 0)}</div>
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-slate-600">เหตุผลการยกเลิก</span>
+                <textarea
+                  className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-0 transition focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                  placeholder="ระบุเหตุผลการยกเลิกรายการรอจ่าย"
+                  value={cancelApprovalReason}
+                  onChange={(event) => setCancelApprovalReason(event.target.value)}
+                />
+              </label>
+            </div>
+            <DialogFooter className="border-t px-5 py-4">
+              <UiButton
+                className="font-normal text-slate-600"
+                disabled={isCancellingApproval}
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setCancelApprovalTarget(null)
+                  setCancelApprovalReason('')
+                }}
+              >
+                ปิด
+              </UiButton>
+              <UiButton
+                className="bg-rose-600 px-5 font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                disabled={isCancellingApproval || !cancelApprovalReason.trim()}
+                type="button"
+                variant="default"
+                onClick={() => void cancelApprovedPaymentQueue()}
+              >
+                ยืนยันยกเลิกรายการรอจ่าย
+              </UiButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </section>
   )

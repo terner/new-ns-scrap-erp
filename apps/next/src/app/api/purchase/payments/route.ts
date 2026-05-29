@@ -61,7 +61,7 @@ async function refreshPurchaseBillPaymentStatus(tx: Prisma.TransactionClient, bi
   if (paidAmount - totalAmount > 0.01) throw new Error('ยอดจ่ายรวมเกินยอดค้างของบิลซื้อ')
 
   const payableBalance = Math.max(0, totalAmount - paidAmount)
-  const status = paidAmount <= 0 ? 'open' : payableBalance <= 0.01 ? 'paid' : 'partial'
+  const status = paidAmount <= 0 ? 'unpaid' : payableBalance <= 0.01 ? 'paid' : 'partial'
 
   await tx.purchase_bills.update({
     data: {
@@ -77,10 +77,27 @@ async function refreshPurchaseBillPaymentStatus(tx: Prisma.TransactionClient, bi
 
 export async function GET() {
   try {
+    const prismaExt = prisma as typeof prisma & {
+      payment_approvals: {
+        findMany: (args: unknown) => Promise<Array<{
+          approved_amount: unknown
+          approved_at: Date | null
+          destination_account_no_snapshot: string | null
+          destination_bank_name_snapshot: string | null
+          destination_payment_method_snapshot: string | null
+          id: string
+          party_id: string | null
+          party_name_snapshot: string | null
+          source_doc_no_snapshot: string | null
+          source_id: string
+          status: string | null
+        }>>
+      }
+    }
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const [accounts, suppliers, bills, payments, whtRatePercent] = await Promise.all([
+    const [accounts, suppliers, approvals, payments, whtRatePercent] = await Promise.all([
       listDailyAccounts(),
       prisma.suppliers.findMany({
         orderBy: [{ name: 'asc' }],
@@ -100,10 +117,23 @@ export async function GET() {
           },
         },
       }),
-      prisma.purchase_bills.findMany({
-        orderBy: [{ date: 'desc' }],
-        select: { date: true, doc_no: true, id: true, paid_amount: true, payable_balance: true, status: true, supplier_id: true, total_amount: true },
+      prismaExt.payment_approvals.findMany({
+        orderBy: [{ approved_at: 'desc' }, { created_at: 'desc' }],
+        select: {
+          approved_amount: true,
+          approved_at: true,
+          destination_account_no_snapshot: true,
+          destination_bank_name_snapshot: true,
+          destination_payment_method_snapshot: true,
+          id: true,
+          party_id: true,
+          party_name_snapshot: true,
+          source_doc_no_snapshot: true,
+          source_id: true,
+          status: true,
+        },
         take: 5000,
+        where: { source_type: 'purchase_bill', status: 'approved' },
       }),
       prisma.payments.findMany({
         include: { accounts: true, suppliers: true },
@@ -113,21 +143,55 @@ export async function GET() {
       activeWhtRatePercent(new Date()),
     ])
 
+    const approvalIds = new Set(approvals.map((approval) => approval.id))
+    const paymentTotalsByApprovalId = new Map<string, number>()
+    for (const payment of payments) {
+      const approvalId = payment.payment_approval_id
+      if (!approvalId || !approvalIds.has(approvalId) || payment.status === 'cancelled') continue
+      const settled = toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
+      paymentTotalsByApprovalId.set(approvalId, (paymentTotalsByApprovalId.get(approvalId) ?? 0) + settled)
+    }
+
+    const purchaseBills = await prisma.purchase_bills.findMany({
+      orderBy: [{ date: 'desc' }],
+      select: { date: true, doc_no: true, id: true, paid_amount: true, payable_balance: true, status: true, supplier_id: true, total_amount: true },
+      where: {
+        id: { in: [...new Set(approvals.map((approval) => approval.source_id))] as string[] },
+      },
+    })
+    const billById = new Map(purchaseBills.map((bill: typeof purchaseBills[number]) => [bill.id, bill]))
+
     return NextResponse.json({
       accounts,
-      bills: bills.map((bill) => ({
-        date: toDateOnly(bill.date),
-        docNo: bill.doc_no,
-        id: bill.id,
-        paidAmount: toNumber(bill.paid_amount),
-        payableBalance: toNumber(bill.payable_balance),
-        status: bill.status ?? '',
-        supplierId: bill.supplier_id,
-        totalAmount: toNumber(bill.total_amount),
-      })),
+      bills: approvals
+        .map((approval: typeof approvals[number]) => {
+          const bill = billById.get(approval.source_id)
+          if (!bill) return null
+          const approvedAmount = toNumber(approval.approved_amount)
+          const paidAgainstApproval = paymentTotalsByApprovalId.get(approval.id) ?? 0
+          const payableBalance = Math.max(0, approvedAmount - paidAgainstApproval)
+          if (payableBalance <= 0.01) return null
+          return {
+            approvalAccountNo: approval.destination_account_no_snapshot ?? '',
+            approvalBankName: approval.destination_bank_name_snapshot ?? '',
+            approvalId: approval.id,
+            approvalPaymentMethod: approval.destination_payment_method_snapshot ?? '',
+            approvedAmount,
+            date: toDateOnly(bill.date),
+            docNo: approval.source_doc_no_snapshot ?? bill.doc_no,
+            id: bill.id,
+            paidAmount: paidAgainstApproval,
+            payableBalance,
+            status: approval.status ?? '',
+            supplierId: approval.party_id ?? bill.supplier_id,
+            totalAmount: approvedAmount,
+          }
+        })
+        .filter((bill): bill is NonNullable<typeof bill> => Boolean(bill)),
       rows: payments.map((payment) => ({
         accountId: payment.account_id ?? '',
         accountName: payment.accounts?.name ?? '-',
+        approvalId: payment.payment_approval_id ?? '',
         amount: toNumber(payment.amount),
         billId: payment.bill_id ?? '',
         date: toDateOnly(payment.date),
@@ -140,10 +204,12 @@ export async function GET() {
         partyName: payment.suppliers?.name ?? payment.supplier_id ?? '-',
         supplierId: payment.supplier_id ?? '',
         supplierName: payment.suppliers?.name ?? payment.supplier_id ?? '-',
+        voucherId: payment.voucher_id ?? payment.id,
+        status: payment.status ?? 'active',
         withholdingTax: toNumber(payment.withholding_tax),
       })),
       settings: { whtRatePercent },
-      suppliers: suppliers.map((supplier) => ({
+      suppliers: suppliers.map((supplier: typeof suppliers[number]) => ({
         active: supplier.active,
         bankAccount: supplier.bank_account,
         bankAccounts: (supplier.supplier_bank_accounts ?? []).map((account) => ({
@@ -173,6 +239,7 @@ export async function POST(request: Request) {
     const paymentDate = normalizeDate(values.date)
     const whtRatePercent = await activeWhtRatePercent(paymentDate)
     const paymentLines = (values.lines?.length ? values.lines : [{
+      approvalId: null,
       amount: values.amount,
       billId: values.billId,
       discount: values.discount,
@@ -206,8 +273,20 @@ export async function POST(request: Request) {
     if (!primaryAccountId) throw new Error('เลือกบัญชีจ่าย')
 
     const result = await prisma.$transaction(async (tx) => {
+      const txExt = tx as typeof tx & {
+        payment_approvals: {
+          findMany: (args: unknown) => Promise<Array<{
+            approved_amount: unknown
+            id: string
+            source_doc_no_snapshot: string | null
+            source_id: string
+          }>>
+          update: (args: unknown) => Promise<unknown>
+        }
+      }
       const splitAccountIds = [...new Set(paymentSplits.map((split) => split.accountId))]
       const lineBillIds = [...new Set(paymentLineTotals.map((line) => line.billId))]
+      const lineApprovalIds = [...new Set(paymentLineTotals.map((line) => line.approvalId).filter(Boolean) as string[])]
       const [lineBills, account] = await Promise.all([
         tx.purchase_bills.findMany({
           select: { branch_id: true, id: true, supplier_id: true },
@@ -218,14 +297,44 @@ export async function POST(request: Request) {
           where: { id: primaryAccountId },
         }),
       ])
-      const billById = new Map(lineBills.map((bill) => [bill.id, bill]))
+      const approvals = lineApprovalIds.length > 0
+        ? await txExt.payment_approvals.findMany({
+          where: {
+            id: { in: lineApprovalIds },
+            source_type: 'purchase_bill',
+            status: 'approved',
+          },
+        })
+        : []
+      const billById = new Map(lineBills.map((bill: typeof lineBills[number]) => [bill.id, bill]))
+      const approvalById = new Map(approvals.map((approval: typeof approvals[number]) => [approval.id, approval]))
       if (billById.size !== lineBillIds.length) throw new Error('ไม่พบบิลซื้อที่ต้องการตัดชำระ')
+      if (approvalById.size !== lineApprovalIds.length) throw new Error('รายการอนุมัติโอนเงินบางรายการไม่ถูกต้องหรือถูกใช้งานแล้ว')
       const firstSupplierId = billById.get(paymentLineTotals[0].billId)?.supplier_id ?? paymentLineTotals[0].supplierId
       if (paymentLineTotals.some((line) => {
         const lineSupplierId = billById.get(line.billId)?.supplier_id ?? line.supplierId
         return lineSupplierId !== firstSupplierId
       })) {
         throw new Error('Payment Voucher เดียวกันต้องเป็นบิลของ Supplier เดียวกัน')
+      }
+      if (paymentLineTotals.some((line) => !line.approvalId)) {
+        throw new Error('ต้องเลือกจากรายการที่อนุมัติโอนเงินแล้วเท่านั้น')
+      }
+      const existingApprovalPayments = lineApprovalIds.length > 0
+        ? await (tx as any).payments.findMany({
+          select: { amount: true, discount: true, id: true, payment_approval_id: true, status: true, withholding_tax: true },
+          where: {
+            payment_approval_id: { in: lineApprovalIds },
+            NOT: { status: 'cancelled' },
+          },
+        })
+        : []
+      const settledByApprovalId = new Map<string, number>()
+      for (const payment of existingApprovalPayments) {
+        const approvalId = payment.payment_approval_id
+        if (!approvalId) continue
+        const settled = toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
+        settledByApprovalId.set(approvalId, (settledByApprovalId.get(approvalId) ?? 0) + settled)
       }
       const splitAccountCount = await tx.accounts.count({ where: { active: true, id: { in: splitAccountIds } } })
       if (splitAccountCount !== splitAccountIds.length) throw new Error('บัญชีจ่ายบางรายการไม่ถูกต้องหรือไม่ active')
@@ -250,7 +359,15 @@ export async function POST(request: Request) {
       const payments = []
       for (const line of paymentLineTotals) {
         const lineBill = billById.get(line.billId)
-        const payment = await tx.payments.upsert({
+        const approval = line.approvalId ? approvalById.get(line.approvalId) : null
+        if (!approval) throw new Error('ไม่พบรายการอนุมัติโอนเงินของบิลนี้')
+        if (approval.source_id !== line.billId) throw new Error('รายการจ่ายไม่ตรงกับบิลที่อนุมัติไว้')
+        const approvalRemaining = Math.max(0, toNumber(approval.approved_amount) - (settledByApprovalId.get(approval.id) ?? 0))
+        const lineSettlementAmount = line.amount + line.withholdingTax + line.discount
+        if (lineSettlementAmount - approvalRemaining > 0.01) {
+          throw new Error(`ยอดจ่ายของ ${approval.source_doc_no_snapshot ?? line.billId} เกินยอดที่อนุมัติไว้`)
+        }
+        const payment = await (tx as any).payments.upsert({
           where: { id: line.id },
           create: {
             account_id: primaryAccountId,
@@ -267,6 +384,7 @@ export async function POST(request: Request) {
             method: values.method,
             net_amount: line.amount + line.fee,
             notes: values.notes,
+            payment_approval_id: approval.id,
             status: 'active',
             supplier_id: lineBill?.supplier_id ?? line.supplierId,
             updated_at: new Date(),
@@ -287,12 +405,24 @@ export async function POST(request: Request) {
             method: values.method,
             net_amount: line.amount + line.fee,
             notes: values.notes,
+            payment_approval_id: approval.id,
             supplier_id: lineBill?.supplier_id ?? line.supplierId,
             updated_at: new Date(),
             updated_by: actor,
             voucher_id: id,
             withholding_tax: line.withholdingTax,
           },
+        })
+        const nextSettled = (settledByApprovalId.get(approval.id) ?? 0) + lineSettlementAmount
+        settledByApprovalId.set(approval.id, nextSettled)
+        await txExt.payment_approvals.update({
+          data: {
+            paid_at: Math.max(0, toNumber(approval.approved_amount) - nextSettled) <= 0.01 ? new Date() : null,
+            payment_id: Math.max(0, toNumber(approval.approved_amount) - nextSettled) <= 0.01 ? payment.id : null,
+            status: Math.max(0, toNumber(approval.approved_amount) - nextSettled) <= 0.01 ? 'paid' : 'approved',
+            updated_at: new Date(),
+          },
+          where: { id: approval.id },
         })
         payments.push(payment)
       }

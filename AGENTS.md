@@ -15,6 +15,14 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - Use a sub agent by default for Playwright/browser QA work; the main agent still defines scope and integrates findings.
 - Split large refactors into reviewable batches with one clear module, transform, or behavior change per batch.
 - During clone/migration batches, use `docs/design.md` as the active design convention source and keep legacy/Vue parity unless a difference is documented and approved.
+- For every UI/page change in `apps/next/`, check these three inputs before editing:
+  1. the business flow / requirement for that page,
+  2. `docs/design.md`,
+  3. the closest reference page in the active app.
+- Do not patch UI from memory or from a loosely similar page alone. If `docs/design.md` and an existing page differ, follow `docs/design.md` unless an override is documented in `docs/migration/00-current-work.md`.
+- For form/list/filter work, explicitly verify wording, field behavior, layout grouping, and control sizing against the relevant flow and reference page before claiming completion.
+- For form field type decisions, map every field to the `Field Input Decision Matrix` in `docs/design.md` before choosing `text`, `number`, or `money pattern`.
+- If a field looks numeric but represents money, identifier, or business code, do not infer the input type from appearance alone; use the matrix and the page flow.
 - After a batch is validated, committed, and pushed, immediately start the next batch from `docs/migration/00-current-work.md` and the relevant tracker unless the user pauses, redirects, or the next step requires explicit approval for high-risk work.
 
 ## Required Reading

@@ -1724,6 +1724,24 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /api/purchase/advance-payments:
+    get:
+      tags: [Purchase]
+      summary: List supplier advance payment / deposit documents
+      responses:
+        "200":
+          $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Purchase]
+      summary: Create supplier advance payment / deposit document before purchase bill allocation
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
   /api/purchase/payments:
     get:
       tags: [Purchase]

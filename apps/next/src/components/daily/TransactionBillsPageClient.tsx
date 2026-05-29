@@ -25,6 +25,7 @@ import { salesBillFormSchema, type SalesBillFormValues } from '@/lib/sales'
 type BillRow = {
   branchId?: string
   branchName?: string
+  canEdit?: boolean
   createdAt?: string
   createdBy?: string
   customerName?: string
@@ -43,9 +44,13 @@ type BillRow = {
     unit?: string
   }>
   itemCount: number
+  hasActiveApproval?: boolean
+  hasActivePayment?: boolean
   licensePlate?: string
+  lockedReason?: string | null
   note?: string
   paidAmount?: number
+  paymentWorkflowStatus?: string
   paymentDocNos?: string[]
   payableBalance?: number
   purchaseSource?: string
@@ -288,8 +293,9 @@ const initialSalesForm = (): SalesBillFormValues => ({
 
 const purchaseStatusOptions: MultiSegmentOption[] = [
   { label: 'ทุกสถานะ', values: [] },
-  { label: 'ยังไม่ชำระเงิน', values: ['unpaid'] },
-  { label: 'ชำระเงินบางส่วน', values: ['partial', 'partially_paid'] },
+  { label: 'ยังไม่อนุมัติ', values: ['pending_approval'] },
+  { label: 'รอจ่าย', values: ['pending_payment'] },
+  { label: 'ชำระบางส่วน', values: ['partial_paid'] },
   { label: 'เสร็จสิ้น', values: ['paid'] },
   { label: 'ยกเลิก', values: ['cancelled'] },
 ]
@@ -463,7 +469,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const stockIssueQty = stockIssueRows.reduce((sum, row) => sum + (row.totalQty ?? 0), 0)
   const stockIssueCost = stockIssueRows.reduce((sum, row) => sum + row.totalCost, 0)
   const stockIssueEst = stockIssueRows.reduce((sum, row) => sum + row.totalEstAmount, 0)
-  const tableColSpan = mode === 'purchase' ? 10 : mode === 'sales' ? 15 : 10
+  const tableColSpan = mode === 'purchase' ? 11 : mode === 'sales' ? 15 : 10
   const statusOptions = mode === 'purchase' ? purchaseStatusOptions : salesStatusOptions
   const selectedReceipt = useMemo(() => {
     if (!form.receiptTicketId) return null
@@ -695,6 +701,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   }
 
   function openEditPurchaseForm(row: BillRow) {
+    if (row.canEdit === false) {
+      setError(row.lockedReason ?? 'บิลนี้ยังแก้ไขไม่ได้')
+      return
+    }
     setEditingBillId(row.id)
     setForm(purchaseFormFromRow(row))
     setFieldErrors({})
@@ -703,6 +713,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   }
 
   function openCancelPurchaseBill(row: BillRow) {
+    if (row.canEdit === false) {
+      setError(row.lockedReason ?? 'บิลนี้ยังยกเลิกไม่ได้')
+      return
+    }
     setCancelingBill(row)
     setCancelNote('')
     setCancelNoteError('')
@@ -1140,7 +1154,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <Button disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</Button>
         </div>
       </div>
-      <Table>
+      <Table className="[&_tbody_tr]:border-0">
           <TableHeader>
             <tr>
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่'} sortKey="docNo" onSort={changeSort} />
@@ -1150,6 +1164,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" sortKey="warehouse" onSort={changeSort} /> : null}
               {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" sortKey="transactionMode" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'สถานะการชำระเงิน' : 'สถานะรับเงิน'} sortKey="status" onSort={changeSort} />
+              {mode === 'purchase' ? <th className="p-2 text-center">สถานะการจ่าย</th> : null}
               {mode === 'purchase' ? <th className="p-2 text-left">เลขที่การชำระเงิน</th> : null}
               {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" sortKey="itemCount" onSort={changeSort} /> : null}
               {mode === 'stock-issue' ? <th className="p-2 text-right">น้ำหนัก</th> : null}
@@ -1180,6 +1195,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                     {statusText(row.status)}
                   </span>
                 </td>
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-center">
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${workflowStatusBadgeClass(row.paymentWorkflowStatus ?? 'pending_approval')}`}>
+                    <span className="size-1.5 rounded-full bg-current" />
+                    {workflowStatusText(row.paymentWorkflowStatus ?? 'pending_approval')}
+                  </span>
+                </td> : null}
                 {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-xs">{row.paymentDocNos?.length ? <div className="space-y-0.5">{row.paymentDocNos.map((docNo: string) => <div key={`${row.id}-${docNo}`} className="text-slate-700">{docNo}</div>)}</div> : <span className="text-slate-400">-</span>}</td> : null}
                 {mode !== 'purchase' ? <td className="p-2 text-right">{row.itemCount}</td> : null}
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.totalQty ?? 0)} /> : null}
@@ -1190,7 +1211,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <TableNumberCell tone="amber" value={formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)} /> : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.vatInvoiceIssued ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-xs text-slate-600"><div>{row.updatedBy || row.createdBy || '-'}</div><div className="text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></td> : null}
-                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><Button className="px-2 py-1 text-xs" disabled={row.status.toLowerCase().includes('cancel')} size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}>แก้ไข</Button><Button className="px-2 py-1 text-xs" disabled={row.status.toLowerCase().includes('cancel')} size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelPurchaseBill(row) }}>ยกเลิก</Button></div></td> : null}
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><Button className="px-2 py-1 text-xs" disabled={row.canEdit === false} size="xs" title={row.canEdit === false ? (row.lockedReason ?? 'บิลนี้ยังแก้ไขไม่ได้') : undefined} type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditPurchaseForm(row) }}>แก้ไข</Button><Button className="px-2 py-1 text-xs" disabled={row.canEdit === false} size="xs" title={row.canEdit === false ? (row.lockedReason ?? 'บิลนี้ยังยกเลิกไม่ได้') : undefined} type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelPurchaseBill(row) }}>ยกเลิก</Button></div></td> : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1"><Button className="px-2 py-1 text-xs" disabled size="xs" title="รอเปิด flow แก้ไขบิลขาย" type="button" variant="outline">แก้ไข</Button><Button className="px-2 py-1 text-xs" disabled size="xs" title="รอเปิด flow ยกเลิกบิลขาย" type="button" variant="outline">ยกเลิก</Button></div></td> : null}
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <td className="p-2 text-right"><div className="flex justify-end gap-1 whitespace-nowrap"><Button className="bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" disabled={row.status !== 'pending'} size="xs" type="button" variant="ghost">→ เปิดบิลขาย</Button><Button className="px-2 py-1 text-xs text-slate-400 hover:bg-slate-100" disabled size="xs" type="button" variant="ghost">แก้</Button><Button className="px-2 py-1 text-xs text-slate-400 hover:bg-slate-100" disabled size="xs" type="button" variant="ghost">ยกเลิก</Button></div></td> : null}
               </TableRow>
@@ -1205,7 +1226,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             <div className="sticky top-0 z-10 flex items-center justify-between rounded-md-t-md border-b bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
               <div>
                 <h3 className="text-xl font-bold">📥 {editingBillId ? 'แก้ไขบิลรับซื้อ' : 'สร้างบิลรับซื้อใหม่'}</h3>
-                <p className="mt-1 text-xs opacity-80">{editingBillId ? 'แก้ไขได้แม้มีการชำระแล้ว ระบบจะคำนวณยอดค้างและ stock ledger ใหม่' : 'บันทึก header และรายการสินค้าในบิลรับซื้อ'}</p>
+                <p className="mt-1 text-xs opacity-80">{editingBillId ? 'แก้ไขได้เฉพาะบิลที่ยังไม่อนุมัติโอนเงินและยังไม่มีการชำระเงิน' : 'บันทึก header และรายการสินค้าในบิลรับซื้อ'}</p>
               </div>
               <button className="text-3xl leading-none text-white/80 hover:text-white" type="button" onClick={() => setShowForm(false)}>&times;</button>
             </div>
@@ -1789,6 +1810,26 @@ function statusText(status: string) {
     received: 'เสร็จสิ้น',
     unreceived: 'ยังไม่รับเงิน',
     unpaid: 'ยังไม่ชำระเงิน',
+  }
+  return labels[status.toLowerCase()] ?? status
+}
+
+function workflowStatusBadgeClass(status: string) {
+  const normalized = status.toLowerCase()
+  if (normalized === 'paid') return 'text-emerald-700'
+  if (normalized === 'partial_paid') return 'text-cyan-700'
+  if (normalized === 'pending_payment') return 'text-blue-700'
+  if (normalized === 'cancelled') return 'text-slate-500'
+  return 'text-amber-700'
+}
+
+function workflowStatusText(status: string) {
+  const labels: Record<string, string> = {
+    cancelled: 'ยกเลิก',
+    paid: 'เสร็จสิ้น',
+    partial_paid: 'ชำระบางส่วน',
+    pending_approval: 'ยังไม่อนุมัติ',
+    pending_payment: 'รอจ่าย',
   }
   return labels[status.toLowerCase()] ?? status
 }

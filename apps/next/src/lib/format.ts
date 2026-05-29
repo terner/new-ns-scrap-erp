@@ -51,3 +51,38 @@ export function sanitizePhoneInput(value: string) {
 export function sanitizeAccountNoInput(value: string) {
   return value.replace(/\D/g, '').slice(0, 40)
 }
+
+export function sanitizeDecimalInput(value: string, maxFractionDigits = 2) {
+  let output = ''
+  let seenDot = false
+  let fractionDigits = 0
+
+  for (const char of value) {
+    if (/\d/.test(char)) {
+      if (seenDot && fractionDigits >= maxFractionDigits) continue
+      output += char
+      if (seenDot) fractionDigits += 1
+      continue
+    }
+    if (char === '.' && !seenDot) {
+      output += char
+      seenDot = true
+    }
+  }
+
+  return output
+}
+
+export function formatDecimalDisplay(value: number | null | undefined, fractionDigits = 2) {
+  if (value === null || value === undefined || Number.isNaN(value)) return ''
+
+  return value.toLocaleString('th-TH', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
+}
+
+export function formatDecimalDraft(value: number | null | undefined, fractionDigits = 2) {
+  if (value === null || value === undefined || Number.isNaN(value)) return ''
+  return value.toFixed(fractionDigits)
+}

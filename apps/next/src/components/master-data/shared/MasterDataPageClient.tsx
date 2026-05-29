@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FocusEvent } from 'react'
 import {
+  accountMasterDataFormSchema,
   emptyMasterDataForm,
   listMasterDataRecords,
   masterDataFormSchema,
@@ -15,7 +16,7 @@ import {
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { FormSelectField } from '@/components/ui/FormSelectField'
 import { PhoneInput } from '@/components/ui/PhoneInput'
-import { formatPhoneDisplay, sanitizeAccountNoInput } from '@/lib/format'
+import { formatDecimalDisplay, formatDecimalDraft, formatPhoneDisplay, sanitizeAccountNoInput, sanitizeDecimalInput } from '@/lib/format'
 
 type SortKey = keyof MasterDataRecord
 
@@ -26,12 +27,17 @@ type MasterDataPageClientProps = {
 const pageSizeOptions = [10, 25, 50, 100]
 
 function recordToForm(record: MasterDataRecord): MasterDataFormValues {
+  const normalizedSubtype = record.type === 'cash'
+    ? 'cash'
+    : (record.subtype ?? 'savings')
+
   return {
     id: record.id,
     code: record.code,
     name: record.name,
     active: record.active,
     type: record.type,
+    subtype: normalizedSubtype,
     phone: formatPhoneDisplay(record.phone),
     email: record.email,
     note: record.note,
@@ -91,6 +97,12 @@ function formatNumber(value: number | null, fractionDigits = 2) {
   return value.toLocaleString('th-TH', { maximumFractionDigits: fractionDigits, minimumFractionDigits: fractionDigits })
 }
 
+function parseNumericFieldValue(value: string) {
+  if (value.trim() === '' || value.trim() === '.') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function compareRecords(left: MasterDataRecord, right: MasterDataRecord, key: SortKey, direction: 'asc' | 'desc') {
   const multiplier = direction === 'asc' ? 1 : -1
   const leftValue = left[key]
@@ -108,18 +120,49 @@ function compareRecords(left: MasterDataRecord, right: MasterDataRecord, key: So
 }
 
 function validateMasterDataForm(config: MasterDataPageConfig, values: MasterDataFormValues) {
-  const parsed = masterDataFormSchema.safeParse(values)
+  const schema = config.apiPath === '/api/master-data/accounts' ? accountMasterDataFormSchema : masterDataFormSchema
+  const parsed = schema.safeParse(values)
   const errors: Record<string, string> = {}
+  const hiddenFieldKeys = new Set<string>()
+
+  if (config.apiPath === '/api/master-data/accounts') {
+    delete errors.name
+    const accountName = typeof values.name === 'string' ? values.name.trim() : ''
+    if (!accountName) {
+      errors.name = 'กรอกชื่อบัญชี'
+    } else if (accountName.length > 180) {
+      errors.name = 'ชื่อบัญชียาวเกินไป'
+    }
+
+    if (!values.type) {
+      hiddenFieldKeys.add('subtype')
+      hiddenFieldKeys.add('bankName')
+      hiddenFieldKeys.add('bankBranch')
+      hiddenFieldKeys.add('accountNo')
+      hiddenFieldKeys.add('currency')
+      hiddenFieldKeys.add('odLimit')
+    } else if (values.type === 'cash') {
+      hiddenFieldKeys.add('subtype')
+      hiddenFieldKeys.add('bankName')
+      hiddenFieldKeys.add('bankBranch')
+      hiddenFieldKeys.add('accountNo')
+      hiddenFieldKeys.add('odLimit')
+    } else if (values.type === 'bank' && values.subtype !== 'od') {
+      hiddenFieldKeys.add('odLimit')
+    }
+  }
 
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
       const key = String(issue.path[0] ?? '')
+      if (hiddenFieldKeys.has(key)) continue
       if (key && !errors[key]) errors[key] = issue.message
     }
   }
 
   for (const field of config.fields) {
     const key = String(field.key)
+    if (hiddenFieldKeys.has(key)) continue
     const value = values[field.key]
     const textValue = typeof value === 'string' ? value.trim() : value
 
@@ -132,6 +175,42 @@ function validateMasterDataForm(config: MasterDataPageConfig, values: MasterData
       const allowedValues = new Set(field.options?.map((option) => option.value) ?? [])
       if (allowedValues.size > 0 && !allowedValues.has(String(textValue))) {
         errors[key] = `${field.label}ไม่อยู่ในตัวเลือกที่กำหนด`
+      }
+    }
+  }
+
+  if (config.apiPath === '/api/master-data/accounts') {
+    const accountType = values.type
+    const accountSubtype = accountType === 'cash' ? 'cash' : values.subtype
+    const currency = String(values.currency ?? '').trim().toUpperCase()
+    const odLimit = values.odLimit
+
+    if (!values.currency) {
+      errors.currency = 'กรอกสกุลเงิน'
+    }
+
+    if (accountType === 'bank' && !accountSubtype) {
+      errors.subtype = 'เลือกชนิดบัญชี'
+    }
+
+    if (accountSubtype === 'cash') {
+      // no extra bank-account requirement
+    } else {
+      if (!values.bankName) errors.bankName = 'เลือกธนาคาร'
+      if (!values.accountNo) errors.accountNo = 'กรอกเลขที่บัญชี'
+    }
+
+    if (accountSubtype === 'fcd' && currency === 'THB') {
+      errors.currency = 'บัญชี FCD ต้องใช้สกุลเงินที่ไม่ใช่ THB'
+    }
+
+    if ((accountSubtype === 'savings' || accountSubtype === 'current' || accountSubtype === 'od') && currency && currency !== 'THB') {
+      errors.currency = 'บัญชีประเภทนี้ต้องใช้สกุลเงิน THB'
+    }
+
+    if (accountSubtype === 'od') {
+      if (odLimit === null || odLimit === undefined || odLimit <= 0) {
+        errors.odLimit = 'กรอกวงเงิน OD มากกว่า 0'
       }
     }
   }
@@ -425,6 +504,36 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
   function update<K extends keyof MasterDataFormValues>(key: K, value: MasterDataFormValues[K]) {
     setForm((current) => {
       const next = { ...current, [key]: value }
+      if (config.apiPath === '/api/master-data/accounts') {
+        const typedNext = next as MasterDataFormValues
+        if (key === 'type') {
+          if (value === 'cash') {
+            typedNext.subtype = 'cash'
+            typedNext.bankName = null
+            typedNext.bankBranch = null
+            typedNext.accountNo = null
+            typedNext.odLimit = null
+          } else if (value === 'bank') {
+            if (!typedNext.subtype || typedNext.subtype === 'cash') typedNext.subtype = 'savings'
+            if (!typedNext.currency) typedNext.currency = 'THB'
+          }
+        }
+        if (key === 'subtype') {
+          if (value === 'cash') typedNext.type = 'cash'
+          else if (value === 'savings' || value === 'current' || value === 'fcd' || value === 'od') {
+            typedNext.type = 'bank'
+            if (value === 'savings' || value === 'current' || value === 'od') {
+              typedNext.currency = 'THB'
+            }
+            if (value === 'fcd' && typedNext.currency === 'THB') {
+              typedNext.currency = null
+            }
+            if (value !== 'od') {
+              typedNext.odLimit = null
+            }
+          }
+        }
+      }
       if (Object.keys(errors).length > 0) {
         setErrors(validateMasterDataForm(config, next).errors)
       }
@@ -452,7 +561,20 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
       </div>
 
       <div className="grid max-h-[76vh] gap-4 overflow-y-auto px-5 py-5 md:grid-cols-3">
-        {config.fields.map((field) => (
+        {config.fields.filter((field) => {
+          if (config.apiPath === '/api/master-data/accounts') {
+            if (!form.type && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'currency', 'odLimit'].includes(String(field.key))) {
+              return false
+            }
+            if (form.type === 'cash' && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
+              return false
+            }
+            if (form.type === 'bank' && field.key === 'odLimit' && form.subtype !== 'od') {
+              return false
+            }
+          }
+          return true
+        }).map((field) => (
           <FormField
             key={field.key}
             error={errors[field.key]}
@@ -462,7 +584,7 @@ function MasterDataForm({ config, isSaving, record, supportsActive, onCancel, on
               const normalized = field.key === 'availableForSale'
                 ? value === 'true'
                 : field.type === 'number'
-                  ? (value === '' ? null : Number(value))
+                  ? parseNumericFieldValue(value)
                   : value || null
               update(field.key, normalized as never)
             }}
@@ -493,8 +615,11 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
   const isEmailField = field.key === 'email'
   const isPhoneField = field.key === 'phone'
   const isAccountNoField = field.key === 'accountNo'
-  const inputType = field.type === 'number' ? 'number' : isEmailField ? 'email' : 'text'
+  const isNumberField = field.type === 'number'
+  const isMoneyField = field.inputFormat === 'money'
+  const inputType = isEmailField ? 'email' : 'text'
   const inputPlaceholder = isEmailField ? 'example@company.com' : `กรอก${field.label}`
+  const [draftValue, setDraftValue] = useState<string | null>(null)
 
   if (field.type === 'select') {
     return (
@@ -527,18 +652,51 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
         <input
           aria-invalid={Boolean(error)}
           aria-required={field.required}
-          className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none focus:border-slate-700 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-          inputMode={isEmailField ? 'email' : isAccountNoField ? 'numeric' : undefined}
+          className={`mt-1.5 w-full rounded-md border px-3 py-2 outline-none focus:border-slate-700 ${isMoneyField ? 'text-right' : ''} ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+          inputMode={isEmailField ? 'email' : isAccountNoField ? 'numeric' : isNumberField ? 'decimal' : undefined}
           placeholder={inputPlaceholder}
           type={inputType}
-          value={String(value ?? '')}
+          value={isMoneyField ? (draftValue ?? formatDecimalDisplay(typeof value === 'number' ? value : null, 2)) : String(value ?? '')}
+          onBlur={(event) => {
+            if (!isMoneyField) return
+            const nextValue = sanitizeDecimalInput(event.target.value, 2)
+            if (nextValue.trim() === '' || nextValue.trim() === '.') {
+              setDraftValue(null)
+              onChange('')
+              return
+            }
+            const parsed = Number(nextValue)
+            if (!Number.isFinite(parsed)) {
+              setDraftValue(null)
+              onChange('')
+              return
+            }
+            const normalized = parsed.toFixed(2)
+            setDraftValue(null)
+            onChange(normalized)
+          }}
           onChange={(event) => {
             const nextValue = isEmailField
               ? event.target.value.replace(/[^\x20-\x7E]/g, '')
               : isAccountNoField
                 ? sanitizeAccountNoInput(event.target.value)
+                : isNumberField
+                  ? sanitizeDecimalInput(event.target.value, isMoneyField ? 2 : 6)
                 : event.target.value
+            if (isMoneyField) {
+              setDraftValue(nextValue)
+            }
             onChange(nextValue)
+          }}
+          onFocus={(event: FocusEvent<HTMLInputElement>) => {
+            if (!isMoneyField) return
+            const currentValue = typeof value === 'number' ? formatDecimalDraft(value, 2) : ''
+            setDraftValue(currentValue)
+            // Place caret at end after swapping from formatted display to editable draft.
+            requestAnimationFrame(() => {
+              const end = event.target.value.length
+              event.target.setSelectionRange(end, end)
+            })
           }}
         />
       )}

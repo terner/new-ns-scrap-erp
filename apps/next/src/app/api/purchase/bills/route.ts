@@ -5,6 +5,7 @@ import { purchaseBillCancelSchema, purchaseBillFormSchema, type PurchaseBillForm
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { PO_BUY_STATUS, reconcilePoBuys } from '@/lib/server/po-buy-reconciliation'
 import { prisma } from '@/lib/server/prisma'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
@@ -61,6 +62,13 @@ type BillQuery = {
   sortKey: string
   statuses?: string[]
 }
+
+type PurchasePaymentWorkflowStatus =
+  | 'pending_approval'
+  | 'pending_payment'
+  | 'partial_paid'
+  | 'paid'
+  | 'cancelled'
 
 function branchBillCode(branchCode: string | null | undefined) {
   const digits = String(branchCode ?? '').replace(/\D/g, '')
@@ -399,9 +407,17 @@ function extractReferencedReceiptTicketIdsFromBillItems(items: Array<{ source_sn
   }).filter(Boolean))]
 }
 
+function extractReferencedPoBuyIdsFromValues(values: PurchaseBillFormValues) {
+  return [...new Set([values.poBuyId, ...values.items.map((item) => item.poBuyId)].filter(Boolean) as string[])]
+}
+
+function extractReferencedPoBuyIdsFromBillItems(items: Array<{ po_buy_id?: string | null }>) {
+  return [...new Set(items.map((item) => item.po_buy_id).filter(Boolean) as string[])]
+}
+
 async function validateStockReceiptSelection(
   values: PurchaseBillFormValues,
-  poBuyById: Map<string, { product_id: string | null; remaining_qty: Prisma.Decimal | null; supplier_id: string | null }>,
+  poBuyById: Map<string, { product_id: string | null; remaining_qty: Prisma.Decimal | null; status: string | null; supplier_id: string | null }>,
   excludeBillId?: string,
 ) {
   if (!values.receiptTicketId) {
@@ -445,6 +461,9 @@ async function validateStockReceiptSelection(
       const poBuy = poBuyById.get(item.poBuyId)
       if (!poBuy) {
         return { error: 'PO Buy ที่เลือกไม่ถูกต้อง' as const }
+      }
+      if (poBuy.status !== PO_BUY_STATUS.OPEN && poBuy.status !== PO_BUY_STATUS.PARTIAL) {
+        return { error: 'PO Buy นี้ไม่อยู่ในสถานะที่ตัดบิลรับซื้อได้' as const }
       }
       if (poBuy.supplier_id && poBuy.supplier_id !== values.supplierId) {
         return { error: 'PO Buy ต้องเป็นผู้ขายเดียวกับบิลรับซื้อ' as const }
@@ -637,7 +656,7 @@ async function optionsPayload() {
       orderBy: [{ doc_no: 'desc' }],
       select: { doc_no: true, id: true, product_id: true, remaining_amount: true, remaining_qty: true, status: true, supplier_id: true, unit_price: true },
       take: 500,
-      where: { status: { notIn: ['closed', 'Closed', 'cancelled', 'Cancelled'] } },
+      where: { status: { in: [PO_BUY_STATUS.OPEN, PO_BUY_STATUS.PARTIAL] } },
     }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
     prisma.salespersons.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
@@ -670,7 +689,7 @@ async function optionsPayload() {
   return {
     branches,
     poBuys: poBuys.map((po) => ({
-      active: !['closed', 'Closed', 'cancelled', 'Cancelled'].includes(po.status ?? ''),
+      active: (po.status === PO_BUY_STATUS.OPEN || po.status === PO_BUY_STATUS.PARTIAL) && toNumber(po.remaining_qty) > 0.0001,
       id: po.id,
       label: `${po.doc_no}${po.remaining_qty ? ` · คงเหลือ ${toNumber(po.remaining_qty).toLocaleString('th-TH')} กก.` : po.remaining_amount ? ` · คงเหลือ ${toNumber(po.remaining_amount).toLocaleString('th-TH')}` : ''}`,
       name: po.doc_no,
@@ -724,7 +743,6 @@ function billWhere(query: BillQuery): Prisma.purchase_billsWhereInput {
   }
   if (query.filterMode) where.transaction_mode = query.filterMode
   if (query.filterSource) where.purchase_source = query.filterSource
-  if (query.statuses?.length) where.status = { in: query.statuses }
   if (query.search) {
     where.OR = [
       { doc_no: { contains: query.search, mode: 'insensitive' } },
@@ -736,6 +754,20 @@ function billWhere(query: BillQuery): Prisma.purchase_billsWhereInput {
   }
 
   return where
+}
+
+function derivePurchasePaymentWorkflowStatus(params: {
+  hasActiveApproval: boolean
+  isCancelled: boolean
+  paidAmount: number
+  payableBalance: number
+  status: string | null | undefined
+}): PurchasePaymentWorkflowStatus {
+  if (params.isCancelled) return 'cancelled'
+  if (params.payableBalance <= 0.01 || String(params.status ?? '').toLowerCase() === 'paid') return 'paid'
+  if (params.paidAmount > 0.01) return 'partial_paid'
+  if (params.hasActiveApproval) return 'pending_payment'
+  return 'pending_approval'
 }
 
 function billOrderBy(query: BillQuery): Prisma.purchase_billsOrderByWithRelationInput[] {
@@ -771,7 +803,7 @@ function billOrderBy(query: BillQuery): Prisma.purchase_billsOrderByWithRelation
 
 async function rowsPayload(query: BillQuery, includePaging = true) {
   const where = billWhere(query)
-  const [rows, totalRows, totals] = await Promise.all([
+  const [rows, totals] = await Promise.all([
     prisma.purchase_bills.findMany({
       include: {
         branches: true,
@@ -780,25 +812,32 @@ async function rowsPayload(query: BillQuery, includePaging = true) {
         warehouses: true,
       },
       orderBy: billOrderBy(query),
-      skip: includePaging ? (query.page - 1) * query.pageSize : 0,
-      take: includePaging ? query.pageSize : 10000,
       where,
     }),
-    prisma.purchase_bills.count({ where }),
     prisma.purchase_bills.aggregate({
       _sum: { total_amount: true },
       where,
     }),
   ])
   const billIds = rows.map((row) => row.id)
-  const payments = billIds.length > 0 ? await prisma.payments.findMany({
-    orderBy: [{ created_at: 'asc' }],
-    select: { bill_id: true, doc_no: true, status: true },
-    where: {
-      bill_id: { in: billIds },
-      NOT: { status: 'cancelled' },
-    },
-  }) : []
+  const [payments, activeApprovals] = billIds.length > 0 ? await Promise.all([
+    prisma.payments.findMany({
+      orderBy: [{ created_at: 'asc' }],
+      select: { bill_id: true, doc_no: true, status: true },
+      where: {
+        bill_id: { in: billIds },
+        NOT: { status: 'cancelled' },
+      },
+    }),
+    prisma.payment_approvals.findMany({
+      select: { source_id: true },
+      where: {
+        source_id: { in: billIds },
+        source_type: 'purchase_bill',
+        status: 'approved',
+      },
+    }),
+  ]) : [[], []]
   const paymentDocNosByBillId = new Map<string, string[]>()
   payments.forEach((payment) => {
     const billId = payment.bill_id ?? ''
@@ -807,15 +846,64 @@ async function rowsPayload(query: BillQuery, includePaging = true) {
     if (!current.includes(payment.doc_no)) current.push(payment.doc_no)
     paymentDocNosByBillId.set(billId, current)
   })
+  const activeApprovalBillIds = new Set(activeApprovals.map((approval) => approval.source_id))
+
+  const mappedRows = rows.map((row) => {
+      const paymentDocNos = paymentDocNosByBillId.get(row.id) ?? []
+      const hasActiveApproval = activeApprovalBillIds.has(row.id)
+      const hasActivePayment = paymentDocNos.length > 0
+      const isCancelled = String(row.status ?? '').toLowerCase().includes('cancel')
+      const paidAmount = toNumber(row.paid_amount)
+      const payableBalance = toNumber(row.payable_balance)
+      const paymentWorkflowStatus = derivePurchasePaymentWorkflowStatus({
+        hasActiveApproval,
+        isCancelled,
+        paidAmount,
+        payableBalance,
+        status: row.status,
+      })
+      const lockedReason = isCancelled
+        ? 'บิลนี้ถูกยกเลิกแล้ว'
+        : hasActiveApproval
+          ? 'บิลนี้ถูกอนุมัติโอนเงินแล้ว ต้องยกเลิกรายการรอจ่ายก่อน'
+          : hasActivePayment
+            ? 'บิลนี้มีการชำระเงินแล้ว'
+            : null
+      return {
+        ...billJson(row, paymentDocNos),
+        canEdit: !lockedReason,
+        hasActiveApproval,
+        hasActivePayment,
+        lockedReason,
+        paymentWorkflowStatus,
+      }
+    })
+  const filteredRows = query.statuses?.length
+    ? mappedRows.filter((row) => query.statuses?.includes(String(row.paymentWorkflowStatus ?? '').toLowerCase()))
+    : mappedRows
+  const pagedRows = includePaging
+    ? filteredRows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize)
+    : filteredRows
 
   return {
-    rows: rows.map((row) => billJson(row, paymentDocNosByBillId.get(row.id) ?? [])),
+    rows: pagedRows,
     totalAmount: toNumber(totals._sum.total_amount),
-    totalRows,
+    totalRows: filteredRows.length,
   }
 }
 
-function buildWorkbook(rows: ReturnType<typeof billJson>[]) {
+function buildWorkbook(rows: Array<{
+  createdAt?: string
+  createdBy?: string
+  date: string
+  docNo: string
+  itemCount: number
+  payableBalance?: number
+  status: string
+  supplierName?: string
+  totalAmount?: number
+  transactionMode?: string
+}>) {
   const dataRows = rows.map((row) => ({
     'เลขที่': row.docNo,
     'วันที่': row.date,
@@ -886,6 +974,11 @@ export async function POST(request: Request) {
 
     const productIds = [...new Set(values.items.map((item) => item.productId))]
     const poBuyIds = [...new Set([values.poBuyId, ...values.items.map((item) => item.poBuyId)].filter(Boolean) as string[])]
+    if (poBuyIds.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        await reconcilePoBuys(tx, poBuyIds)
+      }, { timeout: 30000 })
+    }
     const [supplier, branch, poBuys, products] = await Promise.all([
       prisma.suppliers.findFirst({ select: { id: true, sales_id: true }, where: { active: true, id: values.supplierId } }),
       prisma.branches.findFirst({ where: { active: true, id: values.branchId } }),
@@ -996,6 +1089,7 @@ export async function POST(request: Request) {
           if (poAllocationRows.length > 0) {
             await tx.purchase_bill_po_allocations.createMany({ data: poAllocationRows })
           }
+          await reconcilePoBuys(tx, extractReferencedPoBuyIdsFromValues(values), { actor })
 
           if (values.transactionMode === 'STOCK') {
             await tx.stock_ledger.createMany({
@@ -1043,6 +1137,11 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const prismaExt = prisma as typeof prisma & {
+      payment_approvals: {
+        count: (args: unknown) => Promise<number>
+      }
+    }
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
@@ -1052,15 +1151,22 @@ export async function PATCH(request: Request) {
     if (raw?.action === 'cancel') {
       const values = purchaseBillCancelSchema.parse(raw)
       const actor = currentActor(context)
-      const [existingBill, payments, existingBillItems] = await Promise.all([
+      const [existingBill, payments, existingBillItems, activeApprovalCount] = await Promise.all([
         prisma.purchase_bills.findUnique({ where: { id: values.id } }),
         prisma.payments.findMany({
           select: { amount: true, discount: true, status: true, withholding_tax: true },
           where: { bill_id: values.id, NOT: { status: 'cancelled' } },
         }),
         prisma.purchase_bill_items.findMany({
-          select: { source_snapshot: true },
+          select: { po_buy_id: true, source_snapshot: true },
           where: { purchase_bill_id: values.id },
+        }),
+        prismaExt.payment_approvals.count({
+          where: {
+            source_id: values.id,
+            source_type: 'purchase_bill',
+            status: 'approved',
+          },
         }),
       ])
 
@@ -1070,6 +1176,9 @@ export async function PATCH(request: Request) {
       }
       const paidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
       if (paidAmount > 0) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกไม่ได้ เพราะบิลนี้มีการชำระเงินแล้ว' }, { status: 400 })
+      if (activeApprovalCount > 0) {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกไม่ได้ เพราะบิลนี้ถูกอนุมัติโอนเงินแล้ว' }, { status: 400 })
+      }
 
       const cancelledAt = new Date()
       const cancelledBill = await prisma.$transaction(async (tx) => {
@@ -1089,6 +1198,7 @@ export async function PATCH(request: Request) {
         await tx.stock_ledger.deleteMany({ where: { ref_id: values.id, ref_type: 'PB' } })
         await tx.purchase_bill_receipt_allocations.deleteMany({ where: { purchase_bill_id: values.id } })
         await tx.purchase_bill_po_allocations.deleteMany({ where: { purchase_bill_id: values.id } })
+        await reconcilePoBuys(tx, extractReferencedPoBuyIdsFromBillItems(existingBillItems), { actor })
         await refreshWeightTicketStatuses(tx, extractReferencedReceiptTicketIdsFromBillItems(existingBillItems))
         return bill
       })
@@ -1101,7 +1211,12 @@ export async function PATCH(request: Request) {
 
     const productIds = [...new Set(values.items.map((item) => item.productId))]
     const poBuyIds = [...new Set([values.poBuyId, ...values.items.map((item) => item.poBuyId)].filter(Boolean) as string[])]
-    const [existingBill, supplier, branch, poBuys, products, payments, existingBillItems] = await Promise.all([
+    if (poBuyIds.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        await reconcilePoBuys(tx, poBuyIds)
+      }, { timeout: 30000 })
+    }
+    const [existingBill, supplier, branch, poBuys, products, payments, existingBillItems, activeApprovalCount] = await Promise.all([
       prisma.purchase_bills.findUnique({ where: { id } }),
       prisma.suppliers.findFirst({ select: { id: true, sales_id: true }, where: { active: true, id: values.supplierId } }),
       prisma.branches.findFirst({ where: { active: true, id: values.branchId } }),
@@ -1112,14 +1227,28 @@ export async function PATCH(request: Request) {
         where: { bill_id: id, NOT: { status: 'cancelled' } },
       }),
       prisma.purchase_bill_items.findMany({
-        select: { source_snapshot: true },
+        select: { po_buy_id: true, source_snapshot: true },
         where: { purchase_bill_id: id },
+      }),
+      prismaExt.payment_approvals.count({
+        where: {
+          source_id: id,
+          source_type: 'purchase_bill',
+          status: 'approved',
+        },
       }),
     ])
 
     if (!existingBill) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบบิลรับซื้อ' }, { status: 404 })
     if (String(existingBill.status ?? '').toLowerCase().includes('cancel')) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขไม่ได้ เพราะบิลนี้ถูกยกเลิกแล้ว' }, { status: 400 })
+    }
+    const activePaidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
+    if (activeApprovalCount > 0) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขไม่ได้ เพราะบิลนี้ถูกอนุมัติโอนเงินแล้ว ต้องยกเลิกรายการรอจ่ายก่อน' }, { status: 400 })
+    }
+    if (activePaidAmount > 0) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขไม่ได้ เพราะบิลนี้มีการชำระเงินแล้ว' }, { status: 400 })
     }
     const billDate = existingBill.date ? toDateOnly(existingBill.date) : bangkokDateInput(new Date())
     const vatRatePercent = toNumber(existingBill.vat_rate_percent) ?? (await activeVatRatePercent(normalizeDate(billDate)))
@@ -1170,7 +1299,7 @@ export async function PATCH(request: Request) {
     if (missingWarehouseStatus) return NextResponse.json({ code: 'BAD_REQUEST', error: `ไม่พบคลัง ${missingWarehouseStatus} ที่เปิดใช้งานสำหรับสาขานี้` }, { status: 400 })
     const purchaseWarehouseId = values.transactionMode === 'STOCK' ? warehouseByStatus.get(items[0]?.itemStatus ?? 'RM')?.id ?? null : null
 
-    const paidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
+    const paidAmount = activePaidAmount
     const payableBalance = Math.max(0, totals.totalAmount - paidAmount)
     const status = paidAmount <= 0 ? 'unpaid' : payableBalance <= 0.01 ? 'paid' : 'partial'
 
@@ -1223,6 +1352,10 @@ export async function PATCH(request: Request) {
       if (poAllocationRows.length > 0) {
         await tx.purchase_bill_po_allocations.createMany({ data: poAllocationRows })
       }
+      await reconcilePoBuys(tx, [
+        ...extractReferencedPoBuyIdsFromValues(values),
+        ...extractReferencedPoBuyIdsFromBillItems(existingBillItems),
+      ], { actor })
 
       await tx.stock_ledger.deleteMany({ where: { ref_id: id, ref_type: 'PB' } })
       if (values.transactionMode === 'STOCK') {

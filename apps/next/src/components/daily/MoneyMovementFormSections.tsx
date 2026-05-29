@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatMoney, type DailyAccountOption } from '@/lib/daily'
 
 type Bill = {
+  approvalId?: string
   docNo: string
   id: string
   payableBalance?: number
@@ -22,6 +23,7 @@ type MoneyFormLike = {
 
 type PaymentLineLike = {
   amount: number
+  approvalId: string | null
   billId: string
   discount: number
   fee: number

@@ -48,7 +48,16 @@ type PoBuyPayload = {
     suppliers: Option[]
   }
   rows: PoBuyRow[]
-  summary: { open: number; remainingAmount: number; remainingQty: number; totalAmount: number; totalRows: number }
+  summary: {
+    open: number
+    partial: number
+    received: number
+    remainingAmount: number
+    remainingQty: number
+    shortClosed: number
+    totalAmount: number
+    totalRows: number
+  }
 }
 
 type PoBuyItem = {
@@ -74,7 +83,19 @@ type PoBuyRow = {
   qty: number
   remainingAmount: number
   remainingQty: number
+  shortClosedAt: string
+  shortClosedBy: string
+  shortClosedNote: string
+  shortClosedQty: number
   status: string
+  statusLogs: Array<{
+    createdAt: string
+    createdBy: string
+    id: string
+    meta: unknown
+    note: string
+    status: string
+  }>
   supplierId: string
   supplierName: string
   totalAmount: number
@@ -85,7 +106,7 @@ type PoBuyRow = {
 type FieldErrors = Record<string, string>
 type PoBuySortDirection = 'asc' | 'desc'
 type PoBuySortKey = 'date' | 'docNo' | 'expectedDelivery' | 'itemCount' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
-type PoBuyStatusKey = 'cancelled' | 'open' | 'partial' | 'received'
+type PoBuyStatusKey = 'cancelled' | 'open' | 'partial' | 'received' | 'shortClosed'
 
 function blankItem(): PoBuyFormItem {
   return { productId: '', qty: 0, unitPrice: 0 }
@@ -142,6 +163,7 @@ function formatDateTime(value?: string) {
 function poBuyStatusKey(status: string): PoBuyStatusKey {
   const normalized = status.trim().toLowerCase()
   if (normalized.includes('cancel')) return 'cancelled'
+  if (normalized.includes('short')) return 'shortClosed'
   if (normalized.includes('partial')) return 'partial'
   if (normalized.includes('received')) return 'received'
   return 'open'
@@ -150,6 +172,7 @@ function poBuyStatusKey(status: string): PoBuyStatusKey {
 function poBuyStatusLabel(status: string) {
   const key = poBuyStatusKey(status)
   if (key === 'cancelled') return 'ยกเลิก'
+  if (key === 'shortClosed') return 'ปิดรับไม่ครบ'
   if (key === 'partial') return 'รับบางส่วน'
   if (key === 'received') return 'รับครบ'
   return 'ยังไม่รับ'
@@ -184,6 +207,9 @@ export function PoBuyPageClient() {
   const [search, setSearch] = useState('')
   const [selectedPoIds, setSelectedPoIds] = useState<string[]>([])
   const [selectedRow, setSelectedRow] = useState<PoBuyRow | null>(null)
+  const [shortCloseNote, setShortCloseNote] = useState('')
+  const [shortCloseNoteError, setShortCloseNoteError] = useState('')
+  const [shortClosingRow, setShortClosingRow] = useState<PoBuyRow | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [sortDirection, setSortDirection] = useState<PoBuySortDirection>('desc')
   const [sortKey, setSortKey] = useState<PoBuySortKey>('date')
@@ -245,6 +271,13 @@ export function PoBuyPageClient() {
     setCancelingRow(row)
     setCancelNote('')
     setCancelNoteError('')
+    setError(null)
+  }
+
+  const openShortCloseDialog = (row: PoBuyRow) => {
+    setShortClosingRow(row)
+    setShortCloseNote('')
+    setShortCloseNoteError('')
     setError(null)
   }
 
@@ -335,6 +368,33 @@ export function PoBuyPageClient() {
     }
   }
 
+  const submitShortClose = async () => {
+    if (!shortClosingRow) return
+    const note = shortCloseNote.trim()
+    if (!note) {
+      setShortCloseNoteError('กรอกเหตุผลการปิดรับไม่ครบ')
+      return
+    }
+
+    setError(null)
+    setShortCloseNoteError('')
+    setIsSaving(true)
+    try {
+      const closed = await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
+        body: JSON.stringify({ action: 'shortClose', id: shortClosingRow.id, note }),
+        method: 'PATCH',
+      })
+      setShortClosingRow(null)
+      setShortCloseNote('')
+      setSearch(closed.docNo)
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ปิดรับไม่ครบไม่สำเร็จ')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     const filteredRows = (data?.rows ?? []).filter((row) => {
@@ -361,6 +421,7 @@ export function PoBuyPageClient() {
   const openRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'open')
   const partialRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'partial')
   const receivedRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'received')
+  const shortClosedRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'shortClosed')
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ format: 'xlsx' })
     if (search.trim()) params.set('q', search.trim())
@@ -418,6 +479,7 @@ export function PoBuyPageClient() {
         <Metric color="blue" label="🆕 ยังไม่รับ" sublabel="รอรับ 100%" value={`${openRows.length || data?.summary.open || 0}`} />
         <Metric color="amber" label="⚙ รับบางส่วน" sublabel="รับแล้วบางส่วน" value={`${partialRows.length}`} />
         <Metric color="emerald" label="✓ รับครบ" sublabel="รับครบแล้ว" value={`${receivedRows.length}`} />
+        <Metric color="red" label="⛔ ปิดรับไม่ครบ" sublabel="หยุดรับส่วนคงเหลือ" value={`${shortClosedRows.length || data?.summary.shortClosed || 0}`} />
         <Metric box color="amber" label="⏳ น้ำหนักรอรับ" sublabel={`${data?.summary.totalRows ?? 0} PO`} value={formatMoney(data?.summary.remainingQty ?? 0)} />
         <Metric box color="red" label="💰 มูลค่ารอรับ" sublabel={`${data?.summary.totalRows ?? 0} PO`} value={formatMoney(data?.summary.remainingAmount ?? 0)} />
       </div>
@@ -457,6 +519,12 @@ export function PoBuyPageClient() {
             label="รับครบ"
             onClick={() => toggleStatusFilter('Received', setStatuses)}
             tone="received"
+          />
+          <PoBuySegment
+            active={statuses.includes('Short Closed')}
+            label="ปิดรับไม่ครบ"
+            onClick={() => toggleStatusFilter('Short Closed', setStatuses)}
+            tone="shortClosed"
           />
           <PoBuySegment
             active={statuses.includes('Cancelled')}
@@ -509,8 +577,15 @@ export function PoBuyPageClient() {
                 <TableCell className="w-28 whitespace-nowrap text-center"><span className={`rounded-full px-2 py-0.5 ${statusBadge(row.status)}`}>{poBuyStatusLabel(row.status)}</span></TableCell>
                 <TableCell className="w-28 whitespace-nowrap text-xs text-slate-600"><div className="truncate">{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></TableCell>
                 <TableCell className="whitespace-nowrap text-right">
-                  <UiButton className="mr-2 font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</UiButton>
-                  <UiButton className="font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</UiButton>
+                  {row.status === 'Open' && row.qty === row.remainingQty ? (
+                    <>
+                      <UiButton className="mr-2 font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</UiButton>
+                      <UiButton className="font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</UiButton>
+                    </>
+                  ) : null}
+                  {(row.status === 'Open' || row.status === 'Partially Received') && row.remainingQty > 0 ? (
+                    <UiButton className="font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openShortCloseDialog(row) }}>ปิดรับไม่ครบ</UiButton>
+                  ) : null}
                 </TableCell>
               </TableRow>
           ))}
@@ -552,6 +627,25 @@ export function PoBuyPageClient() {
             setCancelNoteError('')
           }}
           onSubmit={submitCancel}
+        />
+      ) : null}
+      {shortClosingRow ? (
+        <PoBuyShortCloseModal
+          error={shortCloseNoteError}
+          isSaving={isSaving}
+          note={shortCloseNote}
+          row={shortClosingRow}
+          onChangeNote={(value) => {
+            setShortCloseNote(value)
+            setShortCloseNoteError('')
+          }}
+          onClose={() => {
+            if (isSaving) return
+            setShortClosingRow(null)
+            setShortCloseNote('')
+            setShortCloseNoteError('')
+          }}
+          onSubmit={submitShortClose}
         />
       ) : null}
       {selectedRow ? <PoBuyDetailModal row={selectedRow} onClose={() => setSelectedRow(null)} /> : null}
@@ -652,6 +746,53 @@ function PoBuyCancelModal({
   )
 }
 
+function PoBuyShortCloseModal({
+  error,
+  isSaving,
+  note,
+  onChangeNote,
+  onClose,
+  onSubmit,
+  row,
+}: {
+  error: string
+  isSaving: boolean
+  note: string
+  onChangeNote: (value: string) => void
+  onClose: () => void
+  onSubmit: () => void
+  row: PoBuyRow
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => {
+      if (!open && !isSaving) onClose()
+    }}>
+      <DialogContent aria-labelledby="po-buy-short-close-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
+        <DialogHeader className="border-b">
+          <DialogTitle id="po-buy-short-close-title">ปิดรับไม่ครบ {row.docNo}</DialogTitle>
+          <DialogDescription>{row.supplierName} · คงเหลือ {formatMoney(row.remainingQty)} กก.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 p-4 text-sm">
+          <label className="block text-xs font-medium text-slate-600" htmlFor="po-buy-short-close-note">เหตุผลการปิดรับไม่ครบ *</label>
+          <textarea
+            id="po-buy-short-close-note"
+            className="w-full rounded-md border px-3 py-2"
+            maxLength={500}
+            rows={3}
+            value={note}
+            onChange={(event) => onChangeNote(event.target.value)}
+          />
+          {error ? <div className="text-xs text-red-600">{error}</div> : null}
+        </div>
+        <DialogFooter>
+          <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ปิด</UiButton>
+          <UiButton className="bg-amber-600 font-normal hover:bg-amber-700" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'ยืนยันปิดรับไม่ครบ'}</UiButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function poBuySortValue(row: PoBuyRow, key: PoBuySortKey) {
   if (key === 'date') return row.date
   if (key === 'docNo') return row.docNo
@@ -704,7 +845,7 @@ function PoBuySegment({
   active: boolean
   label: string
   onClick: () => void
-  tone?: 'cancelled' | 'default' | 'open' | 'partial' | 'received'
+  tone?: 'cancelled' | 'default' | 'open' | 'partial' | 'received' | 'shortClosed'
 }) {
   const className = tone === 'open'
     ? active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white hover:bg-blue-50'
@@ -712,6 +853,8 @@ function PoBuySegment({
       ? active ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300 bg-white hover:bg-amber-50'
       : tone === 'received'
         ? active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white hover:bg-emerald-50'
+        : tone === 'shortClosed'
+          ? active ? 'border-red-600 bg-red-600 text-white' : 'border-slate-300 bg-white hover:bg-red-50'
         : tone === 'cancelled'
           ? active ? 'border-slate-500 bg-slate-500 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
           : active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white hover:bg-slate-100'
@@ -727,6 +870,7 @@ function statusBadge(status: string) {
   const normalized = poBuyStatusKey(status)
   if (normalized === 'received') return 'bg-emerald-100 text-emerald-700'
   if (normalized === 'partial') return 'bg-amber-100 text-amber-700'
+  if (normalized === 'shortClosed') return 'bg-red-100 text-red-700'
   if (normalized === 'cancelled') return 'bg-slate-100 text-slate-500'
   return 'bg-blue-100 text-blue-700'
 }
@@ -904,12 +1048,22 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
           <Detail label="สถานะ" value={poBuyStatusLabel(row.status)} />
           <Detail label="Qty" value={formatMoney(row.qty)} />
           <Detail label="คงเหลือ" value={formatMoney(row.remainingQty)} />
+          <Detail label="ปิดรับไม่ครบ" value={row.shortClosedQty > 0 ? formatMoney(row.shortClosedQty) : '-'} />
         </div>
         {row.notes.trim() ? (
           <div className="px-4 pb-4">
             <div className="rounded-md bg-slate-50 p-3 text-sm">
               <div className="text-xs text-slate-500">หมายเหตุ</div>
               <div className="mt-1 whitespace-pre-wrap text-slate-700">{row.notes}</div>
+            </div>
+          </div>
+        ) : null}
+        {row.shortClosedNote.trim() ? (
+          <div className="px-4 pb-4">
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm">
+              <div className="text-xs text-red-600">เหตุผลการปิดรับไม่ครบ</div>
+              <div className="mt-1 whitespace-pre-wrap text-red-800">{row.shortClosedNote}</div>
+              <div className="mt-1 text-xs text-red-600">{row.shortClosedBy || '-'} · {formatDateTime(row.shortClosedAt)}</div>
             </div>
           </div>
         ) : null}
@@ -927,6 +1081,21 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
                 ))}
             </TableBody>
           </Table>
+        </div>
+        <div className="px-4 pb-4">
+          <div className="mb-2 text-sm font-medium text-slate-700">ประวัติสถานะ</div>
+          <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+            {row.statusLogs.length === 0 ? <div className="text-sm text-slate-500">ยังไม่มีประวัติสถานะ</div> : row.statusLogs.map((log) => (
+              <div key={log.id} className="border-b border-slate-200 pb-2 last:border-b-0 last:pb-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-medium text-slate-800">{poBuyStatusLabel(log.status)}</div>
+                  <div className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</div>
+                </div>
+                <div className="mt-0.5 text-xs text-slate-500">{log.createdBy || '-'}</div>
+                {log.note ? <div className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{log.note}</div> : null}
+              </div>
+            ))}
+          </div>
         </div>
         <DialogFooter>
           <UiButton className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</UiButton>

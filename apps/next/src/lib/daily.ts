@@ -95,6 +95,7 @@ export const pettyAdvanceReturnFormSchema = z.object({
 export type PettyAdvanceReturnFormValues = z.infer<typeof pettyAdvanceReturnFormSchema>
 
 const supplierPaymentLineSchema = z.object({
+  approvalId: optionalSafeId('รหัสอนุมัติจ่าย'),
   amount: positiveMoney('ยอดจ่าย'),
   billId: z.string().trim().min(1, 'เลือกบิลซื้อ').max(80, 'บิลซื้อยาวเกินไป').regex(/^[A-Za-z0-9_.:-]+$/, 'บิลซื้อมีรูปแบบไม่ถูกต้อง'),
   discount: money('ส่วนลด').default(0),
