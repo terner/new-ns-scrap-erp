@@ -100,6 +100,7 @@ type Option = {
   product_id?: string | null
   remainingQty?: number | null
   sales_id?: string | null
+  sales_name?: string | null
   supplier_id?: string | null
   unitPrice?: number | null
   unit?: string | null
@@ -445,6 +446,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   })
   const activeSalesChannels = options.salesChannels.filter((option) => option.active !== false)
   const activeSuppliers = options.suppliers.filter((option) => option.active !== false)
+  const selectedSupplier = form.supplierId
+    ? activeSuppliers.find((supplier) => supplier.id === form.supplierId) ?? null
+    : null
+  const selectedSupplierCaretakerName = selectedSupplier?.sales_name
+    ?? (selectedSupplier?.sales_id
+      ? options.salespersons.find((salesperson) => salesperson.id === selectedSupplier.sales_id)?.name ?? null
+      : null)
   const editingBill = editingBillId ? rows.find((row): row is BillRow => !isStockIssueRow(row) && row.id === editingBillId) : null
   const formVatRatePercent = editingBill?.vatRatePercent ?? vatRatePercent
   const formSubtotal = form.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price), 0)
@@ -1275,9 +1283,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           <div className="text-blue-900">เลือกใบรับของแล้ว ระบบล็อกสาขา ผู้ขาย และใบรับของเพื่อกันข้อมูลไม่ตรงกัน</div>
                           <Button size="xs" type="button" variant="outline" onClick={clearSelectedStockReceipt}>ล้างใบรับของ</Button>
                         </div>
-                        <div className="grid gap-3 md:grid-cols-4">
+                        <div className="grid gap-3 md:grid-cols-5">
                         <div><div className="font-semibold text-slate-500">เลขที่ใบรับของ</div><div className="text-slate-900">{selectedReceipt.documentNo}</div></div>
                         <div><div className="font-semibold text-slate-500">ผู้ขาย</div><div className="text-slate-900">{selectedReceipt.partyName}</div></div>
+                        <div><div className="font-semibold text-slate-500">ผู้ดูแล</div><div className="text-slate-900">{selectedSupplierCaretakerName || '-'}</div></div>
                         <div><div className="font-semibold text-slate-500">วันที่</div><div className="text-slate-900">{formatDateDisplay(selectedReceipt.documentDate)}</div></div>
                         <div><div className="font-semibold text-slate-500">ทะเบียนรถ</div><div className="text-slate-900">{selectedReceipt.vehicleNo || '-'}</div></div>
                         </div>
@@ -1436,7 +1445,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           <Fragment key={index}>
                             <tr className="border-t align-top hover:bg-blue-50/30">
                               <td className="p-2" colSpan={4}>
-                                <ProductSearchCombobox errorKey={`items.${index}.productId`} inputId={`purchase-bill-product-search-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateItem(index, 'productId', value)} />
+                                <ProductSearchCombobox error={fieldErrors[`items.${index}.productId`]} errorKey={`items.${index}.productId`} inputId={`purchase-bill-product-search-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateItem(index, 'productId', value)} />
                                 <input className="mt-1.5 w-full rounded-md border bg-yellow-50 px-2 py-1 text-xs" placeholder="ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)" value={item.displayName ?? ''} onChange={(event) => updateItem(index, 'displayName', event.target.value || null)} />
                               </td>
                               <td className="p-2" colSpan={3}>
@@ -1521,7 +1530,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       <input checked={form.hasVat} className="size-5" disabled={!stockReceiptSelected} type="checkbox" onChange={(event) => updateForm('hasVat', event.target.checked)} />
                       <span className="font-bold text-slate-700">มี {vatLabel}</span>
                     </label>
-                    <InputField error={fieldErrors.discountTotal} inputClassName="text-right tabular-nums" label="ส่วนลดท้ายบิล (บาท)" type="number" value={form.discountTotal ? String(form.discountTotal) : ''} onChange={(value) => {
+                    <InputField error={fieldErrors.discountTotal} errorKey="discountTotal" inputClassName="text-right tabular-nums" label="ส่วนลดท้ายบิล (บาท)" type="number" value={form.discountTotal ? String(form.discountTotal) : ''} onChange={(value) => {
                       if (!stockReceiptSelected) return
                       updateForm('discountTotal', Number(value || 0))
                     }} />
@@ -1537,23 +1546,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 </div>
               </div>
 
-              {form.hasVat ? (
-                <div className="rounded-md border-2 border-amber-300 bg-amber-50 p-4">
-                  <label className="mb-2 flex cursor-pointer items-center gap-2">
-                    <input checked={form.vatInvoiceReceived} className="size-5" disabled={!stockReceiptSelected} type="checkbox" onChange={(event) => updateForm('vatInvoiceReceived', event.target.checked)} />
-                    <span className="font-bold text-amber-700">ได้รับใบกำกับภาษีตัวจริงแล้ว</span>
-                  </label>
-                  {form.vatInvoiceReceived ? (
-                    <div className="mt-2 grid gap-3 md:grid-cols-2">
-                      <InputField error={fieldErrors.vatInvoiceNo} label="เลขที่ใบกำกับภาษี" placeholder="เช่น TI-001" value={form.vatInvoiceNo ?? ''} onChange={(value) => updateForm('vatInvoiceNo', value || null)} />
-                      <InputField error={fieldErrors.vatInvoiceDate} label="วันที่ใบกำกับภาษี" type="date" value={form.vatInvoiceDate ?? ''} onChange={(value) => updateForm('vatInvoiceDate', value || null)} />
-                    </div>
-                  ) : <div className="mt-1 text-xs text-amber-700">ยังไม่ได้รับใบกำกับภาษีตัวจริง ต้องติดตามเพื่อใช้เครดิต VAT ซื้อ</div>}
-                </div>
-              ) : null}
-
               <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-                <Field error={fieldErrors.note ?? fieldErrors.notes} label="หมายเหตุ"><textarea className="w-full rounded-md border px-3 py-2" disabled={!stockReceiptSelected} rows={2} value={form.note ?? form.notes ?? ''} onChange={(event) => {
+                <Field error={fieldErrors.note ?? fieldErrors.notes} label="หมายเหตุ"><textarea data-error-key={fieldErrors.note ? 'note' : fieldErrors.notes ? 'notes' : undefined} className={`w-full rounded-md border px-3 py-2 ${(fieldErrors.note ?? fieldErrors.notes) ? 'border-red-400 bg-red-50 text-red-700' : ''}`} disabled={!stockReceiptSelected} rows={2} value={form.note ?? form.notes ?? ''} onChange={(event) => {
                   const value = event.target.value || null
                   updateForm('note', value)
                   updateForm('notes', value)
@@ -1609,15 +1603,15 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       {salesForm.items.map((item, index) => (
                         <tr key={index} className="border-t align-top hover:bg-blue-50/30">
                           <td className="p-2" colSpan={3}>
-                            <ProductSearchCombobox inputId={`sales-bill-product-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateSalesItem(index, 'productId', value)} />
+                            <ProductSearchCombobox error={salesFieldErrors[`items.${index}.productId`]} errorKey={`items.${index}.productId`} inputId={`sales-bill-product-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateSalesItem(index, 'productId', value)} />
                           </td>
                           <td className="p-2">
                             <div className="mb-1 text-[11px] font-semibold text-emerald-700">จำนวนสุทธิ</div>
-                            <input className="w-full rounded-md border px-2 py-2 text-right tabular-nums" min={0} step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateSalesItem(index, 'qty', Number(event.target.value))} />
+                            <input data-error-key={`items.${index}.qty`} className={`w-full rounded-md border px-2 py-2 text-right tabular-nums ${salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : ''}`} min={0} step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateSalesItem(index, 'qty', Number(event.target.value))} />
                           </td>
                           <td className="p-2">
                             <div className="mb-1 text-[11px] font-semibold text-slate-500">ราคา/หน่วย</div>
-                            <input className="w-full rounded-md border px-2 py-2 text-right tabular-nums" min={0} step="0.01" type="number" value={item.price || ''} onChange={(event) => updateSalesItem(index, 'price', Number(event.target.value))} />
+                            <input data-error-key={`items.${index}.price`} className={`w-full rounded-md border px-2 py-2 text-right tabular-nums ${salesFieldErrors[`items.${index}.price`] ? 'border-red-400 bg-red-50 text-red-700' : ''}`} min={0} step="0.01" type="number" value={item.price || ''} onChange={(event) => updateSalesItem(index, 'price', Number(event.target.value))} />
                           </td>
                           <td className="p-2">
                             <div className="mb-1 text-[11px] font-semibold text-slate-500">ส่วนลด</div>
@@ -1659,7 +1653,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         <Segment current={salesForm.vatType} label="รวม VAT" value="INCLUDE" onClick={(value) => updateSalesForm('vatType', value as SalesBillFormValues['vatType'])} />
                       </div>
                     ) : null}
-                    <InputField error={salesFieldErrors.discountTotal} inputClassName="text-right tabular-nums" label="ส่วนลดท้ายบิล (บาท)" type="number" value={salesForm.discountTotal ? String(salesForm.discountTotal) : ''} onChange={(value) => updateSalesForm('discountTotal', Number(value || 0))} />
+                    <InputField error={salesFieldErrors.discountTotal} errorKey="discountTotal" inputClassName="text-right tabular-nums" label="ส่วนลดท้ายบิล (บาท)" type="number" value={salesForm.discountTotal ? String(salesForm.discountTotal) : ''} onChange={(value) => updateSalesForm('discountTotal', Number(value || 0))} />
                   </div>
                   <div className="rounded-md border-2 border-blue-200 bg-blue-50 p-4">
                     <div className="mb-2 flex justify-between rounded-md border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ขาย</span><span className="tabular-nums">{formatMoney(salesForm.items.reduce((sum, item) => sum + item.qty, 0))} กก.</span></div>
@@ -1680,8 +1674,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                   </label>
                   {salesForm.vatInvoiceIssued ? (
                     <div className="mt-2 grid gap-3 md:grid-cols-2">
-                      <InputField error={salesFieldErrors.vatInvoiceNo} label="เลขที่ใบกำกับภาษี" value={salesForm.vatInvoiceNo ?? ''} onChange={(value) => updateSalesForm('vatInvoiceNo', value || null)} />
-                      <InputField error={salesFieldErrors.vatInvoiceDate} label="วันที่ใบกำกับภาษี" type="date" value={salesForm.vatInvoiceDate ?? ''} onChange={(value) => updateSalesForm('vatInvoiceDate', value || null)} />
+                      <InputField error={salesFieldErrors.vatInvoiceNo} errorKey="vatInvoiceNo" label="เลขที่ใบกำกับภาษี" value={salesForm.vatInvoiceNo ?? ''} onChange={(value) => updateSalesForm('vatInvoiceNo', value || null)} />
+                      <InputField error={salesFieldErrors.vatInvoiceDate} errorKey="vatInvoiceDate" label="วันที่ใบกำกับภาษี" type="date" value={salesForm.vatInvoiceDate ?? ''} onChange={(value) => updateSalesForm('vatInvoiceDate', value || null)} />
                     </div>
                   ) : <div className="mt-1 text-xs text-amber-700">ยังไม่ได้ออกใบกำกับภาษี ต้องติดตามเพื่อใช้เอกสารขาย</div>}
                 </div>
