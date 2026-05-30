@@ -100,7 +100,7 @@ export const purchaseBillFormSchema = z.object({
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `รายการที่ ${index + 1} ต้องกรอกราคา/กก. ให้มากกว่า 0`,
-          path: ['items'],
+          path: ['items', index, 'price'],
         })
       }
     })

@@ -660,7 +660,7 @@ async function optionsPayload() {
     }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
     prisma.salespersons.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
-    prisma.suppliers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true, sales_id: true } }),
+    prisma.suppliers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, id: true, name: true, sales_id: true, sales_rep: true } }),
     prisma.warehouses.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, branch_id: true, id: true, name: true } }),
     activeVatRatePercent(new Date()),
     prisma.weight_tickets.findMany({
@@ -703,7 +703,13 @@ async function optionsPayload() {
       .map((ticket) => weightTicketOptionJson(ticket, usageMap))
       .filter((ticket) => ticket.productSummaries.length > 0),
     salespersons,
-    suppliers,
+    suppliers: suppliers.map((supplier) => ({
+      active: supplier.active,
+      id: supplier.id,
+      name: supplier.name,
+      sales_id: supplier.sales_id,
+      sales_name: supplier.sales_rep,
+    })),
     vatRatePercent,
     warehouses,
   }

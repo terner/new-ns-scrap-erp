@@ -386,10 +386,20 @@ paths:
   /api/daily/payment-approval:
     get:
       tags: [Daily]
-      summary: List payment approval queue baseline
+      summary: List payment approval queue for purchase bills, advance payments, and expenses
       responses:
         "200":
           $ref: "#/components/responses/ListOk"
+    post:
+      tags: [Daily]
+      summary: Approve selected payment queue items and create PMA snapshots
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /api/daily/expenses:
     get:
@@ -1728,12 +1738,14 @@ paths:
     get:
       tags: [Purchase]
       summary: List supplier advance payment / deposit documents
+      description: Returns supplier advance rows and filters. `inDate` and `outDate` values are returned in local `YYYY-MM-DDTHH:mm` form for the advance-payment flow.
       responses:
         "200":
           $ref: "#/components/responses/ListOk"
     post:
       tags: [Purchase]
       summary: Create supplier advance payment / deposit document before purchase bill allocation
+      description: Accepts `inDate` and `outDate` as local date-time strings in `YYYY-MM-DDTHH:mm` format.
       requestBody:
         $ref: "#/components/requestBodies/JsonBody"
       responses:
@@ -1741,6 +1753,60 @@ paths:
           $ref: "#/components/responses/Ok"
         "400":
           $ref: "#/components/responses/BadRequest"
+
+  /api/purchase/advance-payments/{id}:
+    get:
+      tags: [Purchase]
+      summary: Read supplier advance payment detail with allocation usage and timeline
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Purchase]
+      summary: Update mutable supplier advance payment / deposit document
+      description: Allowed only while the ADV is still `pending_approval` and has not been allocated, paid, refunded, or cancelled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Purchase]
+      summary: Cancel mutable supplier advance payment / deposit document
+      description: Cancels the ADV with a required reason and records the action in the ADV timeline. Allowed only while status is `pending_approval`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/JsonBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/purchase/payments:
     get:

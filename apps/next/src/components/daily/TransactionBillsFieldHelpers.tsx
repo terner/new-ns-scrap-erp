@@ -7,6 +7,7 @@ import { FormSelectField } from '@/components/ui/FormSelectField'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
+import { cn } from '@/lib/utils'
 
 type Option = {
   code?: string | null
@@ -69,10 +70,10 @@ export function InputField({
     <Field className={className} error={error} label={label}>
       {type === 'date' ? (
         <div data-error-key={errorKey}>
-          <DatePickerInput className={inputClassName ?? 'w-full'} value={value} onChange={onChange} />
+          <DatePickerInput className={cn('w-full', error ? '[&_input]:border-red-400 [&_input]:bg-red-50 [&_input]:text-red-700 [&_[data-slot=\"input-group\"]]:border-red-400' : '', inputClassName)} value={value} onChange={onChange} />
         </div>
       ) : (
-        <Input data-error-key={errorKey} className={inputClassName} placeholder={placeholder} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+        <Input data-error-key={errorKey} className={cn(error ? 'border-red-400 bg-red-50 text-red-700' : '', inputClassName)} placeholder={placeholder} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
       )}
     </Field>
   )
@@ -121,7 +122,7 @@ export function SelectField({
 
   return (
     <Field className={className} error={error} label={label}>
-      <Select data-error-key={errorKey} className="w-full" value={value} onChange={(event) => onChange(event.target.value)}>
+      <Select data-error-key={errorKey} className={cn('w-full', error ? 'border-red-400 bg-red-50 text-red-700' : '')} value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">{placeholder}</option>
         {options.map((option) => <option key={option.id} value={option.id}>{!hideCode && option.code ? `${option.code} — ` : ''}{option.name}</option>)}
       </Select>
@@ -169,12 +170,14 @@ export function SupplierSearchCombobox({
 }
 
 export function ProductSearchCombobox({
+  error,
   inputId,
   options,
   value,
   onChange,
   errorKey,
 }: {
+  error?: string
   errorKey?: string
   inputId: string
   options: Option[]
@@ -183,6 +186,7 @@ export function ProductSearchCombobox({
 }) {
   return (
     <SearchCombobox
+      error={error}
       errorKey={errorKey}
       inputId={inputId}
       label="สินค้า *"

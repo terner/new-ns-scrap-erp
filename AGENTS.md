@@ -11,6 +11,10 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - Never commit secrets, production dumps, raw sensitive exports, or `.env.local`.
 - Do not store user passwords in application tables. Use `auth.users` as the authentication source of truth.
 - Do not use destructive git commands or revert user changes unless explicitly requested.
+- Git remote policy:
+  - push to `new-origin` only unless the user explicitly says otherwise
+  - treat `origin` as the old/legacy repo and do not push there by default
+  - if both remotes exist, verify the destination remote before push, branch deletion, or PR creation
 - Update docs at every meaningful checkpoint as if the session can close at any time.
 - Use a sub agent by default for Playwright/browser QA work; the main agent still defines scope and integrates findings.
 - Split large refactors into reviewable batches with one clear module, transform, or behavior change per batch.
@@ -65,6 +69,9 @@ Do not treat this as a greenfield rewrite unless explicitly instructed.
 ## Current Environment Shortlist
 
 - Active app: `apps/next/`
+- Git remotes:
+  - `new-origin` = active target repo `https://github.com/terner/new-ns-scrap-erp.git`
+  - `origin` = old/legacy repo `https://github.com/sirimasth/ns-scrap-erp.git`
 - Dev/target Supabase: `fhglqymcdmrgbsbadnwr`
 - Legacy production/source Supabase: `mqsgptraslgpyzbpndlg` read-only
 - Staging/UAT: not created yet

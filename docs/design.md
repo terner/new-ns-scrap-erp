@@ -97,6 +97,24 @@
 - section spacing baseline: `space-y-4`
 - field label baseline: `mb-1 text-xs font-medium text-slate-600`
 
+### Validation Error Pattern
+
+ใช้เป็น baseline กลางของ active Next app สำหรับทุก form ที่มี validation ตอนกด `บันทึก` / `ตกลง` / `ยืนยัน`
+
+Rules:
+- field ที่เป็น required หรือ field ที่ schema/API boundary ตัดสินว่า invalid ต้องแสดง error ที่ตัว field นั้นโดยตรง ไม่ไปกองเป็นข้อความรวมด้านบนอย่างเดียว
+- field ที่ invalid ต้องมี `กรอบสีแดง` และ `พื้นหลังแดงอ่อน` ทันทีในรอบ submit เดียวกัน
+- ต้องมี `ข้อความ error ใต้ field` เป็นภาษาที่ผู้ใช้ทำงานต่อได้ทันที
+- เมื่อ submit ไม่ผ่าน ระบบต้อง `scroll` ไปหา field แรกที่ invalid และ `focus` field นั้นอัตโนมัติ
+- ถ้าเป็น list/line item form เช่น `items.N.price` หรือ `items.N.productId` ต้องชี้ error กลับไปที่ row และช่องจริงนั้น ไม่ชี้รวมที่ section `items` เว้นแต่เป็น error ระดับทั้งกลุ่มจริง ๆ
+- helper/component กลางของ form เช่น `Input`, `textarea`, `select`, searchable combobox, date picker, required select และ branch/supplier/product pickers ต้องรองรับ pattern นี้เหมือนกัน
+- required marker `*` อย่างเดียวไม่พอ; หลัง submit ไม่ผ่าน user ต้องเห็นทั้ง visual error state และ focus jump
+
+Reference baseline:
+- `/purchase/bills`
+- `apps/next/src/lib/form-errors.ts`
+- `apps/next/src/components/daily/TransactionBillsPageClient.tsx`
+
 ## List Page Pattern
 
 ใช้กับหน้ากลุ่ม transaction และ report list เป็นหลัก

@@ -85,7 +85,8 @@ Status terms:
 | `/purchase/advance-payments` | จ่ายเงินล่วงหน้า / มัดจำ | partial write baseline | `GET/POST /api/purchase/advance-payments` | `supplier_advance_payments`, `supplier_advance_allocations`, `suppliers`, `branches`, `accounts` | `finance.cash.view` |
 | `/sales/bills` | บิลขาย | read baseline | `GET /api/sales/bills` | `sales_bills`, `customers` | `finance.cash.view` |
 | `/sales/stock-issue` | เบิกออกรอบิล | read baseline | `GET /api/sales/stock-issue` | `stock_issues` | `finance.cash.view` |
-| `/daily/payment-approval` | อนุมัติโอนเงิน | read baseline | `GET /api/daily/payment-approval` | payments/approval source TBD | `finance.cash.view` |
+| `/daily/payment-approval` | อนุมัติจ่ายเงิน | partial write | `GET/POST /api/daily/payment-approval` | `payment_approvals`, `purchase_bills`, `supplier_advance_payments`, `expenses` | `finance.cash.view` |
+UI note: compact summary tables; row click opens approval detail modal, and AP approval amount entry now lives in the modal instead of the list grid.
 | `/purchase/payments` | จ่ายเงิน Supplier | partial write | `GET/POST /api/purchase/payments` | `payments`, `purchase_bills`, `accounts` | `finance.cash.view` |
 | `/purchase/receipt-vouchers` | ใบสำคัญรับเงิน | read baseline | `GET /api/purchase/receipt-vouchers` | `receipt_vouchers` | `finance.cash.view` |
 | `/sales/receipts` | รับเงิน Customer | partial write | `GET/POST /api/sales/receipts` | `receipts`, `sales_bills`, `accounts` | `finance.cash.view` |
