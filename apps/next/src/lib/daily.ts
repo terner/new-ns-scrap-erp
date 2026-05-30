@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ApiError } from '@/lib/api-client'
 
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
 const businessTextPattern = /^[\p{L}\p{M}\p{N}\s.&,()/'"+#%:-]+$/u
@@ -188,7 +189,11 @@ export async function dailyFetchJson<T>(url: string, init?: RequestInit): Promis
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(payload?.error ?? 'โหลดหรือบันทึกข้อมูลไม่สำเร็จ')
+    throw new ApiError(payload?.error ?? 'โหลดหรือบันทึกข้อมูลไม่สำเร็จ', {
+      code: payload?.code,
+      fieldErrors: payload?.fieldErrors,
+      status: response.status,
+    })
   }
 
   return payload as T

@@ -12,6 +12,7 @@ import { Select as UiSelect } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip'
+import { ApiError } from '@/lib/api-client'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
@@ -136,6 +137,14 @@ function flattenClientErrors(values: PoBuyFormState) {
     if (!errors[path]) errors[path] = issue.message
   })
   return { data: null, errors }
+}
+
+function flattenApiFieldErrors(fieldErrors: Record<string, string[] | undefined>): FieldErrors {
+  return Object.fromEntries(
+    Object.entries(fieldErrors)
+      .map(([key, value]) => [key, value?.[0] ?? 'ข้อมูลไม่ถูกต้อง'])
+      .filter(([, value]) => Boolean(value)),
+  )
 }
 
 function optionLabel(option: Option) {
@@ -335,6 +344,9 @@ export function PoBuyPageClient() {
       setSearch(created.docNo)
       await loadData()
     } catch (caught) {
+      if (caught instanceof ApiError && Object.keys(caught.fieldErrors).length > 0) {
+        setFieldErrors(flattenApiFieldErrors(caught.fieldErrors))
+      }
       setError(caught instanceof Error ? caught.message : 'บันทึก PO Buy ไม่ได้')
     } finally {
       setIsSaving(false)

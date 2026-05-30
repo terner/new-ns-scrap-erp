@@ -229,6 +229,9 @@ export function MoneyMovementPageClient({
   const [isBillLocked, setIsBillLocked] = useState(false)
   const [moneyDrafts, setMoneyDrafts] = useState<Record<string, string>>({})
   const [copiedAccountKey, setCopiedAccountKey] = useState<string | null>(null)
+  const [cancelApprovalReason, setCancelApprovalReason] = useState('')
+  const [cancelApprovalTarget, setCancelApprovalTarget] = useState<Bill | null>(null)
+  const [isCancellingApproval, setIsCancellingApproval] = useState(false)
 
   const apiPath = historyOnly && mode === 'payment'
     ? '/api/purchase/payment-history'
@@ -659,6 +662,32 @@ export function MoneyMovementPageClient({
       : 'bg-emerald-500'
   }
 
+  async function cancelApprovedPaymentQueue() {
+    if (!cancelApprovalTarget?.approvalId) return
+    if (!cancelApprovalReason.trim()) {
+      setError('กรุณาระบุเหตุผลการยกเลิก')
+      return
+    }
+    setIsCancellingApproval(true)
+    setError(null)
+    try {
+      await dailyFetchJson('/api/purchase/payments/cancel-approved', {
+        body: JSON.stringify({
+          approvalId: cancelApprovalTarget.approvalId,
+          reason: cancelApprovalReason.trim(),
+        }),
+        method: 'POST',
+      })
+      setCancelApprovalTarget(null)
+      setCancelApprovalReason('')
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ยกเลิกรายการรอจ่ายไม่ได้')
+    } finally {
+      setIsCancellingApproval(false)
+    }
+  }
+
   return (
     <section className="space-y-5">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -750,7 +779,7 @@ export function MoneyMovementPageClient({
                 <TableHead className="w-40 text-right">จ่ายแล้ว</TableHead>
                 <TableHead className="w-40 text-right">คงเหลือรอออก PMT</TableHead>
                 <TableHead className="w-20 text-right">อายุ(วัน)</TableHead>
-                <TableHead className="w-20 text-center" />
+                <TableHead className="w-28 text-center" />
               </tr>
             </TableHeader>
             <TableBody>
@@ -829,18 +858,35 @@ export function MoneyMovementPageClient({
                       <TableCell className={`w-40 whitespace-nowrap text-right font-bold tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</TableCell>
                       <TableCell className="w-20 whitespace-nowrap text-right tabular-nums">{ageInDays(bill.date)}</TableCell>
                       <TableCell className="text-center">
-                        <UiButton
-                          className="font-normal"
-                          size="xs"
-                          type="button"
-                          variant="outline"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openFormForBill(bill)
-                          }}
-                        >
-                          ทำจ่าย
-                        </UiButton>
+                        <div className="flex items-center justify-center gap-2">
+                          <UiButton
+                            className="font-normal"
+                            size="xs"
+                            type="button"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openFormForBill(bill)
+                            }}
+                          >
+                            ทำจ่าย
+                          </UiButton>
+                          <UiButton
+                            className="font-normal text-rose-700"
+                            disabled={(bill.paidAmount ?? 0) > 0.01 || !bill.approvalId}
+                            size="xs"
+                            type="button"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setCancelApprovalTarget(bill)
+                              setCancelApprovalReason('')
+                              setError(null)
+                            }}
+                          >
+                            ยกเลิก
+                          </UiButton>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -1115,6 +1161,63 @@ export function MoneyMovementPageClient({
             </TableBody>
           </Table>
         </>
+      ) : null}
+
+      {mode === 'payment' && !historyOnly && cancelApprovalTarget ? (
+        <Dialog open onOpenChange={(open) => {
+          if (!open && !isCancellingApproval) {
+            setCancelApprovalTarget(null)
+            setCancelApprovalReason('')
+          }
+        }}>
+          <DialogContent className="max-w-lg p-0" hideClose>
+            <DialogHeader className="border-b px-5 py-4">
+              <DialogTitle className="font-bold text-slate-900">ยกเลิกรายการรอจ่าย</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 px-5 py-4 text-sm">
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-slate-700">
+                <div><span className="font-semibold">เลขที่รายการ:</span> {cancelApprovalTarget.docNo}</div>
+                {cancelApprovalTarget.sourceDocNo && cancelApprovalTarget.sourceDocNo !== cancelApprovalTarget.docNo ? (
+                  <div><span className="font-semibold">เอกสารต้นทาง:</span> {cancelApprovalTarget.sourceDocNo}</div>
+                ) : null}
+                <div><span className="font-semibold">{partyLabel}:</span> {partyMap.get(cancelApprovalTarget.supplierId ?? '') ?? cancelApprovalTarget.supplierId ?? '-'}</div>
+                <div><span className="font-semibold">ยอดคงเหลือ:</span> {formatMoney(cancelApprovalTarget.payableBalance ?? 0)}</div>
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-slate-600">เหตุผลการยกเลิก</span>
+                <textarea
+                  className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-0 transition focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                  placeholder="ระบุเหตุผลการยกเลิกรายการรอจ่าย"
+                  value={cancelApprovalReason}
+                  onChange={(event) => setCancelApprovalReason(event.target.value)}
+                />
+              </label>
+            </div>
+            <DialogFooter className="border-t px-5 py-4">
+              <UiButton
+                className="font-normal text-slate-600"
+                disabled={isCancellingApproval}
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setCancelApprovalTarget(null)
+                  setCancelApprovalReason('')
+                }}
+              >
+                ปิด
+              </UiButton>
+              <UiButton
+                className="bg-rose-600 px-5 font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                disabled={isCancellingApproval || !cancelApprovalReason.trim()}
+                type="button"
+                variant="default"
+                onClick={() => void cancelApprovedPaymentQueue()}
+              >
+                ยืนยันยกเลิกรายการรอจ่าย
+              </UiButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       ) : null}
 
     </section>
