@@ -5,6 +5,10 @@
 - Do not revert user changes unless explicitly requested.
 - Do not use destructive git commands unless explicitly requested.
 - Keep commits focused by phase or module.
+- Push only to `new-origin` / `https://github.com/terner/new-ns-scrap-erp.git`.
+- Treat `origin` / `https://github.com/sirimasth/ns-scrap-erp.git` as legacy read-only reference material only.
+- Never push, force-push, create branches, delete branches, open PRs, write tags, or otherwise mutate `origin` / `https://github.com/sirimasth/ns-scrap-erp.git`.
+- Use `origin` only for read operations such as fetch, log, diff, show, and checkout-to-inspect.
 - Do not commit local tool settings such as `.claude/settings.local.json` unless the user explicitly wants it.
 
 ## Communication Rules

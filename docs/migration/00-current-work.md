@@ -6,6 +6,7 @@ Date: 2026-05-22
 Active app: `apps/next`
 Primary remote: `new-origin`
 Last pushed checkpoint: Sales PO/bill create flow and topbar cleanup (pending commit)
+Git safety checkpoint: `origin` / `https://github.com/sirimasth/ns-scrap-erp.git` is legacy read-only reference material only. Never push, force-push, branch, tag, PR, delete, or otherwise mutate that repo; use it only for read operations.
 
 ## Current Batch
 

@@ -13,7 +13,9 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - Do not use destructive git commands or revert user changes unless explicitly requested.
 - Git remote policy:
   - push to `new-origin` only unless the user explicitly says otherwise
-  - treat `origin` as the old/legacy repo and do not push there by default
+  - `origin` / `https://github.com/sirimasth/ns-scrap-erp.git` is legacy read-only reference material only
+  - never push, force-push, create branches, delete branches, open PRs, write tags, or otherwise mutate `origin` / `https://github.com/sirimasth/ns-scrap-erp.git`
+  - use `origin` only for read operations such as fetch, log, diff, show, and checkout-to-inspect
   - if both remotes exist, verify the destination remote before push, branch deletion, or PR creation
 - Update docs at every meaningful checkpoint as if the session can close at any time.
 - Use a sub agent by default for Playwright/browser QA work; the main agent still defines scope and integrates findings.
