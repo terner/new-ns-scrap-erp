@@ -191,15 +191,19 @@ export async function buildDualCostingManagement() {
     })
   })
 
-  const ledgerRows: CostAllocationLedgerRow[] = tradingDeals.map((deal) => {
+  const ledgerRows: CostAllocationLedgerRow[] = tradingDeals.map((deal, index) => {
     const qty = toNumber(deal.matched_qty)
     const totalCost = toNumber(deal.matched_purchase_amount)
     const allocatedRevenue = toNumber(deal.matched_sales_amount)
     const grossProfit = allocatedRevenue - totalCost
     const targetType = deal.sales_bills?.po_sell_id ? 'PO_SELL' : 'SPOT_SELL'
     const product = deal.products ?? (deal.product_id != null ? productById.get(String(deal.product_id)) : null)
+    const saleDocNo = deal.sales_bill_no ?? deal.sales_bills?.doc_no ?? deal.customers?.name ?? '-'
+    const sourceNo = deal.purchase_bill_no ?? deal.purchase_bills?.doc_no ?? deal.suppliers?.name ?? '-'
+    const productCode = product?.code ?? '-'
+    const allocatedAt = deal.created_at?.toISOString() ?? toDateOnly(deal.date)
     return {
-      allocatedAt: deal.created_at?.toISOString() ?? toDateOnly(deal.date),
+      allocatedAt,
       allocatedBy: deal.created_by ?? '-',
       allocatedQty: qty,
       allocatedRevenue,
@@ -208,14 +212,14 @@ export async function buildDualCostingManagement() {
       date: toDateOnly(deal.date),
       gpPct: pct(grossProfit, allocatedRevenue),
       grossProfit,
-      id: deal.deal_no,
+      id: `${deal.deal_no}:${saleDocNo}:${sourceNo}:${productCode}:${allocatedAt}:${deal.status ?? '-'}:${index}`,
       matchId: deal.deal_no,
       productCategory: product?.metal_group ?? '-',
       productId: product?.code ?? '',
       productName: product ? `${product.code} - ${product.name}` : '-',
-      saleDocNo: deal.sales_bill_no ?? deal.sales_bills?.doc_no ?? deal.customers?.name ?? '-',
+      saleDocNo,
       saleQty: qty,
-      sourceNo: deal.purchase_bill_no ?? deal.purchase_bills?.doc_no ?? deal.suppliers?.name ?? '-',
+      sourceNo,
       status: isCancelled(deal.status) ? 'reversed' : 'approved',
       targetType,
       totalCost,

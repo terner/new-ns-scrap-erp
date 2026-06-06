@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { apiErrorResponse } from '@/lib/server/api-error'
+import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
 import { Prisma } from '../../../../../generated/prisma/client'
 
@@ -116,9 +117,11 @@ export async function GET(request: Request) {
         from public.app_audit_logs a
         left join public.app_users actor on actor.id = a.actor_app_user_id
         left join public.app_users target
-          on a.target_type = 'app_user'
-          and a.target_id ~ '^[0-9]+$'
-          and target.id = a.target_id::bigint
+          on target.id = case
+            when a.target_type = 'app_user' and a.target_id ~ '^[0-9]+$'
+            then a.target_id::bigint
+            else null
+          end
         union all
         select
           'activity'::text as stream,
@@ -178,9 +181,11 @@ export async function GET(request: Request) {
         from public.app_audit_logs a
         left join public.app_users actor on actor.id = a.actor_app_user_id
         left join public.app_users target
-          on a.target_type = 'app_user'
-          and a.target_id ~ '^[0-9]+$'
-          and target.id = a.target_id::bigint
+          on target.id = case
+            when a.target_type = 'app_user' and a.target_id ~ '^[0-9]+$'
+            then a.target_id::bigint
+            else null
+          end
         union all
         select
           'activity'::text as stream,
@@ -234,6 +239,7 @@ export async function GET(request: Request) {
       totalPages: Math.max(1, Math.ceil(total / values.pageSize)),
     })
   } catch (caught) {
-    return authContextErrorResponse(caught)
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'โหลด Audit & Activity Log ไม่สำเร็จ', 500)
   }
 }

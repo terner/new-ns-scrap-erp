@@ -88,26 +88,30 @@ export async function GET(request: Request) {
       where: { NOT: { status: { in: ['cancelled', 'Cancelled'] } } },
     })
 
-    const rows: DealMarginRow[] = deals.map((deal) => {
+    const rows: DealMarginRow[] = deals.map((deal, index) => {
       const matchedQty = toNumber(deal.matched_qty)
       const matchedCost = toNumber(deal.matched_purchase_amount)
       const totalRevenue = toNumber(deal.matched_sales_amount)
       const margin = totalRevenue - matchedCost
       const unitPrice = matchedQty > 0 ? totalRevenue / matchedQty : 0
+      const customer = deal.customers?.name ?? '-'
+      const product = deal.products?.name ?? '-'
+      const date = toDateOnly(deal.date)
+      const rowStatusMatch = statusMatch(matchedQty, matchedQty, deal.status)
       return {
         avgCost: matchedQty > 0 ? matchedCost / matchedQty : 0,
         channel: 'Trading Deal',
-        customer: deal.customers?.name ?? '-',
-        date: toDateOnly(deal.date),
+        customer,
+        date,
         docNo: deal.deal_no,
-        id: deal.deal_no,
+        id: `${deal.deal_no}:${customer}:${product}:${date}:${rowStatusMatch}:${index}`,
         margin,
         marginPct: totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0,
         matchedCost,
         matchedQty,
-        product: deal.products?.name ?? '-',
+        product,
         sellQty: matchedQty,
-        statusMatch: statusMatch(matchedQty, matchedQty, deal.status),
+        statusMatch: rowStatusMatch,
         totalRevenue,
         unitPrice,
       }

@@ -73,10 +73,10 @@ async function accountBalances(asOf: Date) {
     const currency = account.currency ?? 'THB'
     return {
       balance,
-      code: account.account_no,
+      code: account.code,
       currency,
       fxRate: currency === 'THB' ? 1 : 1,
-      id: account.id,
+      id: account.code,
       name: account.name,
       thbEquivalent: balance,
       type: account.type,

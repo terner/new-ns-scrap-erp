@@ -178,6 +178,71 @@ Result:
 
 - remaining tables with `id text`: `0`
 - current `public.id` inventory after Wave 2:
+
+### 2026-06-06 Dual-Costing Ledger Follow-up
+
+- `apps/next/src/lib/server/dual-costing-management.ts` was still leaking a non-unique outward row key in the cost-allocation ledger by reusing `trading_deals.deal_no` as `CostAllocationLedgerRow.id`
+- this was not a DB or schema problem; `deal_no` is a business match/group identifier and can legitimately appear on multiple ledger rows
+- runtime contract is now:
+  - `matchId = deal_no` for user-facing display/filtering
+  - `id = deterministic composite row key` for React/client row identity
+- the row key now combines `deal_no`, `saleDocNo`, `sourceNo`, `productCode`, `allocatedAt`, `status`, and the stable sorted row index, which removes duplicate React keys without reintroducing internal bigint ids to the client
+- verification passed with:
+  - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`
+  - `npm run build --workspace @ns-scrap-erp/next`
+  - `git diff --check`
+
+### 2026-06-06 Match-Log Follow-up
+
+- `apps/next/src/app/api/dual-costing/match-log/route.ts` had the same contract bug independently: it returned `id = deal_no` for each row
+- `deal_no` remains the user-facing `matchId`, but it is not a unique row key because multiple match-log rows can belong to the same deal
+- runtime contract is now:
+  - `matchId = deal_no` for business display, filters, and export columns
+  - `id = deterministic composite row key` for React/client row identity
+- the route now composes `id` from `deal_no`, `target`, `sourceNo`, `product`, `date`, `status`, and the sorted row index
+- verification passed with:
+  - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`
+  - `npm run build --workspace @ns-scrap-erp/next`
+  - `git diff --check`
+
+### 2026-06-06 Deal-Margin Follow-up
+
+- `apps/next/src/app/api/dual-costing/deal-margin/route.ts` was the remaining `trading_deals` read surface still returning `id = deal_no`
+- `deal_no` remains the business-facing `docNo`, but it cannot serve as a unique row key because multiple rows can share the same deal number
+- runtime contract is now:
+  - `docNo = deal_no` for business display/export
+  - `id = deterministic composite row key` for React/client row identity
+- the route now composes `id` from `deal_no`, `customer`, `product`, `date`, `statusMatch`, and the sorted row index
+- verification passed with:
+  - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`
+  - `npm run build --workspace @ns-scrap-erp/next`
+  - `git diff --check`
+
+### 2026-06-06 Finance Bank / Cash Position Follow-up
+
+- the active DB behind `apps/next/.env.local` was still missing `public.bank_statement.doc_no`
+- this broke `/api/finance/bank` and `/api/finance/cash-position` together because both active routes now assume `bank_statement.doc_no` exists as the outward business document key
+- root cause was DB drift, not route logic
+- applying existing migration `supabase/migrations/20260605133000_add_doc_no_to_bank_statement.sql`:
+  - added `bank_statement.doc_no`
+  - backfilled `362` rows
+  - enforced the not-null/unique contract for the local dev DB
+- follow-up direct DB verification confirmed:
+  - `select count(*) from public.bank_statement where doc_no is null;` = `0`
+  - `select count(*) from public.accounts where code is null;` = `0`
+
+### 2026-06-06 Trading Matching Follow-up
+
+- `apps/next/src/app/api/trading/matching/route.ts` was still returning `id = deal_no` for each trading-deal row
+- `deal_no` remains the business-facing `dealNo`, but it is not a unique row key because one deal number can appear on multiple rendered rows
+- runtime contract is now:
+  - `dealNo = deal_no` for business display/export
+  - `id = deterministic composite row key` for React/client row identity
+- the route now composes `id` from `deal_no`, `purchaseBillNo`, `salesBillNo`, `supplierName`, `customerName`, `productName`, `date`, `status`, and the sorted row index
+- verification passed with:
+  - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`
+  - `npm run build --workspace @ns-scrap-erp/next`
+  - `git diff --check`
   - `int8`: `74`
   - `uuid`: `10`
 - selected legacy `_id` text columns still remain only in the known caution bucket such as:
@@ -273,6 +338,9 @@ Planned follow-up:
   - follow-up runtime verification on 2026-06-06 found the same local-app DB was also still missing `20260605170000_add_event_key_to_bill_swap_history.sql` and `20260605173000_add_allocation_key_to_supplier_advance_allocations.sql`
   - the absence of `bill_swap_history.event_key` and `supplier_advance_allocations.allocation_key` was enough to break `/api/daily/bill-swap-history`, `/api/purchase/advance-payments`, and `/api/purchase/bills` even though the route code and Prisma schema were already correct
   - applying those existing migrations to the database referenced by `apps/next/.env.local` restored the missing columns without schema redesign, and browser verification confirmed `/purchase/bills`, `/purchase/advance-payments`, and `/daily/bill-swap-history` all load successfully afterward
+  - follow-up runtime verification on 2026-06-06 also found the same local-app DB had not yet received `20260605153000_upgrade_po_buy_status_logs_to_event_log.sql`
+  - `public.po_buy_status_logs` was still on the legacy shape (`status`, `note`, `meta`, `created_at`, `created_by`, `id`, `po_buy_id`), so `/api/purchase/po-buy` failed as soon as the active route queried event-log fields such as `event_key`, `action`, `from_status`, `to_status`, and `po_buy_doc_no`
+  - applying that existing migration to the database referenced by `apps/next/.env.local` backfilled `495` rows and restored `/purchase/po-buy` without route rollback; browser verification confirmed the page loads successfully afterward
   - master-data UI config follow-up in `apps/next/src/lib/master-data-page-configs.ts` restored visible business codes on pages that already run code-first contracts but were still hiding the field in the active UI: `currencies`, `channels`, `accounts`, and `account-subtypes`
   - `/api/finance/foreign/fx-gain-loss-report` now emits `bank_statement.ref_no` when available and `-` otherwise; it no longer falls back to raw `ref_id` / `ref_type` as outward reference text
   - `cash-others-anomaly` bank-entry anomaly rows now use `bank_statement.doc_no` in outward anomaly ids instead of embedding internal `bank_statement.id`
@@ -888,6 +956,24 @@ Planned follow-up:
     - trading/deal routes now expose `deal_no` or bill `doc_no` instead of bigint ids
     - stock convert/transfer read payloads no longer key from internal ledger ids
     - transaction-ledger display fields no longer fall back to account bigint ids
+ - scoped verification:
+    - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false` passed
+    - `npm run lint --workspace @ns-scrap-erp/next` passed
+    - `npm run build --workspace @ns-scrap-erp/next` passed
+    - `git diff --check` passed
+- 2026-06-06: audit / cash calendar / cash summary runtime cleanup
+  - touched files:
+    - `apps/next/src/lib/server/main-calendars.ts`
+    - `apps/next/src/lib/server/cash-others-anomaly.ts`
+    - `apps/next/src/app/api/admin/auth-events/route.ts`
+  - key repairs:
+    - `buildCashFlowCalendar()` no longer returns `accounts.id bigint` in outward payloads; report rows now use `accounts.code`
+    - `buildCashOthersSummary()` / `accountBalances()` no longer return bigint account ids in `rows.cashAccounts`; outward account ids now use `accounts.code`
+    - `/api/admin/auth-events` now joins `app_users` from `app_audit_logs.target_id` through a guarded `CASE` expression instead of a raw `target_id::bigint` cast, so legacy nonnumeric target refs cannot crash the feed
+    - `/api/admin/auth-events` now distinguishes auth failures from internal runtime/query failures instead of masking every exception as a permission error
+  - contract note:
+    - this closes the active report-family failure mode where bigint ids or unsafe cast paths leaked into read-only report payloads after the DB-first cutover
+    - no internal-id fallback or bigint compatibility path was introduced
   - scoped verification:
     - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false` passed
     - `npm run lint --workspace @ns-scrap-erp/next` passed

@@ -80,25 +80,30 @@ export async function GET(request: Request) {
       take: 10000,
     })
 
-    const rows: MatchLogRow[] = deals.map((deal) => {
+    const rows: MatchLogRow[] = deals.map((deal, index) => {
       const qtyUsed = toNumber(deal.matched_qty)
       const totalCost = toNumber(deal.matched_purchase_amount)
+      const target = deal.sales_bill_no
+        ?? deal.sales_bills?.doc_no
+        ?? deal.customers?.name
+        ?? '-'
+      const sourceNo = deal.purchase_bill_no ?? deal.purchase_bills?.doc_no ?? '-'
+      const product = deal.products?.name ?? '-'
+      const rowStatus = isCancelled(deal.status) ? 'reversed' as const : 'approved' as const
+      const date = toDateOnly(deal.date)
       return {
         allocationMode: deal.auto_created ? 'Auto' : 'Trading',
         costType: 'Purchase' as const,
-        date: toDateOnly(deal.date),
-        id: deal.deal_no,
+        date,
+        id: `${deal.deal_no}:${target}:${sourceNo}:${product}:${date}:${rowStatus}:${index}`,
         matchId: deal.deal_no,
         matchType: 'sales' as const,
-        product: deal.products?.name ?? '-',
+        product,
         qtyUsed,
-        sourceNo: deal.purchase_bill_no ?? deal.purchase_bills?.doc_no ?? '-',
+        sourceNo,
         sourceType: 'Trading_Deal' as const,
-        status: isCancelled(deal.status) ? 'reversed' as const : 'approved' as const,
-        target: deal.sales_bill_no
-          ?? deal.sales_bills?.doc_no
-          ?? deal.customers?.name
-          ?? '-',
+        status: rowStatus,
+        target,
         totalCost,
         unitCost: qtyUsed > 0 ? totalCost / qtyUsed : 0,
       }

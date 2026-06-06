@@ -110,25 +110,32 @@ export async function GET(request: Request) {
       .filter((row) => !to || row.date <= to)
       .filter((row) => !q || `${row.docNo} ${row.customerName}`.toLowerCase().includes(q))
 
-    const dealRows = deals.map((deal) => {
+    const dealRows = deals.map((deal, index) => {
       const salesAmount = toNumber(deal.matched_sales_amount)
       const purchaseAmount = toNumber(deal.matched_purchase_amount)
       const grossProfit = salesAmount - purchaseAmount
+      const customerName = deal.customers?.name ?? '-'
+      const supplierName = deal.suppliers?.name ?? '-'
+      const productName = deal.products?.name ?? '-'
+      const date = toDateOnly(deal.date)
+      const status = deal.status ?? ''
+      const purchaseBillNo = deal.purchase_bill_no ?? ''
+      const salesBillNo = deal.sales_bill_no ?? ''
       return {
-        customerName: deal.customers?.name ?? '-',
-        date: toDateOnly(deal.date),
+        customerName,
+        date,
         dealNo: deal.deal_no,
         grossProfit,
         grossProfitPct: salesAmount > 0 ? (grossProfit / salesAmount) * 100 : 0,
-        id: deal.deal_no,
+        id: `${deal.deal_no}:${purchaseBillNo}:${salesBillNo}:${supplierName}:${customerName}:${productName}:${date}:${status}:${index}`,
         matchedPurchaseAmount: purchaseAmount,
         matchedQty: toNumber(deal.matched_qty),
         matchedSalesAmount: salesAmount,
-        productName: deal.products?.name ?? '-',
-        purchaseBillNo: deal.purchase_bill_no ?? '',
-        salesBillNo: deal.sales_bill_no ?? '',
-        status: deal.status ?? '',
-        supplierName: deal.suppliers?.name ?? '-',
+        productName,
+        purchaseBillNo,
+        salesBillNo,
+        status,
+        supplierName,
       }
     })
       .filter((deal) => !activeStatusFilter || deal.status === activeStatusFilter)
