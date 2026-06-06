@@ -1581,3 +1581,33 @@ Tailwind dependency check:
     - `npm run lint --workspace @ns-scrap-erp/next`
     - `npm run build --workspace @ns-scrap-erp/next`
     - `git diff --check`
+- 2026-06-06: PO Buy form design-alignment checkpoint
+  - UI/runtime changes:
+    - `/purchase/po-buy` item rows now use `SearchCombobox` for the product field instead of a plain `<select>`, matching `docs/design.md` for searchable `product` inputs
+    - product row options keep the outward business label `CODE - NAME` and search by code/name without reintroducing any internal-id display
+    - PO Buy `ราคา/หน่วย` now follows the system money-input baseline (`type="text"` + `inputMode="decimal"` + Thai money formatting on blur) instead of raw `type="number"`
+    - PO Buy `จำนวน (กก.)` stays on the number-exception path but now explicitly uses decimal input mode and hides native number spinners to match the design matrix
+  - contract note:
+    - no schema or API payload change was introduced in this batch; the form still submits the same validated `PoBuyFormValues`
+    - this batch only brings the active page controls back in line with `docs/design.md`
+  - verification:
+    - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`
+    - `npm run lint --workspace @ns-scrap-erp/next`
+    - `npm run build --workspace @ns-scrap-erp/next`
+    - `git diff --check`
+- 2026-06-06: PO Buy combobox and sort behavior checkpoint
+  - UI/runtime changes:
+    - `SearchCombobox` now supports `hideLabel` and `optionsPanelClassName` so PO Buy can hide inline table labels and expand supplier/product dropdown height without changing other pages
+    - PO Buy supplier/product dropdowns now render through a scoped portal host inside the dialog, so the option list is not clipped by the table section and still remains clickable/selectable inside the modal
+    - `SearchCombobox` now supports keyboard navigation for active option lists via `ArrowUp`, `ArrowDown`, and `Enter`, using the highlighted option instead of always choosing the first row
+    - PO Buy `จำนวน` now follows the same editable text-entry pattern as `ราคา/หน่วย` for clearing and retyping values, while still staying a qty field rather than a money-formatted field
+    - new PO Buy forms now default `วันส่งมอบ` to today
+    - `/purchase/po-buy` now defaults table sorting to `docNo desc` so the latest document number appears first
+  - contract note:
+    - no API/schema payload changed in this batch; all changes are UI behavior, combobox rendering, and local client-side sorting defaults only
+    - the scoped portal fix intentionally avoids `document.body` for comboboxes inside the PO Buy dialog because Radix dialog focus/outside handling broke option selection there
+  - verification:
+    - `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`
+    - `npm run lint --workspace @ns-scrap-erp/next`
+    - `npm run build --workspace @ns-scrap-erp/next`
+    - `git diff --check`

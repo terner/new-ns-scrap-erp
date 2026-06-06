@@ -603,4 +603,6 @@ Tracker หลักสำหรับงานที่เหลือทั้
 - [x] `/api/finance/foreign/fx-gain-loss-report` now uses a natural outward composite id and no longer exposes raw internal `ref_id`
 - [x] `/api/admin/auth-events` now uses event-based composite ids instead of internal audit/activity row ids
 - [x] inventoryed remaining models without `code/doc_no` from `schema.prisma`: `59` total (`public 37`, `auth 22`)
+- [x] `/purchase/po-buy` item rows now use searchable product combobox + money-pattern unit price input + number-exception qty input to match `docs/design.md`
+- [x] `/purchase/po-buy` combobox behavior is restored inside the modal: supplier/product dropdowns are selectable, keyboard-navigable, not clipped by the table section, and create forms default `expectedDelivery` to today while list sort defaults to `docNo desc`
 - [ ] decide next schema wave for `public` models still lacking explicit business keys, especially support/admin and document-detail tables

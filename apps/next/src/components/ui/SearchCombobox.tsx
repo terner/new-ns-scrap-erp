@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { Input } from '@/components/ui/Input'
 
@@ -15,9 +16,11 @@ export function SearchCombobox({
   disabled = false,
   error,
   errorKey,
+  hideLabel = false,
   inputId,
   label,
   options,
+  optionsPanelClassName,
   placeholder,
   value,
   onChange,
@@ -25,9 +28,11 @@ export function SearchCombobox({
   disabled?: boolean
   error?: string
   errorKey?: string
+  hideLabel?: boolean
   inputId: string
   label: string
   options: SearchComboboxOption[]
+  optionsPanelClassName?: string
   placeholder?: string
   value: string
   onChange: (optionId: string) => void
@@ -39,16 +44,64 @@ export function SearchCombobox({
   const hasInlineRequired = label.trim().endsWith('*')
   const labelText = hasInlineRequired ? label.trim().slice(0, -1).trimEnd() : label
   const inputRef = useRef<HTMLInputElement>(null)
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const portalHostRef = useRef<HTMLElement | null>(null)
   const selectedOption = useMemo(() => options.find((option) => option.id === value) ?? null, [options, value])
   const selectedLabel = selectedOption?.label ?? ''
   const selectedLabelQuery = selectedLabel.trim().toLowerCase()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState(selectedLabel)
+  const [panelRect, setPanelRect] = useState<{ left: number; top: number; width: number } | null>(null)
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const isSelectedValueQuery = Boolean(selectedOption) && query.trim().toLowerCase() === selectedLabelQuery
 
   useEffect(() => {
     setQuery(selectedLabel)
   }, [selectedLabel])
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input || typeof document === 'undefined') return
+    const scopedPortalHost = input.closest('[data-combobox-portal-root="true"]')
+    const resolvedPortalHost = scopedPortalHost instanceof HTMLElement ? scopedPortalHost : document.body
+    portalHostRef.current = resolvedPortalHost
+    setPortalHost(resolvedPortalHost)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    const updatePanelRect = () => {
+      const input = inputRef.current
+      if (!input) return
+      const inputRect = input.getBoundingClientRect()
+      const host = portalHostRef.current
+      if (!host || host === document.body) {
+        setPanelRect({
+          left: inputRect.left,
+          top: inputRect.bottom + 4,
+          width: inputRect.width,
+        })
+        return
+      }
+
+      const hostRect = host.getBoundingClientRect()
+      setPanelRect({
+        left: inputRect.left - hostRect.left + host.scrollLeft,
+        top: inputRect.bottom - hostRect.top + host.scrollTop + 4,
+        width: inputRect.width,
+      })
+    }
+
+    updatePanelRect()
+    window.addEventListener('resize', updatePanelRect)
+    window.addEventListener('scroll', updatePanelRect, true)
+    return () => {
+      window.removeEventListener('resize', updatePanelRect)
+      window.removeEventListener('scroll', updatePanelRect, true)
+    }
+  }, [open])
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -60,6 +113,26 @@ export function SearchCombobox({
     return rows.slice(0, 80)
   }, [isSelectedValueQuery, options, query])
 
+  useEffect(() => {
+    if (!open) {
+      setHighlightedIndex(-1)
+      return
+    }
+
+    if (filteredOptions.length === 0) {
+      setHighlightedIndex(-1)
+      return
+    }
+
+    const selectedIndex = filteredOptions.findIndex((option) => option.id === value)
+    setHighlightedIndex(selectedIndex >= 0 ? selectedIndex : 0)
+  }, [filteredOptions, open, value])
+
+  useEffect(() => {
+    if (highlightedIndex < 0) return
+    optionRefs.current[highlightedIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [highlightedIndex])
+
   const selectOption = (option: SearchComboboxOption) => {
     if (disabled) return
     onChange(option.id)
@@ -70,12 +143,14 @@ export function SearchCombobox({
 
   return (
     <div className="relative" data-error-key={errorKey}>
-      <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label>
+      {!hideLabel ? <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label> : null}
       <Input
         ref={inputRef}
         aria-autocomplete="list"
+        aria-activedescendant={open && highlightedIndex >= 0 ? `${inputId}-option-${highlightedIndex}` : undefined}
         aria-controls={`${inputId}-options`}
         aria-expanded={open}
+        aria-haspopup="listbox"
         aria-invalid={Boolean(error)}
         className={`h-10 w-full rounded-md border px-3 py-2 text-base sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
         disabled={disabled}
@@ -123,32 +198,71 @@ export function SearchCombobox({
             setOpen(false)
             return
           }
-          if (event.key === 'Enter' && open && filteredOptions[0]) {
+          if (event.key === 'ArrowDown') {
             event.preventDefault()
-            selectOption(filteredOptions[0])
+            if (!open) {
+              setOpen(true)
+              return
+            }
+            if (filteredOptions.length === 0) return
+            setHighlightedIndex((current) => {
+              if (current < 0) return 0
+              return Math.min(current + 1, filteredOptions.length - 1)
+            })
+            return
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault()
+            if (!open) {
+              setOpen(true)
+              return
+            }
+            if (filteredOptions.length === 0) return
+            setHighlightedIndex((current) => {
+              if (current < 0) return filteredOptions.length - 1
+              return Math.max(current - 1, 0)
+            })
+            return
+          }
+          if (event.key === 'Enter' && open && filteredOptions[highlightedIndex >= 0 ? highlightedIndex : 0]) {
+            event.preventDefault()
+            selectOption(filteredOptions[highlightedIndex >= 0 ? highlightedIndex : 0])
           }
         }}
       />
-      {open ? (
-        <div id={`${inputId}-options`} className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-base shadow-xl sm:text-sm" role="listbox">
-          {filteredOptions.length > 0 ? filteredOptions.map((option) => (
-            <button
-              key={option.id}
-              aria-selected={option.id === value}
-              className={`block w-full px-3 py-2 text-left hover:bg-blue-50 ${option.id === value ? 'bg-blue-100 text-blue-800' : ''}`}
-              role="option"
-              type="button"
-              onMouseDown={(event) => {
-                event.preventDefault()
-                selectOption(option)
-              }}
+      {open && panelRect && portalHost
+        ? createPortal(
+            <div
+              id={`${inputId}-options`}
+              className={`${portalHost === document.body ? 'fixed' : 'absolute'} z-[80] max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 text-base shadow-xl sm:text-sm ${optionsPanelClassName ?? ''}`.trim()}
+              role="listbox"
+              style={{ left: panelRect.left, top: panelRect.top, width: panelRect.width }}
             >
-              <span className="block font-medium">{option.label}</span>
-              {option.description ? <span className="block text-sm text-slate-500 sm:text-xs">{option.description}</span> : null}
-            </button>
-          )) : <div className="px-3 py-2 text-base text-slate-500 sm:text-sm">ไม่พบข้อมูลที่ตรงกับคำค้นหา</div>}
-        </div>
-      ) : null}
+              {filteredOptions.length > 0 ? filteredOptions.map((option, index) => (
+                <button
+                  key={option.id}
+                  ref={(element) => {
+                    optionRefs.current[index] = element
+                  }}
+                  id={`${inputId}-option-${index}`}
+                  aria-selected={option.id === value}
+                  className={`block w-full px-3 py-2 text-left hover:bg-blue-50 ${option.id === value ? 'bg-blue-100 text-blue-800' : highlightedIndex === index ? 'bg-slate-100 text-slate-900' : ''}`}
+                  role="option"
+                  type="button"
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    selectOption(option)
+                  }}
+                >
+                  <span className="block font-medium">{option.label}</span>
+                  {option.description ? <span className="block text-sm text-slate-500 sm:text-xs">{option.description}</span> : null}
+                </button>
+              )) : <div className="px-3 py-2 text-base text-slate-500 sm:text-sm">ไม่พบข้อมูลที่ตรงกับคำค้นหา</div>}
+            </div>,
+            portalHost,
+          )
+        : null}
     </div>
   )
 }

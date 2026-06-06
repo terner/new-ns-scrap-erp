@@ -7,7 +7,7 @@ import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input as UiInput } from '@/components/ui/Input'
-import { SearchCombobox } from '@/components/ui/SearchCombobox'
+import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
@@ -117,10 +117,16 @@ function blankItem(): PoBuyFormItem {
   return { productId: '', qty: 0, unitPrice: 0 }
 }
 
+function todayIsoDate() {
+  const now = new Date()
+  const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60_000))
+  return localDate.toISOString().slice(0, 10)
+}
+
 function blankForm(): PoBuyFormState {
   return {
     branchId: '',
-    expectedDelivery: '',
+    expectedDelivery: todayIsoDate(),
     items: [blankItem()],
     notes: '',
     supplierId: '',
@@ -157,6 +163,18 @@ function optionLabel(option: Option) {
 
 function searchableText(option: Option) {
   return `${option.code ?? ''} ${option.name} ${option.id}`.toLowerCase()
+}
+
+function sanitizeMoneyInput(value: string) {
+  return value
+    .replace(/,/g, '')
+    .replace(/[^\d.]/g, '')
+    .replace(/(\..*)\./g, '$1')
+}
+
+function formatMoneyInput(value: number) {
+  if (!Number.isFinite(value)) return ''
+  return value.toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
 }
 
 function formatDateTime(value?: string) {
@@ -269,7 +287,7 @@ export function PoBuyPageClient() {
   const [shortClosingRow, setShortClosingRow] = useState<PoBuyRow | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [sortDirection, setSortDirection] = useState<PoBuySortDirection>('desc')
-  const [sortKey, setSortKey] = useState<PoBuySortKey>('date')
+  const [sortKey, setSortKey] = useState<PoBuySortKey>('docNo')
   const [statuses, setStatuses] = useState<string[]>([])
   const [toDate, setToDate] = useState('')
 
@@ -505,7 +523,7 @@ export function PoBuyPageClient() {
       return
     }
     setSortKey(nextKey)
-    setSortDirection(nextKey === 'date' ? 'desc' : 'asc')
+    setSortDirection(nextKey === 'date' || nextKey === 'docNo' ? 'desc' : 'asc')
   }
 
   const hasFilters = statuses.length > 0 || fromDate || toDate || search.trim()
@@ -957,9 +975,103 @@ function SupplierSearchCombobox({
         label: optionLabel(supplier),
         searchText: searchableText(supplier),
       }))}
+      optionsPanelClassName="max-h-[280px]"
       placeholder="พิมพ์ชื่อผู้ขาย..."
       value={value}
       onChange={onChange}
+    />
+  )
+}
+
+function ProductSearchCombobox({
+  error,
+  inputId,
+  options,
+  value,
+  onChange,
+}: {
+  error?: string
+  inputId: string
+  options: SearchComboboxOption[]
+  value: string
+  onChange: (productId: string) => void
+}) {
+  return (
+    <SearchCombobox
+      error={error}
+      hideLabel
+      inputId={inputId}
+      label="สินค้า *"
+      options={options}
+      optionsPanelClassName="max-h-[280px]"
+      placeholder="พิมพ์รหัส/ชื่อสินค้า..."
+      value={value}
+      onChange={onChange}
+    />
+  )
+}
+
+function MoneyPatternInput({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (value: number) => void
+}) {
+  const [isFocused, setIsFocused] = useState(false)
+  const [rawValue, setRawValue] = useState('')
+
+  useEffect(() => {
+    if (!isFocused) setRawValue(formatMoneyInput(value))
+  }, [isFocused, value])
+
+  return (
+    <UiInput
+      className="h-9 w-full px-2 py-1.5 text-right"
+      inputMode="decimal"
+      type="text"
+      value={isFocused ? rawValue : formatMoneyInput(value)}
+      onBlur={() => {
+        setIsFocused(false)
+        setRawValue(formatMoneyInput(value))
+      }}
+      onChange={(event) => {
+        const nextRawValue = sanitizeMoneyInput(event.target.value)
+        setRawValue(nextRawValue)
+        onChange(nextRawValue ? Number(nextRawValue) : 0)
+      }}
+      onFocus={() => {
+        setIsFocused(true)
+        setRawValue(value > 0 ? sanitizeMoneyInput(String(value)) : '')
+      }}
+    />
+  )
+}
+
+function QuantityPatternInput({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (value: number) => void
+}) {
+  const [rawValue, setRawValue] = useState('')
+
+  useEffect(() => {
+    setRawValue(value > 0 ? sanitizeMoneyInput(String(value)) : '')
+  }, [value])
+
+  return (
+    <UiInput
+      className="h-9 w-full px-2 py-1.5 text-right"
+      inputMode="decimal"
+      type="text"
+      value={rawValue}
+      onChange={(event) => {
+        const nextRawValue = sanitizeMoneyInput(event.target.value)
+        setRawValue(nextRawValue)
+        onChange(nextRawValue ? Number(nextRawValue) : 0)
+      }}
     />
   )
 }
@@ -1000,13 +1112,19 @@ function PoBuyFormModal({
   const activeBranches = branches.filter((branch) => branch.active !== false)
   const activeSuppliers = suppliers.filter((supplier) => supplier.active !== false)
   const activeProducts = products.filter((product) => product.active !== false)
+  const productOptions = useMemo<SearchComboboxOption[]>(() => activeProducts.map((product) => ({
+    description: undefined,
+    id: product.id,
+    label: optionLabel(product),
+    searchText: searchableText(product),
+  })), [activeProducts])
   const fieldError = (name: string) => errors[name] ? <div className="mt-1 text-xs text-red-600">{errors[name]}</div> : null
 
   return (
     <Dialog open onOpenChange={(open) => {
       if (!open && !isSaving) onClose()
     }}>
-      <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-md p-0" hideClose>
+      <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-md p-0" data-combobox-portal-root="true" hideClose>
         <DialogHeader className="border-b px-5 py-3">
           <DialogTitle id="po-buy-form-title">{heading}</DialogTitle>
         </DialogHeader>
@@ -1049,23 +1167,26 @@ function PoBuyFormModal({
                 {form.items.map((item, index) => (
                   <TableRow key={index}>
                     <TableCell className="p-1 align-top">
-                        <UiSelect className="h-9 w-full px-2 py-1.5" value={item.productId} onChange={(event) => onUpdateItem(index, 'productId', event.target.value)}>
-                          <option value="">พิมพ์รหัส/ชื่อสินค้า...</option>
-                          {activeProducts.map((product) => <option key={product.id} value={product.id}>{optionLabel(product)}</option>)}
-                        </UiSelect>
-                        {fieldError(`items.${index}.productId`)}
-                      </TableCell>
-                      <TableCell className="p-1 align-top">
-                        <UiInput className="h-9 w-full px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.qty} onChange={(event) => onUpdateItem(index, 'qty', Number(event.target.value))} />
-                        {fieldError(`items.${index}.qty`)}
-                      </TableCell>
-                      <TableCell className="p-1 align-top">
-                        <UiInput className="h-9 w-full px-2 py-1.5 text-right" min="0" step="0.01" type="number" value={item.unitPrice} onChange={(event) => onUpdateItem(index, 'unitPrice', Number(event.target.value))} />
-                        {fieldError(`items.${index}.unitPrice`)}
-                      </TableCell>
-                      <TableCell className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</TableCell>
-                      <TableCell className="p-1 text-center">{form.items.length > 1 ? <UiButton className="h-8 w-8 px-0 text-red-500" size="icon" type="button" variant="ghost" onClick={() => onRemoveItem(index)}>×</UiButton> : null}</TableCell>
-                    </TableRow>
+                      <ProductSearchCombobox
+                        error={errors[`items.${index}.productId`]}
+                        inputId={`po-buy-product-${index}`}
+                        options={productOptions}
+                        value={item.productId}
+                        onChange={(productId) => onUpdateItem(index, 'productId', productId)}
+                      />
+                      {fieldError(`items.${index}.productId`)}
+                    </TableCell>
+                    <TableCell className="p-1 align-top">
+                      <QuantityPatternInput value={item.qty} onChange={(value) => onUpdateItem(index, 'qty', value)} />
+                      {fieldError(`items.${index}.qty`)}
+                    </TableCell>
+                    <TableCell className="p-1 align-top">
+                      <MoneyPatternInput value={item.unitPrice} onChange={(value) => onUpdateItem(index, 'unitPrice', value)} />
+                      {fieldError(`items.${index}.unitPrice`)}
+                    </TableCell>
+                    <TableCell className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</TableCell>
+                    <TableCell className="p-1 text-center">{form.items.length > 1 ? <UiButton className="h-8 w-8 px-0 text-red-500" size="icon" type="button" variant="ghost" onClick={() => onRemoveItem(index)}>×</UiButton> : null}</TableCell>
+                  </TableRow>
                 ))}
               </TableBody>
               <tfoot className="bg-slate-50 font-bold">
