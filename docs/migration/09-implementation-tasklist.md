@@ -344,7 +344,7 @@ Reporting rule:
   - [x] ระบุว่า `WTI/WTO`, `POB`, `PB`, `ADV`, `PMA`, `PMT`, `POS`, `PSALE`, `SB`, `RCP` ต้องมี status/usage/allocation logs เฉพาะตามข้อมูลของแต่ละ flow
   - [x] ระบุว่า active allocation/detail tables เป็น fact/current tables ไม่ใช่ timeline replacement
   - [x] เพิ่ม `weight_ticket_usage_logs` สำหรับ `WTI -> PB` allocation/release พร้อม backfill active allocations และตาราง `ประวัติการใช้งานใบรับของ` ใน WTI detail
-  - [ ] เพิ่ม `weight_ticket_status_logs` สำหรับ create/edit/cancel/status transition ของ `WTI/WTO`
+  - [x] เพิ่ม `weight_ticket_status_logs` สำหรับ create/edit/cancel/status transition ของ `WTI/WTO` และให้ WTI detail timeline อ่านจาก dedicated document logs แทน `app_audit_logs`
   - [ ] ต่อ `weight_ticket_usage_logs` ฝั่ง `WTO -> SB`
   - [x] เพิ่ม `po_buy_allocation_logs` สำหรับ `POB -> PB` allocation/release พร้อม backfill active allocations และตาราง `ประวัติการจัดสรร` ใน PO Buy detail
   - [x] เพิ่ม `supplier_advance_status_logs` และ `supplier_advance_allocation_logs` สำหรับ lifecycle/status และ ADV -> PB allocation/release timeline

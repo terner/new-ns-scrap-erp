@@ -116,7 +116,7 @@ Timeline/event log ของเอกสารควรมี field ขั้น
 |---|---|---|---|
 | `po_buys` | `doc_no` / `POB` | ครบระดับแรก | มี `po_buy_status_logs.event_key` สำหรับสถานะ, มี `po_buy_allocation_logs.event_key` สำหรับ PB allocate/release, write path append log แล้ว, และ UI detail แสดงประวัติสถานะกับประวัติการจัดสรร |
 | `purchase_bills` | `doc_no`, `ref_no` / `PB` | ครบระดับแรก | มี `purchase_bill_status_logs.event_key`, write path append log, และ detail page แสดง timeline; ยังต้องต่อ usage/reconcile report เชิงลึกตาม flow |
-| `weight_tickets` | `doc_no` / `WTI`, `WTO` | บางส่วน | มี timeline การแก้ไขจาก `app_audit_logs` และมี `weight_ticket_usage_logs` สำหรับ `WTI -> PB` allocate/release; ยังไม่มี `weight_ticket_status_logs` และยังไม่ได้ต่อ usage ของ `WTO -> SB` |
+| `weight_tickets` | `doc_no` / `WTI`, `WTO` | ครบระดับแรกสำหรับ `WTI -> PB` | มี `weight_ticket_status_logs` สำหรับ lifecycle/status และมี `weight_ticket_usage_logs` สำหรับ `WTI -> PB` allocate/release; detail timeline อ่าน dedicated logs แล้ว ไม่ใช้ `app_audit_logs`; ยังไม่ได้ต่อ usage ของ `WTO -> SB` |
 | `supplier_advance_payments` | `doc_no` / `ADV` | ครบระดับแรก | มี `supplier_advance_status_logs.event_key` สำหรับ lifecycle/status และ `supplier_advance_allocation_logs.event_key` สำหรับการหัก/คืนยอดจาก PB; detail timeline อ่านจาก dedicated logs แล้ว ไม่ใช้ `app_audit_logs` หรือ active allocation fact เป็น source หลัก |
 | `payment_approvals` | `doc_no` / `PMA` | ขาด | ต้องมี `payment_approval_status_logs` สำหรับ approve, void, consume/paid, reverse และ detail/timeline |
 | `payments` | `doc_no` / `PMT` | ขาด | มี payment history list แต่ยังไม่มี `payment_status_logs`, `payment_allocations`, `payment_account_splits` และ detail/timeline ของ PMT เอง |
@@ -136,4 +136,4 @@ Timeline/event log ของเอกสารควรมี field ขั้น
 | `loan_payments` | `doc_no` | ขาด | ต้องมี loan payment event/status timeline |
 | `stock_ledger` | `ref_no` + `ledger_key` | บางส่วน | มี persisted `ledger_key` และควรเป็น append-only ledger แต่ยังไม่มี detail timeline ต่อ source document; ต้อง trace กลับ source doc/event ได้ |
 
-สรุปปัจจุบัน: ระบบยังไม่เป็นไปตาม policy ครบทุกเอกสาร มี coverage จริงเฉพาะ `POB`, `PB`, และ `ADV`; `WTI` มี usage history สำหรับฝั่งบิลรับซื้อแล้วแต่ยังเป็น partial เพราะยังขาด status log และฝั่ง `WTO`; ที่เหลือต้องเพิ่ม event/timeline layer ตามลำดับ priority ข้างบน
+สรุปปัจจุบัน: ระบบยังไม่เป็นไปตาม policy ครบทุกเอกสาร มี coverage จริงเฉพาะ `POB`, `PB`, `ADV`, และ `WTI -> PB`; `weight_tickets` ยังเหลือช่องว่างฝั่ง `WTO -> SB`; ที่เหลือต้องเพิ่ม event/timeline layer ตามลำดับ priority ข้างบน

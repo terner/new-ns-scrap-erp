@@ -2039,6 +2039,7 @@ model weight_tickets {
   customer_id                       BigInt?
   id                                BigInt                              @id @default(autoincrement())
   purchase_bill_receipt_allocations purchase_bill_receipt_allocations[]
+  weight_ticket_status_logs         weight_ticket_status_logs[]
   weight_ticket_usage_logs          weight_ticket_usage_logs[]
   weight_ticket_lines               weight_ticket_lines[]
   weight_ticket_product_summaries   weight_ticket_product_summaries[]
@@ -2108,6 +2109,29 @@ model weight_ticket_product_summaries {
   @@unique([weight_ticket_id, product_id], map: "uq_weight_ticket_product_summaries_ticket_product")
   @@index([product_id], map: "idx_weight_ticket_product_summaries_product")
   @@index([weight_ticket_id], map: "idx_weight_ticket_product_summaries_ticket")
+  @@schema("public")
+}
+
+model weight_ticket_status_logs {
+  event_key               String         @unique(map: "idx_weight_ticket_status_logs_event_key") @default(dbgenerated("('WTSTATUS-'::text || gen_random_uuid()::text)"))
+  action                  String
+  weight_ticket_doc_no    String
+  doc_type                String
+  from_status             String?
+  to_status               String
+  gross_weight_snapshot   Decimal        @default(0) @db.Decimal
+  deduct_weight_snapshot  Decimal        @default(0) @db.Decimal
+  net_weight_snapshot     Decimal        @default(0) @db.Decimal
+  note                    String?
+  meta                    Json?
+  created_at              DateTime       @default(now()) @db.Timestamptz(6)
+  created_by              String?
+  id                      BigInt         @id @default(autoincrement())
+  weight_ticket_id        BigInt
+  weight_tickets          weight_tickets @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([weight_ticket_id, created_at(sort: Desc)], map: "idx_weight_ticket_status_logs_ticket_created")
+  @@index([weight_ticket_doc_no], map: "idx_weight_ticket_status_logs_doc_no")
   @@schema("public")
 }
 

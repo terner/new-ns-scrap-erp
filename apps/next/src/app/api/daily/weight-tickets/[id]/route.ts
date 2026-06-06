@@ -9,6 +9,7 @@ import { findActiveBranchReferencesByCodes } from '@/lib/server/branch-reference
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
+import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import {
   branchScopeIds,
   buildWeightTicketLineRows,
@@ -164,6 +165,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const actor = currentActor(auth)
     const documentDate = toDateOnly(existing.document_date)
+    const nextStatus = existing.status === 'partially_billed' || existing.status === 'billed'
+      ? existing.status
+      : defaultTicketStatus(values.type)
     const totals = values.lines.reduce((summary, line) => {
       const grossWeight = Number(line.grossWeight)
       const deductionWeight = line.deductionMode === 'percent'
@@ -202,9 +206,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           net_weight: totals.netWeight,
           party_name: values.type === 'WTI' ? supplier?.name ?? '' : customer?.name ?? '',
           remark: values.remark || null,
-          status: existing.status === 'partially_billed' || existing.status === 'billed'
-            ? existing.status
-            : defaultTicketStatus(values.type),
+          status: nextStatus,
           supplier_id: values.type === 'WTI' ? supplier?.id ?? null : null,
           updated_at: new Date(),
           updated_by: actor,
@@ -244,6 +246,18 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       await tx.weight_tickets.update({
         data: { image_count: imageCount },
         where: { id: existing.id },
+      })
+      await appendWeightTicketStatusLog(tx, {
+        action: WEIGHT_TICKET_STATUS_ACTION.EDITED,
+        actor,
+        fromStatus: existing.status,
+        meta: {
+          previousDocumentNo: existing.doc_no,
+          reason: 'weight_ticket_edit',
+          type: values.type,
+        },
+        toStatus: nextStatus,
+        weightTicketId: existing.id,
       })
 
       return tx.weight_tickets.findUniqueOrThrow({
@@ -303,17 +317,34 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     const actor = currentActor(auth)
     const cancelledAt = new Date()
-    const updated = await prisma.weight_tickets.update({
-      data: {
-        cancel_note: values.note,
-        cancelled_at: cancelledAt,
-        cancelled_by: actor,
-        status: 'cancelled',
-        updated_at: cancelledAt,
-        updated_by: actor,
-      },
-      include: ticketInclude,
-      where: { id: existing.id },
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.weight_tickets.update({
+        data: {
+          cancel_note: values.note,
+          cancelled_at: cancelledAt,
+          cancelled_by: actor,
+          status: 'cancelled',
+          updated_at: cancelledAt,
+          updated_by: actor,
+        },
+        where: { id: existing.id },
+      })
+      await appendWeightTicketStatusLog(tx, {
+        action: WEIGHT_TICKET_STATUS_ACTION.CANCELLED,
+        actor,
+        createdAt: cancelledAt,
+        fromStatus: existing.status,
+        meta: {
+          reason: 'weight_ticket_cancel',
+        },
+        note: values.note,
+        toStatus: 'cancelled',
+        weightTicketId: existing.id,
+      })
+      return tx.weight_tickets.findUniqueOrThrow({
+        include: ticketInclude,
+        where: { id: existing.id },
+      })
     })
 
     const mapped = mapWeightTicketRow(updated as WeightTicketRow, usage)

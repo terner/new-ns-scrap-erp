@@ -19,6 +19,7 @@ import { prisma } from '@/lib/server/prisma'
 import { refreshPurchaseBillSettlement, refreshSupplierAdvancePaymentAllocation } from '@/lib/server/purchase-bill-settlement'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
+import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import { appendWeightTicketUsageLogs, WEIGHT_TICKET_USAGE_ACTION, type WeightTicketUsageAction } from '@/lib/server/weight-ticket-usage-history'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Prisma } from '../../../../../generated/prisma/client'
@@ -300,18 +301,28 @@ function buildBillItems(
   values: PurchaseBillFormValues,
   productByRef: Map<string, ProductRefRow>,
   poBuyByRef: Map<string, PoBuyRefRow>,
+  receiptSummarySourceMap: Map<string, ReceiptSummarySource> = new Map(),
 ) {
   return values.items.map((item) => {
     const product = productByRef.get(item.productId)
     const poBuy = item.poBuyId ? poBuyByRef.get(item.poBuyId) : null
     const price = poBuy ? toNumber(poBuy.unit_price) : item.price
     const amount = Math.max(0, item.qty * price - item.discount)
+    const receiptSummary = item.receiptSummaryId ? receiptSummarySourceMap.get(item.receiptSummaryId) : null
+    const receiptSummaryNetWeight = receiptSummary ? toNumber(receiptSummary.net_weight) : 0
+    const receiptRatio = receiptSummary && receiptSummaryNetWeight > 0 ? item.qty / receiptSummaryNetWeight : 0
+    const grossWeight = receiptSummary && receiptRatio > 0
+      ? toNumber(receiptSummary.gross_weight) * receiptRatio
+      : item.grossWeight
+    const deductWeight = receiptSummary && receiptRatio > 0
+      ? toNumber(receiptSummary.deduct_weight) * receiptRatio
+      : item.deductWeight
     return {
       amount,
-      deductWeight: item.deductWeight,
+      deductWeight,
       discount: item.discount,
       displayName: item.displayName,
-      grossWeight: item.grossWeight,
+      grossWeight,
       itemStatus: normalizeStockStatus(product?.item_status),
       lotNo: item.lotNo,
       note: item.note,
@@ -1225,9 +1236,21 @@ function weightTicketOptionJson(
   }
 }
 
-async function refreshWeightTicketStatuses(tx: Prisma.TransactionClient, ticketIds: bigint[]) {
+type WeightTicketStatusRefreshOptions = {
+  actor?: string | null
+  createdAt?: Date
+  note?: string | null
+  reason?: string
+}
+
+async function refreshWeightTicketStatuses(
+  tx: Prisma.TransactionClient,
+  ticketIds: bigint[],
+  options: WeightTicketStatusRefreshOptions = {},
+) {
   const uniqueTicketIds = [...new Set(ticketIds)]
   if (uniqueTicketIds.length === 0) return
+  const changedAt = options.createdAt ?? new Date()
 
   const ticketRows = await tx.weight_tickets.findMany({
     include: {
@@ -1281,9 +1304,24 @@ async function refreshWeightTicketStatuses(tx: Prisma.TransactionClient, ticketI
     await tx.weight_tickets.update({
       data: {
         status: nextStatus,
-        updated_at: new Date(),
+        updated_at: changedAt,
+        updated_by: options.actor ?? undefined,
       },
       where: { id: ticket.id },
+    })
+    await appendWeightTicketStatusLog(tx, {
+      action: WEIGHT_TICKET_STATUS_ACTION.USAGE_STATUS_CHANGED,
+      actor: options.actor,
+      createdAt: changedAt,
+      fromStatus: ticket.status,
+      meta: {
+        billedWeight: billedQty,
+        reason: options.reason ?? 'purchase_bill_allocation_refresh',
+        totalWeight: totalQty,
+      },
+      note: options.note ?? null,
+      toStatus: nextStatus,
+      weightTicketId: ticket.id,
     })
   }))
 
@@ -1759,7 +1797,7 @@ export async function POST(request: Request) {
       receiptTicketIdsToRefresh = [receiptValidation.ticket.id]
     }
 
-    const items = buildBillItems(values, productByRef, poBuyById)
+    const items = buildBillItems(values, productByRef, poBuyById, receiptSummarySourceMap)
     const poBuyIds = extractReferencedPoBuyIdsFromBuiltItems(items)
     if (poBuyIds.length > 0) {
       await prisma.$transaction(async (tx) => {
@@ -1909,7 +1947,10 @@ export async function POST(request: Request) {
                 warehouse_id: warehouseByStatus.get(item.itemStatus)?.id ?? purchaseWarehouseId,
               })),
             })
-            await refreshWeightTicketStatuses(tx, receiptTicketIdsToRefresh)
+            await refreshWeightTicketStatuses(tx, receiptTicketIdsToRefresh, {
+              actor,
+              reason: 'purchase_bill_create',
+            })
           }
 
           return createdBill
@@ -2015,7 +2056,12 @@ export async function PATCH(request: Request) {
         await resetPurchaseBillAdvanceAllocation(tx, existingBillRef.id, actor, 'ยกเลิกบิลรับซื้อ')
         await deletePendingPaymentApproval(tx, 'purchase_bill', existingBillRef.id)
         await reconcilePoBuys(tx, extractReferencedPoBuyIdsFromBillItems(existingBillItems), { actor })
-        await refreshWeightTicketStatuses(tx, await resolveReferencedReceiptTicketIdsFromBillItems(tx, existingBillItems))
+        await refreshWeightTicketStatuses(tx, await resolveReferencedReceiptTicketIdsFromBillItems(tx, existingBillItems), {
+          actor,
+          createdAt: cancelledAt,
+          note: values.note,
+          reason: 'purchase_bill_cancel',
+        })
         await appendPurchaseBillStatusLog(tx, {
           action: PURCHASE_BILL_STATUS_ACTION.CANCELLED,
           actor,
@@ -2103,7 +2149,7 @@ export async function PATCH(request: Request) {
       receiptTicketIdsToRefresh = [receiptValidation.ticket.id]
     }
 
-    const items = buildBillItems(values, productByRef, poBuyById)
+    const items = buildBillItems(values, productByRef, poBuyById, receiptSummarySourceMap)
     const poBuyIds = extractReferencedPoBuyIdsFromBuiltItems(items)
     if (poBuyIds.length > 0) {
       await prisma.$transaction(async (tx) => {
@@ -2244,7 +2290,10 @@ export async function PATCH(request: Request) {
       await refreshWeightTicketStatuses(tx, [
         ...receiptTicketIdsToRefresh,
         ...await resolveReferencedReceiptTicketIdsFromBillItems(tx, existingBillItems),
-      ])
+      ], {
+        actor,
+        reason: 'purchase_bill_edit',
+      })
 
       const settlement = await refreshPurchaseBillSettlement(tx, existingBillRef.id, actor)
       if (settlement.payableBalance > 0.01) {

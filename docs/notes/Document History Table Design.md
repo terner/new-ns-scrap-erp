@@ -86,7 +86,7 @@ Typed business fields ต้องมาก่อน `metadata` เสมอ เ
 | เอกสาร | Current state | Status/history table | Usage/allocation history | Typed fact/current tables |
 |---|---|---|---|---|
 | `POB` | `po_buys` | `po_buy_status_logs` มีแล้ว | `po_buy_allocation_logs` มีแล้วสำหรับ PB allocate/release เชิง line | `purchase_bill_po_allocations` |
-| `WTI/WTO` | `weight_tickets` | target `weight_ticket_status_logs` | `weight_ticket_usage_logs` มีแล้วสำหรับ `WTI -> PB`; target ต่อไปคือ `WTO -> SB` | `weight_ticket_lines`, `weight_ticket_product_summaries`, `purchase_bill_receipt_allocations`, future sales/WTO allocation |
+| `WTI/WTO` | `weight_tickets` | `weight_ticket_status_logs` มีแล้ว | `weight_ticket_usage_logs` มีแล้วสำหรับ `WTI -> PB`; target ต่อไปคือ `WTO -> SB` | `weight_ticket_lines`, `weight_ticket_product_summaries`, `purchase_bill_receipt_allocations`, future sales/WTO allocation |
 | `PB` | `purchase_bills` | `purchase_bill_status_logs` มีแล้ว | timeline อ่านร่วมกับ WTI/PO/ADV usage logs | `purchase_bill_items`, `purchase_bill_receipt_allocations`, `purchase_bill_po_allocations`, `supplier_advance_allocations` |
 | `ADV` | `supplier_advance_payments` | `supplier_advance_status_logs` มีแล้ว | `supplier_advance_allocation_logs` มีแล้วสำหรับ ADV -> PB allocation/release | `supplier_advance_allocations` |
 | `EXP` | `expenses` | target `expense_status_logs` | Payment handoff อ่านจาก PMA/PMT logs | expense line/detail table ในอนาคต |
@@ -100,8 +100,8 @@ Typed business fields ต้องมาก่อน `metadata` เสมอ เ
 - `created`
 - `edited`
 - `cancelled`
-- `usage-status-changed`
-- `reopened-after-bill-cancel`
+- `usage_status_changed`
+- `status_synced`
 
 field เฉพาะที่ควรมี:
 
@@ -150,11 +150,14 @@ field เฉพาะที่ควรมี:
 
 Implementation checkpoint 2026-06-06:
 
+- `weight_ticket_status_logs` ถูกเพิ่มใน schema/migration แล้วสำหรับ lifecycle/status ของ `WTI/WTO`
 - `weight_ticket_usage_logs` ถูกเพิ่มใน schema/migration แล้วสำหรับ `WTI -> PB`
-- migration backfill active `purchase_bill_receipt_allocations` เป็น `allocated_to_purchase_bill` event โดยเก็บ running remaining weight ต่อ WTI summary
+- migration status-log backfill สร้าง `created` baseline และ `status_synced` สำหรับสถานะปัจจุบันที่ไม่ใช่ค่าเริ่มต้น เช่น `WTI012605-0002 received -> billed`
+- migration usage-log backfill active `purchase_bill_receipt_allocations` เป็น `allocated_to_purchase_bill` event โดยเก็บ running remaining weight ต่อ WTI summary
+- `/api/daily/weight-tickets` append `created`, `/api/daily/weight-tickets/[id]` append `edited/cancelled`, และ `/api/purchase/bills` append `usage_status_changed` เมื่อ PB create/edit/cancel ทำให้ WTI status เปลี่ยนจาก active allocation
 - `/api/purchase/bills` append `allocated_to_purchase_bill` ตอนสร้าง PB, compare diff ตอนแก้ PB, และ append `released_from_purchase_bill` ก่อนลบ active allocation ตอน PB cancel/edit
-- `/api/daily/weight-tickets/[id]` ส่ง `usageTimeline` และหน้า WTI detail แสดงตาราง `ประวัติการใช้งานใบรับของ`
-- ยังไม่ถือว่า `WTI/WTO` timeline ครบ เพราะ `weight_ticket_status_logs` และ `WTO -> SB` usage ยังเป็นงานถัดไป
+- `/api/daily/weight-tickets/[id]` ส่ง `timeline` จาก `weight_ticket_status_logs` + `weight_ticket_usage_logs` และส่ง `usageTimeline` สำหรับตาราง `ประวัติการใช้งานใบรับของ`
+- ยังไม่ถือว่า `WTI/WTO` timeline ครบทั้งหมด เพราะ `WTO -> SB` usage ยังเป็นงานถัดไป
 
 ### `po_buy_allocation_logs`
 
@@ -406,7 +409,7 @@ DB ยังแยก table เฉพาะเหมือนเดิม; commo
 
 | Detail page | Query source |
 |---|---|
-| WTI detail | ปัจจุบันใช้ `app_audit_logs` สำหรับ edit/cancel timeline + `weight_ticket_usage_logs` สำหรับ WTI/PB usage; target ถัดไปคือ `weight_ticket_status_logs` |
+| WTI detail | `weight_ticket_status_logs` + `weight_ticket_usage_logs`; `app_audit_logs` ไม่ใช่ document timeline |
 | POB detail | `po_buy_status_logs` + `po_buy_allocation_logs` |
 | PB detail | `purchase_bill_status_logs` + WTI/PO/ADV usage logs ที่อ้าง PB |
 | ADV detail | `supplier_advance_status_logs` + `supplier_advance_allocation_logs` |
@@ -427,7 +430,7 @@ DB ยังแยก table เฉพาะเหมือนเดิม; commo
 
 ## Implementation Order
 
-1. Purchase trace foundation: `weight_ticket_usage_logs` สำหรับ `WTI -> PB`, `po_buy_allocation_logs`, `supplier_advance_status_logs`, และ `supplier_advance_allocation_logs` ทำแล้ว; งานถัดไปคือ `weight_ticket_status_logs` และ `WTO -> SB` usage
+1. Purchase trace foundation: `weight_ticket_status_logs`, `weight_ticket_usage_logs` สำหรับ `WTI -> PB`, `po_buy_allocation_logs`, `supplier_advance_status_logs`, และ `supplier_advance_allocation_logs` ทำแล้ว; งานถัดไปคือ `WTO -> SB` usage
 2. Payment trace foundation: `payment_approval_status_logs`, `payment_status_logs`, `payment_allocations`, `payment_account_splits`
 3. Sales trace foundation: `po_sell_status_logs`, `stock_issue_status_logs`, `sales_bill_status_logs`, `receipt_status_logs`, sales/receipt allocation facts
 4. Stock/finance/production support logs ตาม priority ของ flow ที่ถูกใช้งานจริง

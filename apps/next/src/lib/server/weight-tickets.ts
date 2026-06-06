@@ -58,15 +58,35 @@ export type WeightTicketRow = Prisma.weight_ticketsGetPayload<{
   }
 }>
 
-type WeightTicketTimelineRow = {
+type WeightTicketStatusTimelineRow = {
   action: string
-  actor_display_name: string | null
-  actor_username: string | null
+  created_at: Date
+  created_by: string | null
   event_key: string
+  from_status: string | null
   id: string
-  metadata: Prisma.JsonValue | null
-  occurred_at: Date
-  outcome: string
+  meta: Prisma.JsonValue | null
+  net_weight_snapshot: Prisma.Decimal
+  note: string | null
+  to_status: string
+}
+
+type WeightTicketUsageDocumentTimelineRow = {
+  action: string
+  allocated_net_weight: Prisma.Decimal
+  created_at: Date
+  created_by: string | null
+  event_key: string
+  from_remaining_weight: Prisma.Decimal | null
+  id: string
+  meta: Prisma.JsonValue | null
+  note: string | null
+  product_code_snapshot: string | null
+  product_name_snapshot: string | null
+  target_doc_no: string | null
+  target_line_no: number | null
+  target_type: string
+  to_remaining_weight: Prisma.Decimal | null
 }
 
 type WeightTicketUsageTimelineRow = {
@@ -333,31 +353,87 @@ export async function getWeightTicketUsageCounts(tx: Prisma.TransactionClient | 
 }
 
 export async function getWeightTicketTimeline(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {
-  const rows = await tx.$queryRaw<WeightTicketTimelineRow[]>`
+  const [statusRows, usageRows] = await Promise.all([
+    tx.$queryRaw<WeightTicketStatusTimelineRow[]>`
     select
-      a.id::text as id,
-      a.event_key,
-      a.action,
-      a.outcome,
-      a.occurred_at,
-      a.metadata,
-      a.actor_display_name,
-      a.actor_username
-    from public.app_audit_logs a
-    where a.entity_table = 'weight_tickets'
-      and a.entity_id = ${ticketId}
-    order by a.occurred_at desc, a.id desc
-  `
+      l.id::text as id,
+      l.event_key,
+      l.action,
+      l.from_status,
+      l.to_status,
+      l.net_weight_snapshot,
+      l.note,
+      l.meta,
+      l.created_at,
+      l.created_by
+    from public.weight_ticket_status_logs l
+    where l.weight_ticket_id = ${ticketId}
+    order by l.created_at desc, l.id desc
+  `,
+    tx.$queryRaw<WeightTicketUsageDocumentTimelineRow[]>`
+    select
+      l.id::text as id,
+      l.event_key,
+      l.action,
+      l.target_type,
+      l.target_doc_no,
+      l.target_line_no,
+      l.product_code_snapshot,
+      l.product_name_snapshot,
+      l.allocated_net_weight,
+      l.from_remaining_weight,
+      l.to_remaining_weight,
+      l.note,
+      l.meta,
+      l.created_at,
+      l.created_by
+    from public.weight_ticket_usage_logs l
+    where l.weight_ticket_id = ${ticketId}
+    order by l.created_at desc, l.id desc
+  `,
+  ])
 
-  return rows.map((row) => ({
+  const statusEvents = statusRows.map((row) => ({
     action: row.action,
-    actorName: row.actor_display_name ?? row.actor_username ?? '-',
+    actorName: row.created_by ?? '-',
     eventKey: row.event_key,
     id: row.event_key,
-    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata as Record<string, unknown> : {},
-    occurredAt: row.occurred_at.toISOString(),
-    outcome: (row.outcome === 'blocked' || row.outcome === 'failure' ? row.outcome : 'success') as 'blocked' | 'failure' | 'success',
+    metadata: {
+      ...(row.meta && typeof row.meta === 'object' ? row.meta as Record<string, unknown> : {}),
+      cancelNote: row.action === 'cancelled' ? row.note ?? '' : undefined,
+      fromStatus: row.from_status,
+      netWeight: toNumber(row.net_weight_snapshot),
+      note: row.note ?? '',
+      toStatus: row.to_status,
+    },
+    occurredAt: row.created_at.toISOString(),
+    outcome: 'success' as const,
   }))
+  const usageEvents = usageRows.map((row) => ({
+    action: row.action,
+    actorName: row.created_by ?? '-',
+    eventKey: row.event_key,
+    id: row.event_key,
+    metadata: {
+      ...(row.meta && typeof row.meta === 'object' ? row.meta as Record<string, unknown> : {}),
+      allocatedNetWeight: toNumber(row.allocated_net_weight),
+      fromRemainingWeight: row.from_remaining_weight == null ? null : toNumber(row.from_remaining_weight),
+      note: row.note ?? '',
+      productCode: row.product_code_snapshot ?? '',
+      productName: row.product_name_snapshot ?? '-',
+      targetDocNo: row.target_doc_no ?? '',
+      targetLineNo: row.target_line_no,
+      targetType: row.target_type,
+      toRemainingWeight: row.to_remaining_weight == null ? null : toNumber(row.to_remaining_weight),
+    },
+    occurredAt: row.created_at.toISOString(),
+    outcome: 'success' as const,
+  }))
+
+  return [...statusEvents, ...usageEvents].sort((left, right) => {
+    const diff = new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime()
+    return diff || right.eventKey.localeCompare(left.eventKey)
+  })
 }
 
 export async function getWeightTicketUsageTimeline(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {

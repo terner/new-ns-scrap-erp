@@ -9,6 +9,7 @@ import { findActiveBranchReferenceByCodeOrId, findActiveBranchReferencesByCodes 
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
+import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import {
   bangkokDateInput,
   branchScopeIds,
@@ -221,6 +222,16 @@ export async function POST(request: Request) {
       await tx.weight_tickets.update({
         data: { image_count: imageCount },
         where: { id: createdTicket.id },
+      })
+      await appendWeightTicketStatusLog(tx, {
+        action: WEIGHT_TICKET_STATUS_ACTION.CREATED,
+        actor,
+        meta: {
+          reason: 'weight_ticket_create',
+          type: values.type,
+        },
+        toStatus: defaultTicketStatus(values.type),
+        weightTicketId: createdTicket.id,
       })
 
       return tx.weight_tickets.findUniqueOrThrow({

@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/Input'
 import { PageTitleOverride } from '@/components/layout/PageTitleOverride'
 import { openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
+import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, type WeightTicketStatus, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
 
 function formatDateTime(value?: string | null) {
@@ -30,6 +30,13 @@ function formatDateTime(value?: string | null) {
 }
 
 function timelineLabel(eventKey: string, action: string) {
+  if (action === 'created') return 'สร้างเอกสาร'
+  if (action === 'edited') return 'แก้ไขเอกสาร'
+  if (action === 'cancelled') return 'ยกเลิกเอกสาร'
+  if (action === 'status_synced') return 'ปรับสถานะปัจจุบัน'
+  if (action === 'usage_status_changed') return 'เปลี่ยนสถานะจากการใช้งาน'
+  if (action === 'allocated_to_purchase_bill') return 'นำไปออกบิลรับซื้อ'
+  if (action === 'released_from_purchase_bill') return 'คืนยอดจากบิลรับซื้อ'
   if (eventKey.endsWith('.created')) return 'สร้างเอกสาร'
   if (eventKey.endsWith('.updated')) return 'แก้ไขเอกสาร'
   if (eventKey.endsWith('.cancelled')) return 'ยกเลิกเอกสาร'
@@ -37,6 +44,28 @@ function timelineLabel(eventKey: string, action: string) {
   if (action === 'update') return 'แก้ไขเอกสาร'
   if (action === 'status') return 'เปลี่ยนสถานะเอกสาร'
   return eventKey
+}
+
+function timelineDotClass(action: string) {
+  if (action === 'cancelled' || action === 'released_from_purchase_bill') return 'border-rose-500'
+  if (action === 'edited' || action === 'usage_status_changed' || action === 'status_synced') return 'border-amber-500'
+  if (action === 'allocated_to_purchase_bill') return 'border-blue-500'
+  return 'border-emerald-500'
+}
+
+function metadataString(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key]
+  return typeof value === 'string' ? value : ''
+}
+
+function metadataNumber(metadata: Record<string, unknown>, key: string) {
+  const value = metadata[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function timelineStatusLabel(type: WeightTicketRecord['type'], status: string) {
+  if (!status) return ''
+  return displayWeightTicketStatus(type, status as WeightTicketStatus)
 }
 
 function usageActionLabel(action: string) {
@@ -450,30 +479,52 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
         ) : null}
 
         <Card className="p-5">
-          <SectionTitle subtitle="เรียงจากล่าสุดลงล่าง" title="Timeline การแก้ไข" />
+          <SectionTitle subtitle="รวมสถานะเอกสารและประวัติการใช้งาน เรียงจากล่าสุดลงล่าง" title="Timeline เอกสาร" />
           <div className="mt-4 space-y-4">
             {ticket.timeline.length === 0 ? (
-              <div className="text-sm text-slate-400">ยังไม่มีประวัติการแก้ไข</div>
-            ) : ticket.timeline.map((event, index) => (
-              <div className="relative pl-6" key={event.id}>
-                {index < ticket.timeline.length - 1 ? <div className="absolute left-[9px] top-5 h-[calc(100%-0.25rem)] w-px bg-slate-200" /> : null}
-                <div className={cn(
-                  'absolute left-0 top-1.5 size-[18px] rounded-full border-2 bg-white',
-                  event.eventKey.endsWith('.cancelled') ? 'border-rose-500' : event.eventKey.endsWith('.updated') ? 'border-amber-500' : 'border-emerald-500',
-                )}
-                />
-                <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="font-medium text-slate-900">{timelineLabel(event.eventKey, event.action)}</div>
-                    <div className="text-xs text-slate-400">{formatDateTime(event.occurredAt)}</div>
+              <div className="text-sm text-slate-400">ยังไม่มี timeline เอกสาร</div>
+            ) : ticket.timeline.map((event, index) => {
+              const fromStatus = metadataString(event.metadata, 'fromStatus')
+              const toStatus = metadataString(event.metadata, 'toStatus')
+              const targetDocNo = metadataString(event.metadata, 'targetDocNo')
+              const productName = metadataString(event.metadata, 'productName')
+              const note = metadataString(event.metadata, 'cancelNote') || metadataString(event.metadata, 'note')
+              const allocatedNetWeight = metadataNumber(event.metadata, 'allocatedNetWeight')
+              const toRemainingWeight = metadataNumber(event.metadata, 'toRemainingWeight')
+              return (
+                <div className="relative pl-6" key={event.id}>
+                  {index < ticket.timeline.length - 1 ? <div className="absolute left-[9px] top-5 h-[calc(100%-0.25rem)] w-px bg-slate-200" /> : null}
+                  <div className={cn('absolute left-0 top-1.5 size-[18px] rounded-full border-2 bg-white', timelineDotClass(event.action))} />
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-medium text-slate-900">{timelineLabel(event.eventKey, event.action)}</div>
+                      <div className="text-xs text-slate-400">{formatDateTime(event.occurredAt)}</div>
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600">{event.actorName}</div>
+                    {toStatus ? (
+                      <div className="mt-2 text-sm text-slate-700">
+                        สถานะ: {fromStatus ? `${timelineStatusLabel(ticket.type, fromStatus)} -> ` : ''}{timelineStatusLabel(ticket.type, toStatus)}
+                      </div>
+                    ) : null}
+                    {targetDocNo || productName || allocatedNetWeight != null ? (
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                        {targetDocNo ? (
+                          <Link className="font-medium text-blue-700 hover:underline" href={`/purchase/bills/${encodeURIComponent(targetDocNo)}`}>
+                            {targetDocNo}
+                          </Link>
+                        ) : null}
+                        {productName ? <span>{productName}</span> : null}
+                        {allocatedNetWeight != null ? <span>{formatWeight(allocatedNetWeight)} กก.</span> : null}
+                        {toRemainingWeight != null ? <span>คงเหลือ {formatWeight(toRemainingWeight)} กก.</span> : null}
+                      </div>
+                    ) : null}
+                    {note ? (
+                      <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">{note}</div>
+                    ) : null}
                   </div>
-                  <div className="mt-1 text-sm text-slate-600">{event.actorName}</div>
-                  {'cancelNote' in event.metadata && typeof event.metadata.cancelNote === 'string' && event.metadata.cancelNote ? (
-                    <div className="mt-2 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{event.metadata.cancelNote}</div>
-                  ) : null}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </Card>
 
