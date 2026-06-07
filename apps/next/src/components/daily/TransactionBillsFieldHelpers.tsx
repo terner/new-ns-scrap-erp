@@ -1,12 +1,14 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useState, type FocusEvent } from 'react'
 
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { FormSelectField } from '@/components/ui/FormSelectField'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
+import { formatDecimalDisplay, formatDecimalDraft, sanitizeDecimalInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type Option = {
@@ -75,6 +77,72 @@ export function InputField({
       ) : (
         <Input data-error-key={errorKey} className={cn(error ? 'border-red-400 bg-red-50 text-red-700' : '', inputClassName)} placeholder={placeholder} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
       )}
+    </Field>
+  )
+}
+
+export function MoneyInputField({
+  className,
+  disabled = false,
+  error,
+  errorKey,
+  inputClassName,
+  label,
+  onChange,
+  placeholder,
+  value,
+}: {
+  className?: string
+  disabled?: boolean
+  error?: string
+  errorKey?: string
+  inputClassName?: string
+  label: string
+  onChange: (value: number) => void
+  placeholder?: string
+  value: number
+}) {
+  const [draftValue, setDraftValue] = useState<string | null>(null)
+
+  return (
+    <Field className={className} error={error} label={label}>
+      <Input
+        data-error-key={errorKey}
+        inputMode="decimal"
+        className={cn('text-right tabular-nums', error ? 'border-red-400 bg-red-50 text-red-700' : '', inputClassName)}
+        disabled={disabled}
+        placeholder={placeholder}
+        type="text"
+        value={draftValue ?? formatDecimalDisplay(value || null, 2)}
+        onBlur={(event) => {
+          const nextValue = sanitizeDecimalInput(event.target.value, 2)
+          if (nextValue.trim() === '' || nextValue.trim() === '.') {
+            setDraftValue(null)
+            onChange(0)
+            return
+          }
+          const parsed = Number(nextValue)
+          setDraftValue(null)
+          onChange(Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : 0)
+        }}
+        onChange={(event) => {
+          const nextValue = sanitizeDecimalInput(event.target.value, 2)
+          setDraftValue(nextValue)
+          if (nextValue.trim() === '' || nextValue.trim() === '.') {
+            onChange(0)
+            return
+          }
+          const parsed = Number(nextValue)
+          onChange(Number.isFinite(parsed) ? parsed : 0)
+        }}
+        onFocus={(event: FocusEvent<HTMLInputElement>) => {
+          setDraftValue(value > 0 ? formatDecimalDraft(value, 2) : '')
+          requestAnimationFrame(() => {
+            const end = event.target.value.length
+            event.target.setSelectionRange(end, end)
+          })
+        }}
+      />
     </Field>
   )
 }
@@ -156,7 +224,6 @@ export function SupplierSearchCombobox({
         inputId="purchase-bill-supplier-search"
         label="ผู้ขาย *"
         options={options.map((supplier) => ({
-          description: `${supplier.code ? `${supplier.code} · ` : ''}${supplier.id}`,
           id: supplier.id,
           label: optionLabel(supplier),
           searchText: searchableOptionText(supplier),

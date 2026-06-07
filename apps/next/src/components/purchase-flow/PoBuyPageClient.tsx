@@ -1007,7 +1007,6 @@ function SupplierSearchCombobox({
       inputId="po-buy-supplier-search"
       label="ผู้ขาย *"
       options={options.map((supplier) => ({
-        description: `${supplier.code ? `${supplier.code} · ` : ''}${supplier.id}`,
         id: supplier.id,
         label: optionLabel(supplier),
         searchText: searchableText(supplier),

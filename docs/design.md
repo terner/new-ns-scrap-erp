@@ -450,6 +450,7 @@ Decision rules:
 ตัวอย่างที่ใช้บ่อย:
 - `สินค้า` -> `searchable combobox`
 - `ยอดมัดจำ` -> `money input pattern`
+- `ส่วนลดท้ายบิล` -> `money input pattern`
 - `ราคา/หน่วย` -> `money input pattern`
 - `ราคา/กก.` -> `money input pattern`
 - `จำนวน (กก.)` -> `number exception`

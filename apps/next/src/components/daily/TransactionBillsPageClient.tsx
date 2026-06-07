@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
-import { Field, InputField, ProductSearchCombobox, SelectField, SupplierSearchCombobox, SummaryLine } from '@/components/daily/TransactionBillsFieldHelpers'
+import { Field, InputField, MoneyInputField, ProductSearchCombobox, SelectField, SupplierSearchCombobox, SummaryLine } from '@/components/daily/TransactionBillsFieldHelpers'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
@@ -817,6 +817,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         && (
           (key === 'branchId' && value !== current.branchId)
           || (key === 'supplierId' && value !== current.supplierId)
+          || (key === 'warehouseId' && value !== current.warehouseId)
           || (key === 'receiptTicketId' && value !== current.receiptTicketId)
           || (key === 'transactionMode' && value !== current.transactionMode)
         )
@@ -957,7 +958,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         note: null,
         poBuyId: null,
         price: 0,
-        qty: 0,
+        qty: source.poBuyId ? remainingQty : 0,
         salesPrice: source.salesPrice ?? 0,
       }
       const items = [...current.items]
@@ -1320,9 +1321,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {form.transactionMode === 'TRADING' ? (
                   <div className="mt-3 rounded-md border border-purple-200 bg-purple-50 p-2 text-xs text-purple-700">รายการ Trading ไม่เข้า Stock และจะใช้สำหรับจับคู่ขายใน Trading Matching ภายหลัง</div>
                 ) : null}
-                {stockReceiptLocked ? (
-                  <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">เลือกใบรับของแล้ว ระบบล็อกประเภทบิลไว้ก่อน หากต้องการเปลี่ยนให้ล้างใบรับของก่อน</div>
-                ) : null}
               </div>
 
               <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -1335,7 +1333,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       <Select
                         data-error-key="warehouseId"
                         className={`mt-1 w-full ${fieldErrors.warehouseId ? 'border-red-400 bg-red-50 text-red-700' : form.warehouseId ? 'text-slate-900' : 'text-slate-400'}`}
-                        disabled={!form.branchId}
+                        disabled={stockReceiptLocked || !form.branchId}
                         required
                         value={form.warehouseId ?? ''}
                         onChange={(event) => updateForm('warehouseId', event.target.value || null)}
@@ -1368,16 +1366,16 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                     />
                     {selectedReceipt ? (
                       <div className="mt-3 space-y-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-slate-700">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="text-blue-900">เลือกใบรับของแล้ว ระบบล็อกสาขา ผู้ขาย และใบรับของเพื่อกันข้อมูลไม่ตรงกัน</div>
-                          <Button size="xs" type="button" variant="outline" onClick={clearSelectedStockReceipt}>ล้างใบรับของ</Button>
-                        </div>
                         <div className="grid gap-3 md:grid-cols-5">
                         <div><div className="font-semibold text-slate-500">เลขที่ใบรับของ</div><div className="text-slate-900">{selectedReceipt.documentNo}</div></div>
                         <div><div className="font-semibold text-slate-500">ผู้ขาย</div><div className="text-slate-900">{selectedReceipt.partyName}</div></div>
                         <div><div className="font-semibold text-slate-500">ผู้ดูแล</div><div className="text-slate-900">{selectedSupplierCaretakerName || '-'}</div></div>
                         <div><div className="font-semibold text-slate-500">วันที่</div><div className="text-slate-900">{formatDateDisplay(selectedReceipt.documentDate)}</div></div>
                         <div><div className="font-semibold text-slate-500">ทะเบียนรถ</div><div className="text-slate-900">{selectedReceipt.vehicleNo || '-'}</div></div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-xs text-red-600"><span className="font-bold">*</span> เลือกใบรับของแล้ว ระบบล็อกสาขา คลัง ผู้ขาย และใบรับของเพื่อกันข้อมูลไม่ตรงกัน</div>
+                          <Button size="xs" type="button" variant="outline" onClick={clearSelectedStockReceipt}>ล้างใบรับของ</Button>
                         </div>
                       </div>
                     ) : null}
@@ -1656,10 +1654,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         <div>ยอดคงเหลือที่ใช้ได้: {formatMoney(availableAdvanceAmount)} บาท</div>
                       </div>
                     ) : null}
-                    <InputField error={fieldErrors.discountTotal} errorKey="discountTotal" inputClassName="text-right tabular-nums" label="ส่วนลดท้ายบิล (บาท)" type="number" value={form.discountTotal ? String(form.discountTotal) : ''} onChange={(value) => {
-                      if (!stockReceiptSelected) return
-                      updateForm('discountTotal', Number(value || 0))
-                    }} />
+                    <MoneyInputField disabled={!stockReceiptSelected} error={fieldErrors.discountTotal} errorKey="discountTotal" label="ส่วนลดท้ายบิล (บาท)" value={form.discountTotal} onChange={(value) => updateForm('discountTotal', value)} />
                   </div>
                   <div className="rounded-md border-2 border-blue-200 bg-blue-50 p-4">
                     <div className="mb-2 flex justify-between rounded-md border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ซื้อ</span><span className="tabular-nums">{formatMoney(formTotalWeight)} กก.</span></div>
@@ -1781,7 +1776,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         <Segment current={salesForm.vatType} label="รวม VAT" value="INCLUDE" onClick={(value) => updateSalesForm('vatType', value as SalesBillFormValues['vatType'])} />
                       </div>
                     ) : null}
-                    <InputField error={salesFieldErrors.discountTotal} errorKey="discountTotal" inputClassName="text-right tabular-nums" label="ส่วนลดท้ายบิล (บาท)" type="number" value={salesForm.discountTotal ? String(salesForm.discountTotal) : ''} onChange={(value) => updateSalesForm('discountTotal', Number(value || 0))} />
+                    <MoneyInputField error={salesFieldErrors.discountTotal} errorKey="discountTotal" label="ส่วนลดท้ายบิล (บาท)" value={salesForm.discountTotal} onChange={(value) => updateSalesForm('discountTotal', value)} />
                   </div>
                   <div className="rounded-md border-2 border-blue-200 bg-blue-50 p-4">
                     <div className="mb-2 flex justify-between rounded-md border border-emerald-300 bg-emerald-100 p-2 font-bold text-emerald-800"><span>น้ำหนักรวมที่ขาย</span><span className="tabular-nums">{formatMoney(salesForm.items.reduce((sum, item) => sum + item.qty, 0))} กก.</span></div>
