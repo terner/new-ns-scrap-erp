@@ -1386,7 +1386,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         value={purchaseWarehouseDisplayValue}
                       />
                       {fieldErrors.warehouseId ? <div className="mt-1 text-xs text-red-600">{fieldErrors.warehouseId}</div> : null}
-                      <div className="mt-1 text-[11px] text-slate-500">ระบบเลือกคลัง RM ตามสาขาอัตโนมัติและล็อกไม่ให้แก้เอง</div>
                     </label>
                   ) : null}
                   <SupplierSearchCombobox className="md:max-w-[420px]" disabled={stockReceiptLocked} error={fieldErrors.supplierId} errorKey="supplierId" options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
