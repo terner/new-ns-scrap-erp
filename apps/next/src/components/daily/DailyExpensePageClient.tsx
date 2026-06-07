@@ -706,69 +706,69 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           {formOpen ? (
             <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-              <form ref={formRef} noValidate className="w-full max-w-4xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
+              <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
                 <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
                   <h3 className="font-bold">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
                   <button className="text-2xl text-slate-400" type="button" onClick={() => setFormOpen(false)}>&times;</button>
                 </div>
-                <div className="grid gap-4 bg-slate-50 p-4 xl:grid-cols-[minmax(0,1fr)_260px]">
-                  <div className="space-y-4">
-                    <div className="rounded-md bg-white p-4 shadow">
-                      <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลหลัก</div>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <TextField error={fieldErrors.payee} fieldName="payee" label="ผู้รับเงิน" required value={form.payee} onChange={(value) => setForm({ ...form, payee: value })} />
-                        <SelectField fieldName="expenseTypeId" label="ประเภทค่าใช้จ่าย" placeholder="ทุกประเภท" value={expenseTypeId} onChange={updateExpenseTypeFilter} options={activeExpenseTypes.map((type) => ({ id: type.id, name: type.name }))} />
-                        <TextField error={fieldErrors.dueDate} fieldName="dueDate" label="ครบกำหนด" type="date" value={form.dueDate ?? ''} onChange={(value) => setForm({ ...form, dueDate: value })} />
-                        <SelectField error={fieldErrors.accountId} fieldName="accountId" label="บัญชีที่ใช้ทำจ่าย" placeholder="ไม่ระบุบัญชี" value={form.accountId ?? ''} onChange={(value) => setForm({ ...form, accountId: value })} options={accounts.filter((account) => account.active).map((account) => ({ id: account.id, name: accountPaymentOptionLabel(account) }))} />
-                        {form.id ? (
-                          <div data-field="status">
-                            <label className="mb-1 block text-xs font-medium text-slate-600">
-                              สถานะเอกสาร
-                            </label>
-                            <div className="flex h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">
-                              {expenseStatusLabel(form.status)}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-500">สถานะจะเปลี่ยนผ่าน flow อนุมัติจ่ายเงินเท่านั้น</div>
+                <div className="space-y-4 bg-slate-50 p-4">
+                  <div className="rounded-md bg-white p-4 shadow">
+                    <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลหลัก</div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <TextField error={fieldErrors.payee} fieldName="payee" label="ผู้รับเงิน" required value={form.payee} onChange={(value) => setForm({ ...form, payee: value })} />
+                      <SelectField fieldName="expenseTypeId" label="ประเภทค่าใช้จ่าย" placeholder="ทุกประเภท" value={expenseTypeId} onChange={updateExpenseTypeFilter} options={activeExpenseTypes.map((type) => ({ id: type.id, name: type.name }))} />
+                      <TextField error={fieldErrors.dueDate} fieldName="dueDate" label="ครบกำหนด" type="date" value={form.dueDate ?? ''} onChange={(value) => setForm({ ...form, dueDate: value })} />
+                      <SelectField error={fieldErrors.accountId} fieldName="accountId" label="บัญชีที่ใช้ทำจ่าย" placeholder="ไม่ระบุบัญชี" value={form.accountId ?? ''} onChange={(value) => setForm({ ...form, accountId: value })} options={accounts.filter((account) => account.active).map((account) => ({ id: account.id, name: accountPaymentOptionLabel(account) }))} />
+                      {form.id ? (
+                        <div data-field="status">
+                          <label className="mb-1 block text-xs font-medium text-slate-600">
+                            สถานะเอกสาร
+                          </label>
+                          <div className="flex h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">
+                            {expenseStatusLabel(form.status)}
                           </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="rounded-md bg-white p-4 shadow">
-                      <ExpenseLineTable
-                        categoryOptions={filteredFormCategoryOptions}
-                        errors={fieldErrors}
-                        lines={formTotals.lines}
-                        netAmount={formTotals.netAmount}
-                        totalAmount={formTotals.amount}
-                        totalVatAmount={formTotals.vatAmount}
-                        totalWhtAmount={formTotals.whtAmount}
-                        vatRatePercent={vatRatePercent}
-                        whtRatePercent={whtRatePercent}
-                        onAddLine={addExpenseLine}
-                        onLineChange={updateExpenseLine}
-                        onRemoveLine={removeExpenseLine}
-                      />
-                    </div>
-
-                    <div className="rounded-md bg-white p-4 shadow">
-                      <div className="mb-3 text-sm font-semibold text-slate-900">เอกสารอ้างอิงและหมายเหตุ</div>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <TextField error={fieldErrors.refDocNo} fieldName="refDocNo" label="เลขอ้างอิง" value={form.refDocNo ?? ''} onChange={(value) => setForm({ ...form, refDocNo: value })} />
-                        <TextField error={fieldErrors.taxInvoiceNo} fieldName="taxInvoiceNo" label="เลขใบกำกับภาษี" value={form.taxInvoiceNo ?? ''} onChange={(value) => setForm({ ...form, taxInvoiceNo: value })} />
-                        <div className="md:col-span-3">
-                          <TextAreaField error={fieldErrors.notes} fieldName="notes" label="หมายเหตุ" rows={3} value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+                          <div className="mt-1 text-xs text-slate-500">สถานะจะเปลี่ยนผ่าน flow อนุมัติจ่ายเงินเท่านั้น</div>
                         </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="rounded-md bg-white p-4 shadow">
+                    <ExpenseLineTable
+                      categoryOptions={filteredFormCategoryOptions}
+                      errors={fieldErrors}
+                      lines={formTotals.lines}
+                      netAmount={formTotals.netAmount}
+                      totalAmount={formTotals.amount}
+                      totalVatAmount={formTotals.vatAmount}
+                      totalWhtAmount={formTotals.whtAmount}
+                      vatRatePercent={vatRatePercent}
+                      whtRatePercent={whtRatePercent}
+                      onAddLine={addExpenseLine}
+                      onLineChange={updateExpenseLine}
+                      onRemoveLine={removeExpenseLine}
+                    />
+                  </div>
+
+                  <div className="rounded-md bg-white p-4 shadow">
+                    <div className="mb-3 text-sm font-semibold text-slate-900">เอกสารอ้างอิงและหมายเหตุ</div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <TextField error={fieldErrors.refDocNo} fieldName="refDocNo" label="เลขอ้างอิง" value={form.refDocNo ?? ''} onChange={(value) => setForm({ ...form, refDocNo: value })} />
+                      <TextField error={fieldErrors.taxInvoiceNo} fieldName="taxInvoiceNo" label="เลขใบกำกับภาษี" value={form.taxInvoiceNo ?? ''} onChange={(value) => setForm({ ...form, taxInvoiceNo: value })} />
+                      <div className="md:col-span-3">
+                        <TextAreaField error={fieldErrors.notes} fieldName="notes" label="หมายเหตุ" rows={3} value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-sm font-semibold text-slate-800">สรุปก่อนบันทึก</div>
-                    <SummaryLine label="ยอดก่อน VAT" value={formatMoney(formTotals.amount)} />
-                    <SummaryLine label="+ VAT" value={formatMoney(formTotals.vatAmount)} />
-                    <SummaryLine label="- WHT" value={formatMoney(formTotals.whtAmount)} />
-                    <SummaryLine emphasize label="ยอดสุทธิ" value={formatMoney(formTotals.netAmount)} />
+                  <div className="rounded-md border border-slate-200 bg-white p-4 shadow">
+                    <div className="mb-3 text-sm font-semibold text-slate-800">สรุปก่อนบันทึก</div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <SummaryTile label="ยอดก่อน VAT" value={formatMoney(formTotals.amount)} />
+                      <SummaryTile label="+ VAT" value={formatMoney(formTotals.vatAmount)} />
+                      <SummaryTile label="- WHT" value={formatMoney(formTotals.whtAmount)} />
+                      <SummaryTile emphasize label="ยอดสุทธิ" value={formatMoney(formTotals.netAmount)} />
+                    </div>
                     {form.id ? (
                       <div className="mt-4 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-600">
                         สถานะปัจจุบัน: <span className={`font-semibold ${expenseStatusTextClass(form.status)}`}>{expenseStatusLabel(form.status)}</span>
@@ -885,11 +885,13 @@ function formatMonthLabel(month: string) {
   return new Intl.DateTimeFormat('th-TH', { month: 'short', year: '2-digit' }).format(new Date(`${month}-01T00:00:00`))
 }
 
-function SummaryLine({ emphasize = false, label, value }: { emphasize?: boolean; label: string; value: string }) {
+function SummaryTile({ emphasize = false, label, value }: { emphasize?: boolean; label: string; value: string }) {
   return (
-    <div className={`mt-3 flex items-center justify-between text-sm ${emphasize ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>
-      <span>{label}</span>
-      <span>{value}</span>
+    <div className={`rounded-md border p-3 ${emphasize ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+      <div className={`text-xs font-medium ${emphasize ? 'text-red-700' : 'text-slate-500'}`}>{label}</div>
+      <div className={`mt-1 text-right text-base font-semibold tabular-nums ${emphasize ? 'text-red-700' : 'text-slate-900'}`}>
+        {value}
+      </div>
     </div>
   )
 }
