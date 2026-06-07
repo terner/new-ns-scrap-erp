@@ -380,6 +380,14 @@ Rules:
 - search text ต้องค้นได้อย่างน้อยจาก:
   - รหัสสินค้า
   - ชื่อสินค้า
+- dropdown list ควรแสดงรายการให้เห็นได้ประมาณ 5 รายการก่อนค่อย scroll
+- ต้องรองรับ keyboard interaction เป็น baseline:
+  - `ArrowDown` / `ArrowUp` สำหรับเลื่อนรายการ
+  - `Enter` สำหรับเลือกรายการที่ focus อยู่
+- ถ้า combobox อยู่ใน modal, dialog, table row, หรือ section ที่มี `overflow`:
+  - panel ต้องไม่ถูกตัดโดย container
+  - panel ต้องยัง click เลือกรายการได้จริง
+  - panel ควรเปิดชิดกับช่องที่เรียกใช้งาน ไม่ลอยไปคนละตำแหน่ง
 - ถ้าหน้าใดมี product option น้อยมากและมีเหตุผลเรื่อง workflow จนไม่ต้องค้นหา ค่อยใช้ plain `select` เป็น page-specific override
 
 ### Remark / Note Field Pattern
@@ -414,6 +422,7 @@ Rules:
   - ระบุ `step` ให้ชัด เช่น `0.01`
 - ช่องเงินต้องชิดขวาเสมอ
 - summary/read-only amount field ใช้ `formatMoney(...)` หรือ formatter กลางเดียวกันทั้งหน้า
+- ช่อง `ราคา`, `ราคา/หน่วย`, `ราคา/กก.`, และ field unit-price อื่นใช้ pattern นี้เป็น default กลาง
 
 ### Field Input Decision Matrix
 
@@ -430,12 +439,20 @@ Rules:
 Decision rules:
 - ถ้า field มีความหมายเป็น “มูลค่าเงิน” ให้เลือก `money input pattern` ก่อนเสมอ
 - ถ้า field มีความหมายเป็น “ปริมาณ” หรือ “น้ำหนัก” ให้ใช้ `number exception` ได้
+- ถ้า field `จำนวน` / `น้ำหนัก` อยู่ในตาราง edit row และ `type="number"` ทำให้ลบค่า, พิมพ์แก้, หรือคุม cursor ยาก:
+  - อนุญาตให้ใช้ `type="text" + inputMode="decimal"` แบบ text-entry sanitization ได้
+  - แต่ยังต้องถือ contract เดิมของ `number exception`
+  - ห้าม format comma + 2 ตำแหน่งแบบช่องเงินตอน blur
+  - ห้ามเด้งกลับ `0` ระหว่างที่ผู้ใช้กำลังลบหรือแก้ไขค่า
 - ถ้า field นั้นแม้จะมีแต่ตัวเลข แต่ไม่ใช่ค่าคำนวณ ให้ใช้ `text`
 - ถ้า page ใดจะ override matrix นี้ ต้องบันทึกเหตุผลไว้ใน `docs/migration/00-current-work.md`
 
 ตัวอย่างที่ใช้บ่อย:
+- `สินค้า` -> `searchable combobox`
 - `ยอดมัดจำ` -> `money input pattern`
+- `ราคา/หน่วย` -> `money input pattern`
 - `ราคา/กก.` -> `money input pattern`
+- `จำนวน (กก.)` -> `number exception`
 - `น้ำหนักเข้า`, `น้ำหนักออก`, `น้ำหนักสุทธิ` -> `number exception`
 - `เลขที่ใบชั่งใหญ่` -> `text`
 - `ทะเบียนรถ` -> `text`

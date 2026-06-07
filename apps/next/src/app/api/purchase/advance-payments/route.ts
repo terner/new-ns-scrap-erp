@@ -10,7 +10,6 @@ import { advancePaymentStatusLabel, mapAdvancePaymentRow, parseBangkokDateTimeIn
 import { findActiveAccountReferenceByCode } from '@/lib/server/account-reference'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, listDailyAccounts, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
-import { ensurePendingPaymentApproval } from '@/lib/server/payment-approval-pending'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
@@ -420,16 +419,6 @@ export async function POST(request: Request) {
         select: { doc_no: true, id: true },
       })
 
-      await ensurePendingPaymentApproval(tx, {
-        actor,
-        branchCode: branch.code,
-        documentDate: normalizeDate(advanceDate),
-        partyCode: supplier.code,
-        partyName: supplier.name,
-        sourceDocNo: created.doc_no,
-        sourceId: created.id,
-        sourceType: 'advance_payment',
-      })
       await appendSupplierAdvanceStatusLog(tx, {
         action: SUPPLIER_ADVANCE_STATUS_ACTION.CREATED,
         actor,

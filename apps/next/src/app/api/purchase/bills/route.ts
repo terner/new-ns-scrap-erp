@@ -12,7 +12,6 @@ import {
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
-import { deletePendingPaymentApproval, ensurePendingPaymentApproval } from '@/lib/server/payment-approval-pending'
 import { appendPoBuyAllocationLogs, PO_BUY_ALLOCATION_ACTION, PO_BUY_STATUS, reconcilePoBuys } from '@/lib/server/po-buy-reconciliation'
 import { appendPurchaseBillStatusLog, createInitialPurchaseBillStatusLog, PURCHASE_BILL_STATUS_ACTION } from '@/lib/server/purchase-bill-history'
 import { prisma } from '@/lib/server/prisma'
@@ -765,7 +764,6 @@ async function validateAdvancePaymentSelection(
   billId?: bigint,
 ) {
   if (!values.advancePaymentId) return null
-  const advancePaymentId = parseInternalBigIntId(values.advancePaymentId)
 
   const advancePayment = await tx.supplier_advance_payments.findFirst({
     select: {
@@ -778,10 +776,7 @@ async function validateAdvancePaymentSelection(
       supplier_id: true,
     },
     where: {
-      OR: [
-        { doc_no: values.advancePaymentId },
-        ...(advancePaymentId != null ? [{ id: advancePaymentId }] : []),
-      ],
+      doc_no: values.advancePaymentId,
     },
   })
   if (!advancePayment || advancePayment.cancelled_at) {
@@ -1381,7 +1376,6 @@ async function optionsPayload() {
       take: 500,
       where: {
         cancelled_at: null,
-        status: { in: ['paid', 'partially_allocated', 'allocated'] },
       },
     }),
     prisma.branches.findMany({
@@ -1431,7 +1425,7 @@ async function optionsPayload() {
 
   return {
     advancePayments: advancePayments.map((advance) => ({
-      active: true,
+      active: ['paid', 'partially_allocated', 'allocated'].includes(advance.status) && toNumber(advance.remaining_amount) > 0.01,
       advanceDate: toDateOnly(advance.advance_date),
       amount: toNumber(advance.amount),
       branch_id: branchCodeById.get(advance.branch_id) ?? null,
@@ -1911,19 +1905,6 @@ export async function POST(request: Request) {
             purchaseBillId: createdBill.id,
             toStatus: settlement.status,
           })
-          if (settlement.payableBalance > 0.01) {
-            await ensurePendingPaymentApproval(tx, {
-              actor,
-              branchCode: effectiveBranch.code,
-              documentDate: createdAt,
-              partyCode: supplier.code,
-              partyName: supplier.name,
-              sourceDocNo: createdBill.doc_no,
-              sourceId: createdBill.id,
-              sourceType: 'purchase_bill',
-            })
-          }
-
           if (values.transactionMode === 'STOCK') {
             await tx.stock_ledger.createMany({
               data: items.map((item) => ({
@@ -2054,7 +2035,6 @@ export async function PATCH(request: Request) {
         await tx.purchase_bill_receipt_allocations.deleteMany({ where: { purchase_bill_id: existingBillRef.id } })
         await tx.purchase_bill_po_allocations.deleteMany({ where: { purchase_bill_id: existingBillRef.id } })
         await resetPurchaseBillAdvanceAllocation(tx, existingBillRef.id, actor, 'ยกเลิกบิลรับซื้อ')
-        await deletePendingPaymentApproval(tx, 'purchase_bill', existingBillRef.id)
         await reconcilePoBuys(tx, extractReferencedPoBuyIdsFromBillItems(existingBillItems), { actor })
         await refreshWeightTicketStatuses(tx, await resolveReferencedReceiptTicketIdsFromBillItems(tx, existingBillItems), {
           actor,
@@ -2296,20 +2276,6 @@ export async function PATCH(request: Request) {
       })
 
       const settlement = await refreshPurchaseBillSettlement(tx, existingBillRef.id, actor)
-      if (settlement.payableBalance > 0.01) {
-        await ensurePendingPaymentApproval(tx, {
-          actor,
-          branchCode: effectiveBranch.code,
-          documentDate: existingBill.date ?? normalizeDate(billDate),
-          partyCode: supplier.code,
-          partyName: supplier.name,
-          sourceDocNo: bill.doc_no,
-          sourceId: bill.id,
-          sourceType: 'purchase_bill',
-        })
-      } else {
-        await deletePendingPaymentApproval(tx, 'purchase_bill', bill.id)
-      }
       await appendPurchaseBillStatusLog(tx, {
         action: PURCHASE_BILL_STATUS_ACTION.EDITED,
         actor,

@@ -91,18 +91,18 @@ function itemsFromPo(row: {
   qty: unknown
   remaining_qty: unknown
   unit_price: unknown
-}, productById: Map<bigint, ProductRef>) {
+}, productByCode: Map<string, ProductRef>, productById: Map<bigint, ProductRef>) {
   if (Array.isArray(row.items) && row.items.length) {
     return row.items
       .filter((item): item is PoItem => typeof item === 'object' && item !== null)
       .map((item, index) => {
         const productId = resolveProductCode(item.productId ?? row.product_id, productById)
-        const resolvedProduct = row.product_id ? productById.get(row.product_id) ?? null : null
+        const resolvedProduct = productId ? productByCode.get(productId) ?? null : row.product_id ? productById.get(row.product_id) ?? null : null
         const qty = jsonNumber(item.remainingQty ?? item.qty)
         return {
           lineId: `${productId || 'line'}-${index}`,
           productId,
-          productName: item.productName ?? resolvedProduct?.name ?? '-',
+          productName: resolvedProduct?.name ?? item.productName ?? '-',
           qty,
           unitCost: jsonNumber(item.unitPrice ?? row.unit_price),
         }
@@ -244,7 +244,7 @@ export async function GET(request: Request) {
     const rows: CostPoolRow[] = []
 
     poBuys.forEach((po) => {
-      const poItems = itemsFromPo(po, productById)
+      const poItems = itemsFromPo(po, productByCode, productById)
       poItems.forEach((item) => {
         const qty = item.qty
         const unitCost = item.unitCost

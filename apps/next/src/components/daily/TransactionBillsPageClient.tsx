@@ -229,9 +229,23 @@ function poQtyVariance(poQty: number, itemQty: number) {
 
 function summaryQtyVariance(expectedQty: number, allocatedQty: number) {
   const diff = expectedQty - allocatedQty
-  if (Math.abs(diff) < 0.001) return { className: 'text-emerald-700', text: 'จัดสรรครบแล้ว' }
-  if (diff > 0) return { className: 'text-amber-700', text: `ค้างจัดสรร ${formatMoney(diff)} กก.` }
-  return { className: 'text-red-700', text: `จัดสรรเกิน ${formatMoney(Math.abs(diff))} กก.` }
+  if (Math.abs(diff) < 0.001) return { className: 'text-emerald-700', text: 'จัดสรรในบิลนี้ครบแล้ว' }
+  if (diff > 0) return { className: 'text-amber-700', text: `ค้างจัดสรรในบิลนี้ ${formatMoney(diff)} กก.` }
+  return { className: 'text-red-700', text: `จัดสรรในบิลนี้เกิน ${formatMoney(Math.abs(diff))} กก.` }
+}
+
+function advancePaymentStatusLabel(status: string | null | undefined) {
+  const labels: Record<string, string> = {
+    allocated: 'ใช้หักบิลแล้ว',
+    approved: 'อนุมัติแล้ว รอจ่ายเงินจริง',
+    cancelled: 'ยกเลิก',
+    paid: 'พร้อมใช้หักบิล',
+    partially_allocated: 'ใช้หักบิลบางส่วน',
+    pending_approval: 'ยังไม่อนุมัติ',
+    refunded: 'คืนเงินแล้ว',
+    refunding: 'รอคืนเงิน',
+  }
+  return labels[status ?? ''] ?? (status || '-')
 }
 
 const numberInputClass = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
@@ -446,12 +460,16 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const activeBranches = options.branches.filter((option) => option.active !== false)
   const resolvedPreferredBranchId = preferredBranchId && activeBranches.some((branch) => branch.id === preferredBranchId) ? preferredBranchId : null
   const activePoBuys = options.poBuys.filter((option) => option.active !== false && (!form.supplierId || option.supplier_id === form.supplierId))
-  const activeAdvancePayments = options.advancePayments.filter((option) => {
+  const matchingAdvancePayments = options.advancePayments.filter((option) => {
     if (!form.supplierId || option.supplier_id !== form.supplierId) return false
     if (form.branchId && option.branch_id && option.branch_id !== form.branchId) return false
-    const isSelected = option.id === form.advancePaymentId
-    return isSelected || (option.remainingAmount ?? 0) > 0.01
+    return true
   })
+  const activeAdvancePayments = matchingAdvancePayments.filter((option) => {
+    const isSelected = option.id === form.advancePaymentId
+    return isSelected || (option.active !== false && (option.remainingAmount ?? 0) > 0.01)
+  })
+  const inactiveAdvancePayments = matchingAdvancePayments.filter((option) => !activeAdvancePayments.some((activeOption) => activeOption.id === option.id))
   const activeCustomers = options.customers.filter((option) => option.active !== false)
   const activeProducts = options.products.filter((option) => option.active !== false)
   const activeReceipts = options.receipts.filter((receipt) => {
@@ -478,7 +496,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const formTotal = form.hasVat && form.vatType === 'EXCLUDE' ? formAfterDiscount + formVat : formAfterDiscount
   const selectedAdvancePayment = form.advancePaymentId
     ? activeAdvancePayments.find((option) => option.id === form.advancePaymentId)
-      ?? options.advancePayments.find((option) => option.id === form.advancePaymentId)
       ?? null
     : null
   const editingAdvanceCarry = editingBill && editingBill.advancePaymentId === form.advancePaymentId
@@ -630,6 +647,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       return [{
         className: variance.className,
         message: `${summary.productName}: ${variance.text}`,
+        rowIndex: state?.rowIndices[0] ?? null,
         summaryId: summary.id,
       }]
     })
@@ -1011,6 +1029,21 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       setFieldErrors(nextFieldErrors)
       setError(parsed.error.issues[0]?.message ?? 'กรุณาตรวจสอบข้อมูลในฟอร์ม')
       focusFieldError(firstErrorKeyFromZodIssues(parsed.error.issues))
+      return
+    }
+
+    if (stockAllocationIssues.length > 0) {
+      const nextFieldErrors = stockAllocationIssues.reduce<Record<string, string>>((errors, issue) => {
+        if (issue.rowIndex != null) {
+          errors[`items.${issue.rowIndex}.qty`] = issue.message
+        }
+        return errors
+      }, { items: 'ใบรับของ WTI ที่เลือกต้องจัดสรรน้ำหนักคงเหลือให้ครบก่อนบันทึก' })
+      const firstIssue = stockAllocationIssues[0]
+      const firstErrorKey = firstIssue?.rowIndex != null ? `items.${firstIssue.rowIndex}.qty` : 'items'
+      setFieldErrors(nextFieldErrors)
+      setError(firstIssue?.message ?? 'ใบรับของ WTI ที่เลือกต้องจัดสรรน้ำหนักคงเหลือให้ครบก่อนบันทึก')
+      focusFieldError(firstErrorKey)
       return
     }
 
@@ -1566,15 +1599,37 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       <input checked={form.hasVat} className="size-5" disabled={!stockReceiptSelected} type="checkbox" onChange={(event) => updateForm('hasVat', event.target.checked)} />
                       <span className="font-bold text-slate-700">มี {vatLabel}</span>
                     </label>
-                    <SelectField
+                    <SearchCombobox
+                      disabled={!form.supplierId}
                       error={fieldErrors.advancePaymentId}
                       errorKey="advancePaymentId"
+                      inputId="purchase-bill-advance-payment-search"
                       label="เอกสารจ่ายเงินล่วงหน้า/มัดจำ"
-                      options={activeAdvancePayments}
-                      placeholder={form.supplierId ? 'เลือกเลขที่เอกสาร ADV' : 'เลือกผู้ขายก่อน'}
+                      options={activeAdvancePayments.map((option) => ({
+                        description: `${option.name} · คงเหลือ ${formatMoney(option.remainingAmount ?? 0)} บาท`,
+                        id: option.id,
+                        label: option.label ?? option.name,
+                        searchText: `${option.label ?? ''} ${option.name} ${option.id}`.toLowerCase(),
+                      }))}
+                      placeholder={form.supplierId ? 'ค้นหาเลขที่เอกสาร ADV' : 'เลือกผู้ขายก่อน'}
                       value={form.advancePaymentId ?? ''}
                       onChange={(value) => updateForm('advancePaymentId', value || null)}
                     />
+                    {form.supplierId && activeAdvancePayments.length === 0 ? (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {matchingAdvancePayments.length === 0 ? (
+                          <span>ไม่พบ ADV ของผู้ขายและสาขานี้</span>
+                        ) : (
+                          <div className="space-y-1">
+                            <div>มี ADV ของผู้ขายนี้ แต่ยังไม่พร้อมใช้หักบิล ต้องอนุมัติและจ่ายเงินจริงให้เป็นสถานะพร้อมใช้ก่อน</div>
+                            <div className="text-amber-700">
+                              {inactiveAdvancePayments.slice(0, 3).map((option) => `${option.name} (${advancePaymentStatusLabel(option.status)})`).join(', ')}
+                              {inactiveAdvancePayments.length > 3 ? ` และอีก ${inactiveAdvancePayments.length - 3} รายการ` : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                     {selectedAdvancePayment ? (
                       <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                         <div>เอกสาร: {selectedAdvancePayment.name}</div>

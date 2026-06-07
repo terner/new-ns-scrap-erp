@@ -14,7 +14,7 @@ import {
 import { findActiveAccountReferenceByCode } from '@/lib/server/account-reference'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor } from '@/lib/server/daily'
-import { deletePendingPaymentApproval, ensurePendingPaymentApproval, hasLockedPaymentApproval } from '@/lib/server/payment-approval-pending'
+import { hasLockedPaymentApproval } from '@/lib/server/payment-approval-pending'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
@@ -154,16 +154,6 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         where: { id: existing.id },
       })
 
-      await ensurePendingPaymentApproval(tx, {
-        actor,
-        branchCode: branch.code,
-        documentDate: row.advance_date,
-        partyCode: supplier.code,
-        partyName: supplier.name,
-        sourceDocNo: row.doc_no,
-        sourceId: row.id,
-        sourceType: 'advance_payment',
-      })
       await appendSupplierAdvanceStatusLog(tx, {
         action: SUPPLIER_ADVANCE_STATUS_ACTION.EDITED,
         actor,
@@ -236,7 +226,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         include: advancePaymentInclude,
         where: { id: existing.id },
       })
-      await deletePendingPaymentApproval(tx, 'advance_payment', existing.id)
       await appendSupplierAdvanceStatusLog(tx, {
         action: SUPPLIER_ADVANCE_STATUS_ACTION.CANCELLED,
         actor,

@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor } from '@/lib/server/daily'
-import { deletePendingPaymentApproval, hasLockedPaymentApproval } from '@/lib/server/payment-approval-pending'
+import { hasLockedPaymentApproval } from '@/lib/server/payment-approval-pending'
 import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
 
 function isPendingApprovalExpenseStatus(status: string | null | undefined) {
   const normalized = String(status ?? '').toLowerCase()
-  return normalized === 'pending_approval' || normalized === 'pending' || normalized === ''
+  return normalized === 'pending_approval'
 }
 
 async function findExpenseByDocNo(id: string) {
@@ -57,7 +57,6 @@ export async function PATCH(_request: Request, context: { params: Promise<{ id: 
           ref_type: 'EXP',
         },
       })
-      await deletePendingPaymentApproval(tx, 'expense', expense.id)
     })
 
     return NextResponse.json({ id: expense.doc_no })

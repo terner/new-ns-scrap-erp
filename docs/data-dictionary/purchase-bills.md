@@ -42,7 +42,7 @@ Current source of truth:
 - Target purchase bill มีส่วนลดได้เฉพาะ `ส่วนลดท้ายใบ` ระดับหัวบิลเท่านั้น ห้ามมีส่วนลดรายสินค้า
 - `ส่วนลดท้ายใบ` ต้องบันทึกเป็นค่าใช้จ่าย/รายการแยก และต้องไม่ลดต้นทุนสินค้า, stock ledger cost, WAC, หรือ Cost Pool
 - Trading purchase bill ไม่ใช้ `ใบรับของ`, ต้องกรอกสินค้า จำนวน/น้ำหนักในบิลรับซื้อ, ไม่สร้าง stock ledger, และตัด PO เฉพาะกรณี Trading + PO
-- Cost Pool รับเฉพาะสินค้า Stock purchase ที่อยู่ในกลุ่มทองแดง/ทองเหลือง (`ทองแดง`, `ทองเหลือง`, `copper`, `brass`) ไม่ใช่ทุก Stock purchase
+- Cost Pool รับเฉพาะ `PO Buy` และ `Stock Spot Buy / No PO purchase bill` ที่อยู่ในกลุ่มทองแดง/ทองเหลือง (`ทองแดง`, `ทองเหลือง`, `copper`, `brass`); PB line ที่อ้าง PO ไม่สร้าง Cost Pool source เพิ่ม
 - ถ้า PO Buy ถูกปิดแบบ `ปิดรับไม่ครบ` ต้องไม่เหลือยอด PO คงเหลือที่ยังไม่ได้รับอยู่ใน Cost Pool candidate; ห้ามลบยอดที่รับ/ออกบิล/ลง stock ไปแล้ว
 - Schema ปัจจุบันยังใช้ `transaction_mode`, `purchase_source`, `po_buy_id`, และ `purchase_bill_items.po_buy_id` เป็น compatibility ระหว่างรอ normalize allocation tables
 

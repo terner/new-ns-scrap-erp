@@ -33,6 +33,7 @@
 | OpenAPI baseline | `docs/api/openapi.yaml` | skeleton API contract catalog for current Next route handlers |
 | Data dictionary | `docs/data-dictionary/` | table/column business meaning for developers; start with `purchase-bills.md` |
 | Purchase flow | `docs/notes/Purchase Flow.md` | target purchase flow: Stock/Trading, PO/Spot, ใบรับของ/WTI, ใบส่งของ/WTO numbering, short-close PO, Cost Pool eligibility, quantity/weight entry rules, Thai statuses, PO/PB/Stock effects, and `PB/payable handoff` to Payment Flow |
+| Cost Pool | `docs/notes/Cost Pool.md` | canonical Cost Pool/Dual Costing rule: copper/brass-only eligibility, source types, availability, short-close/reversal behavior, API/read-model contract, and current implementation gap |
 | Purchase flow status matrix | `docs/notes/Purchase Flow Status Matrix.md` | cross-flow acceptance matrix for purchase/payment document statuses by use case and step, covering `POB`, `WTI`, `ADV`, `PB`, `PMA`, `PMT`, void PMA, cancel PMT, and source lock rules without moving PMA/PMT ownership into Purchase Flow |
 | Payment flow | `docs/notes/Payment Flow.md` | canonical payment/approval flow and owner of source payable lifecycle: `อนุมัติจ่ายเงิน`, split approval items, `รอจ่าย`, `PMA/PMT`, advance payment/deposit, payment history, and supplier advance refund rules |
 | Purchase flow test matrix | `docs/notes/Purchase Flow Test Matrix.md` | execution/UAT matrix for Purchase Flow: PO Buy, WTI, Purchase Bill, payment approval, supplier payment, payment rollback, and stock impact/reversal |

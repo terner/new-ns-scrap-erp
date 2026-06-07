@@ -6,7 +6,7 @@ import { findActiveAccountReferenceByCode } from '@/lib/server/account-reference
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, listDailyAccounts, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
-import { ensurePendingPaymentApproval, hasLockedPaymentApproval } from '@/lib/server/payment-approval-pending'
+import { hasLockedPaymentApproval } from '@/lib/server/payment-approval-pending'
 import { prisma } from '@/lib/server/prisma'
 import { activeVatRatePercent, activeWhtRatePercent } from '@/lib/server/tax-settings'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
@@ -35,7 +35,13 @@ type ExpenseWithRelations = Prisma.expensesGetPayload<{
 
 function isPendingApprovalExpenseStatus(status: string | null | undefined) {
   const normalized = String(status ?? '').toLowerCase()
-  return normalized === 'pending_approval' || normalized === 'pending' || normalized === ''
+  return normalized === 'pending_approval'
+}
+
+function requireExpenseStatus(status: string | null | undefined) {
+  const normalized = String(status ?? '').toLowerCase()
+  if (normalized === 'pending_approval' || normalized === 'approved' || normalized === 'paid' || normalized === 'cancelled') return normalized
+  throw new Error(`สถานะค่าใช้จ่ายไม่ถูกต้อง: ${status ?? '-'}`)
 }
 
 async function findExpenseByDocNo(
@@ -51,12 +57,7 @@ async function findExpenseByDocNo(
 }
 
 function expenseJson(row: ExpenseWithRelations) {
-  const rawStatus = String(row.status ?? row.paid_status ?? '').toLowerCase()
-  const status = rawStatus === 'approved' || rawStatus === 'paid' || rawStatus === 'cancelled' || rawStatus === 'pending_approval'
-    ? rawStatus
-    : rawStatus === 'paid'
-      ? 'paid'
-      : 'pending_approval'
+  const status = requireExpenseStatus(row.status)
   return {
     accountId: row.accounts?.code ?? '',
     accountName: row.accounts?.name ?? '-',
@@ -320,17 +321,6 @@ export async function POST(request: Request) {
           ref_id: expense.id.toString(),
           ref_type: 'EXP',
         },
-      })
-
-      await ensurePendingPaymentApproval(tx, {
-        actor,
-        branchCode: branch?.code,
-        documentDate,
-        partyCode: null,
-        partyName: values.payee,
-        sourceDocNo: expense.doc_no,
-        sourceId: expense.id,
-        sourceType: 'expense',
       })
 
       return expense

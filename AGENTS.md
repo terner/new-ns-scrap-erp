@@ -29,6 +29,7 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 - For form/list/filter work, explicitly verify wording, field behavior, layout grouping, and control sizing against the relevant flow and reference page before claiming completion.
 - For form field type decisions, map every field to the `Field Input Decision Matrix` in `docs/design.md` before choosing `text`, `number`, or `money pattern`.
 - If a field looks numeric but represents money, identifier, or business code, do not infer the input type from appearance alone; use the matrix and the page flow.
+- Do not change application code outside the intended business flow just to tolerate bad, legacy, or malformed data. If data violates the target contract, fix the data, migration, seed, or source-of-truth process instead of adding compatibility branches, fallback logic, skip-row handling, or silent coercion in runtime code.
 - After a batch is validated, committed, and pushed, immediately start the next batch from `docs/migration/00-current-work.md` and the relevant tracker unless the user pauses, redirects, or the next step requires explicit approval for high-risk work.
 
 ## Required Reading
