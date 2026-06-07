@@ -120,7 +120,8 @@ Current source of truth:
    - `lines`, `accountId`, `amount`, `method`, และ `splits` ต้องมีค่าใน API payload; `billId`/`supplierId` top-level ยังใช้เป็น compatibility ของบรรทัดแรก
    - `lines` คือรายการบิลที่จะจ่าย เช่น `{ billId, supplierId, amount, withholdingTax, discount, fee }`
    - `splits` คือบัญชีจ่ายจริงแบบ legacy split payment; ผลรวม `splits.amount` ต้องเท่ากับ `net_amount`
-   - ผู้ใช้กรอกเฉพาะ `amount` เป็นยอดเงินสดที่จะทำจ่าย; `withholding_tax` คำนวณจาก `wht_settings` ที่ active ตามวันที่จ่าย
+   - ผู้ใช้กรอกเฉพาะ `amount` เป็นยอดเงินสดที่จะทำจ่าย; `withholding_tax` คำนวณจาก active default row ใน `wht_settings` ตามวันที่จ่าย
+   - `wht_settings` เป็น master/config หลายอัตรา และ `/admin/system-settings` ต้องแสดง WHT ทุก row ให้แก้เปอร์เซ็นต์ได้รายแถว
    - สูตร WHT ปัจจุบันใช้ cash amount เป็นฐาน: `withholding_tax = amount * rate / (100 - rate)` เพื่อให้ `amount + withholding_tax` ตัดยอดค้างได้ตรงกับยอด gross ของบิล
    - สูตรยอดตัดบิล: `amount + withholding_tax + discount`
    - ถ้า payment เดิมถูกแก้แล้วย้าย `bill_id` จะ refresh ทั้งบิลเก่าและบิลใหม่
@@ -164,7 +165,7 @@ Current source of truth:
 
 - ผู้ใช้กด `+ เพิ่มบรรทัด` เพื่อเลือกบิลซื้อค้างจ่ายได้มากกว่า 1 ใบใน voucher เดียว
 - UI ส่ง `lines: [{ billId, supplierId, amount, withholdingTax, discount, fee }]`
-- API recompute WHT ต่อบรรทัดจาก `wht_settings` และใช้ `amount + withholding_tax + discount` เพื่อตัดยอดบิลแต่ละใบ
+- API recompute WHT ต่อบรรทัดจาก active default row ใน `wht_settings` และใช้ `amount + withholding_tax + discount` เพื่อตัดยอดบิลแต่ละใบ
 - ทุกบรรทัดที่บันทึกสำเร็จใช้ `doc_no` เดียวกัน และมี `voucher_id` ชี้กลับไปที่ voucher เดียวกัน
 
 ## Payment Account Splits

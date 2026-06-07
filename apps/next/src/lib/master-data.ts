@@ -64,6 +64,7 @@ export const masterDataRecordSchema = z.object({
   code: nullableString,
   name: z.string().min(1),
   active: z.boolean().default(true),
+  isDefault: z.boolean().default(false),
   type: nullableString,
   typeLabel: nullableString,
   subtypeLabel: nullableString,

@@ -15,21 +15,13 @@ import {
   type ProductFormValues,
 } from '@/lib/product'
 
-type SortKey = 'active' | 'code' | 'itemStatus' | 'name' | 'type' | 'unit'
-
-const stockStatusOptions = [
-  { label: 'RM - Raw Material', shortLabel: 'Raw Material', value: 'RM' },
-  { label: 'FG - Finish Good', shortLabel: 'Finish Good', value: 'FG' },
-  { label: 'WIP - Work in Process', shortLabel: 'Work in Process', value: 'WIP' },
-  { label: 'SCRAP - เศษ/ของเสีย/สูญเสีย', shortLabel: 'เศษ/ของเสีย/สูญเสีย', value: 'SCRAP' },
-] as const
+type SortKey = 'active' | 'code' | 'name' | 'type' | 'unit'
 
 const emptyProductForm: ProductFormValues = {
   id: undefined,
   code: null,
   name: '',
   active: true,
-  itemStatus: 'RM',
   type: null,
   unit: 'กก.',
 }
@@ -40,7 +32,6 @@ function productToForm(product: Product): ProductFormValues {
     code: product.code,
     name: product.name,
     active: product.active,
-    itemStatus: product.itemStatus,
     type: product.type,
     unit: product.unit ?? 'กก.',
   }
@@ -52,10 +43,6 @@ function displayValue(value: string | number | null) {
 
 function uniqueText(values: Array<string | null>) {
   return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b, 'th', { numeric: true }))
-}
-
-function stockStatusLabel(value: Product['itemStatus']) {
-  return stockStatusOptions.find((option) => option.value === value)?.shortLabel ?? value
 }
 
 function compareProducts(left: Product, right: Product, key: SortKey, direction: 'asc' | 'desc') {
@@ -82,7 +69,6 @@ export function ProductsPageClient() {
   const [isImporting, setIsImporting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [itemStatusFilter, setItemStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<string>>(new Set())
@@ -129,7 +115,6 @@ export function ProductsPageClient() {
     const rows = products.filter((product) => {
       if (activeFilter === 'active' && !product.active) return false
       if (activeFilter === 'inactive' && product.active) return false
-      if (itemStatusFilter && product.itemStatus !== itemStatusFilter) return false
       if (productTypeFilter && product.type !== productTypeFilter) return false
       if (!query) return true
 
@@ -137,7 +122,7 @@ export function ProductsPageClient() {
     })
 
     return [...rows].sort((left, right) => compareProducts(left, right, sortKey, sortDirection))
-  }, [activeFilter, itemStatusFilter, productTypeFilter, products, search, sortDirection, sortKey])
+  }, [activeFilter, productTypeFilter, products, search, sortDirection, sortKey])
 
   const total = filteredSortedProducts.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -258,7 +243,6 @@ export function ProductsPageClient() {
 
   function resetFilters() {
     setActiveFilter('')
-    setItemStatusFilter('')
     setProductTypeFilter('')
     setSearch('')
     setPage(1)
@@ -275,7 +259,7 @@ export function ProductsPageClient() {
 
       <div className="rounded-md bg-white p-3 shadow">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="grid w-full gap-2 md:grid-cols-2 xl:max-w-4xl xl:grid-cols-[minmax(0,1fr)_170px_190px_130px]">
+          <div className="grid w-full gap-2 md:grid-cols-2 xl:max-w-3xl xl:grid-cols-[minmax(0,1fr)_190px_130px]">
             <input
               className="w-full rounded-md border px-3 py-2 text-sm"
               onChange={(event) => {
@@ -297,18 +281,6 @@ export function ProductsPageClient() {
             >
               <option value="">ทุกประเภท</option>
               {productTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
-            <select
-              aria-label="กรองประเภทคลังที่จะรับเข้า"
-              className="rounded-md border px-3 py-2 text-sm"
-              value={itemStatusFilter}
-              onChange={(event) => {
-                setPage(1)
-                setItemStatusFilter(event.target.value)
-              }}
-            >
-              <option value="">ทุกประเภทคลัง</option>
-              {stockStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <select
               aria-label="กรองสถานะใช้งาน"
@@ -412,7 +384,6 @@ export function ProductsPageClient() {
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('code')}>รหัส{sortLabel('code')}</button></th>
                 <th className="min-w-[220px] p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('name')}>ชื่อสินค้า{sortLabel('name')}</button></th>
                 <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('type')}>ประเภท{sortLabel('type')}</button></th>
-                <th className="p-2 text-center"><button className="font-semibold" type="button" onClick={() => setSort('itemStatus')}>ประเภทคลังที่จะรับเข้า{sortLabel('itemStatus')}</button></th>
                 <th className="p-2 text-center"><button className="font-semibold" type="button" onClick={() => setSort('unit')}>หน่วย{sortLabel('unit')}</button></th>
                 <th className="p-2 text-center"><button className="font-semibold" type="button" onClick={() => setSort('active')}>สถานะ{sortLabel('active')}</button></th>
                 <th className="p-2 text-center">แก้ไข</th>
@@ -436,7 +407,6 @@ export function ProductsPageClient() {
                   <td className="p-2 font-mono text-xs">{product.code}</td>
                   <td className="p-2 font-medium">{product.name}</td>
                   <td className="p-2">{displayValue(product.type)}</td>
-                  <td className="p-2 text-center"><StockStatusBadge value={product.itemStatus} /></td>
                   <td className="p-2 text-center">{displayValue(product.unit)}</td>
                   <td className="p-2 text-center">
                     <ActiveToggle
@@ -462,7 +432,7 @@ export function ProductsPageClient() {
               ))}
               {paginatedProducts.length === 0 ? (
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={7}>ไม่พบข้อมูลที่ค้นหา</td>
+                  <td className="p-4 text-center text-sm text-slate-500" colSpan={6}>ไม่พบข้อมูลที่ค้นหา</td>
                 </tr>
               ) : null}
             </tbody>
@@ -524,9 +494,6 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
               <option value="">เลือกประเภทสินค้า</option>
               {productTypes.map((type) => <option key={type} value={type}>{type}</option>)}
             </SelectField>
-            <SelectField error={errors.itemStatus} label="ประเภทคลังที่จะรับเข้า *" value={form.itemStatus} onChange={(value) => update('itemStatus', value as ProductFormValues['itemStatus'])}>
-              {stockStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </SelectField>
             <SelectField error={errors.unit} label="หน่วย" value={form.unit ?? ''} onChange={(value) => update('unit', value || null)}>
               <option value="">เลือกหน่วย</option>
               {productUnits.map((unit) => {
@@ -549,18 +516,6 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
       </div>
     </form>
   )
-}
-
-function StockStatusBadge({ value }: { value: Product['itemStatus'] }) {
-  const className = value === 'FG'
-    ? 'bg-emerald-50 text-emerald-700'
-    : value === 'WIP'
-      ? 'bg-amber-50 text-amber-700'
-      : value === 'SCRAP'
-        ? 'bg-red-50 text-red-700'
-        : 'bg-blue-50 text-blue-700'
-
-  return <span className={`inline-flex min-w-[112px] justify-center rounded-md-full px-2 py-0.5 text-xs font-semibold ${className}`}>{value} · {stockStatusLabel(value)}</span>
 }
 
 type SelectFieldProps = {

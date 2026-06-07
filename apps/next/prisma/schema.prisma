@@ -1715,7 +1715,6 @@ model products {
   name                            String
   unit                            String?                           @default("kg")
   metal_group                     String?
-  item_status                     String?                           @default("RM")
   std_price                       Decimal?                          @default(0) @db.Decimal
   std_cost                        Decimal?                          @default(0) @db.Decimal
   active                          Boolean?                          @default(true)
@@ -1739,7 +1738,6 @@ model products {
   weight_ticket_product_summaries weight_ticket_product_summaries[]
 
   @@index([metal_group], map: "idx_products_metal_group")
-  @@index([item_status], map: "idx_products_status")
   @@schema("public")
 }
 

@@ -16,6 +16,12 @@ export type StockBalanceKey = {
   warehouseId: string | bigint | null
 }
 
+const stockLedgerInclude = {
+  branches: true,
+  products: { select: { code: true, metal_group: true, name: true } },
+  warehouses: true,
+} as const
+
 export function stockKey(input: StockBalanceKey) {
   return [
     input.productId ?? '-',
@@ -99,7 +105,7 @@ export async function stockReferenceData() {
       orderBy: [{ name: 'asc' }],
       select: { active: true, branches: { select: { code: true } }, branch_id: true, code: true, id: true, name: true },
     }),
-    prisma.products.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, item_status: true, metal_group: true, name: true } }),
+    prisma.products.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, metal_group: true, name: true } }),
     prisma.customers.findMany({ orderBy: [{ code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
   ])
 
@@ -112,7 +118,7 @@ export async function stockReferenceData() {
       const code = requireBusinessCode(row.code, `ลูกค้า ${row.id}`)
       return { active: row.active, code, id: code, name: row.name }
     }),
-    products: products.map((row) => ({ active: row.active, code: row.code, id: row.code, metalGroup: row.metal_group, name: row.name, status: row.item_status })),
+    products: products.map((row) => ({ active: row.active, code: row.code, id: row.code, metalGroup: row.metal_group, name: row.name, status: null })),
     warehouses: warehouses.map((row) => ({
       active: row.active,
       branchId: row.branches ? requireBusinessCode(row.branches.code, `สาขาคลัง ${row.branch_id ?? row.id}`) : null,
@@ -135,7 +141,7 @@ export async function stockBalanceSnapshot(input: {
   const normalizedInput = await normalizeStockReferenceInput(input)
   const where = stockWhere(normalizedInput)
   const ledgerRows = await prisma.stock_ledger.findMany({
-    include: { branches: true, products: true, warehouses: true },
+    include: stockLedgerInclude,
     orderBy: [{ date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
     where,
   })
@@ -160,7 +166,7 @@ export async function stockBalanceSnapshot(input: {
   }>()
 
   for (const row of ledgerRows) {
-    const productStatus = row.output_category ?? row.products?.item_status ?? '-'
+    const productStatus = row.output_category ?? '-'
     const key = stockKey({
       branchId: row.branches?.code ?? null,
       lotNo: row.lot_no ?? null,

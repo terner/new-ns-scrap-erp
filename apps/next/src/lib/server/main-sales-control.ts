@@ -140,13 +140,13 @@ function activeStatus(status?: string | null) {
 async function productsContext() {
   const products = await prisma.products.findMany({
     orderBy: [{ code: 'asc' }],
-    select: { code: true, id: true, item_status: true, metal_group: true, name: true, std_cost: true },
+    select: { code: true, id: true, metal_group: true, name: true, std_cost: true },
     where: { active: { not: false } },
   })
   const refs = products.map((product) => ({
     code: product.code,
     id: product.id,
-    itemStatus: product.item_status ?? 'RM',
+    itemStatus: '',
     metalGroup: product.metal_group ?? '',
     name: product.name,
     wac: toNumber(product.std_cost),

@@ -26,8 +26,6 @@ import type { Prisma } from '../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
 
-const STOCK_STATUS_VALUES = ['RM', 'WIP', 'FG', 'SCRAP'] as const
-
 type PurchaseBillRow = Prisma.purchase_billsGetPayload<{
   include: {
     branches: true
@@ -91,7 +89,6 @@ type PurchasePaymentWorkflowStatus =
 type ProductRefRow = {
   code: string
   id: bigint
-  item_status: string | null
   name: string
   unit: string | null
 }
@@ -130,13 +127,6 @@ function branchBillCode(branchCode: string | null | undefined) {
   return digits ? digits.padStart(2, '0').slice(-2) : null
 }
 
-function normalizeStockStatus(value: string | null | undefined) {
-  const normalized = String(value ?? 'RM').toUpperCase()
-  return STOCK_STATUS_VALUES.includes(normalized as typeof STOCK_STATUS_VALUES[number])
-    ? normalized as typeof STOCK_STATUS_VALUES[number]
-    : 'RM'
-}
-
 function bangkokDateInput(value: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     day: '2-digit',
@@ -153,6 +143,7 @@ async function resolveProductsByCodeOrId(productRefs: string[]) {
   if (uniqueRefs.length === 0) return []
   const bigintIds = uniqueRefs.map((ref) => parseInternalBigIntId(ref)).filter((value): value is bigint => value != null)
   return prisma.products.findMany({
+    select: { code: true, id: true, name: true, unit: true },
     where: {
       active: true,
       OR: [
@@ -387,7 +378,7 @@ function buildBillItems(
       discount: item.discount,
       displayName: item.displayName,
       grossWeight,
-      itemStatus: normalizeStockStatus(product?.item_status),
+      itemStatus: 'RM',
       lotNo: item.lotNo,
       note: item.note,
       poBuyId: item.poBuyId,

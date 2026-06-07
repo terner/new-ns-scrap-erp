@@ -14,7 +14,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024
 const headerMap = {
   active: ['สถานะ', 'active'],
   code: ['รหัสสินค้า', 'code'],
-  itemStatus: ['ประเภทคลังที่จะรับเข้า', 'รับเข้าเป็น', 'สถานะรับเข้าสต๊อก', 'itemStatus', 'item_status'],
   name: ['ชื่อสินค้า', 'name'],
   type: ['ประเภทสินค้า', 'ประเภท', 'type'],
   unit: ['หน่วย', 'unit'],
@@ -167,7 +166,6 @@ export async function POST(request: Request) {
       const values = {
         code,
         name: cellText(row, 'name'),
-        itemStatus: cellText(row, 'itemStatus') || 'RM',
         type: cellText(row, 'type') || null,
         unit: cellText(row, 'unit') || null,
         active: normalizeActive(cellText(row, 'active')),
@@ -217,9 +215,11 @@ export async function POST(request: Request) {
         ? prisma.products.update({
           where: { id: existingId },
           data: payload,
+          select: { id: true },
         })
         : prisma.products.create({
           data: payload,
+          select: { id: true },
         })
     }))
 

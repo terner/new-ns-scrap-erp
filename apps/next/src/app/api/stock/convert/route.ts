@@ -9,6 +9,8 @@ import { stockConvertFormSchema } from '@/lib/stock'
 
 export const runtime = 'nodejs'
 
+const productDisplaySelect = { code: true, name: true } as const
+
 async function nextDocNo() {
   const prefix = 'GA-'
   const last = await prisma.stock_ledger.findFirst({
@@ -27,12 +29,12 @@ export async function GET() {
     const [reference, adjustments, ledgerRows] = await Promise.all([
       stockReferenceData(),
       prisma.grade_adjustments.findMany({
-        include: { products: true, warehouses: true },
+        include: { products: { select: productDisplaySelect }, warehouses: true },
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 500,
       }),
       prisma.stock_ledger.findMany({
-        include: { products: true },
+        include: { products: { select: productDisplaySelect } },
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 1000,
         where: { ref_type: 'GA' },

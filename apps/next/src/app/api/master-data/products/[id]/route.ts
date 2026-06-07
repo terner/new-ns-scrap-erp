@@ -5,8 +5,20 @@ import { parseInternalBigIntId } from '@/lib/business-code'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { prisma } from '@/lib/server/prisma'
+import type { Prisma } from '../../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
+
+const productSelect = {
+  active: true,
+  code: true,
+  created_at: true,
+  id: true,
+  name: true,
+  type: true,
+  unit: true,
+  updated_at: true,
+} satisfies Prisma.productsSelect
 
 const routeParamsSchema = z.object({
   id: z.string().min(1),
@@ -38,6 +50,7 @@ export async function PATCH(request: Request, { params }: ProductRouteProps) {
     }
     const product = await prisma.products.update({
       data: { active: values.active },
+      select: productSelect,
       where: { id: resolved.id },
     })
 

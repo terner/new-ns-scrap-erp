@@ -47,6 +47,46 @@ type ExpenseLineJson = {
   whtPct: number
 }
 
+type PayeeOption = {
+  code: string
+  name: string
+  source: 'customer' | 'supplier' | 'salesperson' | 'employee'
+}
+
+function payeeSourceLabel(source: PayeeOption['source']) {
+  if (source === 'customer') return 'Customer'
+  if (source === 'supplier') return 'Supplier'
+  if (source === 'salesperson') return 'Sale'
+  return 'พนักงาน'
+}
+
+function normalizePayeeName(value: string | null | undefined) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ')
+}
+
+function buildPayeeOptions(groups: PayeeOption[][]) {
+  const byName = new Map<string, PayeeOption & { sourceLabel: string }>()
+  for (const option of groups.flat()) {
+    const name = normalizePayeeName(option.name)
+    if (!name) continue
+    const key = name.toLowerCase()
+    const existing = byName.get(key)
+    if (existing) {
+      const nextSourceLabel = payeeSourceLabel(option.source)
+      const sources = new Set(existing.sourceLabel.split(', '))
+      sources.add(nextSourceLabel)
+      byName.set(key, { ...existing, sourceLabel: Array.from(sources).join(', ') })
+      continue
+    }
+    byName.set(key, {
+      ...option,
+      name,
+      sourceLabel: payeeSourceLabel(option.source),
+    })
+  }
+  return Array.from(byName.values()).sort((left, right) => left.name.localeCompare(right.name, 'th'))
+}
+
 function isPendingApprovalExpenseStatus(status: string | null | undefined) {
   const normalized = String(status ?? '').toLowerCase()
   return normalized === 'pending_approval'
@@ -231,15 +271,52 @@ export async function GET(request: Request) {
       throw new Error('บัญชีไม่ถูกต้อง')
     }
 
-    const [accounts, categories, expenseTypes, rows, vatRatePercent, whtRatePercent] = await Promise.all([
+    const [
+      accounts,
+      categories,
+      customerPayees,
+      supplierPayees,
+      salespersonPayees,
+      appUserPayees,
+      directorPayees,
+      rows,
+      vatRatePercent,
+      whtRatePercent,
+    ] = await Promise.all([
       listDailyAccounts(),
       prisma.expense_categories.findMany({
         include: { expense_types: { select: { active: true, code: true, name: true } } },
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
       }),
-      prisma.expense_types.findMany({
+      prisma.customers.findMany({
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
-        select: { active: true, code: true, name: true },
+        select: { code: true, name: true },
+        take: 2500,
+        where: { active: { not: false } },
+      }),
+      prisma.suppliers.findMany({
+        orderBy: [{ active: 'desc' }, { name: 'asc' }],
+        select: { code: true, name: true },
+        take: 2500,
+        where: { active: { not: false } },
+      }),
+      prisma.salespersons.findMany({
+        orderBy: [{ active: 'desc' }, { name: 'asc' }],
+        select: { code: true, name: true },
+        take: 1000,
+        where: { active: { not: false } },
+      }),
+      prisma.app_users.findMany({
+        orderBy: [{ active: 'desc' }, { display_name: 'asc' }, { username: 'asc' }],
+        select: { display_name: true, email: true, id: true, username: true },
+        take: 1000,
+        where: { active: true },
+      }),
+      prisma.director_employees.findMany({
+        orderBy: [{ active: 'desc' }, { name: 'asc' }],
+        select: { code: true, name: true },
+        take: 1000,
+        where: { active: true },
       }),
       prisma.expenses.findMany({
         include: {
@@ -274,6 +351,18 @@ export async function GET(request: Request) {
       )
     })
 
+    const payeeOptions = buildPayeeOptions([
+      customerPayees.map((row) => ({ code: row.code, name: row.name, source: 'customer' })),
+      supplierPayees.map((row) => ({ code: row.code, name: row.name, source: 'supplier' })),
+      salespersonPayees.map((row) => ({ code: row.code, name: row.name, source: 'salesperson' })),
+      appUserPayees.map((row) => ({
+        code: String(row.id),
+        name: row.display_name || row.username || row.email || '',
+        source: 'employee',
+      })),
+      directorPayees.map((row) => ({ code: row.code, name: row.name, source: 'employee' })),
+    ])
+
     if (url.searchParams.get('format') === 'xlsx') {
       return xlsxResponse(buildWorkbook(mappedRows), `daily_expenses_${new Date().toISOString().slice(0, 10)}.xlsx`)
     }
@@ -287,7 +376,7 @@ export async function GET(request: Request) {
         typeId: row.expense_types?.code ?? null,
         typeName: row.expense_types?.name ?? null,
       })),
-      expenseTypes: expenseTypes.map((row) => ({ active: row.active, id: row.code, name: row.name })),
+      payeeOptions,
       rows: mappedRows,
       settings: { vatRatePercent, whtRatePercent },
     })

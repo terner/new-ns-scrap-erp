@@ -117,7 +117,7 @@ function jsonString(...values: unknown[]) {
 
 async function stockSnapshot(asOf: Date, branchId?: bigint | null) {
   const rows = await prisma.stock_ledger.findMany({
-    include: { products: { select: { code: true, item_status: true, metal_group: true, name: true, std_price: true } } },
+    include: { products: { select: { code: true, metal_group: true, name: true, std_price: true } } },
     orderBy: [{ date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
     take: 50000,
     where: { ...branchWhere(branchId), date: { lte: endOfDay(asOf) } },
@@ -135,7 +135,7 @@ async function stockSnapshot(asOf: Date, branchId?: bigint | null) {
       metalGroup: row.products?.metal_group ?? '-',
       name: row.products?.name ?? '-',
       qty: 0,
-      status: row.output_category ?? row.products?.item_status ?? 'OTHER',
+      status: row.output_category ?? 'OTHER',
       stdPrice: toNumber(row.products?.std_price),
       value: 0,
     }

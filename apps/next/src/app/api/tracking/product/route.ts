@@ -40,7 +40,6 @@ type ProductRef = {
   active: boolean | null
   code: string
   id: bigint
-  item_status: string | null
   metal_group: string | null
   name: string
   type: string | null
@@ -153,7 +152,7 @@ function createAgg(product: ProductRef | undefined, fallbackName: string, matchK
     cogs: 0,
     gp: 0,
     id: product?.code ?? '',
-    itemStatus: product?.item_status ?? '',
+    itemStatus: '',
     matchKey,
     metalGroup: product?.metal_group ?? '',
     name: product?.name ?? fallbackName,
@@ -193,7 +192,7 @@ export async function GET(request: Request) {
     const [products, purchaseBills, salesBills, stockRows] = await Promise.all([
       prisma.products.findMany({
         orderBy: [{ code: 'asc' }, { name: 'asc' }],
-        select: { active: true, code: true, id: true, item_status: true, metal_group: true, name: true, type: true, unit: true },
+        select: { active: true, code: true, id: true, metal_group: true, name: true, type: true, unit: true },
         where: {
           active: { not: false },
           ...(normalizedProductId?.id != null ? { id: normalizedProductId.id } : {}),

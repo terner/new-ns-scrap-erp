@@ -47,7 +47,15 @@ Finance-domain notes:
 - purchase channels
 - sales channels
 - transaction modes
-- VAT / WHT flags
+- VAT / WHT flags and tax-rate config
+
+Tax-rate config notes:
+- `vat_settings` และ `wht_settings` เป็น DB-backed master/config ไม่ใช่ frontend hardcode
+- `/admin/system-settings` เป็นหน้า user-facing สำหรับ `VAT / WHT`
+- VAT แสดงเป็น primary active/default rate editor
+- WHT ต้องแสดงทุก row ที่มีใน `wht_settings` เป็นตาราง และให้แก้ `rate_percent` ได้รายแถว
+- WHT master มาตรฐานต้องมี 1% (ขนส่ง/รับเหมา), 2% (โฆษณา), 3% (บริการ), 5% (ค่าเช่า), 10% (ต่างชาติ), และ 15% (ดอกเบี้ย/เงินปันผล)
+- Runtime calculation ต้องเลือก WHT จาก active default row ก่อน ไม่เลือกจาก row ที่ updated ล่าสุดเพียงอย่างเดียว
 
 ### Thai Address Reference
 

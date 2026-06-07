@@ -12,11 +12,21 @@ export const runtime = 'nodejs'
 const sortColumns = {
   active: 'active',
   code: 'code',
-  itemStatus: 'item_status',
   name: 'name',
   type: 'type',
   unit: 'unit',
 } as const
+
+const productSelect = {
+  active: true,
+  code: true,
+  created_at: true,
+  id: true,
+  name: true,
+  type: true,
+  unit: true,
+  updated_at: true,
+} satisfies Prisma.productsSelect
 
 function parseListParams(request: Request) {
   const url = new URL(request.url)
@@ -44,7 +54,6 @@ function productSearchWhere(q: string, filters: { active: string; productType: s
 
   where.OR = [
     { code: { contains: q, mode: 'insensitive' } },
-    { item_status: { contains: q, mode: 'insensitive' } },
     { name: { contains: q, mode: 'insensitive' } },
     { type: { contains: q, mode: 'insensitive' } },
     { unit: { contains: q, mode: 'insensitive' } },
@@ -117,6 +126,7 @@ export async function GET(request: Request) {
     const [products, total] = await Promise.all([
       prisma.products.findMany({
         orderBy: [{ [sortColumn]: direction }, { id: 'asc' }],
+        select: productSelect,
         skip: all ? undefined : (page - 1) * pageSize,
         take: pageSize,
         where,
@@ -169,8 +179,8 @@ export async function POST(request: Request) {
     }
 
     const product = existingProduct
-      ? await prisma.products.update({ where: { id: existingProduct.id }, data: payload })
-      : await prisma.products.create({ data: payload })
+      ? await prisma.products.update({ where: { id: existingProduct.id }, data: payload, select: productSelect })
+      : await prisma.products.create({ data: payload, select: productSelect })
 
     return NextResponse.json(mapPrismaProduct(product))
   } catch (caught) {

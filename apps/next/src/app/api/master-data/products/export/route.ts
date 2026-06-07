@@ -15,17 +15,26 @@ const EXPORT_LIMIT = 10000
 const sortColumns = {
   active: 'active',
   code: 'code',
-  itemStatus: 'item_status',
   name: 'name',
   type: 'type',
   unit: 'unit',
 } as const
 
+const productSelect = {
+  active: true,
+  code: true,
+  created_at: true,
+  id: true,
+  name: true,
+  type: true,
+  unit: true,
+  updated_at: true,
+} satisfies Prisma.productsSelect
+
 const productColumns: Array<{ key: keyof Product; label: string; width: number }> = [
   { key: 'code', label: 'รหัสสินค้า', width: 90 },
   { key: 'name', label: 'ชื่อสินค้า', width: 220 },
   { key: 'type', label: 'ประเภทสินค้า', width: 140 },
-  { key: 'itemStatus', label: 'ประเภทคลังที่จะรับเข้า', width: 180 },
   { key: 'unit', label: 'หน่วย', width: 80 },
   { key: 'active', label: 'สถานะ', width: 90 },
   { key: 'createdAt', label: 'สร้างเมื่อ', width: 150 },
@@ -55,7 +64,6 @@ function productSearchWhere(q: string, filters: { active: string; productType: s
 
   where.OR = [
     { code: { contains: q, mode: 'insensitive' } },
-    { item_status: { contains: q, mode: 'insensitive' } },
     { name: { contains: q, mode: 'insensitive' } },
     { type: { contains: q, mode: 'insensitive' } },
     { unit: { contains: q, mode: 'insensitive' } },
@@ -110,6 +118,7 @@ export async function GET(request: Request) {
     const [rows, total] = await Promise.all([
       prisma.products.findMany({
         orderBy: [{ [sortColumn]: direction }, { id: 'asc' }],
+        select: productSelect,
         take: EXPORT_LIMIT,
         where,
       }),

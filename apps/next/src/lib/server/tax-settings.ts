@@ -8,7 +8,7 @@ function sanitizeRate(value: number | null, fallback: number) {
 
 export async function activeVatRatePercent(effectiveDate: Date) {
   const row = await prisma.vat_settings.findFirst({
-    orderBy: [{ updated_at: 'desc' }, { is_default: 'desc' }, { effective_from: 'desc' }, { id: 'asc' }],
+    orderBy: [{ is_default: 'desc' }, { effective_from: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
     select: { rate_percent: true },
     where: {
       active: true,
@@ -25,7 +25,7 @@ export async function activeVatRatePercent(effectiveDate: Date) {
 
 export async function activeWhtRatePercent(effectiveDate: Date) {
   const row = await prisma.wht_settings.findFirst({
-    orderBy: [{ updated_at: 'desc' }, { is_default: 'desc' }, { effective_from: 'desc' }, { id: 'asc' }],
+    orderBy: [{ is_default: 'desc' }, { effective_from: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
     select: { rate_percent: true },
     where: {
       active: true,

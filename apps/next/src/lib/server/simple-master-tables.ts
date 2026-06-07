@@ -394,7 +394,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   vatSettings: {
     delegate: () => prisma.vat_settings as Delegate,
     prefix: 'VAT-',
-    orderBy: [{ active: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
+    orderBy: [{ active: 'desc' }, { is_default: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
     coerceLookupValue: (value) => {
       const parsed = parseInternalBigIntId(value)
       if (parsed === null) throw new Error('รหัส VAT ไม่ถูกต้อง')
@@ -408,6 +408,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         name: record.name,
         ratePercent: toNumber(record.rate_percent as { toNumber: () => number } | number | null),
         active: record.active,
+        isDefault: Boolean(record.is_default),
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
       }
@@ -422,7 +423,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   whtSettings: {
     delegate: () => prisma.wht_settings as Delegate,
     prefix: 'WHT-',
-    orderBy: [{ active: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
+    orderBy: [{ active: 'desc' }, { is_default: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
     coerceLookupValue: (value) => {
       const parsed = parseInternalBigIntId(value)
       if (parsed === null) throw new Error('รหัส WHT ไม่ถูกต้อง')
@@ -436,6 +437,7 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         name: record.name,
         ratePercent: toNumber(record.rate_percent as { toNumber: () => number } | number | null),
         active: record.active,
+        isDefault: Boolean(record.is_default),
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
       }

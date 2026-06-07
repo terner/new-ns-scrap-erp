@@ -12,6 +12,12 @@ import { findActiveWarehouseReferenceByCodeOrId } from '@/lib/server/warehouse-r
 
 export const runtime = 'nodejs'
 
+const stockLedgerInclude = {
+  branches: true,
+  products: { select: { code: true, name: true } },
+  warehouses: true,
+} as const
+
 async function nextStockTransferDocNo(date: string) {
   const compactDate = date.slice(2, 4) + date.slice(5, 7)
   const startsWith = `ST${compactDate}-`
@@ -44,7 +50,7 @@ export async function GET() {
       }),
       prisma.products.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
       prisma.stock_ledger.findMany({
-        include: { branches: true, products: true, warehouses: true },
+        include: stockLedgerInclude,
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 5000,
         where: { ref_type: 'ST' },

@@ -6,7 +6,6 @@ type PrismaProduct = {
   code: string
   name: string
   active: boolean | null
-  item_status: string | null
   type: string | null
   unit: string | null
   created_at: Date | null
@@ -20,7 +19,6 @@ export function mapPrismaProduct(row: PrismaProduct): Product {
     code: outwardId,
     name: row.name,
     active: row.active ?? true,
-    itemStatus: ['RM', 'WIP', 'FG', 'SCRAP'].includes(row.item_status ?? '') ? row.item_status : 'RM',
     type: row.type,
     unit: row.unit,
     createdAt: row.created_at?.toISOString() ?? null,
@@ -39,7 +37,6 @@ export function toProductWriteInput(values: ProductFormValues) {
   return {
     code,
     name: parsed.name,
-    item_status: parsed.itemStatus,
     type: parsed.type || null,
     unit: parsed.unit || 'กก.',
     active: parsed.active,

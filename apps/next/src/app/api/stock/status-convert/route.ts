@@ -9,6 +9,12 @@ import { statusConvertFormSchema } from '@/lib/stock'
 
 export const runtime = 'nodejs'
 
+const stockLedgerInclude = {
+  branches: true,
+  products: { select: { code: true, name: true } },
+  warehouses: true,
+} as const
+
 async function nextDocNo() {
   const prefix = 'SC-'
   const last = await prisma.stock_ledger.findFirst({
@@ -27,7 +33,7 @@ export async function GET() {
     const [reference, rows] = await Promise.all([
       stockReferenceData(),
       prisma.stock_ledger.findMany({
-        include: { branches: true, products: true, warehouses: true },
+        include: stockLedgerInclude,
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 500,
         where: { ref_type: 'SC', qty_out: { gt: 0 } },

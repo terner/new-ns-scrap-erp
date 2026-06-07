@@ -335,7 +335,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   })).filter((row) => row.amount > 0)
   const pendingIssues = stockIssues.filter((issue) => ['pending', 'draft', 'open'].includes((issue.status ?? '').toLowerCase()))
   const pendingIssueQty = pendingIssues.reduce((sum, issue) => sum + itemsQty(issue.items), 0)
-  const fgRows = stockRows.filter((row) => (row.output_category ?? row.products?.item_status ?? '').toUpperCase() === 'FG')
+  const fgRows = stockRows.filter((row) => (row.output_category ?? '').toUpperCase() === 'FG')
   const fgQty = fgRows.reduce((sum, row) => sum + toNumber(row.qty_in) - toNumber(row.qty_out), 0)
   const fgValue = fgRows.reduce((sum, row) => sum + toNumber(row.value_in) - toNumber(row.value_out), 0)
   const emptyAging = () => ({ '1-30': 0, '31-60': 0, '61-90': 0, current: 0, over90: 0 })

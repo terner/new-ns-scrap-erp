@@ -10,6 +10,12 @@ import { stockQuerySchema } from '@/lib/stock'
 
 export const runtime = 'nodejs'
 
+const stockLedgerInclude = {
+  branches: true,
+  products: { select: { code: true, name: true } },
+  warehouses: true,
+} as const
+
 const ledgerQuerySchema = stockQuerySchema.extend({
   balanceMode: z.enum(['product', 'warehouse']).default('product'),
   direction: z.enum(['asc', 'desc']).default('desc'),
@@ -34,12 +40,12 @@ export async function GET(request: Request) {
 
     const [allRowsRaw, pageRowsRaw, reference, total] = await Promise.all([
       prisma.stock_ledger.findMany({
-        include: { branches: true, products: true, warehouses: true },
+        include: stockLedgerInclude,
         orderBy: [{ date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
         where,
       }),
       prisma.stock_ledger.findMany({
-        include: { branches: true, products: true, warehouses: true },
+        include: stockLedgerInclude,
         orderBy,
         skip,
         take: query.pageSize,
@@ -48,10 +54,10 @@ export async function GET(request: Request) {
       stockReferenceData(),
       prisma.stock_ledger.count({ where }),
     ])
-    const allRows = allRowsRaw as Array<(typeof allRowsRaw)[number] & { products?: { item_status?: string | null } | null }>
+    const allRows = allRowsRaw
     const pageRows = pageRowsRaw as Array<(typeof pageRowsRaw)[number] & {
       branches?: { name: string } | null
-      products?: { code: string; item_status?: string | null; name: string } | null
+      products?: { code: string; name: string } | null
       warehouses?: { name: string } | null
     }>
 
@@ -78,7 +84,7 @@ export async function GET(request: Request) {
     const runningByRowId = new Map<string, number>()
     for (const row of allRows) {
       const key = query.balanceMode === 'warehouse'
-        ? `${String(row.product_id ?? '')}|${String(row.branch_id ?? '')}|${String(row.warehouse_id ?? '')}|${row.lot_no ?? ''}|${row.output_category ?? row.products?.item_status ?? ''}`
+        ? `${String(row.product_id ?? '')}|${String(row.branch_id ?? '')}|${String(row.warehouse_id ?? '')}|${row.lot_no ?? ''}|${row.output_category ?? ''}`
         : String(row.product_id ?? '')
       if (!key) continue
       const nextBalance = (balanceByKey.get(key) ?? 0) + toNumber(row.qty_in) - toNumber(row.qty_out)
@@ -101,7 +107,7 @@ export async function GET(request: Request) {
         lotNo: row.lot_no ?? '',
         note: row.note ?? row.notes ?? '',
         notAvailableForSale: row.not_available_for_sale === true,
-        outputCategory: row.output_category ?? row.products?.item_status ?? '',
+        outputCategory: row.output_category ?? '',
         productCode: row.products?.code ?? '',
         productId: row.products?.code ?? '',
         productName: row.products?.name ?? '-',

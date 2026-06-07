@@ -8,7 +8,6 @@ import { dailyFetchJson, expenseFormSchema, formatMoney, todayDateInput, type Da
 import { formatDateDisplay, formatDecimalDisplay, formatDecimalDraft, sanitizeDecimalInput } from '@/lib/format'
 
 type CategoryOption = { active: boolean | null; id: string; name: string; typeId?: string | null; typeName?: string | null }
-type ExpenseTypeOption = { active: boolean | null; id: string; name: string }
 type ExpenseLineDraft = Omit<ExpenseLineFormValues, 'id'> & { categoryName?: string; id: string; lineNo?: number; vatPct?: number }
 type ExpenseRow = Omit<ExpenseFormValues, 'lines'> & {
   accountName: string
@@ -21,10 +20,17 @@ type ExpenseRow = Omit<ExpenseFormValues, 'lines'> & {
   wht: number
 }
 
+type PayeeOption = {
+  code: string
+  name: string
+  source: 'customer' | 'supplier' | 'salesperson' | 'employee'
+  sourceLabel: string
+}
+
 type ExpensePayload = {
   accounts: DailyAccountOption[]
   categories: CategoryOption[]
-  expenseTypes?: ExpenseTypeOption[]
+  payeeOptions?: PayeeOption[]
   rows: ExpenseRow[]
   settings?: {
     vatRatePercent: number
@@ -185,10 +191,6 @@ function calculateExpenseTotals(lines: ExpenseLineDraft[], vatRatePercent: numbe
   }
 }
 
-function accountPaymentOptionLabel(account: DailyAccountOption) {
-  return `${account.name} (คงเหลือ ${formatMoney(account.balance ?? 0)})`
-}
-
 export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnly?: boolean }) {
   const [accounts, setAccounts] = useState<DailyAccountOption[]>([])
   const [categories, setCategories] = useState<CategoryOption[]>([])
@@ -196,10 +198,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<ExpenseFormValues>(emptyForm)
   const [formOpen, setFormOpen] = useState(false)
-  const [expenseTypeId, setExpenseTypeId] = useState('')
-  const [expenseTypes, setExpenseTypes] = useState<ExpenseTypeOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [payeeOptions, setPayeeOptions] = useState<PayeeOption[]>([])
   const [rows, setRows] = useState<ExpenseRow[]>([])
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('')
@@ -221,7 +222,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       const payload = await dailyFetchJson<ExpensePayload>('/api/daily/expenses')
       setAccounts(payload.accounts)
       setCategories(payload.categories)
-      setExpenseTypes(payload.expenseTypes ?? [])
+      setPayeeOptions(payload.payeeOptions ?? [])
       setRows(payload.rows)
       setVatRatePercent(payload.settings?.vatRatePercent ?? 7)
       setWhtRatePercent(payload.settings?.whtRatePercent ?? 3)
@@ -287,14 +288,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
     netAmount: filteredRows.reduce((sum, row) => sum + row.netAmount, 0),
   }), [filteredRows])
 
-  const activeExpenseTypes = useMemo(() => expenseTypes.filter((item) => item.active !== false), [expenseTypes])
-
-  const categoryTypeById = useMemo(() => new Map(categories.map((category) => [category.id, category.typeId ?? ''])), [categories])
-
   const filteredFormCategoryOptions = useMemo(() => categories
     .filter((category) => category.active !== false)
-    .filter((category) => !expenseTypeId || category.typeId === expenseTypeId)
-    .map((category) => ({ id: category.id, name: category.name })), [categories, expenseTypeId])
+    .map((category) => ({ id: category.id, name: category.name })), [categories])
 
   const formLines = useMemo(() => normalizeExpenseLines(form.lines, form), [form])
   const formTotals = useMemo(() => calculateExpenseTotals(formLines, vatRatePercent), [formLines, vatRatePercent])
@@ -396,11 +392,6 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
     setPage(1)
   }, [accountId, categoryId, dateFrom, dateTo, pageSize, search, statusFilter])
 
-  function expenseTypeForLines(lines: ExpenseLineDraft[]) {
-    const typeIds = Array.from(new Set(lines.map((line) => line.categoryId ? categoryTypeById.get(line.categoryId) ?? '' : '').filter(Boolean)))
-    return typeIds.length === 1 ? typeIds[0] : ''
-  }
-
   function syncFormLines(current: ExpenseFormValues, lines: ExpenseLineDraft[]) {
     const totals = calculateExpenseTotals(lines, vatRatePercent)
     const description = totals.lines.map((line) => line.description).filter(Boolean).join(' / ').slice(0, 500) || null
@@ -417,7 +408,6 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
   function openCreateForm() {
     setForm({ ...emptyForm, date: todayDateInput(), lines: [createExpenseLine()] })
-    setExpenseTypeId('')
     setFieldErrors({})
     setFormOpen(true)
   }
@@ -446,23 +436,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       status: row.status,
       taxInvoiceNo: row.taxInvoiceNo,
     }, nextLines))
-    setExpenseTypeId(expenseTypeForLines(nextLines))
     setError(null)
     setFieldErrors({})
     setFormOpen(true)
-  }
-
-  function updateExpenseTypeFilter(nextExpenseTypeId: string) {
-    setExpenseTypeId(nextExpenseTypeId)
-    setForm((current) => {
-      if (!nextExpenseTypeId) return current
-      const nextLines = normalizeExpenseLines(current.lines, current).map((line) => (
-        !line.categoryId || categoryTypeById.get(line.categoryId) === nextExpenseTypeId
-          ? line
-          : { ...line, categoryId: null, categoryName: '' }
-      ))
-      return syncFormLines(current, nextLines)
-    })
   }
 
   function updateExpenseLine(index: number, patch: Partial<ExpenseLineDraft>) {
@@ -715,10 +691,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลหลัก</div>
                     <div className="grid gap-3 md:grid-cols-3">
-                      <TextField error={fieldErrors.payee} fieldName="payee" label="ผู้รับเงิน" required value={form.payee} onChange={(value) => setForm({ ...form, payee: value })} />
-                      <SelectField fieldName="expenseTypeId" label="ประเภทค่าใช้จ่าย" placeholder="ทุกประเภท" value={expenseTypeId} onChange={updateExpenseTypeFilter} options={activeExpenseTypes.map((type) => ({ id: type.id, name: type.name }))} />
+                      <PayeeField error={fieldErrors.payee} options={payeeOptions} value={form.payee} onChange={(value) => setForm({ ...form, payee: value })} />
                       <TextField error={fieldErrors.dueDate} fieldName="dueDate" label="ครบกำหนด" type="date" value={form.dueDate ?? ''} onChange={(value) => setForm({ ...form, dueDate: value })} />
-                      <SelectField error={fieldErrors.accountId} fieldName="accountId" label="บัญชีที่ใช้ทำจ่าย" placeholder="ไม่ระบุบัญชี" value={form.accountId ?? ''} onChange={(value) => setForm({ ...form, accountId: value })} options={accounts.filter((account) => account.active).map((account) => ({ id: account.id, name: accountPaymentOptionLabel(account) }))} />
                       {form.id ? (
                         <div data-field="status">
                           <label className="mb-1 block text-xs font-medium text-slate-600">
@@ -930,6 +904,32 @@ function SegmentMulti({
 
 function renderRequiredMark(required?: boolean) {
   return required ? <span className="ml-1 text-red-600">*</span> : null
+}
+
+function PayeeField(props: { error?: string; onChange: (value: string) => void; options: PayeeOption[]; value: string }) {
+  return (
+    <label className="block" data-field="payee">
+      <span className="mb-1 block text-xs font-medium text-slate-600">ผู้รับเงิน{renderRequiredMark(true)}</span>
+      <input
+        aria-invalid={Boolean(props.error)}
+        autoComplete="off"
+        className={`h-9 w-full rounded-md border px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-100 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white text-slate-900'}`}
+        list="expense-payee-options"
+        placeholder="ค้นหา Customer / Supplier / Sale / พนักงาน หรือกรอกเอง"
+        required
+        type="search"
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+      <datalist id="expense-payee-options">
+        {props.options.map((option) => (
+          <option key={`${option.source}-${option.code}-${option.name}`} label={`${option.sourceLabel} · ${option.code}`} value={option.name} />
+        ))}
+      </datalist>
+      <span className="mt-1 block text-[11px] text-slate-500">เลือกจาก master data ได้ หรือพิมพ์ชื่อผู้รับเงินใหม่ได้โดยตรง</span>
+      {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
+    </label>
+  )
 }
 
 function TextField(props: { error?: string; fieldName?: string; label: string; onChange?: (value: string) => void; readOnly?: boolean; required?: boolean; type?: string; value: string }) {
