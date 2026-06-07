@@ -5,6 +5,7 @@ type WarehouseReference = {
   code: string
   id: bigint
   name: string
+  type: string | null
 }
 
 export async function findActiveWarehouseReferenceByCodeOrId(
@@ -19,6 +20,7 @@ export async function findActiveWarehouseReferenceByCodeOrId(
       code: true,
       id: true,
       name: true,
+      type: true,
     },
     where: {
       active: true,
@@ -36,6 +38,7 @@ export async function findActiveWarehouseReferenceByCodeOrId(
     code: warehouse.code,
     id: warehouse.id,
     name: warehouse.name,
+    type: warehouse.type ?? null,
   }
 }
 

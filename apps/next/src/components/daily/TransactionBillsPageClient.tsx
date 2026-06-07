@@ -484,12 +484,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   })
   const activeSalesChannels = options.salesChannels.filter((option) => option.active !== false)
   const activeSuppliers = options.suppliers.filter((option) => option.active !== false)
-  const activePurchaseWarehouses = options.warehouses.filter((option) => {
-    if (option.active === false) return false
-    if (form.branchId && option.branch_id !== form.branchId) return false
-    return true
-  })
-  const defaultPurchaseWarehouseId = useCallback((branchId: string) => options.warehouses.find((warehouse) => warehouse.active !== false && warehouse.branch_id === branchId && warehouse.type === 'RM')?.id ?? null, [options.warehouses])
+  const defaultPurchaseWarehouse = useCallback((branchId: string) => options.warehouses.find((warehouse) => warehouse.active !== false && warehouse.branch_id === branchId && warehouse.type?.toUpperCase() === 'RM') ?? null, [options.warehouses])
+  const defaultPurchaseWarehouseId = useCallback((branchId: string) => defaultPurchaseWarehouse(branchId)?.id ?? null, [defaultPurchaseWarehouse])
+  const selectedPurchaseWarehouse = form.warehouseId ? options.warehouses.find((warehouse) => warehouse.id === form.warehouseId) ?? null : null
+  const purchaseWarehouseDisplayValue = form.branchId
+    ? selectedPurchaseWarehouse?.name ?? 'ไม่พบคลัง RM ของสาขานี้'
+    : 'เลือกสาขาก่อน'
   const selectedSupplier = form.supplierId
     ? activeSuppliers.find((supplier) => supplier.id === form.supplierId) ?? null
     : null
@@ -627,30 +627,16 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     if (form.transactionMode !== 'STOCK') return
     if (!form.branchId) return
 
-    const branchWarehouseIds = new Set(
-      options.warehouses
-        .filter((warehouse) => warehouse.active !== false && warehouse.branch_id === form.branchId)
-        .map((warehouse) => warehouse.id),
-    )
-    if (form.warehouseId && branchWarehouseIds.has(form.warehouseId)) return
-
     const nextWarehouseId = defaultPurchaseWarehouseId(form.branchId)
-    if (!nextWarehouseId || nextWarehouseId === form.warehouseId) return
+    if (nextWarehouseId === form.warehouseId) return
 
     setForm((current) => {
       if (current.transactionMode !== 'STOCK' || !current.branchId) return current
-      const currentBranchWarehouseIds = new Set(
-        options.warehouses
-          .filter((warehouse) => warehouse.active !== false && warehouse.branch_id === current.branchId)
-          .map((warehouse) => warehouse.id),
-      )
-      if (current.warehouseId && currentBranchWarehouseIds.has(current.warehouseId)) return current
-
       const nextWarehouseId = defaultPurchaseWarehouseId(current.branchId)
-      if (!nextWarehouseId || nextWarehouseId === current.warehouseId) return current
+      if (nextWarehouseId === current.warehouseId) return current
       return { ...current, warehouseId: nextWarehouseId }
     })
-  }, [defaultPurchaseWarehouseId, form.branchId, form.transactionMode, form.warehouseId, mode, options.warehouses])
+  }, [defaultPurchaseWarehouseId, form.branchId, form.transactionMode, form.warehouseId, mode])
 
   function summaryAvailableForRow(summaryId: string | null, index: number) {
     if (!summaryId) return 0
@@ -848,6 +834,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   function updateForm<K extends keyof PurchaseBillFormValues>(key: K, value: PurchaseBillFormValues[K]) {
     setForm((current) => {
       const stockContextLocked = current.transactionMode === 'STOCK' && Boolean(current.receiptTicketId)
+      if (current.transactionMode === 'STOCK' && key === 'warehouseId') return current
       if (
         stockContextLocked
         && (
@@ -1391,18 +1378,15 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                   {form.transactionMode === 'STOCK' ? (
                     <label className="block text-xs font-medium text-slate-600">
                       คลัง <span className="ml-1 text-red-600">*</span>
-                      <Select
+                      <Input
                         data-error-key="warehouseId"
-                        className={`mt-1 w-full ${fieldErrors.warehouseId ? 'border-red-400 bg-red-50 text-red-700' : form.warehouseId ? 'text-slate-900' : 'text-slate-400'}`}
-                        disabled={stockReceiptLocked || !form.branchId}
+                        className={`mt-1 w-full cursor-not-allowed bg-slate-100 ${fieldErrors.warehouseId ? 'border-red-400 bg-red-50 text-red-700' : form.warehouseId ? 'text-slate-900' : 'text-slate-400'}`}
+                        readOnly
                         required
-                        value={form.warehouseId ?? ''}
-                        onChange={(event) => updateForm('warehouseId', event.target.value || null)}
-                      >
-                        <option disabled value="">{form.branchId ? 'เลือกคลัง' : 'เลือกสาขาก่อน'}</option>
-                        {activePurchaseWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
-                      </Select>
+                        value={purchaseWarehouseDisplayValue}
+                      />
                       {fieldErrors.warehouseId ? <div className="mt-1 text-xs text-red-600">{fieldErrors.warehouseId}</div> : null}
+                      <div className="mt-1 text-[11px] text-slate-500">ระบบเลือกคลัง RM ตามสาขาอัตโนมัติและล็อกไม่ให้แก้เอง</div>
                     </label>
                   ) : null}
                   <SupplierSearchCombobox className="md:max-w-[420px]" disabled={stockReceiptLocked} error={fieldErrors.supplierId} errorKey="supplierId" options={activeSuppliers} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />

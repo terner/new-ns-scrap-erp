@@ -1864,6 +1864,9 @@ export async function POST(request: Request) {
     if (values.transactionMode === 'STOCK' && warehouse?.branchCode !== effectiveBranch.code) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'คลังต้องอยู่ในสาขาเดียวกับบิลรับซื้อ' }, { status: 400 })
     }
+    if (values.transactionMode === 'STOCK' && warehouse?.type?.toUpperCase() !== 'RM') {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'บิลรับซื้อ Stock ต้องใช้คลัง RM ของสาขาเท่านั้น' }, { status: 400 })
+    }
 
     const poBuyById = createPoBuyRefMap(poBuys)
     const missingPoBuy = poBuyRefs.find((poBuyId) => !poBuyById.has(poBuyId))
@@ -2196,6 +2199,9 @@ export async function PATCH(request: Request) {
     if (!effectiveBranch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เลือกสาขาก่อนบันทึกบิล' }, { status: 400 })
     if (values.transactionMode === 'STOCK' && warehouse?.branchCode !== effectiveBranch.code) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'คลังต้องอยู่ในสาขาเดียวกับบิลรับซื้อ' }, { status: 400 })
+    }
+    if (values.transactionMode === 'STOCK' && warehouse?.type?.toUpperCase() !== 'RM') {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'บิลรับซื้อ Stock ต้องใช้คลัง RM ของสาขาเท่านั้น' }, { status: 400 })
     }
 
     const poBuyById = createPoBuyRefMap(poBuys)
