@@ -146,9 +146,13 @@ export async function GET(request: Request) {
       throw new Error('บัญชีไม่ถูกต้อง')
     }
 
-    const [accounts, categories, rows, vatRatePercent, whtRatePercent] = await Promise.all([
+    const [accounts, categories, expenseTypes, rows, vatRatePercent, whtRatePercent] = await Promise.all([
       listDailyAccounts(),
       prisma.expense_categories.findMany({
+        include: { expense_types: { select: { active: true, code: true, name: true } } },
+        orderBy: [{ active: 'desc' }, { name: 'asc' }],
+      }),
+      prisma.expense_types.findMany({
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
         select: { active: true, code: true, name: true },
       }),
@@ -188,7 +192,14 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       accounts,
-      categories: categories.map((row) => ({ active: row.active, id: row.code, name: row.name })),
+      categories: categories.map((row) => ({
+        active: row.active,
+        id: row.code,
+        name: row.name,
+        typeId: row.expense_types?.code ?? null,
+        typeName: row.expense_types?.name ?? null,
+      })),
+      expenseTypes: expenseTypes.map((row) => ({ active: row.active, id: row.code, name: row.name })),
       rows: mappedRows,
       settings: { vatRatePercent, whtRatePercent },
     })
