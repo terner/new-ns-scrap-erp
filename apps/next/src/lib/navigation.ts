@@ -337,6 +337,18 @@ export const navigationItems: NavigationItem[] = [
   { href: '/admin/users-permissions', icon: '🛡️', label: 'Users & Permissions', section: 'admin' },
 ]
 
+const sidebarParentPathByDetailPrefix: Array<[string, string]> = [
+  ['/purchase/payment-approvals', '/daily/payment-approval'],
+]
+
+export function sidebarNavigationPath(pathname: string) {
+  const normalizedPath = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname
+  const mappedParent = sidebarParentPathByDetailPrefix.find(([detailPrefix]) => (
+    normalizedPath === detailPrefix || normalizedPath.startsWith(`${detailPrefix}/`)
+  ))
+  return mappedParent?.[1] ?? normalizedPath
+}
+
 export function pageTitleForPath(pathname: string) {
   if (pathname === '/login') return 'เข้าสู่ระบบ'
 

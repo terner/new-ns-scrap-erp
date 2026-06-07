@@ -68,6 +68,7 @@ type WeightTicketOptionRow = Prisma.weight_ticketsGetPayload<{
 }>
 
 type BillQuery = {
+  branchId?: string
   dateFrom?: string
   dateTo?: string
   filterMode?: string
@@ -293,6 +294,9 @@ function billItemsJson(row: PurchaseBillRow) {
 
 function billJson(row: PurchaseBillRow, paymentDocNos: string[] = []) {
   const items = billItemsJson(row)
+  const receiptDocNos = [...new Set(items
+    .map((item) => item.receiptTicketDocNo)
+    .filter((value): value is string => Boolean(value)))]
   const activeAdvanceAllocation = row.supplier_advance_allocations.find((allocation) => allocation.status === 'active') ?? null
   return {
     advanceAllocatedAmount: activeAdvanceAllocation ? toNumber(activeAdvanceAllocation.allocated_amount) : 0,
@@ -315,6 +319,7 @@ function billJson(row: PurchaseBillRow, paymentDocNos: string[] = []) {
     payableBalance: toNumber(row.payable_balance),
     poBuyId: items[0]?.poBuyId ?? '',
     purchaseSource: row.purchase_source ?? 'SPOT_BUY',
+    receiptDocNos,
     refNo: row.ref_no ?? '',
     salesId: stringifyBusinessValue(row.sales_id),
     status: row.status ?? 'unpaid',
@@ -1550,6 +1555,7 @@ function parseBillQuery(url: URL, includePaging = true): BillQuery {
   const sortDirection = url.searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
 
   return {
+    branchId: url.searchParams.get('branchId')?.trim().toUpperCase() || undefined,
     dateFrom: url.searchParams.get('dateFrom') || undefined,
     dateTo: url.searchParams.get('dateTo') || undefined,
     filterMode: url.searchParams.get('filterMode') || undefined,
@@ -1570,6 +1576,13 @@ function parseBillQuery(url: URL, includePaging = true): BillQuery {
 function billWhere(query: BillQuery): Prisma.purchase_billsWhereInput {
   const where: Prisma.purchase_billsWhereInput = {}
 
+  if (query.branchId) {
+    where.branches = {
+      is: {
+        code: query.branchId,
+      },
+    }
+  }
   if (query.dateFrom || query.dateTo) {
     where.date = {
       ...(query.dateFrom ? { gte: normalizeDate(query.dateFrom) } : {}),
@@ -1745,6 +1758,7 @@ function buildWorkbook(rows: Array<{
   docNo: string
   itemCount: number
   payableBalance?: number
+  receiptDocNos?: string[]
   status: string
   supplierName?: string
   totalAmount?: number
@@ -1752,6 +1766,7 @@ function buildWorkbook(rows: Array<{
 }>) {
   const dataRows = rows.map((row) => ({
     'เลขที่': row.docNo,
+    'เลขที่ใบรับของ': row.receiptDocNos?.join(', ') || '-',
     'วันที่': row.date,
     'ผู้ขาย': row.supplierName,
     'ประเภท': row.transactionMode,
@@ -1765,10 +1780,10 @@ function buildWorkbook(rows: Array<{
   const workbook = XLSX.utils.book_new()
   const sheet = XLSX.utils.json_to_sheet(dataRows)
   sheet['!cols'] = [
-    { wch: 16 }, { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 12 },
+    { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 12 },
     { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
   ]
-  applyWorksheetTableLayout(sheet, 10, dataRows.length + 1)
+  applyWorksheetTableLayout(sheet, 11, dataRows.length + 1)
   XLSX.utils.book_append_sheet(workbook, sheet, 'บิลรับซื้อ')
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer
 }

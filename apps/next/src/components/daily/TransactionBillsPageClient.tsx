@@ -57,6 +57,7 @@ type BillRow = {
   paymentDocNos?: string[]
   payableBalance?: number
   purchaseSource?: string
+  receiptDocNos?: string[]
   receivableBalance?: number
   receivedAmount?: number
   refNo?: string
@@ -337,6 +338,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [cancelNote, setCancelNote] = useState('')
   const [cancelNoteError, setCancelNoteError] = useState('')
   const [cancelingBill, setCancelingBill] = useState<BillRow | null>(null)
+  const [branchFilter, setBranchFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -372,6 +374,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       sortDirection,
       sortKey,
     })
+    if (mode === 'purchase' && branchFilter) params.set('branchId', branchFilter)
     if (search.trim()) params.set('search', search.trim())
     if (dateFrom) params.set('dateFrom', dateFrom)
     if (dateTo) params.set('dateTo', dateTo)
@@ -379,7 +382,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     if ((mode === 'purchase' || mode === 'sales') && statusFilter.length > 0) params.set('status', statusFilter.join(','))
     if (mode === 'stock-issue' && filterMode) params.set('status', filterMode)
     return `${apiPath}?${params.toString()}`
-  }, [apiPath, dateFrom, dateTo, filterMode, mode, page, pageSize, search, sortDirection, sortKey, statusFilter])
+  }, [apiPath, branchFilter, dateFrom, dateTo, filterMode, mode, page, pageSize, search, sortDirection, sortKey, statusFilter])
 
   const loadData = useCallback(async () => {
     const requestId = latestLoadRequestRef.current + 1
@@ -450,7 +453,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
   useEffect(() => {
     setPage(1)
-  }, [dateFrom, dateTo, filterMode, pageSize, search, sortDirection, sortKey, statusFilter])
+  }, [branchFilter, dateFrom, dateTo, filterMode, pageSize, search, sortDirection, sortKey, statusFilter])
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -528,7 +531,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const stockIssueQty = stockIssueRows.reduce((sum, row) => sum + (row.totalQty ?? 0), 0)
   const stockIssueCost = stockIssueRows.reduce((sum, row) => sum + row.totalCost, 0)
   const stockIssueEst = stockIssueRows.reduce((sum, row) => sum + row.totalEstAmount, 0)
-  const tableColSpan = mode === 'purchase' ? 11 : mode === 'sales' ? 15 : 10
+  const tableColSpan = mode === 'purchase' ? 12 : mode === 'sales' ? 15 : 10
   const statusOptions = mode === 'purchase' ? purchaseStatusOptions : salesStatusOptions
   const selectedReceipt = (() => {
     if (!form.receiptTicketId) return null
@@ -677,6 +680,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   }
 
   function clearFilters() {
+    setBranchFilter('')
     setSearch('')
     setDateFrom('')
     setDateTo('')
@@ -1127,6 +1131,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     setError(null)
     try {
       const params = new URLSearchParams({ format: 'xlsx', sortDirection, sortKey })
+      if (mode === 'purchase' && branchFilter) params.set('branchId', branchFilter)
       if (search.trim()) params.set('search', search.trim())
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
@@ -1181,7 +1186,20 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <DatePickerInput id="purchase-bills-date-from" value={dateFrom} onChange={setDateFrom} />
           <span className="text-slate-400">→</span>
           <DatePickerInput id="purchase-bills-date-to" value={dateTo} onChange={setDateTo} />
-          {(search || dateFrom || dateTo || filterMode || statusFilter.length > 0) ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
+          {mode === 'purchase' ? (
+            <BranchSelectCombobox
+              allOptionLabel="ทุกสาขา"
+              branches={activeBranches}
+              className="w-[12rem]"
+              includeAllOption
+              inputId="purchase-bills-branch-filter"
+              label=""
+              placeholder="เลือกสาขา"
+              value={branchFilter || null}
+              onChange={(branchId) => setBranchFilter(branchId ?? '')}
+            />
+          ) : null}
+          {(search || branchFilter || dateFrom || dateTo || filterMode || statusFilter.length > 0) ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
           {mode === 'purchase' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
           {mode === 'purchase' ? <Button type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</Button> : null}
           {mode === 'sales' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
@@ -1239,6 +1257,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <TableHeader>
             <tr>
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่'} sortKey="docNo" onSort={changeSort} />
+              {mode === 'purchase' ? <th className="p-2 text-left">เลขที่ใบรับของ</th> : null}
               {mode === 'sales' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่อ้างอิง" sortKey="refNo" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'วันที่สร้างรายการ' : 'วันที่'} sortKey="date" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} sortKey="name" onSort={changeSort} />
@@ -1265,6 +1284,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             {!isLoading && pageRows.map((row) => (
               <TableRow key={row.id} className={`hover:bg-slate-50 ${mode === 'purchase' && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
                 <td className="whitespace-nowrap p-2 text-xs">{row.docNo}</td>
+                {mode === 'purchase' && !isStockIssueRow(row) ? (
+                  <td className="p-2 text-xs">
+                    {row.receiptDocNos?.length
+                      ? <div className="space-y-0.5">{row.receiptDocNos.map((docNo) => <div className="whitespace-nowrap text-slate-700" key={`${row.id}-${docNo}`}>{docNo}</div>)}</div>
+                      : <span className="text-slate-400">-</span>}
+                  </td>
+                ) : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="whitespace-nowrap p-2 text-xs text-slate-600">{row.refNo || '-'}</td> : null}
                 <td className="p-2">{formatDateDisplay(row.date)}</td>
                 <td className="p-2">{'supplierName' in row ? row.supplierName : row.customerName}</td>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { canAccessPath, navigationItems, navigationSections, type NavigationSectionKey } from '@/lib/navigation'
+import { canAccessPath, navigationItems, navigationSections, sidebarNavigationPath, type NavigationSectionKey } from '@/lib/navigation'
 
 type AppNavigationProps = {
   onNavigate?: () => void
@@ -23,6 +23,7 @@ function isNavigationPathActive(pathname: string, href: string) {
 
 export function AppNavigation({ onNavigate }: AppNavigationProps) {
   const pathname = usePathname()
+  const activePathname = sidebarNavigationPath(pathname)
   const navRef = useRef<HTMLElement | null>(null)
   const hasRestoredScrollRef = useRef(false)
   const suppressScrollSaveRef = useRef(false)
@@ -70,17 +71,17 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
 
   useEffect(() => {
     const activeItem = visibleItems.find((item) => {
-      if (isNavigationPathActive(pathname, item.href)) return true
-      return item.children?.some((child) => isNavigationPathActive(pathname, child.href)) ?? false
+      if (isNavigationPathActive(activePathname, item.href)) return true
+      return item.children?.some((child) => isNavigationPathActive(activePathname, child.href)) ?? false
     })
 
     if (!activeItem) return
 
     setExpandedSection(activeItem.section)
-    if (activeItem.children?.some((child) => isNavigationPathActive(pathname, child.href))) {
+    if (activeItem.children?.some((child) => isNavigationPathActive(activePathname, child.href))) {
       setExpandedMenu(activeItem.href)
     }
-  }, [pathname, visibleItems])
+  }, [activePathname, visibleItems])
 
   useEffect(() => {
     const nav = navRef.current
@@ -164,8 +165,8 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
               <span className="text-[10px]">{sectionExpanded ? '▾' : '▸'}</span>
             </button>
             {sectionExpanded ? items.map((item) => {
-              const childActive = item.children?.some((child) => isNavigationPathActive(pathname, child.href)) ?? false
-              const active = isNavigationPathActive(pathname, item.href) || childActive
+              const childActive = item.children?.some((child) => isNavigationPathActive(activePathname, child.href)) ?? false
+              const active = isNavigationPathActive(activePathname, item.href) || childActive
               const expanded = expandedMenu === item.href
 
               return (
@@ -216,7 +217,7 @@ export function AppNavigation({ onNavigate }: AppNavigationProps) {
                   {item.children?.length && expanded ? (
                     <div className="bg-slate-950/30 py-1">
                       {item.children.map((child) => {
-                        const childIsActive = isNavigationPathActive(pathname, child.href)
+                        const childIsActive = isNavigationPathActive(activePathname, child.href)
 
                         return (
                           <Link
