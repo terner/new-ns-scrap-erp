@@ -110,7 +110,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <DetailCard label="เลขที่เอกสาร" value={row.doc_no} />
-        <DetailCard label="วันที่เอกสาร" value={dateOrDash(row.date)} />
+        <DetailCard label="วันที่จ่าย" value={dateOrDash(row.date)} />
         <DetailCard label="ครบกำหนด" value={dateOrDash(row.due_date)} />
         <DetailCard label="สถานะเอกสาร" value={expenseStatusLabel(row.status ?? row.paid_status)} />
         <DetailCard label="หมวดค่าใช้จ่าย" value={row.expense_categories?.name ?? '-'} />

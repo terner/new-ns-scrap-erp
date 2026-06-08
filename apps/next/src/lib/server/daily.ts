@@ -27,9 +27,21 @@ type DailyDocNoModel = {
     where: { doc_no: { startsWith: string } }
   }) => Promise<{ doc_no: string } | null>
 }
+type BankStatementHistoryModel = {
+  findFirst: (args: {
+    orderBy: { bank_statement_doc_no: 'desc' }
+    select: { bank_statement_doc_no: true }
+    where: { bank_statement_doc_no: { startsWith: string } }
+  }) => Promise<{ bank_statement_doc_no: string | null } | null>
+}
 
 function dailyDocNoModel(client: unknown, table: DailyDocNoTable) {
   return (client as Record<DailyDocNoTable, DailyDocNoModel>)[table]
+}
+
+function docNoRunningNumber(docNo: string | null | undefined, startsWith: string) {
+  const running = Number(String(docNo ?? '').slice(startsWith.length))
+  return Number.isFinite(running) ? running : 0
 }
 
 export async function nextDailyDocNo(table: DailyDocNoTable, prefix: string, date: string, client: unknown = prisma) {
@@ -41,8 +53,7 @@ export async function nextDailyDocNo(table: DailyDocNoTable, prefix: string, dat
     select: { doc_no: true },
     where: { doc_no: { startsWith } },
   })
-  const lastNumber = Number(String(last?.doc_no ?? '').slice(startsWith.length))
-  const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1
+  const nextNumber = docNoRunningNumber(last?.doc_no, startsWith) + 1
   return `${startsWith}${String(nextNumber).padStart(4, '0')}`
 }
 
@@ -62,8 +73,32 @@ export async function nextDailyDocNos(
     select: { doc_no: true },
     where: { doc_no: { startsWith } },
   })
-  const lastNumber = Number(String(last?.doc_no ?? '').slice(startsWith.length))
-  const startNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1
+  const startNumber = docNoRunningNumber(last?.doc_no, startsWith) + 1
+  return Array.from({ length: count }, (_, index) => `${startsWith}${String(startNumber + index).padStart(4, '0')}`)
+}
+
+export async function nextBankStatementDocNos(date: string, count: number, client: unknown = prisma) {
+  if (count <= 0) return []
+  const compactDate = date.slice(2, 4) + date.slice(5, 7)
+  const startsWith = `BST${compactDate}-`
+  const model = dailyDocNoModel(client, 'bank_statement')
+  const historyModel = (client as { payment_account_splits?: BankStatementHistoryModel }).payment_account_splits
+  const [lastStatement, lastPaymentSplit] = await Promise.all([
+    model.findFirst({
+      orderBy: { doc_no: 'desc' },
+      select: { doc_no: true },
+      where: { doc_no: { startsWith } },
+    }),
+    historyModel?.findFirst({
+      orderBy: { bank_statement_doc_no: 'desc' },
+      select: { bank_statement_doc_no: true },
+      where: { bank_statement_doc_no: { startsWith } },
+    }) ?? Promise.resolve(null),
+  ])
+  const startNumber = Math.max(
+    docNoRunningNumber(lastStatement?.doc_no, startsWith),
+    docNoRunningNumber(lastPaymentSplit?.bank_statement_doc_no, startsWith),
+  ) + 1
   return Array.from({ length: count }, (_, index) => `${startsWith}${String(startNumber + index).padStart(4, '0')}`)
 }
 

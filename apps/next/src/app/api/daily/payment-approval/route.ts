@@ -3,10 +3,10 @@ import { z } from 'zod'
 import { defaultPaymentMethodNameByGroup, paymentMethodGroupFromValue, resolvePaymentMethodName } from '@/lib/account-payment-method'
 import { requireBusinessCode, requireDocumentNo } from '@/lib/business-code'
 import { apiErrorResponse } from '@/lib/server/api-error'
-import { appendSupplierAdvanceStatusLog, SUPPLIER_ADVANCE_STATUS_ACTION } from '@/lib/server/advance-payment-history'
+import { refreshAdvancePaymentWorkflowStatus } from '@/lib/server/advance-payments'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { listDailyAccounts, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
-import { nextPaymentApprovalDocNo } from '@/lib/server/payment-approval-pending'
+import { nextPaymentApprovalDocNos } from '@/lib/server/payment-approval-pending'
 import { getActivePaymentMethods, type ActivePaymentMethod } from '@/lib/server/payment-methods'
 import { appendPaymentApprovalStatusLog, PAYMENT_APPROVAL_STATUS_ACTION } from '@/lib/server/payment-history'
 import { prisma } from '@/lib/server/prisma'
@@ -30,10 +30,6 @@ type ApprovalDestinationOption = {
   kind: 'bank' | 'cash'
   label: string
   paymentMethod: string
-}
-
-function splitApprovalDocNo(cycleDocNo: string, splitCount: number, splitIndex: number) {
-  return splitCount > 1 ? `${cycleDocNo}/${splitIndex + 1}` : cycleDocNo
 }
 
 function normalizeSupplierBankAccounts(params: {
@@ -159,7 +155,7 @@ export async function GET() {
         orderBy: [{ approved_at: 'desc' }, { created_at: 'desc' }],
         take: 5000,
         where: {
-          status: { in: ['approved', 'paid'] },
+          status: { in: ['approved', 'paid', 'voided'] },
         },
       }),
       getActivePaymentMethods(),
@@ -170,14 +166,26 @@ export async function GET() {
     const approvedByPurchaseBillId = new Map<string, typeof approvals[number][]>()
     const approvedByAdvanceId = new Map<string, typeof approvals[number][]>()
     const approvedByExpenseId = new Map<string, typeof approvals[number][]>()
+    const voidedByPurchaseBillId = new Map<string, typeof approvals[number][]>()
+    const voidedByAdvanceId = new Map<string, typeof approvals[number][]>()
+    const voidedByExpenseId = new Map<string, typeof approvals[number][]>()
     const activeByAdvanceId = new Map<string, typeof approvals[number][]>()
     const activeByExpenseId = new Map<string, typeof approvals[number][]>()
     for (const approval of approvals) {
-      if (approval.source_type === 'advance_payment') {
+      if ((approval.status === 'approved' || approval.status === 'paid') && approval.source_type === 'advance_payment') {
         activeByAdvanceId.set(approval.source_id, [...(activeByAdvanceId.get(approval.source_id) ?? []), approval])
       }
-      if (approval.source_type === 'expense') {
+      if ((approval.status === 'approved' || approval.status === 'paid') && approval.source_type === 'expense') {
         activeByExpenseId.set(approval.source_id, [...(activeByExpenseId.get(approval.source_id) ?? []), approval])
+      }
+      if (approval.status === 'voided') {
+        const targetMap = approval.source_type === 'purchase_bill'
+          ? voidedByPurchaseBillId
+          : approval.source_type === 'advance_payment'
+            ? voidedByAdvanceId
+            : voidedByExpenseId
+        targetMap.set(approval.source_id, [...(targetMap.get(approval.source_id) ?? []), approval])
+        continue
       }
       if (approval.status !== 'approved') continue
       const targetMap = approval.source_type === 'purchase_bill'
@@ -191,6 +199,7 @@ export async function GET() {
     const apRows = purchaseBills.flatMap((bill: typeof purchaseBills[number]) => {
       const billId = bill.id.toString()
       const activeApprovals = approvedByPurchaseBillId.get(billId) ?? []
+      const voidedApprovals = voidedByPurchaseBillId.get(billId) ?? []
       const totalAmount = toNumber(bill.total_amount)
       const paidAmount = toNumber(bill.paid_amount)
       const payableBalance = Math.max(0, toNumber(bill.payable_balance) || totalAmount - paidAmount)
@@ -243,12 +252,38 @@ export async function GET() {
         supplierName: approval.party_name_snapshot ?? bill.suppliers?.name ?? '-',
         totalAmount: toNumber(approval.approved_amount),
       }})
-      return [...pendingRows, ...approvedRows]
+      const voidedRows = voidedApprovals.map((approval) => {
+        const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
+        const approvedAmount = toNumber(approval.approved_amount)
+        return {
+        approvalDisplayDocNo: approvalDocNo,
+        bankAccount: approval.destination_account_no_snapshot ?? '',
+        bankAccounts: [],
+        approvalId: approvalDocNo,
+        approvalStatus: 'voided' as const,
+        approvedAmount,
+        destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
+        bankName: approval.destination_bank_name_snapshot ?? '',
+        date: toDateOnly(approval.voided_at ?? approval.approved_at ?? bill.date),
+        docNo: approvalDocNo,
+        id: approvalDocNo,
+        paidAmount: 0,
+        payableBalance: approvedAmount,
+        sourceLabel: 'บิลซื้อ',
+        sourceDocNo,
+        sourceType: 'purchase_bill' as const,
+        supplierName: approval.party_name_snapshot ?? bill.suppliers?.name ?? '-',
+        totalAmount: approvedAmount,
+        voidReason: approval.void_reason ?? '',
+        voidedAt: toDateOnly(approval.voided_at),
+      }})
+      return [...pendingRows, ...approvedRows, ...voidedRows]
     })
 
     const advanceRows = advancePayments.flatMap((advance: typeof advancePayments[number]) => {
       const advanceId = advance.id.toString()
       const activeApprovals = approvedByAdvanceId.get(advanceId) ?? []
+      const voidedApprovals = voidedByAdvanceId.get(advanceId) ?? []
       const activeOrConsumedApprovals = activeByAdvanceId.get(advanceId) ?? []
       const totalAmount = toNumber(advance.amount)
       const bankAccounts = normalizeSupplierBankAccounts({
@@ -300,13 +335,39 @@ export async function GET() {
         supplierName: approval.party_name_snapshot ?? advance.suppliers?.name ?? '-',
         totalAmount: toNumber(approval.approved_amount),
       }})
-      return [...pendingRows, ...approvedRows]
+      const voidedRows = voidedApprovals.map((approval) => {
+        const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
+        const approvedAmount = toNumber(approval.approved_amount)
+        return {
+        approvalDisplayDocNo: approvalDocNo,
+        bankAccount: approval.destination_account_no_snapshot ?? '',
+        bankAccounts: [],
+        approvalId: approvalDocNo,
+        approvalStatus: 'voided' as const,
+        approvedAmount,
+        destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
+        bankName: approval.destination_bank_name_snapshot ?? '',
+        date: toDateOnly(approval.voided_at ?? approval.approved_at ?? advance.advance_date),
+        docNo: approvalDocNo,
+        id: approvalDocNo,
+        paidAmount: 0,
+        payableBalance: approvedAmount,
+        sourceLabel: 'ADV',
+        sourceDocNo,
+        sourceType: 'advance_payment' as const,
+        supplierName: approval.party_name_snapshot ?? advance.suppliers?.name ?? '-',
+        totalAmount: approvedAmount,
+        voidReason: approval.void_reason ?? '',
+        voidedAt: toDateOnly(approval.voided_at),
+      }})
+      return [...pendingRows, ...approvedRows, ...voidedRows]
     })
 
     const expenseRows = expenses.flatMap((expense: typeof expenses[number]) => {
       const amount = toNumber(expense.net_amount) || toNumber(expense.amount) + toNumber(expense.vat) - toNumber(expense.wht)
       const expenseId = expense.id.toString()
       const activeApprovals = approvedByExpenseId.get(expenseId) ?? []
+      const voidedApprovals = voidedByExpenseId.get(expenseId) ?? []
       const activeOrConsumedApprovals = activeByExpenseId.get(expenseId) ?? []
       const approvedOutstanding = activeOrConsumedApprovals.reduce((sum, approval) => sum + toNumber(approval.approved_amount), 0)
       const pendingAmount = Math.max(0, amount - approvedOutstanding)
@@ -351,7 +412,31 @@ export async function GET() {
         sourceType: 'expense' as const,
         totalAmount: toNumber(approval.approved_amount),
       }})
-      return [...pendingRows, ...approvedRows]
+      const voidedRows = voidedApprovals.map((approval) => {
+        const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
+        const approvedAmount = toNumber(approval.approved_amount)
+        return {
+        accountId: approval.destination_account_no_snapshot ?? expense.accounts?.code ?? '',
+        accountName: approval.destination_bank_name_snapshot || approval.destination_payment_method_snapshot || '',
+        approvalDisplayDocNo: approvalDocNo,
+        approvalId: approvalDocNo,
+        approvalStatus: 'voided' as const,
+        approvedAmount,
+        date: toDateOnly(approval.voided_at ?? approval.approved_at ?? expense.date),
+        destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
+        destinationOptions: [],
+        docNo: approvalDocNo,
+        dueDate: toDateOnly(expense.due_date),
+        id: approvalDocNo,
+        payee: approval.party_name_snapshot ?? expense.payee ?? '-',
+        refDocNo: expense.ref_doc_no ?? '',
+        sourceDocNo,
+        sourceType: 'expense' as const,
+        totalAmount: approvedAmount,
+        voidReason: approval.void_reason ?? '',
+        voidedAt: toDateOnly(approval.voided_at),
+      }})
+      return [...pendingRows, ...approvedRows, ...voidedRows]
     })
 
     return NextResponse.json({ apRows: [...apRows, ...advanceRows], expenseRows })
@@ -470,10 +555,12 @@ export async function POST(request: Request) {
           rows: bill.suppliers?.supplier_bank_accounts,
         })
         const approvedAt = new Date()
-        const cycleDocNo = await nextPaymentApprovalDocNo(tx, bill.date, bill.branches?.code ?? '')
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('payment_approvals.doc_no'))`
+        const approvalDocNos = await nextPaymentApprovalDocNos(tx, bill.date, bill.branches?.code ?? '', values.splits.length)
 
         for (const [index, split] of values.splits.entries()) {
           const selectedDestination = destinations.find((option) => option.id === split.destinationId)
+          const approvalDocNo = requireDocumentNo(approvalDocNos[index], `PMA split ${index + 1}`)
           if (!selectedDestination) throw new Error(`ไม่พบช่องทางจ่ายปลายทางของ ${bill.doc_no}`)
           const approval = await tx.payment_approvals.create({
             data: {
@@ -484,7 +571,7 @@ export async function POST(request: Request) {
               destination_bank_account_id_snapshot: selectedDestination.kind === 'cash' ? null : selectedDestination.id,
               destination_bank_name_snapshot: selectedDestination.kind === 'cash' ? null : selectedDestination.bankName || null,
               destination_payment_method_snapshot: selectedDestination.paymentMethod || null,
-              doc_no: splitApprovalDocNo(cycleDocNo, values.splits.length, index),
+              doc_no: approvalDocNo,
               party_id: bill.suppliers?.code ?? null,
               party_name_snapshot: bill.suppliers?.name ?? null,
               source_date_snapshot: bill.date ? normalizeDate(toDateOnly(bill.date)) : null,
@@ -530,10 +617,12 @@ export async function POST(request: Request) {
           rows: advance.suppliers?.supplier_bank_accounts,
         })
         const approvedAt = new Date()
-        const cycleDocNo = await nextPaymentApprovalDocNo(tx, advance.advance_date, advance.branches?.code ?? '')
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('payment_approvals.doc_no'))`
+        const approvalDocNos = await nextPaymentApprovalDocNos(tx, advance.advance_date, advance.branches?.code ?? '', values.splits.length)
 
         for (const [index, split] of values.splits.entries()) {
           const selectedDestination = destinations.find((option) => option.id === split.destinationId)
+          const approvalDocNo = requireDocumentNo(approvalDocNos[index], `PMA split ${index + 1}`)
           if (!selectedDestination) throw new Error(`ไม่พบช่องทางจ่ายปลายทางของ ${advance.doc_no}`)
           const approval = await tx.payment_approvals.create({
             data: {
@@ -544,7 +633,7 @@ export async function POST(request: Request) {
               destination_bank_account_id_snapshot: selectedDestination.kind === 'cash' ? null : selectedDestination.id,
               destination_bank_name_snapshot: selectedDestination.kind === 'cash' ? null : selectedDestination.bankName || null,
               destination_payment_method_snapshot: selectedDestination.paymentMethod || null,
-              doc_no: splitApprovalDocNo(cycleDocNo, values.splits.length, index),
+              doc_no: approvalDocNo,
               party_id: advance.suppliers?.code ?? null,
               party_name_snapshot: advance.suppliers?.name ?? null,
               source_date_snapshot: advance.advance_date ? normalizeDate(toDateOnly(advance.advance_date)) : null,
@@ -572,29 +661,14 @@ export async function POST(request: Request) {
             toStatus: 'approved',
           })
         }
-        await tx.supplier_advance_payments.update({
-          data: {
-            status: 'approved',
-            updated_at: new Date(),
-            updated_by: actor,
+        await refreshAdvancePaymentWorkflowStatus(tx, advance.id, actor, {
+          logIfUnchanged: true,
+          meta: {
+            approvedAmount: cycleAmount,
+            approvalDocNos,
+            splitCount: values.splits.length,
           },
-          where: { id: advance.id },
         })
-        if (advance.status !== 'approved') {
-          await appendSupplierAdvanceStatusLog(tx, {
-            action: SUPPLIER_ADVANCE_STATUS_ACTION.APPROVED,
-            actor,
-            advancePaymentId: advance.id,
-            createdAt: approvedAt,
-            fromStatus: advance.status,
-            meta: {
-              approvedAmount: cycleAmount,
-              approvalDocNo: cycleDocNo,
-              splitCount: values.splits.length,
-            },
-            toStatus: 'approved',
-          })
-        }
       }
 
       if (values.sourceType === 'expense') {
@@ -609,9 +683,11 @@ export async function POST(request: Request) {
         }
 
         const approvedAt = new Date()
-        const cycleDocNo = await nextPaymentApprovalDocNo(tx, expense.date, expense.branches?.code ?? '')
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('payment_approvals.doc_no'))`
+        const approvalDocNos = await nextPaymentApprovalDocNos(tx, expense.date, expense.branches?.code ?? '', values.splits.length)
 
         for (const [index, split] of values.splits.entries()) {
+          const approvalDocNo = requireDocumentNo(approvalDocNos[index], `PMA split ${index + 1}`)
           const account = await tx.accounts.findFirst({
             select: {
               code: true,
@@ -632,7 +708,7 @@ export async function POST(request: Request) {
               destination_bank_account_id_snapshot: account.code ?? null,
               destination_bank_name_snapshot: account.name ?? null,
               destination_payment_method_snapshot: account.name ?? null,
-              doc_no: splitApprovalDocNo(cycleDocNo, values.splits.length, index),
+              doc_no: approvalDocNo,
               party_id: null,
               party_name_snapshot: expense.payee ?? null,
               source_date_snapshot: expense.date ? normalizeDate(toDateOnly(expense.date)) : null,

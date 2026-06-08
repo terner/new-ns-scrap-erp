@@ -205,9 +205,9 @@ Implementation checkpoint 2026-06-06:
 - `partially_allocated`
 - `allocated`
 - `allocation_released`
-- `refund_required`
-- `refunded`
 - `status_synced`
+
+หมายเหตุ 2026-06-08: `refund_required` / `refunded` ไม่ใช่ event/status runtime ของ `ADV` ใน phase ปัจจุบันแล้ว; ถ้ามี Supplier refund flow ต้องออกแบบเป็น flow/table แยกและไม่ทำให้ filter หน้า ADV แสดงสถานะคืนเงิน
 
 field เฉพาะที่ควรมี:
 

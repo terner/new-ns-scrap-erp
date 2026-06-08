@@ -14,17 +14,6 @@ import type { Prisma } from '../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
 
-function bangkokDateInput(value: Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-  }).formatToParts(value)
-  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
-  return `${part('year')}-${part('month')}-${part('day')}`
-}
-
 type ExpenseWithRelations = Prisma.expensesGetPayload<{
   include: {
     accounts: true
@@ -54,10 +43,8 @@ type PayeeOption = {
 }
 
 function payeeSourceLabel(source: PayeeOption['source']) {
-  if (source === 'customer') return 'Customer'
   if (source === 'supplier') return 'Supplier'
-  if (source === 'salesperson') return 'Sale'
-  return 'พนักงาน'
+  return 'Supplier'
 }
 
 function normalizePayeeName(value: string | null | undefined) {
@@ -274,11 +261,7 @@ export async function GET(request: Request) {
     const [
       accounts,
       categories,
-      customerPayees,
       supplierPayees,
-      salespersonPayees,
-      appUserPayees,
-      directorPayees,
       rows,
       vatRatePercent,
       whtRatePercent,
@@ -288,35 +271,11 @@ export async function GET(request: Request) {
         include: { expense_types: { select: { active: true, code: true, name: true } } },
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
       }),
-      prisma.customers.findMany({
-        orderBy: [{ active: 'desc' }, { name: 'asc' }],
-        select: { code: true, name: true },
-        take: 2500,
-        where: { active: { not: false } },
-      }),
       prisma.suppliers.findMany({
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
         select: { code: true, name: true },
         take: 2500,
         where: { active: { not: false } },
-      }),
-      prisma.salespersons.findMany({
-        orderBy: [{ active: 'desc' }, { name: 'asc' }],
-        select: { code: true, name: true },
-        take: 1000,
-        where: { active: { not: false } },
-      }),
-      prisma.app_users.findMany({
-        orderBy: [{ active: 'desc' }, { display_name: 'asc' }, { username: 'asc' }],
-        select: { display_name: true, email: true, id: true, username: true },
-        take: 1000,
-        where: { active: true },
-      }),
-      prisma.director_employees.findMany({
-        orderBy: [{ active: 'desc' }, { name: 'asc' }],
-        select: { code: true, name: true },
-        take: 1000,
-        where: { active: true },
       }),
       prisma.expenses.findMany({
         include: {
@@ -352,15 +311,7 @@ export async function GET(request: Request) {
     })
 
     const payeeOptions = buildPayeeOptions([
-      customerPayees.map((row) => ({ code: row.code, name: row.name, source: 'customer' })),
       supplierPayees.map((row) => ({ code: row.code, name: row.name, source: 'supplier' })),
-      salespersonPayees.map((row) => ({ code: row.code, name: row.name, source: 'salesperson' })),
-      appUserPayees.map((row) => ({
-        code: String(row.id),
-        name: row.display_name || row.username || row.email || '',
-        source: 'employee',
-      })),
-      directorPayees.map((row) => ({ code: row.code, name: row.name, source: 'employee' })),
     ])
 
     if (url.searchParams.get('format') === 'xlsx') {
@@ -482,11 +433,12 @@ export async function POST(request: Request) {
         throw new Error('แก้ไขไม่ได้ เพราะรายการค่าใช้จ่ายนี้มี PMA อนุมัติแล้ว')
       }
 
-      const documentDateInput = existingExpense
-        ? toDateOnly(existingExpense.date)
-        : bangkokDateInput(new Date())
+      const documentDateInput = values.date
       const documentDate = normalizeDate(documentDateInput)
-      const docNo = existingExpense?.doc_no ?? await nextDailyDocNo('expenses', 'EXP', documentDateInput)
+      if (!existingExpense) {
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('expenses.doc_no'))`
+      }
+      const docNo = existingExpense?.doc_no ?? await nextDailyDocNo('expenses', 'EXP', documentDateInput, tx)
       const persistedStatus = 'pending_approval'
 
       const expense = existingExpense

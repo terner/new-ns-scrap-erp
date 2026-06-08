@@ -428,7 +428,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
   }
 
   return (
-    <div className="space-y-5 pb-32">
+    <div className="min-w-0 space-y-5 overflow-x-hidden pb-32">
       <div>
         <div>
           <Tabs value={form.type} onValueChange={(value) => setForm((current) => ({ ...current, partyId: '', type: value as WeightTicketType }))}>
@@ -501,8 +501,8 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
 
           <Card className="p-5">
             <SectionHeader title="สินค้าและน้ำหนัก" subtitle="เลือกสินค้า กรอกน้ำหนัก และเลือกวิธีหักสิ่งเจือปนต่อรายการ" />
-            <div className="mt-4 grid items-start gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
-              <div className="space-y-3 xl:max-h-[calc(100vh-16rem)] xl:overflow-hidden">
+            <div className="mt-4 grid min-w-0 items-start gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+              <div className="min-w-0 space-y-3 xl:max-h-[calc(100vh-16rem)] xl:overflow-hidden">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-medium text-slate-700">รายการทั้งหมด {form.lines.length} รายการ</div>
                   <Button size="xs" type="button" onClick={addLine}>
@@ -557,7 +557,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                 const lineTotals = calculateLineTotals(line)
 
                 return (
-                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3 sm:p-4 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto">
+                  <div className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-3 sm:p-4 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto">
                     <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                       <div className="inline-flex rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">รายการ {index + 1}</div>
                       <Button disabled={form.lines.length === 1} size="xs" type="button" variant="outline" onClick={() => removeLine(line.id)}>
@@ -566,24 +566,34 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                       </Button>
                     </div>
                     <div className={cn(
-                      'grid gap-4',
+                      'grid min-w-0 gap-4',
                       line.deductionMode === 'none'
                         ? 'xl:grid-cols-[minmax(0,1.4fr)_10rem_10rem_10rem]'
                         : 'xl:grid-cols-[minmax(0,1.3fr)_10rem_10rem_minmax(0,1fr)_10rem]',
                     )}
                     >
-                      <SearchCombobox
-                        error={showError(`line-${line.id}-product`)}
-                        inputId={`weight-product-${line.id}`}
-                        label="สินค้า*"
-                        options={products}
-                        placeholder="เลือกสินค้า"
-                        value={line.productId}
-                        onChange={(value) => {
-                          markTouched(`line-${line.id}-product`)
-                          updateLine(line.id, (current) => ({ ...current, productId: value }))
-                        }}
-                      />
+                      <div className="min-w-0">
+                        <SearchCombobox
+                          error={showError(`line-${line.id}-product`)}
+                          inputId={`weight-product-${line.id}`}
+                          label="สินค้า*"
+                          options={products}
+                          placeholder="เลือกสินค้า"
+                          value={line.productId}
+                          onChange={(value) => {
+                            markTouched(`line-${line.id}-product`)
+                            updateLine(line.id, (current) => ({ ...current, productId: value }))
+                          }}
+                        />
+                        <ProductImagePicker
+                          products={products}
+                          value={line.productId}
+                          onChange={(value) => {
+                            markTouched(`line-${line.id}-product`)
+                            updateLine(line.id, (current) => ({ ...current, productId: value }))
+                          }}
+                        />
+                      </div>
                       <FieldBlock error={showError(`line-${line.id}-gross`)} label="น้ำหนักรวม กก.*">
                         <Input
                           inputMode="decimal"
@@ -638,14 +648,6 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                         </FieldBlock>
                       ) : null}
                     </div>
-                    <ProductImagePicker
-                      products={products}
-                      value={line.productId}
-                      onChange={(value) => {
-                        markTouched(`line-${line.id}-product`)
-                        updateLine(line.id, (current) => ({ ...current, productId: value }))
-                      }}
-                    />
                     <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-4">
                       <MiniMetric label="Gross" value={`${formatWeight(lineTotals.grossWeight)} กก.`} />
                       <MiniMetric label="Deduct" value={`${formatWeight(lineTotals.deductionWeight)} กก.`} />
@@ -859,13 +861,13 @@ function ProductImagePicker({
   }, [category, products])
 
   return (
-    <div className="mt-4">
+    <div className="mt-2">
       <div className="mb-1 block text-xs font-medium text-slate-600">เลือกจากรูปสินค้า</div>
-      <div className="rounded-md border border-slate-200 bg-white p-2 sm:p-3">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-1.5 sm:p-2">
+        <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
           <button
             className={cn(
-              'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium',
+              'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
               category === 'all' ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
             )}
             type="button"
@@ -876,7 +878,7 @@ function ProductImagePicker({
           {categories.map((item) => (
             <button
               className={cn(
-                'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium',
+                'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
                 category === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
               )}
               key={item}
@@ -887,32 +889,32 @@ function ProductImagePicker({
             </button>
           ))}
         </div>
-        <div className="mt-2 max-h-72 overflow-y-auto pr-1 sm:mt-3 sm:max-h-80">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        <div className="mt-1.5 max-h-72 min-w-0 overflow-y-auto pr-1 sm:mt-2 sm:max-h-80">
+          <div className="grid min-w-0 grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6">
             {filteredProducts.map((product) => {
               const selected = product.id === value
               return (
                 <button
                   className={cn(
-                    'overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:border-emerald-500',
+                    'min-w-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:border-emerald-500',
                     selected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200',
                   )}
                   key={product.id}
                   type="button"
                   onClick={() => onChange(product.id)}
                 >
-                  <div className="h-20 bg-slate-100 sm:h-24">
+                  <div className="h-10 bg-slate-100 sm:h-12">
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img alt={product.name ?? product.label} className="h-full w-full object-cover" src={product.imageUrl} />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-slate-400">
-                        <ImagePlus className="h-6 w-6" />
+                        <ImagePlus className="h-4 w-4" />
                       </div>
                     )}
                   </div>
-                  <div className={cn('px-1.5 py-1.5 text-center text-[11px] font-semibold leading-snug sm:px-2 sm:py-2 sm:text-xs', selected ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-50 text-slate-800')}>
-                    <div className="line-clamp-2 min-h-7 sm:min-h-8">{product.name ?? product.label}</div>
+                  <div className={cn('min-w-0 px-1 py-1 text-center text-[10px] font-semibold leading-tight sm:text-[11px]', selected ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-50 text-slate-800')}>
+                    <div className="line-clamp-2 min-h-6 min-w-0 break-words">{product.name ?? product.label}</div>
                   </div>
                 </button>
               )

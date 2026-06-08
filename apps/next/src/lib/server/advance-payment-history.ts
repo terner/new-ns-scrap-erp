@@ -24,9 +24,8 @@ export const SUPPLIER_ADVANCE_STATUS_ACTION = {
   EDITED: 'edited',
   PAID: 'paid',
   PARTIALLY_ALLOCATED: 'partially_allocated',
+  PARTIALLY_APPROVED: 'partially_approved',
   PAYMENT_REVERSED: 'payment_reversed',
-  REFUND_REQUIRED: 'refund_required',
-  REFUNDED: 'refunded',
   STATUS_SYNCED: 'status_synced',
 } as const
 
@@ -36,12 +35,11 @@ export const SUPPLIER_ADVANCE_ALLOCATION_ACTION = {
 } as const
 
 export function supplierAdvanceStatusActionForStatus(status: string) {
+  if (status === 'partially_approved') return SUPPLIER_ADVANCE_STATUS_ACTION.PARTIALLY_APPROVED
   if (status === 'approved') return SUPPLIER_ADVANCE_STATUS_ACTION.APPROVED
   if (status === 'paid') return SUPPLIER_ADVANCE_STATUS_ACTION.PAID
   if (status === 'partially_allocated') return SUPPLIER_ADVANCE_STATUS_ACTION.PARTIALLY_ALLOCATED
   if (status === 'allocated') return SUPPLIER_ADVANCE_STATUS_ACTION.ALLOCATED
-  if (status === 'refunding') return SUPPLIER_ADVANCE_STATUS_ACTION.REFUND_REQUIRED
-  if (status === 'refunded') return SUPPLIER_ADVANCE_STATUS_ACTION.REFUNDED
   if (status === 'cancelled') return SUPPLIER_ADVANCE_STATUS_ACTION.CANCELLED
   return SUPPLIER_ADVANCE_STATUS_ACTION.STATUS_SYNCED
 }

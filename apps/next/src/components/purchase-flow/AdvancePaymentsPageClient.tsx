@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
-import { dailyFetchJson, formatMoney, type DailyAccountOption } from '@/lib/daily'
+import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { supplierAdvancePaymentFormSchema } from '@/lib/purchase-advance'
 
@@ -103,7 +103,7 @@ type AdvancePaymentDetail = AdvancePaymentRow & {
 }
 
 type Payload = {
-  accounts: DailyAccountOption[]
+  accounts: unknown[]
   branches: OptionRow[]
   filters: { statuses: StatusOption[] }
   pagination: {
@@ -163,14 +163,6 @@ function currentDateTimeLocalValue() {
   return local.toISOString().slice(0, 16)
 }
 
-function isCashAccount(account: DailyAccountOption) {
-  return String(account.type ?? '').trim().toLowerCase() === 'cash'
-}
-
-function normalizedAccountType(value: string | null | undefined) {
-  return String(value ?? '').trim().toLowerCase()
-}
-
 export function AdvancePaymentsPageClient() {
   const [cancelNote, setCancelNote] = useState('')
   const [cancelNoteError, setCancelNoteError] = useState('')
@@ -219,8 +211,6 @@ export function AdvancePaymentsPageClient() {
       setForm((current) => ({
         ...current,
         branchId: current.branchId,
-        fundingAccountId: current.fundingAccountId,
-        paymentMethod: current.paymentMethod,
       }))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดรายการจ่ายเงินล่วงหน้าไม่ได้')
@@ -247,21 +237,6 @@ export function AdvancePaymentsPageClient() {
     searchText: `${product.code ?? ''} ${product.name} ${product.unit ?? ''}`,
   })), [activeProducts])
   const selectedProduct = useMemo(() => activeProducts.find((product) => product.id === form.productId) ?? null, [activeProducts, form.productId])
-  const paymentMethodOptions = useMemo(() => {
-    return (data?.paymentMethods ?? [])
-      .filter((method) => method.active !== false)
-      .map((method) => ({ label: method.name, value: method.name }))
-  }, [data?.paymentMethods])
-  const filteredAccounts = useMemo(() => {
-    const activeAccounts = (data?.accounts ?? []).filter((account) => account.active !== false)
-    if (!form.paymentMethod) return activeAccounts
-    const selectedMethodType = normalizedAccountType(
-      (data?.paymentMethods ?? []).find((method) => method.name === form.paymentMethod)?.type,
-    )
-    if (!selectedMethodType) return []
-    return activeAccounts.filter((account) => normalizedAccountType(account.type) === selectedMethodType)
-  }, [data?.accounts, data?.paymentMethods, form.paymentMethod])
-
   const computedAmount = useMemo(() => {
     const netWeight = Number(form.netWeight)
     const pricePerKg = Number(form.pricePerKg)
@@ -395,13 +370,6 @@ export function AdvancePaymentsPageClient() {
     })
   }
 
-  useEffect(() => {
-    if (!form.fundingAccountId) return
-    const selectedStillVisible = filteredAccounts.some((account) => account.id === form.fundingAccountId)
-    if (selectedStillVisible) return
-    setForm((current) => ({ ...current, fundingAccountId: '' }))
-  }, [filteredAccounts, form.fundingAccountId])
-
   const removeVehiclePhoto = useCallback((fileId: string) => {
     setVehiclePhotoFiles((current) => {
       const target = current.find((file) => file.id === fileId)
@@ -528,7 +496,7 @@ export function AdvancePaymentsPageClient() {
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-4">
               <FormSection
-                description="ระบุผู้ขาย วิธีจ่าย และยอดเงินที่ต้องจ่ายล่วงหน้า"
+                description="ระบุผู้ขาย สาขา และยอดเงินที่ต้องจ่ายล่วงหน้า"
                 title="ข้อมูลการเงิน"
               >
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -538,25 +506,6 @@ export function AdvancePaymentsPageClient() {
                       <option disabled value="">เลือกสาขา</option>
                       {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                     </Select>
-                  </Field>
-                  <Field error={fieldErrors.paymentMethod} label="วิธีจ่าย *">
-                    <Select className={form.paymentMethod ? '' : 'text-slate-400'} value={form.paymentMethod} onChange={(event) => updateForm('paymentMethod', event.target.value)}>
-                      <option disabled value="">เลือกวิธีจ่าย</option>
-                      {paymentMethodOptions.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
-                    </Select>
-                  </Field>
-                  <Field error={fieldErrors.fundingAccountId} label="บัญชีที่จ่าย *">
-                    <Select
-                      className={form.fundingAccountId ? '' : 'text-slate-400'}
-                      disabled={!form.paymentMethod}
-                      value={form.fundingAccountId}
-                      onChange={(event) => updateForm('fundingAccountId', event.target.value)}
-                    >
-                      <option disabled value="">{form.paymentMethod ? 'เลือกบัญชี' : 'เลือกวิธีจ่ายก่อน'}</option>
-                      {filteredAccounts.map((account) => <option key={account.id} value={account.id}>{accountOptionLabel(account)}</option>)}
-                    </Select>
-                    {!form.paymentMethod ? <p className="mt-1 text-xs text-slate-500">กรุณาเลือกวิธีจ่ายก่อน แล้วระบบจะเปิดรายการบัญชีที่รองรับ</p> : null}
-                    {form.paymentMethod && filteredAccounts.length === 0 ? <p className="mt-1 text-xs text-amber-700">ไม่พบบัญชีที่รองรับวิธีจ่ายนี้</p> : null}
                   </Field>
                   <MoneyInputField error={fieldErrors.amount} label="ยอดมัดจำ *" value={form.amount} onChange={(value) => updateForm('amount', value)} />
                 </div>
@@ -578,7 +527,6 @@ export function AdvancePaymentsPageClient() {
                 title="สินค้าและน้ำหนัก"
               >
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <InputField error={fieldErrors.customerName} label="ชื่อลูกค้า" value={form.customerName} onChange={(value) => updateForm('customerName', value)} />
                   <SearchCombobox
                     error={fieldErrors.productName}
                     errorKey="productName"
@@ -597,12 +545,11 @@ export function AdvancePaymentsPageClient() {
               </FormSection>
 
               <FormSection
-                description="รวบรวมข้อมูลตัวรถ รูปประกอบ และผู้ขับในจุดเดียว"
-                title="ข้อมูลรถและผู้ขับ"
+                description="รวบรวมข้อมูลตัวรถและรูปประกอบในจุดเดียว"
+                title="ข้อมูลรถ"
               >
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <InputField error={fieldErrors.plateNo} label="ทะเบียนรถ" value={form.plateNo} onChange={(value) => updateForm('plateNo', value)} />
-                  <InputField error={fieldErrors.driverName} label="พนักงานขับรถ" value={form.driverName} onChange={(value) => updateForm('driverName', value)} />
                   <div className="md:col-span-2 xl:col-span-3">
                     <Field error={fieldErrors.vehiclePhotoNames} label="รูปภาพรถ">
                       <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
@@ -653,8 +600,6 @@ export function AdvancePaymentsPageClient() {
                 title="ข้อมูลประกอบ"
               >
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <InputField error={fieldErrors.scaleOperator} label="ผู้ชั่งน้ำหนัก" value={form.scaleOperator} onChange={(value) => updateForm('scaleOperator', value)} />
-                  <InputField error={fieldErrors.senderName} label="ผู้ส่ง" value={form.senderName} onChange={(value) => updateForm('senderName', value)} />
                   <div className="md:col-span-2 xl:col-span-4">
                     <TextAreaField error={fieldErrors.remark} label="หมายเหตุ" rows={3} value={form.remark} onChange={(value) => updateForm('remark', value)} />
                   </div>
@@ -739,25 +684,27 @@ export function AdvancePaymentsPageClient() {
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" sortKey="advanceDate" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ผู้ขาย" sortKey="supplierName" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ใบชั่งใหญ่" sortKey="largeScaleDocNo" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ทะเบียน / สินค้า" sortKey="productName" onSort={changeSort} />
+                  <th className="p-2 text-left text-xs font-semibold text-slate-700">ทะเบียนรถ</th>
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สินค้า" sortKey="productName" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="น้ำหนักสุทธิ" sortKey="netWeight" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดมัดจำ" sortKey="amount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ใช้แล้ว" sortKey="allocatedAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="นำไปหักแล้ว" sortKey="allocatedAmount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="คงเหลือ" sortKey="remainingAmount" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} />
                   <th className="p-2 text-right text-xs font-semibold text-slate-700">จัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
-                {!isLoading && (data?.rows ?? []).length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ยังไม่มีรายการจ่ายเงินล่วงหน้า</td></tr> : null}
+                {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
+                {!isLoading && (data?.rows ?? []).length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>ยังไม่มีรายการจ่ายเงินล่วงหน้า</td></tr> : null}
                 {!isLoading && (data?.rows ?? []).map((row) => (
                   <tr key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => void loadDetail(row.id)}>
                     <td className="p-2 font-mono text-xs whitespace-nowrap">{row.docNo}</td>
                     <td className="p-2 whitespace-nowrap">{row.advanceDate}</td>
                     <td className="p-2">{row.supplierName}</td>
                     <td className="p-2 font-mono text-xs">{row.largeScaleDocNo || '-'}</td>
-                    <td className="p-2"><div>{row.plateNo || '-'}</div><div className="text-xs text-slate-500">{row.productName || '-'}</div></td>
+                    <td className="p-2 whitespace-nowrap">{row.plateNo || '-'}</td>
+                    <td className="p-2">{row.productName || '-'}</td>
                     <td className="p-2 text-right tabular-nums">{formatMoney(row.netWeight)}</td>
                     <td className="p-2 text-right font-medium tabular-nums">{formatMoney(row.amount)}</td>
                     <td className="p-2 text-right tabular-nums">{formatMoney(row.allocatedAmount)}</td>
@@ -828,22 +775,16 @@ export function AdvancePaymentsPageClient() {
                     items={[
                       ['ผู้ขาย', detail.supplierName],
                       ['สาขา', detail.branchName],
-                      ['วิธีจ่าย', detail.paymentMethod || '-'],
-                      ['บัญชีที่จ่าย', detail.accountName || '-'],
                       ['วันที่เอกสาร', formatDateDisplay(detail.advanceDate)],
                       ['วันที่รถเข้า', formatDateTimeDisplay(detail.inDate)],
                       ['วันที่รถออก', formatDateTimeDisplay(detail.outDate)],
                       ['ใบชั่งใหญ่', detail.largeScaleDocNo || '-'],
                       ['ทะเบียนรถ', detail.plateNo || '-'],
-                      ['ชื่อลูกค้า', detail.customerName || '-'],
                       ['สินค้า', detail.productName || '-'],
                       ['น้ำหนักเข้า', formatMoney(detail.weightIn)],
                       ['น้ำหนักออก', formatMoney(detail.weightOut)],
                       ['น้ำหนักสุทธิ', formatMoney(detail.netWeight)],
                       ['ราคา/กก.', formatMoney(detail.pricePerKg)],
-                      ['ผู้ชั่ง', detail.scaleOperator || '-'],
-                      ['ผู้ส่ง', detail.senderName || '-'],
-                      ['คนขับรถ', detail.driverName || '-'],
                       ['หมายเหตุ', detail.remark || '-'],
                     ]}
                   />
@@ -986,11 +927,6 @@ function Field({ children, error, label }: { children: React.ReactNode; error?: 
   )
 }
 
-function accountOptionLabel(account: DailyAccountOption) {
-  const balanceSuffix = ` (คงเหลือ ${formatMoney(account.balance ?? 0)})`
-  return `${account.name}${balanceSuffix}`
-}
-
 function productOptionLabel(option: OptionRow) {
   return option.code ? `${option.code} - ${option.name}` : option.name
 }
@@ -1020,7 +956,7 @@ function InputField({ className, error, label, onChange, type = 'text', value, .
 
 function ExportButton({ href }: { href: string }) {
   return (
-    <Button asChild className="gap-2" variant="export">
+    <Button asChild className="gap-2" size="sm" variant="export">
       <a href={href}>
         <Download className="h-4 w-4 shrink-0" />
         <span>ส่งออก Excel</span>
@@ -1177,14 +1113,13 @@ function timelineLabel(event: AdvancePaymentTimelineEvent) {
   if (event.eventKey === 'purchase.advance-payment.updated') return 'แก้ไขรายการ ADV'
   if (event.eventKey === 'purchase.advance-payment.cancelled') return 'ยกเลิกรายการ ADV'
   if (event.eventKey === 'purchase.advance-payment.approved') return 'อนุมัติ ADV'
+  if (event.eventKey === 'purchase.advance-payment.partially-approved') return 'อนุมัติ ADV บางส่วน'
   if (event.eventKey === 'purchase.advance-payment.approval-voided') return 'ยกเลิกรายการรอจ่าย ADV'
   if (event.eventKey === 'purchase.advance-payment.paid') return 'จ่าย ADV สำเร็จ'
   if (event.eventKey === 'purchase.advance-payment.payment-reversed') return 'ยกเลิกการจ่าย ADV'
   if (event.eventKey === 'purchase.advance-payment.partially-allocated') return 'ใช้ ADV หักบิลบางส่วน'
   if (event.eventKey === 'purchase.advance-payment.fully-allocated') return 'ใช้ ADV หักบิลครบ'
   if (event.eventKey === 'purchase.advance-payment.allocation-released') return 'คืนยอดหักบิล ADV'
-  if (event.eventKey === 'purchase.advance-payment.refund-required') return 'รอคืนเงิน ADV'
-  if (event.eventKey === 'purchase.advance-payment.refunded') return 'คืนเงิน ADV แล้ว'
   if (event.eventKey === 'purchase.advance-payment.status-synced') return 'ปรับสถานะ ADV'
   if (event.eventKey === 'purchase.advance-payment.allocated') return 'ใช้ ADV หักบิล'
   if (event.eventKey === 'purchase.advance-payment.allocation-voided') return 'ยกเลิกการหักบิล ADV'

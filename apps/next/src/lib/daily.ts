@@ -125,11 +125,11 @@ export type PettyAdvanceReturnFormValues = z.infer<typeof pettyAdvanceReturnForm
 const supplierPaymentLineSchema = z.object({
   approvalId: optionalDocNo,
   amount: positiveMoney('ยอดจ่าย'),
-  billId: requiredDocNo('บิลซื้อ'),
+  billId: requiredDocNo('เอกสารต้นทาง'),
   discount: money('ส่วนลด').default(0),
   fee: money('ค่าธรรมเนียม').default(0),
   id: optionalSafeId('รหัสบรรทัดจ่าย'),
-  supplierId: z.string().trim().min(1, 'เลือกผู้ขาย'),
+  supplierId: z.string().trim().min(1, 'เลือกผู้รับเงิน'),
   withholdingTax: money('ภาษีหัก ณ ที่จ่าย').default(0),
 })
 
@@ -137,8 +137,8 @@ export const supplierPaymentFormSchema = z.object({
   id: optionalSafeId('รหัสรายการ'),
   docNo: optionalDocNo,
   date: requiredDate,
-  billId: requiredDocNo('บิลซื้อ'),
-  supplierId: z.string().trim().min(1, 'เลือกผู้ขาย'),
+  billId: requiredDocNo('เอกสารต้นทาง'),
+  supplierId: z.string().trim().min(1, 'เลือกผู้รับเงิน'),
   accountId: z.string().trim().min(1, 'เลือกบัญชีจ่าย'),
   amount: positiveMoney('ยอดจ่าย'),
   withholdingTax: money('ภาษีหัก ณ ที่จ่าย').default(0),

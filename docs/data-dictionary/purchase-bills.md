@@ -103,29 +103,44 @@ Current source of truth:
 บิลรับซื้อสร้างภาระเจ้าหนี้โดยตรงผ่าน `purchase_bills.payable_balance`:
 
 1. สร้างบิลซื้อที่ `/api/purchase/bills`
-   - `paid_amount = 0`
-   - `payable_balance = total_amount`
-   - `status = open`
+   - `paid_amount` รวมยอด PMT ที่ไม่ cancelled และ ADV allocation ที่ active
+   - `payable_balance = total_amount - paid_amount`
+   - `status = unpaid / partial / paid / cancelled`
    - ถ้าเป็น `STOCK` จะเขียน `stock_ledger`; ถ้าเป็น `TRADING` ไม่เข้า stock
-  - target flow: `STOCK` ต้องอ้างใบรับของและ allocate receipt line ไป PO/Spot ในบิล ส่วน `TRADING` ต้องกรอกจำนวน/น้ำหนักในบิลเอง
-2. หน้า `/purchase/payments` โหลดบิลค้างจาก `purchase_bills` ผ่าน `GET /api/purchase/payments`
-   - ใช้ `payable_balance` เพื่อแสดงบิลที่ต้องจ่าย
-   - หน้าจอแสดงบิล Supplier ในตารางเดียวกันทั้งค้างจ่าย, จ่ายบางส่วน, จ่ายครบ และยกเลิก โดยแยกจากตารางประวัติ `payments`
-   - ถ้ากด `ทำจ่าย` จาก row ของบิล Modal จะล็อกบิลนั้นเป็น read-only ไม่ต้องเลือกบิลซ้ำ
-   - `payments` ยังไม่มี row จนกว่าผู้ใช้กดบันทึก Payment Voucher
-3. เมื่อบันทึกจ่าย Supplier ที่ `POST /api/purchase/payments`
-   - สร้างหรือแก้ row ใน `payments`; ถ้า voucher มีหลายบิล จะสร้าง 1 row ต่อบิลโดยใช้ `doc_no` และ `voucher_id` เดียวกัน
+   - target flow: `STOCK` ต้องอ้างใบรับของและ allocate receipt line ไป PO/Spot ในบิล ส่วน `TRADING` ต้องกรอกจำนวน/น้ำหนักในบิลเอง
+2. หน้า `/daily/payment-approval` โหลด PB ที่ `payable_balance > 0` และยังไม่ cancelled เป็น source `ยังไม่อนุมัติ`
+   - การอนุมัติสร้าง snapshot ใน `payment_approvals` ด้วยเลข `PMA...`
+   - `payment_approvals.status in ('approved','paid')` ถือเป็น active/locked PMA สำหรับ source PB
+   - PB ที่มี PMA active ต้อง lock field การเงิน, คู่ค้า, สาขา, VAT/ส่วนลด, WTI/PO/ADV allocation และ action แก้ไข/ยกเลิก
+3. หน้า `/purchase/payments` โหลดเฉพาะ PMA ที่ `status = approved`
+   - ผู้ใช้ทำจ่ายจาก PMA ไม่ใช่จาก PB โดยตรง
+   - `payments` ยังไม่มี row จนกว่าผู้ใช้กดบันทึก Payment Voucher จาก PMA
+4. เมื่อบันทึกจ่ายผู้รับเงินที่ `POST /api/purchase/payments`
+   - สร้าง row ใน `payments`; ถ้า voucher มีหลาย PMA จะสร้าง 1 row ต่อ PMA/source โดยใช้ `doc_no` และ `voucher_id` เดียวกัน
    - สร้าง `bank_statement` เงินออก `ref_type = PMT`; ถ้าแยกหลายบัญชีจะสร้าง 1 row ต่อบัญชีจ่าย โดยใช้ `ref_id` เดียวกัน
    - refresh บิลซื้อที่เกี่ยวข้องใน transaction เดียวกัน โดยรวมยอดจาก `payments` ที่ `status != cancelled`
    - `lines`, `accountId`, `amount`, `method`, และ `splits` ต้องมีค่าใน API payload; `billId`/`supplierId` top-level ยังใช้เป็น compatibility ของบรรทัดแรก
    - `lines` คือรายการบิลที่จะจ่าย เช่น `{ billId, supplierId, amount, withholdingTax, discount, fee }`
    - `splits` คือบัญชีจ่ายจริงแบบ legacy split payment; ผลรวม `splits.amount` ต้องเท่ากับ `net_amount`
+   - `/purchase/payments` modal ต้องแสดง validation error ใน modal เองเมื่อยังไม่เลือก `บัญชีจ่าย` หรือยอด split ไม่เท่ากับ `net_amount`; ห้ามปล่อยให้ browser-native validation ทำให้ปุ่มบันทึกดูเหมือนไม่ตอบสนอง
    - ผู้ใช้กรอกเฉพาะ `amount` เป็นยอดเงินสดที่จะทำจ่าย; `withholding_tax` คำนวณจาก active default row ใน `wht_settings` ตามวันที่จ่าย
    - `wht_settings` เป็น master/config หลายอัตรา และ `/admin/system-settings` ต้องแสดง WHT ทุก row ให้แก้เปอร์เซ็นต์ได้รายแถว
    - สูตร WHT ปัจจุบันใช้ cash amount เป็นฐาน: `withholding_tax = amount * rate / (100 - rate)` เพื่อให้ `amount + withholding_tax` ตัดยอดค้างได้ตรงกับยอด gross ของบิล
    - สูตรยอดตัดบิล: `amount + withholding_tax + discount`
    - ถ้า payment เดิมถูกแก้แล้วย้าย `bill_id` จะ refresh ทั้งบิลเก่าและบิลใหม่
    - ถ้ายอดจ่ายรวมเกิน `purchase_bills.total_amount` เกิน 0.01 ระบบ reject และ rollback
+
+หน้า `/purchase/bills` ไม่ใช้ `purchase_bills.status` ดิบเป็น filter หลักแล้ว แต่ derive read model จาก Payment Flow:
+
+| สถานะหน้า PB | Runtime derive |
+|---|---|
+| `ยังไม่อนุมัติ` | ไม่ cancelled, `payable_balance > 0`, ไม่มี PMA active และไม่มี PMT active; partial ADV allocation ที่ยังมียอดค้างยังอยู่สถานะนี้ |
+| `รอจ่าย` | มี `payment_approvals.status in ('approved','paid')` ของ PB |
+| `ชำระบางส่วน` | มี PMT/payment activity จริงและ `payable_balance > 0` |
+| `เสร็จสิ้น` | `payable_balance <= 0` หรือ PB settlement status เป็น `paid` |
+| `ยกเลิก` | PB ถูก cancelled |
+
+`แก้ไข` / `ยกเลิก` ใน `/purchase/bills` ต้อง disabled และ PATCH ต้อง reject เมื่อมี PMA active หรือ PMT active (`payments.status != cancelled`) เพื่อกันการแก้ source ระหว่าง payment cycle
 
 ผลลัพธ์ของสถานะบิลหลัง refresh:
 

@@ -12,7 +12,7 @@ tags:
   - business-flow
 status: draft
 created: 2026-06-06
-updated: 2026-06-06
+updated: 2026-06-08
 ---
 
 # Purchase Flow Status Matrix / Matrix สถานะ Flow ซื้อ
@@ -30,6 +30,7 @@ updated: 2026-06-06
 - `ยังไม่อนุมัติ` คือ source queue จาก `PB / ADV / EXP` ยังไม่ใช่ `PMA`
 - `PMA` เกิดตอนกด approve เท่านั้น และเก็บเฉพาะยอดที่อนุมัติจริง
 - `PMT` ต้องจ่ายเต็ม PMA ที่เลือก ถ้าต้องจ่ายบางส่วนต้อง split ตั้งแต่ชั้น approve เป็น PMA ยอดย่อย
+- `ADV` ที่ approve ไม่เต็มยอดต้องแสดง `อนุมัติแล้วบางส่วน`; filter หน้า ADV ไม่ใช้สถานะ `รอคืนเงิน` หรือ `คืนเงินแล้ว`
 - เมื่อมี `PMA approved` อย่างน้อย 1 รายการ source document ต้อง lock field การเงินทั้งใบ
 - void PMA ก่อนออก PMT หรือ cancel PMT ต้องส่งยอดกลับไป source pending candidate และต้องสร้าง PMA ใหม่ก่อนจ่ายใหม่
 - Stock PB ที่เลือก WTI/summary เข้า draft แล้วต้องจัดสรรยอด remaining ของ WTI/summary ที่เลือกให้ครบก่อน save; ถ้า PO ไม่ครอบคลุมยอดที่เหลือต้องเป็น `Spot Buy` line ชัดเจน
@@ -68,28 +69,28 @@ updated: 2026-06-06
 | ปิด PO ส่งของไม่ครบ | `UC-PUR-05` | `POB = ปิดรับไม่ครบ`; WTI/PB ที่เกิดแล้วคงสถานะเดิม | ไม่สร้างยอด payable จากส่วนที่ short close | ไม่มี PMA ใหม่จากยอด short close | ไม่มี PMT จากยอด short close |
 | บันทึก WTI | `UC-PUR-01`, `UC-PUR-02`, `UC-PUR-06`, `UC-PUR-07`, `UC-PUR-08`, `UC-PUR-09`, `UC-PUR-12` | `WTI = รับของแล้ว`; PO ยังไม่ถูกตัดจนกว่า PB save | ไม่มี source payable จาก WTI อย่างเดียว | ไม่มี | ไม่มี |
 | บันทึก ADV | use case ที่มีมัดจำก่อน PB | PO ถ้ามีคงสถานะเดิม | `ADV = source ยังไม่อนุมัติ` | ไม่มีจนกว่าจะ approve | ไม่มี |
-| อนุมัติ ADV | use case ที่มีมัดจำก่อน PB | PO ถ้ามีคงสถานะเดิม | ADV locked ตามยอดที่อนุมัติ; ยอด ADV ที่ยังไม่ approve ยังเป็น source pending | `PMA approved` ตาม split amount | ไม่มี |
+| อนุมัติ ADV | use case ที่มีมัดจำก่อน PB | PO ถ้ามีคงสถานะเดิม | ADV = `อนุมัติแล้วบางส่วน` ถ้า approve ไม่ครบ, หรือ `อนุมัติแล้ว` ถ้าครบ; ยอด ADV ที่ยังไม่ approve ยังเป็น source pending | `PMA approved` ตาม split amount | ไม่มี |
 | จ่าย ADV | use case ที่มีมัดจำก่อน PB | PO ถ้ามีคงสถานะเดิม | ADV ถูก settle ตาม PMA ที่จ่าย; ถ้ามียอดเหลือต้องกลับไป approve ใหม่ | PMA ที่เลือกถูก consumed/paid | `PMT = เสร็จสิ้น` และต้องจ่ายเต็ม PMA |
 | บันทึก PB Stock/Trading | `UC-PUR-01`..`UC-PUR-14` ที่ออก PB | PO/WTI ถูกตัดตาม allocation; WTI ที่เลือกครบในบิลใหม่เป็น `เสร็จสิ้น`, หรือยังเป็น `ออกบิลแล้วบางส่วน` เฉพาะกรณีมี active usage เดิมที่ยังเหลือ; PO เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` | `PB = เปิดอยู่`; payment status = `ยังไม่อนุมัติ` ถ้ายอดสุทธิหลังหัก ADV > 0, หรือ `เสร็จสิ้น` ถ้า ADV ตัดเต็ม | ไม่มีสำหรับยอด PB จนกว่าจะ approve | ไม่มี |
 | แก้ source ก่อนอนุมัติ | `PB / ADV / EXP` ทุกแบบ | PO/WTI recalc ตาม write path ที่ถูกต้อง | แก้ได้เฉพาะเมื่อยังไม่มี `PMA approved` หรือ `PMT active`; pending queue อ่าน source ล่าสุด | ไม่มี | ไม่มี |
 | ยกเลิก source ก่อนอนุมัติ | `PB / ADV / EXP` ทุกแบบ | PO/WTI/stock/ADV allocation ต้อง reverse ตาม source type | source = `ยกเลิก`; หายจาก pending queue | ไม่มี | ไม่มี |
 | อนุมัติ source บางส่วน | `UC-PUR-14` และทุก source ที่จ่ายบางส่วน | PO/WTI ไม่เปลี่ยนจากการ approve | source ยังมี pending balance แต่ financial fields ถูก lock ทั้งใบ | `PMA approved` 1..n rows ตามยอด split ที่ approve | ไม่มี |
 | อนุมัติ source เต็มยอด | `UC-PUR-14` และทุก source ที่อนุมัติเต็ม | PO/WTI ไม่เปลี่ยนจากการ approve | source ไม่มี remaining approval balance แต่ยังไม่ใช่ payment เสร็จ | `PMA approved` ครอบคลุมยอด payable | ไม่มี |
-| Void PMA ก่อนออก PMT | PMA approved ที่ยังไม่ถูกจ่าย | PO/WTI ไม่เปลี่ยน | ยอด PMA ที่ void กลับไปเป็น source `ยังไม่อนุมัติ`; source ยังใช้ข้อมูลปัจจุบันสำหรับ approve รอบใหม่ | PMA เดิม = `voided`/audit เท่านั้น ไม่ reuse | ไม่มี |
+| Void PMA ก่อนออก PMT | PMA approved ที่ยังไม่ถูกจ่าย | PO/WTI ไม่เปลี่ยน | ยอด PMA ที่ void กลับไปเป็น source pending; ADV/PB/EXP recalc เป็น `ยังไม่อนุมัติ` หรือ `อนุมัติแล้วบางส่วน` ตาม active PMA ที่เหลือ | PMA เดิม = `voided`/audit เท่านั้น ไม่ reuse | ไม่มี |
 | ทำจ่าย PMA | PMA approved ทุกแบบ | PO/WTI ไม่เปลี่ยนจากการจ่าย | source ลด payable balance ตาม PMA ที่จ่าย; ถ้ายอด source ยังเหลือให้แสดง `ชำระบางส่วน`, ถ้าครบให้ `เสร็จสิ้น` | PMA ที่เลือกถูก consumed/paid | `PMT = เสร็จสิ้น`; ต้องจ่ายเต็มทุก PMA ที่เลือก |
-| ยกเลิก PMT | PMT ที่จ่ายจริงแล้ว | PO/WTI ไม่เปลี่ยนจากการ cancel PMT | ยอดที่ reverse กลับไป source `ยังไม่อนุมัติ`; ถ้าจะจ่ายใหม่ต้อง approve ใหม่ | PMA เดิมจบ cycle เป็น audit/history ห้าม reuse | `PMT = ยกเลิกแล้ว` |
+| ยกเลิก PMT | PMT ที่จ่ายจริงแล้ว | PO/WTI ไม่เปลี่ยนจากการ cancel PMT | ยอดที่ reverse กลับไป source pending; ADV/PB/EXP recalc ตาม active PMA/PMT/allocation ที่เหลือ ถ้าจะจ่ายใหม่ต้อง approve ใหม่ | PMA เดิมจบ cycle เป็น audit/history ห้าม reuse | `PMT = ยกเลิกแล้ว` |
 
 ## ADV Before PB
 
 | ขั้นตอน | สถานะ ADV/source | สถานะ PMA | สถานะ PMT | สถานะ PB ที่เกี่ยวข้อง | หมายเหตุ |
 |---|---|---|---|---|---|
 | บันทึก ADV | `ADV = ยังไม่อนุมัติ` ใน source pending queue | ไม่มี | ไม่มี | ยังไม่มี PB หรือ PB ยังไม่ถูก allocate ADV | pending tab แสดง `ADV` เป็นเลขหลัก |
-| อนุมัติ ADV บางส่วน | ADV ยังมี pending balance ถ้าอนุมัติไม่ครบ | `PMA approved` ตามยอด split | ไม่มี | ยังไม่กระทบ PB จนกว่าจะจ่ายและ allocate | source financial fields ของ ADV ถูก lock ตาม rule PMA approved |
-| อนุมัติ ADV เต็มยอด | ADV ไม่มี remaining approval balance | `PMA approved` ครอบคลุมยอด ADV | ไม่มี | ยังไม่กระทบ PB จนกว่าจะจ่ายและ allocate | approved tab แสดง `PMA` เป็นเลขหลักและ `ADV` เป็น reference |
+| อนุมัติ ADV บางส่วน | `ADV = อนุมัติแล้วบางส่วน`; ยังมี pending balance ถ้าอนุมัติไม่ครบ | `PMA approved` ตามยอด split | ไม่มี | ยังไม่กระทบ PB จนกว่าจะจ่ายและ allocate | source financial fields ของ ADV ถูก lock ตาม rule PMA approved |
+| อนุมัติ ADV เต็มยอด | `ADV = อนุมัติแล้ว`; ไม่มี remaining approval balance | `PMA approved` ครอบคลุมยอด ADV | ไม่มี | ยังไม่กระทบ PB จนกว่าจะจ่ายและ allocate | approved tab แสดง `PMA` เป็นเลขหลักและ `ADV` เป็น reference |
 | จ่าย ADV | ADV ถูก settle ตาม PMA ที่จ่าย | PMA ถูก consumed/paid | `PMT = เสร็จสิ้น` | ยังไม่มี PB หรือรอ allocate เข้า PB ภายหลัง | PMT ต้องจ่ายเต็ม PMA ที่เลือก |
 | Allocate ADV เข้า PB | ADV available balance ลดลงตาม allocation | ไม่เปลี่ยน | ไม่เปลี่ยน | PB ยอดสุทธิลดลง; ถ้าหักเต็มให้ PB payment status = `เสร็จสิ้น`, ถ้ายังเหลือให้ `ยังไม่อนุมัติ` | ห้าม allocate ADV เกินยอดจ่ายจริงที่ยัง available |
-| Void PMA ก่อน PMT | ยอด PMA กลับไปเป็น ADV source pending | PMA เดิมเป็น audit/history | ไม่มี | ไม่กระทบ PB | ต้อง approve ใหม่เพื่อสร้าง PMA ใหม่ |
-| Cancel PMT ของ ADV | ยอดที่ reverse กลับเป็น ADV source pending | PMA เดิมจบ cycle ห้าม reuse | `PMT = ยกเลิกแล้ว` | ถ้า ADV ถูก allocate เข้า PB แล้วต้อง reverse allocation ตาม policy ก่อนใช้ใหม่ | ต้อง approve ADV ใหม่ก่อนจ่ายใหม่ |
+| Void PMA ก่อน PMT | ADV recalc จาก active PMA ที่เหลือ: `ยังไม่อนุมัติ` หรือ `อนุมัติแล้วบางส่วน` | PMA เดิมเป็น audit/history | ไม่มี | ไม่กระทบ PB | ต้อง approve ใหม่เพื่อสร้าง PMA ใหม่ |
+| Cancel PMT ของ ADV | ADV recalc จาก active PMA/PMT/allocation ที่เหลือ: `ยังไม่อนุมัติ`, `อนุมัติแล้วบางส่วน`, หรือสถานะ allocation ตามจริง | PMA เดิมจบ cycle ห้าม reuse | `PMT = ยกเลิกแล้ว` | ถ้า ADV ถูก allocate เข้า PB แล้วต้อง reverse allocation ตาม policy ก่อนใช้ใหม่ | ต้อง approve ADV ใหม่ก่อนจ่ายใหม่ |
 
 ## Flow Stock + PO
 

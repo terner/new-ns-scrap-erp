@@ -6,11 +6,13 @@ function normalizeBranchCode(value: string | null | undefined) {
   return trimmed ? trimmed.padStart(2, '0').slice(-2) : '00'
 }
 
-export async function nextPaymentApprovalDocNo(
+export async function nextPaymentApprovalDocNos(
   tx: Prisma.TransactionClient,
   documentDate: Date,
   branchCode: string,
+  count: number,
 ) {
+  if (count <= 0) return []
   const period = toDateOnly(documentDate).slice(2, 4) + toDateOnly(documentDate).slice(5, 7)
   const normalizedBranchCode = normalizeBranchCode(branchCode)
   const startsWith = `PMA${normalizedBranchCode}${period}-`
@@ -24,7 +26,17 @@ export async function nextPaymentApprovalDocNo(
     const running = Number(suffix.split('/')[0] ?? '')
     return Number.isFinite(running) && running > max ? running : max
   }, 0)
-  return `${startsWith}${String(lastNumber + 1).padStart(4, '0')}`
+  return Array.from({ length: count }, (_, index) => `${startsWith}${String(lastNumber + 1 + index).padStart(4, '0')}`)
+}
+
+export async function nextPaymentApprovalDocNo(
+  tx: Prisma.TransactionClient,
+  documentDate: Date,
+  branchCode: string,
+) {
+  const [docNo] = await nextPaymentApprovalDocNos(tx, documentDate, branchCode, 1)
+  if (!docNo) throw new Error('ออกเลข PMA ไม่ได้')
+  return docNo
 }
 
 type PaymentApprovalSourceType = 'advance_payment' | 'expense' | 'purchase_bill'

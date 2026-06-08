@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseInternalBigIntId, stringifyBusinessValue } from '@/lib/business-code'
 import { apiErrorResponse } from '@/lib/server/api-error'
-import { appendSupplierAdvanceStatusLog, supplierAdvanceStatusActionForStatus, SUPPLIER_ADVANCE_STATUS_ACTION } from '@/lib/server/advance-payment-history'
+import { SUPPLIER_ADVANCE_STATUS_ACTION } from '@/lib/server/advance-payment-history'
+import { refreshAdvancePaymentWorkflowStatus } from '@/lib/server/advance-payments'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, toNumber } from '@/lib/server/daily'
+import { refreshExpensePaymentStatus } from '@/lib/server/expense-payment-status'
 import {
   appendPaymentApprovalStatusLog,
   appendPaymentStatusLog,
@@ -38,61 +40,11 @@ async function refreshPurchaseBillPaymentStatus(tx: Parameters<typeof prisma.$tr
 }
 
 async function refreshAdvancePaymentPaymentStatus(tx: Parameters<typeof prisma.$transaction>[0] extends (arg: infer T) => Promise<unknown> ? T : never, advanceId: bigint, actor: string) {
-  const [advance, approvals] = await Promise.all([
-    tx.supplier_advance_payments.findUnique({
-      select: { id: true, status: true },
-      where: { id: advanceId },
-    }),
-    tx.payment_approvals.findMany({
-      select: { approved_amount: true, id: true },
-      where: {
-        source_id: advanceId.toString(),
-        source_type: 'advance_payment',
-        status: { in: ['approved', 'paid'] },
-      },
-    }),
-  ])
-  if (!advance || advance.status === 'cancelled') return
-
-  let allSettled = approvals.length > 0
-  for (const approval of approvals) {
-    const activePayments = await tx.payments.findMany({
-      select: { amount: true, discount: true, status: true, withholding_tax: true },
-      where: {
-        payment_approval_id: approval.id,
-        NOT: { status: 'cancelled' },
-      },
-    })
-    const settledAmount = activePayments.reduce((sum, payment) => (
-      sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
-    ), 0)
-    if (Math.max(0, toNumber(approval.approved_amount) - settledAmount) > 0.01) {
-      allSettled = false
-      break
-    }
-  }
-
-  const nextStatus = approvals.length === 0 ? 'pending_approval' : allSettled ? 'paid' : 'approved'
-  await tx.supplier_advance_payments.update({
-    data: {
-      status: nextStatus,
-      updated_at: new Date(),
-      updated_by: actor,
-    },
-    where: { id: advanceId },
+  await refreshAdvancePaymentWorkflowStatus(tx, advanceId, actor, {
+    action: SUPPLIER_ADVANCE_STATUS_ACTION.PAYMENT_REVERSED,
+    logIfUnchanged: true,
+    meta: { reason: 'payment_cancel_refresh' },
   })
-  if (nextStatus !== advance.status) {
-    await appendSupplierAdvanceStatusLog(tx, {
-      action: nextStatus === 'approved' || nextStatus === 'pending_approval'
-        ? SUPPLIER_ADVANCE_STATUS_ACTION.PAYMENT_REVERSED
-        : supplierAdvanceStatusActionForStatus(nextStatus),
-      actor,
-      advancePaymentId: advanceId,
-      fromStatus: advance.status,
-      meta: { reason: 'payment_cancel_refresh' },
-      toStatus: nextStatus,
-    })
-  }
 }
 
 export async function POST(request: Request) {
@@ -322,6 +274,12 @@ export async function POST(request: Request) {
             const advanceId = parseInternalBigIntId(approval.source_id)
             if (advanceId != null) {
               await refreshAdvancePaymentPaymentStatus(tx, advanceId, actor)
+            }
+          }
+          if (approval.source_type === 'expense') {
+            const expenseId = parseInternalBigIntId(approval.source_id)
+            if (expenseId != null) {
+              await refreshExpensePaymentStatus(tx, expenseId, actor)
             }
           }
         }

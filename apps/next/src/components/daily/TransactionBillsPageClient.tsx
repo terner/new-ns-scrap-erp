@@ -243,9 +243,8 @@ function advancePaymentStatusLabel(status: string | null | undefined) {
     cancelled: 'ยกเลิก',
     paid: 'พร้อมใช้หักบิล',
     partially_allocated: 'ใช้หักบิลบางส่วน',
+    partially_approved: 'อนุมัติแล้วบางส่วน',
     pending_approval: 'ยังไม่อนุมัติ',
-    refunded: 'คืนเงินแล้ว',
-    refunding: 'รอคืนเงิน',
   }
   return labels[status ?? ''] ?? (status || '-')
 }
@@ -533,7 +532,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const stockIssueQty = stockIssueRows.reduce((sum, row) => sum + (row.totalQty ?? 0), 0)
   const stockIssueCost = stockIssueRows.reduce((sum, row) => sum + row.totalCost, 0)
   const stockIssueEst = stockIssueRows.reduce((sum, row) => sum + row.totalEstAmount, 0)
-  const tableColSpan = mode === 'purchase' ? 12 : mode === 'sales' ? 15 : 10
+  const tableColSpan = mode === 'purchase' ? 11 : mode === 'sales' ? 15 : 10
   const statusOptions = mode === 'purchase' ? purchaseStatusOptions : salesStatusOptions
   const selectedReceipt = (() => {
     if (!form.receiptTicketId) return null
@@ -1285,9 +1284,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} sortKey="name" onSort={changeSort} />
               {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" sortKey="warehouse" onSort={changeSort} /> : null}
               {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" sortKey="transactionMode" onSort={changeSort} /> : null}
-              <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'สถานะการชำระเงิน' : 'สถานะรับเงิน'} sortKey="status" onSort={changeSort} />
-              {mode === 'purchase' ? <th className="p-2 text-center">สถานะการจ่าย</th> : null}
-              {mode === 'purchase' ? <th className="p-2 text-left">เลขที่การชำระเงิน</th> : null}
+              <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'สถานะเอกสาร' : 'สถานะรับเงิน'} sortKey="status" onSort={changeSort} />
+              {mode === 'purchase' ? <th className="p-2 text-left">PMA / PMT</th> : null}
               {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" sortKey="itemCount" onSort={changeSort} /> : null}
               {mode === 'stock-issue' ? <th className="p-2 text-right">น้ำหนัก</th> : null}
               {mode === 'stock-issue' ? <th className="p-2 text-right">ต้นทุน</th> : null}
@@ -1319,17 +1317,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {mode !== 'purchase' ? <td className="p-2">{formatBranchWarehouse(row)}</td> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{row.transactionMode ?? '-'}</span></td> : null}
                 <td className="p-2 text-center">
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusBadgeClass(row.status)}`}>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${mode === 'purchase' && !isStockIssueRow(row) ? workflowStatusBadgeClass(row.paymentWorkflowStatus ?? 'pending_approval') : statusBadgeClass(row.status)}`}>
                     <span className="size-1.5 rounded-full bg-current" />
-                    {statusText(row.status)}
+                    {mode === 'purchase' && !isStockIssueRow(row) ? workflowStatusText(row.paymentWorkflowStatus ?? 'pending_approval') : statusText(row.status)}
                   </span>
                 </td>
-                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-center">
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${workflowStatusBadgeClass(row.paymentWorkflowStatus ?? 'pending_approval')}`}>
-                    <span className="size-1.5 rounded-full bg-current" />
-                    {workflowStatusText(row.paymentWorkflowStatus ?? 'pending_approval')}
-                  </span>
-                </td> : null}
                 {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-xs">{row.paymentDocNos?.length ? <div className="space-y-0.5">{row.paymentDocNos.map((docNo: string) => <div key={`${row.id}-${docNo}`} className="text-slate-700">{docNo}</div>)}</div> : <span className="text-slate-400">-</span>}</td> : null}
                 {mode !== 'purchase' ? <td className="p-2 text-right">{row.itemCount}</td> : null}
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.totalQty ?? 0)} /> : null}

@@ -1,4 +1,9 @@
 import type { Prisma } from '../../../generated/prisma/client'
+import {
+  appendSupplierAdvanceStatusLog,
+  SUPPLIER_ADVANCE_STATUS_ACTION,
+  supplierAdvanceStatusActionForStatus,
+} from '@/lib/server/advance-payment-history'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 
 export type AdvancePaymentTimelineEvent = {
@@ -45,11 +50,16 @@ export function advancePaymentStatusLabel(status: string) {
     cancelled: 'ยกเลิก',
     paid: 'เสร็จสิ้น',
     partially_allocated: 'ใช้หักบิลบางส่วน',
+    partially_approved: 'อนุมัติแล้วบางส่วน',
     pending_approval: 'ยังไม่อนุมัติ',
-    refunded: 'คืนเงินแล้ว',
-    refunding: 'รอคืนเงิน',
   }
   return labels[status] ?? status
+}
+
+const EPSILON = 0.01
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 export function toBangkokDateTimeInput(date: Date | null | undefined) {
@@ -99,10 +109,7 @@ export function advancePaymentMutationReason(row: {
   if (row.status === 'paid') return action === 'edit'
     ? 'แก้ไขไม่ได้ เพราะรายการ ADV นี้จ่ายแล้ว'
     : 'ยกเลิกไม่ได้ เพราะรายการ ADV นี้จ่ายแล้ว'
-  if (row.status === 'refunding' || row.status === 'refunded') return action === 'edit'
-    ? 'แก้ไขไม่ได้ เพราะรายการ ADV นี้อยู่ในขั้นตอนคืนเงินแล้ว'
-    : 'ยกเลิกไม่ได้ เพราะรายการ ADV นี้อยู่ในขั้นตอนคืนเงินแล้ว'
-  if (row.status === 'approved') return action === 'edit'
+  if (row.status === 'approved' || row.status === 'partially_approved') return action === 'edit'
     ? 'แก้ไขไม่ได้ เพราะรายการ ADV นี้อนุมัติแล้ว'
     : 'ยกเลิกไม่ได้ เพราะรายการ ADV นี้อนุมัติแล้ว'
   if (row.status !== 'pending_approval') return action === 'edit'
@@ -207,19 +214,151 @@ type PrismaClientLike = {
   $queryRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: unknown[]): Promise<T>
 }
 
+type AdvancePaymentStatusTx = Pick<
+  Prisma.TransactionClient,
+  'payment_approvals' | 'payments' | 'supplier_advance_payments' | 'supplier_advance_status_logs'
+>
+
+type SupplierAdvanceStatusAction = typeof SUPPLIER_ADVANCE_STATUS_ACTION[keyof typeof SUPPLIER_ADVANCE_STATUS_ACTION]
+
+export type AdvancePaymentApprovalStatusSummary = {
+  activeApprovalAmount: number
+  activeApprovalCount: number
+  allActiveApprovalsSettled: boolean
+}
+
+export function deriveAdvancePaymentWorkflowStatus(params: {
+  activeApprovalAmount: number
+  allocatedAmount: number
+  allActiveApprovalsSettled: boolean
+  amount: number
+  cancelledAt?: Date | null
+  currentStatus?: string | null
+  remainingAmount: number
+}) {
+  const currentStatus = String(params.currentStatus ?? '')
+  if (params.cancelledAt || currentStatus === 'cancelled') return 'cancelled'
+  if (params.allocatedAmount > EPSILON) {
+    return params.remainingAmount <= EPSILON ? 'allocated' : 'partially_allocated'
+  }
+  if (params.activeApprovalAmount <= EPSILON) return 'pending_approval'
+  if (params.activeApprovalAmount < params.amount - EPSILON) return 'partially_approved'
+  return params.allActiveApprovalsSettled ? 'paid' : 'approved'
+}
+
+export async function summarizeAdvancePaymentApprovalStatus(
+  tx: Pick<Prisma.TransactionClient, 'payment_approvals' | 'payments'>,
+  advancePaymentId: bigint,
+): Promise<AdvancePaymentApprovalStatusSummary> {
+  const approvals = await tx.payment_approvals.findMany({
+    select: { approved_amount: true, id: true },
+    where: {
+      source_id: advancePaymentId.toString(),
+      source_type: 'advance_payment',
+      status: { in: ['approved', 'paid'] },
+    },
+  })
+  let allActiveApprovalsSettled = approvals.length > 0
+  for (const approval of approvals) {
+    const payments = await tx.payments.findMany({
+      select: { amount: true, discount: true, withholding_tax: true },
+      where: {
+        payment_approval_id: approval.id,
+        NOT: { status: 'cancelled' },
+      },
+    })
+    const settledAmount = payments.reduce((sum, payment) => (
+      sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
+    ), 0)
+    if (Math.max(0, toNumber(approval.approved_amount) - settledAmount) > EPSILON) {
+      allActiveApprovalsSettled = false
+      break
+    }
+  }
+
+  return {
+    activeApprovalAmount: roundMoney(approvals.reduce((sum, approval) => sum + toNumber(approval.approved_amount), 0)),
+    activeApprovalCount: approvals.length,
+    allActiveApprovalsSettled,
+  }
+}
+
+export async function refreshAdvancePaymentWorkflowStatus(
+  tx: AdvancePaymentStatusTx,
+  advancePaymentId: bigint,
+  actor?: string | null,
+  options?: {
+    action?: SupplierAdvanceStatusAction
+    logIfUnchanged?: boolean
+    meta?: Prisma.InputJsonValue
+    note?: string | null
+  },
+) {
+  const advance = await tx.supplier_advance_payments.findUnique({
+    select: {
+      allocated_amount: true,
+      amount: true,
+      cancelled_at: true,
+      id: true,
+      remaining_amount: true,
+      status: true,
+    },
+    where: { id: advancePaymentId },
+  })
+  if (!advance) throw new Error('ไม่พบ ADV ที่ต้องการคำนวณสถานะใหม่')
+
+  const approvalSummary = await summarizeAdvancePaymentApprovalStatus(tx, advancePaymentId)
+  const nextStatus = deriveAdvancePaymentWorkflowStatus({
+    activeApprovalAmount: approvalSummary.activeApprovalAmount,
+    allocatedAmount: toNumber(advance.allocated_amount),
+    allActiveApprovalsSettled: approvalSummary.allActiveApprovalsSettled,
+    amount: toNumber(advance.amount),
+    cancelledAt: advance.cancelled_at,
+    currentStatus: advance.status,
+    remainingAmount: toNumber(advance.remaining_amount),
+  })
+
+  if (nextStatus !== advance.status) {
+    await tx.supplier_advance_payments.update({
+      data: {
+        status: nextStatus,
+        updated_at: new Date(),
+        updated_by: actor ?? null,
+      },
+      where: { id: advancePaymentId },
+    })
+  }
+
+  if (nextStatus !== advance.status || options?.logIfUnchanged) {
+    await appendSupplierAdvanceStatusLog(tx, {
+      action: options?.action ?? supplierAdvanceStatusActionForStatus(nextStatus),
+      actor: actor ?? null,
+      advancePaymentId,
+      fromStatus: advance.status,
+      meta: options?.meta,
+      note: options?.note ?? null,
+      toStatus: nextStatus,
+    })
+  }
+
+  return {
+    ...approvalSummary,
+    status: nextStatus,
+  }
+}
+
 function statusTimelineEventKey(action: string) {
   if (action === 'created') return 'purchase.advance-payment.created'
   if (action === 'edited') return 'purchase.advance-payment.updated'
   if (action === 'cancelled') return 'purchase.advance-payment.cancelled'
   if (action === 'approved') return 'purchase.advance-payment.approved'
+  if (action === 'partially_approved') return 'purchase.advance-payment.partially-approved'
   if (action === 'approval_voided') return 'purchase.advance-payment.approval-voided'
   if (action === 'paid') return 'purchase.advance-payment.paid'
   if (action === 'payment_reversed') return 'purchase.advance-payment.payment-reversed'
   if (action === 'partially_allocated') return 'purchase.advance-payment.partially-allocated'
   if (action === 'allocated') return 'purchase.advance-payment.fully-allocated'
   if (action === 'allocation_released') return 'purchase.advance-payment.allocation-released'
-  if (action === 'refund_required') return 'purchase.advance-payment.refund-required'
-  if (action === 'refunded') return 'purchase.advance-payment.refunded'
   return 'purchase.advance-payment.status-synced'
 }
 

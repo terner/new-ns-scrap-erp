@@ -86,6 +86,8 @@ type PurchasePaymentWorkflowStatus =
   | 'paid'
   | 'cancelled'
 
+const LOCKED_PURCHASE_PAYMENT_APPROVAL_STATUSES = ['approved', 'paid'] as const
+
 type ProductRefRow = {
   code: string
   id: bigint
@@ -1608,15 +1610,60 @@ function billWhere(query: BillQuery): Prisma.purchase_billsWhereInput {
 function derivePurchasePaymentWorkflowStatus(params: {
   hasActiveApproval: boolean
   isCancelled: boolean
-  paidAmount: number
+  paymentSettledAmount: number
   payableBalance: number
   status: string | null | undefined
 }): PurchasePaymentWorkflowStatus {
   if (params.isCancelled) return 'cancelled'
   if (params.payableBalance <= 0.01 || String(params.status ?? '').toLowerCase() === 'paid') return 'paid'
-  if (params.paidAmount > 0.01) return 'partial_paid'
+  if (params.paymentSettledAmount > 0.01) return 'partial_paid'
   if (params.hasActiveApproval) return 'pending_payment'
   return 'pending_approval'
+}
+
+function purchasePaymentWorkflowStatusLabel(status: string) {
+  const labels: Record<PurchasePaymentWorkflowStatus, string> = {
+    cancelled: 'ยกเลิก',
+    paid: 'เสร็จสิ้น',
+    partial_paid: 'ชำระบางส่วน',
+    pending_approval: 'ยังไม่อนุมัติ',
+    pending_payment: 'รอจ่าย',
+  }
+  return labels[status as PurchasePaymentWorkflowStatus] ?? status
+}
+
+function purchasePaymentWorkflowStatusRank(status: string | null | undefined) {
+  const ranks: Record<PurchasePaymentWorkflowStatus, number> = {
+    pending_approval: 1,
+    pending_payment: 2,
+    partial_paid: 3,
+    paid: 4,
+    cancelled: 5,
+  }
+  return ranks[String(status ?? 'pending_approval').toLowerCase() as PurchasePaymentWorkflowStatus] ?? 99
+}
+
+function purchaseBillLockedReason(params: {
+  hasActiveApproval: boolean
+  hasActivePayment: boolean
+  isCancelled: boolean
+}) {
+  if (params.isCancelled) return 'บิลนี้ถูกยกเลิกแล้ว'
+  if (params.hasActivePayment) return 'แก้ไข/ยกเลิกไม่ได้ เพราะบิลนี้มีรอบจ่ายเงิน PMT แล้ว'
+  if (params.hasActiveApproval) return 'แก้ไข/ยกเลิกไม่ได้ เพราะมี PMA อนุมัติแล้ว'
+  return null
+}
+
+function sortPurchaseBillRowsByWorkflow<T extends { docNo: string; paymentWorkflowStatus?: string }>(
+  rows: T[],
+  direction: Prisma.SortOrder,
+) {
+  return [...rows].sort((left, right) => {
+    const rankDiff = purchasePaymentWorkflowStatusRank(left.paymentWorkflowStatus) - purchasePaymentWorkflowStatusRank(right.paymentWorkflowStatus)
+    const docDiff = left.docNo.localeCompare(right.docNo, 'th')
+    const result = rankDiff || docDiff
+    return direction === 'asc' ? result : -result
+  })
 }
 
 function billOrderBy(query: BillQuery): Prisma.purchase_billsOrderByWithRelationInput[] {
@@ -1655,100 +1702,109 @@ async function rowsPayload(
   includePaging = true,
 ) {
   const where = billWhere(query)
-  const [rows, totals] = await Promise.all([
-    prisma.purchase_bills.findMany({
-      include: {
-        branches: true,
-        purchase_bill_items: { orderBy: { line_no: 'asc' } },
-        supplier_advance_allocations: {
-          include: {
-            supplier_advance_payments: {
-              select: { doc_no: true, id: true },
-            },
+  const rows = await prisma.purchase_bills.findMany({
+    include: {
+      branches: true,
+      purchase_bill_items: { orderBy: { line_no: 'asc' } },
+      supplier_advance_allocations: {
+        include: {
+          supplier_advance_payments: {
+            select: { doc_no: true, id: true },
           },
-          orderBy: [{ allocated_at: 'desc' }],
         },
-        suppliers: true,
-        warehouses: true,
+        orderBy: [{ allocated_at: 'desc' }],
       },
-      orderBy: billOrderBy(query),
-      where,
-    }),
-    prisma.purchase_bills.aggregate({
-      _sum: { total_amount: true },
-      where,
-    }),
-  ])
+      suppliers: true,
+      warehouses: true,
+    },
+    orderBy: billOrderBy(query),
+    where,
+  })
   const billIds = rows.map((row) => row.id)
   const [payments, activeApprovals] = billIds.length > 0 ? await Promise.all([
     prisma.payments.findMany({
       orderBy: [{ created_at: 'asc' }],
-      select: { bill_id: true, doc_no: true, status: true },
+      select: { amount: true, bill_id: true, discount: true, doc_no: true, status: true, withholding_tax: true },
       where: {
         bill_id: { in: billIds },
         NOT: { status: 'cancelled' },
       },
     }),
     prisma.payment_approvals.findMany({
-      select: { source_id: true },
+      select: { doc_no: true, source_id: true, status: true },
       where: {
         source_id: { in: billIds.map((billId) => stringifyBusinessValue(billId)) },
         source_type: 'purchase_bill',
-        status: 'approved',
+        status: { in: [...LOCKED_PURCHASE_PAYMENT_APPROVAL_STATUSES] },
       },
     }),
   ]) : [[], []]
+  const activePaymentBillIds = new Set<bigint>()
   const paymentDocNosByBillId = new Map<bigint, string[]>()
+  const paymentSettledAmountByBillId = new Map<bigint, number>()
   payments.forEach((payment) => {
     const billId = payment.bill_id
-    if (billId == null || !payment.doc_no) return
+    if (billId == null) return
+    activePaymentBillIds.add(billId)
     const current = paymentDocNosByBillId.get(billId) ?? []
-    if (!current.includes(payment.doc_no)) current.push(payment.doc_no)
+    if (payment.doc_no && !current.includes(payment.doc_no)) current.push(payment.doc_no)
     paymentDocNosByBillId.set(billId, current)
+    const paymentAmount = toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
+    paymentSettledAmountByBillId.set(billId, (paymentSettledAmountByBillId.get(billId) ?? 0) + paymentAmount)
   })
   const activeApprovalBillIds = new Set(activeApprovals.map((approval) => approval.source_id))
+  const activeApprovalDocNosByBillId = new Map<string, string[]>()
+  activeApprovals.forEach((approval) => {
+    if (!approval.doc_no) return
+    const current = activeApprovalDocNosByBillId.get(approval.source_id) ?? []
+    if (!current.includes(approval.doc_no)) current.push(approval.doc_no)
+    activeApprovalDocNosByBillId.set(approval.source_id, current)
+  })
 
   const mappedRows = rows.map((row) => {
-      const paymentDocNos = paymentDocNosByBillId.get(row.id) ?? []
-      const hasActiveApproval = activeApprovalBillIds.has(stringifyBusinessValue(row.id))
-      const hasActivePayment = paymentDocNos.length > 0
-      const isCancelled = String(row.status ?? '').toLowerCase().includes('cancel')
-      const paidAmount = toNumber(row.paid_amount)
-      const payableBalance = toNumber(row.payable_balance)
-      const paymentWorkflowStatus = derivePurchasePaymentWorkflowStatus({
-        hasActiveApproval,
-        isCancelled,
-        paidAmount,
-        payableBalance,
-        status: row.status,
-      })
-      const lockedReason = isCancelled
-        ? 'บิลนี้ถูกยกเลิกแล้ว'
-        : hasActiveApproval
-          ? 'บิลนี้ถูกอนุมัติโอนเงินแล้ว ต้องยกเลิกรายการรอจ่ายก่อน'
-          : hasActivePayment
-            ? 'บิลนี้มีการชำระเงินแล้ว'
-            : null
-      return {
-        ...billJson(row, paymentDocNos),
-        canEdit: !lockedReason,
-        hasActiveApproval,
-        hasActivePayment,
-        lockedReason,
-        paymentWorkflowStatus,
-      }
+    const paymentDocNos = paymentDocNosByBillId.get(row.id) ?? []
+    const billId = stringifyBusinessValue(row.id)
+    const approvalDocNos = activeApprovalDocNosByBillId.get(billId) ?? []
+    const hasActiveApproval = activeApprovalBillIds.has(billId)
+    const hasActivePayment = activePaymentBillIds.has(row.id)
+    const isCancelled = String(row.status ?? '').toLowerCase().includes('cancel')
+    const paymentSettledAmount = paymentSettledAmountByBillId.get(row.id) ?? 0
+    const payableBalance = toNumber(row.payable_balance)
+    const paymentWorkflowStatus = derivePurchasePaymentWorkflowStatus({
+      hasActiveApproval,
+      isCancelled,
+      paymentSettledAmount,
+      payableBalance,
+      status: row.status,
     })
+    const lockedReason = purchaseBillLockedReason({
+      hasActiveApproval,
+      hasActivePayment,
+      isCancelled,
+    })
+    return {
+      ...billJson(row, [...approvalDocNos, ...paymentDocNos]),
+      canEdit: !lockedReason,
+      hasActiveApproval,
+      hasActivePayment,
+      lockedReason,
+      paymentWorkflowStatus,
+    }
+  })
   const filteredRows = query.statuses?.length
     ? mappedRows.filter((row) => query.statuses?.includes(String(row.paymentWorkflowStatus ?? '').toLowerCase()))
     : mappedRows
-  const pagedRows = includePaging
-    ? filteredRows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize)
+  const sortedRows = query.sortKey === 'status'
+    ? sortPurchaseBillRowsByWorkflow(filteredRows, query.sortDirection)
     : filteredRows
+  const pagedRows = includePaging
+    ? sortedRows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize)
+    : sortedRows
 
   return {
     rows: pagedRows,
-    totalAmount: toNumber(totals._sum.total_amount),
-    totalRows: filteredRows.length,
+    totalAmount: sortedRows.reduce((sum, row) => sum + (row.totalAmount ?? 0), 0),
+    totalRows: sortedRows.length,
   }
 }
 
@@ -1759,6 +1815,8 @@ function buildWorkbook(rows: Array<{
   docNo: string
   itemCount: number
   payableBalance?: number
+  paymentDocNos?: string[]
+  paymentWorkflowStatus?: string
   receiptDocNos?: string[]
   status: string
   supplierName?: string
@@ -1771,7 +1829,8 @@ function buildWorkbook(rows: Array<{
     'วันที่': row.date,
     'ผู้ขาย': row.supplierName,
     'ประเภท': row.transactionMode,
-    'สถานะ': row.status,
+    'สถานะ': purchasePaymentWorkflowStatusLabel(row.paymentWorkflowStatus ?? row.status),
+    'PMA / PMT': row.paymentDocNos?.join(', ') || '-',
     'จำนวนรายการ': row.itemCount,
     'ยอดรวม': row.totalAmount,
     'ค้างจ่าย': row.payableBalance,
@@ -1781,10 +1840,10 @@ function buildWorkbook(rows: Array<{
   const workbook = XLSX.utils.book_new()
   const sheet = XLSX.utils.json_to_sheet(dataRows)
   sheet['!cols'] = [
-    { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 12 },
-    { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
+    { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 14 },
+    { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
   ]
-  applyWorksheetTableLayout(sheet, 11, dataRows.length + 1)
+  applyWorksheetTableLayout(sheet, 12, dataRows.length + 1)
   XLSX.utils.book_append_sheet(workbook, sheet, 'บิลรับซื้อ')
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer
 }
@@ -2060,7 +2119,7 @@ export async function PATCH(request: Request) {
           where: {
             source_id: stringifyBusinessValue(existingBillRef.id),
             source_type: 'purchase_bill',
-            status: { in: ['approved', 'paid'] },
+            status: { in: [...LOCKED_PURCHASE_PAYMENT_APPROVAL_STATUSES] },
           },
         }),
       ])
@@ -2070,6 +2129,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ code: 'BAD_REQUEST', error: 'บิลนี้ถูกยกเลิกแล้ว' }, { status: 400 })
       }
       const paidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
+      if (payments.length > 0) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกไม่ได้ เพราะบิลนี้มีรอบจ่ายเงิน PMT แล้ว' }, { status: 400 })
       if (paidAmount > 0) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกไม่ได้ เพราะบิลนี้มีการชำระเงินแล้ว' }, { status: 400 })
       if (activeApprovalCount > 0) {
         return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยกเลิกไม่ได้ เพราะบิลนี้ถูกอนุมัติโอนเงินแล้ว' }, { status: 400 })
@@ -2161,7 +2221,7 @@ export async function PATCH(request: Request) {
         where: {
           source_id: stringifyBusinessValue(existingBillRef.id),
           source_type: 'purchase_bill',
-          status: { in: ['approved', 'paid'] },
+          status: { in: [...LOCKED_PURCHASE_PAYMENT_APPROVAL_STATUSES] },
         },
       }),
       values.warehouseId ? findActiveWarehouseReferenceByCodeOrId(values.warehouseId) : Promise.resolve(null),
@@ -2172,6 +2232,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขไม่ได้ เพราะบิลนี้ถูกยกเลิกแล้ว' }, { status: 400 })
     }
     const activePaidAmount = payments.reduce((sum, payment) => sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount), 0)
+    if (payments.length > 0) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขไม่ได้ เพราะบิลนี้มีรอบจ่ายเงิน PMT แล้ว' }, { status: 400 })
+    }
     if (activeApprovalCount > 0) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'แก้ไขไม่ได้ เพราะบิลนี้ถูกอนุมัติโอนเงินแล้ว ต้องยกเลิกรายการรอจ่ายก่อน' }, { status: 400 })
     }

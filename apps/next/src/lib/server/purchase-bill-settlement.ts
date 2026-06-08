@@ -4,11 +4,12 @@ import {
   supplierAdvanceStatusActionForStatus,
   SUPPLIER_ADVANCE_STATUS_ACTION,
 } from '@/lib/server/advance-payment-history'
+import { deriveAdvancePaymentWorkflowStatus, summarizeAdvancePaymentApprovalStatus } from '@/lib/server/advance-payments'
 import { toNumber } from '@/lib/server/daily'
 
 type PurchaseBillSettlementTx = Pick<
   Prisma.TransactionClient,
-  'payments' | 'purchase_bills' | 'supplier_advance_allocations' | 'supplier_advance_payments' | 'supplier_advance_status_logs'
+  'payment_approvals' | 'payments' | 'purchase_bills' | 'supplier_advance_allocations' | 'supplier_advance_payments' | 'supplier_advance_status_logs'
 >
 
 function roundMoney(value: number) {
@@ -100,21 +101,15 @@ export async function refreshSupplierAdvancePaymentAllocation(
   if (allocatedAmount - totalAmount > 0.01) throw new Error('ยอดใช้หักบิลรวมเกินยอด ADV')
 
   const remainingAmount = Math.max(0, roundMoney(totalAmount - allocatedAmount))
-  const nextStatus = advancePayment.status === 'cancelled'
-    ? 'cancelled'
-    : advancePayment.status === 'pending_approval'
-      ? 'pending_approval'
-      : advancePayment.status === 'approved'
-        ? 'approved'
-        : advancePayment.status === 'refunding'
-          ? 'refunding'
-          : advancePayment.status === 'refunded'
-            ? 'refunded'
-            : allocatedAmount <= 0.01
-              ? 'paid'
-              : remainingAmount <= 0.01
-                ? 'allocated'
-                : 'partially_allocated'
+  const approvalSummary = await summarizeAdvancePaymentApprovalStatus(tx, advancePaymentId)
+  const nextStatus = deriveAdvancePaymentWorkflowStatus({
+    activeApprovalAmount: approvalSummary.activeApprovalAmount,
+    allocatedAmount,
+    allActiveApprovalsSettled: approvalSummary.allActiveApprovalsSettled,
+    amount: totalAmount,
+    currentStatus: advancePayment.status,
+    remainingAmount,
+  })
 
   await tx.supplier_advance_payments.update({
     data: {

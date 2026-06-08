@@ -1,8 +1,10 @@
 'use client'
 
 import { Download } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
 import { Button } from '@/components/ui/Button'
+import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, expenseFormSchema, formatMoney, todayDateInput, type DailyAccountOption, type ExpenseFormValues, type ExpenseLineFormValues } from '@/lib/daily'
 import { formatDateDisplay, formatDecimalDisplay, formatDecimalDraft, sanitizeDecimalInput } from '@/lib/format'
@@ -71,7 +73,7 @@ const emptyForm: ExpenseFormValues = {
   date: todayDateInput(),
   description: null,
   docNo: null,
-  dueDate: null,
+  dueDate: todayDateInput(),
   hasVat: false,
   hasWht: false,
   id: null,
@@ -192,6 +194,7 @@ function calculateExpenseTotals(lines: ExpenseLineDraft[], vatRatePercent: numbe
 }
 
 export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnly?: boolean }) {
+  const router = useRouter()
   const [accounts, setAccounts] = useState<DailyAccountOption[]>([])
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -290,7 +293,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
   const filteredFormCategoryOptions = useMemo(() => categories
     .filter((category) => category.active !== false)
-    .map((category) => ({ id: category.id, name: category.name })), [categories])
+    .map((category) => ({
+      description: category.typeName ?? undefined,
+      id: category.id,
+      label: category.name,
+      searchText: `${category.id} ${category.name} ${category.typeName ?? ''}`,
+    })), [categories])
 
   const formLines = useMemo(() => normalizeExpenseLines(form.lines, form), [form])
   const formTotals = useMemo(() => calculateExpenseTotals(formLines, vatRatePercent), [formLines, vatRatePercent])
@@ -407,7 +415,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   }
 
   function openCreateForm() {
-    setForm({ ...emptyForm, date: todayDateInput(), lines: [createExpenseLine()] })
+    const today = todayDateInput()
+    setForm({ ...emptyForm, date: today, dueDate: today, lines: [createExpenseLine()] })
     setFieldErrors({})
     setFormOpen(true)
   }
@@ -690,8 +699,11 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 <div className="space-y-4 bg-slate-50 p-4">
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลหลัก</div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <PayeeField error={fieldErrors.payee} options={payeeOptions} value={form.payee} onChange={(value) => setForm({ ...form, payee: value })} />
+                    <div className="grid gap-3 md:grid-cols-4">
+                      <div className="md:col-span-2">
+                        <PayeeField error={fieldErrors.payee} options={payeeOptions} value={form.payee} onChange={(value) => setForm({ ...form, payee: value })} />
+                      </div>
+                      <TextField error={fieldErrors.date} fieldName="date" label="วันที่จ่าย" required type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
                       <TextField error={fieldErrors.dueDate} fieldName="dueDate" label="ครบกำหนด" type="date" value={form.dueDate ?? ''} onChange={(value) => setForm({ ...form, dueDate: value })} />
                       {form.id ? (
                         <div data-field="status">
@@ -763,7 +775,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               <thead className="bg-slate-100">
                 <tr>
                   <th className="p-2 text-left">เลขที่</th>
-                  <th className="p-2 text-left">วันที่</th>
+                  <th className="p-2 text-left">วันที่จ่าย</th>
                   <th className="p-2 text-left">ครบกำหนด</th>
                   <th className="p-2 text-left">อ้างอิง</th>
                   <th className="p-2 text-left">ผู้รับ</th>
@@ -780,7 +792,11 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 {!isLoading && pagedRows.map((row) => {
                   const overdue = row.status !== 'paid' && row.status !== 'cancelled' && row.dueDate ? row.dueDate < todayDateInput() : false
                   return (
-                    <tr key={row.id} className={`hover:bg-slate-50 ${expenseRowTone(row.status)}`}>
+                    <tr
+                      key={row.id}
+                      className={`cursor-pointer hover:bg-slate-50 ${expenseRowTone(row.status)}`}
+                      onClick={() => router.push(`/daily/expense/${encodeURIComponent(row.docNo)}`)}
+                    >
                       <td className="p-2 font-mono text-xs">{row.docNo}</td>
                       <td className="p-2">{formatDateDisplay(row.date)}</td>
                       <td className="p-2 text-xs">{row.dueDate ? <span className={overdue ? 'font-bold text-red-600' : 'text-slate-700'}>{formatDateDisplay(row.dueDate)}{overdue ? <span className="block text-[10px] text-red-500">เลยกำหนด</span> : null}</span> : <span className="text-slate-300">-</span>}</td>
@@ -798,8 +814,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       <td className="p-2 text-center">
                         {canMutateExpense(row.status) ? (
                           <div className="flex items-center justify-center gap-2">
-                            <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>แก้ไข</button>
-                            <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50" type="button" onClick={() => void cancelExpense(row)}>ยกเลิก</button>
+                            <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
+                            <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50" type="button" onClick={(event) => { event.stopPropagation(); void cancelExpense(row) }}>ยกเลิก</button>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-300">-</span>
@@ -915,7 +931,7 @@ function PayeeField(props: { error?: string; onChange: (value: string) => void; 
         autoComplete="off"
         className={`h-9 w-full rounded-md border px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-100 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white text-slate-900'}`}
         list="expense-payee-options"
-        placeholder="ค้นหา Customer / Supplier / Sale / พนักงาน หรือกรอกเอง"
+        placeholder="ค้นหา Supplier หรือกรอกเอง"
         required
         type="search"
         value={props.value}
@@ -926,7 +942,7 @@ function PayeeField(props: { error?: string; onChange: (value: string) => void; 
           <option key={`${option.source}-${option.code}-${option.name}`} label={`${option.sourceLabel} · ${option.code}`} value={option.name} />
         ))}
       </datalist>
-      <span className="mt-1 block text-[11px] text-slate-500">เลือกจาก master data ได้ หรือพิมพ์ชื่อผู้รับเงินใหม่ได้โดยตรง</span>
+      <span className="mt-1 block text-[11px] text-slate-500">เลือกจาก Supplier master ได้ หรือพิมพ์ชื่อผู้รับเงินใหม่ได้โดยตรง</span>
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
   )
@@ -988,7 +1004,7 @@ function MoneyInputControl(props: { className?: string; error?: string; onChange
 }
 
 function ExpenseLineTable(props: {
-  categoryOptions: Array<{ id: string; name: string }>
+  categoryOptions: SearchComboboxOption[]
   errors: Record<string, string>
   lines: ExpenseLineDraft[]
   netAmount: number
@@ -1001,7 +1017,7 @@ function ExpenseLineTable(props: {
   vatRatePercent: number
   whtRatePercent: number
 }) {
-  const categoryPlaceholder = props.categoryOptions.length > 0 ? 'เลือกหมวดค่าใช้จ่าย' : 'ไม่มีหมวดในประเภทนี้'
+  const categoryPlaceholder = props.categoryOptions.length > 0 ? 'พิมพ์ค้นหาหมวดค่าใช้จ่าย...' : 'ไม่มีหมวดค่าใช้จ่าย'
 
   return (
     <div>
@@ -1039,15 +1055,18 @@ function ExpenseLineTable(props: {
               return (
                 <tr key={line.id} className="border-t">
                   <td className="p-1 align-top" data-field={`lines.${index}.categoryId`}>
-                    <select
-                      aria-invalid={Boolean(categoryError)}
-                      className={`h-8 w-full rounded-md border bg-white px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-blue-100 ${categoryError ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300'} ${line.categoryId ? 'text-slate-900' : 'text-slate-400'}`}
+                    <SearchCombobox
+                      error={categoryError}
+                      errorKey={`lines.${index}.categoryId`}
+                      hideLabel
+                      inputClassName="h-8 px-2 py-1 text-xs"
+                      inputId={`expense-line-category-${index}`}
+                      label="หมวดค่าใช้จ่าย"
+                      options={props.categoryOptions}
+                      placeholder={categoryPlaceholder}
                       value={line.categoryId ?? ''}
-                      onChange={(event) => props.onLineChange(index, { categoryId: event.target.value || null })}
-                    >
-                      <option value="">{categoryPlaceholder}</option>
-                      {props.categoryOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
-                    </select>
+                      onChange={(value) => props.onLineChange(index, { categoryId: value || null })}
+                    />
                     {categoryError ? <span className="mt-1 block text-xs text-red-700">{categoryError}</span> : null}
                   </td>
                   <td className="p-1 align-top" data-field={`lines.${index}.description`}>

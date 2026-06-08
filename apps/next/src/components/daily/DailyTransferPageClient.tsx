@@ -6,6 +6,7 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { dailyFetchJson, formatMoney, todayDateInput, transferFormSchema, type DailyAccountOption, type TransferFormValues } from '@/lib/daily'
+import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
 import { formatDateDisplay } from '@/lib/format'
 
 type TransferRow = TransferFormValues & {
@@ -20,6 +21,9 @@ type TransferPayload = {
   accounts: DailyAccountOption[]
   rows: TransferRow[]
 }
+type Period = '' | 'month' | 'today' | 'week'
+
+const pageSizeOptions = [10, 25, 50, 100]
 
 const emptyForm: TransferFormValues = {
   amount: 0,
@@ -41,11 +45,14 @@ export function DailyTransferPageClient() {
   const [formOpen, setFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [moneyDrafts, setMoneyDrafts] = useState<Record<string, string>>({})
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [rows, setRows] = useState<TransferRow[]>([])
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [period, setPeriod] = useState('')
+  const [period, setPeriod] = useState<Period>('')
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
 
@@ -79,8 +86,21 @@ export function DailyTransferPageClient() {
   }, [dateFrom, dateTo, fromAccountId, rows, search, toAccountId])
 
   const totalAmount = filteredRows.reduce((sum, row) => sum + row.amount, 0)
+  const totalRows = filteredRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const activeAccounts = useMemo(() => accounts.filter((account) => account.active), [accounts])
 
-  function applyPeriod(nextPeriod: '' | 'month' | 'today' | 'week') {
+  useEffect(() => {
+    setPage(1)
+  }, [dateFrom, dateTo, fromAccountId, pageSize, period, search, toAccountId])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  function applyPeriod(nextPeriod: Period) {
     setPeriod(nextPeriod)
     const today = todayDateInput()
     const start = new Date(`${today}T00:00:00.000Z`)
@@ -110,6 +130,8 @@ export function DailyTransferPageClient() {
   function openCreateForm() {
     setForm({ ...emptyForm, date: todayDateInput() })
     setFieldErrors({})
+    setMoneyDrafts({})
+    setError(null)
     setFormOpen(true)
   }
 
@@ -126,14 +148,46 @@ export function DailyTransferPageClient() {
       toAccountId: row.toAccountId,
     })
     setFieldErrors({})
+    setMoneyDrafts({})
+    setError(null)
     setFormOpen(true)
+  }
+
+  function updateForm<K extends keyof TransferFormValues>(key: K, value: TransferFormValues[K]) {
+    setForm((current) => ({ ...current, [key]: value }))
+    setFieldErrors((current) => ({ ...current, [key]: '' }))
+  }
+
+  function moneyInputValue(key: string, value: number) {
+    if (Object.prototype.hasOwnProperty.call(moneyDrafts, key)) return moneyDrafts[key]
+    return value ? formatMoney(value) : ''
+  }
+
+  function startMoneyInput(key: string, value: number) {
+    setMoneyDrafts((current) => ({ ...current, [key]: value ? String(value) : '' }))
+  }
+
+  function changeMoneyInput(key: string, rawValue: string, onValue: (value: number) => void) {
+    const nextValue = sanitizeMoneyInput(rawValue)
+    setMoneyDrafts((current) => ({ ...current, [key]: nextValue }))
+    onValue(parseMoneyInput(nextValue))
+  }
+
+  function finishMoneyInput(key: string) {
+    setMoneyDrafts((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
   }
 
   async function saveForm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const parsed = transferFormSchema.safeParse(form)
     if (!parsed.success) {
-      setFieldErrors(Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])))
+      setFieldErrors(issueMapFromZodIssues(parsed.error.issues))
+      setError(parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง')
+      focusFieldError(firstErrorKeyFromZodIssues(parsed.error.issues))
       return
     }
 
@@ -155,7 +209,7 @@ export function DailyTransferPageClient() {
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error && !formOpen ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
@@ -165,11 +219,11 @@ export function DailyTransferPageClient() {
           <DatePickerInput className="w-[130px]" value={dateTo} onChange={(value) => { setDateTo(value); setPeriod('') }} />
           <select className="h-9 rounded-md border border-slate-300 px-2 py-2 text-sm" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)}>
             <option value="">ทุกบัญชีต้นทาง</option>
-            {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
           <select className="h-9 rounded-md border border-slate-300 px-2 py-2 text-sm" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)}>
             <option value="">ทุกบัญชีปลายทาง</option>
-            {accounts.filter((account) => account.active).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
           {search || dateFrom || dateTo || fromAccountId || toAccountId ? <Button size="sm" type="button" variant="secondary" onClick={clearFilters}>ล้าง</Button> : null}
           <Button className="ml-auto" size="sm" type="button" onClick={openCreateForm}>+ โอนใหม่</Button>
@@ -180,29 +234,72 @@ export function DailyTransferPageClient() {
           <PeriodButton active={period === 'today'} label="วันนี้" tone="blue" onClick={() => applyPeriod('today')} />
           <PeriodButton active={period === 'week'} label="7 วัน" tone="emerald" onClick={() => applyPeriod('week')} />
           <PeriodButton active={period === 'month'} label="เดือนนี้" tone="amber" onClick={() => applyPeriod('month')} />
-          <span className="ml-auto text-xs text-slate-500">พบ <b className="text-slate-700">{filteredRows.length}</b> รายการ · รวม <b className="text-blue-700">{formatMoney(totalAmount)}</b></span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+          <span className="ml-2 text-slate-500">· รวม <span className="font-semibold text-blue-700">{formatMoney(totalAmount)}</span></span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <Button className="font-normal" disabled={currentPage <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</Button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <Button className="font-normal" disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</Button>
         </div>
       </div>
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form noValidate className="w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
-            <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
-              <h3 className="font-bold">{form.id ? 'แก้ไขรายการโอนเงิน' : 'โอนเงินระหว่างบัญชี'}</h3>
-              <button className="text-2xl text-slate-400" type="button" onClick={() => setFormOpen(false)}>&times;</button>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4">
+          <form noValidate className="mx-auto my-4 w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+              <h3 className="font-bold text-slate-900">{form.id ? 'แก้ไขรายการโอนเงิน' : 'โอนเงินระหว่างบัญชี'}</h3>
+              <button className="text-3xl leading-none text-slate-400 hover:text-slate-700" type="button" onClick={() => setFormOpen(false)}>&times;</button>
             </div>
-            <div className="grid gap-4 p-5 md:grid-cols-2">
-              <TextField label="เลขที่" readOnly value={form.docNo ?? 'ระบบจะออกเลขให้'} />
-              <TextField error={fieldErrors.date} label="วันที่" required type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
-              <SelectField error={fieldErrors.fromAccountId} label="จากบัญชี" required value={form.fromAccountId} onChange={(value) => setForm({ ...form, fromAccountId: value })} options={accounts.filter((account) => account.active)} />
-              <SelectField error={fieldErrors.toAccountId} label="เข้าบัญชี" required value={form.toAccountId} onChange={(value) => setForm({ ...form, toAccountId: value })} options={accounts.filter((account) => account.active)} />
-              <TextField error={fieldErrors.amount} label="จำนวน" required type="number" value={String(form.amount)} onChange={(value) => setForm({ ...form, amount: Number(value) })} />
-              <TextField error={fieldErrors.fee} label="ค่าธรรมเนียม" type="number" value={String(form.fee)} onChange={(value) => setForm({ ...form, fee: Number(value) })} />
-              <TextField error={fieldErrors.byPerson} label="ผู้ทำรายการ" value={form.byPerson ?? ''} onChange={(value) => setForm({ ...form, byPerson: value })} />
-              <TextField error={fieldErrors.notes} label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+            {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div> : null}
+            <div className="grid gap-3 p-5 md:grid-cols-2">
+              <SelectField error={fieldErrors.fromAccountId} label="บัญชีต้นทาง" required value={form.fromAccountId} onChange={(value) => updateForm('fromAccountId', value)} options={activeAccounts} />
+              <SelectField error={fieldErrors.toAccountId} label="บัญชีปลายทาง" required value={form.toAccountId} onChange={(value) => updateForm('toAccountId', value)} options={activeAccounts} />
+              <MoneyField
+                error={fieldErrors.amount}
+                inputKey="amount"
+                label="จำนวนเงิน"
+                required
+                value={form.amount}
+                valueText={moneyInputValue('amount', form.amount)}
+                onChange={(value) => updateForm('amount', value)}
+                onChangeMoneyInput={changeMoneyInput}
+                onFinishMoneyInput={finishMoneyInput}
+                onStartMoneyInput={startMoneyInput}
+              />
+              <MoneyField
+                error={fieldErrors.fee}
+                inputKey="fee"
+                label="ค่าธรรมเนียม"
+                value={form.fee}
+                valueText={moneyInputValue('fee', form.fee)}
+                onChange={(value) => updateForm('fee', value)}
+                onChangeMoneyInput={changeMoneyInput}
+                onFinishMoneyInput={finishMoneyInput}
+                onStartMoneyInput={startMoneyInput}
+              />
+              <TextAreaField className="md:col-span-2" error={fieldErrors.notes} label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => updateForm('notes', value)} />
+            </div>
+            <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:grid-cols-3">
+              <SummaryBox label="ยอดโอน" value={formatMoney(form.amount)} />
+              <SummaryBox label="ค่าธรรมเนียม" value={formatMoney(form.fee)} />
+              <SummaryBox label="ยอดออกจากบัญชีต้นทาง" value={formatMoney(form.amount + form.fee)} />
             </div>
             <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-4">
-              <Button size="sm" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+              <Button className="font-normal" size="sm" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
               <Button disabled={isSaving} size="sm" type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
             </div>
           </form>
@@ -218,13 +315,13 @@ export function DailyTransferPageClient() {
             <TableHead>เข้า</TableHead>
             <TableHead className="text-right">จำนวน</TableHead>
             <TableHead className="text-right">ค่าธรรมเนียม</TableHead>
-            <TableHead>ผู้ทำ</TableHead>
+            <TableHead>ผู้ทำรายการ</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </tr>
         </TableHeader>
         <TableBody>
           {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={8}>กำลังโหลดข้อมูล</td></tr> : null}
-          {!isLoading && filteredRows.map((row) => (
+          {!isLoading && pagedRows.map((row) => (
             <TableRow key={row.id} className="hover:bg-slate-50">
               <TableCell className="font-mono text-xs">{row.docNo}</TableCell>
               <TableCell className="whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
@@ -239,7 +336,7 @@ export function DailyTransferPageClient() {
               </TableCell>
             </TableRow>
           ))}
-          {!isLoading && filteredRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={8}>ยังไม่มีรายการ</td></tr> : null}
+          {!isLoading && pagedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={8}>ยังไม่มีรายการ</td></tr> : null}
         </TableBody>
       </Table>
     </section>
@@ -256,25 +353,83 @@ function PeriodButton(props: { active: boolean; label: string; onClick: () => vo
   return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${props.active ? activeClass : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`} type="button" onClick={props.onClick}>{props.label}</button>
 }
 
-function TextField(props: { error?: string; label: string; onChange?: (value: string) => void; readOnly?: boolean; required?: boolean; type?: string; value: string }) {
+function sanitizeMoneyInput(value: string) {
+  const normalized = value.replace(/,/g, '').replace(/[^\d.]/g, '')
+  const [whole = '', ...decimalParts] = normalized.split('.')
+  if (decimalParts.length === 0) return whole
+  return `${whole}.${decimalParts.join('').slice(0, 2)}`
+}
+
+function parseMoneyInput(value: string) {
+  const parsed = Number(sanitizeMoneyInput(value))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function SummaryBox(props: { label: string; value: string }) {
   return (
-    <label className="block text-xs font-medium text-slate-600">
+    <div className="rounded-md border border-slate-200 bg-white p-3">
+      <div className="text-xs text-slate-500">{props.label}</div>
+      <div className="mt-1 text-lg font-bold text-slate-900">{props.value}</div>
+    </div>
+  )
+}
+
+function MoneyField(props: {
+  error?: string
+  inputKey: string
+  label: string
+  onChange: (value: number) => void
+  onChangeMoneyInput: (key: string, rawValue: string, onValue: (value: number) => void) => void
+  onFinishMoneyInput: (key: string) => void
+  onStartMoneyInput: (key: string, value: number) => void
+  required?: boolean
+  value: number
+  valueText: string
+}) {
+  return (
+    <label className="block text-xs font-medium text-slate-600" data-error-key={props.inputKey}>
       {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
-      {props.type === 'date'
-        ? <DatePickerInput className="mt-1.5 w-full" readOnly={props.readOnly} required={props.required} value={props.value} onChange={(value) => props.onChange?.(value)} />
-        : <Input className={`mt-1.5 h-9 ${props.error ? 'border-red-400 bg-red-50' : ''} ${props.readOnly ? 'bg-slate-50' : ''}`} readOnly={props.readOnly} type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange?.(event.target.value)} />}
+      <Input
+        className={`mt-1.5 h-9 text-right tabular-nums ${props.error ? 'border-red-400 bg-red-50' : ''}`}
+        inputMode="decimal"
+        type="text"
+        value={props.valueText}
+        onBlur={() => props.onFinishMoneyInput(props.inputKey)}
+        onChange={(event) => props.onChangeMoneyInput(props.inputKey, event.target.value, props.onChange)}
+        onFocus={() => props.onStartMoneyInput(props.inputKey, props.value)}
+      />
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
   )
 }
 
-function SelectField(props: { error?: string; label: string; onChange: (value: string) => void; options: DailyAccountOption[]; required?: boolean; value: string }) {
+function TextAreaField(props: { className?: string; error?: string; label: string; onChange?: (value: string) => void; required?: boolean; value: string }) {
   return (
-    <label className="block text-xs font-medium text-slate-600">
+    <label className={`block text-xs font-medium text-slate-600 ${props.className ?? ''}`} data-error-key="notes">
+      {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
+      <textarea
+        className={`mt-1.5 min-h-20 w-full rounded-md border px-3 py-2 text-sm outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+        rows={3}
+        value={props.value}
+        onChange={(event) => props.onChange?.(event.target.value)}
+      />
+      {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
+    </label>
+  )
+}
+
+function accountOptionLabel(account: DailyAccountOption) {
+  return `${account.name} (คงเหลือ ${formatMoney(account.balance ?? 0)})`
+}
+
+function SelectField(props: { error?: string; label: string; onChange: (value: string) => void; options: DailyAccountOption[]; required?: boolean; value: string }) {
+  const errorKey = props.label === 'บัญชีต้นทาง' ? 'fromAccountId' : 'toAccountId'
+  return (
+    <label className="block text-xs font-medium text-slate-600" data-error-key={errorKey}>
       {props.label}{props.required ? <span className="text-red-600"> *</span> : null}
       <select className={`mt-1.5 h-9 w-full rounded-md border px-3 py-2 text-sm outline-none ${props.error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`} value={props.value} onChange={(event) => props.onChange(event.target.value)}>
-        <option value="">ไม่ระบุ</option>
-        {props.options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+        <option value="">เลือก{props.label}</option>
+        {props.options.map((option) => <option key={option.id} value={option.id}>{accountOptionLabel(option)}</option>)}
       </select>
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>

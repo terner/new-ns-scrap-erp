@@ -591,13 +591,16 @@ Tracker หลักสำหรับงานที่เหลือทั้
   - [x] เพิ่ม Mermaid flow และแยก status matrix ไว้ที่ `docs/notes/Purchase Flow Status Matrix.md` ตั้งแต่ PO/WTI/PB/ADV -> PMA -> PMT รวมถึง void PMA และ cancel PMT
   - [x] แยก ownership เอกสารให้ชัด: `Purchase Flow.md` จบที่ `PB/payable handoff`, ส่วน approval/PMA/PMT/void/cancel/payment history รับช่วงใน `Payment Flow.md`; matrix เป็น acceptance bridge ข้าม flow เท่านั้น
   - [x] normalize legacy `payment_approvals.source_id` data (`PB-...` / `ADV-...`) ให้กลับมาอ้าง internal bigint id string ตาม flow มาตรฐาน ไม่เพิ่ม compatibility code ใน runtime
-  - [ ] ถอย runtime/schema/data จาก `PMA pending` เป็น source-derived pending queue
-  - [ ] ปรับ `/daily/payment-approval` แท็บ `ยังไม่อนุมัติ` ให้อ่าน `PB/ADV/EXP` และคำนวณ remaining approval balance จาก source minus active/consumed PMA
-  - [ ] ปรับ approve action ให้สร้าง `PMA approved` ใหม่ตาม split amount ที่อนุมัติจริง
-  - [ ] ปรับ `/daily/payment-approval` แท็บ `อนุมัติแล้ว` ให้ใช้ `PMA.doc_no` เป็นเลขหลัก และแสดง `PB/ADV/EXP` เป็นเอกสารอ้างอิง
-  - [ ] ปรับ `/purchase/payments` ให้อ่านเฉพาะ `PMA approved`, รวมหลาย PMA ของ supplier เดียวกันได้, และบังคับ PMT full-pay ทุก PMA ที่เลือก
-  - [ ] เพิ่ม action void PMA ที่ approved แล้วแต่ยังไม่ออก PMT โดยให้ยอดกลับไป source pending candidate และเก็บ PMA เดิมเป็น audit/history
-  - [ ] ปรับ cancel PMT ให้ reverse bank/payment allocation, ปิด PMA cycle เดิม, และส่งยอดกลับ source pending candidate เพื่อ approve ใหม่
+  - [x] ถอย runtime/schema/data จาก `PMA pending` เป็น source-derived pending queue
+  - [x] ปรับ `/daily/payment-approval` แท็บ `ยังไม่อนุมัติ` ให้อ่าน `PB/ADV/EXP` และคำนวณ remaining approval balance จาก source minus active/consumed PMA
+  - [x] ปรับ approve action ให้สร้าง `PMA approved` ใหม่ตาม split amount ที่อนุมัติจริง
+  - [x] ปรับ `/daily/payment-approval` แท็บ `อนุมัติแล้ว` ให้ใช้ `PMA.doc_no` เป็นเลขหลัก และแสดง `PB/ADV/EXP` เป็นเอกสารอ้างอิง
+  - [x] ปรับ `/purchase/payments` ให้อ่านเฉพาะ `PMA approved`, รวมหลาย PMA ของผู้รับเงินเดียวกันได้, และบังคับ PMT full-pay ทุก PMA ที่เลือก
+  - [x] sync `/purchase/payments` PMT modal UI/flow 2026-06-08: ไม่แสดง manual `วิธีจ่าย`, derive `PMT.method` จาก selected PMA `destination_payment_method_snapshot`, restrict PMA selection to same recipient/payment method, and show `ช่องทางรับเงิน` / `บัญชีรับเงิน` next to source document before the numeric payment row
+  - [x] สร้าง task/แก้ runtime gap 2026-06-08: `EXP` PMA approved ต้องเข้า `/purchase/payments`, ทำ PMT ได้โดย WHT เป็น 0 ตามยอด PMA, แสดงผู้รับเงินใน `/purchase/payment-history`, และ cancel PMT ต้อง recalc `expenses.status / paid_status / paid_at` กลับตาม active PMA/PMT
+  - [x] เพิ่ม action void PMA ที่ approved แล้วแต่ยังไม่ออก PMT โดยให้ยอดกลับไป source pending candidate, เก็บ PMA เดิมเป็น audit/history, และแสดง snapshot `ยกเลิกแล้ว` ใน `/daily/payment-approval`
+  - [x] ปรับ cancel PMT ให้ reverse bank/payment allocation, ปิด PMA cycle เดิม, และส่งยอดกลับ source pending candidate เพื่อ approve ใหม่
+  - [x] ปรับ ADV status/filter 2026-06-08: เพิ่ม `อนุมัติแล้วบางส่วน` จาก active PMA partial totals, ถอด `รอคืนเงิน` / `คืนเงินแล้ว` ออกจาก runtime/filter/constraint, และให้ void PMA / cancel PMT recalc ADV จาก active PMA/PMT/allocation facts แทนการเซ็ตสถานะค้าง
   - [ ] บังคับ source financial lock หลังมี `PMA approved` หรือ `PMT active` ให้ครบทุก write path ของ `ADV`, `PB`, `EXP`
 
 ## 2026-06-05 Identifier Contract Checkpoint

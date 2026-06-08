@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { PageTitleOverride } from '@/components/layout/PageTitleOverride'
+import { advancePaymentStatusLabel } from '@/lib/server/advance-payments'
 import { AuthContextError, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
@@ -19,16 +20,8 @@ function money(value: number | null | undefined) {
 }
 
 function labelStatus(status: string | null | undefined) {
-  const normalized = String(status ?? '').toLowerCase()
-  if (normalized === 'pending_approval') return 'ยังไม่อนุมัติ'
-  if (normalized === 'approved') return 'รอจ่าย'
-  if (normalized === 'paid') return 'เสร็จสิ้น'
-  if (normalized === 'partially_allocated') return 'ใช้หักบางส่วน'
-  if (normalized === 'allocated') return 'ใช้หักครบ'
-  if (normalized === 'refunding') return 'รอคืนเงิน'
-  if (normalized === 'refunded') return 'คืนเงินแล้ว'
-  if (normalized === 'cancelled') return 'ยกเลิก'
-  return status ?? '-'
+  const normalized = String(status ?? '').trim()
+  return normalized ? advancePaymentStatusLabel(normalized) : '-'
 }
 
 function dateOrDash(value: Date | null | undefined) {
@@ -128,8 +121,6 @@ export default async function AdvancePaymentDetailPage({ params }: PageProps) {
         <DetailCard label="วันที่เอกสาร" value={dateOrDash(row.advance_date)} />
         <DetailCard label="สาขา" value={row.branches?.name ?? '-'} />
         <DetailCard label="ผู้ขาย" value={row.suppliers?.name ?? '-'} />
-        <DetailCard label="วิธีจ่าย" value={text(row.payment_method)} />
-        <DetailCard label="บัญชีที่จ่าย" value={row.accounts?.name ?? '-'} />
         <DetailCard label="เลขเอกสารชั่งใหญ่" value={text(row.large_scale_doc_no)} />
         <DetailCard label="ทะเบียนรถ" value={text(row.plate_no)} />
         <DetailCard label="สินค้า" value={text(row.product_name)} />

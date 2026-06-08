@@ -2472,7 +2472,7 @@ model supplier_advance_payments {
   amount                           Decimal                            @default(0) @db.Decimal
   allocated_amount                 Decimal                            @default(0) @db.Decimal
   remaining_amount                 Decimal                            @default(0) @db.Decimal
-  payment_method                   String
+  payment_method                   String?
   status                           String                             @default("pending_approval")
   large_scale_doc_no               String?
   in_date                          DateTime?                          @db.Date

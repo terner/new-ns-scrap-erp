@@ -34,6 +34,7 @@ created: 2026-05-16
 - [[Document Timeline Policy]] - กฎกลางว่าเอกสารธุรกิจที่มีเลขเอกสารต้องมี timeline/history แบบ append-only แยกจาก current-state table
 - [[Document History Table Design]] - target schema design สำหรับแยก history/status/usage table ตามเอกสารหรือ business flow แทนการรวมทุก event เข้า generic table เดียว
 - [[Sales Flow]] - flow ขายแบบละเอียด: PO Sell, Pending Sale/PSALE, ใบส่งของ/WTO, บิลขาย Trading จากหลายบิลซื้อพร้อม stock line, Sales Bill, Receipt, เลขเอกสาร, สถานะ, stock/AR effect
+- [[Daily Cash Flow]] - flow เงินสด/ธนาคารรายวัน โดยเริ่มจาก `/daily/transfer`: field ที่ระบบจัดการเอง, validation, และ paired bank statement side effect
 
 ## Migration Entry Points
 

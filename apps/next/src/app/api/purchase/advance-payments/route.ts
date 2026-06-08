@@ -116,10 +116,8 @@ function buildWorkbook(rows: ReturnType<typeof rowJson>[]) {
     น้ำหนักสุทธิ: row.netWeight,
     ราคา_ต่อ_กก: row.pricePerKg,
     ยอดมัดจำ: row.amount,
-    ใช้แล้ว: row.allocatedAmount,
+    นำไปหักแล้ว: row.allocatedAmount,
     คงเหลือ: row.remainingAmount,
-    วิธีจ่าย: row.paymentMethod,
-    บัญชีจ่าย: row.accountName,
     สถานะ: row.statusLabel,
   }))
   const workbook = XLSX.utils.book_new()
@@ -321,12 +319,11 @@ export async function GET(request: Request) {
         statuses: [
           { label: 'ทั้งหมด', value: 'all' },
           { label: 'ยังไม่อนุมัติ', value: 'pending_approval' },
+          { label: 'อนุมัติแล้วบางส่วน', value: 'partially_approved' },
           { label: 'อนุมัติแล้ว', value: 'approved' },
           { label: 'เสร็จสิ้น', value: 'paid' },
           { label: 'ใช้หักบิลบางส่วน', value: 'partially_allocated' },
           { label: 'ใช้หักบิลแล้ว', value: 'allocated' },
-          { label: 'รอคืนเงิน', value: 'refunding' },
-          { label: 'คืนเงินแล้ว', value: 'refunded' },
           { label: 'ยกเลิก', value: 'cancelled' },
         ],
       },

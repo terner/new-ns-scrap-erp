@@ -19,10 +19,12 @@ type ApprovalDestinationOption = {
   paymentMethod: string
 }
 
+type ApprovalStatus = 'approved' | 'pending' | 'voided'
+
 type ApprovalApRow = {
   approvalDisplayDocNo: string | null
   approvalId: string | null
-  approvalStatus: 'approved' | 'pending'
+  approvalStatus: ApprovalStatus
   approvedAmount: number
   bankAccount: string
   bankAccounts: ApprovalDestinationOption[]
@@ -38,6 +40,8 @@ type ApprovalApRow = {
   sourceType: 'advance_payment' | 'purchase_bill'
   supplierName: string
   totalAmount: number
+  voidReason?: string | null
+  voidedAt?: string | null
 }
 
 type ApprovalExpenseRow = {
@@ -45,7 +49,7 @@ type ApprovalExpenseRow = {
   accountName: string
   approvalDisplayDocNo: string | null
   approvalId: string | null
-  approvalStatus: 'approved' | 'pending'
+  approvalStatus: ApprovalStatus
   approvedAmount: number
   date: string
   destinationLabel: string
@@ -58,6 +62,8 @@ type ApprovalExpenseRow = {
   sourceDocNo: string
   sourceType: 'expense'
   totalAmount: number
+  voidReason?: string | null
+  voidedAt?: string | null
 }
 
 type ApprovalPayload = {
@@ -66,7 +72,7 @@ type ApprovalPayload = {
 }
 
 type ApprovalTab = 'advance' | 'ap' | 'expense'
-type ApprovalFilter = 'all' | 'pending' | 'approved'
+type ApprovalFilter = 'all' | 'pending' | 'approved' | 'voided'
 type ApprovalSortDirection = 'asc' | 'desc'
 type ApprovalSortKey = 'bankAccount' | 'date' | 'docNo' | 'dueDate' | 'paidAmount' | 'partyName' | 'payableBalance' | 'totalAmount'
 type ApprovalDetailState =
@@ -83,6 +89,7 @@ const approvalFilterOptions: Array<{ label: string; value: ApprovalFilter }> = [
   { label: 'ทั้งหมด', value: 'all' },
   { label: 'ยังไม่อนุมัติ', value: 'pending' },
   { label: 'อนุมัติแล้ว', value: 'approved' },
+  { label: 'ยกเลิกแล้ว', value: 'voided' },
 ]
 
 function formatDecimalWithGrouping(value: number) {
@@ -111,17 +118,26 @@ function expenseDestinationSummaryLabel(row: ApprovalExpenseRow) {
 
 function approvalStatusLabel(status: ApprovalApRow['approvalStatus']) {
   if (status === 'approved') return 'อนุมัติแล้ว'
+  if (status === 'voided') return 'ยกเลิกแล้ว'
   return 'ยังไม่อนุมัติ'
 }
 
 function approvalStatusTone(status: ApprovalApRow['approvalStatus']) {
   if (status === 'approved') return 'text-emerald-700'
+  if (status === 'voided') return 'text-red-700'
   return 'text-slate-500'
 }
 
 function approvalStatusDot(status: ApprovalApRow['approvalStatus']) {
   if (status === 'approved') return 'bg-emerald-500'
+  if (status === 'voided') return 'bg-red-500'
   return 'bg-slate-300'
+}
+
+function approvalRowKindLabel(status: ApprovalStatus) {
+  if (status === 'pending') return 'source รออนุมัติ'
+  if (status === 'voided') return 'PMA ยกเลิกแล้ว'
+  return 'PMA approved'
 }
 
 function newSplitDraft(optionId: string, amount: number): SplitDraft {
@@ -267,6 +283,7 @@ export function PaymentApprovalPageClient() {
       if (dateTo && rowDate > dateTo) return false
       if (approvalFilter === 'approved' && row.approvalStatus !== 'approved') return false
       if (approvalFilter === 'pending' && row.approvalStatus !== 'pending') return false
+      if (approvalFilter === 'voided' && row.approvalStatus !== 'voided') return false
       return true
     })
   }, [advanceApprovalRows, approvalFilter, data.expenseRows, dateFrom, dateTo, purchaseApprovalRows, search, tab])
@@ -300,8 +317,9 @@ export function PaymentApprovalPageClient() {
       totals.totalRemain += totalRemain
       if (row.approvalStatus === 'pending') totals.pendingCount += 1
       if (row.approvalStatus === 'approved') totals.approvedCount += 1
+      if (row.approvalStatus === 'voided') totals.voidedCount += 1
       return totals
-    }, { approvedCount: 0, pendingCount: 0, totalFull: 0, totalPaid: 0, totalRemain: 0 })
+    }, { approvedCount: 0, pendingCount: 0, totalFull: 0, totalPaid: 0, totalRemain: 0, voidedCount: 0 })
   }, [filteredRows])
 
   const splitTotal = splitDrafts.reduce((sum, split) => sum + split.amount, 0)
@@ -518,7 +536,7 @@ export function PaymentApprovalPageClient() {
         <div className="rounded-md bg-blue-50 p-2"><div className="text-xs text-blue-600">ยอดเต็ม</div><div className="font-bold text-blue-700">{formatMoney(summary.totalFull)}</div></div>
         <div className="rounded-md bg-emerald-50 p-2"><div className="text-xs text-emerald-600">ชำระแล้ว</div><div className="font-bold text-emerald-700">{formatMoney(summary.totalPaid)}</div></div>
         <div className="rounded-md bg-red-50 p-2"><div className="text-xs text-red-600">คงเหลือ</div><div className="font-bold text-red-700">{formatMoney(summary.totalRemain)}</div></div>
-        <div className="rounded-md bg-amber-50 p-2"><div className="text-xs text-amber-600">อนุมัติแล้ว / รออนุมัติ</div><div className="font-bold text-amber-700">{summary.approvedCount} / {summary.pendingCount}</div></div>
+        <div className="rounded-md bg-amber-50 p-2"><div className="text-xs text-amber-600">อนุมัติ / รอ / ยกเลิก</div><div className="font-bold text-amber-700">{summary.approvedCount} / {summary.pendingCount} / {summary.voidedCount}</div></div>
       </div>
 
       <div className="overflow-hidden rounded-md bg-white shadow">
@@ -595,7 +613,7 @@ export function PaymentApprovalPageClient() {
                   <TableRow key={row.id} className="cursor-pointer border-0 hover:bg-slate-50" onClick={() => openDetail({ row, tab: 'ap' })}>
                     <TableCell className="text-xs">
                       <div className="font-medium whitespace-nowrap">{row.docNo}</div>
-                      <div className="text-[11px] text-slate-500">{row.approvalStatus === 'pending' ? 'source รออนุมัติ' : 'PMA approved'}</div>
+                      <div className="text-[11px] text-slate-500">{approvalRowKindLabel(row.approvalStatus)}</div>
                     </TableCell>
                     <TableCell className="text-xs">
                       <div className="font-medium whitespace-nowrap">{row.sourceDocNo}</div>
@@ -649,7 +667,7 @@ export function PaymentApprovalPageClient() {
                     <TableRow key={row.id} className="cursor-pointer border-0 hover:bg-slate-50" onClick={() => openDetail({ row, tab: 'expense' })}>
                       <TableCell className="text-xs">
                         <div className="font-medium whitespace-nowrap">{row.docNo}</div>
-                        <div className="text-slate-500">{row.approvalStatus === 'pending' ? 'source รออนุมัติ' : 'PMA approved'}</div>
+                        <div className="text-slate-500">{approvalRowKindLabel(row.approvalStatus)}</div>
                       </TableCell>
                       <TableCell className="text-xs">
                         <div className="font-medium whitespace-nowrap">{row.sourceDocNo}</div>
@@ -700,6 +718,8 @@ export function PaymentApprovalPageClient() {
                   <DetailItem label="ช่องทางจ่าย / ปลายทาง" value={detail.row.destinationLabel || '-'} />
                   <DetailItem label="ยอดอนุมัติ" value={formatMoney(detail.row.approvedAmount)} />
                   <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
+                  {detail.row.voidedAt ? <DetailItem label="วันที่ยกเลิก" value={formatDateDisplay(detail.row.voidedAt)} /> : null}
+                  {detail.row.voidReason ? <DetailItem label="เหตุผลยกเลิก" value={detail.row.voidReason} /> : null}
                 </div>
               )}
             </div>
@@ -716,7 +736,14 @@ export function PaymentApprovalPageClient() {
                 <DetailItem label="ยอดเต็ม" value={formatMoney(detail.row.totalAmount)} />
                 <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
               </div>
-              {detail.row.approvalStatus === 'pending' ? renderSplitApprovalSection(detail.row) : null}
+              {detail.row.approvalStatus === 'pending' ? renderSplitApprovalSection(detail.row) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <DetailItem label="เลขที่อนุมัติ" value={detail.row.approvalDisplayDocNo ?? detail.row.docNo} />
+                  <DetailItem label="ยอดอนุมัติ" value={formatMoney(detail.row.approvedAmount)} />
+                  {detail.row.voidedAt ? <DetailItem label="วันที่ยกเลิก" value={formatDateDisplay(detail.row.voidedAt)} /> : null}
+                  {detail.row.voidReason ? <DetailItem label="เหตุผลยกเลิก" value={detail.row.voidReason} /> : null}
+                </div>
+              )}
             </div>
           ) : null}
 

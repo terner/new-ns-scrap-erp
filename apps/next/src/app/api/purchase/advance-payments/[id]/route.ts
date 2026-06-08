@@ -94,8 +94,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const [branch, fundingAccount, paymentMethod, product, supplier] = await Promise.all([
       findActiveBranchReferenceByCodeOrId(values.branchId),
-      findActiveAccountReferenceByCode(values.fundingAccountId),
-      prisma.payment_methods.findFirst({ select: { id: true, name: true, type: true }, where: { active: true, name: values.paymentMethod } }),
+      values.fundingAccountId ? findActiveAccountReferenceByCode(values.fundingAccountId) : Promise.resolve(null),
+      values.paymentMethod
+        ? prisma.payment_methods.findFirst({ select: { id: true, name: true, type: true }, where: { active: true, name: values.paymentMethod } })
+        : Promise.resolve(null),
       values.productName
         ? prisma.products.findFirst({ select: { id: true, name: true }, where: { active: true, name: values.productName } })
         : Promise.resolve(null),
@@ -108,13 +110,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!supplier) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'ผู้ขายไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { supplierId: ['เลือกผู้ขาย'] } }, { status: 400 })
     }
-    if (!paymentMethod) {
+    if (values.paymentMethod && !paymentMethod) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'วิธีจ่ายไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { paymentMethod: ['เลือกวิธีจ่าย'] } }, { status: 400 })
     }
-    if (!fundingAccount) {
+    if (values.fundingAccountId && !fundingAccount) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'บัญชีที่จ่ายไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { fundingAccountId: ['เลือกบัญชีที่จ่าย'] } }, { status: 400 })
     }
-    if (String(fundingAccount.type ?? '').trim().toLowerCase() !== String(paymentMethod.type ?? '').trim().toLowerCase()) {
+    if (fundingAccount && paymentMethod && String(fundingAccount.type ?? '').trim().toLowerCase() !== String(paymentMethod.type ?? '').trim().toLowerCase()) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'บัญชีที่จ่ายไม่รองรับวิธีจ่ายที่เลือก', fieldErrors: { fundingAccountId: ['เลือกบัญชีที่รองรับวิธีจ่ายนี้'] } }, { status: 400 })
     }
     if (values.productName && !product) {
@@ -130,7 +132,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           branch_id: branch.id,
           customer_name: values.customerName,
           driver_name: values.driverName,
-          funding_account_id: fundingAccount.id,
+          funding_account_id: fundingAccount?.id ?? null,
           in_date: values.inDate ? parseBangkokDateTimeInput(values.inDate) : null,
           large_scale_doc_no: values.largeScaleDocNo,
           net_weight: values.netWeight,

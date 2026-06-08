@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { paymentMethodGroupFromValue, type PaymentMethodGroup } from '@/lib/account-payment-method'
 import { BillSelect, Field, SelectField, SummaryPill } from '@/components/daily/MoneyMovementFieldHelpers'
 import { PaymentLinesSection, PaymentSplitsSection } from '@/components/daily/MoneyMovementFormSections'
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input as UiInput } from '@/components/ui/Input'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { customerReceiptFormSchema, dailyFetchJson, formatMoney, supplierPaymentFormSchema, todayDateInput, type CustomerReceiptFormValues, type DailyAccountOption, type SupplierPaymentFormValues } from '@/lib/daily'
 import { formatAccountNoDisplay, formatDateDisplay } from '@/lib/format'
 
@@ -35,6 +36,7 @@ type Bill = {
   payableBalance?: number
   receivableBalance?: number
   sourceDocNo?: string
+  sourceType?: 'advance_payment' | 'expense' | 'purchase_bill'
   status?: string
   supplierId?: string | null
   totalAmount: number
@@ -79,6 +81,7 @@ type PaymentLine = NonNullable<SupplierPaymentFormValues['lines']>[number] & { b
 type PaymentSplit = SupplierPaymentFormValues['splits'][number]
 type HistorySortField = 'accountName' | 'amount' | 'date' | 'docNo' | 'netAmount' | 'partyName'
 type PaymentHistoryStatusFilter = 'active' | 'all' | 'cancelled'
+type ReceiptTab = 'entry' | 'history'
 const pageSizeOptions = [10, 25, 50, 100]
 
 function newPaymentLine(): PaymentLine {
@@ -173,6 +176,14 @@ function paymentBillLabel(bill: Bill, partyName: string) {
   return `${bill.docNo}${sourceLabel} | ${partyName} | ค้าง ${formatMoney(bill.payableBalance ?? 0)}`
 }
 
+function isExpensePaymentBill(bill: Bill | null | undefined) {
+  return bill?.sourceType === 'expense'
+}
+
+function normalizedPaymentMethod(value: string | null | undefined) {
+  return String(value ?? '').trim()
+}
+
 const paymentTheme = {
   action: 'bg-rose-600 hover:bg-rose-700',
   banner: 'from-rose-600 via-red-600 to-orange-500',
@@ -222,6 +233,7 @@ export function MoneyMovementPageClient({
   const [formOpen, setFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const isSavingRef = useRef(false)
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -229,12 +241,13 @@ export function MoneyMovementPageClient({
   const [billSearch, setBillSearch] = useState('')
   const [billPage, setBillPage] = useState(1)
   const [billPageSize, setBillPageSize] = useState(25)
-  const [billSort, setBillSort] = useState<'age_desc' | 'balance_desc' | 'date_desc' | 'date_asc' | 'doc_desc' | 'supplier_asc'>('age_desc')
+  const [billSort, setBillSort] = useState<'age_desc' | 'balance_desc' | 'date_desc' | 'date_asc' | 'doc_desc' | 'supplier_asc'>('date_desc')
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPageSize, setHistoryPageSize] = useState(10)
   const [historySortField, setHistorySortField] = useState<HistorySortField>(mode === 'payment' ? 'date' : 'docNo')
   const [historySortDirection, setHistorySortDirection] = useState<'asc' | 'desc'>('desc')
   const [paymentHistoryStatusFilter, setPaymentHistoryStatusFilter] = useState<PaymentHistoryStatusFilter>('all')
+  const [receiptTab, setReceiptTab] = useState<ReceiptTab>('entry')
   const [form, setForm] = useState<MoneyForm>(() => initialForm(mode))
   const [isBillLocked, setIsBillLocked] = useState(false)
   const [moneyDrafts, setMoneyDrafts] = useState<Record<string, string>>({})
@@ -252,18 +265,19 @@ export function MoneyMovementPageClient({
   const parties = useMemo(() => (mode === 'payment' ? data.suppliers ?? [] : data.customers ?? []), [data.customers, data.suppliers, mode])
   const paymentMethods = useMemo(() => data.paymentMethods ?? [], [data.paymentMethods])
   const theme = mode === 'payment' ? paymentTheme : receiptTheme
-  const title = mode === 'payment' ? 'จ่ายเงิน Supplier' : 'รับเงิน Customer'
+  const title = mode === 'payment' ? 'จ่ายเงินผู้รับเงิน' : 'รับเงิน Customer'
   const subtitle = mode === 'payment' ? 'Payment Voucher' : 'Receipt Voucher'
   const amountLabel = mode === 'payment' ? 'ยอดจ่าย' : 'ยอดรับ'
   const accountLabel = mode === 'payment' ? 'บัญชีจ่าย' : 'บัญชีรับ'
-  const partyLabel = mode === 'payment' ? 'ผู้ขาย' : 'ลูกค้า'
+  const partyLabel = mode === 'payment' ? 'ผู้รับเงิน' : 'ลูกค้า'
   const balanceLabel = mode === 'payment' ? 'ค้างจ่าย' : 'ค้างรับ'
   const whtRatePercent = mode === 'payment' ? data.settings?.whtRatePercent ?? 0 : 0
   const partyValue = mode === 'payment'
     ? (form as SupplierPaymentFormValues).supplierId
     : (form as CustomerReceiptFormValues).customerId
-  const showEntrySection = !historyOnly
-  const showHistorySection = !entryOnly
+  const showReceiptTabs = mode === 'receipt' && !entryOnly && !historyOnly
+  const showEntrySection = !historyOnly && (!showReceiptTabs || receiptTab === 'entry')
+  const showHistorySection = !entryOnly && (!showReceiptTabs || receiptTab === 'history')
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -301,10 +315,20 @@ export function MoneyMovementPageClient({
   const paymentSupplierId = mode === 'payment'
     ? paymentLines.find((line) => line.supplierId)?.supplierId ?? (form as SupplierPaymentFormValues).supplierId
     : ''
+  const paymentMethodFilter = mode === 'payment'
+    ? paymentLines
+      .map((line) => billMap.get(line.billId)?.approvalPaymentMethod)
+      .map(normalizedPaymentMethod)
+      .find(Boolean) ?? normalizedPaymentMethod(form.method)
+    : ''
   const paymentSelectableBills = useMemo(() => {
-    if (mode !== 'payment' || !paymentSupplierId) return outstandingBills
-    return outstandingBills.filter((bill) => bill.supplierId === paymentSupplierId)
-  }, [mode, outstandingBills, paymentSupplierId])
+    if (mode !== 'payment') return outstandingBills
+    return outstandingBills.filter((bill) => {
+      const matchesSupplier = !paymentSupplierId || bill.supplierId === paymentSupplierId
+      const matchesPaymentMethod = !paymentMethodFilter || normalizedPaymentMethod(bill.approvalPaymentMethod) === paymentMethodFilter
+      return matchesSupplier && matchesPaymentMethod
+    })
+  }, [mode, outstandingBills, paymentMethodFilter, paymentSupplierId])
   const selectedPaymentBillIds = useMemo(() => new Set(paymentLines.map((line) => line.approvalId || line.billId).filter(Boolean)), [paymentLines])
   const supplierBills = useMemo(() => {
     if (mode !== 'payment') return []
@@ -315,7 +339,15 @@ export function MoneyMovementPageClient({
       const status = paymentBillStatus(bill)
       const supplier = supplierMap.get(bill.supplierId ?? '')
       const supplierBankAccounts = supplierBankAccountLines(supplier, paymentMethods)
-      const searchHaystack = `${bill.docNo} ${bill.sourceDocNo ?? ''} ${supplierName} ${bill.date ?? ''} ${supplierBankAccounts.map((account) => `${account.bankName} ${account.accountNo}`).join(' ')}`.toLowerCase()
+      const searchHaystack = [
+        bill.id,
+        bill.docNo,
+        bill.approvalId ?? '',
+        bill.sourceDocNo ?? '',
+        supplierName,
+        bill.date ?? '',
+        supplierBankAccounts.map((account) => `${account.bankName} ${account.accountNo}`).join(' '),
+      ].join(' ').toLowerCase()
       const matchesSearch = !query || searchHaystack.includes(query)
       const matchesStatus = balance > 0 && status !== 'cancelled'
       return matchesSearch && matchesStatus
@@ -355,11 +387,14 @@ export function MoneyMovementPageClient({
   useEffect(() => {
     if (mode !== 'payment') return
     setForm((current) => {
-      const nextWithholdingTax = withholdingTaxFromCashAmount(current.amount, whtRatePercent)
+      const currentLines = (current as SupplierPaymentFormValues).lines ?? []
+      const nextWithholdingTax = currentLines.length > 0
+        ? roundMoney(currentLines.reduce((sum, line) => sum + (Number(line.withholdingTax) || 0), 0))
+        : withholdingTaxFromCashAmount(current.amount, whtRatePercent)
       if (Math.abs(current.withholdingTax - nextWithholdingTax) < 0.005) return current
       return { ...current, withholdingTax: nextWithholdingTax } as MoneyForm
     })
-  }, [form.amount, mode, whtRatePercent])
+  }, [form.amount, mode, paymentLines, whtRatePercent])
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -419,8 +454,8 @@ export function MoneyMovementPageClient({
   function openFormForBill(bill: Bill) {
     const balance = bill.payableBalance ?? 0
     const settlementAmount = balance > 0 ? balance : bill.totalAmount
-    const paymentAmount = paymentCashAmountFromSettlement(settlementAmount, whtRatePercent)
-    const withholdingTax = withholdingTaxFromCashAmount(paymentAmount, whtRatePercent)
+    const paymentAmount = isExpensePaymentBill(bill) ? roundMoney(settlementAmount) : paymentCashAmountFromSettlement(settlementAmount, whtRatePercent)
+    const withholdingTax = isExpensePaymentBill(bill) ? 0 : withholdingTaxFromCashAmount(paymentAmount, whtRatePercent)
     const netAmount = roundMoney(paymentAmount)
     setForm({
       ...initialForm(mode),
@@ -499,7 +534,9 @@ export function MoneyMovementPageClient({
       ...form,
       [partyKey]: nextPartyId,
       amount: mode === 'payment'
-        ? paymentCashAmountFromSettlement(balance > 0 ? balance : bill.totalAmount, whtRatePercent)
+        ? isExpensePaymentBill(bill)
+          ? roundMoney(balance > 0 ? balance : bill.totalAmount)
+          : paymentCashAmountFromSettlement(balance > 0 ? balance : bill.totalAmount, whtRatePercent)
         : balance > 0 ? balance : bill.totalAmount,
       billId,
     } as MoneyForm)
@@ -508,7 +545,7 @@ export function MoneyMovementPageClient({
   function paymentLineFromBill(bill: Bill): PaymentLine {
     const balance = bill.payableBalance ?? 0
     const settlementAmount = balance > 0 ? balance : bill.totalAmount
-    const amount = paymentCashAmountFromSettlement(settlementAmount, whtRatePercent)
+    const amount = isExpensePaymentBill(bill) ? roundMoney(settlementAmount) : paymentCashAmountFromSettlement(settlementAmount, whtRatePercent)
     return {
       ...newPaymentLine(),
       amount,
@@ -516,8 +553,14 @@ export function MoneyMovementPageClient({
       billText: paymentBillLabel(bill, partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'),
       billId: bill.id,
       supplierId: bill.supplierId ?? '',
-      withholdingTax: withholdingTaxFromCashAmount(amount, whtRatePercent),
+      withholdingTax: isExpensePaymentBill(bill) ? 0 : withholdingTaxFromCashAmount(amount, whtRatePercent),
     }
+  }
+
+  function paymentLineWithholdingTax(line: PaymentLine) {
+    const bill = billMap.get(line.billId)
+    if (isExpensePaymentBill(bill)) return 0
+    return withholdingTaxFromCashAmount(Number(line.amount) || 0, whtRatePercent)
   }
 
   function syncPaymentLines(nextLines: PaymentLine[]) {
@@ -526,9 +569,10 @@ export function MoneyMovementPageClient({
       amount: Number(line.amount) || 0,
       discount: Number(line.discount) || 0,
       fee: Number(line.fee) || 0,
-      withholdingTax: withholdingTaxFromCashAmount(Number(line.amount) || 0, whtRatePercent),
+      withholdingTax: paymentLineWithholdingTax(line),
     })) : [newPaymentLine()]
     const firstLine = normalizedLines[0]
+    const firstLinePaymentMethod = normalizedPaymentMethod(billMap.get(firstLine?.billId ?? '')?.approvalPaymentMethod)
     setForm({
       ...form,
       amount: roundMoney(normalizedLines.reduce((sum, line) => sum + line.amount, 0)),
@@ -536,6 +580,7 @@ export function MoneyMovementPageClient({
       discount: roundMoney(normalizedLines.reduce((sum, line) => sum + line.discount, 0)),
       fee: roundMoney(normalizedLines.reduce((sum, line) => sum + line.fee, 0)),
       lines: normalizedLines,
+      method: firstLinePaymentMethod || form.method,
       supplierId: firstLine?.supplierId ?? '',
       withholdingTax: roundMoney(normalizedLines.reduce((sum, line) => sum + line.withholdingTax, 0)),
     } as MoneyForm)
@@ -551,6 +596,7 @@ export function MoneyMovementPageClient({
   }
 
   function updatePaymentLine(index: number, patch: Partial<PaymentLine>) {
+    setError(null)
     syncPaymentLines(paymentLines.map((line, lineIndex) => (lineIndex === index ? { ...line, ...patch } : line)))
   }
 
@@ -595,6 +641,7 @@ export function MoneyMovementPageClient({
   }
 
   function updatePaymentSplit(index: number, patch: Partial<PaymentSplit>) {
+    setError(null)
     syncPaymentSplits(paymentSplits.map((split, splitIndex) => {
       if (splitIndex !== index) return split
       const nextSplit = { ...split, ...patch }
@@ -656,12 +703,18 @@ export function MoneyMovementPageClient({
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isSavingRef.current) return
     const payload = mode === 'payment' ? normalizedPaymentForm() : form
     const parsed = (mode === 'payment' ? supplierPaymentFormSchema : customerReceiptFormSchema).safeParse(payload)
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง')
       return
     }
+    if (mode === 'payment' && Math.abs(paymentSplitTotal - formNetAmount) > 0.01) {
+      setError('รวมยอดแยกบัญชีต้องเท่ากับยอดสุทธิที่ต้องจ่าย')
+      return
+    }
+    isSavingRef.current = true
     setIsSaving(true)
     setError(null)
     try {
@@ -671,6 +724,7 @@ export function MoneyMovementPageClient({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'บันทึกข้อมูลไม่ได้')
     } finally {
+      isSavingRef.current = false
       setIsSaving(false)
     }
   }
@@ -719,7 +773,7 @@ export function MoneyMovementPageClient({
 
   return (
     <section className="space-y-5">
-      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error && !formOpen ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-5">
         <KpiCard label="จำนวน Voucher" value={rows.length.toLocaleString('th-TH')} tone="slate" />
@@ -729,19 +783,37 @@ export function MoneyMovementPageClient({
         <KpiCard label={balanceLabel} value={formatMoney(metrics.outstanding)} tone="violet" />
       </div>
 
+      {showReceiptTabs ? (
+        <Tabs
+          className="gap-0"
+          value={receiptTab}
+          onValueChange={(value) => {
+            setReceiptTab(value as ReceiptTab)
+            setError(null)
+          }}
+        >
+          <TabsList className="w-full" variant="line">
+            <TabsTrigger value="entry" variant="line">รับเงิน Customer</TabsTrigger>
+            <TabsTrigger value="history" variant="line">ประวัติการรับเงิน</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      ) : null}
+
+      {mode === 'receipt' && showEntrySection ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 rounded-md bg-white p-3 shadow">
+          <UiButton className="font-bold shadow" type="button" variant="default" onClick={openForm}>
+            + รับเงิน Customer
+          </UiButton>
+        </div>
+      ) : null}
+
       {mode === 'payment' && showEntrySection ? (
         <>
-          <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">รายการรอออก PMT</h2>
-              <p className="mt-1 text-sm text-slate-500">แสดงเฉพาะ approval items ที่อนุมัติแล้วและพร้อมสร้าง Payment Voucher</p>
-            </div>
-          </div>
           <div className="space-y-2 rounded-md bg-white p-3 shadow">
             <div className="flex flex-wrap items-center gap-2">
               <UiInput
                 className="min-w-[260px] flex-1 rounded-md"
-                placeholder="ค้นหาเลขบิล / Supplier / ธนาคาร / เลขบัญชี"
+                placeholder="ค้นหา PMA / บิล / เงินมัดจำ / ค่าใช้จ่าย / ผู้รับเงิน / ธนาคาร / เลขบัญชี"
                 type="search"
                 value={billSearch}
                 onChange={(event) => setBillSearch(event.target.value)}
@@ -752,7 +824,7 @@ export function MoneyMovementPageClient({
                 variant="secondary"
                 onClick={() => {
                   setBillSearch('')
-                  setBillSort('age_desc')
+                  setBillSort('date_desc')
                 }}
               >
                 ✕ ล้าง
@@ -766,7 +838,7 @@ export function MoneyMovementPageClient({
                 <option value="date_desc">วันที่ล่าสุด</option>
                 <option value="date_asc">วันที่เก่าสุด</option>
                 <option value="doc_desc">เลขบิลล่าสุด</option>
-                <option value="supplier_asc">Supplier A-Z</option>
+                <option value="supplier_asc">ผู้รับเงิน A-Z</option>
               </UiSelect>
             </div>
           </div>
@@ -791,7 +863,7 @@ export function MoneyMovementPageClient({
               <tr>
                 <TableHead>เลขที่รายการ</TableHead>
                 <TableHead>วันที่</TableHead>
-                <TableHead>Supplier</TableHead>
+                <TableHead>ผู้รับเงิน</TableHead>
                 <TableHead className="w-36">ธนาคาร</TableHead>
                 <TableHead>เลขบัญชี</TableHead>
                 <TableHead className="w-40 text-right">ยอดรวม</TableHead>
@@ -910,7 +982,7 @@ export function MoneyMovementPageClient({
                     </TableRow>
                   )
                 })}
-              {!isLoading && supplierBillPageRows.length === 0 ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={10}>ไม่พบบิลค้างจ่ายตามเงื่อนไข</TableCell></TableRow> : null}
+              {!isLoading && supplierBillPageRows.length === 0 ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={10}>ไม่พบ PMA ค้างจ่ายตามเงื่อนไข</TableCell></TableRow> : null}
             </TableBody>
           </Table>
         </>
@@ -921,7 +993,7 @@ export function MoneyMovementPageClient({
           if (!open && !isSaving) setFormOpen(false)
         }}>
           <DialogContent className={`top-[max(2rem,50%)] max-h-[90vh] overflow-y-auto p-0 ${mode === 'payment' ? 'max-w-5xl' : 'max-w-4xl'}`} hideClose>
-            <form onSubmit={save}>
+            <form noValidate onSubmit={save}>
             <DialogHeader className={`${mode === 'payment' ? 'bg-white text-slate-900' : theme.muted} flex-row items-center justify-between border-b px-5 py-4`}>
               <div>
                 <DialogTitle className="font-bold">{mode === 'payment' ? 'สร้าง Payment Voucher' : title}</DialogTitle>
@@ -929,20 +1001,9 @@ export function MoneyMovementPageClient({
               </div>
               <UiButton className="h-8 w-8 px-0 text-2xl text-slate-500" size="icon" type="button" variant="ghost" onClick={() => setFormOpen(false)}>&times;</UiButton>
             </DialogHeader>
+            {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div> : null}
             {mode === 'payment' ? (
               <div className="flex flex-col gap-4 p-5 text-sm">
-                <div className="order-1 max-w-xs">
-                  <label className="block">
-                    <span className="mb-1 block text-xs">วิธีจ่าย</span>
-                    <UiSelect className="h-9 rounded-md border px-2 py-1.5 text-sm" required value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
-                      <option disabled value="">เลือกวิธีจ่าย/รับเงิน</option>
-                      {paymentMethods.map((method) => (
-                        <option key={method.name} value={method.name}>{method.name}</option>
-                      ))}
-                    </UiSelect>
-                  </label>
-                </div>
-
                 <PaymentSplitsSection
                   activeAccounts={activeAccounts}
                   formNetAmount={formNetAmount}
@@ -1034,7 +1095,7 @@ export function MoneyMovementPageClient({
           <div className="space-y-2 rounded-md bg-white p-3 shadow">
             <div className="flex flex-wrap items-center gap-2">
               <UiInput className="h-9 min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลขที่ / ชื่อ / บัญชี / หมายเหตุ" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-              {mode === 'receipt' ? (
+              {mode === 'receipt' && !showReceiptTabs ? (
                 <UiButton className="font-bold shadow" type="button" variant="default" onClick={openForm}>
                   + รับเงิน Customer
                 </UiButton>

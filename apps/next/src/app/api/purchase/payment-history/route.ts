@@ -26,6 +26,7 @@ export async function GET() {
           party_name_snapshot: string | null
           source_doc_no_snapshot: string | null
           source_id: string
+          source_type: string
           status: string
           void_reason: string | null
           voided_at: Date | null
@@ -65,12 +66,13 @@ export async function GET() {
           payments: { select: { id: true } },
           source_doc_no_snapshot: true,
           source_id: true,
+          source_type: true,
           status: true,
           void_reason: true,
           voided_at: true,
         },
         take: 5000,
-        where: { source_type: { in: ['purchase_bill', 'advance_payment'] }, status: 'voided' },
+        where: { source_type: { in: ['purchase_bill', 'advance_payment', 'expense'] }, status: 'voided' },
       }),
     ])
     const paymentApprovalIds = [...new Set(payments.map((payment) => payment.payment_approval_id).filter((approvalId): approvalId is bigint => approvalId != null))]
@@ -78,6 +80,7 @@ export async function GET() {
       select: {
         doc_no: true,
         id: true,
+        party_name_snapshot: true,
         source_doc_no_snapshot: true,
       },
       where: {
@@ -91,6 +94,9 @@ export async function GET() {
     )
     const approvalSourceDocNoByInternalId = new Map(
       activeApprovals.map((approval) => [stringifyBusinessValue(approval.id), approval.source_doc_no_snapshot ?? ''] as const),
+    )
+    const approvalPartyNameByInternalId = new Map(
+      activeApprovals.map((approval) => [stringifyBusinessValue(approval.id), approval.party_name_snapshot ?? ''] as const),
     )
     const voucherIds = [...new Set(payments.map((payment) => payment.voucher_id).filter((voucherId): voucherId is string => Boolean(voucherId)))]
     const [bankStatements, paymentAllocations, paymentAccountSplits] = voucherIds.length > 0 ? await Promise.all([
@@ -207,7 +213,8 @@ export async function GET() {
           method: payment.method ?? '',
           netAmount: 0,
           notes: payment.notes ?? '',
-          partyName: payment.suppliers?.name ?? '-',
+          partyName: payment.suppliers?.name
+            ?? (paymentApprovalInternalId ? (approvalPartyNameByInternalId.get(paymentApprovalInternalId) || '-') : '-'),
           status: payment.status ?? 'active',
           supplierId: payment.supplier_id ? (supplierCodeById.get(payment.supplier_id) ?? '') : '',
           withholdingTax: 0,

@@ -9,9 +9,9 @@ tags:
   - purchase
   - test
   - qa
-status: draft
+status: in-progress
 created: 2026-05-27
-updated: 2026-05-27
+updated: 2026-06-08
 ---
 
 # Purchase Flow Test Matrix
@@ -57,29 +57,72 @@ updated: 2026-05-27
 
 | UC ID | หมวด | Use Case | หน้า/API หลัก | Priority | Status |
 |---|---|---|---|---|---|
-| `UC-PUR-01` | Core | Spot Buy เต็ม flow | `WTI -> /purchase/bills -> /daily/payment-approval -> /purchase/payments -> /purchase/payment-history` | High | `Not Run` |
-| `UC-PUR-02` | Core | PO Buy เต็ม flow | `PO Buy -> WTI -> PB -> Approval -> Payment` | High | `Not Run` |
-| `UC-PUR-03` | PO | PO รับของบางส่วน | `/purchase/po-buy`, `/purchase/bills` | Medium | `Not Run` |
-| `UC-PUR-04` | PO | PO ใช้ครบ | `/purchase/po-buy`, `/purchase/bills` | Medium | `Not Run` |
+| `UC-PUR-01` | Core | Spot Buy เต็ม flow | `WTI -> /purchase/bills -> /daily/payment-approval -> /purchase/payments -> /purchase/payment-history` | High | `Pass` |
+| `UC-PUR-02` | Core | PO Buy เต็ม flow | `PO Buy -> WTI -> PB -> Approval -> Payment` | High | `Pass` |
+| `UC-PUR-03` | PO | PO รับของบางส่วน | `/purchase/po-buy`, `/purchase/bills` | Medium | `Pass` |
+| `UC-PUR-04` | PO | PO ใช้ครบ | `/purchase/po-buy`, `/purchase/bills` | Medium | `Pass` |
 | `UC-PUR-05` | PO | ปิดรับไม่ครบ | `/purchase/po-buy` | Medium | `Not Run` |
 | `UC-PUR-06` | WTI | WTI สินค้าเดียวหลาย lot | `/daily/weight-ticket-list/[id]`, `/purchase/bills` | Medium | `Not Run` |
-| `UC-PUR-07` | WTI | WTI ที่เลือกใน PB ต้องจัดสรรครบก่อนบันทึก | `/purchase/bills`, `/daily/weight-ticket-list` | High | `Not Run` |
-| `UC-PUR-08` | Allocation | 1 summary แตกหลายแถวใน PB | `/purchase/bills` | High | `Not Run` |
-| `UC-PUR-09` | Approval | PB ต้องไปโผล่หน้าอนุมัติโอนเงิน | `/daily/payment-approval` | High | `Not Run` |
-| `UC-PUR-10` | Approval | approval snapshot lock | `/daily/payment-approval`, `payment_approvals` | High | `Not Run` |
+| `UC-PUR-07` | WTI | WTI ที่เลือกใน PB ต้องจัดสรรครบก่อนบันทึก | `/purchase/bills`, `/daily/weight-ticket-list` | High | `Pass` |
+| `UC-PUR-08` | Allocation | 1 summary แตกหลายแถวใน PB | `/purchase/bills` | High | `Pass` |
+| `UC-PUR-09` | Approval | PB ต้องไปโผล่หน้าอนุมัติโอนเงิน | `/daily/payment-approval` | High | `Pass` |
+| `UC-PUR-10` | Approval | approval snapshot lock | `/daily/payment-approval`, `payment_approvals` | High | `Pass` |
 | `UC-PUR-11` | Approval | อนุมัติยอดเกินไม่ได้ | `/daily/payment-approval` | Medium | `Not Run` |
-| `UC-PUR-12` | Payment | จ่าย 1 บิล 1 บัญชี | `/purchase/payments`, `/purchase/payment-history` | Medium | `Not Run` |
-| `UC-PUR-13` | Payment | จ่ายหลายบิลพร้อมกัน | `/purchase/payments`, `/purchase/payment-history` | High | `Not Run` |
-| `UC-PUR-14` | Payment | จ่ายหลายบัญชี | `/purchase/payments`, `/purchase/payment-history` | High | `Not Run` |
-| `UC-PUR-15` | Payment | หลายบิล + หลายบัญชี + WHT | `/purchase/payments`, `/purchase/payment-history` | High | `Not Run` |
-| `UC-PUR-16` | Guard | approved แล้ว cancel bill ไม่ได้ | `/purchase/bills`, `/api/purchase/bills` | High | `Not Run` |
-| `UC-PUR-17` | Guard | paid แล้ว cancel bill ไม่ได้ | `/purchase/bills`, `/api/purchase/bills` | High | `Not Run` |
-| `UC-PUR-18` | Reversal | ยกเลิกการจ่ายเงิน | `/purchase/payment-history`, `/api/purchase/payment-history` | High | `Not Run` |
+| `UC-PUR-12` | Payment | จ่าย 1 บิล 1 บัญชี | `/purchase/payments`, `/purchase/payment-history` | Medium | `Pass` |
+| `UC-PUR-13` | Payment | จ่ายหลายบิลพร้อมกัน | `/purchase/payments`, `/purchase/payment-history` | High | `Pass` |
+| `UC-PUR-14` | Payment | จ่ายหลายบัญชี | `/purchase/payments`, `/purchase/payment-history` | High | `Pass` |
+| `UC-PUR-15` | Payment | หลายบิล + หลายบัญชี + WHT | `/purchase/payments`, `/purchase/payment-history` | High | `Pass` |
+| `UC-PUR-16` | Guard | approved แล้ว cancel bill ไม่ได้ | `/purchase/bills`, `/api/purchase/bills` | High | `Pass` |
+| `UC-PUR-17` | Guard | paid แล้ว cancel bill ไม่ได้ | `/purchase/bills`, `/api/purchase/bills` | High | `Pass` |
+| `UC-PUR-18` | Reversal | ยกเลิกการจ่ายเงิน | `/purchase/payment-history`, `/api/purchase/payment-history` | High | `Pass` |
 | `UC-PUR-19` | Reversal | cancel payment แล้วแก้บิล + อนุมัติใหม่ได้ | `/purchase/payment-history`, `/purchase/bills`, `/daily/payment-approval` | High | `Not Run` |
 | `UC-PUR-20` | Reversal | cancel payment แล้วค่อย cancel bill | `/purchase/payment-history`, `/purchase/bills` | Medium | `Not Run` |
-| `UC-PUR-21` | Stock | STOCK bill ต้องเข้า stock | `/purchase/bills`, `/stock/ledger`, `/stock/balance` | High | `Not Run` |
+| `UC-PUR-21` | Stock | STOCK bill ต้องเข้า stock | `/purchase/bills`, `/stock/ledger`, `/stock/balance` | High | `Pass` |
 | `UC-PUR-22` | Stock | TRADING bill ต้องไม่เข้า stock แบบ STOCK | `/purchase/bills`, `/stock/ledger`, `/stock/balance` | Medium | `Not Run` |
-| `UC-PUR-23` | Stock | cancel PB ต้อง reverse stock | `/purchase/bills`, `/stock/ledger`, `/stock/balance` | High | `Not Run` |
+| `UC-PUR-23` | Stock | cancel PB ต้อง reverse stock | `/purchase/bills`, `/stock/ledger`, `/stock/balance` | High | `Pass` |
+
+## Execution Runs
+
+### 2026-06-08 API-backed E2E UAT
+
+- Run tag: `QA-PUR-1780884426224`
+- Harness: `tmp/test_purchase_flow.mjs`
+- Result file: `tmp/test_purchase_flow_result.json`
+- App/server: active Next app on `http://127.0.0.1:3000`
+- Scope actually executed: authenticated API-backed E2E through local Next routes, with DB checks for exact stock-ledger rows.
+- Browser click-path note: protected routes redirect to `/login` without an authenticated browser session; sub-agent browser QA found no unauthenticated console errors, but full click-path UAT still needs a logged-in browser/session setup.
+
+Documents created in this run:
+
+| Purpose | Documents |
+|---|---|
+| Spot Buy | `WTI012606-0011`, `PB012606-0008` |
+| PO partial/full | `POB012606-0007`, `WTI012606-0012`, `PB012606-0009`, `WTI012606-0013`, `PB012606-0010` |
+| Split PO + Spot allocation | `POB012606-0008`, `WTI012606-0014`, `PB012606-0011` |
+| Cancel PB stock reversal | `WTI012606-0015`, `PB012606-0012` |
+| Payment | `PMT012606-0002`, voucher id `PMT-e03aad90-9830-46cb-826e-9c509bcd3fe1` |
+
+Evidence summary:
+
+| Use Case | Evidence |
+|---|---|
+| `UC-PUR-01` | Spot WTI `WTI012606-0011` created PB `PB012606-0008`; later approved, paid, appeared in payment history, and PMT was cancelled for reversal coverage. |
+| `UC-PUR-02` | PO `POB012606-0007` was received through PB `PB012606-0009` and `PB012606-0010`, then included in approval/payment flow. |
+| `UC-PUR-03` | After PB `PB012606-0009`, PO `POB012606-0007` showed `Partially Received` with `remainingQty = 30`. |
+| `UC-PUR-04` | After PB `PB012606-0010`, PO `POB012606-0007` showed `Received` with `remainingQty = 0`. |
+| `UC-PUR-07` | WTI `WTI012606-0014` saved only after the PB allocated the full 100 kg. |
+| `UC-PUR-08` | PB `PB012606-0011` split summary `WTI012606-0014:SKU001:2` into PO 70 kg and Spot 30 kg rows. |
+| `UC-PUR-09` | PB `PB012606-0008`, `PB012606-0009`, `PB012606-0010`, and `PB012606-0011` appeared in pending approval queue. |
+| `UC-PUR-10` | Approval created PMA snapshots for all four PB rows before PMT. |
+| `UC-PUR-12` | Payment history showed `PMT012606-0002` with all four PB document numbers. |
+| `UC-PUR-13` | One PMT paid four PB rows together. |
+| `UC-PUR-14` | PMT split cash payment across accounts `AC-MOVBFTZXHFTB` and `AC-MOVBDXC5N1W9`. |
+| `UC-PUR-15` | PMT used multi-bill + multi-account with system WHT calculation; cash amount was `2580.20` after WHT split. |
+| `UC-PUR-16` | Cancelling approved PB `PB012606-0011` was rejected with `ยกเลิกไม่ได้ เพราะบิลนี้ถูกอนุมัติโอนเงินแล้ว`. |
+| `UC-PUR-17` | Cancelling paid PB `PB012606-0008` was rejected with `ยกเลิกไม่ได้ เพราะบิลนี้มีรอบจ่ายเงิน PMT แล้ว`. |
+| `UC-PUR-18` | Cancelling voucher `PMT-e03aad90-9830-46cb-826e-9c509bcd3fe1` succeeded; payment history status became `cancelled`. |
+| `UC-PUR-21` | Stock ledger API and DB checks found PB ledger rows for `PB012606-0008`, `PB012606-0009`, `PB012606-0010`, `PB012606-0011`, and `PB012606-0012`. |
+| `UC-PUR-23` | Cancelling PB `PB012606-0012` left `0` active stock-ledger rows for that PB and returned WTI `WTI012606-0015` to `received`. |
 
 ## Detailed Use Cases
 

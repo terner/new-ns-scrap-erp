@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseInternalBigIntId, requireDocumentNo } from '@/lib/business-code'
 import { apiErrorResponse } from '@/lib/server/api-error'
-import { appendSupplierAdvanceStatusLog, SUPPLIER_ADVANCE_STATUS_ACTION } from '@/lib/server/advance-payment-history'
+import { SUPPLIER_ADVANCE_STATUS_ACTION } from '@/lib/server/advance-payment-history'
+import { refreshAdvancePaymentWorkflowStatus } from '@/lib/server/advance-payments'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, toNumber } from '@/lib/server/daily'
 import { appendPaymentApprovalStatusLog, PAYMENT_APPROVAL_STATUS_ACTION } from '@/lib/server/payment-history'
@@ -87,29 +88,14 @@ export async function POST(request: Request) {
 
       const sourceInternalId = parseInternalBigIntId(approval.source_id)
       if (sourceInternalId != null && approval.source_type === 'advance_payment') {
-        const advance = await tx.supplier_advance_payments.findUnique({
-          select: { status: true },
-          where: { id: sourceInternalId },
-        })
-        await tx.supplier_advance_payments.update({
-          data: {
-            status: 'pending_approval',
-            updated_at: new Date(),
-            updated_by: actor,
-          },
-          where: { id: sourceInternalId },
-        })
-        await appendSupplierAdvanceStatusLog(tx, {
+        await refreshAdvancePaymentWorkflowStatus(tx, sourceInternalId, actor, {
           action: SUPPLIER_ADVANCE_STATUS_ACTION.APPROVAL_VOIDED,
-          actor,
-          advancePaymentId: sourceInternalId,
-          fromStatus: advance?.status ?? null,
+          logIfUnchanged: true,
           meta: {
             approvalDocNo,
             reason: payload.reason,
           },
           note: payload.reason,
-          toStatus: 'pending_approval',
         })
       }
       if (sourceInternalId != null && approval.source_type === 'expense') {
