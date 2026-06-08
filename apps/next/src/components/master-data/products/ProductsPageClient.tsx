@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ImagePlus, Trash2 } from 'lucide-react'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { getErrorMessage } from '@/lib/api-client'
 import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
@@ -14,6 +15,7 @@ import {
   type Product,
   type ProductFormValues,
 } from '@/lib/product'
+import { decodeStoredImageAsset, encodeStoredImageAsset } from '@/lib/weight-tickets'
 
 type SortKey = 'active' | 'code' | 'name' | 'type' | 'unit'
 
@@ -22,6 +24,7 @@ const emptyProductForm: ProductFormValues = {
   code: null,
   name: '',
   active: true,
+  imageNames: [],
   type: null,
   unit: 'กก.',
 }
@@ -32,6 +35,7 @@ function productToForm(product: Product): ProductFormValues {
     code: product.code,
     name: product.name,
     active: product.active,
+    imageNames: product.imageNames,
     type: product.type,
     unit: product.unit ?? 'กก.',
   }
@@ -43,6 +47,15 @@ function displayValue(value: string | number | null) {
 
 function uniqueText(values: Array<string | null>) {
   return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b, 'th', { numeric: true }))
+}
+
+async function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error(`อ่านไฟล์ ${file.name} ไม่สำเร็จ`))
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.readAsDataURL(file)
+  })
 }
 
 function compareProducts(left: Product, right: Product, key: SortKey, direction: 'asc' | 'desc') {
@@ -455,6 +468,8 @@ type ProductFormProps = {
 function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, onSubmit }: ProductFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<ProductFormValues>(() => (product ? productToForm(product) : emptyProductForm))
+  const productImages = useMemo(() => (form.imageNames ?? []).map((rawValue) => decodeStoredImageAsset(rawValue)), [form.imageNames])
+  const primaryImage = productImages[0] ?? null
 
   useEffect(() => {
     setForm(product ? productToForm(product) : emptyProductForm)
@@ -463,6 +478,27 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
 
   function update<K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) {
     setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  async function replacePrimaryImage(fileList: FileList | null) {
+    const selectedFile = Array.from(fileList ?? [])[0]
+    if (!selectedFile) return
+    if (!selectedFile.type.startsWith('image/')) {
+      setErrors((current) => ({ ...current, imageNames: 'อัปโหลดได้เฉพาะไฟล์รูปภาพ' }))
+      return
+    }
+
+    const nextImage = encodeStoredImageAsset(selectedFile.name, await fileToDataUrl(selectedFile))
+    setErrors((current) => {
+      const nextErrors = { ...current }
+      delete nextErrors.imageNames
+      return nextErrors
+    })
+    update('imageNames', [nextImage])
+  }
+
+  function removeProductImage(index: number) {
+    update('imageNames', (form.imageNames ?? []).filter((_, imageIndex) => imageIndex !== index))
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -487,9 +523,9 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
       <div className="max-h-[76vh] space-y-5 overflow-y-auto px-5 py-5">
         <section>
           <h4 className="mb-3 text-sm font-bold text-slate-700">ข้อมูลสินค้า</h4>
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-4">
             {form.id ? <TextField error={errors.code} label="รหัสสินค้า" readOnly value={form.code ?? ''} onChange={(value) => update('code', value)} /> : null}
-            <TextField className="md:col-span-2" error={errors.name} label="ชื่อสินค้า *" value={form.name} onChange={(value) => update('name', value)} />
+            <TextField error={errors.name} label="ชื่อสินค้า *" value={form.name} onChange={(value) => update('name', value)} />
             <SelectField error={errors.type} label="ประเภทสินค้า" value={form.type ?? ''} onChange={(value) => update('type', value || null)}>
               <option value="">เลือกประเภทสินค้า</option>
               {productTypes.map((type) => <option key={type} value={type}>{type}</option>)}
@@ -502,6 +538,51 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
                 return <option key={unit.id} value={value}>{label}</option>
               })}
             </SelectField>
+            <div className="md:col-span-4">
+              <div className="block text-xs font-medium text-slate-600">
+                รูปสินค้า
+                <div className={`mt-1 rounded-md border bg-slate-50 p-3 ${errors.imageNames ? 'border-red-300' : 'border-slate-200'}`}>
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <label className="group relative block h-36 w-36 cursor-pointer overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100 hover:border-slate-400">
+                        {primaryImage?.url ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img alt={primaryImage.fileName} className="h-full w-full object-cover" src={primaryImage.url} />
+                            <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-2 py-1.5 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+                              คลิกเพื่อเปลี่ยนรูป
+                            </span>
+                          </>
+                        ) : (
+                          <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                              <ImagePlus className="h-6 w-6" />
+                            </span>
+                            <span className="px-3 text-center text-xs font-medium text-slate-500">เพิ่มรูปสินค้า</span>
+                          </span>
+                        )}
+                        <input
+                          accept="image/*"
+                          className="hidden"
+                          type="file"
+                          onChange={(event) => {
+                            void replacePrimaryImage(event.target.files)
+                            event.target.value = ''
+                          }}
+                        />
+                      </label>
+                      {primaryImage ? (
+                        <button className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline" type="button" onClick={() => removeProductImage(0)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          ลบรูปหลัก
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {errors.imageNames ? <div className="mt-2 text-xs text-red-700">{errors.imageNames}</div> : null}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -528,10 +609,10 @@ type SelectFieldProps = {
 
 function SelectField({ children, error, label, value, onChange }: SelectFieldProps) {
   return (
-    <label className="block text-sm font-medium">
+    <label className="block text-xs font-medium text-slate-600">
       {label}
       <select
-        className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700"
+        className={`mt-1 h-9 w-full rounded-md border px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-700 ${error ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white'}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -555,10 +636,10 @@ type TextFieldProps = {
 
 function TextField({ className = '', error, label, list, readOnly = false, type = 'text', value, onChange }: TextFieldProps) {
   return (
-    <label className={`block text-sm font-medium ${className}`}>
+    <label className={`block text-xs font-medium text-slate-600 ${className}`}>
       {label}
       <input
-        className={`mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-700 ${readOnly ? 'bg-slate-50' : ''}`}
+        className={`mt-1 h-9 w-full rounded-md border px-3 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-700 ${error ? 'border-red-300 bg-red-50' : readOnly ? 'border-slate-300 bg-slate-50' : 'border-slate-300 bg-white'}`}
         list={list}
         min={type === 'number' ? 0 : undefined}
         readOnly={readOnly}

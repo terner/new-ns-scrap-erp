@@ -1724,6 +1724,7 @@ model products {
   version                         Int?                              @default(1)
   type                            String?
   grade                           String?
+  image_names                     String[]                          @default([])
   id                              BigInt                            @id @default(autoincrement())
   grade_adjustments               grade_adjustments[]
   po_buy_allocation_logs          po_buy_allocation_logs[]

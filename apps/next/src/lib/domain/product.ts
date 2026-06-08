@@ -8,6 +8,7 @@ type PrismaProduct = {
   active: boolean | null
   type: string | null
   unit: string | null
+  image_names: string[] | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -19,6 +20,7 @@ export function mapPrismaProduct(row: PrismaProduct): Product {
     code: outwardId,
     name: row.name,
     active: row.active ?? true,
+    imageNames: row.image_names ?? [],
     type: row.type,
     unit: row.unit,
     createdAt: row.created_at?.toISOString() ?? null,
@@ -39,6 +41,7 @@ export function toProductWriteInput(values: ProductFormValues) {
     name: parsed.name,
     type: parsed.type || null,
     unit: parsed.unit || 'กก.',
+    image_names: parsed.imageNames,
     active: parsed.active,
   }
 }

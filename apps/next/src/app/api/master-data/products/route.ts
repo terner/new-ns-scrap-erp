@@ -22,6 +22,7 @@ const productSelect = {
   code: true,
   created_at: true,
   id: true,
+  image_names: true,
   name: true,
   type: true,
   unit: true,

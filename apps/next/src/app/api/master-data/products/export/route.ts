@@ -25,6 +25,7 @@ const productSelect = {
   code: true,
   created_at: true,
   id: true,
+  image_names: true,
   name: true,
   type: true,
   unit: true,
@@ -36,6 +37,7 @@ const productColumns: Array<{ key: keyof Product; label: string; width: number }
   { key: 'name', label: 'ชื่อสินค้า', width: 220 },
   { key: 'type', label: 'ประเภทสินค้า', width: 140 },
   { key: 'unit', label: 'หน่วย', width: 80 },
+  { key: 'imageNames', label: 'รูปสินค้า', width: 220 },
   { key: 'active', label: 'สถานะ', width: 90 },
   { key: 'createdAt', label: 'สร้างเมื่อ', width: 150 },
   { key: 'updatedAt', label: 'แก้ไขเมื่อ', width: 150 },
@@ -77,6 +79,16 @@ function formatCellValue(product: Product, key: keyof Product) {
   if (value === null || value === undefined || value === '') return ''
   if (typeof value === 'boolean') return value ? 'ใช้งาน' : 'ปิด'
   if (typeof value === 'number') return value
+  if (key === 'imageNames' && Array.isArray(value)) {
+    return value.map((item) => {
+      try {
+        const parsed = JSON.parse(item.trim()) as { fileName?: unknown }
+        return typeof parsed.fileName === 'string' ? parsed.fileName : item
+      } catch {
+        return item
+      }
+    }).join(', ')
+  }
   return String(value)
 }
 

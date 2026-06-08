@@ -210,7 +210,7 @@ export async function POST(request: Request) {
 
     await prisma.$transaction(validRows.map((row) => {
       const existingId = existingIdByCode.get(row.code)
-      const payload = toProductWriteInput(row)
+      const { image_names: _imageNames, ...payload } = toProductWriteInput(row)
       return existingId
         ? prisma.products.update({
           where: { id: existingId },
