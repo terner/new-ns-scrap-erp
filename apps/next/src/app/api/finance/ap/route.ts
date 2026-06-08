@@ -2,6 +2,7 @@ import type { Prisma } from '../../../../../generated/prisma/client'
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { requireBusinessCode } from '@/lib/business-code'
+import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
@@ -59,7 +60,7 @@ function billWhere(query: ApQuery, branchId: bigint | null, supplierId: bigint |
   return {
     ...(branchId !== null ? { branch_id: branchId } : {}),
     ...(supplierId !== null ? { supplier_id: supplierId } : {}),
-    ...(query.status ? { status: query.status } : { NOT: { status: 'cancelled' } }),
+    ...(query.status ? { status: query.status } : { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] } }),
     ...(query.from || query.to
       ? {
           date: {
@@ -119,7 +120,7 @@ export async function GET(request: Request) {
           withholding_tax: true,
         },
         take: 10000,
-        where: { NOT: { status: 'cancelled' } },
+        where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] } },
       }),
       prisma.suppliers.findMany({
         orderBy: [{ code: 'asc' }, { name: 'asc' }],

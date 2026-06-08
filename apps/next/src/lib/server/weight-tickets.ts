@@ -340,7 +340,7 @@ export async function getWeightTicketUsageCounts(tx: Prisma.TransactionClient | 
          , array_remove(array_agg(distinct pb.doc_no), null) as doc_nos
     from public.purchase_bill_receipt_allocations pbra
     join public.purchase_bills pb on pb.id = pbra.purchase_bill_id
-    where coalesce(pb.status, '') <> 'cancelled'
+    where lower(coalesce(pb.status, '')) not in ('cancelled', 'cancelled_supplier_swap')
       and pbra.weight_ticket_id = ${ticketId}
   `
 

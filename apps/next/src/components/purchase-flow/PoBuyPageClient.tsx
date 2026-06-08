@@ -299,6 +299,110 @@ function poBuyStatusMetaText(meta: unknown) {
   return ''
 }
 
+function PoBuyStatusTimeline({ row }: { row: PoBuyRow }) {
+  const events = [
+    ...row.statusLogs.map((log) => ({
+      createdAt: log.createdAt,
+      createdBy: log.createdBy,
+      id: `status:${log.id}`,
+      log,
+      type: 'status' as const,
+    })),
+    ...row.allocationLogs.map((log) => ({
+      createdAt: log.createdAt,
+      createdBy: log.createdBy,
+      id: `allocation:${log.id}`,
+      log,
+      type: 'allocation' as const,
+    })),
+  ].sort((left, right) => {
+    const leftTime = new Date(left.createdAt).getTime()
+    const rightTime = new Date(right.createdAt).getTime()
+    if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) return leftTime - rightTime
+    if (left.type !== right.type) return left.type === 'status' ? -1 : 1
+    return left.id.localeCompare(right.id)
+  })
+
+  const timelineEvents = events.length > 0
+    ? events
+    : [{
+        createdAt: row.updatedAt || row.createdAt,
+        createdBy: row.updatedBy || row.createdBy,
+        id: `status:${row.id}:current-status`,
+        log: {
+          action: 'current_status',
+          createdAt: row.updatedAt || row.createdAt,
+          createdBy: row.updatedBy || row.createdBy,
+          eventKey: `${row.docNo}:current-status`,
+          fromStatus: '',
+          id: `${row.id}:current-status`,
+          meta: null,
+          note: '',
+          poBuyDocNo: row.docNo,
+          toStatus: row.status,
+        },
+        type: 'status' as const,
+      }]
+  const renderedTimelineEvents = [...timelineEvents].reverse()
+
+  return (
+    <div className="space-y-3">
+      {renderedTimelineEvents.map((event, index) => {
+        const isLatest = index === 0
+        const statusLog = event.type === 'status' ? event.log : null
+        const allocationLog = event.type === 'allocation' ? event.log : null
+        const metaText = statusLog ? poBuyStatusMetaText(statusLog.meta) : ''
+        const transitionText = statusLog
+          ? poBuyStatusTransitionLabel(statusLog)
+          : allocationLog
+            ? poBuyAllocationDescription(allocationLog)
+            : ''
+        const statusTone = statusLog
+          ? statusBadge(statusLog.toStatus || row.status)
+          : allocationLog?.action === 'released_from_purchase_bill'
+            ? 'text-slate-600'
+            : 'text-indigo-700'
+        const actionLabel = statusLog
+          ? statusLog.action === 'current_status' ? 'สถานะปัจจุบัน' : poBuyStatusActionLabel(statusLog.action)
+          : allocationLog
+            ? poBuyAllocationActionLabel(allocationLog.action)
+            : 'อัปเดต PO'
+        const pillText = statusLog ? poBuyStatusLabel(statusLog.toStatus || row.status) : 'จัดสรร PO'
+
+        return (
+          <div key={event.id} className="grid grid-cols-[88px_1fr] gap-3 sm:grid-cols-[128px_1fr]">
+            <div className="pt-1 text-right text-xs text-slate-500">
+              <div>{formatDateTime(event.createdAt)}</div>
+              <div className="mt-1 truncate text-[11px]">{event.createdBy || '-'}</div>
+            </div>
+            <div className="relative border-l border-slate-200 pb-4 pl-4 last:pb-0">
+              <span className={`absolute -left-1.5 top-1 h-3 w-3 rounded-full border-2 border-white ${isLatest ? 'bg-slate-700' : 'bg-slate-300'}`} />
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-medium text-slate-800">{actionLabel}</div>
+                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusTone}`}>
+                  <span className="size-1.5 rounded-full bg-current" />
+                  {pillText}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-slate-500">{transitionText}</div>
+              {metaText ? <div className="mt-1 text-xs text-slate-500">{metaText}</div> : null}
+              {allocationLog ? (
+                <div className="mt-2 grid gap-2 rounded-md bg-white px-3 py-2 text-xs text-slate-600 sm:grid-cols-4">
+                  <div>จำนวน: <span className="font-medium text-slate-800">{formatMoney(allocationLog.allocatedQty)}</span></div>
+                  <div>มูลค่า: <span className="font-medium text-slate-800">{formatMoney(allocationLog.allocatedAmount)}</span></div>
+                  <div>ก่อน: <span className="font-medium text-slate-800">{formatMoney(allocationLog.fromRemainingQty)}</span></div>
+                  <div>หลัง: <span className="font-medium text-slate-800">{formatMoney(allocationLog.toRemainingQty)}</span></div>
+                </div>
+              ) : null}
+              {(statusLog?.note || allocationLog?.note) ? <div className="mt-2 whitespace-pre-wrap rounded-md bg-white px-3 py-2 text-sm text-slate-700">{statusLog?.note || allocationLog?.note}</div> : null}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function ExportButton({ href }: { href: string }) {
   return (
     <UiButton asChild className="ml-auto gap-2" variant="export">
@@ -695,7 +799,12 @@ export function PoBuyPageClient() {
                 <TableNumberCell tone="amber" value={formatMoney(row.remainingQty)} />
                 <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.expectedDelivery)}</TableCell>
                 <TableCell className="text-center"><PoBuyNoteIndicator note={row.notes} poNo={row.docNo} /></TableCell>
-                <TableCell className="w-28 whitespace-nowrap text-center"><span className={`rounded-full px-2 py-0.5 ${statusBadge(row.status)}`}>{poBuyStatusLabel(row.status)}</span></TableCell>
+                <TableCell className="w-28 whitespace-nowrap text-center">
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusBadge(row.status)}`}>
+                    <span className="size-1.5 rounded-full bg-current" />
+                    {poBuyStatusLabel(row.status)}
+                  </span>
+                </TableCell>
                 <TableCell className="w-28 whitespace-nowrap text-xs text-slate-600"><div className="truncate">{row.updatedBy || row.createdBy || '-'}</div><div className="font-mono text-[10px] text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></TableCell>
                 <TableCell className="whitespace-nowrap text-right">
                   {row.status === 'Open' && row.qty === row.remainingQty ? (
@@ -999,11 +1108,11 @@ function toggleStatusFilter(value: string, setStatuses: Dispatch<SetStateAction<
 
 function statusBadge(status: string) {
   const normalized = poBuyStatusKey(status)
-  if (normalized === 'received') return 'bg-emerald-100 text-emerald-700'
-  if (normalized === 'partial') return 'bg-amber-100 text-amber-700'
-  if (normalized === 'shortClosed') return 'bg-red-100 text-red-700'
-  if (normalized === 'cancelled') return 'bg-slate-100 text-slate-500'
-  return 'bg-blue-100 text-blue-700'
+  if (normalized === 'received') return 'text-emerald-700'
+  if (normalized === 'partial') return 'text-cyan-700'
+  if (normalized === 'shortClosed') return 'text-rose-700'
+  if (normalized === 'cancelled') return 'text-slate-500'
+  return 'text-amber-700'
 }
 
 function SupplierSearchCombobox({
@@ -1279,10 +1388,9 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
             <DialogDescription>{row.supplierName}</DialogDescription>
           </div>
         </DialogHeader>
-        <div className="grid gap-3 p-4 md:grid-cols-3">
+        <div className="grid gap-3 p-4 md:grid-cols-5">
           <Detail label="วันที่สร้างเอกสาร" value={formatDateDisplay(row.date)} />
           <Detail label="วันที่กำหนดส่ง" value={formatDateDisplay(row.expectedDelivery)} />
-          <Detail label="สถานะ" value={poBuyStatusLabel(row.status)} />
           <Detail label="Qty" value={formatMoney(row.qty)} />
           <Detail label="คงเหลือ" value={formatMoney(row.remainingQty)} />
           <Detail label="ปิดรับไม่ครบ" value={row.shortClosedQty > 0 ? formatMoney(row.shortClosedQty) : '-'} />
@@ -1320,46 +1428,15 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
           </Table>
         </div>
         <div className="px-4 pb-4">
-          <div className="mb-2 text-sm font-medium text-slate-700">ประวัติสถานะ</div>
-          <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-            {row.statusLogs.length === 0 ? <div className="text-sm text-slate-500">ยังไม่มีประวัติสถานะ</div> : row.statusLogs.map((log) => (
-              <div key={log.id} className="border-b border-slate-200 pb-2 last:border-b-0 last:pb-0">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">{poBuyStatusActionLabel(log.action)}</div>
-                    <div className="text-xs text-slate-500">{poBuyStatusTransitionLabel(log)}</div>
-                  </div>
-                  <div className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</div>
-                </div>
-                <div className="mt-0.5 text-xs text-slate-500">{log.createdBy || '-'}</div>
-                {poBuyStatusMetaText(log.meta) ? <div className="mt-1 text-xs text-slate-500">{poBuyStatusMetaText(log.meta)}</div> : null}
-                {log.note ? <div className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{log.note}</div> : null}
-              </div>
-            ))}
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium text-slate-700">ประวัติ POB</div>
+            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusBadge(row.status)}`}>
+              <span className="size-1.5 rounded-full bg-current" />
+              ล่าสุด: {poBuyStatusLabel(row.status)}
+            </span>
           </div>
-        </div>
-        <div className="px-4 pb-4">
-          <div className="mb-2 text-sm font-medium text-slate-700">ประวัติการจัดสรร</div>
-          <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
-            {row.allocationLogs.length === 0 ? <div className="text-sm text-slate-500">ยังไม่มีประวัติการจัดสรร PO</div> : row.allocationLogs.map((log) => (
-              <div key={log.id} className="border-b border-slate-200 pb-2 last:border-b-0 last:pb-0">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">{poBuyAllocationActionLabel(log.action)}</div>
-                    <div className="text-xs text-slate-500">{poBuyAllocationDescription(log)}</div>
-                  </div>
-                  <div className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</div>
-                </div>
-                <div className="mt-1 grid gap-2 text-xs text-slate-600 sm:grid-cols-4">
-                  <div>จำนวน: <span className="font-medium text-slate-800">{formatMoney(log.allocatedQty)}</span></div>
-                  <div>มูลค่า: <span className="font-medium text-slate-800">{formatMoney(log.allocatedAmount)}</span></div>
-                  <div>ก่อน: <span className="font-medium text-slate-800">{formatMoney(log.fromRemainingQty)}</span></div>
-                  <div>หลัง: <span className="font-medium text-slate-800">{formatMoney(log.toRemainingQty)}</span></div>
-                </div>
-                <div className="mt-0.5 text-xs text-slate-500">{log.createdBy || '-'}</div>
-                {log.note ? <div className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{log.note}</div> : null}
-              </div>
-            ))}
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <PoBuyStatusTimeline row={row} />
           </div>
         </div>
         <DialogFooter>

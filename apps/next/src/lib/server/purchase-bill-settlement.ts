@@ -109,6 +109,7 @@ export async function refreshSupplierAdvancePaymentAllocation(
     amount: totalAmount,
     currentStatus: advancePayment.status,
     remainingAmount,
+    settledAmount: approvalSummary.settledAmount,
   })
 
   await tx.supplier_advance_payments.update({

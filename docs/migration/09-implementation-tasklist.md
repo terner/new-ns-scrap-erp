@@ -491,6 +491,15 @@ Reporting rule:
 - [ ] design `purchase_bill_lines`
 - [ ] define stock movement trigger/rule
 - [ ] define payment relation
+- [x] `/purchase/bills` supplier swap flow
+  - [x] แยก page-specific flow doc เป็น `docs/notes/Purchase Bills Page Flow.md`
+  - [x] เพิ่มปุ่ม `เปลี่ยน Supplier` ใน modal แก้ไข PB ข้างช่อง Supplier
+  - [x] save supplier swap ต้อง void PB เดิมทั้งใบและสร้าง PB ใหม่เลขใหม่ใน transaction เดียว
+  - [x] PB ใหม่คง WTI/receipt เดิมได้ แต่เปลี่ยน Supplier และราคาได้
+  - [x] PB ใหม่จาก supplier swap ต้องเป็น Spot Buy ทั้งหมด และ API ต้อง reject ถ้ามี `poBuyId` เพราะห้ามตัด PO ข้าม Supplier จากใบรับของเดิม
+  - [x] ADV allocation ของ PB เดิมต้องถูก void/release ไปกับ PB เดิม และไม่ carry ไป PB ใหม่อัตโนมัติ
+  - [x] PB เดิมที่ถูก void จาก supplier swap ใช้ status แยก `cancelled_supplier_swap` และแสดงผล `ยกเลิก/เปลี่ยน Supplier`
+  - [x] บันทึก `bill_swap_history` ให้ `/daily/bill-swap-history` แสดง Supplier เดิม/ใหม่ ราคาเดิม/ใหม่ และเลข PB ใหม่ในเหตุผลได้
 
 ### 6.2 Sales Prep
 
@@ -630,6 +639,7 @@ Tracker หลักสำหรับงานที่เหลือทั้
 - [x] `/api/stock/convert` and `/api/stock/transfer` no longer derive outward read keys from internal ledger ids
 - [x] `/api/admin/transaction-ledger` no longer falls back from `accountName` to `account_id`
 - [x] `advance-payments` and `weight-tickets` history/timeline events now use outward `event_key` instead of internal audit-log row ids
+- [x] ADV runtime status now includes `partially_paid` (`จ่ายแล้วบางส่วน`), labels `paid` as `จ่ายแล้ว`, and prioritizes allocation status over payment status. PB cancel / supplier swap release ADV allocation now recalculates back to `จ่ายแล้ว` or `จ่ายแล้วบางส่วน` from actual PMT settlement.
 - [x] purchase-bill weight-ticket selectors now use `doc_no` and doc-based composites instead of internal ticket/line/summary ids
 - [x] `/api/finance/foreign/fx-gain-loss-report` now uses a natural outward composite id and no longer exposes raw internal `ref_id`
 - [x] `/api/admin/auth-events` now uses event-based composite ids instead of internal audit/activity row ids

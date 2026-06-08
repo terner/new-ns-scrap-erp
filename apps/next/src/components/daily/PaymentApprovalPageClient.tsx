@@ -72,7 +72,6 @@ type ApprovalPayload = {
 }
 
 type ApprovalTab = 'advance' | 'ap' | 'expense'
-type ApprovalFilter = 'all' | 'pending' | 'approved' | 'voided'
 type ApprovalSortDirection = 'asc' | 'desc'
 type ApprovalSortKey = 'bankAccount' | 'date' | 'docNo' | 'dueDate' | 'paidAmount' | 'partyName' | 'payableBalance' | 'totalAmount'
 type ApprovalDetailState =
@@ -85,11 +84,11 @@ type SplitDraft = {
 }
 
 const pageSizeOptions = [10, 25, 50, 100]
-const approvalFilterOptions: Array<{ label: string; value: ApprovalFilter }> = [
-  { label: 'ทั้งหมด', value: 'all' },
-  { label: 'ยังไม่อนุมัติ', value: 'pending' },
-  { label: 'อนุมัติแล้ว', value: 'approved' },
-  { label: 'ยกเลิกแล้ว', value: 'voided' },
+const approvalFilterOptions: Array<{ label: string; values: ApprovalStatus[] }> = [
+  { label: 'ทั้งหมด', values: [] },
+  { label: 'ยังไม่อนุมัติ', values: ['pending'] },
+  { label: 'อนุมัติแล้ว', values: ['approved'] },
+  { label: 'ยกเลิกแล้ว', values: ['voided'] },
 ]
 
 function formatDecimalWithGrouping(value: number) {
@@ -230,7 +229,7 @@ export function PaymentApprovalPageClient() {
   const [inputDrafts, setInputDrafts] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmittingApproval, setIsSubmittingApproval] = useState(false)
-  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>('pending')
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<ApprovalStatus[]>([])
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
@@ -281,12 +280,10 @@ export function PaymentApprovalPageClient() {
       if (query && !haystack.includes(query)) return false
       if (dateFrom && rowDate < dateFrom) return false
       if (dateTo && rowDate > dateTo) return false
-      if (approvalFilter === 'approved' && row.approvalStatus !== 'approved') return false
-      if (approvalFilter === 'pending' && row.approvalStatus !== 'pending') return false
-      if (approvalFilter === 'voided' && row.approvalStatus !== 'voided') return false
+      if (approvalStatusFilter.length > 0 && !approvalStatusFilter.includes(row.approvalStatus)) return false
       return true
     })
-  }, [advanceApprovalRows, approvalFilter, data.expenseRows, dateFrom, dateTo, purchaseApprovalRows, search, tab])
+  }, [advanceApprovalRows, approvalStatusFilter, data.expenseRows, dateFrom, dateTo, purchaseApprovalRows, search, tab])
 
   const rows = useMemo(() => {
     const collator = new Intl.Collator('th-TH', { numeric: true, sensitivity: 'base' })
@@ -330,15 +327,27 @@ export function PaymentApprovalPageClient() {
 
   useEffect(() => {
     setPage(1)
-  }, [approvalFilter, dateFrom, dateTo, pageSize, search, sortDirection, sortKey, tab])
+  }, [approvalStatusFilter, dateFrom, dateTo, pageSize, search, sortDirection, sortKey, tab])
 
   function clearFilters() {
-    setApprovalFilter('all')
+    setApprovalStatusFilter([])
     setDateFrom('')
     setDateTo('')
     setSearch('')
     setSortDirection('desc')
     setSortKey('date')
+  }
+
+  function toggleApprovalStatusFilter(values: ApprovalStatus[]) {
+    if (values.length === 0) {
+      setApprovalStatusFilter([])
+      return
+    }
+    setApprovalStatusFilter((current) => {
+      const allSelected = values.every((value) => current.includes(value))
+      if (allSelected) return current.filter((value) => !values.includes(value))
+      return Array.from(new Set([...current, ...values]))
+    })
   }
 
   function changeSort(nextKey: ApprovalSortKey) {
@@ -559,17 +568,20 @@ export function PaymentApprovalPageClient() {
             <DatePickerInput id="payment-approval-date-from" value={dateFrom} onChange={setDateFrom} />
             <span className="text-slate-400">→</span>
             <DatePickerInput id="payment-approval-date-to" value={dateTo} onChange={setDateTo} />
-            {(search || dateFrom || dateTo || approvalFilter !== 'all' || sortKey !== 'date' || sortDirection !== 'desc') ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
+            {(search || dateFrom || dateTo || approvalStatusFilter.length > 0 || sortKey !== 'date' || sortDirection !== 'desc') ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">สถานะ:</span>
             {approvalFilterOptions.map((option) => {
-              const active = approvalFilter === option.value
+              const active = option.values.length === 0
+                ? approvalStatusFilter.length === 0
+                : option.values.every((value) => approvalStatusFilter.includes(value))
               return (
                 <button
-                  key={option.value}
-                  className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${active ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'}`}
+                  key={option.label}
+                  className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
                   type="button"
-                  onClick={() => setApprovalFilter(option.value)}
+                  onClick={() => toggleApprovalStatusFilter(option.values)}
                 >
                   {option.label}
                 </button>

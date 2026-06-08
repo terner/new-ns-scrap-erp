@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { requireBusinessCode } from '@/lib/business-code'
+import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
@@ -88,7 +89,7 @@ export async function GET(request: Request) {
         include: { purchase_bill_items: { orderBy: { line_no: 'asc' } } },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
-        where: { NOT: { status: 'cancelled' } },
+        where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] } },
       }),
       prisma.payments.findMany({
         orderBy: [{ date: 'desc' }],

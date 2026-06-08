@@ -48,9 +48,10 @@ export function advancePaymentStatusLabel(status: string) {
     allocated: 'ใช้หักบิลแล้ว',
     approved: 'อนุมัติแล้ว',
     cancelled: 'ยกเลิก',
-    paid: 'เสร็จสิ้น',
+    paid: 'จ่ายแล้ว',
     partially_allocated: 'ใช้หักบิลบางส่วน',
     partially_approved: 'อนุมัติแล้วบางส่วน',
+    partially_paid: 'จ่ายแล้วบางส่วน',
     pending_approval: 'ยังไม่อนุมัติ',
   }
   return labels[status] ?? status
@@ -225,6 +226,7 @@ export type AdvancePaymentApprovalStatusSummary = {
   activeApprovalAmount: number
   activeApprovalCount: number
   allActiveApprovalsSettled: boolean
+  settledAmount: number
 }
 
 export function deriveAdvancePaymentWorkflowStatus(params: {
@@ -235,12 +237,15 @@ export function deriveAdvancePaymentWorkflowStatus(params: {
   cancelledAt?: Date | null
   currentStatus?: string | null
   remainingAmount: number
+  settledAmount: number
 }) {
   const currentStatus = String(params.currentStatus ?? '')
   if (params.cancelledAt || currentStatus === 'cancelled') return 'cancelled'
   if (params.allocatedAmount > EPSILON) {
     return params.remainingAmount <= EPSILON ? 'allocated' : 'partially_allocated'
   }
+  if (params.settledAmount >= params.amount - EPSILON) return 'paid'
+  if (params.settledAmount > EPSILON) return 'partially_paid'
   if (params.activeApprovalAmount <= EPSILON) return 'pending_approval'
   if (params.activeApprovalAmount < params.amount - EPSILON) return 'partially_approved'
   return params.allActiveApprovalsSettled ? 'paid' : 'approved'
@@ -259,6 +264,7 @@ export async function summarizeAdvancePaymentApprovalStatus(
     },
   })
   let allActiveApprovalsSettled = approvals.length > 0
+  let totalSettledAmount = 0
   for (const approval of approvals) {
     const payments = await tx.payments.findMany({
       select: { amount: true, discount: true, withholding_tax: true },
@@ -270,6 +276,7 @@ export async function summarizeAdvancePaymentApprovalStatus(
     const settledAmount = payments.reduce((sum, payment) => (
       sum + toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
     ), 0)
+    totalSettledAmount += settledAmount
     if (Math.max(0, toNumber(approval.approved_amount) - settledAmount) > EPSILON) {
       allActiveApprovalsSettled = false
       break
@@ -280,6 +287,7 @@ export async function summarizeAdvancePaymentApprovalStatus(
     activeApprovalAmount: roundMoney(approvals.reduce((sum, approval) => sum + toNumber(approval.approved_amount), 0)),
     activeApprovalCount: approvals.length,
     allActiveApprovalsSettled,
+    settledAmount: roundMoney(totalSettledAmount),
   }
 }
 
@@ -316,6 +324,7 @@ export async function refreshAdvancePaymentWorkflowStatus(
     cancelledAt: advance.cancelled_at,
     currentStatus: advance.status,
     remainingAmount: toNumber(advance.remaining_amount),
+    settledAmount: approvalSummary.settledAmount,
   })
 
   if (nextStatus !== advance.status) {
@@ -354,6 +363,7 @@ function statusTimelineEventKey(action: string) {
   if (action === 'approved') return 'purchase.advance-payment.approved'
   if (action === 'partially_approved') return 'purchase.advance-payment.partially-approved'
   if (action === 'approval_voided') return 'purchase.advance-payment.approval-voided'
+  if (action === 'partially_paid') return 'purchase.advance-payment.partially-paid'
   if (action === 'paid') return 'purchase.advance-payment.paid'
   if (action === 'payment_reversed') return 'purchase.advance-payment.payment-reversed'
   if (action === 'partially_allocated') return 'purchase.advance-payment.partially-allocated'

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { defaultPaymentMethodNameByGroup, paymentMethodGroupFromValue, resolvePaymentMethodName } from '@/lib/account-payment-method'
 import { requireBusinessCode, requireDocumentNo } from '@/lib/business-code'
+import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { refreshAdvancePaymentWorkflowStatus } from '@/lib/server/advance-payments'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -118,7 +119,7 @@ export async function GET() {
         orderBy: [{ date: 'asc' }, { doc_no: 'asc' }],
         take: 5000,
         where: {
-          NOT: { status: 'cancelled' },
+          status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] },
         },
       }),
       prisma.supplier_advance_payments.findMany({
@@ -474,7 +475,7 @@ export async function POST(request: Request) {
         },
         where: {
           ...(values.sourceType === 'purchase_bill' ? { doc_no: sourceDocNo } : { id: BigInt(-1) }),
-          NOT: { status: 'cancelled' },
+          status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] },
         },
       })
       if (values.sourceType === 'purchase_bill' && bills.length !== 1) throw new Error('ไม่พบบิลซื้อที่ต้องการอนุมัติ หรือบิลถูกยกเลิกแล้ว')

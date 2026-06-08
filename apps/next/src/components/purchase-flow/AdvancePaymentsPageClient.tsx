@@ -237,12 +237,13 @@ export function AdvancePaymentsPageClient() {
     searchText: `${product.code ?? ''} ${product.name} ${product.unit ?? ''}`,
   })), [activeProducts])
   const selectedProduct = useMemo(() => activeProducts.find((product) => product.id === form.productId) ?? null, [activeProducts, form.productId])
+  const derivedNetWeight = useMemo(() => calculateNetWeightInputValue(form.weightIn, form.weightOut), [form.weightIn, form.weightOut])
   const computedAmount = useMemo(() => {
-    const netWeight = Number(form.netWeight)
+    const netWeight = Number(derivedNetWeight)
     const pricePerKg = Number(form.pricePerKg)
     if (!Number.isFinite(netWeight) || !Number.isFinite(pricePerKg)) return 0
     return Math.max(0, netWeight * pricePerKg)
-  }, [form.netWeight, form.pricePerKg])
+  }, [derivedNetWeight, form.pricePerKg])
 
   const closeForm = useCallback(() => {
     setEditingAdvanceId(null)
@@ -289,7 +290,7 @@ export function AdvancePaymentsPageClient() {
       fundingAccountId: 'fundingAccountId' in row ? row.fundingAccountId : '',
       inDate: 'inDate' in row && row.inDate ? row.inDate : defaultDateTime,
       largeScaleDocNo: row.largeScaleDocNo ?? '',
-      netWeight: String(row.netWeight ?? ''),
+      netWeight: calculateNetWeightInputValue(String(row.weightIn ?? ''), String(row.weightOut ?? '')),
       outDate: 'outDate' in row && row.outDate ? row.outDate : defaultDateTime,
       paymentMethod: row.paymentMethod ?? '',
       plateNo: 'plateNo' in row ? row.plateNo : '',
@@ -362,10 +363,17 @@ export function AdvancePaymentsPageClient() {
   }, [])
 
   const updateForm = (field: string, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }))
+    setForm((current) => {
+      const next = { ...current, [field]: value }
+      if (field === 'weightIn' || field === 'weightOut') {
+        next.netWeight = calculateNetWeightInputValue(next.weightIn, next.weightOut)
+      }
+      return next
+    })
     setFieldErrors((current) => {
       const next = { ...current }
       delete next[field]
+      if (field === 'weightIn' || field === 'weightOut') delete next.netWeight
       return next
     })
   }
@@ -401,8 +409,12 @@ export function AdvancePaymentsPageClient() {
   const submitForm = async () => {
     setError(null)
     setFieldErrors({})
-    const parsed = supplierAdvancePaymentFormSchema.safeParse({
+    const normalizedForm = {
       ...form,
+      netWeight: calculateNetWeightInputValue(form.weightIn, form.weightOut),
+    }
+    const parsed = supplierAdvancePaymentFormSchema.safeParse({
+      ...normalizedForm,
       productName: selectedProduct?.name ?? '',
       vehiclePhotoNames: vehiclePhotoFiles.map((file) => file.fileName),
     })
@@ -539,7 +551,7 @@ export function AdvancePaymentsPageClient() {
                   />
                   <InputField error={fieldErrors.weightIn} label="น้ำหนักเข้า *" min="0" step="0.01" type="number" value={form.weightIn} onChange={(value) => updateForm('weightIn', value)} />
                   <InputField error={fieldErrors.weightOut} label="น้ำหนักออก *" min="0" step="0.01" type="number" value={form.weightOut} onChange={(value) => updateForm('weightOut', value)} />
-                  <InputField error={fieldErrors.netWeight} label="น้ำหนักสุทธิ *" min="0" step="0.01" type="number" value={form.netWeight} onChange={(value) => updateForm('netWeight', value)} />
+                  <InputField readOnly className="bg-slate-50 text-slate-700" error={fieldErrors.netWeight} label="น้ำหนักสุทธิ *" min="0" step="0.01" type="number" value={derivedNetWeight} onChange={() => undefined} />
                   <MoneyInputField error={fieldErrors.pricePerKg} label="ราคา/กก. *" value={form.pricePerKg} onChange={(value) => updateForm('pricePerKg', value)} />
                 </div>
               </FormSection>
@@ -992,6 +1004,16 @@ function AdvancePaymentSortHeader({
   )
 }
 
+function calculateNetWeightInputValue(weightIn: string, weightOut: string) {
+  if (!weightIn.trim() && !weightOut.trim()) return ''
+  const inputWeight = Number(weightIn)
+  const outputWeight = Number(weightOut)
+  const normalizedInputWeight = Number.isFinite(inputWeight) ? inputWeight : 0
+  const normalizedOutputWeight = Number.isFinite(outputWeight) ? outputWeight : 0
+  const netWeight = Math.max(0, Math.round((normalizedInputWeight - normalizedOutputWeight + Number.EPSILON) * 100) / 100)
+  return String(netWeight)
+}
+
 function sanitizeMoneyInput(value: string) {
   const digitsOnly = value.replace(/,/g, '').replace(/[^\d.]/g, '')
   const [integerPart = '', decimalPart = ''] = digitsOnly.split('.')
@@ -1058,7 +1080,7 @@ function Metric({ label, tone, value }: { label: string; tone?: 'amber'; value: 
 function StatusDot({ label, status }: { label: string; status: string }) {
   const color = status === 'pending_approval'
     ? 'bg-amber-500 text-amber-700'
-    : status === 'paid' || status === 'allocated'
+    : status === 'paid' || status === 'partially_paid' || status === 'allocated'
       ? 'bg-emerald-500 text-emerald-700'
       : status === 'cancelled'
         ? 'bg-red-500 text-red-700'
@@ -1115,6 +1137,7 @@ function timelineLabel(event: AdvancePaymentTimelineEvent) {
   if (event.eventKey === 'purchase.advance-payment.approved') return 'อนุมัติ ADV'
   if (event.eventKey === 'purchase.advance-payment.partially-approved') return 'อนุมัติ ADV บางส่วน'
   if (event.eventKey === 'purchase.advance-payment.approval-voided') return 'ยกเลิกรายการรอจ่าย ADV'
+  if (event.eventKey === 'purchase.advance-payment.partially-paid') return 'จ่าย ADV บางส่วน'
   if (event.eventKey === 'purchase.advance-payment.paid') return 'จ่าย ADV สำเร็จ'
   if (event.eventKey === 'purchase.advance-payment.payment-reversed') return 'ยกเลิกการจ่าย ADV'
   if (event.eventKey === 'purchase.advance-payment.partially-allocated') return 'ใช้ ADV หักบิลบางส่วน'

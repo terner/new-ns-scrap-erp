@@ -36,6 +36,8 @@ updated: 2026-06-08
 
 matrix สถานะเอกสารราย use case และราย step แยกไว้ที่ [[Purchase Flow Status Matrix]]
 
+เอกสาร flow เฉพาะหน้า `/purchase/bills` แยกไว้ที่ [[Purchase Bills Page Flow]] เพื่อเก็บรายละเอียด create/edit/cancel, supplier swap, UI guard, และ side effects ระดับ page
+
 เอกสาร canonical สำหรับส่วน `อนุมัติจ่ายเงิน / รอจ่าย / ทำจ่าย / ประวัติการจ่ายเงิน / คืนเงินมัดจำ` ถูกแยกไปที่ [[Payment Flow]]
 
 ## Scope Boundary / จุดตัดกับ Payment Flow
@@ -189,7 +191,7 @@ use case หลัก:
   - `ชื่อสินค้า`
   - `น้ำหนักเข้า`
   - `น้ำหนักออก`
-  - `น้ำหนักสุทธิ`
+  - `น้ำหนักสุทธิ` เป็นค่า derive จาก `น้ำหนักเข้า - น้ำหนักออก` ไม่ใช่ช่องที่แก้เอง
   - `ราคา/กก.`
   - `หมายเหตุ`
   - `ราคาที่ต้องจ่ายล่วงหน้า`

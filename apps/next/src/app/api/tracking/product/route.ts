@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
+import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
@@ -203,7 +204,7 @@ export async function GET(request: Request) {
         include: { purchase_bill_items: { orderBy: { line_no: 'asc' } } },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
-        where: { NOT: { status: 'cancelled' }, ...(branch?.id != null ? { branch_id: branch.id } : {}) },
+        where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] }, ...(branch?.id != null ? { branch_id: branch.id } : {}) },
       }),
       prisma.sales_bills.findMany({
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],

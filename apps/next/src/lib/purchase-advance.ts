@@ -32,6 +32,7 @@ export const supplierAdvancePaymentStatusValues = [
   'pending_approval',
   'partially_approved',
   'approved',
+  'partially_paid',
   'paid',
   'partially_allocated',
   'allocated',
