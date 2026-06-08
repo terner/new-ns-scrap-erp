@@ -81,7 +81,7 @@ function buildWorkbook(rows: Array<Record<string, string | number>>) {
   const headers = rows[0] ? Object.keys(rows[0]) : []
   sheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, header.length + 4) }))
   applyWorksheetTableLayout(sheet, headers.length, rows.length + 1)
-  XLSX.utils.book_append_sheet(workbook, sheet, 'PO Buy')
+  XLSX.utils.book_append_sheet(workbook, sheet, 'PO ซื้อ')
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer
 }
 
@@ -225,9 +225,9 @@ async function resolveProductsByCodeOrId(productRefs: string[]) {
   }
 }
 
-async function resolvePoBuyByDocNoOrId(idOrDocNo: string) {
+async function resolvePoBuyByDocNoOrId(idOrDocNo: string, client: Pick<typeof prisma, 'po_buys'> = prisma) {
   const internalId = parseInternalBigIntId(idOrDocNo)
-  return prisma.po_buys.findFirst({
+  return client.po_buys.findFirst({
     where: {
       OR: [
         { doc_no: idOrDocNo },
@@ -412,22 +412,23 @@ export async function GET(request: Request) {
 
     if (url.searchParams.get('format') === 'xlsx') {
       return xlsxResponse(buildWorkbook(rows.map((row) => ({
-        CreatedBy: row.createdBy,
-        Date: row.date,
-        DocNo: row.docNo,
-        ExpectedDelivery: row.expectedDelivery,
-        ItemCount: row.itemCount,
-        Notes: row.notes,
-        Product: row.productName,
-        Qty: row.qty,
-        RemainingAmount: row.remainingAmount,
-        RemainingQty: row.remainingQty,
-        Status: row.status,
-        Seller: row.supplierName,
-        TotalAmount: row.totalAmount,
-        UpdatedAt: row.updatedAt || row.createdAt,
-        UpdatedBy: row.updatedBy || row.createdBy,
-      }))), 'po_buy.xlsx')
+        เลขที่: row.docNo,
+        วันที่: row.date,
+        ผู้ขาย: row.supplierName,
+        สาขา: row.branchId || '-',
+        สินค้า: row.productName,
+        จำนวนรายการ: row.itemCount,
+        จำนวนรวม: row.qty,
+        ยอดรวม: row.totalAmount,
+        รอรับรวม: row.remainingQty,
+        มูลค่าคงเหลือ: row.remainingAmount,
+        วันที่กำหนดส่ง: row.expectedDelivery,
+        สถานะ: row.status,
+        หมายเหตุ: row.notes,
+        อัปเดตล่าสุด: row.updatedAt || row.createdAt,
+        อัปเดตโดย: row.updatedBy || row.createdBy,
+        สร้างโดย: row.createdBy,
+      }))), `po_buy_${new Date().toISOString().slice(0, 10)}.xlsx`)
     }
 
     return NextResponse.json({
@@ -651,13 +652,14 @@ export async function PUT(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  let action = 'cancel'
   try {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
     const raw = await request.json()
     const actor = currentActor(context)
-    const action = typeof raw?.action === 'string' ? raw.action : 'cancel'
+    action = typeof raw?.action === 'string' ? raw.action : 'cancel'
 
     if (action === 'shortClose') {
       const values = poBuyShortCloseSchema.parse(raw)
@@ -668,10 +670,13 @@ export async function PATCH(request: Request) {
       if (existing.status === PO_BUY_STATUS.RECEIVED || toNumber(existing.remaining_qty) <= 0.0001) {
         return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Buy นี้รับครบแล้ว ไม่สามารถปิดรับไม่ครบได้' }, { status: 400 })
       }
+      if (existing.status !== PO_BUY_STATUS.PARTIAL) {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ปิดรับไม่ครบได้เฉพาะ PO Buy ที่รับบางส่วนแล้ว' }, { status: 400 })
+      }
 
       const shortClosedAt = new Date()
       const updated = await prisma.$transaction(async (tx) => {
-        const current = await resolvePoBuyByDocNoOrId(values.id)
+        const current = await resolvePoBuyByDocNoOrId(values.id, tx)
         if (!current) throw new Error('NOT_FOUND')
         const updatedRow = await tx.po_buys.update({
           where: { id: current.id },
@@ -748,6 +753,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ docNo: updated.doc_no, id: updated.doc_no })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
-    return apiErrorResponse(caught, 'ยกเลิก PO Buy ไม่ได้', 500)
+    return apiErrorResponse(caught, action === 'shortClose' ? 'ปิดรับไม่ครบไม่สำเร็จ' : 'ยกเลิก PO Buy ไม่ได้', 500)
   }
 }

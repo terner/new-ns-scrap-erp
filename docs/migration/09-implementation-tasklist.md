@@ -631,4 +631,6 @@ Tracker หลักสำหรับงานที่เหลือทั้
 - [x] inventoryed remaining models without `code/doc_no` from `schema.prisma`: `59` total (`public 37`, `auth 22`)
 - [x] `/purchase/po-buy` item rows now use searchable product combobox + money-pattern unit price input + number-exception qty input to match `docs/design.md`
 - [x] `/purchase/po-buy` combobox behavior is restored inside the modal: supplier/product dropdowns are selectable, keyboard-navigable, not clipped by the table section, and create forms default `expectedDelivery` to today while list sort defaults to `docNo desc`
+- [x] `/purchase/po-buy` short-close action is now only enabled for partially received PO rows with remaining quantity; unreceived open rows show the action disabled and the PATCH route rejects direct short-close requests unless the PO is partially received
+- [x] `/purchase/po-buy` Excel export now follows the active purchase export convention: Thai headers, Thai worksheet name, dated filename, branch code included, and search/status/date/selected-row filters preserved
 - [ ] decide next schema wave for `public` models still lacking explicit business keys, especially support/admin and document-detail tables

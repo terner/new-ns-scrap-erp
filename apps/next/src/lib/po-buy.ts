@@ -3,6 +3,7 @@ import { z } from 'zod'
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
 const safeIdPattern = /^[A-Za-z0-9_.:-]+$/
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
+const multilineTextPattern = /^[^\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]+$/u
 
 const requiredDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD')
 const requiredDeliveryDate = z.preprocess(
@@ -40,7 +41,7 @@ export const poBuyCancelSchema = z.object({
 
 export const poBuyShortCloseSchema = z.object({
   id: z.string().trim().min(1, 'ระบุ PO Buy ที่ต้องการปิดรับไม่ครบ').max(80, 'รหัส PO Buy ยาวเกินไป').regex(safeIdPattern, 'รหัส PO Buy มีรูปแบบไม่ถูกต้อง'),
-  note: z.string().trim().min(1, 'กรอกเหตุผลการปิดรับไม่ครบ').max(500, 'เหตุผลยาวเกินไป').regex(generalTextPattern, 'เหตุผลมีรูปแบบไม่ถูกต้อง'),
+  note: z.string().trim().min(1, 'กรอกเหตุผลการปิดรับไม่ครบ').max(500, 'เหตุผลยาวเกินไป').regex(multilineTextPattern, 'เหตุผลมีรูปแบบไม่ถูกต้อง'),
 })
 
 export type PoBuyFormValues = z.infer<typeof poBuyFormSchema>

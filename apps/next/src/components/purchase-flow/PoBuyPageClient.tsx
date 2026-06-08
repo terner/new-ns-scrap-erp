@@ -228,6 +228,15 @@ function poBuyStatusLabel(status: string) {
   return 'ยังไม่รับ'
 }
 
+function canShortClosePoBuy(row: PoBuyRow) {
+  return poBuyStatusKey(row.status) === 'partial' && row.remainingQty > 0
+}
+
+function shouldShowShortCloseButton(row: PoBuyRow) {
+  const statusKey = poBuyStatusKey(row.status)
+  return (statusKey === 'open' || statusKey === 'partial') && row.remainingQty > 0
+}
+
 function poBuyStatusActionLabel(action: string) {
   switch (action) {
     case 'created':
@@ -437,14 +446,13 @@ export function PoBuyPageClient() {
     setIsSaving(true)
     try {
       const payload: PoBuyFormValues = parsed.data
-      const created = await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
+      await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
         body: JSON.stringify(editingPoId ? { ...payload, id: editingPoId } : payload),
         method: editingPoId ? 'PUT' : 'POST',
       })
       setShowForm(false)
       setEditingPoId(null)
       setEditingPoNo(null)
-      setSearch(created.docNo)
       await loadData()
     } catch (caught) {
       if (caught instanceof ApiError && Object.keys(caught.fieldErrors).length > 0) {
@@ -468,13 +476,12 @@ export function PoBuyPageClient() {
     setCancelNoteError('')
     setIsSaving(true)
     try {
-      const cancelled = await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
+      await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
         body: JSON.stringify({ id: cancelingRow.id, note }),
         method: 'PATCH',
       })
       setCancelingRow(null)
       setCancelNote('')
-      setSearch(cancelled.docNo)
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'ยกเลิก PO Buy ไม่ได้')
@@ -495,13 +502,12 @@ export function PoBuyPageClient() {
     setShortCloseNoteError('')
     setIsSaving(true)
     try {
-      const closed = await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
+      await dailyFetchJson<{ docNo: string; id: string }>('/api/purchase/po-buy', {
         body: JSON.stringify({ action: 'shortClose', id: shortClosingRow.id, note }),
         method: 'PATCH',
       })
       setShortClosingRow(null)
       setShortCloseNote('')
-      setSearch(closed.docNo)
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'ปิดรับไม่ครบไม่สำเร็จ')
@@ -698,8 +704,18 @@ export function PoBuyPageClient() {
                       <UiButton className="font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</UiButton>
                     </>
                   ) : null}
-                  {(row.status === 'Open' || row.status === 'Partially Received') && row.remainingQty > 0 ? (
-                    <UiButton className="font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openShortCloseDialog(row) }}>ปิดรับไม่ครบ</UiButton>
+                  {shouldShowShortCloseButton(row) ? (
+                    <UiButton
+                      className="font-normal"
+                      disabled={!canShortClosePoBuy(row)}
+                      size="xs"
+                      title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
+                      type="button"
+                      variant="outline"
+                      onClick={(event) => { event.stopPropagation(); openShortCloseDialog(row) }}
+                    >
+                      ปิดรับไม่ครบ
+                    </UiButton>
                   ) : null}
                 </TableCell>
               </TableRow>
@@ -1006,6 +1022,7 @@ function SupplierSearchCombobox({
       error={error}
       inputId="po-buy-supplier-search"
       label="ผู้ขาย *"
+      inputClassName="!h-9 px-2 py-1.5"
       options={options.map((supplier) => ({
         id: supplier.id,
         label: optionLabel(supplier),
@@ -1037,6 +1054,7 @@ function ProductSearchCombobox({
       error={error}
       hideLabel
       inputId={inputId}
+      inputClassName="!h-9 px-2 py-1.5"
       label="สินค้า *"
       options={options}
       optionsPanelClassName="max-h-[280px]"
@@ -1063,7 +1081,7 @@ function MoneyPatternInput({
 
   return (
     <UiInput
-      className="h-9 w-full px-2 py-1.5 text-right"
+      className="!h-9 w-full px-2 py-1.5 text-right"
       inputMode="decimal"
       type="text"
       value={isFocused ? rawValue : formatMoneyInput(value)}
@@ -1099,7 +1117,7 @@ function QuantityPatternInput({
 
   return (
     <UiInput
-      className="h-9 w-full px-2 py-1.5 text-right"
+      className="!h-9 w-full px-2 py-1.5 text-right"
       inputMode="decimal"
       type="text"
       value={rawValue}
@@ -1160,12 +1178,12 @@ function PoBuyFormModal({
     <Dialog open onOpenChange={(open) => {
       if (!open && !isSaving) onClose()
     }}>
-      <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-md p-0" data-combobox-portal-root="true" hideClose>
+      <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-5xl overflow-y-auto rounded-md p-0" data-combobox-portal-root="true" hideClose>
         <DialogHeader className="border-b px-5 py-3">
           <DialogTitle id="po-buy-form-title">{heading}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 p-5 text-sm">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 md:grid-cols-3">
             <div>
               <SupplierSearchCombobox
                 error={errors.supplierId}
@@ -1177,7 +1195,7 @@ function PoBuyFormModal({
             </div>
             <div>
               <label className="mb-1 block text-xs">สาขา <span className="text-red-600">*</span></label>
-              <UiSelect className={`h-9 w-full px-2 py-1.5 ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
+              <UiSelect className={`!h-9 w-full px-2 py-1.5 text-sm ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
                 <option disabled value="">เลือกสาขา</option>
                 {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
               </UiSelect>
@@ -1185,7 +1203,7 @@ function PoBuyFormModal({
             </div>
             <div>
               <label className="mb-1 block text-xs">วันส่งมอบ <span className="text-red-600">*</span></label>
-              <DatePickerInput className="h-9 w-full" required value={form.expectedDelivery} onChange={(value) => onUpdate('expectedDelivery', value)} />
+              <DatePickerInput className="!h-9 w-full" required value={form.expectedDelivery} onChange={(value) => onUpdate('expectedDelivery', value)} />
               {fieldError('expectedDelivery')}
             </div>
           </div>
@@ -1195,51 +1213,53 @@ function PoBuyFormModal({
               <label className="font-medium">📋 รายการสินค้า ({form.items.length})</label>
               <UiButton className="bg-emerald-600 font-normal hover:bg-emerald-700" size="xs" type="button" variant="default" onClick={onAddItem}>+ เพิ่มรายการ</UiButton>
             </div>
-            <Table>
-              <TableHeader>
-                <tr><TableHead>สินค้า / Grade *</TableHead><TableHead className="w-32 text-right">จำนวน (กก.) *</TableHead><TableHead className="w-32 text-right">ราคา/หน่วย *</TableHead><TableHead className="w-32 text-right">มูลค่ารวม</TableHead><TableHead className="w-8" /></tr>
-              </TableHeader>
-              <TableBody>
-                {form.items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="p-1 align-top">
-                      <ProductSearchCombobox
-                        error={errors[`items.${index}.productId`]}
-                        inputId={`po-buy-product-${index}`}
-                        options={productOptions}
-                        value={item.productId}
-                        onChange={(productId) => onUpdateItem(index, 'productId', productId)}
-                      />
-                      {fieldError(`items.${index}.productId`)}
-                    </TableCell>
-                    <TableCell className="p-1 align-top">
-                      <QuantityPatternInput value={item.qty} onChange={(value) => onUpdateItem(index, 'qty', value)} />
-                      {fieldError(`items.${index}.qty`)}
-                    </TableCell>
-                    <TableCell className="p-1 align-top">
-                      <MoneyPatternInput value={item.unitPrice} onChange={(value) => onUpdateItem(index, 'unitPrice', value)} />
-                      {fieldError(`items.${index}.unitPrice`)}
-                    </TableCell>
-                    <TableCell className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</TableCell>
-                    <TableCell className="p-1 text-center">{form.items.length > 1 ? <UiButton className="h-8 w-8 px-0 text-red-500" size="icon" type="button" variant="ghost" onClick={() => onRemoveItem(index)}>×</UiButton> : null}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <tfoot className="bg-slate-50 font-bold">
-                <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.totalCost)}</td><td /></tr>
-              </tfoot>
-            </Table>
+            <div className="overflow-x-auto rounded-md border">
+              <Table className="min-w-[820px] border-0">
+                <TableHeader>
+                  <tr><TableHead>สินค้า</TableHead><TableHead className="w-36 text-right">จำนวน (กก.) *</TableHead><TableHead className="w-36 text-right">ราคา/หน่วย *</TableHead><TableHead className="w-36 text-right">มูลค่ารวม</TableHead><TableHead className="w-10" /></tr>
+                </TableHeader>
+                <TableBody>
+                  {form.items.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="p-1 align-top">
+                        <ProductSearchCombobox
+                          error={errors[`items.${index}.productId`]}
+                          inputId={`po-buy-product-${index}`}
+                          options={productOptions}
+                          value={item.productId}
+                          onChange={(productId) => onUpdateItem(index, 'productId', productId)}
+                        />
+                        {fieldError(`items.${index}.productId`)}
+                      </TableCell>
+                      <TableCell className="p-1 align-top">
+                        <QuantityPatternInput value={item.qty} onChange={(value) => onUpdateItem(index, 'qty', value)} />
+                        {fieldError(`items.${index}.qty`)}
+                      </TableCell>
+                      <TableCell className="p-1 align-top">
+                        <MoneyPatternInput value={item.unitPrice} onChange={(value) => onUpdateItem(index, 'unitPrice', value)} />
+                        {fieldError(`items.${index}.unitPrice`)}
+                      </TableCell>
+                      <TableCell className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</TableCell>
+                      <TableCell className="p-1 text-center">{form.items.length > 1 ? <UiButton className="h-8 w-8 px-0 text-red-500" size="icon" type="button" variant="ghost" onClick={() => onRemoveItem(index)}>×</UiButton> : null}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <tfoot className="bg-slate-50 font-bold">
+                  <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.totalCost)}</td><td /></tr>
+                </tfoot>
+              </Table>
+            </div>
             {fieldError('items')}
           </div>
 
           <div>
             <label className="mb-1 block text-xs">หมายเหตุ</label>
-            <textarea className="w-full rounded-md border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
+            <textarea className="min-h-16 w-full rounded-md border px-2 py-1.5 text-sm" rows={2} value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
             {fieldError('notes')}
           </div>
         </div>
         <DialogFooter className="px-5">
-          <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ยกเลิก</UiButton>
+          <UiButton className="font-normal" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ยกเลิก</UiButton>
           <UiButton className="bg-blue-600 font-normal hover:bg-blue-700" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</UiButton>
         </DialogFooter>
       </DialogContent>

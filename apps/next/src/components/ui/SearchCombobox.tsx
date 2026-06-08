@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { Input } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
 
 export type SearchComboboxOption = {
   description?: string
@@ -17,6 +18,7 @@ export function SearchCombobox({
   error,
   errorKey,
   hideLabel = false,
+  inputClassName,
   inputId,
   label,
   options,
@@ -29,6 +31,7 @@ export function SearchCombobox({
   error?: string
   errorKey?: string
   hideLabel?: boolean
+  inputClassName?: string
   inputId: string
   label: string
   options: SearchComboboxOption[]
@@ -152,7 +155,11 @@ export function SearchCombobox({
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-invalid={Boolean(error)}
-        className={`h-10 w-full rounded-md border px-3 py-2 text-base sm:text-sm ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+        className={cn(
+          'h-10 w-full rounded-md border px-3 py-2 text-base sm:text-sm',
+          error ? 'border-red-400 bg-red-50' : 'border-slate-300',
+          inputClassName,
+        )}
         disabled={disabled}
         id={inputId}
         placeholder={placeholder}
