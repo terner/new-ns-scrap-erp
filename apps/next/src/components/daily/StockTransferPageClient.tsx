@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney, stockTransferFormSchema, todayDateInput, type StockTransferFormValues } from '@/lib/daily'
 import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
 import { formatDateDisplay } from '@/lib/format'
@@ -13,8 +15,19 @@ type Option = { active: boolean | null; branch_id?: string | null; code?: string
 type Row = { date: string; docNo: string; from: string; id: string; itemCount: number; notes: string; to: string; totalQty: number }
 type Payload = { branches: Option[]; products: Option[]; rows: Row[]; warehouses: Option[] }
 type Period = '' | 'today' | 'week' | 'month'
+type StockTransferColumnKey = 'action' | 'date' | 'docNo' | 'from' | 'itemCount' | 'notes' | 'to' | 'totalQty'
 
 const numberInputClass = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+const stockTransferColumns: Array<ResizableColumnDefinition<StockTransferColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'from', defaultWidth: 190, minWidth: 140 },
+  { key: 'to', defaultWidth: 190, minWidth: 140 },
+  { key: 'itemCount', defaultWidth: 110, minWidth: 90 },
+  { key: 'totalQty', defaultWidth: 140, minWidth: 120 },
+  { key: 'notes', defaultWidth: 240, minWidth: 160 },
+  { key: 'action', defaultWidth: 120, minWidth: 100 },
+]
 
 const emptyForm: StockTransferFormValues = {
   date: todayDateInput(),
@@ -45,6 +58,7 @@ export function StockTransferPageClient() {
   const [period, setPeriod] = useState<Period>('')
   const [search, setSearch] = useState('')
   const [toBranchId, setToBranchId] = useState('')
+  const columnResize = useResizableColumns('daily.stock-transfer', stockTransferColumns)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -212,6 +226,7 @@ export function StockTransferPageClient() {
           <span className="ml-2 text-slate-500">· น้ำหนักรวม <span className="font-semibold text-blue-700">{formatMoney(totalWeight)}</span> กก.</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
           <select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -417,17 +432,20 @@ export function StockTransferPageClient() {
         </div>
       ) : null}
 
-      <Table>
+      <Table style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <colgroup>
+          {stockTransferColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+        </colgroup>
         <TableHeader>
           <tr>
-            <TableHead>เลขที่</TableHead>
-            <TableHead>วันที่</TableHead>
-            <TableHead>จาก</TableHead>
-            <TableHead>ไป</TableHead>
-            <TableHead className="text-right">รายการ</TableHead>
-            <TableHead className="text-right">น้ำหนักรวม</TableHead>
-            <TableHead>หมายเหตุ</TableHead>
-            <TableHead className="text-right">จัดการ</TableHead>
+            <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
+            <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+            <ResizableTableHead label="จาก" resizeProps={columnResize.getResizeHandleProps('from', 'จาก')} />
+            <ResizableTableHead label="ไป" resizeProps={columnResize.getResizeHandleProps('to', 'ไป')} />
+            <ResizableTableHead align="right" label="รายการ" resizeProps={columnResize.getResizeHandleProps('itemCount', 'รายการ')} />
+            <ResizableTableHead align="right" label="น้ำหนักรวม" resizeProps={columnResize.getResizeHandleProps('totalQty', 'น้ำหนักรวม')} />
+            <ResizableTableHead label="หมายเหตุ" resizeProps={columnResize.getResizeHandleProps('notes', 'หมายเหตุ')} />
+            <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
           </tr>
         </TableHeader>
         <TableBody>

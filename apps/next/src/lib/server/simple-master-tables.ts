@@ -41,9 +41,49 @@ type SimpleMasterConfig = {
 }
 
 const asRecord = (row: unknown) => row as Record<string, unknown>
-const directorTypeSchema = z.enum(['กรรมการ', 'พนักงาน', 'อื่นๆ']).nullable()
+const directorTitleSchema = z.enum(['นาย', 'นาง', 'นางสาว'], {
+  invalid_type_error: 'เลือกคำนำหน้าชื่อ',
+  required_error: 'เลือกคำนำหน้าชื่อ',
+})
+const directorTypeSchema = z.enum(['กรรมการ', 'ผู้ถือหุ้น', 'พนักงาน', 'บุคคลที่เกี่ยวข้อง'], {
+  invalid_type_error: 'เลือกประเภท',
+  required_error: 'เลือกประเภท',
+})
+const directorPersonSchema = z.object({
+  accountName: z.string().nullable(),
+  accountNo: z.string().nullable(),
+  bankBranch: z.string().nullable(),
+  bankName: z.string().nullable(),
+  firstName: z.string({ invalid_type_error: 'กรอกชื่อ', required_error: 'กรอกชื่อ' }).trim().min(1, 'กรอกชื่อ'),
+  lastName: z.string({ invalid_type_error: 'กรอกนามสกุล', required_error: 'กรอกนามสกุล' }).trim().min(1, 'กรอกนามสกุล'),
+  nameTitle: directorTitleSchema,
+  type: directorTypeSchema,
+}).superRefine((values, context) => {
+  const hasBankInfo = Boolean(values.bankName || values.accountNo || values.accountName || values.bankBranch)
+  if (!hasBankInfo) return
+
+  if (!values.bankName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกธนาคาร', path: ['bankName'] })
+  if (!values.accountName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบัญชี', path: ['accountName'] })
+  if (!values.accountNo) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกเลขบัญชี', path: ['accountNo'] })
+})
 
 type SimpleMasterValues = ReturnType<typeof parseMasterDataForm>
+
+function trimText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function directorDisplayName(values: Pick<SimpleMasterValues, 'firstName' | 'lastName' | 'nameTitle'>) {
+  return [values.nameTitle, values.firstName, values.lastName].map((part) => part?.trim()).filter(Boolean).join(' ')
+}
+
+function prepareSimpleMasterBody(kind: SimpleMasterKind, body: unknown) {
+  if (kind !== 'directors' || body === null || typeof body !== 'object' || Array.isArray(body)) return body
+
+  const record = body as Record<string, unknown>
+  const name = [record.nameTitle, record.firstName, record.lastName].map(trimText).filter(Boolean).join(' ')
+  return { ...record, name: name || '-' }
+}
 
 async function nextBankNameId() {
   const rows = await prisma.bank_names.findMany({ select: { code: true } })
@@ -53,6 +93,16 @@ async function nextBankNameId() {
     return Number.isFinite(value) ? Math.max(max, value) : max
   }, 0)
   return `BANK-${String(maxNumber + 1).padStart(3, '0')}`
+}
+
+async function nextDirectorPersonCode() {
+  const rows = await prisma.director_employees.findMany({ select: { code: true } })
+  const maxNumber = rows.reduce((max, row) => {
+    const matched = row.code.match(/^P(\d+)$/i)
+    const value = matched ? Number(matched[1]) : 0
+    return Number.isFinite(value) ? Math.max(max, value) : max
+  }, 0)
+  return `P${String(maxNumber + 1).padStart(3, '0')}`
 }
 
 function permissionForSimpleMaster(kind: SimpleMasterKind, action: 'manage' | 'view') {
@@ -66,7 +116,16 @@ function requireSimpleMasterPermission(kind: SimpleMasterKind, action: 'manage' 
 
 function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMasterValues) {
   if (kind === 'directors') {
-    directorTypeSchema.parse(values.type)
+    directorPersonSchema.parse({
+      accountName: values.accountName,
+      accountNo: values.accountNo,
+      bankBranch: values.bankBranch,
+      bankName: values.bankName,
+      firstName: values.firstName,
+      lastName: values.lastName,
+      nameTitle: values.nameTitle,
+      type: values.type,
+    })
   }
 
   if (kind === 'productionOutputCategories') {
@@ -133,19 +192,24 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
   },
   directors: {
     delegate: () => prisma.director_employees as Delegate,
-    prefix: 'D',
+    prefix: 'P',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
     lookupKey: 'code',
+    nextId: nextDirectorPersonCode,
     map: (row) => {
       const record = asRecord(row)
       return {
         id: record.code,
         code: record.code,
         name: record.name,
+        nameTitle: record.name_title,
+        firstName: record.first_name,
+        lastName: record.last_name,
         type: record.type,
-        phone: record.phone,
         bankName: record.bank_name,
-        accountNo: record.account_no ?? record.bank_account,
+        accountName: record.bank_account_name,
+        accountNo: record.account_no,
+        bankBranch: record.bank_branch,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -153,14 +217,20 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
     },
     data: (values, _id, code) => ({
       code,
-      name: values.name,
-      type: values.type || null,
-      phone: values.phone || null,
+      name: directorDisplayName(values),
+      name_title: values.nameTitle,
+      first_name: values.firstName,
+      last_name: values.lastName,
+      type: values.type,
+      phone: null,
       bank_name: values.bankName || null,
+      bank_account_name: values.accountName || null,
       account_no: values.accountNo || null,
+      bank_branch: values.bankBranch || null,
       bank_account: values.accountNo || null,
       active: values.active,
     }),
+    normalizeValues: async (values) => (values.id ? { ...values, code: values.id } : { ...values, code: null }),
   },
   expenseTypes: {
     delegate: () => prisma.expense_types as Delegate,
@@ -497,7 +567,7 @@ export async function saveSimpleMasterData(request: Request, kind: SimpleMasterK
   await requireSimpleMasterPermission(kind, 'manage')
 
   const config = configs[kind]
-  const rawValues = validateSimpleMasterValues(kind, parseMasterDataForm(await request.json()))
+  const rawValues = validateSimpleMasterValues(kind, parseMasterDataForm(prepareSimpleMasterBody(kind, await request.json())))
   const values = config.normalizeValues ? await config.normalizeValues(rawValues) : rawValues
   if (kind === 'machines' && values.type) {
     const machineType = await prisma.production_machine_types.findFirst({ where: { active: true, name: values.type } })

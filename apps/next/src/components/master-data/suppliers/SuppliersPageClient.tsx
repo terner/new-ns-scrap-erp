@@ -1,5 +1,6 @@
 'use client'
 
+import { Check, Copy, Download, Plus, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   defaultSupplierPaymentMethodName,
@@ -17,13 +18,30 @@ import {
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { FormSelectField } from '@/components/ui/FormSelectField'
 import { PhoneInput } from '@/components/ui/PhoneInput'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { getErrorMessage } from '@/lib/api-client'
 import { formatAccountNoDisplay, formatPhoneDisplay, sanitizeAccountNoInput, sanitizePhoneInput } from '@/lib/format'
 import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
 import { listThaiDistricts, listThaiProvinces, listThaiSubdistricts, type ThaiDistrict, type ThaiProvince, type ThaiSubdistrict } from '@/lib/thai-address'
 
 type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'phone' | 'bankName' | 'accountNo' | 'salesName' | 'active'
+type ActiveFilter = '' | 'active' | 'inactive'
+type SupplierColumnKey = SortKey | 'action'
 type SupplierBankAccountForm = SupplierFormValues['bankAccounts'][number]
+
+const supplierColumns: Array<ResizableColumnDefinition<SupplierColumnKey>> = [
+  { key: 'code', defaultWidth: 110, minWidth: 90 },
+  { key: 'name', defaultWidth: 240, minWidth: 180 },
+  { key: 'taxId', defaultWidth: 150, minWidth: 130 },
+  { key: 'type', defaultWidth: 120, minWidth: 100 },
+  { key: 'phone', defaultWidth: 130, minWidth: 110 },
+  { key: 'bankName', defaultWidth: 220, minWidth: 160 },
+  { key: 'accountNo', defaultWidth: 220, minWidth: 170 },
+  { key: 'salesName', defaultWidth: 160, minWidth: 130 },
+  { key: 'active', defaultWidth: 140, minWidth: 120 },
+  { key: 'action', defaultWidth: 90, minWidth: 80 },
+]
 
 const emptyBankAccount: SupplierBankAccountForm = {
   id: null,
@@ -197,6 +215,7 @@ export function SuppliersPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [pendingToggleIds, setPendingToggleIds] = useState<Set<string>>(new Set())
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('')
   const [supplierTypeFilter, setSupplierTypeFilter] = useState('')
   const [marketScopeFilter, setMarketScopeFilter] = useState('')
   const [page, setPage] = useState(1)
@@ -212,6 +231,7 @@ export function SuppliersPageClient() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [sortKey, setSortKey] = useState<SortKey>('code')
   const [subdistricts, setSubdistricts] = useState<ThaiSubdistrict[]>([])
+  const columnResize = useResizableColumns('master-data.suppliers', supplierColumns)
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -236,18 +256,21 @@ export function SuppliersPageClient() {
       if (supplierTypeFilter && supplier.type !== supplierTypeFilter) return false
       if (marketScopeFilter && supplier.marketScope !== marketScopeFilter) return false
       if (salespersonFilter && supplier.salesId !== salespersonFilter) return false
+      if (activeFilter === 'active' && !supplier.active) return false
+      if (activeFilter === 'inactive' && supplier.active) return false
       if (!query) return true
 
       return Object.values(supplier).some((value) => String(value ?? '').toLowerCase().includes(query))
     })
 
     return [...rows].sort((left, right) => compareSuppliers(left, right, sortKey, sortDirection))
-  }, [supplierTypeFilter, suppliers, marketScopeFilter, salespersonFilter, search, sortDirection, sortKey])
+  }, [activeFilter, supplierTypeFilter, suppliers, marketScopeFilter, salespersonFilter, search, sortDirection, sortKey])
 
   const total = filteredSortedSuppliers.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, totalPages)
   const paginatedSuppliers = filteredSortedSuppliers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const hasActiveFilters = Boolean(search.trim() || supplierTypeFilter || marketScopeFilter || salespersonFilter || activeFilter)
 
   useEffect(() => {
     if (page > totalPages) {
@@ -351,6 +374,7 @@ export function SuppliersPageClient() {
     setIsExporting(true)
     try {
       const { blob, filename } = await exportSuppliers({
+        active: activeFilter,
         supplierType: supplierTypeFilter,
         direction: sortDirection,
         marketScope: marketScopeFilter,
@@ -427,6 +451,23 @@ export function SuppliersPageClient() {
     }
   }
 
+  function segmentedButtonClass(active: boolean) {
+    return `rounded-md border px-3 py-1 text-xs font-medium ${
+      active
+        ? 'border-slate-700 bg-slate-700 text-white'
+        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+    }`
+  }
+
+  function clearFilters() {
+    setSearch('')
+    setSupplierTypeFilter('')
+    setMarketScopeFilter('')
+    setSalespersonFilter('')
+    setActiveFilter('')
+    setPage(1)
+  }
+
   return (
     <section className="space-y-4">
       {error ? (
@@ -437,10 +478,11 @@ export function SuppliersPageClient() {
       ) : null}
 
       <div className="rounded-md bg-white p-3 shadow">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="grid w-full gap-2 md:grid-cols-2 xl:max-w-5xl xl:grid-cols-[minmax(0,1fr)_170px_170px_190px]">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex w-full flex-wrap items-center gap-2 lg:max-w-5xl">
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 text-sm"
               onChange={(event) => {
                 setPage(1)
                 setSearch(event.target.value)
@@ -451,7 +493,7 @@ export function SuppliersPageClient() {
             />
             <select
               aria-label="กรองประเภทผู้ขาย"
-              className="rounded-md border px-3 py-2 text-sm"
+              className="h-9 rounded-md border border-slate-300 px-3 text-sm"
               value={supplierTypeFilter}
               onChange={(event) => {
                 setPage(1)
@@ -464,7 +506,7 @@ export function SuppliersPageClient() {
             </select>
             <select
               aria-label="กรองในประเทศหรือต่างประเทศ"
-              className="rounded-md border px-3 py-2 text-sm"
+              className="h-9 rounded-md border border-slate-300 px-3 text-sm"
               value={marketScopeFilter}
               onChange={(event) => {
                 setPage(1)
@@ -477,7 +519,7 @@ export function SuppliersPageClient() {
             </select>
             <select
               aria-label="กรองผู้ดูแล"
-              className="rounded-md border px-3 py-2 text-sm"
+              className="h-9 rounded-md border border-slate-300 px-3 text-sm"
               value={salespersonFilter}
               onChange={(event) => {
                 setPage(1)
@@ -489,9 +531,15 @@ export function SuppliersPageClient() {
                 <option key={salesperson.id} value={salesperson.id}>{salesperson.name}</option>
               ))}
             </select>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <label className={`cursor-pointer rounded-md bg-blue-600 px-3 py-2 text-sm font-bold text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
+              {hasActiveFilters ? (
+                <button className="h-9 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={clearFilters}>
+                  ล้างตัวกรอง
+                </button>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-medium text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
+              <Upload aria-hidden="true" className="h-4 w-4" />
               {isImporting ? 'กำลัง Import...' : 'Import Excel'}
               <input
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -504,11 +552,26 @@ export function SuppliersPageClient() {
                 }}
               />
             </label>
-            <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
-              {isExporting ? 'กำลัง Export...' : '📊 Export Excel'}
+            <button className="inline-flex h-9 items-center gap-1 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
+              <Download aria-hidden="true" className="h-4 w-4" />
+              {isExporting ? 'กำลัง Export...' : 'Export Excel'}
             </button>
-            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={() => void openCreateForm()}>
-              + เพิ่มรายการ
+            <button className="inline-flex h-9 items-center gap-1 rounded-md bg-slate-900 px-4 text-sm font-medium text-white" type="button" onClick={() => void openCreateForm()}>
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              เพิ่มรายการ
+            </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">สถานะ:</span>
+            <button className={segmentedButtonClass(activeFilter === '')} type="button" onClick={() => { setActiveFilter(''); setPage(1) }}>
+              ทั้งหมด
+            </button>
+            <button className={segmentedButtonClass(activeFilter === 'active')} type="button" onClick={() => { setActiveFilter(activeFilter === 'active' ? '' : 'active'); setPage(1) }}>
+              ใช้งาน
+            </button>
+            <button className={segmentedButtonClass(activeFilter === 'inactive')} type="button" onClick={() => { setActiveFilter(activeFilter === 'inactive' ? '' : 'inactive'); setPage(1) }}>
+              ปิด
             </button>
           </div>
         </div>
@@ -520,9 +583,14 @@ export function SuppliersPageClient() {
             พบทั้งหมด <span className="font-semibold text-slate-900">{total.toLocaleString('th-TH')}</span> รายการ
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {columnResize.hasCustomWidths ? (
+              <button className="h-9 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>
+                Set col to default
+              </button>
+            ) : null}
             <select
               aria-label="จำนวนรายการต่อหน้า"
-              className="rounded-md border border-slate-300 px-2 py-1"
+              className="h-9 rounded-md border border-slate-300 px-2 py-1"
               value={pageSize}
               onChange={(event) => {
                 setPage(1)
@@ -535,7 +603,7 @@ export function SuppliersPageClient() {
               <option value={100}>100 / หน้า</option>
             </select>
             <button
-              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50"
+              className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50"
               disabled={page <= 1 || isLoading}
               type="button"
               onClick={() => {
@@ -544,11 +612,11 @@ export function SuppliersPageClient() {
             >
               ก่อนหน้า
             </button>
-            <span className="px-1">
+            <span className="px-1 text-sm">
               หน้า {currentPage.toLocaleString('th-TH')} / {totalPages.toLocaleString('th-TH')}
             </span>
             <button
-              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50"
+              className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50"
               disabled={page >= totalPages || isLoading}
               type="button"
               onClick={() => {
@@ -586,29 +654,35 @@ export function SuppliersPageClient() {
       {isLoading ? <div className="rounded-md bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูลผู้ขาย</div> : null}
 
       {!isLoading ? (
-        <div className="overflow-x-auto rounded-md bg-white shadow">
-          <table className="w-full text-sm">
+        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <colgroup>
+              {supplierColumns.map((column) => (
+                <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+              ))}
+            </colgroup>
             <thead className="bg-slate-100">
               <tr>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('code')}>รหัส{sortLabel('code')}</button></th>
-                <th className="min-w-[220px] p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('name')}>ชื่อบริษัท/ร้านค้า{sortLabel('name')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('taxId')}>เลขผู้เสียภาษี{sortLabel('taxId')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('type')}>ประเภท{sortLabel('type')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('phone')}>โทร{sortLabel('phone')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('bankName')}>ธนาคารรับเงิน{sortLabel('bankName')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('accountNo')}>เลขที่บัญชีรับเงิน{sortLabel('accountNo')}</button></th>
-                <th className="p-2 text-left"><button className="font-semibold" type="button" onClick={() => setSort('salesName')}>ผู้ดูแล{sortLabel('salesName')}</button></th>
-                <th className="p-2 text-center"><button className="font-semibold" type="button" onClick={() => setSort('active')}>สถานะ{sortLabel('active')}</button></th>
-                <th className="p-2 text-center">แก้ไข</th>
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="รหัส" resizeProps={columnResize.getResizeHandleProps('code', 'รหัส')} sortKey="code" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ชื่อบริษัท/ร้านค้า" resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อบริษัท/ร้านค้า')} sortKey="name" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขผู้เสียภาษี" resizeProps={columnResize.getResizeHandleProps('taxId', 'เลขผู้เสียภาษี')} sortKey="taxId" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ประเภท" resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} sortKey="type" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="โทร" resizeProps={columnResize.getResizeHandleProps('phone', 'โทร')} sortKey="phone" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ธนาคารรับเงิน" resizeProps={columnResize.getResizeHandleProps('bankName', 'ธนาคารรับเงิน')} sortKey="bankName" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่บัญชีรับเงิน" resizeProps={columnResize.getResizeHandleProps('accountNo', 'เลขที่บัญชีรับเงิน')} sortKey="accountNo" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้ดูแล" resizeProps={columnResize.getResizeHandleProps('salesName', 'ผู้ดูแล')} sortKey="salesName" onSort={setSort} />
+                <ResizableTableHead activeSortKey={sortKey} align="center" direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('active', 'สถานะ')} sortKey="active" onSort={setSort} />
+                <ResizableTableHead align="center" label="แก้ไข" resizeProps={columnResize.getResizeHandleProps('action', 'แก้ไข')} />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {paginatedSuppliers.map((supplier) => {
                 const receivingLines = supplierReceivingLines(supplier)
                 return (
                   <tr
                     key={supplier.id}
-                    className="cursor-pointer border-t hover:bg-slate-50"
+                    className="cursor-pointer hover:bg-slate-50"
                     role="button"
                     tabIndex={0}
                     onClick={() => void openEditForm(supplier)}
@@ -619,28 +693,28 @@ export function SuppliersPageClient() {
                       }
                     }}
                   >
-                    <td className="p-2 font-mono text-xs">{supplier.code}</td>
-                    <td className="p-2 font-medium">{supplier.name}</td>
-                    <td className="p-2 font-mono text-xs">{displayValue(supplier.taxId)}</td>
-                    <td className="p-2">{displayValue(supplier.type)}</td>
-                    <td className="p-2">{displayValue(formatPhoneDisplay(supplier.phone))}</td>
-                    <td className="p-2 align-top">
+                    <td className="whitespace-nowrap p-2 font-mono text-xs font-semibold text-slate-700">{supplier.code}</td>
+                    <td className="truncate p-2 text-xs font-semibold text-slate-800" title={supplier.name}>{supplier.name}</td>
+                    <td className="whitespace-nowrap p-2 font-mono text-xs font-semibold text-slate-700">{displayValue(supplier.taxId)}</td>
+                    <td className="p-2 text-xs font-semibold text-slate-700">{displayValue(supplier.type)}</td>
+                    <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{displayValue(formatPhoneDisplay(supplier.phone))}</td>
+                    <td className="p-2 align-top text-xs font-semibold text-slate-700">
                       {receivingLines.length ? (
                         <div className="space-y-1">
                           {receivingLines.map((line, index) => (
-                            <div key={`${supplier.id}-bank-${index}`} className="min-h-5 leading-5">{line.bankName}</div>
+                            <div key={`${supplier.id}-bank-${index}`} className="min-h-5 truncate leading-5" title={line.bankName}>{line.bankName}</div>
                           ))}
                         </div>
                       ) : '-'}
                     </td>
-                    <td className="p-2 align-top font-mono text-xs">
+                    <td className="p-2 align-top font-mono text-xs font-semibold text-slate-700">
                       {receivingLines.length ? (
                         <div className="space-y-1">
                           {receivingLines.map((line, index) => {
                             const accountKey = `${supplier.id}-account-${index}`
                             return (
                               <div key={accountKey} className="flex min-h-5 items-center gap-2 leading-5">
-                                <span>{line.accountNo}</span>
+                                <span className="truncate">{line.accountNo}</span>
                                 {line.rawAccountNo ? (
                                   <CopyAccountButton
                                     accountKey={accountKey}
@@ -656,18 +730,19 @@ export function SuppliersPageClient() {
                         </div>
                       ) : '-'}
                     </td>
-                    <td className="p-2">{displayValue(supplier.salesName)}</td>
+                    <td className="truncate p-2 text-xs font-semibold text-slate-700" title={supplier.salesName ?? undefined}>{displayValue(supplier.salesName)}</td>
                     <td className="p-2 text-center">
                       <ActiveToggle
                         checked={supplier.active}
                         disabled={pendingToggleIds.has(supplier.id)}
                         label={supplier.active ? 'ใช้งาน' : 'ปิด'}
+                        labelClassName="text-xs font-semibold text-slate-600"
                         onChange={(active) => void handleToggleActive(supplier, active)}
                       />
                     </td>
                     <td className="p-2 text-center">
                       <button
-                        className="text-blue-600"
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
@@ -682,11 +757,12 @@ export function SuppliersPageClient() {
               })}
               {paginatedSuppliers.length === 0 ? (
                 <tr>
-                  <td className="p-4 text-center text-sm text-slate-500" colSpan={10}>ไม่พบข้อมูลที่ค้นหา</td>
+                  <td className="p-8 text-center text-sm text-slate-500" colSpan={10}>ไม่พบข้อมูลที่ค้นหา</td>
                 </tr>
               ) : null}
             </tbody>
           </table>
+          </div>
         </div>
       ) : null}
     </section>
@@ -727,16 +803,7 @@ function CopyAccountButton({ accountKey, accountNo, copied, label, onCopy }: Cop
       }}
     >
       <span className="sr-only">{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
-      {copied ? (
-        <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-      ) : (
-        <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
-          <rect height="14" rx="2" width="14" x="8" y="8" />
-          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-        </svg>
-      )}
+      {copied ? <Check aria-hidden="true" className="h-3.5 w-3.5" /> : <Copy aria-hidden="true" className="h-3.5 w-3.5" />}
     </button>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { Check, Copy, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from 'react'
 import { paymentMethodGroupFromValue, type PaymentMethodGroup } from '@/lib/account-payment-method'
 import { BillSelect, Field, SelectField, SummaryPill } from '@/components/daily/MoneyMovementFieldHelpers'
 import { PaymentLinesSection, PaymentSplitsSection } from '@/components/daily/MoneyMovementFormSections'
@@ -9,9 +9,11 @@ import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input as UiInput } from '@/components/ui/Input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Select as UiSelect } from '@/components/ui/Select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { customerReceiptFormSchema, dailyFetchJson, formatMoney, supplierPaymentFormSchema, todayDateInput, type CustomerReceiptFormValues, type DailyAccountOption, type SupplierPaymentFormValues } from '@/lib/daily'
 import { formatAccountNoDisplay, formatDateDisplay } from '@/lib/format'
 
@@ -113,7 +115,47 @@ type PaymentBillSortField = 'age' | 'balance' | 'date' | 'docNo' | 'paidAmount' 
 type HistorySortField = 'accountName' | 'amount' | 'date' | 'docNo' | 'netAmount' | 'partyName'
 type PaymentHistoryStatusFilter = 'active' | 'all' | 'cancelled'
 type ReceiptTab = 'entry' | 'history'
+type PaymentQueueColumnKey = 'accountNo' | 'action' | 'age' | 'balance' | 'bankName' | 'date' | 'docNo' | 'paidAmount' | 'partyName' | 'totalAmount'
+type MoneyHistoryColumnKey = 'accountName' | 'action' | 'amount' | 'bankFee' | 'billRefs' | 'date' | 'docNo' | 'netAmount' | 'notes' | 'partyName' | 'status' | 'wht'
 const pageSizeOptions = [10, 25, 50, 100]
+const paymentQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'partyName', defaultWidth: 220, minWidth: 150 },
+  { key: 'bankName', defaultWidth: 150, minWidth: 120 },
+  { key: 'accountNo', defaultWidth: 220, minWidth: 160 },
+  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'paidAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'balance', defaultWidth: 170, minWidth: 140 },
+  { key: 'age', defaultWidth: 100, minWidth: 90 },
+  { key: 'action', defaultWidth: 150, minWidth: 140 },
+]
+const paymentHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 150, minWidth: 120 },
+  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'billRefs', defaultWidth: 220, minWidth: 160 },
+  { key: 'accountName', defaultWidth: 220, minWidth: 160 },
+  { key: 'amount', defaultWidth: 150, minWidth: 120 },
+  { key: 'wht', defaultWidth: 130, minWidth: 110 },
+  { key: 'bankFee', defaultWidth: 130, minWidth: 110 },
+  { key: 'netAmount', defaultWidth: 150, minWidth: 120 },
+  { key: 'status', defaultWidth: 130, minWidth: 110 },
+  { key: 'notes', defaultWidth: 180, minWidth: 130 },
+]
+const receiptHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 150, minWidth: 120 },
+  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'billRefs', defaultWidth: 220, minWidth: 160 },
+  { key: 'accountName', defaultWidth: 220, minWidth: 160 },
+  { key: 'amount', defaultWidth: 150, minWidth: 120 },
+  { key: 'wht', defaultWidth: 130, minWidth: 110 },
+  { key: 'bankFee', defaultWidth: 130, minWidth: 110 },
+  { key: 'netAmount', defaultWidth: 150, minWidth: 120 },
+  { key: 'notes', defaultWidth: 180, minWidth: 130 },
+  { key: 'action', defaultWidth: 130, minWidth: 110 },
+]
 
 function newPaymentLine(): PaymentLine {
   return { amount: 0, approvalId: null, billId: '', billText: '', discount: 0, fee: 0, id: `PL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, supplierId: '', withholdingTax: 0 }
@@ -281,6 +323,7 @@ function TableSortHeader<TSortKey extends string>({
   direction,
   label,
   onSort,
+  resizeProps,
   sortKey,
 }: {
   activeKey: TSortKey
@@ -288,17 +331,19 @@ function TableSortHeader<TSortKey extends string>({
   direction: 'asc' | 'desc'
   label: string
   onSort: (key: TSortKey) => void
+  resizeProps?: ButtonHTMLAttributes<HTMLButtonElement>
   sortKey: TSortKey
 }) {
-  const active = activeKey === sortKey
-  const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
   return (
-    <TableHead className="p-0">
-      <button className={`flex w-full items-center gap-1 p-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
-        <span>{label}</span>
-        <span className="text-slate-400">{active ? direction === 'asc' ? '▲' : '▼' : '↕'}</span>
-      </button>
-    </TableHead>
+    <ResizableTableHead
+      activeSortKey={activeKey}
+      align={align}
+      direction={direction}
+      label={label}
+      resizeProps={resizeProps}
+      sortKey={sortKey}
+      onSort={onSort}
+    />
   )
 }
 
@@ -345,6 +390,9 @@ export function MoneyMovementPageClient({
   const [paymentDetail, setPaymentDetail] = useState<PaymentHistoryDetail | null>(null)
   const [isPaymentDetailLoading, setIsPaymentDetailLoading] = useState(false)
   const [paymentDetailError, setPaymentDetailError] = useState<string | null>(null)
+  const paymentQueueColumnResize = useResizableColumns('daily.purchase-payments.queue', paymentQueueColumns)
+  const historyColumns = useMemo(() => mode === 'payment' ? paymentHistoryColumns : receiptHistoryColumns, [mode])
+  const historyColumnResize = useResizableColumns(`daily.money-movement.${mode}.history`, historyColumns)
 
   const showReceiptTabs = mode === 'receipt' && !entryOnly && !historyOnly
   const showPaymentTabs = mode === 'payment' && !entryOnly && !historyOnly
@@ -1037,6 +1085,7 @@ export function MoneyMovementPageClient({
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <div>พบทั้งหมด <span className="font-semibold text-slate-900">{supplierBillTotalRows}</span> รายการ</div>
             <div className="flex flex-wrap items-center gap-2">
+              {paymentQueueColumnResize.hasCustomWidths ? <UiButton className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={paymentQueueColumnResize.resetColumnWidths}>Set col to default</UiButton> : null}
               <UiSelect
                 aria-label="จำนวนรายการต่อหน้า"
                 className="h-9 w-auto min-w-[96px] px-2"
@@ -1050,19 +1099,22 @@ export function MoneyMovementPageClient({
               <UiButton className="h-9 font-normal" disabled={supplierBillCurrentPage >= supplierBillTotalPages} size="sm" type="button" variant="outline" onClick={() => setBillPage((value) => Math.min(supplierBillTotalPages, value + 1))}>ถัดไป</UiButton>
             </div>
           </div>
-          <Table className="min-w-[1220px] text-xs">
+          <Table className="text-xs" style={{ minWidth: paymentQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <colgroup>
+              {paymentQueueColumns.map((column) => <col key={column.key} style={paymentQueueColumnResize.getColumnStyle(column.key)} />)}
+            </colgroup>
             <TableHeader className="text-slate-700">
               <tr>
-                <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="เลขที่รายการ" sortKey="docNo" onSort={toggleBillSort} />
-                <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="วันที่" sortKey="date" onSort={toggleBillSort} />
-                <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="ผู้รับเงิน" sortKey="supplier" onSort={toggleBillSort} />
-                <TableHead className="w-36 p-2 text-left text-xs font-semibold text-slate-700">ธนาคาร</TableHead>
-                <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">เลขบัญชี</TableHead>
-                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดรวม" sortKey="totalAmount" onSort={toggleBillSort} />
-                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="จ่ายแล้ว" sortKey="paidAmount" onSort={toggleBillSort} />
-                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="คงเหลือรอออก PMT" sortKey="balance" onSort={toggleBillSort} />
-                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="อายุ(วัน)" sortKey="age" onSort={toggleBillSort} />
-                <TableHead className="w-28 p-2 text-center text-xs font-semibold text-slate-700" />
+                <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="เลขที่รายการ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('docNo', 'เลขที่รายการ')} sortKey="docNo" onSort={toggleBillSort} />
+                <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="วันที่" resizeProps={paymentQueueColumnResize.getResizeHandleProps('date', 'วันที่')} sortKey="date" onSort={toggleBillSort} />
+                <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="ผู้รับเงิน" resizeProps={paymentQueueColumnResize.getResizeHandleProps('partyName', 'ผู้รับเงิน')} sortKey="supplier" onSort={toggleBillSort} />
+                <ResizableTableHead label="ธนาคาร" resizeProps={paymentQueueColumnResize.getResizeHandleProps('bankName', 'ธนาคาร')} />
+                <ResizableTableHead label="เลขบัญชี" resizeProps={paymentQueueColumnResize.getResizeHandleProps('accountNo', 'เลขบัญชี')} />
+                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดรวม" resizeProps={paymentQueueColumnResize.getResizeHandleProps('totalAmount', 'ยอดรวม')} sortKey="totalAmount" onSort={toggleBillSort} />
+                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="จ่ายแล้ว" resizeProps={paymentQueueColumnResize.getResizeHandleProps('paidAmount', 'จ่ายแล้ว')} sortKey="paidAmount" onSort={toggleBillSort} />
+                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="คงเหลือรอออก PMT" resizeProps={paymentQueueColumnResize.getResizeHandleProps('balance', 'คงเหลือรอออก PMT')} sortKey="balance" onSort={toggleBillSort} />
+                <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="อายุ(วัน)" resizeProps={paymentQueueColumnResize.getResizeHandleProps('age', 'อายุ(วัน)')} sortKey="age" onSort={toggleBillSort} />
+                <ResizableTableHead align="center" label="" resizeProps={paymentQueueColumnResize.getResizeHandleProps('action', 'Action')} />
               </tr>
             </TableHeader>
             <TableBody className="divide-y divide-slate-100">
@@ -1323,6 +1375,7 @@ export function MoneyMovementPageClient({
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
               <div>พบทั้งหมด <span className="font-semibold text-slate-900">{historyTotalRows}</span> รายการ</div>
               <div className="flex flex-wrap items-center gap-2">
+                {historyColumnResize.hasCustomWidths ? <UiButton className="font-normal" size="sm" type="button" variant="outline" onClick={historyColumnResize.resetColumnWidths}>Set col to default</UiButton> : null}
                 <UiSelect
                   aria-label="จำนวนรายการต่อหน้าประวัติ"
                   className="h-9 w-auto min-w-[96px] px-2"
@@ -1337,21 +1390,24 @@ export function MoneyMovementPageClient({
               </div>
             </div>
 
-            <Table className={mode === 'payment' ? 'min-w-[1180px] text-xs' : 'min-w-[1260px] text-xs'}>
+            <Table className="text-xs" style={{ minWidth: historyColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {historyColumns.map((column) => <col key={column.key} style={historyColumnResize.getColumnStyle(column.key)} />)}
+              </colgroup>
               <TableHeader className="text-slate-700">
                 <tr>
-                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="เลขที่รายการ" sortKey="docNo" onSort={toggleHistorySort} />
-                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="วันที่สร้างรายการ" sortKey="date" onSort={toggleHistorySort} />
-                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label={partyLabel} sortKey="partyName" onSort={toggleHistorySort} />
-                  <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">บิลอ้างอิง</TableHead>
-                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="บัญชีที่ใช้ทำจ่าย" sortKey="accountName" onSort={toggleHistorySort} />
-                  <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label={amountLabel} sortKey="amount" onSort={toggleHistorySort} />
-                  <TableHead className="w-40 p-2 text-right text-xs font-semibold text-slate-700">WHT</TableHead>
-                  <TableHead className="w-40 p-2 text-right text-xs font-semibold text-slate-700">Bank Fee</TableHead>
-                  <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label="สุทธิ" sortKey="netAmount" onSort={toggleHistorySort} />
-                  {mode === 'payment' ? <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">สถานะ</TableHead> : null}
-                  <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">หมายเหตุ</TableHead>
-                  {mode === 'receipt' ? <TableHead className="p-2 text-center text-xs font-semibold text-slate-700">Action</TableHead> : null}
+                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="เลขที่รายการ" resizeProps={historyColumnResize.getResizeHandleProps('docNo', 'เลขที่รายการ')} sortKey="docNo" onSort={toggleHistorySort} />
+                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="วันที่สร้างรายการ" resizeProps={historyColumnResize.getResizeHandleProps('date', 'วันที่สร้างรายการ')} sortKey="date" onSort={toggleHistorySort} />
+                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label={partyLabel} resizeProps={historyColumnResize.getResizeHandleProps('partyName', partyLabel)} sortKey="partyName" onSort={toggleHistorySort} />
+                  <ResizableTableHead label="บิลอ้างอิง" resizeProps={historyColumnResize.getResizeHandleProps('billRefs', 'บิลอ้างอิง')} />
+                  <TableSortHeader activeKey={historySortField} align="left" direction={historySortDirection} label="บัญชีที่ใช้ทำจ่าย" resizeProps={historyColumnResize.getResizeHandleProps('accountName', 'บัญชีที่ใช้ทำจ่าย')} sortKey="accountName" onSort={toggleHistorySort} />
+                  <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label={amountLabel} resizeProps={historyColumnResize.getResizeHandleProps('amount', amountLabel)} sortKey="amount" onSort={toggleHistorySort} />
+                  <ResizableTableHead align="right" label="WHT" resizeProps={historyColumnResize.getResizeHandleProps('wht', 'WHT')} />
+                  <ResizableTableHead align="right" label="Bank Fee" resizeProps={historyColumnResize.getResizeHandleProps('bankFee', 'Bank Fee')} />
+                  <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label="สุทธิ" resizeProps={historyColumnResize.getResizeHandleProps('netAmount', 'สุทธิ')} sortKey="netAmount" onSort={toggleHistorySort} />
+                  {mode === 'payment' ? <ResizableTableHead label="สถานะ" resizeProps={historyColumnResize.getResizeHandleProps('status', 'สถานะ')} /> : null}
+                  <ResizableTableHead label="หมายเหตุ" resizeProps={historyColumnResize.getResizeHandleProps('notes', 'หมายเหตุ')} />
+                  {mode === 'receipt' ? <ResizableTableHead align="center" label="Action" resizeProps={historyColumnResize.getResizeHandleProps('action', 'Action')} /> : null}
                 </tr>
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">

@@ -1,13 +1,16 @@
 'use client'
 
 import { Download } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
 import { Button } from '@/components/ui/Button'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
+import { paymentMethodGroupFromValue, type PaymentMethodGroup } from '@/lib/account-payment-method'
 import { dailyFetchJson, expenseFormSchema, formatMoney, todayDateInput, type DailyAccountOption, type ExpenseFormValues, type ExpenseLineFormValues } from '@/lib/daily'
 import { formatDateDisplay, formatDecimalDisplay, formatDecimalDraft, sanitizeDecimalInput } from '@/lib/format'
+import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
 
 type CategoryOption = { active: boolean | null; id: string; name: string; typeId?: string | null; typeName?: string | null }
 type ExpenseLineDraft = Omit<ExpenseLineFormValues, 'id'> & { categoryName?: string; id: string; lineNo?: number; vatPct?: number }
@@ -23,6 +26,15 @@ type ExpenseRow = Omit<ExpenseFormValues, 'lines'> & {
 }
 
 type PayeeOption = {
+  bankAccounts?: Array<{
+    accountName: string | null
+    accountNo: string | null
+    active: boolean | null
+    bankName: string | null
+    code: string
+    isPrimary: boolean | null
+    paymentMethod: string | null
+  }>
   code: string
   name: string
   source: 'customer' | 'supplier' | 'salesperson' | 'employee'
@@ -67,6 +79,10 @@ type MultiSegmentOption = {
   label: string
   values: ExpenseFormValues['status'][]
 }
+type ExpenseDashboardColumnKey = 'avg' | 'category' | 'status' | 'total' | `month:${string}`
+type ExpenseColumnKey = 'account' | 'action' | 'amountSummary' | 'category' | 'date' | 'docNo' | 'dueDate' | 'netAmount' | 'payee' | 'refDocNo' | 'status'
+type ExpenseSortDirection = 'asc' | 'desc'
+type ExpenseSortKey = Exclude<ExpenseColumnKey, 'action'>
 
 const whtRateOptions = [
   { label: '1% (ขนส่ง/รับเหมา)', value: 1 },
@@ -81,9 +97,11 @@ const emptyForm: ExpenseFormValues = {
   accountId: null,
   amount: 0,
   branchId: null,
+  bankFee: 0,
   categoryId: null,
   date: todayDateInput(),
   description: null,
+  discount: 0,
   docNo: null,
   dueDate: todayDateInput(),
   hasVat: false,
@@ -92,8 +110,11 @@ const emptyForm: ExpenseFormValues = {
   lines: [],
   notes: null,
   payee: '',
+  paymentAction: 'submit_approval',
   refDocNo: null,
   status: 'pending_approval',
+  supplierId: '',
+  supplierPaymentDestinationId: null,
   taxInvoiceNo: null,
 }
 
@@ -104,12 +125,34 @@ const expenseStatusOptions: MultiSegmentOption[] = [
   { label: 'เสร็จสิ้น', values: ['paid'] },
   { label: 'ยกเลิกแล้ว', values: ['cancelled'] },
 ]
+const expenseColumns: Array<ResizableColumnDefinition<ExpenseColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'dueDate', defaultWidth: 120, minWidth: 100 },
+  { key: 'refDocNo', defaultWidth: 140, minWidth: 110 },
+  { key: 'payee', defaultWidth: 180, minWidth: 130 },
+  { key: 'category', defaultWidth: 160, minWidth: 120 },
+  { key: 'account', defaultWidth: 180, minWidth: 130 },
+  { key: 'status', defaultWidth: 130, minWidth: 110 },
+  { key: 'netAmount', defaultWidth: 150, minWidth: 120 },
+  { key: 'amountSummary', defaultWidth: 170, minWidth: 140 },
+  { key: 'action', defaultWidth: 150, minWidth: 140 },
+]
 
 function expenseStatusLabel(status: ExpenseFormValues['status']) {
   if (status === 'approved') return 'อนุมัติแล้ว'
   if (status === 'paid') return 'เสร็จสิ้น'
   if (status === 'cancelled') return 'ยกเลิกแล้ว'
   return 'ยังไม่อนุมัติ'
+}
+
+function paymentMethodOptionGroup(value: string, paymentMethods: Array<Pick<MasterDataRecord, 'name' | 'type'>>) {
+  return paymentMethodGroupFromValue(value, paymentMethods) ?? 'bank'
+}
+
+function accountMatchesPaymentMethod(account: DailyAccountOption, methodGroup: PaymentMethodGroup, paymentMethods: Array<Pick<MasterDataRecord, 'name' | 'type'>>) {
+  const accountGroup = paymentMethodGroupFromValue(account.type, paymentMethods) ?? (String(account.type ?? '').toLowerCase().includes('cash') || String(account.type ?? '').includes('เงินสด') ? 'cash' : 'bank')
+  return accountGroup === methodGroup
 }
 
 function expenseStatusTextClass(status: ExpenseFormValues['status']) {
@@ -137,6 +180,31 @@ function canMutateExpense(status: ExpenseFormValues['status']) {
   return status === 'pending_approval'
 }
 
+function expenseSortValue(row: ExpenseRow, key: ExpenseSortKey) {
+  switch (key) {
+    case 'account':
+      return row.accountName
+    case 'amountSummary':
+      return row.amount
+    case 'category':
+      return row.categoryName
+    case 'date':
+      return row.date
+    case 'docNo':
+      return row.docNo
+    case 'dueDate':
+      return row.dueDate ?? ''
+    case 'netAmount':
+      return row.netAmount
+    case 'payee':
+      return row.payee
+    case 'refDocNo':
+      return row.refDocNo ?? ''
+    case 'status':
+      return expenseStatusLabel(row.status)
+  }
+}
+
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
@@ -155,6 +223,20 @@ function createExpenseLine(seed: Partial<ExpenseLineDraft> = {}): ExpenseLineDra
     whtAmount: seed.whtAmount ?? 0,
     whtPct: seed.whtPct ?? 0,
   }
+}
+
+function normalizeLookupText(value: string | null | undefined) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+function findSupplierPayeeOption(options: PayeeOption[], value: string) {
+  const normalizedValue = normalizeLookupText(value)
+  if (!normalizedValue) return null
+  return options.find((option) => option.source === 'supplier' && normalizeLookupText(option.name) === normalizedValue) ?? null
+}
+
+function supplierPaymentDestinationLabel(account: NonNullable<PayeeOption['bankAccounts']>[number]) {
+  return [account.paymentMethod, account.bankName, account.accountNo, account.accountName].filter(Boolean).join(' / ') || account.code
 }
 
 function normalizeExpenseLines(lines: ExpenseFormValues['lines'] | ExpenseLineDraft[] | undefined, fallback?: Partial<ExpenseFormValues>): ExpenseLineDraft[] {
@@ -288,15 +370,17 @@ function buildLegacyExpenseDashboard(rows: ExpenseRow[], categories: CategoryOpt
 }
 
 export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnly?: boolean }) {
-  const router = useRouter()
   const [accounts, setAccounts] = useState<DailyAccountOption[]>([])
   const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [detailRow, setDetailRow] = useState<ExpenseRow | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<ExpenseFormValues>(emptyForm)
   const [formOpen, setFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [paymentMethods, setPaymentMethods] = useState<MasterDataRecord[]>([])
   const [payeeOptions, setPayeeOptions] = useState<PayeeOption[]>([])
   const [rows, setRows] = useState<ExpenseRow[]>([])
   const [search, setSearch] = useState('')
@@ -308,17 +392,26 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [periodMonths, setPeriodMonths] = useState(6)
+  const [sortDirection, setSortDirection] = useState<ExpenseSortDirection>('desc')
+  const [sortKey, setSortKey] = useState<ExpenseSortKey>('date')
   const [vatRatePercent, setVatRatePercent] = useState(7)
   const [whtRatePercent, setWhtRatePercent] = useState(3)
   const formRef = useRef<HTMLFormElement | null>(null)
+  const columnResize = useResizableColumns('daily.expense', expenseColumns)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const payload = await dailyFetchJson<ExpensePayload>('/api/daily/expenses')
+      const [payload, paymentMethodRows] = await Promise.all([
+        dailyFetchJson<ExpensePayload>('/api/daily/expenses'),
+        listMasterDataRecords('/api/master-data/payment-methods'),
+      ])
+      const activePaymentMethods = paymentMethodRows.filter((method) => method.active)
       setAccounts(payload.accounts)
       setCategories(payload.categories)
+      setPaymentMethods(activePaymentMethods)
+      setPaymentMethod((current) => current || activePaymentMethods[0]?.name || '')
       setPayeeOptions(payload.payeeOptions ?? [])
       setRows(payload.rows)
       setVatRatePercent(payload.settings?.vatRatePercent ?? 7)
@@ -346,8 +439,16 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
         const lineText = row.lines.map((line) => `${line.categoryName ?? ''} ${line.description ?? ''}`).join(' ')
         return !query || `${row.docNo} ${row.payee} ${row.refDocNo ?? ''} ${row.description ?? ''} ${lineText}`.toLowerCase().includes(query)
       })
-      .sort((left, right) => right.date.localeCompare(left.date) || right.docNo.localeCompare(left.docNo))
-  }, [accountId, categoryId, dateFrom, dateTo, rows, search, statusFilter])
+      .sort((left, right) => {
+        const leftValue = expenseSortValue(left, sortKey)
+        const rightValue = expenseSortValue(right, sortKey)
+        const base = typeof leftValue === 'number' && typeof rightValue === 'number'
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue), 'th', { numeric: true })
+        const directed = sortDirection === 'asc' ? base : -base
+        return directed || right.date.localeCompare(left.date) || right.docNo.localeCompare(left.docNo)
+      })
+  }, [accountId, categoryId, dateFrom, dateTo, rows, search, sortDirection, sortKey, statusFilter])
 
   const summary = useMemo(() => {
     const month = todayDateInput().slice(0, 7)
@@ -396,6 +497,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
   const formLines = useMemo(() => normalizeExpenseLines(form.lines, form), [form])
   const formTotals = useMemo(() => calculateExpenseTotals(formLines, vatRatePercent), [formLines, vatRatePercent])
+  const selectedSupplier = useMemo(() => payeeOptions.find((option) => option.source === 'supplier' && option.code === form.supplierId) ?? null, [form.supplierId, payeeOptions])
+  const supplierPaymentDestinations = useMemo(() => selectedSupplier?.bankAccounts?.filter((account) => account.active !== false) ?? [], [selectedSupplier])
+  const selectedPaymentMethodGroup = useMemo(() => paymentMethodOptionGroup(paymentMethod, paymentMethods), [paymentMethod, paymentMethods])
+  const paymentAccountOptions = useMemo(() => accounts.filter((account) => account.active && accountMatchesPaymentMethod(account, selectedPaymentMethodGroup, paymentMethods)), [accounts, paymentMethods, selectedPaymentMethodGroup])
+  const formPaymentAmount = useMemo(() => Math.max(0, formTotals.netAmount - (Number(form.discount) || 0)), [form.discount, formTotals.netAmount])
+  const formCashOutAmount = useMemo(() => formPaymentAmount + (selectedPaymentMethodGroup === 'cash' ? 0 : Number(form.bankFee) || 0), [form.bankFee, formPaymentAmount, selectedPaymentMethodGroup])
 
   const exportHref = useMemo(() => {
     const params = new URLSearchParams()
@@ -410,6 +517,14 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   }, [accountId, categoryId, dateFrom, dateTo, search, statusFilter])
 
   const dashboard = useMemo(() => buildLegacyExpenseDashboard(rows, categories, periodMonths), [categories, periodMonths, rows])
+  const dashboardColumns = useMemo<Array<ResizableColumnDefinition<ExpenseDashboardColumnKey>>>(() => [
+    { key: 'category', defaultWidth: 200, minWidth: 150 },
+    ...dashboard.monthList.map((month) => ({ key: `month:${month}` as const, defaultWidth: 130, minWidth: 110 })),
+    { key: 'avg', defaultWidth: 130, minWidth: 110 },
+    { key: 'total', defaultWidth: 140, minWidth: 120 },
+    { key: 'status', defaultWidth: 130, minWidth: 110 },
+  ], [dashboard.monthList])
+  const dashboardColumnResize = useResizableColumns('daily.expense-dashboard.heatmap', dashboardColumns)
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -417,7 +532,16 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
   useEffect(() => {
     setPage(1)
-  }, [accountId, categoryId, dateFrom, dateTo, pageSize, search, statusFilter])
+  }, [accountId, categoryId, dateFrom, dateTo, pageSize, search, sortDirection, sortKey, statusFilter])
+
+  function changeSort(nextKey: ExpenseSortKey) {
+    if (nextKey === sortKey) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(nextKey)
+    setSortDirection(nextKey === 'payee' || nextKey === 'category' || nextKey === 'account' || nextKey === 'status' ? 'asc' : 'desc')
+  }
 
   function syncFormLines(current: ExpenseFormValues, lines: ExpenseLineDraft[]) {
     const totals = calculateExpenseTotals(lines, vatRatePercent)
@@ -435,7 +559,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
   function openCreateForm() {
     const today = todayDateInput()
-    setForm({ ...emptyForm, date: today, dueDate: today, lines: [createExpenseLine()] })
+    setForm({ ...emptyForm, date: today, dueDate: today, lines: [createExpenseLine()], paymentAction: 'submit_approval' })
+    setPaymentMethod((current) => current || paymentMethods[0]?.name || '')
     setFieldErrors({})
     setFormOpen(true)
   }
@@ -449,10 +574,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
     setForm(syncFormLines({
       accountId: row.accountId,
       amount: row.amount,
+      bankFee: 0,
       branchId: row.branchId,
       categoryId: row.categoryId,
       date: row.date,
       description: row.description,
+      discount: 0,
       docNo: row.docNo,
       dueDate: row.dueDate,
       hasVat: row.hasVat,
@@ -460,13 +587,30 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       id: row.id,
       notes: row.notes,
       payee: row.payee,
+      paymentAction: 'submit_approval',
       refDocNo: row.refDocNo,
       status: row.status,
+      supplierId: row.supplierId,
+      supplierPaymentDestinationId: null,
       taxInvoiceNo: row.taxInvoiceNo,
     }, nextLines))
     setError(null)
+    setPaymentMethod((current) => current || paymentMethods[0]?.name || '')
     setFieldErrors({})
     setFormOpen(true)
+  }
+
+  function updatePaymentMethod(nextMethod: string) {
+    const nextGroup = paymentMethodOptionGroup(nextMethod, paymentMethods)
+    setPaymentMethod(nextMethod)
+    setForm((current) => {
+      const selectedAccount = accounts.find((account) => account.id === current.accountId)
+      return {
+        ...current,
+        accountId: selectedAccount && accountMatchesPaymentMethod(selectedAccount, nextGroup, paymentMethods) ? current.accountId : null,
+        bankFee: nextGroup === 'cash' ? 0 : current.bankFee,
+      }
+    })
   }
 
   function updateExpenseLine(index: number, patch: Partial<ExpenseLineDraft>) {
@@ -511,7 +655,11 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   async function saveForm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const totals = calculateExpenseTotals(normalizeExpenseLines(form.lines, form), vatRatePercent)
-    const payload = syncFormLines({ ...form, status: 'pending_approval' }, totals.lines)
+    const payload = syncFormLines({
+      ...form,
+      bankFee: selectedPaymentMethodGroup === 'cash' ? 0 : form.bankFee,
+      status: form.paymentAction === 'pay_now' ? 'paid' : 'pending_approval',
+    }, totals.lines)
     const parsed = expenseFormSchema.safeParse(payload)
     if (!parsed.success) {
       const nextFieldErrors = Object.fromEntries(parsed.error.issues.map((issue) => [issue.path.join('.'), issue.message]))
@@ -557,6 +705,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 {months} เดือน
               </button>
             ))}
+            {dashboardColumnResize.hasCustomWidths ? <Button className="h-9" size="sm" type="button" variant="outline" onClick={dashboardColumnResize.resetColumnWidths}>Set col to default</Button> : null}
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -591,14 +740,19 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           )}
 
           <div className="overflow-x-auto rounded-md bg-white shadow">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs" style={{ minWidth: dashboardColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {dashboardColumns.map((column) => <col key={column.key} style={dashboardColumnResize.getColumnStyle(column.key)} />)}
+              </colgroup>
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="sticky left-0 bg-slate-100 p-2 text-left">หมวด</th>
-                  {dashboard.monthList.map((month) => <th key={month} className="p-2 text-right">{formatMonthLabel(month)}</th>)}
-                  <th className="bg-blue-100 p-2 text-right">เฉลี่ย</th>
-                  <th className="bg-rose-100 p-2 text-right">รวม</th>
-                  <th className="p-2 text-center">สถานะ</th>
+                  <ResizableTableHead label="หมวด" resizeProps={dashboardColumnResize.getResizeHandleProps('category', 'หมวด')} />
+                  {dashboard.monthList.map((month) => (
+                    <ResizableTableHead key={month} align="right" label={formatMonthLabel(month)} resizeProps={dashboardColumnResize.getResizeHandleProps(`month:${month}`, formatMonthLabel(month))} />
+                  ))}
+                  <ResizableTableHead align="right" label="เฉลี่ย" resizeProps={dashboardColumnResize.getResizeHandleProps('avg', 'เฉลี่ย')} />
+                  <ResizableTableHead align="right" label="รวม" resizeProps={dashboardColumnResize.getResizeHandleProps('total', 'รวม')} />
+                  <ResizableTableHead align="center" label="สถานะ" resizeProps={dashboardColumnResize.getResizeHandleProps('status', 'สถานะ')} />
                 </tr>
               </thead>
               <tbody>
@@ -699,6 +853,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <div>พบทั้งหมด {filteredSummary.count} รายการ</div>
             <div className="flex flex-wrap items-center gap-2">
+              {columnResize.hasCustomWidths ? <Button className="h-9" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
               <select className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
                 {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
               </select>
@@ -717,11 +872,71 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 </div>
                 <div className="space-y-4 bg-slate-50 p-4">
                   <div className="rounded-md bg-white p-4 shadow">
+                    <div className="mb-3 text-sm font-semibold text-slate-900">วิธีดำเนินการ</div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { description: 'สร้าง EXP แล้วส่งเข้าอนุมัติจ่ายเงิน', label: 'ส่งอนุมัติ', value: 'submit_approval' as const },
+                        { description: 'สร้าง EXP และ PMT ทันที โดยไม่สร้าง PMA', label: 'จ่ายเลย', value: 'pay_now' as const },
+                      ].map((option) => {
+                        const active = form.paymentAction === option.value
+                        return (
+                          <button
+                            key={option.value}
+                            className={`rounded-md border px-3 py-2 text-left text-sm ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                            type="button"
+                            onClick={() => setForm((current) => ({ ...current, paymentAction: option.value, status: option.value === 'pay_now' ? 'paid' : 'pending_approval' }))}
+                          >
+                            <span className="block font-semibold">{option.label}</span>
+                            <span className={`block text-xs ${active ? 'text-slate-200' : 'text-slate-500'}`}>{option.description}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {form.paymentAction === 'pay_now' ? (
+                      <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+                        ระบบจะสร้าง EXP และ PMT ทันทีโดยไม่สร้าง PMA
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                        ระบบจะสร้าง EXP เป็น `ยังไม่อนุมัติ` แล้วส่งไปหน้าอนุมัติจ่ายเงินก่อนออก PMT
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลหลัก</div>
                     <div className="grid gap-3 md:grid-cols-4">
                       <div className="md:col-span-2">
-                        <PayeeField error={fieldErrors.payee} options={payeeOptions} value={form.payee} onChange={(value) => setForm({ ...form, payee: value })} />
+                        <PayeeField
+                          error={fieldErrors.supplierId ?? fieldErrors.payee}
+                          options={payeeOptions}
+                          value={form.payee}
+                          onChange={(value) => {
+                            const supplier = findSupplierPayeeOption(payeeOptions, value)
+                            setForm({
+                              ...form,
+                              payee: value,
+                              supplierId: supplier?.code ?? '',
+                              supplierPaymentDestinationId: supplier?.bankAccounts?.find((account) => account.isPrimary)?.code ?? supplier?.bankAccounts?.[0]?.code ?? null,
+                            })
+                          }}
+                        />
                       </div>
+                      {form.paymentAction === 'pay_now' ? (
+                        <label className="block md:col-span-2" data-field="supplierPaymentDestinationId">
+                          <span className="mb-1 block text-xs font-medium text-slate-600">ช่องทางรับเงินของ Supplier{renderRequiredMark(true)}</span>
+                          <select
+                            aria-invalid={Boolean(fieldErrors.supplierPaymentDestinationId)}
+                            className={`h-9 w-full rounded-md border px-3 text-sm outline-none ${fieldErrors.supplierPaymentDestinationId ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white text-slate-900'}`}
+                            value={form.supplierPaymentDestinationId ?? ''}
+                            onChange={(event) => setForm({ ...form, supplierPaymentDestinationId: event.target.value || null })}
+                          >
+                            <option value="">{form.supplierId ? 'เลือกช่องทางรับเงิน' : 'เลือก Supplier ก่อน'}</option>
+                            {supplierPaymentDestinations.map((account) => <option key={account.code} value={account.code}>{supplierPaymentDestinationLabel(account)}</option>)}
+                          </select>
+                          {fieldErrors.supplierPaymentDestinationId ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.supplierPaymentDestinationId}</span> : null}
+                        </label>
+                      ) : null}
                       <TextField error={fieldErrors.date} fieldName="date" label="วันที่จ่าย" required type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
                       <TextField error={fieldErrors.dueDate} fieldName="dueDate" label="ครบกำหนด" type="date" value={form.dueDate ?? ''} onChange={(value) => setForm({ ...form, dueDate: value })} />
                       {form.id ? (
@@ -755,6 +970,55 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     />
                   </div>
 
+                  {form.paymentAction === 'pay_now' ? (
+                    <div className="rounded-md bg-white p-4 shadow">
+                      <div className="mb-3 text-sm font-semibold text-slate-900">วิธีการจ่าย</div>
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <label className="block" data-field="paymentMethod">
+                          <span className="mb-1 block text-xs font-medium text-slate-600">วิธีจ่าย{renderRequiredMark(true)}</span>
+                          <select
+                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none"
+                            value={paymentMethod}
+                            onChange={(event) => updatePaymentMethod(event.target.value)}
+                          >
+                            {paymentMethods.length === 0 ? <option value="">ไม่มีวิธีจ่ายที่เปิดใช้งาน</option> : null}
+                            {paymentMethods.map((method) => <option key={method.id} value={method.name}>{method.name}</option>)}
+                          </select>
+                        </label>
+                        <label className="block md:col-span-2" data-field="accountId">
+                          <span className="mb-1 block text-xs font-medium text-slate-600">บัญชีที่จ่ายของบริษัท{renderRequiredMark(true)}</span>
+                          <select
+                            aria-invalid={Boolean(fieldErrors.accountId)}
+                            className={`h-9 w-full rounded-md border px-3 text-sm outline-none ${fieldErrors.accountId ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white text-slate-900'}`}
+                            value={form.accountId ?? ''}
+                            onChange={(event) => setForm({ ...form, accountId: event.target.value || null })}
+                          >
+                            <option value="">{paymentMethod ? 'เลือกบัญชีที่จ่าย' : 'เลือกวิธีจ่ายก่อน'}</option>
+                            {paymentAccountOptions.map((account) => <option key={account.id} value={account.id}>{account.name} ({formatMoney(account.balance)})</option>)}
+                          </select>
+                          {fieldErrors.accountId ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.accountId}</span> : null}
+                        </label>
+                        <label className="block" data-field="discount">
+                          <span className="mb-1 block text-xs font-medium text-slate-600">Discount</span>
+                          <MoneyInputControl className="h-9 text-sm" error={fieldErrors.discount} value={Number(form.discount) || 0} onChange={(value) => setForm({ ...form, discount: value })} />
+                          {fieldErrors.discount ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.discount}</span> : null}
+                        </label>
+                        {selectedPaymentMethodGroup === 'cash' ? null : (
+                          <label className="block" data-field="bankFee">
+                            <span className="mb-1 block text-xs font-medium text-slate-600">Bank fee</span>
+                            <MoneyInputControl className="h-9 text-sm" error={fieldErrors.bankFee} value={Number(form.bankFee) || 0} onChange={(value) => setForm({ ...form, bankFee: value })} />
+                            {fieldErrors.bankFee ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.bankFee}</span> : null}
+                          </label>
+                        )}
+                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 md:col-span-2">
+                          <div>ยอด EXP: <b>{formatMoney(formTotals.netAmount)}</b></div>
+                          <div>ยอดจ่าย Supplier หลัง Discount: <b>{formatMoney(formPaymentAmount)}</b></div>
+                          <div>เงินออกจากบัญชีรวม Bank fee: <b className="text-red-700">{formatMoney(formCashOutAmount)}</b></div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">เอกสารอ้างอิงและหมายเหตุ</div>
                     <div className="grid gap-3 md:grid-cols-3">
@@ -766,16 +1030,65 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-slate-200 bg-white p-4 shadow">
-                    <div className="mb-3 text-sm font-semibold text-slate-800">สรุปก่อนบันทึก</div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <SummaryTile label="ยอดก่อน VAT" value={formatMoney(formTotals.amount)} />
-                      <SummaryTile label="+ VAT" value={formatMoney(formTotals.vatAmount)} />
-                      <SummaryTile label="- WHT" value={formatMoney(formTotals.whtAmount)} />
-                      <SummaryTile emphasize label="ยอดสุทธิ" value={formatMoney(formTotals.netAmount)} />
+                  <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow">
+                    <div className="border-b border-slate-100 bg-slate-900 px-4 py-3 text-white">
+                      <div className="text-sm font-semibold">สรุปก่อนบันทึก</div>
+                      <div className="text-xs text-slate-300">{form.paymentAction === 'pay_now' ? 'ตรวจยอดเอกสารและยอดเงินออกจากบัญชี' : 'ตรวจยอด EXP ก่อนส่งอนุมัติจ่ายเงิน'}</div>
+                    </div>
+                    <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr]">
+                      <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-800">ยอดเอกสาร EXP</div>
+                            <div className="text-xs text-slate-500">คำนวณจากรายการค่าใช้จ่าย VAT และ WHT</div>
+                          </div>
+                          <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">{formTotals.lines.length} รายการ</div>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <SummaryRow label="ยอดก่อน VAT" value={formatMoney(formTotals.amount)} />
+                          <SummaryRow label="+ VAT" value={formatMoney(formTotals.vatAmount)} />
+                          <SummaryRow label="- WHT" value={formatMoney(formTotals.whtAmount)} />
+                          <div className="border-t border-slate-200 pt-2">
+                            <SummaryRow strong label="ยอดสุทธิ EXP" value={formatMoney(formTotals.netAmount)} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`rounded-md border p-4 ${form.paymentAction === 'pay_now' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                        {form.paymentAction === 'pay_now' ? (
+                          <>
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-semibold text-red-900">ยอดจ่ายจริง</div>
+                                <div className="text-xs text-red-700">วิธีจ่าย: {paymentMethod || '-'}</div>
+                              </div>
+                              <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-red-700">{selectedPaymentMethodGroup === 'cash' ? 'ไม่มี Bank fee' : 'รวม Bank fee'}</div>
+                            </div>
+                            <div className="space-y-2 text-sm">
+                              <SummaryRow label="ยอดสุทธิ EXP" tone="red" value={formatMoney(formTotals.netAmount)} />
+                              <SummaryRow label="- Discount" tone="red" value={formatMoney(Number(form.discount) || 0)} />
+                              {selectedPaymentMethodGroup === 'cash' ? null : <SummaryRow label="+ Bank fee" tone="red" value={formatMoney(Number(form.bankFee) || 0)} />}
+                              <div className="border-t border-red-200 pt-3">
+                                <div className="text-xs font-medium text-red-700">เงินออกจากบัญชี</div>
+                                <div className="mt-1 text-right text-2xl font-bold tabular-nums text-red-700">{formatMoney(formCashOutAmount)}</div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex h-full min-h-[170px] flex-col justify-center text-center">
+                            <div className="text-sm font-semibold text-amber-900">ส่งอนุมัติจ่ายเงิน</div>
+                            <div className="mt-2 text-xs leading-5 text-amber-800">
+                              รอบนี้จะสร้าง EXP เป็นสถานะ `ยังไม่อนุมัติ` และยังไม่เกิดเงินออกจากบัญชีจนกว่าจะอนุมัติ PMA และออก PMT
+                            </div>
+                            <div className="mt-4 rounded-md bg-white px-3 py-2 text-sm font-semibold text-amber-900">
+                              ยอดที่จะส่งอนุมัติ: {formatMoney(formTotals.netAmount)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {form.id ? (
-                      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                      <div className="mx-4 mb-4 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-600">
                         สถานะปัจจุบัน: <span className={`font-semibold ${expenseStatusTextClass(form.status)}`}>{expenseStatusLabel(form.status)}</span>
                       </div>
                     ) : null}
@@ -789,21 +1102,35 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
           ) : null}
 
+          {detailRow ? (
+            <ExpenseDetailModal
+              row={detailRow}
+              onClose={() => setDetailRow(null)}
+              onEdit={(row) => {
+                setDetailRow(null)
+                openEditForm(row)
+              }}
+            />
+          ) : null}
+
           <div className="overflow-x-auto rounded-md bg-white shadow">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {expenseColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+              </colgroup>
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">เลขที่</th>
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">วันที่จ่าย</th>
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">ครบกำหนด</th>
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">อ้างอิง</th>
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">ผู้รับ</th>
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">หมวด</th>
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">บัญชี</th>
-                  <th className="p-2 text-center text-xs font-semibold text-slate-700">สถานะ</th>
-                  <th className="bg-red-50 p-2 text-right text-xs font-semibold text-red-700">Net Pay<br /><span className="text-[10px] font-normal">ยอดจ่ายจริง</span></th>
-                  <th className="p-2 text-right text-xs font-semibold text-slate-700">ยอด/VAT/WHT</th>
-                  <th className="p-2 text-center text-xs font-semibold text-slate-700">การกระทำ</th>
+                  <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่จ่าย" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่จ่าย')} sortKey="date" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ครบกำหนด" resizeProps={columnResize.getResizeHandleProps('dueDate', 'ครบกำหนด')} sortKey="dueDate" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="อ้างอิง" resizeProps={columnResize.getResizeHandleProps('refDocNo', 'อ้างอิง')} sortKey="refDocNo" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้รับ" resizeProps={columnResize.getResizeHandleProps('payee', 'ผู้รับ')} sortKey="payee" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="หมวด" resizeProps={columnResize.getResizeHandleProps('category', 'หมวด')} sortKey="category" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บัญชี" resizeProps={columnResize.getResizeHandleProps('account', 'บัญชี')} sortKey="account" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} align="center" direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label={<span className="text-red-700">Net Pay<br /><span className="text-[10px] font-normal">ยอดจ่ายจริง</span></span>} resizeProps={columnResize.getResizeHandleProps('netAmount', 'Net Pay')} sortKey="netAmount" onSort={changeSort} />
+                  <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ยอด/VAT/WHT" resizeProps={columnResize.getResizeHandleProps('amountSummary', 'ยอด/VAT/WHT')} sortKey="amountSummary" onSort={changeSort} />
+                  <ResizableTableHead align="center" label="การกระทำ" resizeProps={columnResize.getResizeHandleProps('action', 'การกระทำ')} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -814,7 +1141,14 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     <tr
                       key={row.id}
                       className={`cursor-pointer hover:bg-slate-50 ${expenseRowTone(row.status)}`}
-                      onClick={() => router.push(`/daily/expense/${encodeURIComponent(row.docNo)}`)}
+                      tabIndex={0}
+                      onClick={() => setDetailRow(row)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setDetailRow(row)
+                        }
+                      }}
                     >
                       <td className="p-2 text-xs font-semibold text-slate-700">{row.docNo}</td>
                       <td className="p-2 text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</td>
@@ -850,6 +1184,111 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
         </>
       )}
     </section>
+  )
+}
+
+function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onEdit: (row: ExpenseRow) => void; row: ExpenseRow }) {
+  const lines = normalizeExpenseLines(row.lines, row)
+  const canEdit = canMutateExpense(row.status)
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="expense-detail-title">
+      <div className="mx-auto my-4 w-full max-w-5xl overflow-hidden rounded-md bg-white shadow-xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b bg-white px-5 py-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 id="expense-detail-title" className="text-lg font-bold text-slate-900">รายละเอียดค่าใช้จ่าย {row.docNo}</h3>
+              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${expenseStatusTextClass(row.status)}`}>
+                <span className={`size-1.5 rounded-full ${expenseStatusDotClass(row.status)}`} />
+                {expenseStatusLabel(row.status)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">อ่านอย่างเดียวจากรายการค่าใช้จ่ายที่แสดงในตาราง</p>
+          </div>
+          <button className="text-3xl leading-none text-slate-400 hover:text-slate-700" type="button" onClick={onClose}>&times;</button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <SummaryTile emphasize label="Net Pay" value={formatMoney(row.netAmount)} />
+            <SummaryTile label="ยอดก่อน VAT" value={formatMoney(row.amount)} />
+            <SummaryTile label="VAT" value={formatMoney(row.vat)} />
+            <SummaryTile label="WHT" value={formatMoney(row.wht)} />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลเอกสาร</div>
+              <div className="grid gap-3 text-sm md:grid-cols-2">
+                <DetailLine label="เลขที่เอกสาร" value={row.docNo} mono />
+                <DetailLine label="วันที่จ่าย" value={formatDateDisplay(row.date)} />
+                <DetailLine label="ครบกำหนด" value={row.dueDate ? formatDateDisplay(row.dueDate) : '-'} />
+                <DetailLine label="เลขอ้างอิง" value={row.refDocNo || '-'} mono />
+                <DetailLine label="ผู้รับเงิน" value={row.payee || '-'} />
+                <DetailLine label="หมวดหลัก" value={row.categoryName || '-'} />
+                <DetailLine label="บัญชีจ่าย" value={row.accountName || '-'} />
+                <DetailLine label="เลขใบกำกับภาษี" value={row.taxInvoiceNo || '-'} mono />
+              </div>
+            </div>
+
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-3 text-sm font-semibold text-slate-900">สรุปยอด</div>
+              <div className="space-y-2">
+                <SummaryRow label="ยอดก่อน VAT" value={formatMoney(row.amount)} />
+                <SummaryRow label="+ VAT" value={formatMoney(row.vat)} />
+                <SummaryRow label="- WHT" value={formatMoney(row.wht)} />
+                <div className="border-t border-slate-200 pt-2">
+                  <SummaryRow strong label="ยอดสุทธิ" value={formatMoney(row.netAmount)} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200">
+            <div className="border-b bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">รายการค่าใช้จ่าย</div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-xs">
+                <thead className="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th className="p-2 text-left font-semibold">หมวด</th>
+                    <th className="p-2 text-left font-semibold">รายละเอียด</th>
+                    <th className="p-2 text-right font-semibold">ยอดก่อน VAT</th>
+                    <th className="p-2 text-right font-semibold">VAT</th>
+                    <th className="p-2 text-right font-semibold">WHT</th>
+                    <th className="p-2 text-right font-semibold">ยอดสุทธิ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {lines.map((line) => {
+                    const lineNet = line.amount + line.vatAmount - line.whtAmount
+                    return (
+                      <tr key={line.id}>
+                        <td className="p-2 align-top font-semibold text-slate-700">{line.categoryName || row.categoryName || '-'}</td>
+                        <td className="p-2 align-top text-slate-700">{line.description || '-'}</td>
+                        <td className="p-2 text-right font-semibold tabular-nums text-slate-700">{formatMoney(line.amount)}</td>
+                        <td className="p-2 text-right font-semibold tabular-nums text-emerald-700">{line.vatAmount > 0 ? formatMoney(line.vatAmount) : '-'}</td>
+                        <td className="p-2 text-right font-semibold tabular-nums text-amber-700">{line.whtAmount > 0 ? formatMoney(line.whtAmount) : '-'}</td>
+                        <td className="p-2 text-right font-semibold tabular-nums text-red-700">{formatMoney(lineNet)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <DetailBlock label="รายละเอียดรวม" value={row.description || '-'} />
+            <DetailBlock label="หมายเหตุ" value={row.notes || '-'} />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-4">
+          <Button className="h-9 font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+          {canEdit ? <Button className="h-9" type="button" onClick={() => onEdit(row)}>แก้ไข</Button> : null}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -905,6 +1344,36 @@ function SummaryTile({ emphasize = false, label, value }: { emphasize?: boolean;
   )
 }
 
+function SummaryRow({ label, strong = false, tone = 'slate', value }: { label: string; strong?: boolean; tone?: 'red' | 'slate'; value: string }) {
+  const labelClass = tone === 'red' ? 'text-red-800' : 'text-slate-600'
+  const valueClass = tone === 'red' ? 'text-red-900' : 'text-slate-900'
+
+  return (
+    <div className={`flex items-center justify-between gap-3 ${strong ? 'text-base font-semibold' : 'text-sm'}`}>
+      <span className={labelClass}>{label}</span>
+      <span className={`text-right tabular-nums ${strong ? 'text-lg font-bold' : 'font-semibold'} ${valueClass}`}>{value}</span>
+    </div>
+  )
+}
+
+function DetailLine({ label, mono = false, value }: { label: string; mono?: boolean; value: string }) {
+  return (
+    <div>
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className={`mt-1 font-semibold text-slate-900 ${mono ? 'font-mono text-xs' : 'text-sm'}`}>{value}</div>
+    </div>
+  )
+}
+
+function DetailBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{value}</div>
+    </div>
+  )
+}
+
 function SegmentMulti({
   current,
   label,
@@ -943,14 +1412,14 @@ function renderRequiredMark(required?: boolean) {
 
 function PayeeField(props: { error?: string; onChange: (value: string) => void; options: PayeeOption[]; value: string }) {
   return (
-    <label className="block" data-field="payee">
+    <label className="block" data-field="supplierId">
       <span className="mb-1 block text-xs font-medium text-slate-600">ผู้รับเงิน{renderRequiredMark(true)}</span>
       <input
         aria-invalid={Boolean(props.error)}
         autoComplete="off"
         className={`h-9 w-full rounded-md border px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-100 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white text-slate-900'}`}
         list="expense-payee-options"
-        placeholder="ค้นหา Supplier หรือกรอกเอง"
+        placeholder="ค้นหา Supplier"
         required
         type="search"
         value={props.value}
@@ -961,7 +1430,7 @@ function PayeeField(props: { error?: string; onChange: (value: string) => void; 
           <option key={`${option.source}-${option.code}-${option.name}`} label={`${option.sourceLabel} · ${option.code}`} value={option.name} />
         ))}
       </datalist>
-      <span className="mt-1 block text-[11px] text-slate-500">เลือกจาก Supplier master ได้ หรือพิมพ์ชื่อผู้รับเงินใหม่ได้โดยตรง</span>
+      <span className="mt-1 block text-[11px] text-slate-500">เลือกผู้รับเงินจาก Supplier master</span>
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
   )

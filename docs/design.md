@@ -200,6 +200,16 @@ rules:
 - ห้ามใช้ปุ่มแดงทึบใน row table เว้นแต่เป็น confirmation dialog หรือ action หลักหลังยืนยันแล้ว
 - ปุ่ม action ใน row ต้อง `stopPropagation()` ถ้า row ทั้งแถว clickable
 
+### Resizable Columns
+
+- ใช้เป็น opt-in สำหรับตารางข้อมูลแน่นหรือกว้างมากเท่านั้น เช่น report/history/ledger ที่ user ต้องเทียบหลายคอลัมน์
+- implementation กลางใช้ `useResizableColumns(tableKey, columns)` และเก็บค่าด้วย `localStorage` key ต่อหน้า/ต่อตาราง เพื่อให้ browser/user เดิมจำความกว้างหลัง refresh
+- ต้องกำหนด `defaultWidth` และ `minWidth` ทุกคอลัมน์ ห้ามให้ user ลากจนข้อมูลหลักหรือ action column ยุบใช้งานไม่ได้
+- table ที่เปิด resizable ต้องใช้ `table-layout: fixed`, `colgroup`, และคง horizontal overflow wrapper ไว้สำหรับจอแคบ
+- header resize handle อยู่ที่ขอบขวาของหัวคอลัมน์, hit area เล็กและไม่ดึงสายตา, ไม่มีเส้นแบ่งท้ายหัวตารางที่เห็นชัด แต่ยังต้องมี focus outline/accessibility label สำหรับ keyboard user
+- ต้องมีทาง reset กลับ default เมื่อมี custom width แล้ว โดยใช้ปุ่ม label `Set col to default` ใน toolbar/pagination row
+- ถ้า header มี sort/click action อยู่แล้ว resize handle ต้อง `stopPropagation()` เพื่อไม่ trigger sort หรือ row action
+
 ### Table / Plain
 
 ใช้กับ transaction list ที่ต้องการความเบา, scan เร็ว, และไม่ต้องพึ่งเส้นคั่นแถว เช่น:
@@ -222,9 +232,16 @@ Rules:
 - `/purchase/advance-payments`
 - `/purchase/payments`
 - `/purchase/payments` แท็บ `ประวัติ`
+- `/sales/receipts` แท็บ `ประวัติ`
 - `/daily/payment-approval`
 - `/daily/transfer`
 - `/daily/expense`
+- `/daily/expense-dashboard`
+- `/daily/petty-advance`
+- `/daily/weight-ticket-list`
+- `/purchase/receipt-vouchers`
+- `/stock/transfer`
+- `/purchase/bills` แท็บ `ประวัติเปลี่ยนบิล Supplier`
 - `/purchase/po-buy`
 
 Rules:

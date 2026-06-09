@@ -76,6 +76,7 @@ export async function POST(request: Request) {
           discount: true,
           doc_no: true,
           id: true,
+          lines: true,
           net_amount: true,
           payment_approval_id: true,
           status: true,
@@ -92,6 +93,16 @@ export async function POST(request: Request) {
 
       const approvalIds = [...new Set(payments.map((payment) => payment.payment_approval_id).filter((value): value is bigint => value != null))]
       const billIds = [...new Set(payments.map((payment) => payment.bill_id).filter((value): value is bigint => value != null))]
+      const directExpenseIds = [...new Set(payments.flatMap((payment) => {
+        const lines = Array.isArray(payment.lines) ? payment.lines : []
+        return lines.flatMap((line) => {
+          if (typeof line !== 'object' || line === null || Array.isArray(line)) return []
+          const sourceType = String((line as Record<string, unknown>).sourceType ?? '')
+          if (sourceType !== 'expense') return []
+          const sourceId = parseInternalBigIntId(String((line as Record<string, unknown>).sourceId ?? ''))
+          return sourceId == null ? [] : [sourceId]
+        })
+      }))]
       const bills = billIds.length > 0
         ? await tx.purchase_bills.findMany({
           select: { doc_no: true, id: true, status: true },
@@ -283,6 +294,22 @@ export async function POST(request: Request) {
             }
           }
         }
+      }
+
+      if (directExpenseIds.length > 0) {
+        await tx.expenses.updateMany({
+          data: {
+            paid_at: null,
+            paid_status: 'unpaid',
+            status: 'cancelled',
+            updated_at: cancelledAt,
+            updated_by: actor,
+          },
+          where: {
+            id: { in: directExpenseIds },
+            status: { not: 'cancelled' },
+          },
+        })
       }
 
       for (const billId of billIds) {

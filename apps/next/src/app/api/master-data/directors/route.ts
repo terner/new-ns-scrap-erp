@@ -7,7 +7,7 @@ export async function GET() {
   try {
     return await listSimpleMasterData('directors')
   } catch (caught) {
-    return errorJson(caught, 'โหลดข้อมูลกรรมการ/พนักงานไม่ได้', 500)
+    return errorJson(caught, 'โหลดข้อมูลบุคคลไม่ได้', 500)
   }
 }
 
@@ -15,6 +15,6 @@ export async function POST(request: Request) {
   try {
     return await saveSimpleMasterData(request, 'directors')
   } catch (caught) {
-    return errorJson(caught, 'บันทึกข้อมูลกรรมการ/พนักงานไม่ได้')
+    return errorJson(caught, 'บันทึกข้อมูลบุคคลไม่ได้')
   }
 }

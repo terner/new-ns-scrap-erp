@@ -248,6 +248,7 @@ export type SupplierImportResult = z.infer<typeof supplierImportResultSchema>
 export type SupplierListResult = z.infer<typeof supplierListResultSchema>
 
 export type SupplierListOptions = {
+  active?: string
   all?: boolean
   direction?: 'asc' | 'desc'
   marketScope?: string
@@ -389,6 +390,7 @@ export function throwSupplierBankAccountValidationError(
 
 export async function listSuppliers(options: SupplierListOptions = {}): Promise<SupplierListResult> {
   const params = new URLSearchParams()
+  if (options.active) params.set('active', options.active)
   if (options.all) params.set('all', '1')
   if (options.supplierType) params.set('type', options.supplierType)
   if (options.marketScope) params.set('marketScope', options.marketScope)
@@ -406,6 +408,7 @@ export async function listSuppliers(options: SupplierListOptions = {}): Promise<
 
 export async function exportSuppliers(options: SupplierListOptions = {}): Promise<{ blob: Blob; filename: string }> {
   const params = new URLSearchParams()
+  if (options.active) params.set('active', options.active)
   if (options.supplierType) params.set('type', options.supplierType)
   if (options.marketScope) params.set('marketScope', options.marketScope)
   if (options.salesId) params.set('salesId', options.salesId)

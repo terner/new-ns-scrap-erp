@@ -1,12 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ButtonHTMLAttributes } from 'react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Select } from '@/components/ui/Select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
@@ -74,6 +76,8 @@ type ApprovalPayload = {
 type ApprovalTab = 'advance' | 'ap' | 'expense'
 type ApprovalSortDirection = 'asc' | 'desc'
 type ApprovalSortKey = 'bankAccount' | 'date' | 'docNo' | 'dueDate' | 'paidAmount' | 'partyName' | 'payableBalance' | 'totalAmount'
+type PaymentApprovalApColumnKey = 'bankAccount' | 'date' | 'docNo' | 'paidAmount' | 'partyName' | 'payableBalance' | 'sourceDocNo' | 'status' | 'totalAmount'
+type PaymentApprovalExpenseColumnKey = 'docNo' | 'dueDate' | 'partyName' | 'refDocNo' | 'sourceDocNo' | 'status' | 'totalAmount'
 type ApprovalDetailState =
   | { row: ApprovalApRow; tab: 'ap' }
   | { row: ApprovalExpenseRow; tab: 'expense' }
@@ -84,6 +88,26 @@ type SplitDraft = {
 }
 
 const pageSizeOptions = [10, 25, 50, 100]
+const paymentApprovalApColumns: Array<ResizableColumnDefinition<PaymentApprovalApColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'sourceDocNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'partyName', defaultWidth: 180, minWidth: 140 },
+  { key: 'bankAccount', defaultWidth: 260, minWidth: 180 },
+  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'paidAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'payableBalance', defaultWidth: 160, minWidth: 130 },
+  { key: 'status', defaultWidth: 130, minWidth: 110 },
+]
+const paymentApprovalExpenseColumns: Array<ResizableColumnDefinition<PaymentApprovalExpenseColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'sourceDocNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'dueDate', defaultWidth: 120, minWidth: 100 },
+  { key: 'partyName', defaultWidth: 200, minWidth: 140 },
+  { key: 'refDocNo', defaultWidth: 180, minWidth: 130 },
+  { key: 'totalAmount', defaultWidth: 150, minWidth: 120 },
+  { key: 'status', defaultWidth: 130, minWidth: 110 },
+]
 const approvalFilterOptions: Array<{ label: string; values: ApprovalStatus[] }> = [
   { label: 'ทั้งหมด', values: [] },
   { label: 'ยังไม่อนุมัติ', values: ['pending'] },
@@ -157,7 +181,7 @@ function approvalBalanceForRow(row: ApprovalApRow | ApprovalExpenseRow) {
 
 function defaultDestinationId(row: ApprovalApRow | ApprovalExpenseRow) {
   if ('bankAccounts' in row) return row.bankAccounts[0]?.id ?? ''
-  return row.destinationOptions.some((option) => option.id === row.accountId) ? row.accountId : ''
+  return row.destinationOptions.some((option) => option.id === row.accountId) ? row.accountId : row.destinationOptions[0]?.id ?? ''
 }
 
 function approvalSortValue(
@@ -201,6 +225,7 @@ function SortableHead({
   direction,
   label,
   onSort,
+  resizeProps,
   sortKey,
 }: {
   align: 'left' | 'right'
@@ -208,17 +233,19 @@ function SortableHead({
   direction: ApprovalSortDirection
   label: string
   onSort: (key: ApprovalSortKey) => void
+  resizeProps?: ButtonHTMLAttributes<HTMLButtonElement>
   sortKey: ApprovalSortKey
 }) {
-  const active = currentKey === sortKey
-  const alignClass = align === 'right' ? 'justify-end text-right' : 'justify-start text-left'
   return (
-    <TableHead className="p-0">
-      <button className={`flex w-full items-center gap-1 p-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
-        <span>{label}</span>
-        <span className="text-slate-400">{active ? (direction === 'asc' ? '▲' : '▼') : '↕'}</span>
-      </button>
-    </TableHead>
+    <ResizableTableHead
+      activeSortKey={currentKey}
+      align={align}
+      direction={direction}
+      label={label}
+      resizeProps={resizeProps}
+      sortKey={sortKey}
+      onSort={onSort}
+    />
   )
 }
 
@@ -239,6 +266,9 @@ export function PaymentApprovalPageClient() {
   const [sortKey, setSortKey] = useState<ApprovalSortKey>('date')
   const [splitDrafts, setSplitDrafts] = useState<SplitDraft[]>([])
   const [tab, setTab] = useState<ApprovalTab>('ap')
+  const apColumnResize = useResizableColumns('daily.payment-approval.ap', paymentApprovalApColumns)
+  const expenseColumnResize = useResizableColumns('daily.payment-approval.expense', paymentApprovalExpenseColumns)
+  const activeColumnResize = tab === 'expense' ? expenseColumnResize : apColumnResize
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -594,6 +624,7 @@ export function PaymentApprovalPageClient() {
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
+          {activeColumnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={activeColumnResize.resetColumnWidths}>Set col to default</Button> : null}
           <Select aria-label="จำนวนรายการต่อหน้า" className="h-9 w-auto px-2 py-1" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
             {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
           </Select>
@@ -605,18 +636,21 @@ export function PaymentApprovalPageClient() {
 
       <div>
         {tab === 'ap' || tab === 'advance' ? (
-          <Table className="text-xs">
+          <Table className="text-xs" style={{ minWidth: apColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {paymentApprovalApColumns.map((column) => <col key={column.key} style={apColumnResize.getColumnStyle(column.key)} />)}
+              </colgroup>
               <TableHeader>
                 <tr>
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขที่เอกสาร" sortKey="docNo" onSort={changeSort} />
-                  <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">เอกสารอ้างอิง</TableHead>
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="วันที่" sortKey="date" onSort={changeSort} />
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ผู้ขาย" sortKey="partyName" onSort={changeSort} />
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ช่องทางจ่าย / ปลายทาง" sortKey="bankAccount" onSort={changeSort} />
-                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ยอด" sortKey="totalAmount" onSort={changeSort} />
-                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ชำระแล้ว" sortKey="paidAmount" onSort={changeSort} />
-                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="คงเหลือ / อนุมัติ" sortKey="payableBalance" onSort={changeSort} />
-                  <TableHead className="p-2 text-center text-xs font-semibold text-slate-700">สถานะ</TableHead>
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขที่เอกสาร" resizeProps={apColumnResize.getResizeHandleProps('docNo', 'เลขที่เอกสาร')} sortKey="docNo" onSort={changeSort} />
+                  <ResizableTableHead label="เอกสารอ้างอิง" resizeProps={apColumnResize.getResizeHandleProps('sourceDocNo', 'เอกสารอ้างอิง')} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={apColumnResize.getResizeHandleProps('date', 'วันที่')} sortKey="date" onSort={changeSort} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ผู้ขาย" resizeProps={apColumnResize.getResizeHandleProps('partyName', 'ผู้ขาย')} sortKey="partyName" onSort={changeSort} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ช่องทางจ่าย / ปลายทาง" resizeProps={apColumnResize.getResizeHandleProps('bankAccount', 'ช่องทางจ่าย / ปลายทาง')} sortKey="bankAccount" onSort={changeSort} />
+                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ยอด" resizeProps={apColumnResize.getResizeHandleProps('totalAmount', 'ยอด')} sortKey="totalAmount" onSort={changeSort} />
+                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ชำระแล้ว" resizeProps={apColumnResize.getResizeHandleProps('paidAmount', 'ชำระแล้ว')} sortKey="paidAmount" onSort={changeSort} />
+                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="คงเหลือ / อนุมัติ" resizeProps={apColumnResize.getResizeHandleProps('payableBalance', 'คงเหลือ / อนุมัติ')} sortKey="payableBalance" onSort={changeSort} />
+                  <ResizableTableHead align="center" label="สถานะ" resizeProps={apColumnResize.getResizeHandleProps('status', 'สถานะ')} />
                 </tr>
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">
@@ -659,16 +693,19 @@ export function PaymentApprovalPageClient() {
               </TableBody>
             </Table>
           ) : (
-            <Table className="text-xs">
+            <Table className="text-xs" style={{ minWidth: expenseColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {paymentApprovalExpenseColumns.map((column) => <col key={column.key} style={expenseColumnResize.getColumnStyle(column.key)} />)}
+              </colgroup>
               <TableHeader>
                 <tr>
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขที่/วันที่" sortKey="docNo" onSort={changeSort} />
-                  <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">เอกสารอ้างอิง</TableHead>
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ครบกำหนด" sortKey="dueDate" onSort={changeSort} />
-                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ผู้รับเงิน" sortKey="partyName" onSort={changeSort} />
-                  <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">รายละเอียด / อ้างอิง</TableHead>
-                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ยอดเต็ม" sortKey="totalAmount" onSort={changeSort} />
-                  <TableHead className="p-2 text-center text-xs font-semibold text-slate-700">สถานะ</TableHead>
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="เลขที่/วันที่" resizeProps={expenseColumnResize.getResizeHandleProps('docNo', 'เลขที่/วันที่')} sortKey="docNo" onSort={changeSort} />
+                  <ResizableTableHead label="เอกสารอ้างอิง" resizeProps={expenseColumnResize.getResizeHandleProps('sourceDocNo', 'เอกสารอ้างอิง')} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ครบกำหนด" resizeProps={expenseColumnResize.getResizeHandleProps('dueDate', 'ครบกำหนด')} sortKey="dueDate" onSort={changeSort} />
+                  <SortableHead align="left" currentKey={sortKey} direction={sortDirection} label="ผู้รับเงิน" resizeProps={expenseColumnResize.getResizeHandleProps('partyName', 'ผู้รับเงิน')} sortKey="partyName" onSort={changeSort} />
+                  <ResizableTableHead label="รายละเอียด / อ้างอิง" resizeProps={expenseColumnResize.getResizeHandleProps('refDocNo', 'รายละเอียด / อ้างอิง')} />
+                  <SortableHead align="right" currentKey={sortKey} direction={sortDirection} label="ยอดเต็ม" resizeProps={expenseColumnResize.getResizeHandleProps('totalAmount', 'ยอดเต็ม')} sortKey="totalAmount" onSort={changeSort} />
+                  <ResizableTableHead align="center" label="สถานะ" resizeProps={expenseColumnResize.getResizeHandleProps('status', 'สถานะ')} />
                 </tr>
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">

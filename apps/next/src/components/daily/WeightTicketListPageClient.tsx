@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ButtonHTMLAttributes } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Plus, Printer, Search, Share2, SquarePen, XCircle } from 'lucide-react'
@@ -11,7 +11,9 @@ import { Card } from '@/components/ui/Card'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 import { cn } from '@/lib/utils'
@@ -31,8 +33,20 @@ import {
 
 type TypeFilter = WeightTicketType
 type StatusFilter = WeightTicketStatus
+type WeightTicketColumnKey = 'action' | 'branch' | 'createdAt' | 'documentNo' | 'netWeight' | 'partyName' | 'status' | 'updatedAt' | 'vehicleNo'
 
 const pageSize = 10
+const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey>> = [
+  { key: 'documentNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'createdAt', defaultWidth: 170, minWidth: 130 },
+  { key: 'partyName', defaultWidth: 210, minWidth: 150 },
+  { key: 'branch', defaultWidth: 140, minWidth: 110 },
+  { key: 'vehicleNo', defaultWidth: 130, minWidth: 110 },
+  { key: 'netWeight', defaultWidth: 150, minWidth: 120 },
+  { key: 'status', defaultWidth: 160, minWidth: 130 },
+  { key: 'updatedAt', defaultWidth: 170, minWidth: 130 },
+  { key: 'action', defaultWidth: 300, minWidth: 240 },
+]
 
 const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; values: StatusFilter[] }>> = {
   WTI: [
@@ -69,6 +83,7 @@ function SortHeader({
   direction,
   label,
   onSort,
+  resizeProps,
   sortKey,
 }: {
   activeKey: WeightTicketSortBy
@@ -76,17 +91,19 @@ function SortHeader({
   direction: WeightTicketSortDir
   label: string
   onSort: (key: WeightTicketSortBy) => void
+  resizeProps?: ButtonHTMLAttributes<HTMLButtonElement>
   sortKey: WeightTicketSortBy
 }) {
-  const active = activeKey === sortKey
-  const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
   return (
-    <th className={`p-2 ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
-      <button className={`inline-flex w-full items-center gap-1 rounded-md px-1 py-0.5 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
-        <span>{label}</span>
-        <span className={`text-[10px] ${active ? 'text-slate-900' : 'text-slate-400'}`}>{active ? direction === 'asc' ? '▲' : '▼' : '↕'}</span>
-      </button>
-    </th>
+    <ResizableTableHead
+      activeSortKey={activeKey}
+      align={align}
+      direction={direction}
+      label={label}
+      resizeProps={resizeProps}
+      sortKey={sortKey}
+      onSort={onSort}
+    />
   )
 }
 
@@ -138,6 +155,7 @@ export function WeightTicketListPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [cancelTicket, setCancelTicket] = useState<WeightTicketRecord | null>(null)
+  const columnResize = useResizableColumns('daily.weight-ticket-list', weightTicketColumns)
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
@@ -362,6 +380,7 @@ export function WeightTicketListPageClient() {
       <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
         <div>{summaryText}</div>
         <div className="flex items-center gap-2">
+          {columnResize.hasCustomWidths ? <Button size="xs" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
           <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
           <span>หน้า {safePage} / {totalPages}</span>
           <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
@@ -370,18 +389,21 @@ export function WeightTicketListPageClient() {
 
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <colgroup>
+              {weightTicketColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+            </colgroup>
             <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
               <tr>
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="เลขที่" onSort={toggleSort} sortKey="documentNo" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="วันที่/เวลา" onSort={toggleSort} sortKey="createdAt" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label={typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} onSort={toggleSort} sortKey="partyName" />
-                <th className="px-3 py-3 text-left font-semibold text-slate-700">สาขา</th>
-                <th className="px-3 py-3 text-left font-semibold text-slate-700">ทะเบียนรถ</th>
-                <SortHeader activeKey={sortBy} align="right" direction={sortDir} label="น้ำหนักสุทธิ" onSort={toggleSort} sortKey="netWeight" />
-                <th className="px-3 py-3 text-left font-semibold text-slate-700">สถานะ</th>
-                <th className="px-3 py-3 text-left font-semibold text-slate-700">อัปเดตล่าสุด</th>
-                <th className="px-3 py-3 text-right font-semibold text-slate-700">จัดการ</th>
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('documentNo', 'เลขที่')} onSort={toggleSort} sortKey="documentNo" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="วันที่/เวลา" resizeProps={columnResize.getResizeHandleProps('createdAt', 'วันที่/เวลา')} onSort={toggleSort} sortKey="createdAt" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label={typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า')} onSort={toggleSort} sortKey="partyName" />
+                <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} />
+                <ResizableTableHead label="ทะเบียนรถ" resizeProps={columnResize.getResizeHandleProps('vehicleNo', 'ทะเบียนรถ')} />
+                <SortHeader activeKey={sortBy} align="right" direction={sortDir} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} onSort={toggleSort} sortKey="netWeight" />
+                <ResizableTableHead label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+                <ResizableTableHead label="อัปเดตล่าสุด" resizeProps={columnResize.getResizeHandleProps('updatedAt', 'อัปเดตล่าสุด')} />
+                <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
               </tr>
             </thead>
             <tbody>

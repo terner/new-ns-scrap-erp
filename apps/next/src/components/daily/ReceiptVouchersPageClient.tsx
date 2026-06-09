@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Select } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/Table'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
@@ -43,6 +45,19 @@ type ReceiptVoucherRow = {
   updatedAt?: string
   updatedBy?: string
 }
+type ReceiptVoucherColumnKey = 'action' | 'date' | 'docNo' | 'licensePlate' | 'purchaseBillDocNo' | 'sellerName' | 'sellerTaxId' | 'totalAmount' | 'totalQty'
+
+const receiptVoucherColumns: Array<ResizableColumnDefinition<ReceiptVoucherColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'sellerName', defaultWidth: 190, minWidth: 140 },
+  { key: 'sellerTaxId', defaultWidth: 170, minWidth: 130 },
+  { key: 'purchaseBillDocNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'licensePlate', defaultWidth: 130, minWidth: 110 },
+  { key: 'totalQty', defaultWidth: 140, minWidth: 120 },
+  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'action', defaultWidth: 150, minWidth: 140 },
+]
 
 export function ReceiptVouchersPageClient() {
   const [dateFrom, setDateFrom] = useState('')
@@ -54,6 +69,7 @@ export function ReceiptVouchersPageClient() {
   const [printingRow, setPrintingRow] = useState<ReceiptVoucherRow | null>(null)
   const [rows, setRows] = useState<ReceiptVoucherRow[]>([])
   const [search, setSearch] = useState('')
+  const columnResize = useResizableColumns('daily.receipt-vouchers', receiptVoucherColumns)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -143,6 +159,7 @@ export function ReceiptVouchersPageClient() {
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
           <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
           <div className="flex flex-wrap items-center gap-2">
+            {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
             <Select
               aria-label="จำนวนรายการต่อหน้า"
               className="h-9 w-auto px-2 py-1"
@@ -160,18 +177,21 @@ export function ReceiptVouchersPageClient() {
           </div>
         </div>
 
-        <Table className="[&_tbody_tr]:border-slate-100">
+        <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <colgroup>
+            {receiptVoucherColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+          </colgroup>
           <TableHeader>
             <tr>
-              <th className="p-2 text-left">เลขที่</th>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">ผู้รับเงิน</th>
-              <th className="p-2 text-left">เลขประจำตัวผู้เสียภาษี</th>
-              <th className="p-2 text-left">บิลซื้อ</th>
-              <th className="p-2 text-left">ทะเบียน</th>
-              <th className="p-2 text-right">น้ำหนัก (กก.)</th>
-              <th className="p-2 text-right">จำนวนเงิน</th>
-              <th className="p-2 text-right">จัดการ</th>
+              <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
+              <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+              <ResizableTableHead label="ผู้รับเงิน" resizeProps={columnResize.getResizeHandleProps('sellerName', 'ผู้รับเงิน')} />
+              <ResizableTableHead label="เลขประจำตัวผู้เสียภาษี" resizeProps={columnResize.getResizeHandleProps('sellerTaxId', 'เลขประจำตัวผู้เสียภาษี')} />
+              <ResizableTableHead label="บิลซื้อ" resizeProps={columnResize.getResizeHandleProps('purchaseBillDocNo', 'บิลซื้อ')} />
+              <ResizableTableHead label="ทะเบียน" resizeProps={columnResize.getResizeHandleProps('licensePlate', 'ทะเบียน')} />
+              <ResizableTableHead align="right" label="น้ำหนัก (กก.)" resizeProps={columnResize.getResizeHandleProps('totalQty', 'น้ำหนัก (กก.)')} />
+              <ResizableTableHead align="right" label="จำนวนเงิน" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'จำนวนเงิน')} />
+              <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
             </tr>
           </TableHeader>
           <TableBody>

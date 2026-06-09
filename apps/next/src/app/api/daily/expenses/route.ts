@@ -4,10 +4,16 @@ import { expenseFormSchema } from '@/lib/daily'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { findActiveAccountReferenceByCode } from '@/lib/server/account-reference'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { currentActor, listDailyAccounts, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { currentActor, listDailyAccounts, nextBankStatementDocNos, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { hasLockedPaymentApproval } from '@/lib/server/payment-approval-pending'
+import {
+  appendPaymentStatusLog,
+  createPaymentAccountSplitFacts,
+  PAYMENT_STATUS_ACTION,
+} from '@/lib/server/payment-history'
 import { prisma } from '@/lib/server/prisma'
+import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { activeVatRatePercent, activeWhtRatePercent } from '@/lib/server/tax-settings'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Prisma } from '../../../../../generated/prisma/client'
@@ -19,6 +25,7 @@ type ExpenseWithRelations = Prisma.expensesGetPayload<{
     accounts: true
     branches: true
     expense_categories: true
+    suppliers: true
   }
 }>
 
@@ -37,6 +44,15 @@ type ExpenseLineJson = {
 }
 
 type PayeeOption = {
+  bankAccounts?: Array<{
+    accountName: string | null
+    accountNo: string | null
+    active: boolean | null
+    bankName: string | null
+    code: string
+    isPrimary: boolean | null
+    paymentMethod: string | null
+  }>
   code: string
   name: string
   source: 'customer' | 'supplier' | 'salesperson' | 'employee'
@@ -87,6 +103,27 @@ function requireExpenseStatus(status: string | null | undefined) {
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function branchPaymentCode(branchCode: string | null | undefined) {
+  const digits = String(branchCode ?? '').replace(/\D/g, '')
+  return digits ? digits.padStart(2, '0').slice(-2) : null
+}
+
+async function nextSupplierPaymentDocNo(tx: Prisma.TransactionClient, date: string, branchCode: string) {
+  const compactDate = date.slice(2, 4) + date.slice(5, 7)
+  const startsWith = `PMT${branchCode}${compactDate}-`
+  const rows = await tx.$queryRaw<Array<{ doc_no: string }>>`
+    select doc_no
+    from public.payments
+    where doc_no like ${`PMT${compactDate}-%`}
+       or doc_no like ${`PMT__${compactDate}-%`}
+  `
+  const lastNumber = rows.reduce((max, row) => {
+    const running = Number(row.doc_no.split('-').at(-1))
+    return Number.isFinite(running) && running > max ? running : max
+  }, 0)
+  return `${startsWith}${String(lastNumber + 1).padStart(4, '0')}`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -172,11 +209,13 @@ function expenseJson(row: ExpenseWithRelations) {
     accountId: row.accounts?.code ?? '',
     accountName: row.accounts?.name ?? '-',
     amount: toNumber(row.amount),
+    bankFee: 0,
     branchId: row.branches?.code ?? '',
     categoryId: row.expense_categories?.code ?? lines[0]?.categoryId ?? '',
     categoryName,
     date: toDateOnly(row.date),
     description: row.description ?? '',
+    discount: 0,
     docNo: row.doc_no,
     dueDate: toDateOnly(row.due_date),
     hasVat: toNumber(row.vat ?? row.vat_amount) > 0,
@@ -185,9 +224,12 @@ function expenseJson(row: ExpenseWithRelations) {
     lines,
     netAmount: toNumber(row.net_amount),
     notes: row.notes ?? '',
-    payee: row.payee ?? '',
+    payee: row.suppliers?.name ?? row.payee ?? '',
+    paymentAction: 'submit_approval' as const,
     refDocNo: row.ref_doc_no ?? '',
     status,
+    supplierId: row.suppliers?.code ?? '',
+    supplierPaymentDestinationId: null,
     taxInvoiceNo: row.tax_invoice_no ?? '',
     vat: toNumber(row.vat ?? row.vat_amount),
     wht: toNumber(row.wht ?? row.wht_amount),
@@ -273,7 +315,15 @@ export async function GET(request: Request) {
       }),
       prisma.suppliers.findMany({
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
-        select: { code: true, name: true },
+        select: {
+          code: true,
+          name: true,
+          supplier_bank_accounts: {
+            include: { bank_names: { select: { name: true } } },
+            orderBy: [{ is_primary: 'desc' }, { created_at: 'asc' }],
+            where: { active: { not: false } },
+          },
+        },
         take: 2500,
         where: { active: { not: false } },
       }),
@@ -282,6 +332,7 @@ export async function GET(request: Request) {
           accounts: true,
           branches: true,
           expense_categories: true,
+          suppliers: true,
         },
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         where: {
@@ -311,7 +362,20 @@ export async function GET(request: Request) {
     })
 
     const payeeOptions = buildPayeeOptions([
-      supplierPayees.map((row) => ({ code: row.code, name: row.name, source: 'supplier' })),
+      supplierPayees.map((row) => ({
+        bankAccounts: row.supplier_bank_accounts.map((account) => ({
+          accountName: account.account_name,
+          accountNo: account.account_no,
+          active: account.active,
+          bankName: account.bank_names?.name ?? null,
+          code: account.code,
+          isPrimary: account.is_primary,
+          paymentMethod: account.payment_method,
+        })),
+        code: row.code,
+        name: row.name,
+        source: 'supplier' as const,
+      })),
     ])
 
     if (url.searchParams.get('format') === 'xlsx') {
@@ -357,7 +421,7 @@ export async function POST(request: Request) {
           whtPct: 0,
         }]
     const categoryCodes = Array.from(new Set(rawLines.map((line) => line.categoryId).filter((value): value is string => Boolean(value))))
-    const [vatRatePercent, whtRatePercent, account, categoryRows, branch] = await Promise.all([
+    const [vatRatePercent, whtRatePercent, account, categoryRows, branch, supplier] = await Promise.all([
       activeVatRatePercent(new Date()),
       activeWhtRatePercent(new Date()),
       values.accountId
@@ -370,6 +434,7 @@ export async function POST(request: Request) {
           })
         : Promise.resolve([]),
       values.branchId ? findActiveBranchReferenceByCodeOrId(values.branchId) : Promise.resolve(null),
+      findActiveSupplierReferenceByCodeOrId(values.supplierId),
     ])
     const categoryByCode = new Map(categoryRows.map((category) => [category.code, category]))
     const invalidCategoryCode = categoryCodes.find((code) => {
@@ -382,6 +447,9 @@ export async function POST(request: Request) {
     }
     if (values.accountId && !account) {
       throw new Error('บัญชีจ่ายไม่ถูกต้อง')
+    }
+    if (!supplier) {
+      throw new Error('เลือก Supplier ผู้รับเงินให้ถูกต้อง')
     }
     const persistedLines = rawLines.map((line, index) => {
       const amount = roundMoney(line.amount)
@@ -439,7 +507,38 @@ export async function POST(request: Request) {
         await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('expenses.doc_no'))`
       }
       const docNo = existingExpense?.doc_no ?? await nextDailyDocNo('expenses', 'EXP', documentDateInput, tx)
-      const persistedStatus = 'pending_approval'
+      const isPayNow = values.paymentAction === 'pay_now'
+      const persistedStatus = isPayNow ? 'paid' : 'pending_approval'
+      const selectedDestination = isPayNow
+        ? await tx.supplier_bank_accounts.findFirst({
+            include: { bank_names: { select: { name: true } } },
+            where: {
+              active: { not: false },
+              code: values.supplierPaymentDestinationId ?? '',
+              supplier_id: supplier.id,
+            },
+          })
+        : null
+      if (isPayNow && !selectedDestination) {
+        throw new Error('เลือกช่องทางรับเงินของ Supplier ให้ถูกต้อง')
+      }
+      const paymentAccount = isPayNow && account
+        ? await tx.accounts.findUnique({
+            select: { branch_id: true, code: true, id: true, name: true },
+            where: { id: account.id },
+          })
+        : null
+      if (isPayNow && !paymentAccount) {
+        throw new Error('เลือกบัญชีที่จ่ายของบริษัทให้ถูกต้อง')
+      }
+      const paymentBranchId = branch?.id ?? paymentAccount?.branch_id ?? null
+      const paymentBranch = paymentBranchId
+        ? await tx.branches.findFirst({ select: { code: true }, where: { active: true, id: paymentBranchId } })
+        : null
+      const paymentBranchCode = isPayNow ? branchPaymentCode(paymentBranch?.code) : null
+      if (isPayNow && !paymentBranchCode) {
+        throw new Error('ไม่พบสาขาสำหรับออกเลข PMT')
+      }
 
       const expense = existingExpense
         ? await tx.expenses.update({
@@ -456,11 +555,15 @@ export async function POST(request: Request) {
               items: persistedLines as Prisma.InputJsonValue,
               net_amount: netAmount,
               notes: values.notes,
-              paid_at: null,
-              paid_status: 'unpaid',
-              payee: values.payee,
+              paid_at: isPayNow ? new Date() : null,
+              paid_status: isPayNow ? 'paid' : 'unpaid',
+              payee: supplier.name,
+              payee_account_name: selectedDestination?.account_name ?? null,
+              payee_account_no: selectedDestination?.account_no ?? null,
+              payee_bank: selectedDestination?.bank_names?.name ?? selectedDestination?.payment_method ?? null,
               ref_doc_no: values.refDocNo,
               status: persistedStatus,
+              supplier_id: supplier.id,
               tax_invoice_no: values.taxInvoiceNo,
               updated_at: new Date(),
               updated_by: actor,
@@ -486,11 +589,15 @@ export async function POST(request: Request) {
               items: persistedLines as Prisma.InputJsonValue,
               net_amount: netAmount,
               notes: values.notes,
-              paid_at: null,
-              paid_status: 'unpaid',
-              payee: values.payee,
+              paid_at: isPayNow ? new Date() : null,
+              paid_status: isPayNow ? 'paid' : 'unpaid',
+              payee: supplier.name,
+              payee_account_name: selectedDestination?.account_name ?? null,
+              payee_account_no: selectedDestination?.account_no ?? null,
+              payee_bank: selectedDestination?.bank_names?.name ?? selectedDestination?.payment_method ?? null,
               ref_doc_no: values.refDocNo,
               status: persistedStatus,
+              supplier_id: supplier.id,
               tax_invoice_no: values.taxInvoiceNo,
               updated_at: new Date(),
               updated_by: actor,
@@ -509,6 +616,121 @@ export async function POST(request: Request) {
           ref_type: 'EXP',
         },
       })
+
+      if (isPayNow) {
+        if (!paymentAccount || !paymentBranchCode) throw new Error('ข้อมูลบัญชีจ่ายไม่ครบถ้วน')
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('payments.doc_no'))`
+        const paymentDocNo = await nextSupplierPaymentDocNo(tx, values.date, paymentBranchCode)
+        const voucherId = paymentDocNo
+        const paidAt = new Date()
+        const discount = Math.min(roundMoney(values.discount), Math.max(0, netAmount - 0.01))
+        const bankFee = roundMoney(values.bankFee)
+        const paymentAmount = roundMoney(netAmount - discount)
+        const paymentNetAmount = roundMoney(paymentAmount + bankFee)
+        if (paymentAmount <= 0) throw new Error('ยอดจ่ายหลังหักส่วนลดต้องมากกว่า 0')
+
+        const payment = await tx.payments.create({
+          data: {
+            account_id: paymentAccount.id,
+            amount: paymentAmount,
+            bank_fee: bankFee,
+            branch_id: paymentBranchId,
+            created_by: actor,
+            date: documentDate,
+            discount,
+            doc_no: paymentDocNo,
+            fee: bankFee,
+            lines: [{
+              amount: paymentAmount,
+              discount,
+              fee: bankFee,
+              sourceDocNo: docNo,
+              sourceId: expense.id.toString(),
+              sourceType: 'expense',
+            }] as Prisma.InputJsonValue,
+            method: selectedDestination?.payment_method ?? selectedDestination?.bank_names?.name ?? 'จ่ายค่าใช้จ่าย',
+            net_amount: paymentNetAmount,
+            notes: values.notes,
+            status: 'active',
+            supplier_id: supplier.id,
+            updated_at: paidAt,
+            updated_by: actor,
+            voucher_id: voucherId,
+            withholding_tax: 0,
+          },
+        })
+
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('bank_statement.doc_no'))`
+        const [statementDocNo] = await nextBankStatementDocNos(values.date, 1, tx)
+        if (!statementDocNo) throw new Error('ออกเลข Bank Statement ไม่ได้')
+        const bankStatement = await tx.bank_statement.create({
+          data: {
+            account_id: paymentAccount.id,
+            amount_in: 0,
+            amount_out: paymentNetAmount,
+            created_by: actor,
+            date: documentDate,
+            description: `${paymentDocNo} - จ่ายค่าใช้จ่าย ${docNo}`,
+            doc_no: statementDocNo,
+            ref_id: voucherId,
+            ref_no: paymentDocNo,
+            ref_type: 'PMT',
+            type: 'จ่ายเงินผู้รับเงิน',
+          },
+        })
+        await createPaymentAccountSplitFacts(tx, [{
+          accountCodeSnapshot: paymentAccount.code,
+          accountId: paymentAccount.id,
+          accountNameSnapshot: paymentAccount.name,
+          actor,
+          amount: paymentNetAmount,
+          bankStatementDocNo: statementDocNo,
+          bankStatementId: bankStatement.id,
+          createdAt: paidAt,
+          paymentDocNo,
+          paymentId: payment.id,
+          paymentVoucherId: voucherId,
+          splitKey: `PMTSPLIT-${paymentDocNo}-${statementDocNo}`,
+        }])
+        await appendPaymentStatusLog(tx, {
+          action: PAYMENT_STATUS_ACTION.POSTED,
+          actor,
+          amountSnapshot: paymentAmount,
+          createdAt: paidAt,
+          fromStatus: null,
+          meta: {
+            directExpense: true,
+            discount,
+            expenseDocNo: docNo,
+            fee: bankFee,
+            sourceType: 'expense',
+            voucherId,
+          },
+          netAmountSnapshot: paymentNetAmount,
+          paymentDocNo,
+          paymentId: payment.id,
+          paymentVoucherId: voucherId,
+          toStatus: 'active',
+        })
+        await appendPaymentStatusLog(tx, {
+          action: PAYMENT_STATUS_ACTION.BANK_POSTED,
+          actor,
+          amountSnapshot: paymentAmount,
+          createdAt: paidAt,
+          fromStatus: null,
+          meta: {
+            bankStatementDocNos: [statementDocNo],
+            directExpense: true,
+            splitCount: 1,
+            voucherId,
+          },
+          netAmountSnapshot: paymentNetAmount,
+          paymentDocNo,
+          paymentId: payment.id,
+          paymentVoucherId: voucherId,
+          toStatus: 'active',
+        })
+      }
 
       return expense
     })

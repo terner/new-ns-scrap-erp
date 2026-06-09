@@ -81,6 +81,30 @@ function timelineDate(value: Date | null | undefined) {
   return isoDateTime(value) ?? ''
 }
 
+function directPaymentSourceRows(lines: unknown) {
+  if (!Array.isArray(lines)) return []
+  return lines.flatMap((line) => {
+    if (typeof line !== 'object' || line === null || Array.isArray(line)) return []
+    const record = line as Record<string, unknown>
+    const sourceType = String(record.sourceType ?? '').trim()
+    const sourceDocNo = String(record.sourceDocNo ?? '').trim()
+    const amountValue = typeof record.amount === 'number'
+      ? record.amount
+      : typeof record.amount === 'string'
+        ? Number(record.amount)
+        : 0
+    const amount = Number.isFinite(amountValue) ? amountValue : 0
+    if (!sourceType && !sourceDocNo && amount <= 0) return []
+    return [{
+      amount,
+      docNo: sourceDocNo || '-',
+      sourceDocNo: sourceDocNo || '-',
+      sourceType,
+      statusLabel: 'จ่ายแล้ว',
+    }]
+  })
+}
+
 export async function GET(_request: Request, context: { params: Promise<{ id: string[] }> }) {
   try {
     const authContext = await getCurrentAuthContext()
@@ -238,6 +262,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const netAmount = payments.reduce((sum, payment) => sum + toNumber(payment.net_amount), 0)
     const status = payments.some((payment) => payment.status === 'cancelled') ? 'cancelled' : 'active'
     const paymentCurrentTone: TimelineTone = status === 'cancelled' ? 'rose' : 'emerald'
+    const directSourceRows = payments.flatMap((payment) => directPaymentSourceRows(payment.lines))
     const timeline = [
       ...statusLogs.map((log) => ({
         actor: log.created_by ?? '',
@@ -290,16 +315,24 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         bankStatementDocNo: split.bank_statement_doc_no ?? '-',
         statusLabel: effectStatusLabel(split.status),
       })),
-      approvalRows: allocations.map((allocation) => ({
-        amount: toNumber(allocation.allocated_amount),
-        docNo: allocation.payment_approval_doc_no,
-        sourceDocNo: allocation.source_doc_no_snapshot ?? '-',
-        statusLabel: effectStatusLabel(allocation.status),
-      })),
+      approvalRows: allocations.length > 0
+        ? allocations.map((allocation) => ({
+            amount: toNumber(allocation.allocated_amount),
+            docNo: allocation.payment_approval_doc_no,
+            sourceDocNo: allocation.source_doc_no_snapshot ?? '-',
+            statusLabel: effectStatusLabel(allocation.status),
+          }))
+        : directSourceRows.map((row) => ({
+            amount: row.amount,
+            docNo: sourceTypeLabel(row.sourceType),
+            sourceDocNo: row.sourceDocNo,
+            statusLabel: status === 'cancelled' ? 'ยกเลิก' : row.statusLabel,
+          })),
       detailCards: [
         { label: 'เลขที่ PMT', value: firstPayment.doc_no },
         { label: 'วันที่จ่าย', value: dateOrDash(firstPayment.date) },
         { label: 'ผู้ขาย', value: firstPayment.suppliers?.name ?? '-' },
+        { label: 'เอกสารต้นทาง', value: directSourceRows.map((row) => row.sourceDocNo).filter((value) => value !== '-').join(', ') || allocations.map((allocation) => allocation.source_doc_no_snapshot).filter(Boolean).join(', ') || '-' },
         { label: 'วิธีจ่าย', value: firstPayment.method ?? '-' },
         { label: 'หมายเหตุ', value: firstPayment.notes ?? '-' },
       ],

@@ -8,6 +8,6 @@ export async function PATCH(request: Request, { params }: MasterDataRouteProps) 
     const { id } = await params
     return await patchSimpleMasterData(request, 'directors', id)
   } catch (caught) {
-    return errorJson(caught, 'อัปเดตสถานะกรรมการ/พนักงานไม่ได้')
+    return errorJson(caught, 'อัปเดตสถานะบุคคลไม่ได้')
   }
 }

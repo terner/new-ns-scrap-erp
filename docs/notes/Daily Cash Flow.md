@@ -11,20 +11,49 @@ tags:
   - business-flow
 status: draft
 created: 2026-06-08
-updated: 2026-06-08
+updated: 2026-06-09
 ---
 
 # Daily Cash Flow / เงินสดธนาคารรายวัน
 
-เอกสารนี้เป็น target flow สำหรับรายการเงินสด/ธนาคารที่อยู่ในกลุ่ม `รายการประจำวัน` และมีผลต่อ `bank_statement` โดยตรง เช่น โอนเงินระหว่างบัญชี, ค่าใช้จ่าย, เงินสำรองจ่าย, และรายการคืนเงินสำรองจ่าย
+เอกสารนี้เป็น target flow สำหรับรายการเงินสด/ธนาคารที่อยู่ในกลุ่ม `รายการประจำวัน` เช่น โอนเงินระหว่างบัญชี, ค่าใช้จ่าย, เอกสารยืมเงิน/เงินสำรองจ่าย, และรายการคืนเงินสำรองจ่าย โดยต้องแยกให้ชัดว่าเอกสารใดเป็นเอกสารตั้งต้น และจังหวะใดจึงกระทบ `bank_statement`
 
 ## ขอบเขตปัจจุบัน
 
 | Flow | Route | สถานะ |
 |---|---|---|
 | โอนเงินระหว่างบัญชี | `/daily/transfer` | implemented partial write |
-| ค่าใช้จ่าย | `/daily/expense` | implemented with approval/payment flow integration |
+| ค่าใช้จ่าย | `/daily/expense` | implemented with approval mode and direct-payment mode |
 | เงินสำรองจ่าย | `/daily/petty-advance` | implemented baseline |
+
+## Flow ค่าใช้จ่าย
+
+หน้า `/daily/expense` ใช้สร้างเอกสาร `EXP` และต้องให้ผู้ใช้เลือก mode ก่อนบันทึก:
+
+- `ส่งอนุมัติ`: สร้าง `EXP` เป็น `pending_approval` แล้วส่งเข้า `/daily/payment-approval`; ยังไม่เกิดผลต่อ `bank_statement` จนกว่าจะออก `PMT`
+- `จ่ายเลย`: สร้าง `EXP` และ `PMT` ทันทีโดยไม่สร้าง `PMA`; ต้องเลือกช่องทางรับเงินของ Supplier, บัญชีที่จ่ายของบริษัท, Discount, และ Bank fee ใน modal
+
+ผลกระทบของ mode `จ่ายเลย`:
+
+- สร้าง `payments` เป็น `PMT...` และเก็บ source snapshot ใน `payments.lines` ด้วย `sourceType = expense` / `sourceDocNo = EXP...`
+- สร้าง `bank_statement` เงินออกด้วย `ref_type = PMT`
+- สร้าง `payment_account_splits` และ `payment_status_logs` เพื่อให้ประวัติการจ่ายเงินอ่าน audit trail ได้
+- แสดงรายการใน `/purchase/payments?tab=history` แม้ไม่มี `PMA` และไม่มี `payment_allocations`
+- ถ้ายกเลิกการจ่าย ต้อง cancel `PMT`, reverse/delete bank statement/payment split facts, และ set `EXP` เป็น `cancelled` เพราะไม่มี `PMA` ให้ย้อนกลับไปเป็นคิวรอจ่าย
+
+## Flow เงินสำรองจ่าย / กู้กรรมการ
+
+หน้า `/daily/petty-advance` ใช้สร้างเอกสาร `PADV` สำหรับรายการยืมเงิน/เงินสำรองจ่าย/กู้กรรมการ โดย `PADV` เป็นเอกสารตั้งต้นของยอดค้าง ไม่สร้าง `BST` ตอนสร้างหรือแก้ไขรายการ:
+
+- modal ไม่แสดงช่อง `เลขที่`; server ออกเลข `PADV...` ตอนบันทึกเท่านั้น และ edit รายการเดิมต้องคงเลขเดิม
+- `วันที่` เอกสารระบบ/เวลา save เป็นข้อมูลระบบ ส่วนช่องที่ผู้ใช้เลือกใน modal คือ `วันที่จ่าย` และใช้เป็น `petty_advances.date`
+- `ผู้รับเงิน` ต้องเลือกจากข้อมูลหลักบุคคลบริษัท `director_employees` เฉพาะประเภท `กรรมการ` หรือ `พนักงาน` ที่ active และมีบัญชีรับเงินครบ
+- ระบบ snapshot `recipient_person_code`, ชื่อผู้รับเงิน, ธนาคาร, ชื่อบัญชี, เลขบัญชี, และสาขา ลงใน `petty_advances` เพื่อให้ประวัติไม่เปลี่ยนตาม master ภายหลัง
+- `บัญชีรับเงิน` ใน modal เป็นข้อมูล read-only จากบุคคลที่เลือก ไม่ใช่ช่องให้พิมพ์เอง และ create/edit modal ไม่มี field บัญชีบริษัท
+- `หมายเหตุ` ใช้ textarea และ validate เป็นข้อความทั่วไปตาม `docs/design.md`
+- filter หน้า list ใช้ segmented/fragment filter สำหรับ `ประเภท` และ `สถานะ` ตาม list-page design baseline โดย `สถานะ` แยกเป็นอีกบรรทัดเพื่อให้อ่านง่าย
+- ปุ่ม `คืนเงิน` ต้องเห็นได้จาก row action และ detail modal เฉพาะรายการที่ยัง active และมียอดคงค้าง
+- เมื่อบันทึกคืนเงิน ระบบสร้าง `PRET...`, เพิ่ม `petty_advance_returns`, ปรับยอดคืน/สถานะของ `PADV`, และสร้าง `BST...` เงินเข้า โดย `BST` เกิดเฉพาะจังหวะคืนเงินเท่านั้น
 
 ## Flow โอนเงินระหว่างบัญชี
 

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { defaultPaymentMethodNameByGroup, paymentMethodGroupFromValue, resolvePaymentMethodName } from '@/lib/account-payment-method'
+import { paymentMethodGroupFromValue, resolvePaymentMethodName } from '@/lib/account-payment-method'
 import { requireBusinessCode, requireDocumentNo } from '@/lib/business-code'
 import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { refreshAdvancePaymentWorkflowStatus } from '@/lib/server/advance-payments'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { listDailyAccounts, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { nextPaymentApprovalDocNos } from '@/lib/server/payment-approval-pending'
 import { getActivePaymentMethods, type ActivePaymentMethod } from '@/lib/server/payment-methods'
 import { appendPaymentApprovalStatusLog, PAYMENT_APPROVAL_STATUS_ACTION } from '@/lib/server/payment-history'
@@ -49,50 +49,22 @@ function normalizeSupplierBankAccounts(params: {
     | null
     | undefined
 }): ApprovalDestinationOption[] {
-  const defaultBankMethod = defaultPaymentMethodNameByGroup(params.paymentMethods, 'bank') ?? ''
-  const cashMethod = defaultPaymentMethodNameByGroup(params.paymentMethods, 'cash')
-  const options: ApprovalDestinationOption[] = (params.rows ?? [])
+  return (params.rows ?? [])
     .filter((account) => account.active !== false)
-    .map((account) => ({
-      accountNo: account.account_no ?? '',
-      bankName: account.bank_names?.name ?? '',
-      id: requireBusinessCode(account.code, `บัญชีรับเงินผู้ขาย ${account.id}`),
-      isPrimary: account.is_primary ?? false,
-      kind: 'bank' as const,
-      label: [account.bank_names?.name ?? '', account.account_no ?? ''].filter(Boolean).join(' / ') || resolvePaymentMethodName(account.payment_method, params.paymentMethods) || defaultBankMethod || 'ไม่ระบุ',
-      paymentMethod: resolvePaymentMethodName(account.payment_method, params.paymentMethods) ?? defaultBankMethod,
-    }))
-
-  if (cashMethod) {
-    const hasCash = options.some((option) => paymentMethodGroupFromValue(option.paymentMethod, params.paymentMethods) === 'cash')
-    if (!hasCash) {
-      options.unshift({
-        accountNo: '',
-        bankName: '',
-        id: `cash:${cashMethod}`,
-        isPrimary: options.length === 0,
-        kind: 'cash',
-        label: cashMethod,
-        paymentMethod: cashMethod,
-      })
-    }
-  }
-
-  return options
-}
-
-function normalizeExpenseDestinationAccounts(rows: Awaited<ReturnType<typeof listDailyAccounts>>): ApprovalDestinationOption[] {
-  return rows
-    .filter((account) => account.active)
-    .map((account) => ({
-      accountNo: account.code ?? '',
-      bankName: account.name,
-      id: account.id,
-      isPrimary: false,
-      kind: account.type === 'cash' ? 'cash' : 'bank',
-      label: [account.name, account.code].filter(Boolean).join(' / '),
-      paymentMethod: account.name,
-    }))
+    .map((account) => {
+      const paymentMethod = resolvePaymentMethodName(account.payment_method, params.paymentMethods) ?? ''
+      const kind: ApprovalDestinationOption['kind'] = paymentMethodGroupFromValue(paymentMethod, params.paymentMethods) === 'cash' ? 'cash' : 'bank'
+      return {
+        accountNo: account.account_no ?? '',
+        bankName: account.bank_names?.name ?? '',
+        id: requireBusinessCode(account.code, `บัญชีรับเงินผู้ขาย ${account.id}`),
+        isPrimary: account.is_primary ?? false,
+        kind,
+        label: [paymentMethod, account.bank_names?.name ?? '', account.account_no ?? ''].filter(Boolean).join(' / ') || 'ไม่ระบุ',
+        paymentMethod,
+      }
+    })
+    .filter((option) => option.paymentMethod.trim() || option.accountNo.trim())
 }
 
 export async function GET() {
@@ -100,7 +72,7 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const [purchaseBills, advancePayments, expenses, approvals, paymentMethods, expenseDestinationAccounts] = await Promise.all([
+    const [purchaseBills, advancePayments, expenses, approvals, paymentMethods] = await Promise.all([
       prisma.purchase_bills.findMany({
         include: {
           suppliers: {
@@ -145,7 +117,21 @@ export async function GET() {
         },
       }),
       prisma.expenses.findMany({
-        include: { accounts: true },
+        include: {
+          accounts: true,
+          suppliers: {
+            include: {
+              supplier_bank_accounts: {
+                include: {
+                  bank_names: {
+                    select: { code: true, name: true },
+                  },
+                },
+                orderBy: [{ is_primary: 'desc' }, { id: 'asc' }],
+              },
+            },
+          },
+        },
         orderBy: [{ date: 'asc' }, { doc_no: 'asc' }],
         take: 5000,
         where: {
@@ -160,9 +146,7 @@ export async function GET() {
         },
       }),
       getActivePaymentMethods(),
-      listDailyAccounts(),
     ])
-    const expenseDestinations = normalizeExpenseDestinationAccounts(expenseDestinationAccounts)
 
     const approvedByPurchaseBillId = new Map<string, typeof approvals[number][]>()
     const approvedByAdvanceId = new Map<string, typeof approvals[number][]>()
@@ -373,6 +357,10 @@ export async function GET() {
       const approvedOutstanding = activeOrConsumedApprovals.reduce((sum, approval) => sum + toNumber(approval.approved_amount), 0)
       const pendingAmount = Math.max(0, amount - approvedOutstanding)
       const sourceDocNo = requireDocumentNo(expense.doc_no, `ค่าใช้จ่าย ${expense.id}`)
+      const destinationOptions = normalizeSupplierBankAccounts({
+        paymentMethods,
+        rows: expense.suppliers?.supplier_bank_accounts,
+      })
       const pendingRows = pendingAmount > 0.01 ? [{
         accountId: expense.accounts?.code ?? '',
         accountName: expense.accounts?.name ?? '',
@@ -382,11 +370,11 @@ export async function GET() {
         approvedAmount: 0,
         date: toDateOnly(expense.date),
         destinationLabel: '',
-        destinationOptions: expenseDestinations,
+        destinationOptions,
         docNo: sourceDocNo,
         dueDate: toDateOnly(expense.due_date),
         id: `expense:${sourceDocNo}`,
-        payee: expense.payee ?? '-',
+        payee: expense.suppliers?.name ?? expense.payee ?? '-',
         refDocNo: expense.ref_doc_no ?? '',
         sourceDocNo,
         sourceType: 'expense' as const,
@@ -407,7 +395,7 @@ export async function GET() {
         docNo: approvalDocNo,
         dueDate: toDateOnly(expense.due_date),
         id: approvalDocNo,
-        payee: approval.party_name_snapshot ?? expense.payee ?? '-',
+        payee: approval.party_name_snapshot ?? expense.suppliers?.name ?? expense.payee ?? '-',
         refDocNo: expense.ref_doc_no ?? '',
         sourceDocNo: expense.doc_no,
         sourceType: 'expense' as const,
@@ -429,7 +417,7 @@ export async function GET() {
         docNo: approvalDocNo,
         dueDate: toDateOnly(expense.due_date),
         id: approvalDocNo,
-        payee: approval.party_name_snapshot ?? expense.payee ?? '-',
+        payee: approval.party_name_snapshot ?? expense.suppliers?.name ?? expense.payee ?? '-',
         refDocNo: expense.ref_doc_no ?? '',
         sourceDocNo,
         sourceType: 'expense' as const,
@@ -506,6 +494,18 @@ export async function POST(request: Request) {
         include: {
           accounts: true,
           branches: true,
+          suppliers: {
+            include: {
+              supplier_bank_accounts: {
+                include: {
+                  bank_names: {
+                    select: { code: true, name: true },
+                  },
+                },
+                orderBy: [{ is_primary: 'desc' }, { id: 'asc' }],
+              },
+            },
+          },
         },
         where: {
           ...(values.sourceType === 'expense' ? { doc_no: sourceDocNo } : { id: BigInt(-1) }),
@@ -684,34 +684,29 @@ export async function POST(request: Request) {
         }
 
         const approvedAt = new Date()
+        const destinations = normalizeSupplierBankAccounts({
+          paymentMethods,
+          rows: expense.suppliers?.supplier_bank_accounts,
+        })
         await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('payment_approvals.doc_no'))`
         const approvalDocNos = await nextPaymentApprovalDocNos(tx, expense.date, expense.branches?.code ?? '', values.splits.length)
 
         for (const [index, split] of values.splits.entries()) {
           const approvalDocNo = requireDocumentNo(approvalDocNos[index], `PMA split ${index + 1}`)
-          const account = await tx.accounts.findFirst({
-            select: {
-              code: true,
-              name: true,
-            },
-            where: {
-              active: true,
-              code: split.destinationId,
-            },
-          })
-          if (!account) throw new Error(`ไม่พบบัญชีปลายทางของ ${expense.doc_no}`)
+          const selectedDestination = destinations.find((option) => option.id === split.destinationId)
+          if (!selectedDestination) throw new Error(`ไม่พบบัญชีปลายทางของ ${expense.doc_no}`)
           const approval = await tx.payment_approvals.create({
             data: {
               approved_amount: split.approvedAmount,
               approved_at: approvedAt,
               approved_by: actor,
-              destination_account_no_snapshot: account.code ?? null,
-              destination_bank_account_id_snapshot: account.code ?? null,
-              destination_bank_name_snapshot: account.name ?? null,
-              destination_payment_method_snapshot: account.name ?? null,
+              destination_account_no_snapshot: selectedDestination.accountNo || null,
+              destination_bank_account_id_snapshot: selectedDestination.id,
+              destination_bank_name_snapshot: selectedDestination.bankName || null,
+              destination_payment_method_snapshot: selectedDestination.paymentMethod || selectedDestination.label || null,
               doc_no: approvalDocNo,
-              party_id: null,
-              party_name_snapshot: expense.payee ?? null,
+              party_id: expense.suppliers?.code ?? null,
+              party_name_snapshot: expense.suppliers?.name ?? expense.payee ?? null,
               source_date_snapshot: expense.date ? normalizeDate(toDateOnly(expense.date)) : null,
               source_doc_no_snapshot: expense.doc_no,
               source_id: expense.id.toString(),

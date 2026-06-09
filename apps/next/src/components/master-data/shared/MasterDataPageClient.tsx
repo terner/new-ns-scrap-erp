@@ -17,9 +17,12 @@ import {
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { FormSelectField } from '@/components/ui/FormSelectField'
 import { PhoneInput } from '@/components/ui/PhoneInput'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { formatDecimalDisplay, formatDecimalDraft, formatPhoneDisplay, sanitizeAccountNoInput, sanitizeDecimalInput } from '@/lib/format'
 
 type SortKey = keyof MasterDataRecord
+type TableColumnKey = SortKey | '__action'
 
 type MasterDataPageClientProps = {
   config: MasterDataPageConfig
@@ -44,6 +47,9 @@ function recordToForm(record: MasterDataRecord, paymentMethods: MasterDataRecord
     id: record.id,
     code: record.code,
     name: record.name,
+    nameTitle: record.nameTitle,
+    firstName: record.firstName,
+    lastName: record.lastName,
     active: record.active,
     type: resolvePaymentMethodValueForAccount(record, paymentMethods),
     subtype: normalizedSubtype,
@@ -61,6 +67,7 @@ function recordToForm(record: MasterDataRecord, paymentMethods: MasterDataRecord
     bankName: record.bankName,
     bankBranch: record.bankBranch,
     accountNo: record.accountNo,
+    accountName: record.accountName,
     currency: record.currency,
     openingBalance: record.openingBalance,
     odLimit: record.odLimit,
@@ -101,6 +108,12 @@ function displayRecordValue(record: MasterDataRecord, key: keyof MasterDataRecor
   return displayValue(record[key] as string | number | boolean | null)
 }
 
+function alignClass(align: 'center' | 'left' | 'right' | undefined) {
+  if (align === 'right') return 'text-right'
+  if (align === 'center') return 'text-center'
+  return 'text-left'
+}
+
 function formatNumber(value: number | null, fractionDigits = 2) {
   if (value === null) return '-'
   return value.toLocaleString('th-TH', { maximumFractionDigits: fractionDigits, minimumFractionDigits: fractionDigits })
@@ -128,13 +141,23 @@ function compareRecords(left: MasterDataRecord, right: MasterDataRecord, key: So
   return String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'th', { numeric: true }) * multiplier
 }
 
+function directorDisplayName(values: Pick<MasterDataFormValues, 'firstName' | 'lastName' | 'nameTitle'>) {
+  return [values.nameTitle, values.firstName, values.lastName].map((part) => part?.trim()).filter(Boolean).join(' ')
+}
+
+function valuesForValidation(config: MasterDataPageConfig, values: MasterDataFormValues) {
+  if (config.apiPath !== '/api/master-data/directors') return values
+  return { ...values, name: directorDisplayName(values) || '-' }
+}
+
 function validateMasterDataForm(
   config: MasterDataPageConfig,
   values: MasterDataFormValues,
   paymentMethodRows: MasterDataRecord[],
 ) {
   const schema = config.apiPath === '/api/master-data/accounts' ? accountMasterDataFormSchema : masterDataFormSchema
-  const parsed = schema.safeParse(values)
+  const normalizedValues = valuesForValidation(config, values)
+  const parsed = schema.safeParse(normalizedValues)
   const errors: Record<string, string> = {}
   const hiddenFieldKeys = new Set<string>()
 
@@ -229,6 +252,20 @@ function validateMasterDataForm(
     }
   }
 
+  if (config.apiPath === '/api/master-data/directors') {
+    if (!values.type) errors.type = 'เลือกประเภท'
+    if (!values.nameTitle) errors.nameTitle = 'เลือกคำนำหน้าชื่อ'
+    if (!values.firstName) errors.firstName = 'กรอกชื่อ'
+    if (!values.lastName) errors.lastName = 'กรอกนามสกุล'
+
+    const hasBankInfo = Boolean(values.bankName || values.accountNo || values.accountName || values.bankBranch)
+    if (hasBankInfo) {
+      if (!values.bankName) errors.bankName = 'เลือกธนาคาร'
+      if (!values.accountName) errors.accountName = 'กรอกชื่อบัญชี'
+      if (!values.accountNo) errors.accountNo = 'กรอกเลขบัญชี'
+    }
+  }
+
   return { errors, values: parsed.success ? parsed.data : null }
 }
 
@@ -246,6 +283,16 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
   const [selectedRecord, setSelectedRecord] = useState<MasterDataRecord | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [sortKey, setSortKey] = useState<SortKey>(config.columns[0]?.key ?? 'code')
+  const resizableColumns = useMemo<Array<ResizableColumnDefinition<TableColumnKey>>>(() => ([
+    ...config.columns.map((column) => ({
+      defaultWidth: column.width ?? 136,
+      key: column.key,
+      maxWidth: column.maxWidth,
+      minWidth: column.minWidth ?? 96,
+    })),
+    { defaultWidth: 76, key: '__action', minWidth: 72 },
+  ]), [config.columns])
+  const columnResize = useResizableColumns<TableColumnKey>(`master-data.${config.apiPath}`, resizableColumns)
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -357,11 +404,6 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
     setPage(1)
   }
 
-  function sortLabel(key: SortKey) {
-    if (sortKey !== key) return ''
-    return sortDirection === 'asc' ? ' ↑' : ' ↓'
-  }
-
   return (
     <section className="space-y-4">
       {error ? (
@@ -375,7 +417,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="w-full md:max-w-md">
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-700"
               onChange={(event) => {
                 setSearch(event.target.value)
                 setPage(1)
@@ -387,7 +429,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
             {config.description ? <div className="mt-2 text-xs text-slate-500">{config.description}</div> : null}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white" type="button" onClick={openCreateForm}>
+            <button className="h-9 rounded-md bg-slate-900 px-4 text-sm font-bold text-white hover:bg-slate-700" type="button" onClick={openCreateForm}>
               + {config.createLabel}
             </button>
           </div>
@@ -420,9 +462,14 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <div>พบทั้งหมด <span className="font-semibold text-slate-900">{total}</span> รายการ</div>
             <div className="flex flex-wrap items-center gap-2">
+              {columnResize.hasCustomWidths ? (
+                <button className="h-9 rounded-md border border-slate-300 px-3 text-xs font-medium hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>
+                  รีเซ็ตความกว้างคอลัมน์
+                </button>
+              ) : null}
               <select
                 aria-label="จำนวนรายการต่อหน้า"
-                className="rounded-md border border-slate-300 px-2 py-1"
+                className="h-9 w-auto min-w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
                 value={pageSize}
                 onChange={(event) => {
                   setPageSize(Number(event.target.value))
@@ -433,31 +480,41 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                   <option key={size} value={size}>{size} / หน้า</option>
                 ))}
               </select>
-              <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+              <button className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
               <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-              <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+              <button className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-md bg-white shadow">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100">
-                <tr>
-                  {config.columns.map((column) => (
-                    <th key={column.key} className={`min-w-32 p-2 text-${column.align ?? 'left'}`}>
-                      <button className="font-semibold" type="button" onClick={() => setSort(column.key)}>
-                        {column.label}{sortLabel(column.key)}
-                      </button>
-                    </th>
-                  ))}
-                  <th className="p-2 text-center">แก้ไข</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+                <colgroup>
+                  {config.columns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+                  <col style={columnResize.getColumnStyle('__action')} />
+                </colgroup>
+                <thead className="bg-slate-100">
+                  <tr>
+                    {config.columns.map((column) => (
+                      <ResizableTableHead
+                        key={column.key}
+                        activeSortKey={sortKey}
+                        align={column.align}
+                        direction={sortDirection}
+                        label={column.label}
+                        resizeProps={columnResize.getResizeHandleProps(column.key, column.label)}
+                        sortKey={column.key}
+                        onSort={setSort}
+                      />
+                    ))}
+                    <ResizableTableHead align="center" label="แก้ไข" resizeProps={columnResize.getResizeHandleProps('__action', 'แก้ไข')} />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
                 {paginatedRecords.map((record) => (
                   <tr
                     key={record.id}
-                    className="cursor-pointer border-t hover:bg-slate-50 focus-within:bg-slate-50"
+                    className="cursor-pointer hover:bg-slate-50 focus-within:bg-slate-50"
                     tabIndex={0}
                     onClick={() => openEditForm(record)}
                     onKeyDown={(event) => {
@@ -468,16 +525,23 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                     }}
                   >
                     {config.columns.map((column) => (
-                      <td key={column.key} className={`p-2 text-${column.align ?? 'left'} ${column.key === 'code' ? 'font-mono text-xs' : ''}`}>
+                      <td key={column.key} className={`truncate p-2 text-xs font-semibold text-slate-700 ${alignClass(column.align)} ${column.key === 'code' ? 'font-mono tabular-nums' : ''}`}>
                         {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
                         {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
-                        {column.format === 'status' ? <ActiveToggle checked={record.active} label={record.active ? 'ใช้งาน' : 'ปิด'} onChange={() => void handleToggleActive(record)} /> : null}
+                        {column.format === 'status' ? (
+                          <ActiveToggle
+                            checked={record.active}
+                            label={record.active ? 'ใช้งาน' : 'ปิด'}
+                            labelClassName="text-xs font-semibold text-slate-600"
+                            onChange={() => void handleToggleActive(record)}
+                          />
+                        ) : null}
                         {!column.format ? displayRecordValue(record, column.key) : null}
                       </td>
                     ))}
                     <td className="p-2 text-center">
                       <button
-                        className="text-blue-600"
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
@@ -491,11 +555,12 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                 ))}
                 {filteredRecords.length === 0 ? (
                   <tr>
-                    <td className="p-4 text-center text-sm text-slate-500" colSpan={config.columns.length + 1}>{config.emptyMessage}</td>
+                    <td className="p-8 text-center text-sm text-slate-500" colSpan={config.columns.length + 1}>{config.emptyMessage}</td>
                   </tr>
                 ) : null}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       ) : null}
@@ -573,6 +638,54 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
     await onSubmit(result.values)
   }
 
+  function isFieldVisible(field: MasterDataField) {
+    if (config.apiPath === '/api/master-data/accounts') {
+      const accountTypeGroup = paymentMethodGroupForFormValue(form.type, paymentMethodRows)
+      if (!form.type && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
+        return false
+      }
+      if (accountTypeGroup === 'cash' && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
+        return false
+      }
+      if (accountTypeGroup === 'bank' && field.key === 'odLimit' && form.subtype !== 'od') {
+        return false
+      }
+    }
+    return true
+  }
+
+  const visibleFields = config.fields.filter(isFieldVisible)
+  const fieldSections = visibleFields.reduce<Array<{ fields: MasterDataField[]; title: string | null }>>((sections, field) => {
+    const title = field.section ?? null
+    const lastSection = sections.at(-1)
+    if (!lastSection || lastSection.title !== title) {
+      sections.push({ fields: [field], title })
+      return sections
+    }
+    lastSection.fields.push(field)
+    return sections
+  }, [])
+  const hasFieldSections = fieldSections.some((section) => section.title)
+
+  function renderField(field: MasterDataField) {
+    return (
+      <FormField
+        key={field.key}
+        error={errors[field.key]}
+        field={field}
+        value={form[field.key]}
+        onChange={(value) => {
+          const normalized = field.key === 'availableForSale'
+            ? value === 'true'
+            : field.type === 'number'
+              ? parseNumericFieldValue(value)
+              : value || null
+          update(field.key, normalized as never)
+        }}
+      />
+    )
+  }
+
   return (
     <form noValidate className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -580,37 +693,23 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
         {supportsActive ? <ActiveToggle checked={form.active} onChange={(checked) => update('active', checked)} /> : null}
       </div>
 
-      <div className="grid max-h-[76vh] gap-4 overflow-y-auto px-5 py-5 md:grid-cols-3">
-        {config.fields.filter((field) => {
-          if (config.apiPath === '/api/master-data/accounts') {
-            const accountTypeGroup = paymentMethodGroupForFormValue(form.type, paymentMethodRows)
-            if (!form.type && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
-              return false
-            }
-            if (accountTypeGroup === 'cash' && ['subtype', 'bankName', 'bankBranch', 'accountNo', 'odLimit'].includes(String(field.key))) {
-              return false
-            }
-            if (accountTypeGroup === 'bank' && field.key === 'odLimit' && form.subtype !== 'od') {
-              return false
-            }
-          }
-          return true
-        }).map((field) => (
-          <FormField
-            key={field.key}
-            error={errors[field.key]}
-            field={field}
-            value={form[field.key]}
-            onChange={(value) => {
-              const normalized = field.key === 'availableForSale'
-                ? value === 'true'
-                : field.type === 'number'
-                  ? parseNumericFieldValue(value)
-                  : value || null
-              update(field.key, normalized as never)
-            }}
-          />
-        ))}
+      <div className="max-h-[76vh] overflow-y-auto px-5 py-5">
+        {hasFieldSections ? (
+          <div className="space-y-5">
+            {fieldSections.map((section, index) => (
+              <section key={`${section.title ?? 'default'}-${index}`} className={index === 0 ? 'space-y-3' : 'space-y-3 border-t border-slate-200 pt-4'}>
+                {section.title ? <h4 className="text-sm font-bold text-slate-700">{section.title}</h4> : null}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {section.fields.map(renderField)}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {visibleFields.map(renderField)}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">

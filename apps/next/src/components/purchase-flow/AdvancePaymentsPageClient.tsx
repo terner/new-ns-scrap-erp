@@ -2,14 +2,16 @@
 
 import { ArrowLeft, Download, ImagePlus, Plus, Save, X } from 'lucide-react'
 import type React from 'react'
-import type { Dispatch, SetStateAction } from 'react'
+import type { ButtonHTMLAttributes, Dispatch, SetStateAction } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { supplierAdvancePaymentFormSchema } from '@/lib/purchase-advance'
@@ -30,6 +32,7 @@ type StatusOption = {
 
 type AdvancePaymentSortDirection = 'asc' | 'desc'
 type AdvancePaymentSortKey = 'accountName' | 'advanceDate' | 'allocatedAmount' | 'amount' | 'docNo' | 'largeScaleDocNo' | 'netWeight' | 'productName' | 'remainingAmount' | 'status' | 'supplierName'
+type AdvancePaymentColumnKey = 'action' | 'advanceDate' | 'allocatedAmount' | 'amount' | 'docNo' | 'largeScaleDocNo' | 'netWeight' | 'plateNo' | 'productName' | 'remainingAmount' | 'status' | 'supplierName'
 
 type AdvancePaymentRow = {
   accountName: string
@@ -131,6 +134,20 @@ type UploadedImageFile = {
   id: string
   url: string | null
 }
+const advancePaymentColumns: Array<ResizableColumnDefinition<AdvancePaymentColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'advanceDate', defaultWidth: 120, minWidth: 100 },
+  { key: 'supplierName', defaultWidth: 190, minWidth: 140 },
+  { key: 'largeScaleDocNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'plateNo', defaultWidth: 130, minWidth: 110 },
+  { key: 'productName', defaultWidth: 170, minWidth: 130 },
+  { key: 'netWeight', defaultWidth: 140, minWidth: 120 },
+  { key: 'amount', defaultWidth: 140, minWidth: 120 },
+  { key: 'allocatedAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'remainingAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'status', defaultWidth: 140, minWidth: 120 },
+  { key: 'action', defaultWidth: 150, minWidth: 140 },
+]
 
 const emptyForm = (): FormState => ({
   amount: '',
@@ -188,6 +205,7 @@ export function AdvancePaymentsPageClient() {
   const [sortKey, setSortKey] = useState<AdvancePaymentSortKey>('advanceDate')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const columnResize = useResizableColumns('daily.advance-payments', advancePaymentColumns)
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
       page: String(page),
@@ -679,6 +697,7 @@ export function AdvancePaymentsPageClient() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <span>พบทั้งหมด {data?.pagination.totalRows ?? 0} รายการ</span>
             <div className="flex flex-wrap items-center gap-2">
+              {columnResize.hasCustomWidths ? <Button className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
               <Select aria-label="จำนวนรายการต่อหน้า" className="h-9 w-auto min-w-[96px] px-2" value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
                 {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
               </Select>
@@ -689,21 +708,24 @@ export function AdvancePaymentsPageClient() {
           </div>
 
           <div className="overflow-x-auto rounded-md bg-white shadow">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {advancePaymentColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+              </colgroup>
               <thead className="bg-slate-100">
                 <tr>
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" sortKey="docNo" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" sortKey="advanceDate" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ผู้ขาย" sortKey="supplierName" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ใบชั่งใหญ่" sortKey="largeScaleDocNo" onSort={changeSort} />
-                  <th className="p-2 text-left text-xs font-semibold text-slate-700">ทะเบียนรถ</th>
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สินค้า" sortKey="productName" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="น้ำหนักสุทธิ" sortKey="netWeight" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดมัดจำ" sortKey="amount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="นำไปหักแล้ว" sortKey="allocatedAmount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="คงเหลือ" sortKey="remainingAmount" onSort={changeSort} />
-                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} />
-                  <th className="p-2 text-right text-xs font-semibold text-slate-700">จัดการ</th>
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('advanceDate', 'วันที่')} sortKey="advanceDate" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ผู้ขาย" resizeProps={columnResize.getResizeHandleProps('supplierName', 'ผู้ขาย')} sortKey="supplierName" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="ใบชั่งใหญ่" resizeProps={columnResize.getResizeHandleProps('largeScaleDocNo', 'ใบชั่งใหญ่')} sortKey="largeScaleDocNo" onSort={changeSort} />
+                  <ResizableTableHead label="ทะเบียนรถ" resizeProps={columnResize.getResizeHandleProps('plateNo', 'ทะเบียนรถ')} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} sortKey="productName" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} sortKey="netWeight" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ยอดมัดจำ" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดมัดจำ')} sortKey="amount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="นำไปหักแล้ว" resizeProps={columnResize.getResizeHandleProps('allocatedAmount', 'นำไปหักแล้ว')} sortKey="allocatedAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} align="right" direction={sortDirection} label="คงเหลือ" resizeProps={columnResize.getResizeHandleProps('remainingAmount', 'คงเหลือ')} sortKey="remainingAmount" onSort={changeSort} />
+                  <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
+                  <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -979,6 +1001,7 @@ function AdvancePaymentSortHeader({
   direction,
   label,
   onSort,
+  resizeProps,
   sortKey,
 }: {
   activeKey: AdvancePaymentSortKey
@@ -986,17 +1009,19 @@ function AdvancePaymentSortHeader({
   direction: AdvancePaymentSortDirection
   label: string
   onSort: (key: AdvancePaymentSortKey) => void
+  resizeProps?: ButtonHTMLAttributes<HTMLButtonElement>
   sortKey: AdvancePaymentSortKey
 }) {
-  const active = activeKey === sortKey
-  const alignClass = align === 'right' ? 'justify-end text-right' : 'justify-start text-left'
   return (
-    <th className="p-0">
-      <button className={`flex w-full items-center gap-1 p-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
-        <span>{label}</span>
-        <span className="text-slate-400">{active ? (direction === 'asc' ? '▲' : '▼') : '↕'}</span>
-      </button>
-    </th>
+    <ResizableTableHead
+      activeSortKey={activeKey}
+      align={align}
+      direction={direction}
+      label={label}
+      resizeProps={resizeProps}
+      sortKey={sortKey}
+      onSort={onSort}
+    />
   )
 }
 

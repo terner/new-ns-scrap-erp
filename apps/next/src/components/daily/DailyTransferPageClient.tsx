@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney, todayDateInput, transferFormSchema, type DailyAccountOption, type TransferFormValues } from '@/lib/daily'
 import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
 import { formatDateDisplay } from '@/lib/format'
@@ -21,9 +23,20 @@ type TransferPayload = {
   accounts: DailyAccountOption[]
   rows: TransferRow[]
 }
+type TransferColumnKey = 'action' | 'amount' | 'byPerson' | 'date' | 'docNo' | 'fee' | 'from' | 'to'
 type Period = '' | 'month' | 'today' | 'week'
 
 const pageSizeOptions = [10, 25, 50, 100]
+const transferColumns: Array<ResizableColumnDefinition<TransferColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'from', defaultWidth: 220, minWidth: 150 },
+  { key: 'to', defaultWidth: 220, minWidth: 150 },
+  { key: 'amount', defaultWidth: 140, minWidth: 120 },
+  { key: 'fee', defaultWidth: 130, minWidth: 110 },
+  { key: 'byPerson', defaultWidth: 160, minWidth: 120 },
+  { key: 'action', defaultWidth: 150, minWidth: 140 },
+]
 
 const emptyForm: TransferFormValues = {
   amount: 0,
@@ -56,6 +69,7 @@ export function DailyTransferPageClient() {
   const [period, setPeriod] = useState<Period>('')
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
+  const columnResize = useResizableColumns('daily.transfer', transferColumns)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -257,6 +271,7 @@ export function DailyTransferPageClient() {
           <span className="ml-2 text-slate-500">· รวม <span className="font-semibold text-blue-700">{formatMoney(totalAmount)}</span></span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? <Button className="font-normal" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
           <select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -367,17 +382,20 @@ export function DailyTransferPageClient() {
         </div>
       ) : null}
 
-      <Table className="text-xs">
+      <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+        <colgroup>
+          {transferColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+        </colgroup>
         <TableHeader>
           <tr>
-            <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">เลขที่</TableHead>
-            <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">วันที่</TableHead>
-            <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">จาก</TableHead>
-            <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">เข้า</TableHead>
-            <TableHead className="p-2 text-right text-xs font-semibold text-slate-700">จำนวน</TableHead>
-            <TableHead className="p-2 text-right text-xs font-semibold text-slate-700">ค่าธรรมเนียม</TableHead>
-            <TableHead className="p-2 text-left text-xs font-semibold text-slate-700">ผู้ทำรายการ</TableHead>
-            <TableHead className="p-2 text-right text-xs font-semibold text-slate-700">Action</TableHead>
+            <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
+            <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+            <ResizableTableHead label="จาก" resizeProps={columnResize.getResizeHandleProps('from', 'จาก')} />
+            <ResizableTableHead label="เข้า" resizeProps={columnResize.getResizeHandleProps('to', 'เข้า')} />
+            <ResizableTableHead align="right" label="จำนวน" resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวน')} />
+            <ResizableTableHead align="right" label="ค่าธรรมเนียม" resizeProps={columnResize.getResizeHandleProps('fee', 'ค่าธรรมเนียม')} />
+            <ResizableTableHead label="ผู้ทำรายการ" resizeProps={columnResize.getResizeHandleProps('byPerson', 'ผู้ทำรายการ')} />
+            <ResizableTableHead align="right" label="Action" resizeProps={columnResize.getResizeHandleProps('action', 'Action')} />
           </tr>
         </TableHeader>
         <TableBody className="divide-y divide-slate-100">

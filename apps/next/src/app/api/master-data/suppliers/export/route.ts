@@ -67,6 +67,7 @@ const supplierColumns: Array<{ key: SupplierExportKey; label: string; width: num
 
 function parseExportParams(request: Request) {
   const url = new URL(request.url)
+  const active = url.searchParams.get('active')?.trim() ?? ''
   const q = url.searchParams.get('q')?.trim() ?? ''
   const supplierType = url.searchParams.get('type')?.trim() ?? ''
   const marketScope = url.searchParams.get('marketScope')?.trim() ?? ''
@@ -75,7 +76,7 @@ function parseExportParams(request: Request) {
   const direction: SortDirection = url.searchParams.get('direction') === 'desc' ? 'desc' : 'asc'
   const sortColumn = sortColumns[sort as keyof typeof sortColumns] ?? sortColumns.code
 
-  return { supplierType, direction, marketScope, q, salesId, sort, sortColumn }
+  return { active, supplierType, direction, marketScope, q, salesId, sort, sortColumn }
 }
 
 const supplierInclude = {
@@ -94,8 +95,14 @@ type SupplierExportRow = Prisma.suppliersGetPayload<{
   include: typeof supplierInclude
 }>
 
-function supplierSearchWhere(q: string, supplierType: string, marketScope: string, salesId: bigint | null): Prisma.suppliersWhereInput {
+function supplierSearchWhere(q: string, supplierType: string, marketScope: string, active: string, salesId: bigint | null): Prisma.suppliersWhereInput {
   const where: Prisma.suppliersWhereInput = {}
+
+  if (active === 'active') {
+    where.active = { not: false }
+  } else if (active === 'inactive') {
+    where.active = false
+  }
 
   if (supplierType) {
     where.type = supplierType
@@ -170,7 +177,7 @@ function buildWorkbook(
   suppliers: Supplier[],
   paymentMethods: SupplierPaymentMethodRecord[],
   total: number,
-  filters: { supplierType: string; marketScope: string; q: string; salesId: string },
+  filters: { active: string; supplierType: string; marketScope: string; q: string; salesId: string },
 ) {
   const generatedAt = new Date()
   const summaryRows = [
@@ -181,6 +188,7 @@ function buildWorkbook(
     ['ประเภทผู้ขาย', filters.supplierType || 'ทุกประเภท'],
     ['ประเทศ/ตลาด', filters.marketScope || 'ทุกตลาด'],
     ['ผู้ดูแล', filters.salesId || 'ทุกผู้ดูแล'],
+    ['สถานะ', filters.active === 'active' ? 'ใช้งาน' : filters.active === 'inactive' ? 'ปิด' : 'ทุกสถานะ'],
   ]
 
   const dataRows = suppliers.map((supplier) => Object.fromEntries(
@@ -205,9 +213,9 @@ export async function GET(request: Request) {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'master.suppliers.export')
 
-    const { supplierType, direction, marketScope, q, salesId, sort, sortColumn } = parseExportParams(request)
+    const { active, supplierType, direction, marketScope, q, salesId, sort, sortColumn } = parseExportParams(request)
     const resolvedSalesperson = salesId ? await findActiveSalespersonReferenceByCodeOrId(salesId) : null
-    const where = supplierSearchWhere(q, supplierType, marketScope, resolvedSalesperson?.id ?? null)
+    const where = supplierSearchWhere(q, supplierType, marketScope, active, resolvedSalesperson?.id ?? null)
     const requiresBankSort = sort === 'bankName' || sort === 'accountNo'
     const [rows, total, paymentMethods] = await Promise.all([
       prisma.suppliers.findMany({
@@ -242,7 +250,7 @@ export async function GET(request: Request) {
     const suppliers = visibleRows.map((row) => mapPrismaSupplier(row as any, paymentMethods, {
       salesId: salespersonReferences.get(String(row.sales_id ?? ''))?.code ?? null,
     }))
-    const body = buildWorkbook(suppliers, paymentMethods, visibleTotal, { supplierType, marketScope, q, salesId })
+    const body = buildWorkbook(suppliers, paymentMethods, visibleTotal, { active, supplierType, marketScope, q, salesId })
     const filename = `suppliers_${new Date().toISOString().slice(0, 10)}.xlsx`
 
     return new NextResponse(new Uint8Array(body), {

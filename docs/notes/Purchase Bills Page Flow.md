@@ -105,7 +105,7 @@ updated: 2026-06-08
 10. ไม่ carry ADV allocation เดิมไป PB ใหม่อัตโนมัติ ถ้าต้องใช้ ADV ให้เลือก allocation ใหม่ใน PB ใหม่
 11. สร้าง stock ledger ใหม่สำหรับ PB ใหม่ถ้าเป็น Stock
 12. recalc PO และ WTI จาก active PB หลังจบ transaction
-13. บันทึกประวัติใน `bill_swap_history` เพื่อให้หน้า `/daily/bill-swap-history` แสดงการเปลี่ยน Supplier และราคาได้
+13. บันทึกประวัติใน `bill_swap_history` เพื่อให้แท็บ `ประวัติเปลี่ยนบิล Supplier` ใน `/purchase/bills` แสดงการเปลี่ยน Supplier และราคาได้
 
 ### Detail / Historical Source Contract
 
@@ -119,7 +119,7 @@ updated: 2026-06-08
 
 ### History Contract
 
-หน้า `/daily/bill-swap-history` ต้องเห็น:
+แท็บ `ประวัติเปลี่ยนบิล Supplier` ในหน้า `/purchase/bills` ต้องเห็น:
 
 - เลข PB เดิมที่ถูก void
 - Supplier เดิม

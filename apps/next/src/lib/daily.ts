@@ -71,13 +71,18 @@ export const expenseFormSchema = z.object({
   dueDate: z.preprocess(blankToNull, requiredDate.nullable().default(null)),
   refDocNo: optionalDocNo,
   categoryId: optionalSafeId('หมวดค่าใช้จ่าย'),
+  supplierId: z.string().trim().min(1, 'เลือกผู้รับเงิน').max(80, 'ผู้รับเงินยาวเกินไป').regex(/^[A-Za-z0-9_.:-]+$/, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
   payee: z.string().trim().min(1, 'กรอกผู้รับเงิน').max(180, 'ผู้รับเงินยาวเกินไป').regex(businessTextPattern, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
   description: optionalGeneralText('รายละเอียด', 500),
   amount: money('ยอดก่อน VAT').default(0),
   hasVat: z.boolean().default(false),
   hasWht: z.boolean().default(false),
   accountId: optionalSafeId('บัญชีจ่าย'),
+  bankFee: money('Bank fee').default(0),
   branchId: optionalSafeId('สาขา'),
+  discount: money('ส่วนลด').default(0),
+  paymentAction: z.enum(['submit_approval', 'pay_now']).default('submit_approval'),
+  supplierPaymentDestinationId: optionalSafeId('ช่องทางรับเงิน Supplier'),
   taxInvoiceNo: optionalDocNo,
   status: z.enum(['pending_approval', 'approved', 'paid', 'cancelled']).default('pending_approval'),
   notes: optionalGeneralText('หมายเหตุ', 500),
@@ -90,7 +95,23 @@ export const expenseFormSchema = z.object({
       path: ['amount'],
     })
   }
-}).refine((value) => value.status !== 'paid' || Boolean(value.accountId), {
+  if (value.paymentAction === 'pay_now') {
+    if (!value.accountId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'เลือกบัญชีที่จ่ายของบริษัท',
+        path: ['accountId'],
+      })
+    }
+    if (!value.supplierPaymentDestinationId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'เลือกช่องทางรับเงินของ Supplier',
+        path: ['supplierPaymentDestinationId'],
+      })
+    }
+  }
+}).refine((value) => value.status !== 'paid' || value.paymentAction === 'pay_now' || Boolean(value.accountId), {
   message: 'เลือกบัญชีจ่ายเมื่อสถานะเป็นจ่ายแล้ว',
   path: ['accountId'],
 })
@@ -103,9 +124,10 @@ export const pettyAdvanceFormSchema = z.object({
   docNo: optionalDocNo,
   date: requiredDate,
   type: z.enum(['DIRECTOR_LOAN', 'PETTY_CASH'], { errorMap: () => ({ message: 'ประเภทไม่ถูกต้อง' }) }),
-  recipientName: z.string().trim().min(1, 'กรอกผู้รับเงิน').max(180, 'ผู้รับเงินยาวเกินไป').regex(businessTextPattern, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
+  recipientId: z.string().trim().min(1, 'เลือกผู้รับเงินจากรายชื่อกรรมการ/พนักงาน').max(80, 'ผู้รับเงินยาวเกินไป').regex(/^[A-Za-z0-9_.:-]+$/, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
+  recipientName: z.string().trim().min(1, 'เลือกผู้รับเงิน').max(180, 'ผู้รับเงินยาวเกินไป').regex(businessTextPattern, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
   amount: positiveMoney('จำนวนเงิน'),
-  accountId: z.string().trim().min(1, 'เลือกบัญชีจ่ายออก'),
+  accountId: optionalSafeId('บัญชีจ่าย'),
   status: z.enum(['active', 'closed', 'cancelled']).default('active'),
   notes: optionalGeneralText('หมายเหตุ', 500),
 })

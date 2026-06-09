@@ -43,6 +43,7 @@ type SupplierListRow = Prisma.suppliersGetPayload<{
 
 function parseListParams(request: Request) {
   const url = new URL(request.url)
+  const active = url.searchParams.get('active')?.trim() ?? ''
   const all = url.searchParams.get('all') === '1'
   const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1)
   const pageSize = all ? 10000 : Math.min(100, Math.max(10, Number(url.searchParams.get('pageSize') ?? '25') || 25))
@@ -54,11 +55,17 @@ function parseListParams(request: Request) {
   const direction: SortDirection = url.searchParams.get('direction') === 'desc' ? 'desc' : 'asc'
   const sortColumn = sortColumns[sort as keyof typeof sortColumns] ?? sortColumns.code
 
-  return { all, direction, marketScope, page, pageSize, q, salesId, sort, sortColumn, supplierType }
+  return { active, all, direction, marketScope, page, pageSize, q, salesId, sort, sortColumn, supplierType }
 }
 
-function supplierSearchWhere(q: string, supplierType: string, marketScope: string, salesId: bigint | null): Prisma.suppliersWhereInput {
+function supplierSearchWhere(q: string, supplierType: string, marketScope: string, salesId: bigint | null, active: string): Prisma.suppliersWhereInput {
   const where: Prisma.suppliersWhereInput = {}
+
+  if (active === 'active') {
+    where.active = { not: false }
+  } else if (active === 'inactive') {
+    where.active = false
+  }
 
   if (supplierType) {
     where.type = supplierType
@@ -143,7 +150,7 @@ export async function GET(request: Request) {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'master.suppliers.view')
 
-    const { all, direction, marketScope, page, pageSize, q, salesId, sort, sortColumn, supplierType } = parseListParams(request)
+    const { active, all, direction, marketScope, page, pageSize, q, salesId, sort, sortColumn, supplierType } = parseListParams(request)
     const resolvedSalesperson = salesId ? await findActiveSalespersonReferenceByCodeOrId(salesId) : null
     if (salesId && !resolvedSalesperson) {
       return NextResponse.json({
@@ -154,7 +161,7 @@ export async function GET(request: Request) {
         totalPages: 1,
       })
     }
-    const where = supplierSearchWhere(q, supplierType, marketScope, resolvedSalesperson?.id ?? null)
+    const where = supplierSearchWhere(q, supplierType, marketScope, resolvedSalesperson?.id ?? null, active)
     const requiresBankSort = sort === 'bankName' || sort === 'accountNo'
     const [supplierRows, total, paymentMethods] = await Promise.all([
       prisma.suppliers.findMany({

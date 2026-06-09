@@ -145,6 +145,14 @@ flowchart TD
   - section `รายการจ่าย` ต้องแสดง PMA/source/ผู้รับเงิน พร้อม `ช่องทางรับเงิน`, `บัญชีรับเงิน`, และยอด `ค้าง` ในบรรทัดเดียวกัน
   - `Discount` และ `Bank Fee` เป็นระดับ PMT voucher และต้องอยู่ใน section `บัญชีจ่าย` ก่อนบรรทัด `รวมแยกบัญชี`; `Net Cash Out` แสดงผ่าน card สรุปยอดสุทธิด้านล่างเท่านั้น และห้ามผูกกับ PMA line รายการใดรายการหนึ่งใน UI
   - PMT modal ไม่ต้องมี WHT; รายการ PMT ใหม่ต้องบันทึก `withholding_tax = 0` และตัดยอด PMA ด้วย `จ่าย + Discount`
+- `/daily/expense`
+  - modal ต้องให้เลือก mode ก่อนบันทึก: `ส่งอนุมัติ` หรือ `จ่ายเลย`
+  - mode `ส่งอนุมัติ` สร้าง `EXP` เป็น `pending_approval` แล้วส่งเข้า `/daily/payment-approval`; หลังอนุมัติจะเกิด `PMA` และจ่ายผ่าน `/purchase/payments` ตาม flow Supplier payment ปกติ
+  - mode `จ่ายเลย` สร้าง `EXP` และ `PMT` ใน transaction เดียวกัน โดยไม่สร้าง `PMA` และไม่เข้าคิวอนุมัติจ่าย
+  - mode `จ่ายเลย` ต้องเลือกช่องทางรับเงินของ Supplier จาก `supplier_bank_accounts`, เลือกบัญชีที่จ่ายของบริษัท, และรองรับ `Discount` กับ `Bank Fee`
+  - direct EXP PMT ต้องบันทึก `payments.lines` เป็น source snapshot (`sourceType = expense`, `sourceDocNo = EXP...`) เพราะไม่มี `payment_approvals` และไม่มี `payment_allocations`
+  - direct EXP PMT ต้องสร้าง `payments`, `bank_statement`, `payment_account_splits`, และ `payment_status_logs`; ประวัติแสดงใน `/purchase/payments?tab=history`
+  - ยกเลิก direct EXP PMT ต้อง mark PMT เป็น `cancelled`, reverse/delete bank statement/payment split facts ตาม payment cancel flow, และ set `expenses.status = cancelled` พร้อม `paid_status = unpaid` เพราะไม่มี PMA ให้ย้อนกลับไปเป็นคิวรอจ่าย
 - แท็บ `ประวัติ` ใน `/purchase/payments`
   - read-only
   - แสดงรายการจ่ายที่ user-facing status เป็น `จ่ายแล้ว` และ `ยกเลิก` เท่านั้น (`จ่ายแล้ว` คือ PMT เสร็จสิ้นแล้ว)
@@ -154,6 +162,7 @@ flowchart TD
   - ไม่มี user-facing detail page/route สำหรับ `/purchase/payments/{id}`; table row ต้องเปิด modal ผ่าน `/api/purchase/payment-history/{PMT/PMA doc no}` เท่านั้น
   - ห้ามแสดงหรือใช้ `voucher_id` เป็น outward UI/URL จากตารางหรือ modal; `voucher_id` เป็น internal grouping key สำหรับ server resolve/audit compatibility เท่านั้น
   - กรณี history row เป็น `PMA voided` ที่ยังไม่มี PMT ให้ modal แสดง PMA snapshot/timeline แทน 404
+  - กรณี history row เป็น direct EXP PMT ที่ไม่มี PMA ให้ table/detail ใช้ `payments.lines.sourceDocNo` แสดงเอกสารต้นทาง
   - PMT/PMA detail timeline ต้องใช้ pattern เดียวกับ `ประวัติ POB`: stream เดียวเรียงล่าสุดขึ้นก่อน, time/actor column ซ้าย, event column มีเส้น timeline, dot latest ตาม tone, และแสดง latest status pill ด้านหัว section
   - route เก่า `/purchase/payment-history` ต้อง redirect ไป `/purchase/payments?tab=history` เพื่อรองรับ bookmark/link เก่า แต่ไม่เป็นเมนูแยก
 
@@ -335,17 +344,23 @@ flowchart TD
 
 ## ค่าใช้จ่าย / EXP source
 
-`/daily/expense` เป็น source document ฝั่งค่าใช้จ่ายของ Payment Flow ไม่ใช่หน้าทำจ่ายเงินจริง
+`/daily/expense` เป็น source document ฝั่งค่าใช้จ่ายของ Payment Flow และมี 2 mode ก่อนบันทึก:
+
+- `ส่งอนุมัติ`: สร้าง `EXP` เป็น `pending_approval` แล้วส่งเข้า `/daily/payment-approval`; หลังอนุมัติจะเกิด `PMA` และจ่ายผ่าน `/purchase/payments`
+- `จ่ายเลย`: สร้าง `EXP` และ `PMT` ทันทีใน transaction เดียวกัน โดยไม่สร้าง `PMA` และไม่เข้าคิวอนุมัติจ่าย
 
 กติกา source:
 
-- สร้างเอกสารเป็น `EXP` แล้วเข้าสถานะ `pending_approval` (`ยังไม่อนุมัติ`)
+- สร้างเอกสารเป็น `EXP`; status เริ่มตาม mode (`pending_approval` สำหรับ `ส่งอนุมัติ`, `paid` สำหรับ `จ่ายเลย`)
 - modal สร้าง/แก้ไขต้องไม่ให้ผู้ใช้กรอก `เลขที่เอกสาร`; เลข `EXP{branchCode}{YYMM}-NNNN` generate server-side ตอน save
 - ผู้ใช้เลือก `วันที่จ่าย` เองใน modal และค่า `expenses.date` ต้องมาจาก `expenseFormSchema.date`
 - year/month ของเลข `EXP` ใหม่อิง `วันที่จ่าย` ที่เลือก แต่ตัวเลข running ยังเป็น server-owned
-- modal สร้างไม่แสดงหรือแก้ `สถานะเอกสาร`; สถานะเปลี่ยนผ่าน approval/payment lifecycle เท่านั้น
-- `บัญชีที่ใช้ทำจ่าย` ไม่อยู่ใน modal ค่าใช้จ่าย เพราะบัญชี/ช่องทางจ่ายจริงเป็นเรื่องของ `อนุมัติจ่ายเงิน` และ `ทำจ่าย`
-- `ผู้รับเงิน` ใน current flow ใช้ suggestion จาก active Supplier master และค่าที่บันทึกยังอยู่ใน `expenses.payee`
+- modal สร้างไม่แสดงหรือแก้ `สถานะเอกสาร` โดยตรง; user เลือกได้เฉพาะ mode การจ่าย
+- mode `ส่งอนุมัติ` ไม่แสดง `บัญชีที่ใช้ทำจ่าย`; บัญชี/ช่องทางจ่ายจริงเป็นเรื่องของ `อนุมัติจ่ายเงิน` และ `ทำจ่าย`
+- mode `จ่ายเลย` ต้องแสดงและบังคับเลือก `ช่องทางรับเงินของ Supplier` จาก `supplier_bank_accounts` และ `บัญชีที่จ่ายของบริษัท`; รองรับ `Discount` และ `Bank Fee`
+- `ผู้รับเงิน` ใน current flow ต้องเลือกจาก active Supplier master, บันทึก canonical relation ที่ `expenses.supplier_id`, และเก็บ `expenses.payee` เป็นชื่อ snapshot/display เท่านั้น
+- EXP approval/payment ห้าม resolve supplier จากชื่อ `expenses.payee` ใน runtime; `/daily/payment-approval` ต้องอ่านช่องทางจ่ายจาก `expense.suppliers.supplier_bank_accounts` โดยตรงเหมือน `PB/ADV`
+- direct EXP PMT ต้องเก็บ source snapshot ใน `payments.lines` (`sourceType = expense`, `sourceDocNo = EXP...`) แทน `payment_allocations` เพราะไม่มี PMA
 
 กติกา line item:
 
@@ -369,6 +384,7 @@ flowchart TD
 - แก้ไข/ยกเลิกได้เฉพาะ `pending_approval`
 - เมื่อมี active `PMA approved` หรือ payment cycle active แล้ว EXP source ต้อง lock field ที่กระทบยอด ผู้รับเงิน ภาษี และรายการค่าใช้จ่าย
 - PMT save/cancel ต้อง recalc `expenses.status`, `expenses.paid_status`, และ `expenses.paid_at` ใน transaction เดียวกับ payment allocation/bank reversal
+- ยกเลิก direct EXP PMT ต้อง mark `PMT` เป็น `cancelled`, reverse/delete bank statement/payment split facts, และ set `EXP` เป็น `cancelled` เพราะไม่มี `PMA` ให้ย้อนกลับไปเป็นคิวรอจ่าย
 
 ## คืนเงินมัดจำ / คืนเงินล่วงหน้า
 

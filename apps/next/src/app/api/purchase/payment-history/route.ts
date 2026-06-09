@@ -167,9 +167,16 @@ export async function GET() {
       const factAllocations = paymentAllocationsByVoucherId.get(voucherKey) ?? []
       const factBillDocNos = [...new Set(factAllocations.map((allocation) => allocation.source_doc_no_snapshot).filter((value): value is string => Boolean(value)))]
       const factApprovalIds = [...new Set(factAllocations.map((allocation) => allocation.payment_approval_doc_no).filter(Boolean))]
+      const directSourceDocNos = Array.isArray(payment.lines)
+        ? [...new Set(payment.lines.flatMap((line) => {
+            if (typeof line !== 'object' || line === null || Array.isArray(line)) return []
+            const sourceDocNo = String((line as Record<string, unknown>).sourceDocNo ?? '').trim()
+            return sourceDocNo ? [sourceDocNo] : []
+          }))]
+        : []
       const billDocNo = factBillDocNos[0] ?? (payment.bill_id
         ? (billDocNoById.get(payment.bill_id) ?? '')
-        : (paymentApprovalInternalId ? (approvalSourceDocNoByInternalId.get(paymentApprovalInternalId) ?? '') : ''))
+        : (paymentApprovalInternalId ? (approvalSourceDocNoByInternalId.get(paymentApprovalInternalId) ?? '') : directSourceDocNos[0] ?? ''))
       if (!existing) {
         const statementRows = bankStatementsByVoucherId.get(voucherKey) ?? []
         const splitRows = paymentAccountSplitsByVoucherId.get(voucherKey) ?? []
@@ -205,7 +212,7 @@ export async function GET() {
               : [],
           amount: 0,
           billDocNo,
-          billDocNos: factBillDocNos.length > 0 ? factBillDocNos : billDocNo ? [billDocNo] : [],
+          billDocNos: factBillDocNos.length > 0 ? factBillDocNos : directSourceDocNos.length > 0 ? directSourceDocNos : billDocNo ? [billDocNo] : [],
           date: toDateOnly(payment.date),
           docNo: payment.doc_no,
           fee: 0,

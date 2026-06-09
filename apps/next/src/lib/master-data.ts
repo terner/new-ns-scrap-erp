@@ -6,6 +6,7 @@ const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim
 const codePattern = /^[A-Za-z0-9_-]+$/
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
 const businessTextPattern = /^[\p{L}\p{M}\p{N}\s.&,()/'"+#%-]+$/u
+const personNamePattern = /^[\p{L}\p{M}.' -]+$/u
 const phonePattern = /^\+?[0-9][0-9\s().-]{7,24}$/
 const accountNoPattern = /^\d{2,40}$/
 
@@ -32,6 +33,15 @@ const optionalGeneralText = (label: string, maxLength = 255) => z.preprocess(
   z.string().trim()
     .max(maxLength, `${label}ยาวเกินไป`)
     .regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`)
+    .nullable()
+    .default(null),
+)
+
+const optionalPersonName = (label: string, maxLength = 80) => z.preprocess(
+  blankToNull,
+  z.string().trim()
+    .max(maxLength, `${label}ยาวเกินไป`)
+    .regex(personNamePattern, `${label}ใช้ได้เฉพาะตัวอักษร ช่องว่าง จุด ขีด และ apostrophe`)
     .nullable()
     .default(null),
 )
@@ -63,6 +73,9 @@ export const masterDataRecordSchema = z.object({
   id: z.string().min(1),
   code: nullableString,
   name: z.string().min(1),
+  nameTitle: nullableString,
+  firstName: nullableString,
+  lastName: nullableString,
   active: z.boolean().default(true),
   isDefault: z.boolean().default(false),
   type: nullableString,
@@ -83,6 +96,7 @@ export const masterDataRecordSchema = z.object({
   bankName: nullableString,
   bankBranch: nullableString,
   accountNo: nullableString,
+  accountName: nullableString,
   currency: nullableString,
   openingBalance: nullableNumber,
   odLimit: nullableNumber,
@@ -122,6 +136,9 @@ export const masterDataFormSchema = masterDataRecordSchema
     id: true,
     code: true,
     name: true,
+    nameTitle: true,
+    firstName: true,
+    lastName: true,
     active: true,
     type: true,
     subtype: true,
@@ -139,6 +156,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     bankName: true,
     bankBranch: true,
     accountNo: true,
+    accountName: true,
     currency: true,
     openingBalance: true,
     odLimit: true,
@@ -170,6 +188,9 @@ export const masterDataFormSchema = masterDataRecordSchema
     id: z.string().trim().optional(),
     code: optionalCode('รหัส'),
     name: z.string().trim().min(1, 'กรอกชื่อรายการ').max(180, 'ชื่อรายการยาวเกินไป').regex(businessTextPattern, 'ชื่อรายการมีรูปแบบไม่ถูกต้อง'),
+    nameTitle: optionalPersonName('คำนำหน้าชื่อ', 40),
+    firstName: optionalPersonName('ชื่อ'),
+    lastName: optionalPersonName('นามสกุล'),
     email: z.preprocess(blankToNull, z.string().trim().email('รูปแบบอีเมลไม่ถูกต้อง').regex(/^[\x20-\x7E]+$/, 'อีเมลต้องใช้ตัวอักษรอังกฤษ ตัวเลข หรือสัญลักษณ์มาตรฐาน').nullable().default(null)),
     phone: optionalPhone,
     note: optionalGeneralText('หมายเหตุ', 500),
@@ -184,6 +205,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     bankName: optionalBusinessText('ธนาคาร', 120),
     bankBranch: optionalBusinessText('สาขาธนาคาร', 160),
     accountNo: optionalAccountNo,
+    accountName: optionalBusinessText('ชื่อบัญชี', 180),
     currency: optionalCode('สกุลเงิน'),
     openingBalance: nonNegativeNumber('ยอดเงินคงเหลือ'),
     odLimit: nonNegativeNumber('วงเงิน OD'),
@@ -226,6 +248,7 @@ export type MasterDataField = {
   label: string
   optionsApiPath?: string
   optionValueKey?: keyof MasterDataRecord
+  section?: string
   type?: MasterDataFieldType
   inputFormat?: MasterDataFieldInputFormat
   options?: Array<{ label: string; value: string }>
@@ -237,6 +260,9 @@ export type MasterDataColumn = {
   label: string
   align?: 'left' | 'right' | 'center'
   format?: 'money' | 'number' | 'status'
+  maxWidth?: number
+  minWidth?: number
+  width?: number
 }
 
 export type MasterDataPageConfig = {
@@ -254,6 +280,9 @@ export const emptyMasterDataForm: MasterDataFormValues = {
   id: undefined,
   code: null,
   name: '',
+  nameTitle: null,
+  firstName: null,
+  lastName: null,
   active: true,
   type: null,
   subtype: null,
@@ -271,6 +300,7 @@ export const emptyMasterDataForm: MasterDataFormValues = {
   bankName: null,
   bankBranch: null,
   accountNo: null,
+  accountName: null,
   currency: null,
   openingBalance: null,
   odLimit: null,

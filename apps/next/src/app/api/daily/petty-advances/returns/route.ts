@@ -5,11 +5,13 @@ import { findActiveAccountReferenceByCode } from '@/lib/server/account-reference
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, nextDailyDocNo, normalizeDate, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
+import type { Prisma } from '../../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
 
-async function findPettyAdvanceByDocNo(value: string) {
-  return prisma.petty_advances.findFirst({
+async function findPettyAdvanceByDocNo(client: Prisma.TransactionClient | typeof prisma, value: string) {
+  const advancesClient = client.petty_advances as typeof prisma.petty_advances
+  return advancesClient.findFirst({
     where: { doc_no: value },
   })
 }
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const advance = await findPettyAdvanceByDocNo(values.advanceId)
+      const advance = await findPettyAdvanceByDocNo(tx, values.advanceId)
 
       if (!advance) {
         return null
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
           amount: values.amount,
           created_by: actor,
           date: normalizeDate(values.date),
-          doc_no: await nextDailyDocNo('petty_advance_returns', 'PRET', values.date),
+          doc_no: await nextDailyDocNo('petty_advance_returns', 'PRET', values.date, tx),
           notes: values.notes,
         },
       })
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
           created_by: actor,
           date: normalizeDate(values.date),
           description: `คืน ${advance.doc_no} โดย ${advance.recipient_name}`,
-          doc_no: await nextDailyDocNo('bank_statement', 'BST', values.date),
+          doc_no: await nextDailyDocNo('bank_statement', 'BST', values.date, tx),
           ref_id: entry.doc_no,
           ref_no: entry.doc_no,
           ref_type: 'PRET',

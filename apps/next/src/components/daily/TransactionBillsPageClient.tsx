@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Download } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, InputField, MoneyInputField, ProductSearchCombobox, SelectField, SupplierSearchCombobox, SummaryLine } from '@/components/daily/TransactionBillsFieldHelpers'
@@ -10,10 +10,12 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Select } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/Table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { SELECTED_BRANCH_KEY } from '@/lib/branch-selection'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { firstErrorKeyFromZodIssues, focusFieldError, issueMapFromZodIssues } from '@/lib/form-errors'
@@ -264,6 +266,7 @@ type TransactionBillsPageClientProps = {
 
 type SortKey = 'date' | 'docNo' | 'itemCount' | 'name' | 'outstanding' | 'refNo' | 'status' | 'totalAmount' | 'transactionMode' | 'updatedBy' | 'warehouse'
 type SortDirection = 'asc' | 'desc'
+type TransactionBillColumnKey = 'action' | 'date' | 'docNo' | 'gp' | 'itemCount' | 'outstanding' | 'paidAmount' | 'partyName' | 'paymentDocs' | 'receiptDocs' | 'refNo' | 'status' | 'stockCost' | 'stockQty' | 'totalAmount' | 'transactionMode' | 'updatedBy' | 'vat' | 'warehouse'
 
 type MultiSegmentOption = {
   label: string
@@ -288,6 +291,51 @@ const blankItem = (): PurchaseBillFormValues['items'][number] => ({
   receiptTicketId: null,
   salesPrice: 0,
 })
+
+const purchaseBillColumns: Array<ResizableColumnDefinition<TransactionBillColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'receiptDocs', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 140, minWidth: 110 },
+  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'transactionMode', defaultWidth: 120, minWidth: 100 },
+  { key: 'status', defaultWidth: 140, minWidth: 120 },
+  { key: 'paymentDocs', defaultWidth: 150, minWidth: 120 },
+  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'outstanding', defaultWidth: 140, minWidth: 120 },
+  { key: 'updatedBy', defaultWidth: 170, minWidth: 130 },
+  { key: 'action', defaultWidth: 150, minWidth: 140 },
+]
+
+const salesBillColumns: Array<ResizableColumnDefinition<TransactionBillColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'refNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'warehouse', defaultWidth: 160, minWidth: 120 },
+  { key: 'transactionMode', defaultWidth: 120, minWidth: 100 },
+  { key: 'status', defaultWidth: 140, minWidth: 120 },
+  { key: 'itemCount', defaultWidth: 100, minWidth: 90 },
+  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'gp', defaultWidth: 140, minWidth: 120 },
+  { key: 'paidAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'outstanding', defaultWidth: 140, minWidth: 120 },
+  { key: 'vat', defaultWidth: 120, minWidth: 100 },
+  { key: 'updatedBy', defaultWidth: 170, minWidth: 130 },
+  { key: 'action', defaultWidth: 150, minWidth: 140 },
+]
+
+const stockIssueColumns: Array<ResizableColumnDefinition<TransactionBillColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'warehouse', defaultWidth: 160, minWidth: 120 },
+  { key: 'status', defaultWidth: 140, minWidth: 120 },
+  { key: 'itemCount', defaultWidth: 100, minWidth: 90 },
+  { key: 'stockQty', defaultWidth: 130, minWidth: 110 },
+  { key: 'stockCost', defaultWidth: 130, minWidth: 110 },
+  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'action', defaultWidth: 230, minWidth: 200 },
+]
 
 function formatPercent(value: number) {
   return value.toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: value % 1 === 0 ? 0 : 2 })
@@ -445,6 +493,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [vatRatePercent, setVatRatePercent] = useState(7)
   const latestLoadRequestRef = useRef(0)
   const latestDetailRequestRef = useRef(0)
+  const tableColumns = useMemo(() => {
+    if (mode === 'purchase') return purchaseBillColumns
+    if (mode === 'sales') return salesBillColumns
+    return stockIssueColumns
+  }, [mode])
+  const columnResize = useResizableColumns(`daily.transaction-bills.${mode}`, tableColumns)
   const apiPath = mode === 'purchase' ? '/api/purchase/bills' : mode === 'sales' ? '/api/sales/bills' : '/api/sales/stock-issue'
   const requestPath = useMemo(() => {
     const params = new URLSearchParams({
@@ -1489,6 +1543,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
           <Select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto px-2 py-1"
@@ -1505,29 +1560,32 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <Button disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</Button>
         </div>
       </div>
-      <Table className="text-xs">
+      <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <colgroup>
+            {tableColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+          </colgroup>
           <TableHeader>
             <tr>
-              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่'} sortKey="docNo" onSort={changeSort} />
-              {mode === 'purchase' ? <th className="p-2 text-left text-xs font-semibold text-slate-700">เลขที่ใบรับของ</th> : null}
-              {mode === 'sales' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่อ้างอิง" sortKey="refNo" onSort={changeSort} /> : null}
-              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'วันที่สร้างรายการ' : 'วันที่'} sortKey="date" onSort={changeSort} />
-              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} sortKey="name" onSort={changeSort} />
-              {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" sortKey="warehouse" onSort={changeSort} /> : null}
-              {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" sortKey="transactionMode" onSort={changeSort} /> : null}
-              <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'สถานะเอกสาร' : 'สถานะรับเงิน'} sortKey="status" onSort={changeSort} />
-              {mode === 'purchase' ? <th className="p-2 text-left text-xs font-semibold text-slate-700">PMA / PMT</th> : null}
-              {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" sortKey="itemCount" onSort={changeSort} /> : null}
-              {mode === 'stock-issue' ? <th className="p-2 text-right text-xs font-semibold text-slate-700">น้ำหนัก</th> : null}
-              {mode === 'stock-issue' ? <th className="p-2 text-right text-xs font-semibold text-slate-700">ต้นทุน</th> : null}
-              <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label={mode === 'stock-issue' ? 'ยอดคาด' : 'ยอดรวม'} sortKey="totalAmount" onSort={changeSort} />
-              {mode === 'sales' ? <th className="p-2 text-right text-xs font-semibold text-slate-700">GP / Margin</th> : null}
-              {mode === 'sales' ? <th className="p-2 text-right text-xs font-semibold text-slate-700">รับแล้ว</th> : null}
-              {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ค้างชำระ" sortKey="outstanding" onSort={changeSort} /> : null}
-              {mode === 'sales' ? <th className="p-2 text-center text-xs font-semibold text-slate-700">VAT</th> : null}
-              {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedBy" onSort={changeSort} /> : null}
-              {mode === 'purchase' ? <th className="p-2 text-right text-xs font-semibold text-slate-700">จัดการ</th> : null}
-              {mode === 'sales' ? <th className="p-2 text-right text-xs font-semibold text-slate-700">จัดการ</th> : null}
+              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่'} resizeProps={columnResize.getResizeHandleProps('docNo', mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่')} sortKey="docNo" onSort={changeSort} />
+              {mode === 'purchase' ? <ResizableTableHead label="เลขที่ใบรับของ" resizeProps={columnResize.getResizeHandleProps('receiptDocs', 'เลขที่ใบรับของ')} /> : null}
+              {mode === 'sales' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่อ้างอิง" resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขที่อ้างอิง')} sortKey="refNo" onSort={changeSort} /> : null}
+              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'วันที่สร้างรายการ' : 'วันที่'} resizeProps={columnResize.getResizeHandleProps('date', mode === 'purchase' ? 'วันที่สร้างรายการ' : 'วันที่')} sortKey="date" onSort={changeSort} />
+              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า')} sortKey="name" onSort={changeSort} />
+              {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" resizeProps={columnResize.getResizeHandleProps('warehouse', 'สาขา / คลัง')} sortKey="warehouse" onSort={changeSort} /> : null}
+              {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" resizeProps={columnResize.getResizeHandleProps('transactionMode', 'ประเภท')} sortKey="transactionMode" onSort={changeSort} /> : null}
+              <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label={mode === 'purchase' ? 'สถานะเอกสาร' : 'สถานะรับเงิน'} resizeProps={columnResize.getResizeHandleProps('status', mode === 'purchase' ? 'สถานะเอกสาร' : 'สถานะรับเงิน')} sortKey="status" onSort={changeSort} />
+              {mode === 'purchase' ? <ResizableTableHead label="PMA / PMT" resizeProps={columnResize.getResizeHandleProps('paymentDocs', 'PMA / PMT')} /> : null}
+              {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รายการ" resizeProps={columnResize.getResizeHandleProps('itemCount', 'รายการ')} sortKey="itemCount" onSort={changeSort} /> : null}
+              {mode === 'stock-issue' ? <ResizableTableHead align="right" label="น้ำหนัก" resizeProps={columnResize.getResizeHandleProps('stockQty', 'น้ำหนัก')} /> : null}
+              {mode === 'stock-issue' ? <ResizableTableHead align="right" label="ต้นทุน" resizeProps={columnResize.getResizeHandleProps('stockCost', 'ต้นทุน')} /> : null}
+              <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label={mode === 'stock-issue' ? 'ยอดคาด' : 'ยอดรวม'} resizeProps={columnResize.getResizeHandleProps('totalAmount', mode === 'stock-issue' ? 'ยอดคาด' : 'ยอดรวม')} sortKey="totalAmount" onSort={changeSort} />
+              {mode === 'sales' ? <ResizableTableHead align="right" label="GP / Margin" resizeProps={columnResize.getResizeHandleProps('gp', 'GP / Margin')} /> : null}
+              {mode === 'sales' ? <ResizableTableHead align="right" label="รับแล้ว" resizeProps={columnResize.getResizeHandleProps('paidAmount', 'รับแล้ว')} /> : null}
+              {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="right" direction={sortDirection} label="ค้างชำระ" resizeProps={columnResize.getResizeHandleProps('outstanding', 'ค้างชำระ')} sortKey="outstanding" onSort={changeSort} /> : null}
+              {mode === 'sales' ? <ResizableTableHead align="center" label="VAT" resizeProps={columnResize.getResizeHandleProps('vat', 'VAT')} /> : null}
+              {mode !== 'stock-issue' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="อัพเดตล่าสุด" resizeProps={columnResize.getResizeHandleProps('updatedBy', 'อัพเดตล่าสุด')} sortKey="updatedBy" onSort={changeSort} /> : null}
+              {mode === 'purchase' ? <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} /> : null}
+              {mode === 'sales' ? <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} /> : null}
             </tr>
           </TableHeader>
           <TableBody className="divide-y divide-slate-100">
@@ -2565,16 +2623,17 @@ function formatDateTime(value?: string) {
   return date.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function SortHeader({ activeKey, align, direction, label, onSort, sortKey }: { activeKey: SortKey; align: 'center' | 'left' | 'right'; direction: SortDirection; label: string; onSort: (key: SortKey) => void; sortKey: SortKey }) {
-  const active = activeKey === sortKey
-  const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
+function SortHeader({ activeKey, align, direction, label, onSort, resizeProps, sortKey }: { activeKey: SortKey; align: 'center' | 'left' | 'right'; direction: SortDirection; label: string; onSort: (key: SortKey) => void; resizeProps?: ButtonHTMLAttributes<HTMLButtonElement>; sortKey: SortKey }) {
   return (
-    <th className="p-0">
-      <button className={`flex w-full items-center gap-1 p-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
-        <span>{label}</span>
-        <span className="text-slate-400">{active ? direction === 'asc' ? '▲' : '▼' : '↕'}</span>
-      </button>
-    </th>
+    <ResizableTableHead
+      activeSortKey={activeKey}
+      align={align}
+      direction={direction}
+      label={label}
+      resizeProps={resizeProps}
+      sortKey={sortKey}
+      onSort={onSort}
+    />
   )
 }
 

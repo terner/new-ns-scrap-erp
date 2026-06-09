@@ -732,17 +732,23 @@ model currencies {
 }
 
 model director_employees {
-  code         String   @unique(map: "directors_code_key")
-  name         String
-  type         String?
-  phone        String?
-  bank_account String?
-  active       Boolean  @default(true)
-  created_at   DateTime @default(now()) @db.Timestamptz(6)
-  updated_at   DateTime @default(now()) @db.Timestamptz(6)
-  bank_name    String?
-  account_no   String?
-  id           BigInt   @id(map: "directors_pkey") @default(autoincrement())
+  code              String   @unique(map: "directors_code_key")
+  name              String
+  type              String?
+  phone             String?
+  bank_account      String?
+  active            Boolean  @default(true)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+  bank_name         String?
+  account_no        String?
+  name_title        String?
+  first_name        String?
+  last_name         String?
+  bank_account_name String?
+  bank_branch       String?
+  id                BigInt   @id(map: "directors_pkey") @default(autoincrement())
+  petty_advances    petty_advances[]
 
   @@index([active])
   @@schema("public")
@@ -908,14 +914,17 @@ model expenses {
   branch_id          BigInt?
   id                 BigInt              @id @default(autoincrement())
   account_id         BigInt?
+  supplier_id        BigInt?
   accounts           accounts?           @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   branches           branches?           @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   expense_categories expense_categories? @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  suppliers          suppliers?          @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([date(sort: Desc)], map: "idx_exp_date")
   @@index([doc_no], map: "idx_expenses_doc_no")
   @@index([due_date], map: "idx_expenses_due_date")
   @@index([paid_status], map: "idx_expenses_paid_status")
+  @@index([supplier_id], map: "idx_expenses_supplier")
   @@index([voucher_id], map: "idx_expenses_voucher_id")
   @@schema("public")
 }
@@ -1414,27 +1423,34 @@ model petty_advance_returns {
 }
 
 model petty_advances {
-  doc_no                String                  @unique
-  date                  DateTime                @db.Date
-  type                  String                  @default("DIRECTOR_LOAN")
-  recipient_name        String
-  amount                Decimal                 @default(0) @db.Decimal
-  status                String                  @default("active")
-  notes                 String?
-  returned_amount       Decimal                 @default(0) @db.Decimal
-  closed_at             DateTime?               @db.Timestamptz(6)
-  created_by            String?
-  created_at            DateTime                @default(now()) @db.Timestamptz(6)
-  updated_by            String?
-  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
-  version               Int                     @default(1)
-  id                    BigInt                  @id @default(autoincrement())
-  account_id            BigInt?
-  petty_advance_returns petty_advance_returns[]
-  accounts              accounts?               @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  doc_no                      String                  @unique
+  date                        DateTime                @db.Date
+  type                        String                  @default("DIRECTOR_LOAN")
+  recipient_name              String
+  recipient_person_code       String?
+  recipient_bank_name         String?
+  recipient_bank_account_name String?
+  recipient_account_no        String?
+  recipient_bank_branch       String?
+  amount                      Decimal                 @default(0) @db.Decimal
+  status                      String                  @default("active")
+  notes                       String?
+  returned_amount             Decimal                 @default(0) @db.Decimal
+  closed_at                   DateTime?               @db.Timestamptz(6)
+  created_by                  String?
+  created_at                  DateTime                @default(now()) @db.Timestamptz(6)
+  updated_by                  String?
+  updated_at                  DateTime                @default(now()) @db.Timestamptz(6)
+  version                     Int                     @default(1)
+  id                          BigInt                  @id @default(autoincrement())
+  account_id                  BigInt?
+  petty_advance_returns       petty_advance_returns[]
+  accounts                    accounts?               @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recipient_person            director_employees?     @relation(fields: [recipient_person_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([account_id], map: "idx_petty_advances_account")
   @@index([date(sort: Desc)], map: "idx_petty_advances_date")
+  @@index([recipient_person_code], map: "idx_petty_advances_recipient_person_code")
   @@index([status], map: "idx_petty_advances_status")
   @@index([type], map: "idx_petty_advances_type")
   @@schema("public")
@@ -2574,6 +2590,7 @@ model suppliers {
   branch_id                 BigInt?
   sales_id                  BigInt?
   assets                    assets[]
+  expenses                  expenses[]
   payment_status_logs       payment_status_logs[]
   payments                  payments[]
   po_buys                   po_buys[]
