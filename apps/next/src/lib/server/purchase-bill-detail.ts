@@ -39,6 +39,7 @@ export type PurchaseBillDetail = {
     sourceType: string
     unit: string
   }>
+  branchId: string
   branchName: string
   createdBy: string
   date: string
@@ -110,6 +111,21 @@ type PurchaseBillDetailRow = Prisma.purchase_billsGetPayload<{
               select: {
                 line_count: true
                 product_name: true
+                weight_ticket_product_summary_lines: {
+                  include: {
+                    weight_ticket_lines: {
+                      select: {
+                        line_no: true,
+                        note: true,
+                      },
+                    },
+                  },
+                  orderBy: {
+                    weight_ticket_lines: {
+                      line_no: 'asc',
+                    },
+                  },
+                },
               }
             }
             weight_tickets: {
@@ -216,6 +232,14 @@ function supplierAddress(supplier: PurchaseBillDetailRow['suppliers']) {
   return supplier.address || supplier.address_line1 || structured
 }
 
+function receiptLineRemark(receiptAllocation: PurchaseBillDetailRow['purchase_bill_items'][number]['purchase_bill_receipt_allocations']) {
+  if (!receiptAllocation) return null
+  const notes = receiptAllocation.weight_ticket_product_summaries.weight_ticket_product_summary_lines
+    .map((bridge) => bridge.weight_ticket_lines.note?.trim() ?? '')
+    .filter((note): note is string => Boolean(note))
+  return Array.from(new Set(notes)).join(' / ')
+}
+
 export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBillDetail | null> {
   const bill: PurchaseBillDetailRow | null = await prisma.purchase_bills.findFirst({
     include: {
@@ -245,11 +269,27 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
                 select: {
                   line_count: true,
                   product_name: true,
+                  weight_ticket_product_summary_lines: {
+                    include: {
+                      weight_ticket_lines: {
+                        select: {
+                          line_no: true,
+                          note: true,
+                        },
+                      },
+                    },
+                    orderBy: {
+                      weight_ticket_lines: {
+                        line_no: 'asc',
+                      },
+                    },
+                  },
                 },
               },
               weight_tickets: {
                 select: {
                   doc_no: true,
+                  vehicle_no: true,
                 },
               },
             },
@@ -294,6 +334,7 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
       ?? '-'
     const receiptVehicleNo = receiptAllocation?.weight_tickets.vehicle_no ?? ''
     const lineNo = item.line_no ?? index + 1
+    const remark = receiptLineRemark(receiptAllocation)
     const receiptSummaryLabel = receiptAllocation?.weight_ticket_product_summaries
       ? `รวมจาก ${receiptAllocation.weight_ticket_product_summaries.line_count ?? 0} lot · ${receiptAllocation.weight_ticket_product_summaries.product_name ?? '-'}`
       : '-'
@@ -308,7 +349,7 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
       grossWeight: allocatedGrossWeight,
       lineId: `${bill.doc_no}:${lineNo}`,
       lineNo,
-      note: item.note ?? '',
+      note: receiptAllocation ? remark ?? '' : item.note ?? '',
       poDocNo,
       price: toNumber(item.price),
       productCode: item.product_code ?? '',
@@ -420,6 +461,7 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
     advanceAllocatedAmount: toNumber(activeAdvanceAllocation?.allocated_amount),
     advancePaymentDocNo: activeAdvanceAllocation?.supplier_advance_payments.doc_no ?? '',
     allocationRows,
+    branchId: bill.branches?.code ?? '',
     branchName: bill.branches?.name ?? '-',
     createdBy: bill.created_by ?? '-',
     date: bill.date ? toDateOnly(bill.date) : '-',

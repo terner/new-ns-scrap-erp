@@ -16,6 +16,7 @@ import { ApiError } from '@/lib/api-client'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { poBuyFormSchema, type PoBuyFormValues } from '@/lib/po-buy'
+import { openPoBuyPrint, openPoBuyPrintWindow, type PoBuyPrintDocument } from '@/lib/po-buy-print'
 
 type Option = {
   active?: boolean | null
@@ -66,11 +67,13 @@ type PoBuyItem = {
   productName: string
   qty: number
   remainingQty: number
+  unit?: string | null
   unitPrice: number
 }
 
 type PoBuyRow = {
   branchId: string
+  branchName?: string | null
   createdAt: string
   createdBy: string
   date: string
@@ -121,6 +124,7 @@ type PoBuyRow = {
     toStatus: string
   }>
   supplierId: string
+  supplierAddress: string
   supplierName: string
   totalAmount: number
   updatedAt: string
@@ -255,6 +259,10 @@ function poBuyStatusActionLabel(action: string) {
       return 'อัปเดตสถานะ'
   }
 }
+
+const rowActionButtonClass = 'rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-normal text-slate-700 shadow-none hover:bg-slate-50 hover:text-slate-900'
+const rowDangerActionButtonClass = 'rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-normal text-red-700 shadow-none hover:bg-red-50 hover:text-red-800'
+const rowWarningActionButtonClass = 'rounded-md border border-amber-200 bg-white px-2 py-1 text-xs font-normal text-amber-700 shadow-none hover:bg-amber-50 hover:text-amber-800'
 
 function poBuyAllocationActionLabel(action: string) {
   switch (action) {
@@ -429,6 +437,7 @@ export function PoBuyPageClient() {
   const [isSaving, setIsSaving] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const [printingPoDocNo, setPrintingPoDocNo] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedPoIds, setSelectedPoIds] = useState<string[]>([])
   const [selectedRow, setSelectedRow] = useState<PoBuyRow | null>(null)
@@ -620,6 +629,22 @@ export function PoBuyPageClient() {
     }
   }
 
+  const printPoBuy = async (row: PoBuyRow) => {
+    if (printingPoDocNo) return
+    let printWindow: Window | null = null
+    setError(null)
+    setPrintingPoDocNo(row.docNo)
+    try {
+      printWindow = openPoBuyPrintWindow()
+      await openPoBuyPrint(row satisfies PoBuyPrintDocument, printWindow)
+    } catch (caught) {
+      printWindow?.close()
+      setError(caught instanceof Error ? caught.message : 'เปิดใบพิมพ์ PO Buy ไม่ได้')
+    } finally {
+      setPrintingPoDocNo(null)
+    }
+  }
+
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     const filteredRows = (data?.rows ?? []).filter((row) => {
@@ -695,18 +720,25 @@ export function PoBuyPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <div className="rounded-md bg-gradient-to-br from-blue-500 to-indigo-700 p-4 text-white shadow">
-          <div className="text-xs opacity-80">📋 PO ทั้งหมด</div>
-          <div className="text-2xl font-bold">{data?.summary.totalRows ?? 0}</div>
-          <div className="mt-1 text-xs opacity-80">มูลค่ารวม {formatMoney(data?.summary.totalAmount ?? 0)}</div>
-        </div>
-        <Metric color="blue" label="🆕 ยังไม่รับ" sublabel="รอรับ 100%" value={`${openRows.length || data?.summary.open || 0}`} />
-        <Metric color="amber" label="⚙ รับบางส่วน" sublabel="รับแล้วบางส่วน" value={`${partialRows.length}`} />
-        <Metric color="emerald" label="✓ รับครบ" sublabel="รับครบแล้ว" value={`${receivedRows.length}`} />
-        <Metric color="red" label="⛔ ปิดรับไม่ครบ" sublabel="หยุดรับส่วนคงเหลือ" value={`${shortClosedRows.length || data?.summary.shortClosed || 0}`} />
-        <Metric box color="amber" label="⏳ น้ำหนักรอรับ" sublabel={`${data?.summary.totalRows ?? 0} PO`} value={formatMoney(data?.summary.remainingQty ?? 0)} />
-        <Metric box color="red" label="💰 มูลค่ารอรับ" sublabel={`${data?.summary.totalRows ?? 0} PO`} value={formatMoney(data?.summary.remainingAmount ?? 0)} />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <SummaryCard
+          accentClassName="bg-gradient-to-br from-blue-500 to-indigo-700 text-white"
+          label="ภาพรวม PO"
+          sublabel={`มูลค่ารวม ${formatMoney(data?.summary.totalAmount ?? 0)}`}
+          value={`${data?.summary.totalRows ?? 0}`}
+        />
+        <SummaryCard
+          label="สถานะการรับ"
+          sublabel="ยังไม่รับ / บางส่วน / รับครบ / ปิดรับไม่ครบ"
+          value={`${openRows.length || data?.summary.open || 0} / ${partialRows.length} / ${receivedRows.length} / ${shortClosedRows.length || data?.summary.shortClosed || 0}`}
+        />
+        <SummaryCard
+          accentClassName="border border-amber-200 bg-amber-50"
+          label="ยอดคงเหลือ"
+          sublabel={`น้ำหนักรอรับ ${formatMoney(data?.summary.remainingQty ?? 0)}`}
+          value={formatMoney(data?.summary.remainingAmount ?? 0)}
+          valueClassName="text-amber-700"
+        />
       </div>
 
       <div className="space-y-2 rounded-md bg-white p-3 shadow">
@@ -780,8 +812,8 @@ export function PoBuyPageClient() {
         </div>
       </div>
 
-      <Table className="min-w-[1240px]">
-        <TableHeader><tr><TableHead className="text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></TableHead><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่ PO ซื้อ" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="ผู้ขาย" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการสินค้า" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><TableHead className="w-16 text-center font-semibold text-slate-700">หมายเหตุ</TableHead><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><TableHead className="text-right font-semibold text-slate-700">จัดการ</TableHead></tr></TableHeader>
+      <Table className="min-w-[1240px] text-xs font-semibold" style={{ fontFamily: "'Noto Sans Thai', Arial, sans-serif" }}>
+        <TableHeader><tr><TableHead className="text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></TableHead><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่ PO ซื้อ" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="ผู้ขาย" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-[280px]" direction={sortDirection} label="รายการสินค้า" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><TableHead className="w-16 text-center font-semibold text-slate-700">หมายเหตุ</TableHead><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><TableHead className="text-right font-semibold text-slate-700">จัดการ</TableHead></tr></TableHeader>
         <TableBody>
           {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
           {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</TableCell></TableRow> : null}
@@ -791,8 +823,8 @@ export function PoBuyPageClient() {
                 <TableCell className="w-36 whitespace-nowrap font-mono">{row.docNo}</TableCell>
                 <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
                 <TableCell className="w-36">{row.supplierName}</TableCell>
-                <TableCell>
-                  <PoBuyTruncatedText text={row.productName} />
+                <TableCell className="w-[280px] max-w-[280px]">
+                  <PoBuyItemSummary fallbackText={row.productName} items={row.items} />
                 </TableCell>
                 <TableNumberCell value={formatMoney(row.qty)} />
                 <TableNumberCell strong value={formatMoney(row.totalAmount)} widthClass="w-32 max-w-32" />
@@ -809,22 +841,28 @@ export function PoBuyPageClient() {
                 <TableCell className="whitespace-nowrap text-right">
                   {row.status === 'Open' && row.qty === row.remainingQty ? (
                     <>
-                      <UiButton className="mr-2 font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</UiButton>
-                      <UiButton className="font-normal" size="xs" type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</UiButton>
+                      <button className={`${rowActionButtonClass} mr-1.5`} type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
+                      <button className={`${rowDangerActionButtonClass} mr-1.5`} type="button" onClick={(event) => { event.stopPropagation(); openCancelDialog(row) }}>ยกเลิก</button>
                     </>
                   ) : null}
+                  <button
+                    className={`${rowActionButtonClass} ${row.status === 'Open' && row.qty === row.remainingQty ? '' : 'mr-1.5'}`}
+                    disabled={printingPoDocNo === row.docNo}
+                    type="button"
+                    onClick={(event) => { event.stopPropagation(); void printPoBuy(row) }}
+                  >
+                    {printingPoDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
+                  </button>
                   {shouldShowShortCloseButton(row) ? (
-                    <UiButton
-                      className="font-normal"
+                    <button
+                      className={`${rowWarningActionButtonClass} ml-1.5 disabled:cursor-not-allowed disabled:opacity-50`}
                       disabled={!canShortClosePoBuy(row)}
-                      size="xs"
                       title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
                       type="button"
-                      variant="outline"
                       onClick={(event) => { event.stopPropagation(); openShortCloseDialog(row) }}
                     >
                       ปิดรับไม่ครบ
-                    </UiButton>
+                    </button>
                   ) : null}
                 </TableCell>
               </TableRow>
@@ -888,14 +926,38 @@ export function PoBuyPageClient() {
           onSubmit={submitShortClose}
         />
       ) : null}
-      {selectedRow ? <PoBuyDetailModal row={selectedRow} onClose={() => setSelectedRow(null)} /> : null}
+      {selectedRow ? (
+        <PoBuyDetailModal
+          isPrinting={printingPoDocNo === selectedRow.docNo}
+          row={selectedRow}
+          onClose={() => setSelectedRow(null)}
+          onPrint={(rowToPrint) => void printPoBuy(rowToPrint)}
+        />
+      ) : null}
     </section>
   )
 }
 
-function Metric({ box, color, label, sublabel, value }: { box?: boolean; color: 'amber' | 'blue' | 'emerald' | 'red'; label: string; sublabel: string; value: string }) {
-  const colorClass = color === 'red' ? 'border-red-300 bg-red-50 text-red-700' : color === 'amber' ? `${box ? 'border-amber-300 bg-amber-50' : 'border-amber-500 bg-white'} text-amber-700` : color === 'emerald' ? 'border-emerald-500 bg-white text-emerald-700' : 'border-blue-500 bg-white text-blue-700'
-  return <div className={`rounded-md p-4 shadow ${box ? 'border-2' : 'border-l-4'} ${colorClass}`}><div className="text-xs">{label}</div><div className="text-2xl font-bold">{value}</div><div className="text-xs text-slate-400">{sublabel}</div></div>
+function SummaryCard({
+  accentClassName = 'border border-slate-200 bg-white text-slate-900',
+  label,
+  sublabel,
+  value,
+  valueClassName = '',
+}: {
+  accentClassName?: string
+  label: string
+  sublabel: string
+  value: string
+  valueClassName?: string
+}) {
+  return (
+    <div className={`rounded-md p-3 shadow ${accentClassName}`}>
+      <div className="text-xs opacity-80">{label}</div>
+      <div className={`mt-1 text-lg font-bold ${valueClassName}`}>{value}</div>
+      <div className="mt-1 text-xs opacity-70">{sublabel}</div>
+    </div>
+  )
 }
 
 function PoBuyNoteIndicator({ note, poNo }: { note: string; poNo: string }) {
@@ -923,16 +985,49 @@ function PoBuyNoteIndicator({ note, poNo }: { note: string; poNo: string }) {
   )
 }
 
-function PoBuyTruncatedText({ text }: { text: string }) {
-  if (!text) return <span>-</span>
+const poBuyVisibleItemLimit = 2
+const poBuyHiddenItemExactLimit = 10
+
+function poBuyItemSummaryText(item: PoBuyItem) {
+  const productName = item.productName || '-'
+  const unit = item.unit?.trim() || ''
+  const quantity = Number.isFinite(item.qty) && item.qty > 0
+    ? ` (${formatMoney(item.qty)}${unit ? ` ${unit}` : ''})`
+    : ''
+  return `${productName}${quantity}`
+}
+
+function poBuyHiddenItemText(hiddenCount: number) {
+  if (hiddenCount <= 0) return ''
+  if (hiddenCount > poBuyHiddenItemExactLimit) return 'และอีกมากกว่า 10 รายการ'
+  return `และอีก ${hiddenCount} รายการ`
+}
+
+function PoBuyItemSummary({ fallbackText, items }: { fallbackText: string; items: PoBuyItem[] }) {
+  const normalizedItems = items.filter((item) => item.productName || item.productId)
+  const fallback = fallbackText.trim()
+  if (normalizedItems.length === 0) return fallback ? <span className="block truncate">{fallback}</span> : <span>-</span>
+
+  const visibleItems = normalizedItems.slice(0, poBuyVisibleItemLimit)
+  const hiddenCount = Math.max(0, normalizedItems.length - visibleItems.length)
+  const hiddenText = poBuyHiddenItemText(hiddenCount)
+  const fullText = normalizedItems.map(poBuyItemSummaryText).join('\n')
+
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="block min-w-0 truncate" tabIndex={0}>{text}</span>
+          <div className="min-w-0 space-y-0.5 text-xs leading-5" tabIndex={0}>
+            {visibleItems.map((item, index) => (
+              <div key={`${item.productId || item.productName}-${index}`} className="truncate">
+                {poBuyItemSummaryText(item)}
+              </div>
+            ))}
+            {hiddenText ? <div className="truncate font-semibold text-slate-500">{hiddenText}</div> : null}
+          </div>
         </TooltipTrigger>
-        <TooltipContent align="start" className="w-80 whitespace-normal p-2 leading-relaxed">
-          {text}
+        <TooltipContent align="start" className="max-h-80 w-96 overflow-y-auto whitespace-pre-wrap p-3 leading-relaxed">
+          {fullText}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -1376,7 +1471,17 @@ function PoBuyFormModal({
   )
 }
 
-function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow }) {
+function PoBuyDetailModal({
+  isPrinting,
+  onClose,
+  onPrint,
+  row,
+}: {
+  isPrinting: boolean
+  onClose: () => void
+  onPrint: (row: PoBuyRow) => void
+  row: PoBuyRow
+}) {
   return (
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
@@ -1440,6 +1545,9 @@ function PoBuyDetailModal({ onClose, row }: { onClose: () => void; row: PoBuyRow
           </div>
         </div>
         <DialogFooter>
+          <UiButton className="font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(row)}>
+            {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์ PO Buy'}
+          </UiButton>
           <UiButton className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</UiButton>
         </DialogFooter>
       </DialogContent>

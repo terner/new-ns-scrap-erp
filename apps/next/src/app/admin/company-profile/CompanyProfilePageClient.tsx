@@ -4,22 +4,30 @@ import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { PhoneInput } from '@/components/ui/PhoneInput'
 import { ApiError, getErrorMessage, readJsonResponse } from '@/lib/api-client'
-import { companyProfileSchema, emptyCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
+import { companyProfileDraftSchema, companyProfileSchema, emptyCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
 import { formatPhoneDisplay, sanitizePhoneInput } from '@/lib/format'
 
 const payloadSchema = z.object({
-  profile: companyProfileSchema,
+  branches: z.array(z.object({
+    address: z.string().nullable(),
+    code: z.string(),
+    hasProfile: z.boolean().default(false),
+    id: z.string(),
+    name: z.string(),
+    phone: z.string().nullable(),
+  })).default([]),
+  profile: companyProfileDraftSchema,
+  profileConfigured: z.boolean().default(false),
+  selectedBranchId: z.string().nullable().default(null),
+  selectedBranchName: z.string().nullable().default(null),
 })
 
+type BranchOption = z.infer<typeof payloadSchema>['branches'][number]
 type FieldErrors = Partial<Record<keyof CompanyProfileFormValues, string>>
 type PreviewKind = 'delivery' | 'receipt'
 
 function sanitizeEmail(value: string) {
   return value.replace(/[^\x20-\x7E]/g, '')
-}
-
-function sanitizeDigits(value: string, maxLength: number) {
-  return value.replace(/\D/g, '').slice(0, maxLength)
 }
 
 function normalizeWebsite(value: string) {
@@ -69,7 +77,7 @@ function buildPreviewHtml(kind: PreviewKind, profile: CompanyProfileFormValues) 
   const companyInfo = `
     ${escapeHtml(profile.address)}<br>
     โทร ${escapeHtml(formatPhoneDisplay(profile.phone) || '-')} ${profile.fax ? ` · แฟกซ์ ${escapeHtml(formatPhoneDisplay(profile.fax))}` : ''}<br>
-    เลขประจำตัวผู้เสียภาษี: ${escapeHtml(profile.taxId || '-')} ${profile.branchCode ? ` · สาขา ${escapeHtml(profile.branchCode)}` : ''}
+    เลขประจำตัวผู้เสียภาษี: ${escapeHtml(profile.taxId || '-')}
     ${profile.email ? `<br>Email: ${escapeHtml(profile.email)}` : ''}
     ${profile.website ? `<br>Website: ${escapeHtml(profile.website)}` : ''}
   `
@@ -186,20 +194,30 @@ function fieldErrorsFromApi(caught: unknown): FieldErrors {
 }
 
 export function CompanyProfilePageClient() {
+  const [branches, setBranches] = useState<BranchOption[]>([])
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [form, setForm] = useState<CompanyProfileFormValues>(emptyCompanyProfile)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [profileConfigured, setProfileConfigured] = useState(false)
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null)
+  const [selectedBranchName, setSelectedBranchName] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (branchId?: string | null) => {
     setError(null)
     setIsLoading(true)
     try {
-      const response = await fetch('/api/admin/company-profile', { cache: 'no-store' })
+      const query = branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''
+      const response = await fetch(`/api/admin/company-profile${query}`, { cache: 'no-store' })
       const payload = await readJsonResponse(response, payloadSchema, 'โหลดข้อมูลบริษัทไม่สำเร็จ')
+      setBranches(payload.branches)
       setForm(payload.profile)
+      setProfileConfigured(payload.profileConfigured)
+      setSelectedBranchId(payload.selectedBranchId)
+      setSelectedBranchName(payload.selectedBranchName)
+      setFieldErrors({})
     } catch (caught) {
       setError(getErrorMessage(caught, 'โหลดข้อมูลบริษัทไม่สำเร็จ'))
     } finally {
@@ -210,6 +228,12 @@ export function CompanyProfilePageClient() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  function selectBranch(branchId: string) {
+    if (branchId === selectedBranchId) return
+    setMessage(null)
+    void loadData(branchId)
+  }
 
   function update<K extends keyof CompanyProfileFormValues>(key: K, value: CompanyProfileFormValues[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -234,14 +258,18 @@ export function CompanyProfilePageClient() {
     setIsSaving(true)
     try {
       const response = await fetch('/api/admin/company-profile', {
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify({ ...parsed.data, branchId: selectedBranchId }),
         headers: { 'Content-Type': 'application/json' },
         method: 'PUT',
       })
       const payload = await readJsonResponse(response, payloadSchema, 'บันทึกข้อมูลบริษัทไม่สำเร็จ')
+      setBranches(payload.branches)
       setForm(payload.profile)
+      setProfileConfigured(payload.profileConfigured)
+      setSelectedBranchId(payload.selectedBranchId)
+      setSelectedBranchName(payload.selectedBranchName)
       setFieldErrors({})
-      setMessage('บันทึกข้อมูลบริษัทสำเร็จ')
+      setMessage(`บันทึกข้อมูลบริษัทสาขา${payload.selectedBranchName ? ` ${payload.selectedBranchName}` : ''}สำเร็จ`)
       return true
     } catch (caught) {
       setFieldErrors(fieldErrorsFromApi(caught))
@@ -297,60 +325,99 @@ export function CompanyProfilePageClient() {
   return (
     <section className="space-y-3">
       <div className="rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-4 text-white shadow">
-        <h1 className="text-xl font-bold">🏢 ข้อมูลบริษัท</h1>
-        <p className="mt-1 text-sm opacity-90">ข้อมูลที่จะแสดงในใบรับสินค้า / ใบส่งของ — บันทึกครั้งเดียวใช้ได้ทุกใบ</p>
+        <h1 className="text-xl font-bold">🏢 ข้อมูลบริษัทตามสาขา</h1>
+        <p className="mt-1 text-sm opacity-90">เลือกสาขาก่อนแก้ไขข้อมูลหัวกระดาษสำหรับใบรับสินค้า / ใบส่งของ</p>
       </div>
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
       {message ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div> : null}
 
-      <div className="grid grid-cols-1 gap-3 rounded-md bg-white p-4 text-sm shadow md:grid-cols-2">
-        <TextField error={fieldErrors.name} label="ชื่อบริษัท (ไทย) *" value={form.name} onChange={(value) => update('name', value)} />
-        <TextField error={fieldErrors.nameEn} label="ชื่อบริษัท (อังกฤษ)" value={form.nameEn ?? ''} onChange={(value) => update('nameEn', value || null)} />
-        <TextField error={fieldErrors.taxId} inputMode="numeric" label="เลขประจำตัวผู้เสียภาษี (13 หลัก)" value={form.taxId ?? ''} onChange={(value) => update('taxId', sanitizeDigits(value, 13) || null)} />
-        <TextField error={fieldErrors.branchCode} inputMode="numeric" label="รหัสสาขา (5 หลัก, ใส่ 00000 ถ้าสำนักงานใหญ่)" value={form.branchCode} onChange={(value) => update('branchCode', sanitizeDigits(value, 5))} />
-        <label className="md:col-span-2">
-          <span className="mb-1 block text-xs font-bold text-slate-700">ที่อยู่ (ตามใบทะเบียนพาณิชย์) *</span>
-          <textarea className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" rows={2} value={form.address} onChange={(event) => update('address', event.target.value)} />
-          {fieldErrors.address ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.address}</span> : null}
-        </label>
-        <label>
-          <span className="mb-1 block text-xs font-bold text-slate-700">โทรศัพท์ *</span>
-          <PhoneInput className="w-full" error={Boolean(fieldErrors.phone)} value={form.phone} onChange={(value) => update('phone', sanitizePhoneInput(value))} />
-          {fieldErrors.phone ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.phone}</span> : null}
-        </label>
-        <TextField error={fieldErrors.fax} inputMode="tel" label="แฟกซ์" value={form.fax ?? ''} onChange={(value) => update('fax', sanitizePhoneInput(value) || null)} />
-        <TextField error={fieldErrors.email} inputMode="email" label="อีเมล" type="email" value={form.email ?? ''} onChange={(value) => update('email', sanitizeEmail(value) || null)} />
-        <TextField error={fieldErrors.website} inputMode="url" label="เว็บไซต์" value={form.website ?? ''} onBlur={() => update('website', normalizeWebsite(form.website ?? ''))} onChange={(value) => update('website', sanitizeEmail(value) || null)} />
-        <TextField className="md:col-span-2" error={fieldErrors.bankInfo} label="ข้อมูลธนาคาร / เลขบัญชี (สำหรับใบส่งของ)" placeholder="เช่น KBank 123-4-56789-0 บริษัท นิวโซลูชั่นส์ (ไทยแลนด์) จำกัด" value={form.bankInfo ?? ''} onChange={(value) => update('bankInfo', value || null)} />
-        <TextField className="md:col-span-2" error={fieldErrors.footerNote} label="ข้อความท้ายเอกสาร" placeholder="เช่น ขอขอบคุณที่ใช้บริการ" value={form.footerNote ?? ''} onChange={(value) => update('footerNote', value || null)} />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="rounded-md bg-white p-3 text-sm shadow">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">สาขา</div>
+            <div className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+              {branches.length.toLocaleString('th-TH')} สาขา
+            </div>
+          </div>
+          <div className="space-y-2">
+            {branches.length ? branches.map((branch) => {
+              const selected = branch.id === selectedBranchId
+              return (
+                <button
+                  className={`w-full rounded-md border px-3 py-2 text-left transition ${selected ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50'}`}
+                  disabled={isLoading || isSaving}
+                  key={branch.id}
+                  type="button"
+                  onClick={() => selectBranch(branch.id)}
+                >
+                  <span className="block text-sm font-bold">{branch.name}</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">รหัส {branch.code}</span>
+                  <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${branch.hasProfile ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {branch.hasProfile ? 'ตั้งค่าข้อมูลสาขาแล้ว' : 'ยังไม่ได้ตั้งค่า'}
+                  </span>
+                </button>
+              )
+            }) : <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">ยังไม่มีข้อมูลสาขาที่เปิดใช้งาน</div>}
+          </div>
+        </div>
 
-        <div className="rounded-md border border-slate-300 bg-slate-50 p-3 md:col-span-2">
-          <label className="mb-2 block text-xs font-bold text-slate-700">โลโก้บริษัท (สำหรับพิมพ์ในใบ — แนะนำไฟล์เล็กกว่า 200KB)</label>
-          <div className="flex flex-wrap items-start gap-3">
-            {form.logoUrl ? (
-              <div className="rounded-md border border-slate-300 bg-white p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="โลโก้บริษัท" className="max-h-20 max-w-[200px]" src={form.logoUrl} />
+        <div className="grid grid-cols-1 gap-3 rounded-md bg-white p-4 text-sm shadow md:grid-cols-2">
+          <div className="md:col-span-2">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">ข้อมูลหัวกระดาษ</div>
+            <div className="mt-1 text-base font-bold text-slate-900">{selectedBranchName ?? 'ยังไม่ได้เลือกสาขา'}</div>
+            {!profileConfigured && selectedBranchId ? (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                สาขานี้ยังไม่มีข้อมูลบริษัทเฉพาะ ต้องกรอกและบันทึกก่อนนำไปใช้ในเอกสารพิมพ์
               </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-slate-300 bg-white p-4 text-xs text-slate-400">ยังไม่มีโลโก้</div>
-            )}
-            <div className="flex flex-col gap-2">
-              <input accept="image/*" className="text-xs" type="file" onChange={(event) => uploadLogo(event.target.files?.[0])} />
-              {form.logoUrl ? <button className="text-left text-xs text-red-600 hover:underline" type="button" onClick={() => update('logoUrl', null)}>🗑 ลบโลโก้</button> : null}
-              {fieldErrors.logoUrl ? <span className="text-xs text-red-600">{fieldErrors.logoUrl}</span> : null}
+            ) : null}
+          </div>
+          <TextField error={fieldErrors.name} label="ชื่อบริษัท (ไทย) *" value={form.name} onChange={(value) => update('name', value)} />
+          <TextField error={fieldErrors.nameEn} label="ชื่อบริษัท (อังกฤษ)" value={form.nameEn ?? ''} onChange={(value) => update('nameEn', value || null)} />
+          <TextField error={fieldErrors.taxId} inputMode="numeric" label="เลขประจำตัวผู้เสียภาษี (13 หลัก)" value={form.taxId ?? ''} onChange={(value) => update('taxId', value.replace(/\D/g, '').slice(0, 13) || null)} />
+          <label className="md:col-span-2">
+            <span className="mb-1 block text-xs font-bold text-slate-700">ที่อยู่ (ตามใบทะเบียนพาณิชย์) *</span>
+            <textarea className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" rows={2} value={form.address} onChange={(event) => update('address', event.target.value)} />
+            {fieldErrors.address ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.address}</span> : null}
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-bold text-slate-700">โทรศัพท์ *</span>
+            <PhoneInput className="w-full" error={Boolean(fieldErrors.phone)} value={form.phone} onChange={(value) => update('phone', sanitizePhoneInput(value))} />
+            {fieldErrors.phone ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.phone}</span> : null}
+          </label>
+          <TextField error={fieldErrors.fax} inputMode="tel" label="แฟกซ์" value={form.fax ?? ''} onChange={(value) => update('fax', sanitizePhoneInput(value) || null)} />
+          <TextField error={fieldErrors.email} inputMode="email" label="อีเมล" type="email" value={form.email ?? ''} onChange={(value) => update('email', sanitizeEmail(value) || null)} />
+          <TextField error={fieldErrors.website} inputMode="url" label="เว็บไซต์" value={form.website ?? ''} onBlur={() => update('website', normalizeWebsite(form.website ?? ''))} onChange={(value) => update('website', sanitizeEmail(value) || null)} />
+          <TextField className="md:col-span-2" error={fieldErrors.bankInfo} label="ข้อมูลธนาคาร / เลขบัญชี (สำหรับใบส่งของ)" placeholder="เช่น KBank 123-4-56789-0 บริษัท นิวโซลูชั่นส์ (ไทยแลนด์) จำกัด" value={form.bankInfo ?? ''} onChange={(value) => update('bankInfo', value || null)} />
+          <TextField className="md:col-span-2" error={fieldErrors.footerNote} label="ข้อความท้ายเอกสาร" placeholder="เช่น ขอขอบคุณที่ใช้บริการ" value={form.footerNote ?? ''} onChange={(value) => update('footerNote', value || null)} />
+
+          <div className="rounded-md border border-slate-300 bg-slate-50 p-3 md:col-span-2">
+            <label className="mb-2 block text-xs font-bold text-slate-700">โลโก้บริษัท (สำหรับพิมพ์ในใบ — แนะนำไฟล์เล็กกว่า 200KB)</label>
+            <div className="flex flex-wrap items-start gap-3">
+              {form.logoUrl ? (
+                <div className="rounded-md border border-slate-300 bg-white p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img alt="โลโก้บริษัท" className="max-h-20 max-w-[200px]" src={form.logoUrl} />
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed border-slate-300 bg-white p-4 text-xs text-slate-400">ยังไม่มีโลโก้</div>
+              )}
+              <div className="flex flex-col gap-2">
+                <input accept="image/*" className="text-xs" type="file" onChange={(event) => uploadLogo(event.target.files?.[0])} />
+                {form.logoUrl ? <button className="text-left text-xs text-red-600 hover:underline" type="button" onClick={() => update('logoUrl', null)}>🗑 ลบโลโก้</button> : null}
+                {fieldErrors.logoUrl ? <span className="text-xs text-red-600">{fieldErrors.logoUrl}</span> : null}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-md bg-slate-50 p-4">
-        <button className="rounded-md bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void save()}>
+        <button className="rounded-md bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isLoading || isSaving || !selectedBranchId} type="button" onClick={() => void save()}>
           {isSaving ? 'กำลังบันทึก...' : '💾 บันทึก'}
         </button>
-        <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void previewReceipt()}>👁 ดูตัวอย่างใบรับสินค้า</button>
-        <button className="rounded-md bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-60" disabled={isLoading || isSaving} type="button" onClick={() => void previewDelivery()}>👁 ดูตัวอย่างใบส่งของ</button>
+        <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-60" disabled={isLoading || isSaving || !selectedBranchId} type="button" onClick={() => void previewReceipt()}>👁 ดูตัวอย่างใบรับสินค้า</button>
+        <button className="rounded-md bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-60" disabled={isLoading || isSaving || !selectedBranchId} type="button" onClick={() => void previewDelivery()}>👁 ดูตัวอย่างใบส่งของ</button>
       </div>
 
       <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">

@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { PageTitleOverride } from '@/components/layout/PageTitleOverride'
-import { openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
+import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
 import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, type WeightTicketStatus, typeLabels, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
@@ -147,12 +147,15 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
   }
 
   async function handlePrintReceipt() {
-    if (!ticket || ticket.type !== 'WTI') return
+    if (!ticket) return
     setIsPrinting(true)
+    let printWindow: Window | null = null
     try {
-      await openWeightTicketReceiptPrint(ticket)
+      printWindow = openWeightTicketPrintWindow(ticket)
+      await openWeightTicketReceiptPrint(ticket, printWindow)
     } catch (caught) {
-      window.alert(getErrorMessage(caught, 'เปิดใบพิมพ์ใบรับสินค้าไม่สำเร็จ'))
+      printWindow?.close()
+      window.alert(getErrorMessage(caught, 'เปิดใบพิมพ์ใบรับ-ส่งสินค้าไม่สำเร็จ'))
     } finally {
       setIsPrinting(false)
     }

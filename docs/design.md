@@ -211,6 +211,22 @@ rules:
 - legacy-style action text/link ในตารางให้คงโทนที่ผู้ใช้คุ้นเคย เว้นแต่มีปุ่ม page-specific ที่ชัดกว่า
 - status cell ใช้ pattern `dot + สีข้อความ` เป็น baseline กลาง; ใช้ `text-xs font-semibold` และ dot เล็ก (`size-1.5`) เพื่อไม่ดึงสายตาเกิน cell อื่น; หลีกเลี่ยง badge background ถ้าไม่จำเป็นตาม legacy/page override
 
+### Multi-Item Summary Columns
+
+ใช้กับ table column ที่ต้องสรุปรายการย่อยหลายรายการในแถวเดียว เช่น `รายการสินค้า`, source documents, linked bills, allocations, หรือรายการจ่าย/รับที่มีหลายบรรทัด
+
+Rules:
+
+- ห้าม render รายการย่อยทั้งหมดเป็น comma-joined string ยาวใน cell เดียว เพราะทำให้แถวสูงเกินและ scan ยาก
+- ต้องกำหนดความกว้าง column หรือ min/max width ชัดเจนตามบริบทหน้า ก่อนปล่อยให้ข้อความตัดบรรทัด
+- ค่า default สำหรับ list table คือแสดงรายการแรกไม่เกิน `3` บรรทัดใน cell แล้วสรุปส่วนที่ซ่อน
+- ถ้าซ่อนรายการไม่เกิน `10` รายการ ให้แสดง `และอีก N รายการ`
+- ถ้าซ่อนมากกว่า `10` รายการ ให้แสดง `และอีกมากกว่า 10 รายการ`
+- cell ต้องมีทางดูรายการเต็มโดยไม่เปลี่ยนหน้า เช่น tooltip/popover หรือ row detail modal; ถ้าเปิด row detail ได้อยู่แล้ว tooltip ยังควรช่วยดูแบบเร็วในตาราง
+- สำหรับ `รายการสินค้า` แต่ละบรรทัดที่แสดงใน cell/tooltip/detail ต้องคง `จำนวน + หน่วยจริง` ตาม rule `Quantity And Unit Display` เมื่อข้อมูลมีอยู่
+- sorting/filter/search ต้องใช้ข้อมูลเต็มของ row ไม่ใช่เฉพาะรายการที่ถูกแสดง 3 บรรทัดแรก
+- export/print/detail ไม่อยู่ภายใต้ข้อจำกัด 3 บรรทัดของ list table และต้องแสดงรายการครบตามบริบทเอกสาร
+
 ### Table Row Actions
 
 - row action ปุ่มแก้ไข/ยกเลิกใช้ขนาดเล็ก `text-xs` และอยู่ในคอลัมน์ขวาสุด

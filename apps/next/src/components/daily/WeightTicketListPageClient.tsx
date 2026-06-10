@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/Input'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
-import { openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
+import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 import { cn } from '@/lib/utils'
 import {
@@ -63,6 +63,9 @@ const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; value
     { label: 'ยกเลิก', values: ['cancelled'] },
   ],
 }
+
+const rowActionButtonClass = 'inline-flex items-center rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2'
+const rowDestructiveActionButtonClass = 'inline-flex items-center rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2'
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'
@@ -284,12 +287,14 @@ export function WeightTicketListPageClient() {
   }
 
   async function handlePrintTicket(ticket: WeightTicketRecord) {
-    if (ticket.type !== 'WTI') return
     setPrintingTicketId(ticket.id)
+    let printWindow: Window | null = null
     try {
-      await openWeightTicketReceiptPrint(ticket)
+      printWindow = openWeightTicketPrintWindow(ticket)
+      await openWeightTicketReceiptPrint(ticket, printWindow)
     } catch (caught) {
-      window.alert(getErrorMessage(caught, 'เปิดใบพิมพ์ใบรับสินค้าไม่สำเร็จ'))
+      printWindow?.close()
+      window.alert(getErrorMessage(caught, 'เปิดใบพิมพ์ใบรับ-ส่งสินค้าไม่สำเร็จ'))
     } finally {
       setPrintingTicketId(null)
     }
@@ -448,11 +453,10 @@ export function WeightTicketListPageClient() {
                     <div className="text-[11px] text-slate-400">{formatDateTime(ticket.updatedAt || ticket.createdAt)}</div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        size="xs"
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        className={rowActionButtonClass}
                         type="button"
-                        variant="outline"
                         onClick={(event) => {
                           event.stopPropagation()
                           void handlePrintTicket(ticket)
@@ -460,11 +464,10 @@ export function WeightTicketListPageClient() {
                       >
                         <Printer className="mr-1 size-3" />
                         {printingTicketId === ticket.id ? 'กำลังเตรียม...' : 'พิมพ์'}
-                      </Button>
-                      <Button
-                        size="xs"
+                      </button>
+                      <button
+                        className={rowActionButtonClass}
                         type="button"
-                        variant="outline"
                         onClick={(event) => {
                           event.stopPropagation()
                           openWeightTicketLineShare(ticket)
@@ -472,23 +475,21 @@ export function WeightTicketListPageClient() {
                       >
                         <Share2 className="mr-1 size-3" />
                         แชร์
-                      </Button>
+                      </button>
                       {ticket.canEdit ? (
-                        <Button asChild size="xs" type="button" variant="outline">
-                          <Link
-                            href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <SquarePen className="mr-1 size-3" />
-                            แก้ไข
-                          </Link>
-                        </Button>
+                        <Link
+                          className={rowActionButtonClass}
+                          href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <SquarePen className="mr-1 size-3" />
+                          แก้ไข
+                        </Link>
                       ) : null}
                       {ticket.canCancel ? (
-                        <Button
-                          size="xs"
+                        <button
+                          className={rowDestructiveActionButtonClass}
                           type="button"
-                          variant="outline"
                           onClick={(event) => {
                             event.stopPropagation()
                             setCancelTicket(ticket)
@@ -498,7 +499,7 @@ export function WeightTicketListPageClient() {
                         >
                           <XCircle className="mr-1 size-3" />
                           ยกเลิก
-                        </Button>
+                        </button>
                       ) : null}
                     </div>
                   </td>

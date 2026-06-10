@@ -1,11 +1,16 @@
 import { z } from 'zod'
 import { readJsonResponse } from '@/lib/api-client'
-import { companyProfileSchema, emptyCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
+import { companyProfileResponseSchema, requireConfiguredCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
+import { branchLabelFromDocumentBranch } from '@/lib/document-branch-code'
 import type { PurchaseBillDetail } from '@/lib/server/purchase-bill-detail'
 
 const companyProfilePayloadSchema = z.object({
-  profile: companyProfileSchema,
+  ...companyProfileResponseSchema.shape,
+  selectedBranchName: z.string().nullable().default(null),
 })
+
+const FIRST_PAGE_ITEM_ROWS = 15
+const CONTINUATION_PAGE_ITEM_ROWS = 24
 
 const DEFAULT_COMPANY_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
@@ -33,16 +38,12 @@ function plain(value: string | null | undefined) {
   return value && value !== '-' ? value : '-'
 }
 
-function sourceSummary(bill: PurchaseBillDetail) {
-  const sourceKinds = new Set(bill.allocationRows.map((row) => row.poDocNo ? 'PO' : 'Spot'))
-  return Array.from(sourceKinds).join(' / ') || '-'
-}
-
-function companyInfo(profile: CompanyProfileFormValues) {
+function companyInfo(profile: CompanyProfileFormValues, bill: PurchaseBillDetail) {
+  const branchLabel = branchLabelFromDocumentBranch({ branchName: bill.branchName, documentNo: bill.docNo })
   return [
     profile.address,
     `โทร ${profile.phone || '-'}${profile.fax ? `  แฟกซ์ ${profile.fax}` : ''}`,
-    `เลขประจำตัวผู้เสียภาษี ${profile.taxId || '-'}${profile.branchCode ? `  สาขา ${profile.branchCode}` : ''}`,
+    `เลขประจำตัวผู้เสียภาษี ${profile.taxId || '-'}${branchLabel ? `  ${branchLabel}` : ''}`,
     [profile.email ? `Email: ${profile.email}` : null, profile.website ? `Website: ${profile.website}` : null].filter(Boolean).join('  '),
   ].filter(Boolean).map(escapeHtml).join('<br>')
 }
@@ -50,10 +51,10 @@ function companyInfo(profile: CompanyProfileFormValues) {
 function itemRows(bill: PurchaseBillDetail) {
   return bill.allocationRows.map((item) => `
     <tr class="item-row">
-      <td class="center">${item.lineNo}</td>
+      <td class="center rank-cell">${item.lineNo}</td>
       <td>
         <div class="item-name">${escapeHtml(item.productName)}</div>
-        <div class="muted">${escapeHtml([item.productCode || null, item.poDocNo ?? 'Spot Buy', item.receiptTicketDocNo !== '-' ? item.receiptTicketDocNo : null].filter(Boolean).join(' · '))}</div>
+        <div class="muted">${escapeHtml([item.productCode || null, item.poDocNo ?? 'Spot Buy'].filter(Boolean).join(' · '))}</div>
       </td>
       <td>${escapeHtml(item.note || '-')}</td>
       <td class="num">${money(item.grossWeight)}</td>
@@ -69,6 +70,12 @@ function emptyRows(count: number) {
   return Array.from({ length: Math.max(0, count) }, () => (
     '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'
   )).join('')
+}
+
+function fillerRowCount(itemCount: number) {
+  if (itemCount <= FIRST_PAGE_ITEM_ROWS) return FIRST_PAGE_ITEM_ROWS - itemCount
+  const lastPageRows = (itemCount - FIRST_PAGE_ITEM_ROWS) % CONTINUATION_PAGE_ITEM_ROWS
+  return lastPageRows === 0 ? 0 : CONTINUATION_PAGE_ITEM_ROWS - lastPageRows
 }
 
 function totalsByUnit(bill: PurchaseBillDetail) {
@@ -97,34 +104,32 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
   const totalSummaryText = totals.map((item) => `${money(item.qty)} ${item.unit}`).join(' / ') || '-'
   const grossSummaryText = totals.map((item) => `${money(item.grossWeight)} ${item.unit}`).join(' / ') || '-'
   const deductSummaryText = totals.map((item) => `${money(item.deductWeight)} ${item.unit}`).join(' / ') || '-'
+  const afterDiscount = Math.max(0, bill.subtotal - bill.discount)
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)} ${escapeHtml(bill.docNo)}</title>
     <style>
-      @page { size: A4 landscape; margin: 10mm; }
+      @page { size: A4 portrait; margin: 10mm; }
       * { box-sizing: border-box; }
       body { margin: 0; color: #0f172a; font-family: 'Noto Sans Thai', Arial, sans-serif; font-size: 11px; line-height: 1.35; background: #f8fafc; }
       .toolbar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: #0f172a; color: white; }
       .toolbar button { border: 0; border-radius: 6px; padding: 7px 14px; background: #15803d; color: white; font: inherit; cursor: pointer; }
       .toolbar button.secondary { background: #475569; }
-      .page { width: 277mm; min-height: 190mm; margin: 0 auto; padding: 7mm; background: white; position: relative; }
+      .page { width: 190mm; min-height: 277mm; margin: 0 auto; padding: 7mm; background: white; position: relative; }
       .print-only { display: none; }
       .accent { height: 4px; background: linear-gradient(90deg, #166534, #65a30d, #cbd5e1); border-radius: 99px; margin-bottom: 12px; }
-      .header { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; align-items: start; border-bottom: 1px solid #cbd5e1; padding-bottom: 12px; }
+      .header { display: grid; grid-template-columns: 1fr .9fr; gap: 12px; align-items: start; border-bottom: 1px solid #cbd5e1; padding-bottom: 12px; }
       .company { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; min-width: 0; }
-      .logo { width: 64px; height: 64px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; }
+      .logo { width: 64px; height: 64px; object-fit: contain; }
       .company-name { font-size: 16px; font-weight: 800; color: #0f172a; }
       .company-en { font-size: 10px; font-weight: 700; color: #475569; margin-top: 1px; }
       .company-info { margin-top: 4px; color: #475569; font-size: 10px; }
       .doc-head { text-align: right; }
       .doc-title { font-size: 22px; font-weight: 900; color: #14532d; letter-spacing: 0; }
-      .doc-sub { color: #475569; font-size: 10px; margin-top: 2px; }
       .doc-grid { margin-top: 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; text-align: left; }
       .kv { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 7px; background: #f8fafc; }
       .kv .label { color: #64748b; font-size: 9px; }
       .kv .value { font-weight: 800; color: #0f172a; margin-top: 1px; }
-      .status { display: inline-flex; border-radius: 999px; padding: 3px 9px; background: #ecfdf5; color: #166534; font-weight: 800; }
-      .status.cancelled { background: #f1f5f9; color: #475569; }
-      .section-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 12px; margin-top: 12px; }
+      .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
       .panel { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
       .panel-title { padding: 6px 9px; background: #f1f5f9; color: #334155; font-weight: 900; }
       .panel-body { padding: 8px 9px; }
@@ -132,23 +137,23 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
       .field-label { color: #64748b; font-size: 9px; }
       .field-value { font-weight: 750; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
       table { width: 100%; border-collapse: collapse; }
-      .items { margin-top: 12px; font-size: 10px; break-inside: auto; page-break-inside: auto; }
+      .items { margin-top: 12px; font-size: 9px; break-inside: auto; page-break-inside: auto; table-layout: fixed; }
       .items thead { display: table-header-group; }
       .items tbody { break-inside: auto; page-break-inside: auto; }
       .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 900; }
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items tr { break-inside: avoid; page-break-inside: avoid; }
-      .items .repeat-head th { background: #f8fafc; color: #334155; font-size: 9px; font-weight: 800; padding: 4px 6px; }
       .items .empty td { height: 24px; color: transparent; }
       .item-name { font-weight: 850; color: #0f172a; }
       .muted { color: #64748b; font-size: 9px; margin-top: 1px; }
       .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .center { text-align: center; }
+      .rank-cell { padding-left: 2px !important; padding-right: 2px !important; }
       .strong { font-weight: 900; }
-      .bottom-grid { display: grid; grid-template-columns: minmax(0, 1fr) 85mm; gap: 12px; margin-top: 12px; align-items: start; break-inside: avoid; page-break-inside: avoid; }
+      .bottom-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; align-items: start; break-inside: avoid; page-break-inside: avoid; }
       .note { min-height: 42px; color: #334155; white-space: pre-wrap; }
       .totals { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
-      .total-row { display: grid; grid-template-columns: 1fr 34mm; gap: 8px; padding: 5px 8px; border-bottom: 1px solid #e2e8f0; }
+      .total-row { display: grid; grid-template-columns: minmax(0, 1fr) 30mm; gap: 8px; padding: 5px 8px; border-bottom: 1px solid #e2e8f0; }
       .total-row:last-child { border-bottom: 0; }
       .total-row.final { background: #14532d; color: white; font-size: 13px; font-weight: 900; }
       .total-row.advance { color: #b45309; }
@@ -162,22 +167,46 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
       .footer { margin-top: 8px; text-align: center; color: #64748b; font-size: 9px; }
       .watermark { display: ${cancelled ? 'block' : 'none'}; position: absolute; top: 72mm; left: 54mm; transform: rotate(-18deg); color: rgba(100,116,139,.14); font-size: 54px; font-weight: 900; pointer-events: none; }
       @media print {
-        body { background: white; }
+        @page { size: A4 portrait; margin: 8mm; }
+        body { background: white; font-size: 9.5px; line-height: 1.2; }
         .toolbar { display: none; }
         .page { width: auto; min-height: auto; padding: 0; }
         .print-only { display: initial; }
+        .accent { margin-bottom: 7px; }
+        .header { gap: 10px; padding-bottom: 7px; }
+        .company { grid-template-columns: 48px 1fr; gap: 8px; }
+        .logo { width: 48px; height: 48px; }
+        .company-name { font-size: 14px; }
+        .company-info { font-size: 9px; line-height: 1.25; margin-top: 2px; }
+        .doc-title { font-size: 19px; }
+        .doc-grid { gap: 3px 6px; margin-top: 5px; }
+        .kv { padding: 3px 5px; }
+        .section-grid { gap: 8px; margin-top: 7px; }
+        .panel-title { padding: 4px 7px; }
+        .panel-body { padding: 5px 7px; }
+        .two-col { gap: 4px 8px; }
         .header, .section-grid { break-inside: avoid; page-break-inside: avoid; }
-        .items { page-break-before: auto; }
-        .items .repeat-head { display: table-row; }
-        .items .empty { display: none; }
-        .bottom-grid { break-before: auto; page-break-before: auto; }
+        .items { font-size: 8px; margin-top: 7px; page-break-before: auto; }
+        .items th { padding: 3px 3px; }
+        .items td { padding: 3px 3px; }
+        .muted { font-size: 8px; }
+        .weight-summary { gap: 6px; margin-top: 6px; }
+        .weight-card { padding: 5px; }
+        .weight-card .value { font-size: 10px; }
+        .bottom-grid { gap: 8px; margin-top: 7px; break-before: auto; page-break-before: auto; }
+        .note { min-height: 24px; }
+        .total-row { padding: 3px 6px; }
+        .total-row.final { font-size: 11px; }
+        .signatures { gap: 18px; margin-top: 10px; }
+        .sig-line { margin-top: 18px; padding-top: 3px; }
+        .footer { margin-top: 4px; }
       }
     </style>
   </head><body>
     <div class="toolbar">
       <button onclick="window.print()">พิมพ์ / Save as PDF</button>
       <button class="secondary" onclick="window.close()">ปิด</button>
-      <span style="font-size:11px;color:#cbd5e1">A4 landscape corporate print</span>
+      <span style="font-size:11px;color:#cbd5e1">A4 portrait corporate print</span>
     </div>
     <main class="page">
       <div class="watermark">${escapeHtml(bill.statusLabel)}</div>
@@ -188,17 +217,14 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
           <div>
             <div class="company-name">${escapeHtml(profile.name || 'New Solutions (Thailand) Co., Ltd.')}</div>
             ${profile.nameEn ? `<div class="company-en">${escapeHtml(profile.nameEn)}</div>` : ''}
-            <div class="company-info">${companyInfo(profile)}</div>
+            <div class="company-info">${companyInfo(profile, bill)}</div>
           </div>
         </div>
         <div class="doc-head">
           <div class="doc-title">${escapeHtml(title)}</div>
-          <div class="doc-sub">Purchase receipt note generated from NS Scrap ERP</div>
           <div class="doc-grid">
             <div class="kv"><div class="label">เลขที่เอกสาร</div><div class="value">${escapeHtml(bill.docNo)}</div></div>
-            <div class="kv"><div class="label">สถานะ</div><div class="value"><span class="status ${cancelled ? 'cancelled' : ''}">${escapeHtml(bill.statusLabel)}</span></div></div>
             <div class="kv"><div class="label">วันที่ส่ง / วันที่เอกสาร</div><div class="value">${escapeHtml(plain(bill.date))}</div></div>
-            <div class="kv"><div class="label">เวลา</div><div class="value">-</div></div>
           </div>
         </div>
       </section>
@@ -218,12 +244,8 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
           <div class="panel-title">ข้อมูลเอกสาร / Document Info</div>
           <div class="panel-body two-col">
             <div><div class="field-label">สาขา</div><div class="field-value">${escapeHtml(bill.branchName)}</div></div>
-            <div><div class="field-label">คลัง</div><div class="field-value">${escapeHtml(plain(bill.warehouseName))}</div></div>
-            <div><div class="field-label">ประเภท</div><div class="field-value">${escapeHtml(bill.transactionMode)}</div></div>
-            <div><div class="field-label">แหล่งซื้อ</div><div class="field-value">${escapeHtml(sourceSummary(bill))}</div></div>
             <div><div class="field-label">ผู้จัดทำ</div><div class="field-value">${escapeHtml(plain(bill.createdBy))}</div></div>
             <div><div class="field-label">Sale</div><div class="field-value">${escapeHtml(plain(bill.salesName))}</div></div>
-            <div><div class="field-label">อ้างอิง</div><div class="field-value">${escapeHtml(plain(bill.refNo))}</div></div>
             <div><div class="field-label">ใบรับของ</div><div class="field-value">${escapeHtml(bill.receiptDocNos.join(', ') || '-')}</div></div>
           </div>
         </div>
@@ -231,26 +253,20 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
 
       <table class="items">
         <thead>
-          <tr class="repeat-head">
-            <th colspan="8">
-              ${escapeHtml(title)} · ${escapeHtml(bill.docNo)} · ${escapeHtml(bill.supplierName)} · ${escapeHtml(plain(bill.date))}
-              <span class="print-only"> · รายการสินค้าอาจต่อหลายหน้า</span>
-            </th>
-          </tr>
           <tr>
-            <th class="center" style="width:9mm">#</th>
-            <th style="width:50mm">สินค้า</th>
+            <th class="center rank-cell" style="width:5mm">#</th>
+            <th style="width:36mm">สินค้า</th>
             <th>REMARK</th>
-            <th class="num" style="width:25mm">นน.ก่อนหัก</th>
-            <th class="num" style="width:23mm">นน.หัก</th>
-            <th class="num" style="width:26mm">นน.สุทธิ</th>
-            <th class="num" style="width:24mm">ราคา</th>
-            <th class="num" style="width:30mm">รวม</th>
+            <th class="num" style="width:19mm">นน.ก่อนหัก</th>
+            <th class="num" style="width:17mm">นน.หัก</th>
+            <th class="num" style="width:20mm">นน.สุทธิ</th>
+            <th class="num" style="width:18mm">ราคา</th>
+            <th class="num" style="width:22mm">รวม</th>
           </tr>
         </thead>
         <tbody>
           ${itemRows(bill)}
-          ${emptyRows(6 - bill.allocationRows.length)}
+          ${emptyRows(fillerRowCount(bill.allocationRows.length))}
         </tbody>
       </table>
 
@@ -262,18 +278,18 @@ export function buildPurchaseBillPrintHtml(bill: PurchaseBillDetail, profile: Co
 
       <section class="bottom-grid">
         <div class="panel">
-          <div class="panel-title">หมายเหตุ / Reference</div>
+          <div class="panel-title">หมายเหตุ</div>
           <div class="panel-body">
             <div class="note">${escapeHtml(plain(bill.note))}</div>
-            <div class="muted">VAT Invoice: ${escapeHtml(plain(bill.vatInvoiceNo))} · วันที่ ${escapeHtml(plain(bill.vatInvoiceDate))} · Supplier Ref: ${escapeHtml(plain(bill.refNo))}</div>
           </div>
         </div>
         <div class="totals">
           <div class="total-row"><div>ยอดเงินรวม</div><div class="num">${money(bill.subtotal)}</div></div>
           <div class="total-row"><div>หักส่วนลด</div><div class="num">${money(bill.discount)}</div></div>
-          <div class="total-row advance"><div>หักเงินมัดจำ / ADV</div><div class="num">${money(bill.advanceAllocatedAmount)}</div></div>
-          <div class="total-row"><div>VAT</div><div class="num">${money(bill.vatAmount)}</div></div>
+          <div class="total-row"><div>ยอดหลังหักส่วนลด</div><div class="num">${money(afterDiscount)}</div></div>
+          <div class="total-row"><div>Vat (คำนวณจากยอดหลังหักส่วนลด)</div><div class="num">${money(bill.vatAmount)}</div></div>
           <div class="total-row final"><div>ยอดรวมทั้งสิ้น</div><div class="num">${money(bill.totalAmount)}</div></div>
+          <div class="total-row advance"><div>หักเงินมัดจำ/ชำระบางส่วน</div><div class="num">${money(bill.paidAmount)}</div></div>
           <div class="total-row"><div>ค้างชำระ</div><div class="num strong">${money(bill.payableBalance)}</div></div>
         </div>
       </section>
@@ -306,9 +322,10 @@ export function openPurchaseBillPrintWindow() {
 
 export async function openPurchaseBillPrint(bill: PurchaseBillDetail, targetWindow?: Window) {
   const printWindow = targetWindow ?? openPurchaseBillPrintWindow()
-  const response = await fetch('/api/admin/company-profile', { cache: 'no-store' })
+  const query = bill.branchId ? `?branchId=${encodeURIComponent(bill.branchId)}` : ''
+  const response = await fetch(`/api/admin/company-profile${query}`, { cache: 'no-store' })
   const payload = await readJsonResponse(response, companyProfilePayloadSchema, 'โหลดข้อมูลบริษัทไม่สำเร็จ')
-  const profile = payload.profile ?? emptyCompanyProfile
+  const profile = requireConfiguredCompanyProfile(payload, payload.selectedBranchName)
   printWindow.document.open()
   printWindow.document.write(buildPurchaseBillPrintHtml(bill, profile))
   printWindow.document.close()

@@ -117,6 +117,7 @@ type PurchaseBillDetail = {
     sourceType: string
     unit: string
   }>
+  branchId: string
   branchName: string
   createdBy: string
   date: string
@@ -158,6 +159,10 @@ type PurchaseBillDetail = {
   warehouseName: string
   refNo: string
   salesName: string
+}
+
+function isPurchaseBillDetail(row: BillRow | PurchaseBillDetail): row is PurchaseBillDetail {
+  return Array.isArray((row as PurchaseBillDetail).allocationRows)
 }
 
 type StockIssueRow = {
@@ -911,7 +916,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     let printWindow: Window | null = null
     try {
       printWindow = openPurchaseBillPrintWindow()
-      const detail = 'allocationRows' in rowOrDetail
+      const detail = isPurchaseBillDetail(rowOrDetail)
         ? rowOrDetail
         : await dailyFetchJson<PurchaseBillDetail>(`/api/purchase/bills/${encodeURIComponent(docNo)}`)
       await openPurchaseBillPrint(detail, printWindow)

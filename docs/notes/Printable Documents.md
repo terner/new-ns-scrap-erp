@@ -11,7 +11,7 @@ tags:
   - business-flow
 status: draft
 created: 2026-06-09
-updated: 2026-06-09
+updated: 2026-06-10
 ---
 
 # Printable Documents / เอกสารที่ต้องพิมพ์
@@ -30,7 +30,8 @@ updated: 2026-06-09
 
 | Priority | เอกสาร | Route หลัก | สถานะ Next | Legacy evidence | หมายเหตุ |
 |---|---|---|---|---|---|
-| P0 | `PB` บิลรับซื้อ / ใบรับสินค้า | `/purchase/bills` | Implemented | `erp.printDocument('receipt', row.raw.id)` ที่ `old-apps/legacy/index.html:15119`, helper ที่ `old-apps/legacy/index.html:6449` | ใช้ corporate A4 landscape, Company Profile header, พิมพ์จาก list/detail/direct detail, รองรับ multi-page สำหรับ 30+ รายการ |
+| P0 | `POB` PO Buy / ใบสั่งซื้อ | `/purchase/po-buy` | Implemented | Legacy PO Buy อยู่ใน flow จองซื้อ/สั่งซื้อก่อนรับของ; active target ใช้เลข `POB...` เป็นเอกสารซื้อหลักก่อน PB | ใช้ corporate A4 portrait ที่อ้างอิง design บิลซื้อ, Company Profile header, พิมพ์จาก list/detail modal, แสดง Supplier พร้อมที่อยู่, รายการสินค้าครบพร้อมหน่วยจริง, ยอดสั่งซื้อ/คงเหลือ, หมายเหตุ, ช่องลงนาม และลายน้ำเฉพาะกรณียกเลิก |
+| P0 | `PB` บิลรับซื้อ / ใบรับสินค้า | `/purchase/bills` | Implemented | `erp.printDocument('receipt', row.raw.id)` ที่ `old-apps/legacy/index.html:15119`, helper ที่ `old-apps/legacy/index.html:6449` | ใช้ corporate A4 portrait, Company Profile header, พิมพ์จาก list/detail/direct detail, รองรับ multi-page สำหรับ 30+ รายการ |
 | P0 | `SB` บิลขาย / ใบส่งของ | `/sales/bills` | Required follow-up | `erp.printDocument('delivery', b.id)` ที่ `old-apps/legacy/index.html:20390`, helper เดียวกับ PB ที่ `old-apps/legacy/index.html:6449` | ควรทำถัดจาก PB เพราะ legacy ใช้ print helper ชุดเดียวกันและ Company Profile มี preview ใบส่งของ |
 | P0 | `WTI/WTO` ใบรับของ/ใบส่งของจากงานชั่ง | `/daily/weight-ticket-list` | Implemented print, share/audit follow-up | `printWeighingTicket(ticket)` และปุ่ม `ใบชั่ง` ที่ `old-apps/legacy/index.html:52560` ถึง `old-apps/legacy/index.html:52985` | Active helper รองรับ WTI/WTO แล้ว; ต้องคง template ที่เน้นน้ำหนัก/สิ่งเจือปน/รูป/ทะเบียนรถ |
 | P1 | `PMA` ใบอนุมัติจ่ายเงิน / ส่ง Cashier | `/daily/payment-approval`, `/purchase/payments` | Required follow-up | `printApprovalSheet` และปุ่ม `พิมพ์ใบอนุมัติส่ง Cashier` ที่ `old-apps/legacy/index.html:27680` ถึง `old-apps/legacy/index.html:27773` | ต้องพิมพ์จาก approval snapshot หลังเกิด PMA แล้ว ไม่พิมพ์จาก pending source live row |

@@ -627,6 +627,7 @@ model company_profiles {
   name_en     String?
   tax_id      String?
   branch_code String?  @default("00000")
+  branch_id   BigInt?
   address     String
   phone       String
   fax         String?
@@ -639,7 +640,9 @@ model company_profiles {
   updated_at  DateTime @default(now()) @db.Timestamptz(6)
   updated_by  String?
   id          BigInt   @id @default(autoincrement())
+  branches    branches? @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
+  @@index([branch_id], map: "idx_company_profiles_branch_id")
   @@schema("public")
 }
 
@@ -701,6 +704,7 @@ model branches {
   accounts                  accounts[]
   app_user_branch_access    app_user_branch_access[]
   assets                    assets[]
+  company_profiles          company_profiles[]
   expenses                  expenses[]
   payments                  payments[]
   production_lines          production_lines[]

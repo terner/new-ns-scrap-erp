@@ -16,8 +16,9 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { readJsonResponse } from '@/lib/api-client'
-import { companyProfileSchema, emptyCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
+import { companyProfileResponseSchema, requireConfiguredCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
 import { customerReceiptFormSchema, dailyFetchJson, formatMoney, supplierPaymentFormSchema, todayDateInput, type CustomerReceiptFormValues, type DailyAccountOption, type SupplierPaymentFormValues } from '@/lib/daily'
+import { branchCodeSummaryFromIssuedDocumentNos } from '@/lib/document-branch-code'
 import { formatAccountNoDisplay, formatDateDisplay } from '@/lib/format'
 
 type PartyBankAccount = {
@@ -122,7 +123,8 @@ type PaymentQueueColumnKey = 'accountNo' | 'action' | 'age' | 'balance' | 'bankN
 type MoneyHistoryColumnKey = 'accountName' | 'action' | 'amount' | 'bankFee' | 'billRefs' | 'date' | 'docNo' | 'netAmount' | 'notes' | 'partyName' | 'status' | 'wht'
 const pageSizeOptions = [10, 25, 50, 100]
 const companyProfilePayloadSchema = z.object({
-  profile: companyProfileSchema,
+  ...companyProfileResponseSchema.shape,
+  selectedBranchName: z.string().nullable().default(null),
 })
 const paymentQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
@@ -309,12 +311,13 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, '&#39;')
 }
 
-function companyInfoForPrint(profile: CompanyProfileFormValues) {
+function companyInfoForPrint(profile: CompanyProfileFormValues, rows: MoneyRow[]) {
+  const branchLabel = branchCodeSummaryFromIssuedDocumentNos(rows.map((row) => row.docNo))
   return [
     profile.address,
     profile.phone ? `โทร ${profile.phone}` : '',
     profile.fax ? `แฟกซ์ ${profile.fax}` : '',
-    profile.taxId ? `เลขประจำตัวผู้เสียภาษี ${profile.taxId}${profile.branchCode ? ` สาขา ${profile.branchCode}` : ''}` : '',
+    profile.taxId ? `เลขประจำตัวผู้เสียภาษี ${profile.taxId}${branchLabel ? ` ${branchLabel}` : ''}` : '',
     profile.email ? `Email: ${profile.email}` : '',
     profile.website ? `Website: ${profile.website}` : '',
   ].filter(Boolean).map(escapeHtml).join('<br>')
@@ -398,7 +401,7 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfileFo
           ${profile.logoUrl ? `<img class="logo" src="${escapeHtml(profile.logoUrl)}" alt="Company logo">` : ''}
           <div class="co-name">${escapeHtml(profile.name || '-')}</div>
           ${profile.nameEn ? `<div>${escapeHtml(profile.nameEn)}</div>` : ''}
-          <div class="co-info">${companyInfoForPrint(profile)}</div>
+          <div class="co-info">${companyInfoForPrint(profile, rows)}</div>
         </div>
         <div class="doc-title">
           <h1>รายงานประวัติการจ่ายเงินประจำวัน</h1>
@@ -914,7 +917,7 @@ export function MoneyMovementPageClient({
     try {
       const response = await fetch('/api/admin/company-profile', { cache: 'no-store' })
       const payload = await readJsonResponse(response, companyProfilePayloadSchema, 'โหลดข้อมูลบริษัทไม่สำเร็จ')
-      const profile = payload.profile ?? emptyCompanyProfile
+      const profile = requireConfiguredCompanyProfile(payload, payload.selectedBranchName)
       const printRows = getDailyPaymentPrintRows()
       printWindow.document.open()
       printWindow.document.write(buildPaymentDailyReportHtml(printRows, profile, {

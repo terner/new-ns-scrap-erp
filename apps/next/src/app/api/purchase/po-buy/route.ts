@@ -20,6 +20,7 @@ type PoItem = {
   qty?: number | string
   unitPrice?: number | string
   remainingQty?: number | string
+  unit?: string | null
 }
 
 type ProductOption = {
@@ -53,7 +54,7 @@ function itemsFromPo(row: {
   qty: unknown
   remaining_qty: unknown
   unit_price: unknown
-}, productById: Map<bigint, { code: string | null; id: bigint; name: string | null }>, productName: string) {
+}, productById: Map<bigint, { code: string | null; id: bigint; name: string | null; unit: string | null }>, productName: string) {
   if (Array.isArray(row.items) && row.items.length) {
     return row.items
       .filter((item): item is PoItem => typeof item === 'object' && item !== null)
@@ -62,15 +63,19 @@ function itemsFromPo(row: {
         productName: item.productName ?? productName,
         qty: jsonNumber(item.qty),
         remainingQty: jsonNumber(item.remainingQty ?? item.qty),
+        unit: item.unit ?? null,
         unitPrice: jsonNumber(item.unitPrice),
       }))
   }
 
+  const product = row.product_id != null ? productById.get(row.product_id) : null
+
   return [{
-    productId: row.product_id != null ? requireBusinessCode(productById.get(row.product_id)?.code, `สินค้า ${row.product_id}`) : '',
+    productId: row.product_id != null ? requireBusinessCode(product?.code, `สินค้า ${row.product_id}`) : '',
     productName,
     qty: jsonNumber(row.qty),
     remainingQty: jsonNumber(row.remaining_qty ?? row.qty),
+    unit: product?.unit ?? null,
     unitPrice: jsonNumber(row.unit_price),
   }]
 }
@@ -105,6 +110,32 @@ function stringifyComparable(value: unknown) {
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean') return String(value)
   return JSON.stringify(value)
+}
+
+function supplierAddress(supplier: {
+  address?: string | null
+  address_line1?: string | null
+  address_no?: string | null
+  address_moo?: string | null
+  address_village?: string | null
+  address_road?: string | null
+  address_subdistrict?: string | null
+  address_district?: string | null
+  address_province?: string | null
+  address_postal_code?: string | null
+} | null | undefined) {
+  if (!supplier) return '-'
+  const structured = [
+    supplier.address_no,
+    supplier.address_moo ? `หมู่ ${supplier.address_moo}` : null,
+    supplier.address_village,
+    supplier.address_road,
+    supplier.address_subdistrict ? `ต.${supplier.address_subdistrict}` : null,
+    supplier.address_district ? `อ.${supplier.address_district}` : null,
+    supplier.address_province ? `จ.${supplier.address_province}` : null,
+    supplier.address_postal_code,
+  ].filter(Boolean).join(' ')
+  return supplier.address || supplier.address_line1 || structured || '-'
 }
 
 function buildPoBuyEditMeta(params: {
@@ -347,6 +378,7 @@ export async function GET(request: Request) {
         createdAt: po.created_at?.toISOString() ?? '',
         createdBy: po.created_by ?? '',
         branchId: po.branch_id ? branchById.get(po.branch_id)?.code ?? '' : '',
+        branchName: po.branch_id ? branchById.get(po.branch_id)?.name ?? '' : '',
         date: toDateOnly(po.date),
         docNo: po.doc_no,
         expectedDelivery: toDateOnly(po.expected_delivery),
@@ -395,6 +427,7 @@ export async function GET(request: Request) {
           toStatus: log.to_status,
         })),
         supplierId: po.supplier_id ? (supplierById.get(po.supplier_id)?.code ?? '') : '',
+        supplierAddress: supplierAddress(po.suppliers),
         supplierName: po.suppliers?.name ?? '-',
         totalAmount,
         updatedAt: po.updated_at?.toISOString() ?? '',

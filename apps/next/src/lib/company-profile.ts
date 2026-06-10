@@ -62,6 +62,33 @@ export const companyProfileSchema = z.object({
 
 export type CompanyProfileFormValues = z.infer<typeof companyProfileSchema>
 
+export const companyProfileDraftSchema = z.object({
+  address: z.string().default(''),
+  bankInfo: z.string().nullable().default(null),
+  branchCode: z.string().default('00000'),
+  email: z.string().nullable().default(null),
+  fax: z.string().nullable().default(null),
+  footerNote: z.string().nullable().default(null),
+  logoUrl: z.string().nullable().default(null),
+  name: z.string().default(''),
+  nameEn: z.string().nullable().default(null),
+  phone: z.string().default(''),
+  taxId: z.string().nullable().default(null),
+  website: z.string().nullable().default(null),
+})
+
+export const companyProfileResponseSchema = z.object({
+  profile: companyProfileDraftSchema,
+  profileConfigured: z.boolean().default(false),
+})
+
+export function requireConfiguredCompanyProfile(payload: z.infer<typeof companyProfileResponseSchema>, branchName?: string | null): CompanyProfileFormValues {
+  if (!payload.profileConfigured) {
+    throw new Error(`ยังไม่ได้ตั้งค่าข้อมูลบริษัท${branchName ? `ของสาขา ${branchName}` : 'ของสาขานี้'}`)
+  }
+  return companyProfileSchema.parse(payload.profile)
+}
+
 export const emptyCompanyProfile: CompanyProfileFormValues = {
   address: '',
   bankInfo: null,
