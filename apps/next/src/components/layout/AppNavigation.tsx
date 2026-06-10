@@ -69,7 +69,6 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
       }))
       .filter((item) => canAccessPath(item.href, authContext) || Boolean(item.children?.length))
   }, [authContext])
-
   useEffect(() => {
     const activeItem = visibleItems.find((item) => {
       if (isNavigationPathActive(activePathname, item.href)) return true

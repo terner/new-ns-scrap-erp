@@ -1,7 +1,10 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
+import { Eye, EyeOff, KeyRound, ShieldCheck, UserRound } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { changePasswordSchema } from '@/lib/auth'
 import { getSupabaseClient } from '@/lib/supabase'
 
@@ -151,90 +154,131 @@ export function ChangePasswordPageClient() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-3">
-      <div className="rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-4 text-white shadow">
-        <h1 className="text-xl font-bold">🔒 เปลี่ยน Password ของฉัน</h1>
-        <p className="mt-1 text-sm opacity-90">เพื่อความปลอดภัย — แนะนำให้เปลี่ยน password ทุก 3-6 เดือน</p>
+    <div className="mx-auto max-w-5xl space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-md bg-white p-4 shadow">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
+          <p className="mt-1 text-sm text-slate-500">ยืนยันรหัสผ่านเดิมก่อนตั้งรหัสผ่านใหม่ของบัญชีผู้ใช้ปัจจุบัน</p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
+          <ShieldCheck className="size-4" />
+          Supabase Auth
+        </div>
       </div>
 
-      <form className="space-y-3 rounded-md bg-white p-5 shadow" onSubmit={submit}>
-        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-          {isFetchingUser ? 'กำลังโหลดผู้ใช้...' : <>👤 <b>{user?.name ?? '-'}</b> · @{user?.username ?? '-'} · {user?.email || '-'}</>}
-        </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <form className="space-y-4 rounded-md bg-white p-5 shadow" onSubmit={submit}>
+          {user?.mustChangePassword ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              รหัสผ่านของคุณยังเป็นค่าเริ่มต้น กรุณาเปลี่ยนก่อนใช้งานต่อ
+            </div>
+          ) : null}
 
-        {user?.mustChangePassword ? (
-          <div className="border-l-4 border-amber-500 bg-amber-50 p-3 text-sm text-amber-800">
-            ⚠ Password ของคุณยังเป็นค่า default — กรุณาเปลี่ยนเพื่อความปลอดภัย
-          </div>
-        ) : null}
+          {!isSupabaseReady ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              ยังไม่ได้ตั้งค่า Supabase dev ใน environment
+            </div>
+          ) : null}
 
-        {!isSupabaseReady ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            ยังไม่ได้ตั้งค่า Supabase dev ใน environment
-          </div>
-        ) : null}
-
-        <label className="block text-sm font-medium text-slate-700">
-          Password เดิม *
-          <input
+          <PasswordField
             autoComplete="current-password"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
             disabled={isLoading || isFetchingUser}
-            onChange={(event) => setCurrentPassword(event.target.value)}
-            type={showPassword ? 'text' : 'password'}
+            error={fieldErrors.currentPassword}
+            label="รหัสผ่านเดิม"
+            showPassword={showPassword}
             value={currentPassword}
+            onChange={setCurrentPassword}
           />
-          {fieldErrors.currentPassword ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.currentPassword}</span> : null}
-        </label>
 
-        <label className="block text-sm font-medium text-slate-700">
-          Password ใหม่ * (อย่างน้อย 8 ตัว มีตัวใหญ่ ตัวเล็ก และตัวเลข)
-          <input
+          <PasswordField
             autoComplete="new-password"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+            description="อย่างน้อย 8 ตัว มีตัวใหญ่ ตัวเล็ก และตัวเลข"
             disabled={isLoading || isFetchingUser}
-            onChange={(event) => setPassword(event.target.value)}
-            type={showPassword ? 'text' : 'password'}
+            error={fieldErrors.password}
+            label="รหัสผ่านใหม่"
+            showPassword={showPassword}
             value={password}
+            onChange={setPassword}
           />
-          {fieldErrors.password ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.password}</span> : null}
-        </label>
 
-        <label className="block text-sm font-medium text-slate-700">
-          ยืนยัน Password ใหม่ *
-          <input
+          <PasswordField
             autoComplete="new-password"
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
             disabled={isLoading || isFetchingUser}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            type={showPassword ? 'text' : 'password'}
+            error={fieldErrors.confirmPassword}
+            label="ยืนยันรหัสผ่านใหม่"
+            showPassword={showPassword}
             value={confirmPassword}
+            onChange={setConfirmPassword}
           />
-          {fieldErrors.confirmPassword ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.confirmPassword}</span> : null}
-        </label>
 
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} type="checkbox" />
-          แสดง password
-        </label>
+          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+            <input checked={showPassword} className="size-4 rounded border-slate-300" onChange={(event) => setShowPassword(event.target.checked)} type="checkbox" />
+            {showPassword ? <EyeOff className="size-4 text-slate-500" /> : <Eye className="size-4 text-slate-500" />}
+            แสดงรหัสผ่าน
+          </label>
 
-        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
-        {message ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div> : null}
+          {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+          {message ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div> : null}
 
-        <button
-          className="w-full rounded-md bg-purple-600 py-2.5 font-bold text-white hover:bg-purple-700 disabled:opacity-60"
-          disabled={isLoading || isFetchingUser || !isSupabaseReady}
-          type="submit"
-        >
-          {isLoading ? 'กำลังเปลี่ยน Password...' : '🔒 เปลี่ยน Password'}
-        </button>
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <Button disabled={isLoading || isFetchingUser || !isSupabaseReady} type="submit">
+              <KeyRound className="mr-2 size-4" />
+              {isLoading ? 'กำลังเปลี่ยนรหัสผ่าน...' : 'บันทึกรหัสผ่านใหม่'}
+            </Button>
+          </div>
+        </form>
 
-        <div className="text-center text-xs text-slate-500">ใช้ Supabase Auth เป็น source of truth; ระบบไม่เก็บ password ในตารางของแอป</div>
-      </form>
+        <aside className="space-y-3">
+          <div className="rounded-md bg-white p-4 shadow">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-md bg-slate-900 text-white">
+                <UserRound className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900">{isFetchingUser ? 'กำลังโหลดผู้ใช้...' : user?.name ?? '-'}</div>
+                <div className="truncate text-xs text-slate-500">@{user?.username ?? '-'}</div>
+              </div>
+            </div>
+            <div className="mt-3 truncate rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">{user?.email || '-'}</div>
+          </div>
 
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-        💡 <b>คำแนะนำ Password:</b> ใช้ทั้งตัวอักษร + ตัวเลข + อักขระพิเศษ (เช่น Ns@2026!) · ห้ามใช้ password เดียวกับเว็บอื่น · อย่าจดไว้ในที่ที่คนอื่นเห็น
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">คำแนะนำรหัสผ่าน</div>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-5 text-slate-600">
+              <li>ใช้ตัวอักษรใหญ่ ตัวอักษรเล็ก และตัวเลขร่วมกัน</li>
+              <li>หลีกเลี่ยงรหัสผ่านเดียวกับระบบอื่น</li>
+              <li>ระบบใช้ Supabase Auth เป็นแหล่งข้อมูลรหัสผ่าน ไม่บันทึกในตารางของแอป</li>
+            </ul>
+          </div>
+        </aside>
       </div>
     </div>
+  )
+}
+
+function PasswordField(props: {
+  autoComplete: string
+  description?: string
+  disabled: boolean
+  error?: string
+  label: string
+  onChange: (value: string) => void
+  showPassword: boolean
+  value: string
+}) {
+  return (
+    <label className="block text-sm font-medium text-slate-700">
+      {props.label} <span className="text-red-600">*</span>
+      {props.description ? <span className="ml-1 text-xs font-normal text-slate-500">({props.description})</span> : null}
+      <Input
+        autoComplete={props.autoComplete}
+        className={`mt-1.5 h-9 ${props.error ? 'border-red-400 bg-red-50' : ''}`}
+        disabled={props.disabled}
+        type={props.showPassword ? 'text' : 'password'}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+      {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
+    </label>
   )
 }

@@ -69,9 +69,9 @@ function rowToProfile(row: CompanyProfileRow): CompanyProfileFormValues {
   }
 }
 
-function newProfileForBranch(branch: BranchRow | null): CompanyProfileFormValues {
+function newProfileForBranch(): CompanyProfileFormValues {
   return {
-    address: branch?.address?.trim() ?? '',
+    address: '',
     bankInfo: null,
     branchCode: '00000',
     email: null,
@@ -80,15 +80,15 @@ function newProfileForBranch(branch: BranchRow | null): CompanyProfileFormValues
     logoUrl: null,
     name: '',
     nameEn: null,
-    phone: branch?.phone?.trim() ?? '',
+    phone: '',
     taxId: null,
     website: null,
   }
 }
 
-function profileForBranch(profile: CompanyProfileRow | null, branch: BranchRow | null) {
+function profileForBranch(profile: CompanyProfileRow | null) {
   if (profile) return rowToProfile(profile)
-  return newProfileForBranch(branch)
+  return newProfileForBranch()
 }
 
 async function activeBranches() {
@@ -149,7 +149,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       branches: branchListJson(branches, profileBranchIds),
-      profile: profileForBranch(profile, branch),
+      profile: profileForBranch(profile),
       profileConfigured: Boolean(profile),
       selectedBranchId: branch?.code ?? null,
       selectedBranchName: branch?.name ?? null,

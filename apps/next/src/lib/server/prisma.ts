@@ -39,6 +39,8 @@ function hasExpectedDelegates(client: PrismaClient) {
   const hasAccountSubtypeField = accountFields.includes('subtype')
   const paymentMethodFields = runtimeModels?.payment_methods?.fields?.map((field) => field.name) ?? []
   const hasPaymentMethodTypeField = paymentMethodFields.includes('type')
+  const companyProfileFields = runtimeModels?.company_profiles?.fields?.map((field) => field.name) ?? []
+  const hasCompanyProfileBranchIdField = companyProfileFields.includes('branch_id')
 
   return typeof clientRecord.weight_ticket_product_summaries?.createMany === 'function'
     && typeof clientRecord.weight_ticket_product_summary_lines?.createMany === 'function'
@@ -55,6 +57,7 @@ function hasExpectedDelegates(client: PrismaClient) {
     && typeof clientRecord.payment_allocations?.createMany === 'function'
     && typeof clientRecord.payment_account_splits?.createMany === 'function'
     && hasAccountSubtypeField
+    && hasCompanyProfileBranchIdField
     && hasPaymentMethodTypeField
 }
 

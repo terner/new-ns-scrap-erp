@@ -304,7 +304,7 @@ export const navigationItems: NavigationItem[] = [
       { href: '/master-data/expense-types', icon: '🧩', label: 'ประเภทค่าใช้จ่าย', section: 'master-data' },
     ],
   },
-  { href: '/master-data/directors', icon: '🧑‍💼', label: 'บุคคลบริษัท', section: 'master-data' },
+  { href: '/master-data/directors', icon: '🧑‍💼', label: 'พนักงาน / กรรมการ', section: 'master-data' },
   {
     href: '/master-data/machines',
     icon: '⚙️',

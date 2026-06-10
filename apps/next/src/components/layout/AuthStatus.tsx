@@ -24,7 +24,13 @@ type AuthStatusProfile = {
   userEmail: string
 }
 
-export function AuthStatus() {
+type AuthStatusProps = {
+  compact?: boolean
+  onMenuOpenChange?: (open: boolean) => void
+  variant?: 'default' | 'sidebar'
+}
+
+export function AuthStatus({ compact = false, onMenuOpenChange, variant = 'default' }: AuthStatusProps) {
   const router = useRouter()
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<AuthStatusProfile>({ roles: [], userEmail: '' })
@@ -122,32 +128,55 @@ export function AuthStatus() {
   const userEmail = profile.userEmail || session?.user.email || ''
   const roleNames = profile.roles.map((role: AuthStatusProfile['roles'][number]) => role.name).join(', ')
 
+  const isSidebar = variant === 'sidebar'
+
   if (isLoading) {
-    return <span className="rounded-md px-3 py-1.5 text-sm text-slate-400">กำลังตรวจ session</span>
+    return (
+      <span className={isSidebar ? 'block truncate rounded-md px-3 py-2 text-xs text-slate-400' : 'rounded-md px-3 py-1.5 text-sm text-slate-400'}>
+        {compact ? '...' : 'กำลังตรวจ session'}
+      </span>
+    )
   }
 
   if (!session) {
     return (
-      <Link className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100" href="/login">
-        Login
+      <Link
+        className={isSidebar
+          ? `flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white ${compact ? 'lg:justify-center lg:px-2' : ''}`
+          : 'rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100'}
+        href="/login"
+      >
+        <UserRound className="size-4 shrink-0" />
+        <span className={compact && isSidebar ? 'lg:hidden' : ''}>Login</span>
       </Link>
     )
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={onMenuOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button className="max-w-80 gap-2 text-slate-600" size="sm" variant="ghost">
-          <UserRound className="size-4 shrink-0" />
-          <span className="hidden min-w-0 flex-1 text-left sm:block">
-            <span className="block max-w-52 truncate text-sm">{userEmail}</span>
-            <span className="block max-w-52 truncate text-xs text-slate-500">{roleNames || 'ยังไม่กำหนด role'}</span>
+        <Button
+          className={isSidebar
+            ? `h-auto min-h-11 w-full justify-start gap-3 rounded-md px-3 py-2 text-left text-slate-300 hover:bg-slate-800 hover:text-white ${compact ? 'lg:justify-center lg:px-2' : ''}`
+            : 'max-w-80 gap-2 text-slate-600'}
+          size="sm"
+          variant="ghost"
+        >
+          <span className={isSidebar ? 'flex size-8 shrink-0 items-center justify-center rounded-md bg-slate-800 text-slate-100' : ''}>
+            <UserRound className="size-4 shrink-0" />
           </span>
-          <span className="sm:hidden">บัญชีผู้ใช้</span>
-          <ChevronDown className="size-4 shrink-0 text-slate-400" />
+          <span className={isSidebar
+            ? `min-w-0 flex-1 text-left ${compact ? 'lg:hidden' : ''}`
+            : 'hidden min-w-0 flex-1 text-left sm:block'}
+          >
+            <span className={isSidebar ? 'block truncate text-sm font-medium text-slate-100' : 'block max-w-52 truncate text-sm'}>{userEmail}</span>
+            <span className={isSidebar ? 'block truncate text-xs text-slate-400' : 'block max-w-52 truncate text-xs text-slate-500'}>{roleNames || 'ยังไม่กำหนด role'}</span>
+          </span>
+          {!isSidebar ? <span className="sm:hidden">บัญชีผู้ใช้</span> : null}
+          <ChevronDown className={`size-4 shrink-0 text-slate-400 ${compact && isSidebar ? 'lg:hidden' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align={isSidebar ? 'start' : 'end'} className="w-64" side={isSidebar ? 'right' : 'bottom'} sideOffset={8}>
         <DropdownMenuItem asChild>
           <Link className="flex items-center gap-2" href="/admin/change-password">
             <KeyRound className="size-4 text-slate-500" />

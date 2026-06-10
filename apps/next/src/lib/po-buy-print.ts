@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { readJsonResponse } from '@/lib/api-client'
-import { companyProfileResponseSchema, requireConfiguredCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
-import { branchLabelFromDocumentBranch } from '@/lib/document-branch-code'
+import { companyProfileForPrint, companyProfileResponseSchema, type CompanyProfilePrintValues } from '@/lib/company-profile'
 
 const companyProfilePayloadSchema = z.object({
   ...companyProfileResponseSchema.shape,
@@ -10,15 +9,6 @@ const companyProfilePayloadSchema = z.object({
 
 const FIRST_PAGE_ITEM_ROWS = 17
 const CONTINUATION_PAGE_ITEM_ROWS = 28
-
-const DEFAULT_COMPANY_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
-  <rect width="180" height="180" rx="24" fill="#f8fafc"/>
-  <rect x="14" y="14" width="152" height="152" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/>
-  <path d="M48 129V48h23l39 49V48h24v81h-22L72 79v50H48z" fill="#14532d"/>
-  <path d="M51 136c30 11 61 11 92-2" fill="none" stroke="#a16207" stroke-width="8" stroke-linecap="round"/>
-</svg>
-`)}`
 
 export type PoBuyPrintItem = {
   productId: string
@@ -96,12 +86,16 @@ function dateTimeDisplay(value: string | null | undefined) {
   })
 }
 
-function companyInfo(profile: CompanyProfileFormValues, po: PoBuyPrintDocument) {
-  const branchLabel = branchLabelFromDocumentBranch({ branchName: po.branchName, documentNo: po.docNo })
+function missing(value: string | null | undefined) {
+  return value?.trim() || 'ไม่มีข้อมูล'
+}
+
+function companyInfo(profile: CompanyProfilePrintValues, po: PoBuyPrintDocument) {
+  const branchLabel = po.branchName?.trim() ? `สาขา ${po.branchName.trim()}` : ''
   return [
-    profile.address,
-    `โทร ${profile.phone || '-'}${profile.fax ? `  แฟกซ์ ${profile.fax}` : ''}`,
-    `เลขประจำตัวผู้เสียภาษี ${profile.taxId || '-'}${branchLabel ? `  ${branchLabel}` : ''}`,
+    missing(profile.address),
+    `โทร ${missing(profile.phone)}${profile.fax ? `  แฟกซ์ ${profile.fax}` : ''}`,
+    `เลขประจำตัวผู้เสียภาษี ${missing(profile.taxId)}${branchLabel ? `  ${branchLabel}` : ''}`,
     [profile.email ? `Email: ${profile.email}` : null, profile.website ? `Website: ${profile.website}` : null].filter(Boolean).join('  '),
   ].filter(Boolean).map(escapeHtml).join('<br>')
 }
@@ -175,8 +169,8 @@ function qtySummaryByUnit(items: PoBuyPrintItem[], key: 'qty' | 'remainingQty') 
   return Array.from(byUnit.entries()).map(([unit, qty]) => `${money(qty)} ${unit}`).join(' / ') || '-'
 }
 
-export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProfileFormValues) {
-  const logoUrl = profile.logoUrl || DEFAULT_COMPANY_LOGO
+export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProfilePrintValues) {
+  const logoHtml = profile.logoUrl ? `<img class="logo" src="${escapeHtml(profile.logoUrl)}" alt="Company logo">` : '<div class="logo no-logo">ไม่มีข้อมูล</div>'
   const title = 'ใบสั่งซื้อ / PO Buy'
   const cancelled = po.status.trim().toLowerCase().includes('cancel')
   const totalQtyText = qtySummaryByUnit(po.items, 'qty')
@@ -187,9 +181,9 @@ export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProf
       <div class="accent"></div>
       <section class="header">
         <div class="company">
-          <img class="logo" src="${escapeHtml(logoUrl)}" alt="Company logo">
+          ${logoHtml}
           <div>
-            <div class="company-name">${escapeHtml(profile.name || 'New Solutions (Thailand) Co., Ltd.')}</div>
+            <div class="company-name">${escapeHtml(missing(profile.name))}</div>
             ${profile.nameEn ? `<div class="company-en">${escapeHtml(profile.nameEn)}</div>` : ''}
             <div class="company-info">${companyInfo(profile, po)}</div>
           </div>
@@ -302,6 +296,7 @@ export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProf
       .header { display: grid; grid-template-columns: 1fr .9fr; gap: 12px; align-items: start; border-bottom: 1px solid #cbd5e1; padding-bottom: 12px; }
       .company { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; min-width: 0; }
       .logo { width: 64px; height: 64px; object-fit: contain; }
+      .no-logo { display: flex; align-items: center; justify-content: center; border: 1px dashed #cbd5e1; border-radius: 8px; color: #64748b; font-size: 9px; font-weight: 800; text-align: center; }
       .company-name { font-size: 16px; font-weight: 800; color: #0f172a; }
       .company-en { font-size: 10px; font-weight: 700; color: #475569; margin-top: 1px; }
       .company-info { margin-top: 4px; color: #475569; font-size: 10px; }
@@ -417,7 +412,7 @@ export async function openPoBuyPrint(po: PoBuyPrintDocument, targetWindow?: Wind
   const query = po.branchId ? `?branchId=${encodeURIComponent(po.branchId)}` : ''
   const response = await fetch(`/api/admin/company-profile${query}`, { cache: 'no-store' })
   const payload = await readJsonResponse(response, companyProfilePayloadSchema, 'โหลดข้อมูลบริษัทไม่สำเร็จ')
-  const profile = requireConfiguredCompanyProfile(payload, payload.selectedBranchName)
+  const profile = companyProfileForPrint(payload)
   printWindow.document.open()
   printWindow.document.write(buildPoBuyPrintHtml(po, profile))
   printWindow.document.close()

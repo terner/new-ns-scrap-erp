@@ -82,11 +82,10 @@ export const companyProfileResponseSchema = z.object({
   profileConfigured: z.boolean().default(false),
 })
 
-export function requireConfiguredCompanyProfile(payload: z.infer<typeof companyProfileResponseSchema>, branchName?: string | null): CompanyProfileFormValues {
-  if (!payload.profileConfigured) {
-    throw new Error(`ยังไม่ได้ตั้งค่าข้อมูลบริษัท${branchName ? `ของสาขา ${branchName}` : 'ของสาขานี้'}`)
-  }
-  return companyProfileSchema.parse(payload.profile)
+export type CompanyProfilePrintValues = z.infer<typeof companyProfileDraftSchema>
+
+export function companyProfileForPrint(payload: z.infer<typeof companyProfileResponseSchema>): CompanyProfilePrintValues {
+  return payload.profile
 }
 
 export const emptyCompanyProfile: CompanyProfileFormValues = {

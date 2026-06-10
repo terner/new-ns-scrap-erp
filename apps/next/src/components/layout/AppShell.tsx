@@ -1,34 +1,73 @@
 'use client'
 
 import type { FocusEvent } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { Search } from 'lucide-react'
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { AuthStatus } from '@/components/layout/AuthStatus'
-import { SELECTED_BRANCH_KEY } from '@/lib/branch-selection'
-import { breadcrumbsForPath, pageSubtitleForPath, pageTitleForPath } from '@/lib/navigation'
+import { breadcrumbsForPath, canAccessPath, navigationItems, navigationSections, pageSubtitleForPath, pageTitleForPath, type NavigationItem } from '@/lib/navigation'
 
 type AppShellProps = {
   children: React.ReactNode
 }
 
-type BranchOption = {
-  code: string | null
-  id: string
-  name: string
+type AuthContextSummary = {
+  isAdmin: boolean
+  permissions: string[]
+}
+
+type MenuSearchResult = {
+  href: string
+  icon: string
+  label: string
+  parentLabel?: string
+  sectionLabel: string
 }
 
 const PAGE_TITLE_EVENT = 'ns-scrap-erp-page-title'
 
+function flattenSearchItems(items: NavigationItem[], authContext: AuthContextSummary | null): MenuSearchResult[] {
+  const sectionLabelByKey = new Map(navigationSections.map((section) => [section.key, section.label]))
+
+  return items.flatMap((item) => {
+    const visibleChildren = item.children?.filter((child) => !authContext || canAccessPath(child.href, authContext)) ?? []
+    const parentVisible = !authContext || canAccessPath(item.href, authContext) || visibleChildren.length > 0
+    if (!parentVisible) return []
+
+    const sectionLabel = sectionLabelByKey.get(item.section) ?? item.section
+    const parentResult: MenuSearchResult[] = !item.children?.length || (!authContext || canAccessPath(item.href, authContext))
+      ? [{
+          href: item.href,
+          icon: item.icon,
+          label: item.label,
+          sectionLabel,
+        }]
+      : []
+
+    const childResults = visibleChildren.map((child) => ({
+      href: child.href,
+      icon: child.icon,
+      label: child.label,
+      parentLabel: item.label,
+      sectionLabel: sectionLabelByKey.get(child.section) ?? sectionLabel,
+    }))
+
+    return [...parentResult, ...childResults]
+  })
+}
+
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const [branches, setBranches] = useState<BranchOption[]>([])
-  const [selectedBranchId, setSelectedBranchId] = useState('all')
   const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarUserMenuOpen, setSidebarUserMenuOpen] = useState(false)
+  const [authContext, setAuthContext] = useState<AuthContextSummary | null>(null)
   const [breadcrumbLabelOverride, setBreadcrumbLabelOverride] = useState<string | null>(null)
+  const [menuSearch, setMenuSearch] = useState('')
+  const [menuSearchFocused, setMenuSearchFocused] = useState(false)
   const [subtitleOverride, setSubtitleOverride] = useState<string | null>(null)
   const [titleOverride, setTitleOverride] = useState<string | null>(null)
   const lastActivityPathRef = useRef<string | null>(null)
@@ -39,6 +78,14 @@ export function AppShell({ children }: AppShellProps) {
     ? breadcrumbs.map((breadcrumb, index) => (index === breadcrumbs.length - 1 ? { ...breadcrumb, label: breadcrumbLabelOverride } : breadcrumb))
     : breadcrumbs
   const isAuthPage = pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
+  const menuSearchResults = useMemo(() => {
+    const query = menuSearch.trim().toLowerCase()
+    if (!query) return []
+
+    return flattenSearchItems(navigationItems, authContext)
+      .filter((item) => `${item.label} ${item.href} ${item.parentLabel ?? ''} ${item.sectionLabel}`.toLowerCase().includes(query))
+      .slice(0, 10)
+  }, [authContext, menuSearch])
 
   useEffect(() => {
     setBreadcrumbLabelOverride(null)
@@ -62,36 +109,6 @@ export function AppShell({ children }: AppShellProps) {
   }, [])
 
   useEffect(() => {
-    if (isAuthPage) return
-
-    const savedBranchId = window.localStorage.getItem(SELECTED_BRANCH_KEY)
-    if (savedBranchId) setSelectedBranchId(savedBranchId)
-
-    let mounted = true
-    async function loadBranches() {
-      try {
-        const response = await fetch('/api/branches', { cache: 'no-store' })
-        const payload = await response.json().catch(() => null)
-        if (!mounted || !response.ok) return
-        const nextBranches = Array.isArray(payload?.branches) ? payload.branches : []
-        setBranches(nextBranches)
-        if (savedBranchId && savedBranchId !== 'all' && !nextBranches.some((branch: BranchOption) => branch.id === savedBranchId)) {
-          setSelectedBranchId('all')
-          window.localStorage.setItem(SELECTED_BRANCH_KEY, 'all')
-        }
-      } catch {
-        if (mounted) setBranches([])
-      }
-    }
-
-    void loadBranches()
-
-    return () => {
-      mounted = false
-    }
-  }, [isAuthPage])
-
-  useEffect(() => {
     if (isAuthPage || lastActivityPathRef.current === pathname) return
     lastActivityPathRef.current = pathname
 
@@ -111,6 +128,36 @@ export function AppShell({ children }: AppShellProps) {
       // Activity logging is best-effort and must not block normal navigation.
     })
   }, [isAuthPage, pathname, title])
+
+  useEffect(() => {
+    if (isAuthPage) return
+
+    let mounted = true
+
+    async function loadAuthContext() {
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' })
+        const payload = await response.json().catch(() => null)
+
+        if (mounted && response.ok) {
+          setAuthContext({
+            isAdmin: payload?.isAdmin === true,
+            permissions: Array.isArray(payload?.permissions) ? payload.permissions : [],
+          })
+        }
+      } catch {
+        if (mounted) {
+          setAuthContext({ isAdmin: false, permissions: [] })
+        }
+      }
+    }
+
+    void loadAuthContext()
+
+    return () => {
+      mounted = false
+    }
+  }, [isAuthPage])
 
   useEffect(() => {
     if (isAuthPage || pathname === '/admin/change-password') return
@@ -136,27 +183,25 @@ export function AppShell({ children }: AppShellProps) {
     }
   }, [isAuthPage, pathname, router])
 
-  function handleBranchChange(value: string) {
-    setSelectedBranchId(value)
-    window.localStorage.setItem(SELECTED_BRANCH_KEY, value)
-    window.dispatchEvent(new CustomEvent('ns-scrap-erp-branch-change', { detail: { branchId: value === 'all' ? null : value } }))
-    void fetch('/api/activity', {
-      body: JSON.stringify({
-        key: 'branch.selected',
-        metadata: { branchId: value === 'all' ? null : value },
-        routePath: pathname,
-        title: 'เลือกสาขา',
-        type: 'action',
-      }),
-      cache: 'no-store',
-      headers: { 'content-type': 'application/json' },
-      method: 'POST',
-    }).catch(() => undefined)
-  }
-
   function handleSidebarBlur(event: FocusEvent<HTMLElement>) {
     if (event.currentTarget.contains(event.relatedTarget)) return
+    if (sidebarUserMenuOpen) return
     setDesktopSidebarExpanded(false)
+  }
+
+  function handleSidebarMouseLeave() {
+    if (sidebarUserMenuOpen) return
+    setDesktopSidebarExpanded(false)
+  }
+
+  function handleMenuSearchBlur(event: FocusEvent<HTMLDivElement>) {
+    if (event.currentTarget.contains(event.relatedTarget)) return
+    setMenuSearchFocused(false)
+  }
+
+  function clearMenuSearch() {
+    setMenuSearch('')
+    setMenuSearchFocused(false)
   }
 
   if (isAuthPage) {
@@ -170,7 +215,7 @@ export function AppShell({ children }: AppShellProps) {
         onBlur={handleSidebarBlur}
         onFocus={() => setDesktopSidebarExpanded(true)}
         onMouseEnter={() => setDesktopSidebarExpanded(true)}
-        onMouseLeave={() => setDesktopSidebarExpanded(false)}
+        onMouseLeave={handleSidebarMouseLeave}
       >
         <div className={`flex items-center border-b border-slate-700 p-4 ${desktopSidebarExpanded ? 'gap-3' : 'lg:justify-center lg:gap-0'}`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white">NS</div>
@@ -181,13 +226,23 @@ export function AppShell({ children }: AppShellProps) {
         </div>
 
         <AppNavigation compact={!desktopSidebarExpanded} onNavigate={() => setSidebarOpen(false)} />
+        <div className="border-t border-slate-800 p-2">
+          <AuthStatus
+            compact={!desktopSidebarExpanded}
+            variant="sidebar"
+            onMenuOpenChange={(open) => {
+              setSidebarUserMenuOpen(open)
+              if (open) setDesktopSidebarExpanded(true)
+            }}
+          />
+        </div>
       </aside>
 
       {sidebarOpen ? <button aria-label="ปิดเมนู" className="fixed inset-0 z-30 bg-black/40 lg:hidden" type="button" onClick={() => setSidebarOpen(false)} /> : null}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <button aria-label="เปิดเมนู" className="text-xl text-slate-600 lg:hidden" type="button" onClick={() => setSidebarOpen(!sidebarOpen)}>
               ☰
             </button>
@@ -197,16 +252,42 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <select aria-label="เลือกสาขา" className="hidden rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm sm:block" value={selectedBranchId} onChange={(event) => handleBranchChange(event.target.value)}>
-              <option value="all">ทุกสาขา</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
-            <AuthStatus />
+          <div className="relative hidden w-[min(360px,38vw)] min-w-64 shrink-0 md:block" onBlur={handleMenuSearchBlur}>
+            <label className="relative block">
+              <span className="sr-only">ค้นหาเมนู</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                placeholder="ค้นหาเมนู..."
+                type="search"
+                value={menuSearch}
+                onChange={(event) => {
+                  setMenuSearch(event.target.value)
+                  setMenuSearchFocused(true)
+                }}
+                onFocus={() => setMenuSearchFocused(true)}
+              />
+            </label>
+            {menuSearchFocused && menuSearch.trim() ? (
+              <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                {menuSearchResults.length ? menuSearchResults.map((item) => (
+                  <Link
+                    className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none"
+                    href={item.href}
+                    key={`${item.href}-${item.label}`}
+                    onClick={clearMenuSearch}
+                  >
+                    <span className="w-5 shrink-0 text-center">{item.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{item.label}</span>
+                      <span className="block truncate text-xs text-slate-500">{item.parentLabel ? `${item.parentLabel} / ` : ''}{item.sectionLabel}</span>
+                    </span>
+                  </Link>
+                )) : (
+                  <div className="px-3 py-4 text-center text-sm text-slate-500">ไม่พบเมนูที่ค้นหา</div>
+                )}
+              </div>
+            ) : null}
           </div>
         </header>
 

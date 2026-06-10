@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { readJsonResponse } from '@/lib/api-client'
-import { companyProfileResponseSchema, requireConfiguredCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
-import { branchLabelFromDocumentBranch } from '@/lib/document-branch-code'
+import { companyProfileForPrint, companyProfileResponseSchema, type CompanyProfilePrintValues } from '@/lib/company-profile'
 import { displayWeightTicketStatus, type WeightTicketRecord } from '@/lib/weight-tickets'
 
 const companyProfilePayloadSchema = z.object({
@@ -38,17 +37,21 @@ function formatDateTime(value?: string | null) {
   })
 }
 
-export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: CompanyProfileFormValues) {
+function missing(value: string | null | undefined) {
+  return value?.trim() || 'ไม่มีข้อมูล'
+}
+
+export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: CompanyProfilePrintValues) {
   const isReceipt = ticket.type === 'WTI'
   const docTitle = isReceipt ? 'ใบรับสินค้า' : 'ใบส่งของ'
   const partyLabel = isReceipt ? 'ผู้ขาย/ผู้ส่งของ' : 'ลูกค้า/ผู้รับสินค้า'
   const signatureLeft = isReceipt ? 'ผู้ส่งสินค้า' : 'ผู้ส่งของ'
   const signatureMiddle = isReceipt ? 'ผู้รับเข้าคลัง' : 'ผู้รับของ'
-  const branchLabel = branchLabelFromDocumentBranch({ branchName: ticket.branchName, documentNo: ticket.documentNo })
+  const branchLabel = ticket.branchName?.trim() ? `สาขา ${ticket.branchName.trim()}` : ''
   const companyInfo = `
-    ${escapeHtml(profile.address)}<br>
-    โทร ${escapeHtml(profile.phone || '-')} ${profile.fax ? ` · แฟกซ์ ${escapeHtml(profile.fax)}` : ''}<br>
-    เลขประจำตัวผู้เสียภาษี: ${escapeHtml(profile.taxId || '-')}${branchLabel ? ` · ${escapeHtml(branchLabel)}` : ''}
+    ${escapeHtml(missing(profile.address))}<br>
+    โทร ${escapeHtml(missing(profile.phone))} ${profile.fax ? ` · แฟกซ์ ${escapeHtml(profile.fax)}` : ''}<br>
+    เลขประจำตัวผู้เสียภาษี: ${escapeHtml(missing(profile.taxId))}${branchLabel ? ` · ${escapeHtml(branchLabel)}` : ''}
     ${profile.email ? `<br>Email: ${escapeHtml(profile.email)}` : ''}
     ${profile.website ? `<br>Website: ${escapeHtml(profile.website)}` : ''}
   `
@@ -106,9 +109,9 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
         <div class="accent"></div>
         <section class="header">
           <div class="company">
-            ${profile.logoUrl ? `<img class="logo" src="${escapeHtml(profile.logoUrl)}" alt="Company logo">` : '<div class="logo-placeholder"></div>'}
+            ${profile.logoUrl ? `<img class="logo" src="${escapeHtml(profile.logoUrl)}" alt="Company logo">` : '<div class="logo-placeholder">ไม่มีข้อมูล</div>'}
             <div>
-              <div class="company-name">${escapeHtml(profile.name || '-')}</div>
+              <div class="company-name">${escapeHtml(missing(profile.name))}</div>
               ${profile.nameEn ? `<div class="company-en">${escapeHtml(profile.nameEn)}</div>` : ''}
               <div class="company-info">${companyInfo}</div>
             </div>
@@ -215,7 +218,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       .header { display: grid; grid-template-columns: 1fr .9fr; gap: 12px; align-items: start; border-bottom: 1px solid #cbd5e1; padding-bottom: 12px; flex: 0 0 auto; }
       .company { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; min-width: 0; }
       .logo, .logo-placeholder { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; }
-      .logo-placeholder { border: 1px solid #cbd5e1; background: #f8fafc; }
+      .logo-placeholder { display: flex; align-items: center; justify-content: center; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 9px; font-weight: 800; text-align: center; }
       .company-name { font-size: 16px; font-weight: 800; color: #0f172a; }
       .company-en { font-size: 10px; font-weight: 700; color: #475569; margin-top: 1px; }
       .company-info { margin-top: 4px; color: #475569; font-size: 10px; }
@@ -317,7 +320,7 @@ export async function openWeightTicketReceiptPrint(ticket: WeightTicketRecord, t
   const query = ticket.branchId ? `?branchId=${encodeURIComponent(ticket.branchId)}` : ''
   const response = await fetch(`/api/admin/company-profile${query}`, { cache: 'no-store' })
   const payload = await readJsonResponse(response, companyProfilePayloadSchema, 'โหลดข้อมูลบริษัทไม่สำเร็จ')
-  const profile = requireConfiguredCompanyProfile(payload, payload.selectedBranchName)
+  const profile = companyProfileForPrint(payload)
   printWindow.document.open()
   printWindow.document.write(buildReceiptPrintHtml(ticket, profile))
   printWindow.document.close()

@@ -16,9 +16,8 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { readJsonResponse } from '@/lib/api-client'
-import { companyProfileResponseSchema, requireConfiguredCompanyProfile, type CompanyProfileFormValues } from '@/lib/company-profile'
+import { companyProfileForPrint, companyProfileResponseSchema, type CompanyProfilePrintValues } from '@/lib/company-profile'
 import { customerReceiptFormSchema, dailyFetchJson, formatMoney, supplierPaymentFormSchema, todayDateInput, type CustomerReceiptFormValues, type DailyAccountOption, type SupplierPaymentFormValues } from '@/lib/daily'
-import { branchCodeSummaryFromIssuedDocumentNos } from '@/lib/document-branch-code'
 import { formatAccountNoDisplay, formatDateDisplay } from '@/lib/format'
 
 type PartyBankAccount = {
@@ -311,13 +310,16 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, '&#39;')
 }
 
-function companyInfoForPrint(profile: CompanyProfileFormValues, rows: MoneyRow[]) {
-  const branchLabel = branchCodeSummaryFromIssuedDocumentNos(rows.map((row) => row.docNo))
+function missingCompanyData(value: string | null | undefined) {
+  return value?.trim() || 'ไม่มีข้อมูล'
+}
+
+function companyInfoForPrint(profile: CompanyProfilePrintValues) {
   return [
-    profile.address,
-    profile.phone ? `โทร ${profile.phone}` : '',
+    missingCompanyData(profile.address),
+    `โทร ${missingCompanyData(profile.phone)}`,
     profile.fax ? `แฟกซ์ ${profile.fax}` : '',
-    profile.taxId ? `เลขประจำตัวผู้เสียภาษี ${profile.taxId}${branchLabel ? ` ${branchLabel}` : ''}` : '',
+    `เลขประจำตัวผู้เสียภาษี ${missingCompanyData(profile.taxId)}`,
     profile.email ? `Email: ${profile.email}` : '',
     profile.website ? `Website: ${profile.website}` : '',
   ].filter(Boolean).map(escapeHtml).join('<br>')
@@ -330,7 +332,7 @@ function paymentDailyReportDateRangeLabel(dateFrom: string, dateTo: string) {
   return from === to ? formatDateDisplay(from) : `${formatDateDisplay(from)} - ${formatDateDisplay(to)}`
 }
 
-function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfileFormValues, params: { dateFrom: string; dateTo: string; printedAt: Date }) {
+function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfilePrintValues, params: { dateFrom: string; dateTo: string; printedAt: Date }) {
   const paidRows = rows.filter((row) => row.status !== 'cancelled')
   const cancelledRows = rows.filter((row) => row.status === 'cancelled')
   const paidAmount = paidRows.reduce((sum, row) => sum + row.amount, 0)
@@ -366,6 +368,7 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfileFo
       .page { padding: 10px; }
       .header { display: grid; grid-template-columns: 1fr 280px; gap: 16px; border-bottom: 2px solid #0f172a; padding-bottom: 10px; }
       .logo { max-height: 52px; max-width: 180px; object-fit: contain; margin-bottom: 4px; }
+      .no-logo { display: flex; align-items: center; justify-content: center; width: 120px; height: 52px; border: 1px dashed #cbd5e1; border-radius: 8px; color: #64748b; font-size: 10px; font-weight: 800; text-align: center; }
       .co-name { font-size: 18px; font-weight: 800; }
       .co-info { color: #475569; line-height: 1.45; margin-top: 3px; }
       .doc-title { text-align: right; }
@@ -398,10 +401,10 @@ function buildPaymentDailyReportHtml(rows: MoneyRow[], profile: CompanyProfileFo
     <div class="page">
       <div class="header">
         <div>
-          ${profile.logoUrl ? `<img class="logo" src="${escapeHtml(profile.logoUrl)}" alt="Company logo">` : ''}
-          <div class="co-name">${escapeHtml(profile.name || '-')}</div>
+          ${profile.logoUrl ? `<img class="logo" src="${escapeHtml(profile.logoUrl)}" alt="Company logo">` : '<div class="logo no-logo">ไม่มีข้อมูล</div>'}
+          <div class="co-name">${escapeHtml(missingCompanyData(profile.name))}</div>
           ${profile.nameEn ? `<div>${escapeHtml(profile.nameEn)}</div>` : ''}
-          <div class="co-info">${companyInfoForPrint(profile, rows)}</div>
+          <div class="co-info">${companyInfoForPrint(profile)}</div>
         </div>
         <div class="doc-title">
           <h1>รายงานประวัติการจ่ายเงินประจำวัน</h1>
@@ -917,7 +920,7 @@ export function MoneyMovementPageClient({
     try {
       const response = await fetch('/api/admin/company-profile', { cache: 'no-store' })
       const payload = await readJsonResponse(response, companyProfilePayloadSchema, 'โหลดข้อมูลบริษัทไม่สำเร็จ')
-      const profile = requireConfiguredCompanyProfile(payload, payload.selectedBranchName)
+      const profile = companyProfileForPrint(payload)
       const printRows = getDailyPaymentPrintRows()
       printWindow.document.open()
       printWindow.document.write(buildPaymentDailyReportHtml(printRows, profile, {
