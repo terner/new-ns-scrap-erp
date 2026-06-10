@@ -241,6 +241,14 @@ function poBuyRemainingQtyForProduct(poBuy: PoBuyRefRow, productId: bigint) {
     : sum, 0)
 }
 
+function poBuyIncludesProduct(poBuy: PoBuyRefRow, productId: bigint) {
+  const items = poBuyItemRows(poBuy)
+  if (items.length === 0) {
+    return poBuy.product_id === productId
+  }
+  return items.some((item) => poBuyItemProductId(poBuy, item) === productId)
+}
+
 function poBuyUnitPriceForProduct(poBuy: PoBuyRefRow, productId: bigint) {
   const items = poBuyItemRows(poBuy)
   const item = items.find((row) => poBuyItemProductId(poBuy, row) === productId)
@@ -1223,7 +1231,7 @@ async function validateStockReceiptSelection(
       if (poBuy.supplier_id && poBuy.supplier_id !== resolvedSupplierId) {
         return { error: 'PO Buy ต้องเป็นผู้ขายเดียวกับบิลรับซื้อ' as const }
       }
-      if (poBuy.product_id && poBuy.product_id !== itemProductId) {
+      if (!poBuyIncludesProduct(poBuy, itemProductId)) {
         return { error: 'PO Buy ต้องเป็นสินค้าเดียวกับรายการที่เลือก' as const }
       }
       const poProductKey = `${item.poBuyId}:${String(itemProductId)}`
