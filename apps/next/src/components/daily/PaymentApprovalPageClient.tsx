@@ -257,7 +257,7 @@ export function PaymentApprovalPageClient() {
   const [inputDrafts, setInputDrafts] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmittingApproval, setIsSubmittingApproval] = useState(false)
-  const [approvalStatusFilter, setApprovalStatusFilter] = useState<ApprovalStatus[]>(['pending'])
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<ApprovalStatus[]>([])
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
