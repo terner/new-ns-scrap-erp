@@ -6,6 +6,12 @@ import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { getErrorMessage } from '@/lib/api-client'
 import { listMasterDataRecords, type MasterDataRecord } from '@/lib/master-data'
 import {
+  buildProductOriginalImageStorageKey,
+  buildProductThumbnailStorageKey,
+  prepareProductImageUploadAssets,
+  PRODUCT_IMAGE_BUCKET,
+} from '@/lib/product-images'
+import {
   exportProducts,
   importProducts,
   listProducts,
@@ -15,7 +21,7 @@ import {
   type Product,
   type ProductFormValues,
 } from '@/lib/product'
-import { decodeStoredImageAsset, encodeStoredImageAsset } from '@/lib/weight-tickets'
+import { getSupabaseClient } from '@/lib/supabase'
 
 type SortKey = 'active' | 'code' | 'name' | 'type' | 'unit'
 
@@ -24,7 +30,8 @@ const emptyProductForm: ProductFormValues = {
   code: null,
   name: '',
   active: true,
-  imageNames: [],
+  imageStorageKey: null,
+  imageThumbnailStorageKey: null,
   type: null,
   unit: 'กก.',
 }
@@ -35,7 +42,8 @@ function productToForm(product: Product): ProductFormValues {
     code: product.code,
     name: product.name,
     active: product.active,
-    imageNames: product.imageNames,
+    imageStorageKey: product.imageStorageKey,
+    imageThumbnailStorageKey: product.imageThumbnailStorageKey,
     type: product.type,
     unit: product.unit ?? 'กก.',
   }
@@ -72,6 +80,12 @@ function compareProducts(left: Product, right: Product, key: SortKey, direction:
   }
 
   return String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'th', { numeric: true }) * multiplier
+}
+
+type ProductSubmitPayload = {
+  imageAction: 'keep' | 'remove' | 'replace'
+  imageFile: File | null
+  values: ProductFormValues
 }
 
 export function ProductsPageClient() {
@@ -158,11 +172,86 @@ export function ProductsPageClient() {
     setFormOpen(true)
   }
 
-  async function handleSubmit(values: ProductFormValues) {
+  async function handleSubmit({ imageAction, imageFile, values }: ProductSubmitPayload) {
     setIsSaving(true)
     setError(null)
     try {
-      await saveProduct(values)
+      const previousImageKey = selectedProduct?.imageStorageKey ?? null
+      const previousThumbKey = selectedProduct?.imageThumbnailStorageKey ?? null
+      const initialImageKey = imageAction === 'remove' ? null : previousImageKey
+      const initialThumbKey = imageAction === 'remove' ? null : previousThumbKey
+      let savedProduct = await saveProduct({
+        ...values,
+        imageStorageKey: initialImageKey,
+        imageThumbnailStorageKey: initialThumbKey,
+      })
+
+      if (imageAction === 'replace' && imageFile) {
+        const supabase = getSupabaseClient()
+        if (!supabase) {
+          throw new Error('ไม่พบการเชื่อมต่อ Supabase สำหรับอัปโหลดรูปสินค้า')
+        }
+
+        const assets = await prepareProductImageUploadAssets(imageFile)
+        const nextImageKey = buildProductOriginalImageStorageKey(savedProduct.code, imageFile.name)
+        const nextThumbKey = buildProductThumbnailStorageKey(savedProduct.code, imageFile.name)
+        const uploadedKeys: string[] = []
+        const storage = supabase.storage.from(PRODUCT_IMAGE_BUCKET)
+
+        try {
+          const { error: originalUploadError } = await storage.upload(nextImageKey, assets.original, {
+            cacheControl: '3600',
+            contentType: assets.original.type || undefined,
+            upsert: true,
+          })
+
+          if (originalUploadError) {
+            throw new Error(`อัปโหลดรูปสินค้าหลักไม่สำเร็จ: ${originalUploadError.message}`)
+          }
+          uploadedKeys.push(nextImageKey)
+
+          const { error: thumbUploadError } = await storage.upload(nextThumbKey, assets.thumbnail, {
+            cacheControl: '3600',
+            contentType: assets.thumbnail.type || undefined,
+            upsert: true,
+          })
+
+          if (thumbUploadError) {
+            throw new Error(`อัปโหลดรูปสินค้าย่อไม่สำเร็จ: ${thumbUploadError.message}`)
+          }
+          uploadedKeys.push(nextThumbKey)
+
+          savedProduct = await saveProduct({
+            ...values,
+            id: savedProduct.id,
+            code: savedProduct.code,
+            imageStorageKey: nextImageKey,
+            imageThumbnailStorageKey: nextThumbKey,
+          })
+        } catch (uploadOrSaveError) {
+          if (uploadedKeys.length > 0) {
+            void storage.remove(uploadedKeys).catch(() => undefined)
+          }
+          throw uploadOrSaveError
+        }
+
+        const oldKeys = [previousImageKey, previousThumbKey]
+          .filter((value): value is string => Boolean(value))
+          .filter((value) => value !== nextImageKey && value !== nextThumbKey)
+
+        if (oldKeys.length > 0) {
+          void storage.remove(oldKeys).catch(() => undefined)
+        }
+      } else if (imageAction === 'remove' && (previousImageKey || previousThumbKey)) {
+        const supabase = getSupabaseClient()
+        if (supabase) {
+          const oldKeys = [previousImageKey, previousThumbKey].filter((value): value is string => Boolean(value))
+          if (oldKeys.length > 0) {
+            void supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove(oldKeys).catch(() => undefined)
+          }
+        }
+      }
+
       setFormOpen(false)
       setSelectedProduct(null)
       await loadData()
@@ -462,17 +551,21 @@ type ProductFormProps = {
   productTypes: string[]
   productUnits: MasterDataRecord[]
   onCancel: () => void
-  onSubmit: (values: ProductFormValues) => Promise<void>
+  onSubmit: (payload: ProductSubmitPayload) => Promise<void>
 }
 
 function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, onSubmit }: ProductFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<ProductFormValues>(() => (product ? productToForm(product) : emptyProductForm))
-  const productImages = useMemo(() => (form.imageNames ?? []).map((rawValue) => decodeStoredImageAsset(rawValue)), [form.imageNames])
-  const primaryImage = productImages[0] ?? null
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null)
+  const [previewImageName, setPreviewImageName] = useState('')
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(product?.thumbnailUrl ?? null)
 
   useEffect(() => {
     setForm(product ? productToForm(product) : emptyProductForm)
+    setPendingImageFile(null)
+    setPreviewImageName(product?.imageNames[0] ?? '')
+    setPreviewImageUrl(product?.thumbnailUrl ?? null)
     setErrors({})
   }, [product])
 
@@ -484,21 +577,25 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
     const selectedFile = Array.from(fileList ?? [])[0]
     if (!selectedFile) return
     if (!selectedFile.type.startsWith('image/')) {
-      setErrors((current) => ({ ...current, imageNames: 'อัปโหลดได้เฉพาะไฟล์รูปภาพ' }))
+      setErrors((current) => ({ ...current, imageStorageKey: 'อัปโหลดได้เฉพาะไฟล์รูปภาพ' }))
       return
     }
 
-    const nextImage = encodeStoredImageAsset(selectedFile.name, await fileToDataUrl(selectedFile))
+    const nextPreviewUrl = await fileToDataUrl(selectedFile)
     setErrors((current) => {
       const nextErrors = { ...current }
-      delete nextErrors.imageNames
+      delete nextErrors.imageStorageKey
       return nextErrors
     })
-    update('imageNames', [nextImage])
+    setPendingImageFile(selectedFile)
+    setPreviewImageName(selectedFile.name)
+    setPreviewImageUrl(nextPreviewUrl)
   }
 
-  function removeProductImage(index: number) {
-    update('imageNames', (form.imageNames ?? []).filter((_, imageIndex) => imageIndex !== index))
+  function removeProductImage() {
+    setPendingImageFile(null)
+    setPreviewImageName('')
+    setPreviewImageUrl(null)
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -510,7 +607,11 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
     }
 
     setErrors({})
-    await onSubmit(parsed.data)
+    await onSubmit({
+      imageAction: pendingImageFile ? 'replace' : (previewImageUrl ? 'keep' : 'remove'),
+      imageFile: pendingImageFile,
+      values: parsed.data,
+    })
   }
 
   return (
@@ -541,14 +642,14 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
             <div className="md:col-span-4">
               <div className="block text-xs font-medium text-slate-600">
                 รูปสินค้า
-                <div className={`mt-1 rounded-md border bg-slate-50 p-3 ${errors.imageNames ? 'border-red-300' : 'border-slate-200'}`}>
+                <div className={`mt-1 rounded-md border bg-slate-50 p-3 ${errors.imageStorageKey ? 'border-red-300' : 'border-slate-200'}`}>
                   <div className="flex flex-col gap-2">
                     <div>
                       <label className="group relative block h-36 w-36 cursor-pointer overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100 hover:border-slate-400">
-                        {primaryImage?.url ? (
+                        {previewImageUrl ? (
                           <>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img alt={primaryImage.fileName} className="h-full w-full object-cover" src={primaryImage.url} />
+                            <img alt={previewImageName || 'รูปสินค้า'} className="h-full w-full object-cover" src={previewImageUrl} />
                             <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-2 py-1.5 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
                               คลิกเพื่อเปลี่ยนรูป
                             </span>
@@ -571,15 +672,15 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
                           }}
                         />
                       </label>
-                      {primaryImage ? (
-                        <button className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline" type="button" onClick={() => removeProductImage(0)}>
+                      {previewImageUrl ? (
+                        <button className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline" type="button" onClick={removeProductImage}>
                           <Trash2 className="h-3.5 w-3.5" />
                           ลบรูปหลัก
                         </button>
                       ) : null}
                     </div>
                   </div>
-                  {errors.imageNames ? <div className="mt-2 text-xs text-red-700">{errors.imageNames}</div> : null}
+                  {errors.imageStorageKey ? <div className="mt-2 text-xs text-red-700">{errors.imageStorageKey}</div> : null}
                 </div>
               </div>
             </div>
