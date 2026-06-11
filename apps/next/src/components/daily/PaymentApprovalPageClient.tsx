@@ -93,20 +93,20 @@ const paymentApprovalApColumns: Array<ResizableColumnDefinition<PaymentApprovalA
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'sourceDocNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
-  { key: 'partyName', defaultWidth: 180, minWidth: 140 },
-  { key: 'bankAccount', defaultWidth: 260, minWidth: 180 },
-  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'paidAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'payableBalance', defaultWidth: 160, minWidth: 130 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 140 },
+  { key: 'bankAccount', defaultWidth: 220, minWidth: 180 },
+  { key: 'totalAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'paidAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'payableBalance', defaultWidth: 90, minWidth: 80 },
   { key: 'status', defaultWidth: 130, minWidth: 110 },
 ]
 const paymentApprovalExpenseColumns: Array<ResizableColumnDefinition<PaymentApprovalExpenseColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'sourceDocNo', defaultWidth: 150, minWidth: 120 },
   { key: 'dueDate', defaultWidth: 120, minWidth: 100 },
-  { key: 'partyName', defaultWidth: 200, minWidth: 140 },
-  { key: 'refDocNo', defaultWidth: 180, minWidth: 130 },
-  { key: 'totalAmount', defaultWidth: 150, minWidth: 120 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 140 },
+  { key: 'refDocNo', defaultWidth: 150, minWidth: 130 },
+  { key: 'totalAmount', defaultWidth: 85, minWidth: 80 },
   { key: 'status', defaultWidth: 130, minWidth: 110 },
 ]
 const approvalFilterOptions: Array<{ label: string; values: ApprovalStatus[] }> = [
@@ -756,9 +756,9 @@ export function PaymentApprovalPageClient() {
                         ? <div className="whitespace-normal text-slate-700">{row.destinationLabel || '-'}</div>
                         : <div className="whitespace-normal text-slate-500">{destinationSummaryLabel(row)}</div>}
                     </TableCell>
-                    <TableCell className="text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.totalAmount)}</TableCell>
-                    <TableCell className="text-right text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(row.paidAmount)}</TableCell>
-                    <TableCell className="text-right text-xs font-semibold text-red-700 tabular-nums">{formatMoney(row.payableBalance)}</TableCell>
+                    <TableCell className="text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.totalAmount)}</TableCell>
+                    <TableCell className="text-right pr-4 text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(row.paidAmount)}</TableCell>
+                    <TableCell className="text-right pr-4 text-xs font-semibold text-red-700 tabular-nums">{formatMoney(row.payableBalance)}</TableCell>
                     <TableCell className="text-center text-xs">
                       <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold ${approvalStatusTone(row.approvalStatus)}`}>
                         <span className={`size-1.5 rounded-full ${approvalStatusDot(row.approvalStatus)}`} />
@@ -834,7 +834,7 @@ export function PaymentApprovalPageClient() {
                       <TableCell className="text-xs font-semibold text-slate-700">{row.dueDate ? <span className={overdue ? 'text-red-600' : 'text-slate-700'}>{formatDateDisplay(row.dueDate)}{overdue ? <span className="block text-[10px] text-red-500">เลยกำหนด</span> : null}</span> : <span className="text-slate-300">-</span>}</TableCell>
                       <TableCell className="text-xs font-semibold text-slate-700">{row.payee}</TableCell>
                       <TableCell className="text-xs font-semibold text-slate-700">{row.refDocNo ? <div className="text-slate-700">{row.refDocNo}</div> : <span className="text-slate-300">-</span>}</TableCell>
-                      <TableCell className="text-right text-xs font-semibold text-red-700 tabular-nums">{formatMoney(row.totalAmount)}</TableCell>
+                      <TableCell className="text-right pr-4 text-xs font-semibold text-red-700 tabular-nums">{formatMoney(row.totalAmount)}</TableCell>
                       <TableCell className="text-center text-xs">
                         <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold ${approvalStatusTone(row.approvalStatus)}`}>
                           <span className={`size-1.5 rounded-full ${approvalStatusDot(row.approvalStatus)}`} />

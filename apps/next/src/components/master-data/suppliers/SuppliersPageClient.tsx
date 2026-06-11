@@ -31,16 +31,16 @@ type SupplierColumnKey = SortKey | 'action'
 type SupplierBankAccountForm = SupplierFormValues['bankAccounts'][number]
 
 const supplierColumns: Array<ResizableColumnDefinition<SupplierColumnKey>> = [
-  { key: 'code', defaultWidth: 110, minWidth: 90 },
-  { key: 'name', defaultWidth: 240, minWidth: 180 },
-  { key: 'taxId', defaultWidth: 150, minWidth: 130 },
-  { key: 'type', defaultWidth: 120, minWidth: 100 },
-  { key: 'phone', defaultWidth: 130, minWidth: 110 },
-  { key: 'bankName', defaultWidth: 220, minWidth: 160 },
-  { key: 'accountNo', defaultWidth: 220, minWidth: 170 },
-  { key: 'salesName', defaultWidth: 160, minWidth: 130 },
-  { key: 'active', defaultWidth: 140, minWidth: 120 },
-  { key: 'action', defaultWidth: 90, minWidth: 80 },
+  { key: 'code', defaultWidth: 100, minWidth: 80 },
+  { key: 'name', defaultWidth: 320, minWidth: 180 },
+  { key: 'taxId', defaultWidth: 130, minWidth: 110 },
+  { key: 'type', defaultWidth: 95, minWidth: 80 },
+  { key: 'phone', defaultWidth: 110, minWidth: 90 },
+  { key: 'bankName', defaultWidth: 180, minWidth: 130 },
+  { key: 'accountNo', defaultWidth: 180, minWidth: 130 },
+  { key: 'salesName', defaultWidth: 120, minWidth: 100 },
+  { key: 'active', defaultWidth: 110, minWidth: 90 },
+  { key: 'action', defaultWidth: 80, minWidth: 70 },
 ]
 
 const emptyBankAccount: SupplierBankAccountForm = {

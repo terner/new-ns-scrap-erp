@@ -12,6 +12,7 @@ import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select } from '@/components/ui/Select'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
+import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { supplierAdvancePaymentFormSchema } from '@/lib/purchase-advance'
@@ -137,14 +138,14 @@ type UploadedImageFile = {
 const advancePaymentColumns: Array<ResizableColumnDefinition<AdvancePaymentColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'advanceDate', defaultWidth: 120, minWidth: 100 },
-  { key: 'supplierName', defaultWidth: 190, minWidth: 140 },
+  { key: 'supplierName', defaultWidth: 320, minWidth: 140 },
   { key: 'largeScaleDocNo', defaultWidth: 150, minWidth: 120 },
   { key: 'plateNo', defaultWidth: 130, minWidth: 110 },
-  { key: 'productName', defaultWidth: 170, minWidth: 130 },
-  { key: 'netWeight', defaultWidth: 140, minWidth: 120 },
-  { key: 'amount', defaultWidth: 140, minWidth: 120 },
-  { key: 'allocatedAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'remainingAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'productName', defaultWidth: 240, minWidth: 130 },
+  { key: 'netWeight', defaultWidth: 85, minWidth: 80 },
+  { key: 'amount', defaultWidth: 85, minWidth: 80 },
+  { key: 'allocatedAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'remainingAmount', defaultWidth: 85, minWidth: 80 },
   { key: 'status', defaultWidth: 140, minWidth: 120 },
   { key: 'action', defaultWidth: 150, minWidth: 140 },
 ]
@@ -739,10 +740,10 @@ export function AdvancePaymentsPageClient() {
                     <td className="p-2 text-xs font-semibold text-slate-700">{row.largeScaleDocNo || '-'}</td>
                     <td className="p-2 whitespace-nowrap text-xs font-semibold text-slate-700">{row.plateNo || '-'}</td>
                     <td className="p-2 text-xs font-semibold text-slate-700">{row.productName || '-'}</td>
-                    <td className="p-2 text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.netWeight)}</td>
-                    <td className="p-2 text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.amount)}</td>
-                    <td className="p-2 text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.allocatedAmount)}</td>
-                    <td className="p-2 text-right text-xs font-semibold text-amber-700 tabular-nums">{formatMoney(row.remainingAmount)}</td>
+                    <TableNumberCell value={formatMoney(row.netWeight)} />
+                    <TableNumberCell value={formatMoney(row.amount)} />
+                    <TableNumberCell value={formatMoney(row.allocatedAmount)} />
+                    <TableNumberCell tone="amber" value={formatMoney(row.remainingAmount)} />
                     <td className="p-2"><StatusDot status={row.status} label={row.statusLabel} /></td>
                     <td className="p-2 text-right">
                       <div className="flex justify-end gap-2">

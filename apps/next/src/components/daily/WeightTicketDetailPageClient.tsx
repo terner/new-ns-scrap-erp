@@ -46,11 +46,12 @@ function timelineLabel(eventKey: string, action: string) {
   return eventKey
 }
 
-function timelineDotClass(action: string) {
-  if (action === 'cancelled' || action === 'released_from_purchase_bill') return 'border-rose-500'
-  if (action === 'edited' || action === 'usage_status_changed' || action === 'status_synced') return 'border-amber-500'
-  if (action === 'allocated_to_purchase_bill') return 'border-blue-500'
-  return 'border-emerald-500'
+function timelineDotClass(action: string, isLatest: boolean) {
+  if (!isLatest) return 'bg-slate-300'
+  if (action === 'cancelled' || action === 'released_from_purchase_bill') return 'bg-rose-500'
+  if (action === 'edited' || action === 'usage_status_changed' || action === 'status_synced') return 'bg-amber-500'
+  if (action === 'allocated_to_purchase_bill') return 'bg-blue-500'
+  return 'bg-emerald-500'
 }
 
 function metadataString(metadata: Record<string, unknown>, key: string) {
@@ -482,8 +483,14 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
         ) : null}
 
         <Card className="p-5">
-          <SectionTitle subtitle="รวมสถานะเอกสารและประวัติการใช้งาน เรียงจากล่าสุดลงล่าง" title="Timeline เอกสาร" />
-          <div className="mt-4 space-y-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium text-slate-700">ประวัติเอกสาร (Timeline)</div>
+            <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold', weightTicketStatusBadgeClass(ticket.type, ticket.status))}>
+              <span className="size-1.5 rounded-full bg-current" />
+              ล่าสุด: {displayWeightTicketStatus(ticket.type, ticket.status)}
+            </span>
+          </div>
+          <div className="space-y-3">
             {ticket.timeline.length === 0 ? (
               <div className="text-sm text-slate-400">ยังไม่มี timeline เอกสาร</div>
             ) : ticket.timeline.map((event, index) => {
@@ -494,36 +501,50 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
               const note = metadataString(event.metadata, 'cancelNote') || metadataString(event.metadata, 'note')
               const allocatedNetWeight = metadataNumber(event.metadata, 'allocatedNetWeight')
               const toRemainingWeight = metadataNumber(event.metadata, 'toRemainingWeight')
+              const isLatest = index === 0
+
               return (
-                <div className="relative pl-6" key={event.id}>
-                  {index < ticket.timeline.length - 1 ? <div className="absolute left-[9px] top-5 h-[calc(100%-0.25rem)] w-px bg-slate-200" /> : null}
-                  <div className={cn('absolute left-0 top-1.5 size-[18px] rounded-full border-2 bg-white', timelineDotClass(event.action))} />
-                  <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-medium text-slate-900">{timelineLabel(event.eventKey, event.action)}</div>
-                      <div className="text-xs text-slate-400">{formatDateTime(event.occurredAt)}</div>
+                <div key={event.id} className="grid grid-cols-[88px_1fr] gap-3 sm:grid-cols-[128px_1fr]">
+                  <div className="pt-1 text-right text-xs text-slate-500">
+                    <div>{formatDateTime(event.occurredAt)}</div>
+                    <div className="mt-1 truncate text-[11px]">{event.actorName}</div>
+                  </div>
+                  <div className="relative border-l border-slate-200 pb-4 pl-4 last:pb-0">
+                    <span className={`absolute -left-1.5 top-1 h-3 w-3 rounded-full border-2 border-white ${timelineDotClass(event.action, isLatest)}`} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-medium text-slate-800">{timelineLabel(event.eventKey, event.action)}</div>
+                      {toStatus ? (
+                        <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold', weightTicketStatusBadgeClass(ticket.type, toStatus as WeightTicketStatus))}>
+                          <span className="size-1.5 rounded-full bg-current" />
+                          {timelineStatusLabel(ticket.type, toStatus)}
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="mt-1 text-sm text-slate-600">{event.actorName}</div>
-                    {toStatus ? (
-                      <div className="mt-2 text-sm text-slate-700">
-                        สถานะ: {fromStatus ? `${timelineStatusLabel(ticket.type, fromStatus)} -> ` : ''}{timelineStatusLabel(ticket.type, toStatus)}
+                    {fromStatus && fromStatus !== toStatus ? (
+                      <div className="mt-1 text-xs text-slate-500">
+                        เปลี่ยนสถานะจาก {timelineStatusLabel(ticket.type, fromStatus)}
                       </div>
                     ) : null}
-                    {targetDocNo || productName || allocatedNetWeight != null ? (
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-                        {targetDocNo ? (
-                          <Link className="font-medium text-blue-700 hover:underline" href={`/purchase/bills/${encodeURIComponent(targetDocNo)}`}>
-                            {targetDocNo}
-                          </Link>
-                        ) : null}
-                        {productName ? <span>{productName}</span> : null}
-                        {allocatedNetWeight != null ? <span>{formatWeight(allocatedNetWeight)} กก.</span> : null}
-                        {toRemainingWeight != null ? <span>คงเหลือ {formatWeight(toRemainingWeight)} กก.</span> : null}
-                      </div>
-                    ) : null}
-                    {note ? (
-                      <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">{note}</div>
-                    ) : null}
+                    <div className="mt-2 grid gap-1 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600 shadow-sm border border-slate-100">
+                      {targetDocNo || productName || allocatedNetWeight != null ? (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {targetDocNo ? (
+                            <Link className="font-medium text-blue-700 hover:underline" href={`/purchase/bills/${encodeURIComponent(targetDocNo)}`}>
+                              {targetDocNo}
+                            </Link>
+                          ) : null}
+                          {productName ? <span>{productName}</span> : null}
+                          {allocatedNetWeight != null ? <span>น้ำหนัก: {formatWeight(allocatedNetWeight)} กก.</span> : null}
+                          {toRemainingWeight != null ? <span>คงเหลือ: {formatWeight(toRemainingWeight)} กก.</span> : null}
+                        </div>
+                      ) : null}
+                      {note ? (
+                        <div className="text-slate-700">{note}</div>
+                      ) : null}
+                      {!targetDocNo && !productName && allocatedNetWeight == null && !note ? (
+                        <div className="text-slate-400">อัปเดตข้อมูล</div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               )

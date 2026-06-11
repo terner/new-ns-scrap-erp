@@ -6,6 +6,11 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { poSellFormSchema, type PoSellFormValues } from '@/lib/sales'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
+import { TableNumberCell } from '@/components/ui/TableNumberCell'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
+import { CollapsedList } from '@/components/ui/CollapsedList'
 
 type Option = {
   active?: boolean | null
@@ -92,6 +97,22 @@ const initialPoSellForm = (): PoSellFormValues => ({
   note: null,
 })
 
+const poSellColumns: ResizableColumnDefinition<string>[] = [
+  { key: 'docNo', minWidth: 90, defaultWidth: 110 },
+  { key: 'date', minWidth: 80, defaultWidth: 90 },
+  { key: 'customerName', minWidth: 120, defaultWidth: 420 },
+  { key: 'productName', minWidth: 100, defaultWidth: 280 },
+  { key: 'qty', minWidth: 70, defaultWidth: 75 },
+  { key: 'totalAmount', minWidth: 80, defaultWidth: 80 },
+  { key: 'matchedQty', minWidth: 70, defaultWidth: 75 },
+  { key: 'remainingQty', minWidth: 70, defaultWidth: 75 },
+  { key: 'margin', minWidth: 80, defaultWidth: 80 },
+  { key: 'marginPct', minWidth: 50, defaultWidth: 55 },
+  { key: 'documentStatus', minWidth: 80, defaultWidth: 90 },
+  { key: 'matchStatus', minWidth: 80, defaultWidth: 90 },
+  { key: 'action', minWidth: 80, defaultWidth: 90 },
+]
+
 export function PoSellPageClient() {
   const latestLoadRequestRef = useRef(0)
   const [data, setData] = useState<PoSellPayload | null>(null)
@@ -108,6 +129,7 @@ export function PoSellPageClient() {
   const [showForm, setShowForm] = useState(false)
   const [documentStatus, setDocumentStatus] = useState('all')
   const [toDate, setToDate] = useState('')
+  const columnResize = useResizableColumns('sales.po-sell', poSellColumns)
 
   const dateQuery = useMemo(() => {
     const params = new URLSearchParams()
@@ -277,6 +299,15 @@ export function PoSellPageClient() {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? (
+            <button
+              className="rounded-md border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              Set col to default
+            </button>
+          ) : null}
           <select
             aria-label="จำนวนรายการต่อหน้า"
             className="rounded-md border border-slate-300 px-2 py-1"
@@ -294,48 +325,55 @@ export function PoSellPageClient() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
-        <table className="w-full min-w-[1220px] text-sm">
-          <thead className="bg-slate-100">
-            <tr>
-              <th className="p-2 text-left">เลขที่</th>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">Customer</th>
-              <th className="p-2 text-left">รายการ</th>
-              <th className="p-2 text-right">จำนวนรวม</th>
-              <th className="p-2 text-right">รายได้รวม</th>
-              <th className="p-2 text-right">Matched</th>
-              <th className="p-2 text-right">เหลือ</th>
-              <th className="p-2 text-right">Deal Margin</th>
-              <th className="p-2 text-right">%</th>
-              <th className="p-2 text-center">สถานะเอกสาร</th>
-              <th className="p-2 text-center">สถานะ Match</th>
-              <th className="p-2 text-right">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && !error && rows.length === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Sell</td></tr> : null}
-            {!isLoading && pageRows.map((row) => (
-              <tr key={row.id} className="border-t hover:bg-slate-50">
-                <td className="p-2 font-mono">{row.docNo}</td>
-                <td className="p-2">{formatDateDisplay(row.date)}</td>
-                <td className="p-2">{row.customerName}</td>
-                <td className="p-2 text-xs"><div>{row.productName || '-'}</div>{row.itemCount > 1 ? <div className="text-slate-400">+ อีก {row.itemCount - 1} รายการ</div> : null}</td>
-                <td className="p-2 text-right">{formatMoney(row.qty)}</td>
-                <td className="p-2 text-right font-medium text-emerald-700">{formatMoney(row.totalAmount)}</td>
-                <td className="p-2 text-right text-blue-700">{formatMoney(row.matchedQty)}</td>
-                <td className="p-2 text-right text-amber-700">{formatMoney(row.remainingQty)}</td>
-                <td className={`p-2 text-right font-bold ${row.margin < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(row.margin)}</td>
-                <td className={`p-2 text-right ${row.marginPct < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatPercent(row.marginPct)}</td>
-                <td className="p-2 text-center"><StatusPill label={row.documentStatusLabel} tone={documentStatusPillTone(row.documentStatus)} /></td>
-                <td className="p-2 text-center"><StatusPill label={row.matchStatus} tone="match" /></td>
-                <td className="whitespace-nowrap p-2 text-right"><div className="flex justify-end gap-1"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ write permission/audit ก่อนเปิดใช้งาน" type="button">แก้ไข</button><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ cancel/reconciliation ก่อนเปิดใช้งาน" type="button">ยกเลิก</button></div></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
+        <colgroup>
+          {poSellColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+        </colgroup>
+        <TableHeader>
+          <tr>
+            <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
+            <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+            <ResizableTableHead label="Customer" resizeProps={columnResize.getResizeHandleProps('customerName', 'Customer')} />
+            <ResizableTableHead label="รายการ" resizeProps={columnResize.getResizeHandleProps('productName', 'รายการ')} />
+            <ResizableTableHead align="right" label="จำนวนรวม" resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวนรวม')} />
+            <ResizableTableHead align="right" label="รายได้รวม" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'รายได้รวม')} />
+            <ResizableTableHead align="right" label="Matched" resizeProps={columnResize.getResizeHandleProps('matchedQty', 'Matched')} />
+            <ResizableTableHead align="right" label="เหลือ" resizeProps={columnResize.getResizeHandleProps('remainingQty', 'เหลือ')} />
+            <ResizableTableHead align="right" label="Deal Margin" resizeProps={columnResize.getResizeHandleProps('margin', 'Deal Margin')} />
+            <ResizableTableHead align="right" label="%" resizeProps={columnResize.getResizeHandleProps('marginPct', '%')} />
+            <ResizableTableHead align="center" label="สถานะเอกสาร" resizeProps={columnResize.getResizeHandleProps('documentStatus', 'สถานะเอกสาร')} />
+            <ResizableTableHead align="center" label="สถานะ Match" resizeProps={columnResize.getResizeHandleProps('matchStatus', 'สถานะ Match')} />
+            <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
+          </tr>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+          {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Sell</TableCell></TableRow> : null}
+          {!isLoading && pageRows.map((row) => (
+            <TableRow key={row.id} className="border-slate-100 hover:bg-slate-50">
+              <TableCell className="whitespace-nowrap font-mono">{row.docNo}</TableCell>
+              <TableCell className="whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
+              <TableCell className="truncate">{row.customerName}</TableCell>
+              <TableCell className="text-xs font-semibold text-slate-700">
+                <CollapsedList
+                  inline
+                  items={row.productName ? row.productName.split(',').map((item) => item.trim()).filter(Boolean) : []}
+                  fallbackText="-"
+                />
+              </TableCell>
+              <TableNumberCell value={formatMoney(row.qty)} />
+              <TableCell className="whitespace-nowrap text-right pr-4 font-semibold text-emerald-700 tabular-nums">{formatMoney(row.totalAmount)}</TableCell>
+              <TableCell className="whitespace-nowrap text-right pr-4 text-blue-700 tabular-nums">{formatMoney(row.matchedQty)}</TableCell>
+              <TableNumberCell tone="amber" value={formatMoney(row.remainingQty)} />
+              <TableCell className={`text-right pr-4 font-bold tabular-nums ${row.margin < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(row.margin)}</TableCell>
+              <TableCell className={`text-right pr-4 tabular-nums ${row.marginPct < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatPercent(row.marginPct)}</TableCell>
+              <TableCell className="text-center"><StatusPill label={row.documentStatusLabel} tone={documentStatusPillTone(row.documentStatus)} /></TableCell>
+              <TableCell className="text-center"><StatusPill label={row.matchStatus} tone="match" /></TableCell>
+              <TableCell className="whitespace-nowrap text-right"><div className="flex justify-end gap-1"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ write permission/audit ก่อนเปิดใช้งาน" type="button">แก้ไข</button><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50" disabled title="รอออกแบบ cancel/reconciliation ก่อนเปิดใช้งาน" type="button">ยกเลิก</button></div></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
       {showForm ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="po-sell-form-title">
           <div className="mx-auto my-4 max-w-2xl rounded-md bg-white shadow-2xl">

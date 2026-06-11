@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Printer } from 'lucide-react'
+
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
@@ -49,15 +49,15 @@ type ReceiptVoucherRow = {
 type ReceiptVoucherColumnKey = 'action' | 'date' | 'docNo' | 'licensePlate' | 'purchaseBillDocNo' | 'sellerName' | 'sellerTaxId' | 'totalAmount' | 'totalQty'
 
 const receiptVoucherColumns: Array<ResizableColumnDefinition<ReceiptVoucherColumnKey>> = [
-  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
-  { key: 'date', defaultWidth: 120, minWidth: 100 },
-  { key: 'sellerName', defaultWidth: 190, minWidth: 140 },
-  { key: 'sellerTaxId', defaultWidth: 170, minWidth: 130 },
-  { key: 'purchaseBillDocNo', defaultWidth: 150, minWidth: 120 },
-  { key: 'licensePlate', defaultWidth: 130, minWidth: 110 },
-  { key: 'totalQty', defaultWidth: 140, minWidth: 120 },
-  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'action', defaultWidth: 150, minWidth: 140 },
+  { key: 'docNo', defaultWidth: 110, minWidth: 90 },
+  { key: 'date', defaultWidth: 90, minWidth: 80 },
+  { key: 'sellerName', defaultWidth: 320, minWidth: 140 },
+  { key: 'sellerTaxId', defaultWidth: 130, minWidth: 110 },
+  { key: 'purchaseBillDocNo', defaultWidth: 110, minWidth: 90 },
+  { key: 'licensePlate', defaultWidth: 100, minWidth: 80 },
+  { key: 'totalQty', defaultWidth: 85, minWidth: 70 },
+  { key: 'totalAmount', defaultWidth: 85, minWidth: 70 },
+  { key: 'action', defaultWidth: 140, minWidth: 100 },
 ]
 
 export function ReceiptVouchersPageClient() {
@@ -210,7 +210,6 @@ export function ReceiptVouchersPageClient() {
                 <td className="whitespace-nowrap p-2 text-right">
                   <div className="flex justify-end gap-2">
                     <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60" type="button" onClick={() => setPrintingRow(row)}>
-                      <Printer className="size-3" />
                       พิมพ์
                     </button>
                     <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button">แก้ไข</button>

@@ -13,6 +13,7 @@ import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Select } from '@/components/ui/Select'
 import { TableNumberCell } from '@/components/ui/TableNumberCell'
+import { CollapsedList } from '@/components/ui/CollapsedList'
 import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/Table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
@@ -357,12 +358,12 @@ const purchaseBillColumns: Array<ResizableColumnDefinition<TransactionBillColumn
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'receiptDocs', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 140, minWidth: 110 },
-  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 140 },
   { key: 'transactionMode', defaultWidth: 120, minWidth: 100 },
   { key: 'status', defaultWidth: 140, minWidth: 120 },
   { key: 'paymentDocs', defaultWidth: 150, minWidth: 120 },
-  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'outstanding', defaultWidth: 140, minWidth: 120 },
+  { key: 'totalAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'outstanding', defaultWidth: 85, minWidth: 80 },
   { key: 'updatedBy', defaultWidth: 170, minWidth: 130 },
   { key: 'action', defaultWidth: 210, minWidth: 190 },
 ]
@@ -371,16 +372,16 @@ const salesBillColumns: Array<ResizableColumnDefinition<TransactionBillColumnKey
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'refNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
-  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 140 },
   { key: 'warehouse', defaultWidth: 160, minWidth: 120 },
   { key: 'transactionMode', defaultWidth: 120, minWidth: 100 },
   { key: 'status', defaultWidth: 140, minWidth: 120 },
-  { key: 'itemCount', defaultWidth: 100, minWidth: 90 },
-  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'gp', defaultWidth: 140, minWidth: 120 },
-  { key: 'paidAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'outstanding', defaultWidth: 140, minWidth: 120 },
-  { key: 'vat', defaultWidth: 120, minWidth: 100 },
+  { key: 'itemCount', defaultWidth: 75, minWidth: 60 },
+  { key: 'totalAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'gp', defaultWidth: 85, minWidth: 80 },
+  { key: 'paidAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'outstanding', defaultWidth: 85, minWidth: 80 },
+  { key: 'vat', defaultWidth: 85, minWidth: 80 },
   { key: 'updatedBy', defaultWidth: 170, minWidth: 130 },
   { key: 'action', defaultWidth: 150, minWidth: 140 },
 ]
@@ -388,13 +389,13 @@ const salesBillColumns: Array<ResizableColumnDefinition<TransactionBillColumnKey
 const stockIssueColumns: Array<ResizableColumnDefinition<TransactionBillColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
-  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 140 },
   { key: 'warehouse', defaultWidth: 160, minWidth: 120 },
   { key: 'status', defaultWidth: 140, minWidth: 120 },
-  { key: 'itemCount', defaultWidth: 100, minWidth: 90 },
-  { key: 'stockQty', defaultWidth: 130, minWidth: 110 },
-  { key: 'stockCost', defaultWidth: 130, minWidth: 110 },
-  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
+  { key: 'itemCount', defaultWidth: 75, minWidth: 60 },
+  { key: 'stockQty', defaultWidth: 85, minWidth: 80 },
+  { key: 'stockCost', defaultWidth: 85, minWidth: 80 },
+  { key: 'totalAmount', defaultWidth: 85, minWidth: 80 },
   { key: 'action', defaultWidth: 230, minWidth: 200 },
 ]
 
@@ -1850,9 +1851,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.docNo}</td>
                 {mode === 'purchase' && !isStockIssueRow(row) ? (
                   <td className="p-2 text-xs font-semibold text-slate-700">
-                    {row.receiptDocNos?.length
-                      ? <div className="space-y-0.5">{row.receiptDocNos.map((docNo) => <div className="whitespace-nowrap text-slate-700" key={`${row.id}-${docNo}`}>{docNo}</div>)}</div>
-                      : <span className="text-slate-400">-</span>}
+                    <CollapsedList items={row.receiptDocNos} splitItems={true} />
                   </td>
                 ) : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.refNo || '-'}</td> : null}
@@ -1866,12 +1865,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                     {mode === 'purchase' && !isStockIssueRow(row) ? workflowStatusText(row.paymentWorkflowStatus ?? 'pending_approval') : statusText(row.status)}
                   </span>
                 </td>
-                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-xs font-semibold text-slate-700">{row.paymentDocNos?.length ? <div className="space-y-0.5">{row.paymentDocNos.map((docNo: string) => <div key={`${row.id}-${docNo}`} className="text-slate-700">{docNo}</div>)}</div> : <span className="text-slate-400">-</span>}</td> : null}
-                {mode !== 'purchase' ? <td className="p-2 text-right text-xs font-semibold text-slate-700">{row.itemCount}</td> : null}
+                {mode === 'purchase' && !isStockIssueRow(row) ? <td className="p-2 text-xs font-semibold text-slate-700"><CollapsedList items={row.paymentDocNos} splitItems={true} /></td> : null}
+                {mode !== 'purchase' ? <td className="p-2 pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">{row.itemCount}</td> : null}
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.totalQty ?? 0)} /> : null}
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell tone="amber" value={formatMoney(row.totalCost)} /> : null}
                 <TableNumberCell strong value={formatMoney(isStockIssueRow(row) ? row.totalEstAmount : row.totalAmount ?? 0)} />
-                {mode === 'sales' && !isStockIssueRow(row) ? <td className={`p-2 text-right font-semibold ${(row.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><div>{formatMoney(row.grossProfit ?? 0)}</div><div className="text-xs text-slate-500">{formatMoney((row.totalAmount ?? 0) > 0 ? (row.grossProfit ?? 0) / (row.totalAmount ?? 1) * 100 : 0)}%</div></td> : null}
+                {mode === 'sales' && !isStockIssueRow(row) ? <td className={`p-2 pr-4 text-right font-semibold tabular-nums ${(row.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><div>{formatMoney(row.grossProfit ?? 0)}</div><div className="text-xs text-slate-500">{formatMoney((row.totalAmount ?? 0) > 0 ? (row.grossProfit ?? 0) / (row.totalAmount ?? 1) * 100 : 0)}%</div></td> : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.receivedAmount ?? 0)} /> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <TableNumberCell tone="amber" value={formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)} /> : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.vatInvoiceIssued ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
@@ -1885,7 +1884,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         type="button"
                         onClick={(event) => { event.stopPropagation(); void printPurchaseBill(row) }}
                       >
-                        <Printer className="size-3" />
                         {printingBillDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
                       </button>
                       <button
@@ -1918,7 +1916,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         type="button"
                         onClick={(event) => { event.stopPropagation(); void printSalesBill(row) }}
                       >
-                        <Printer className="size-3" />
                         {printingBillDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
                       </button>
                       <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled title="รอเปิด flow แก้ไขบิลขาย" type="button">แก้ไข</button>
@@ -3075,6 +3072,8 @@ function SortHeader({ activeKey, align, direction, label, onSort, resizeProps, s
     />
   )
 }
+
+
 
 function formatBranchWarehouse(row: BillRow | StockIssueRow) {
   const branch = row.branchName?.trim()

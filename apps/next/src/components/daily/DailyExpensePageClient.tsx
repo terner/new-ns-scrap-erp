@@ -130,12 +130,12 @@ const expenseColumns: Array<ResizableColumnDefinition<ExpenseColumnKey>> = [
   { key: 'date', defaultWidth: 120, minWidth: 100 },
   { key: 'dueDate', defaultWidth: 120, minWidth: 100 },
   { key: 'refDocNo', defaultWidth: 140, minWidth: 110 },
-  { key: 'payee', defaultWidth: 180, minWidth: 130 },
+  { key: 'payee', defaultWidth: 320, minWidth: 130 },
   { key: 'category', defaultWidth: 160, minWidth: 120 },
   { key: 'account', defaultWidth: 180, minWidth: 130 },
   { key: 'status', defaultWidth: 130, minWidth: 110 },
-  { key: 'netAmount', defaultWidth: 150, minWidth: 120 },
-  { key: 'amountSummary', defaultWidth: 170, minWidth: 140 },
+  { key: 'netAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'amountSummary', defaultWidth: 95, minWidth: 80 },
   { key: 'action', defaultWidth: 150, minWidth: 140 },
 ]
 
@@ -1158,8 +1158,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       <td className="p-2 text-xs font-semibold text-slate-700">{row.categoryName}</td>
                       <td className="p-2 text-xs font-semibold text-slate-700">{row.accountName}</td>
                       <td className="p-2 text-center text-xs"><span className={`inline-flex items-center gap-1.5 font-semibold ${expenseStatusTextClass(row.status)}`}><span className={`size-1.5 rounded-full ${expenseStatusDotClass(row.status)}`} />{expenseStatusLabel(row.status)}</span></td>
-                      <td className={`bg-red-50/60 p-2 text-right text-xs font-semibold ${row.status === 'paid' ? 'text-emerald-700' : row.status === 'approved' ? 'text-blue-700' : row.status === 'cancelled' ? 'text-slate-500' : 'text-amber-700'}`}>{formatMoney(row.netAmount)}</td>
-                      <td className="whitespace-nowrap p-2 text-right text-xs font-semibold text-slate-700">
+                      <td className={`bg-red-50/60 p-2 pr-4 text-right text-xs font-semibold tabular-nums ${row.status === 'paid' ? 'text-emerald-700' : row.status === 'approved' ? 'text-blue-700' : row.status === 'cancelled' ? 'text-slate-500' : 'text-amber-700'}`}>{formatMoney(row.netAmount)}</td>
+                      <td className="whitespace-nowrap p-2 pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">
                         <div>ยอด: <b>{formatMoney(row.amount)}</b></div>
                         {row.vat > 0 ? <div className="text-emerald-700">+VAT: {formatMoney(row.vat)}</div> : null}
                         {row.wht > 0 ? <div className="text-amber-700">-WHT: {formatMoney(row.wht)}</div> : null}

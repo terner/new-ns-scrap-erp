@@ -30,10 +30,10 @@ const pageSizeOptions = [10, 25, 50, 100]
 const transferColumns: Array<ResizableColumnDefinition<TransferColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
-  { key: 'from', defaultWidth: 220, minWidth: 150 },
-  { key: 'to', defaultWidth: 220, minWidth: 150 },
-  { key: 'amount', defaultWidth: 140, minWidth: 120 },
-  { key: 'fee', defaultWidth: 130, minWidth: 110 },
+  { key: 'from', defaultWidth: 280, minWidth: 150 },
+  { key: 'to', defaultWidth: 280, minWidth: 150 },
+  { key: 'amount', defaultWidth: 85, minWidth: 80 },
+  { key: 'fee', defaultWidth: 80, minWidth: 70 },
   { key: 'byPerson', defaultWidth: 160, minWidth: 120 },
   { key: 'action', defaultWidth: 150, minWidth: 140 },
 ]
@@ -417,8 +417,8 @@ export function DailyTransferPageClient() {
               <TableCell className="whitespace-nowrap text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</TableCell>
               <TableCell className="text-xs font-semibold text-red-600">{row.fromAccountName}</TableCell>
               <TableCell className="text-xs font-semibold text-emerald-700">{row.toAccountName}</TableCell>
-              <TableCell className="whitespace-nowrap text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.amount)}</TableCell>
-              <TableCell className="whitespace-nowrap text-right text-xs font-semibold text-amber-700 tabular-nums">{formatMoney(row.fee)}</TableCell>
+              <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.amount)}</TableCell>
+              <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-amber-700 tabular-nums">{formatMoney(row.fee)}</TableCell>
               <TableCell className="text-xs font-semibold text-slate-700">{row.byPerson || '-'}</TableCell>
               <TableCell className="space-x-2 whitespace-nowrap text-right">
                 <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>

@@ -525,7 +525,16 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                     }}
                   >
                     {config.columns.map((column) => (
-                      <td key={column.key} className={`truncate p-2 text-xs font-semibold text-slate-700 ${alignClass(column.align)} ${column.key === 'code' ? 'font-mono tabular-nums' : ''}`}>
+                      <td
+                        key={column.key}
+                        className={`p-2 text-xs font-semibold text-slate-700 ${alignClass(column.align)} ${
+                          column.align === 'right'
+                            ? 'pr-4 tabular-nums whitespace-nowrap'
+                            : column.key === 'code'
+                            ? 'font-mono tabular-nums whitespace-nowrap'
+                            : 'truncate'
+                        }`}
+                      >
                         {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
                         {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
                         {column.format === 'status' ? (

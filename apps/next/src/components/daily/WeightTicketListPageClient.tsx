@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ButtonHTMLAttributes } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Printer, Search, Share2, SquarePen, XCircle } from 'lucide-react'
+import { Plus, Search, XCircle } from 'lucide-react'
 import { getErrorMessage } from '@/lib/api-client'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Button } from '@/components/ui/Button'
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/Input'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
+import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,7 @@ import {
   type WeightTicketType,
   weightTicketStatusBadgeClass,
 } from '@/lib/weight-tickets'
+import { WeightTicketDetailModal } from '@/components/daily/WeightTicketDetailModal'
 
 type TypeFilter = WeightTicketType
 type StatusFilter = WeightTicketStatus
@@ -39,13 +41,13 @@ const pageSize = 10
 const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey>> = [
   { key: 'documentNo', defaultWidth: 150, minWidth: 120 },
   { key: 'createdAt', defaultWidth: 170, minWidth: 130 },
-  { key: 'partyName', defaultWidth: 210, minWidth: 150 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 150 },
   { key: 'branch', defaultWidth: 140, minWidth: 110 },
   { key: 'vehicleNo', defaultWidth: 130, minWidth: 110 },
-  { key: 'netWeight', defaultWidth: 150, minWidth: 120 },
+  { key: 'netWeight', defaultWidth: 95, minWidth: 80 },
   { key: 'status', defaultWidth: 160, minWidth: 130 },
   { key: 'updatedAt', defaultWidth: 170, minWidth: 130 },
-  { key: 'action', defaultWidth: 300, minWidth: 240 },
+  { key: 'action', defaultWidth: 220, minWidth: 200 },
 ]
 
 const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; values: StatusFilter[] }>> = {
@@ -163,6 +165,7 @@ export function WeightTicketListPageClient() {
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
   const [printingTicketId, setPrintingTicketId] = useState<string | null>(null)
+  const [detailTicketDocNo, setDetailTicketDocNo] = useState<string | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -428,15 +431,15 @@ export function WeightTicketListPageClient() {
                 <tr
                   className="cursor-pointer hover:bg-slate-50"
                   key={ticket.id}
-                  onClick={() => router.push(`/daily/weight-ticket-list/${encodeURIComponent(ticket.documentNo)}`)}
+                  onClick={() => setDetailTicketDocNo(ticket.documentNo)}
                 >
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-900">{ticket.documentNo}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDateTime(ticket.createdAt)}</td>
-                  <td className="px-3 py-3 text-slate-900">{ticket.partyName}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.branchName}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.vehicleNo}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-slate-900">{formatWeight(ticket.totals.netWeight)} กก.</td>
-                  <td className="box-border h-[39px] w-[140px] px-3 py-2">
+                  <td className="whitespace-nowrap p-2 text-slate-900">{ticket.documentNo}</td>
+                  <td className="whitespace-nowrap p-2 text-slate-600">{formatDateTime(ticket.createdAt)}</td>
+                  <td className="p-2 text-slate-900">{ticket.partyName}</td>
+                  <td className="whitespace-nowrap p-2 text-slate-600">{ticket.branchName}</td>
+                  <td className="whitespace-nowrap p-2 text-slate-600">{ticket.vehicleNo}</td>
+                  <TableNumberCell value={`${formatWeight(ticket.totals.netWeight)} กก.`} />
+                  <td className="p-2">
                     <div className="flex min-h-[23px] flex-col items-start justify-center">
                       <span className={cn(
                         'inline-flex items-center gap-1.5 text-xs font-medium',
@@ -448,11 +451,11 @@ export function WeightTicketListPageClient() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-slate-600">
+                  <td className="p-2 text-slate-600">
                     <div className="truncate">{ticket.updatedBy}</div>
                     <div className="text-[11px] text-slate-400">{formatDateTime(ticket.updatedAt || ticket.createdAt)}</div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right">
+                  <td className="whitespace-nowrap p-2 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
@@ -462,7 +465,6 @@ export function WeightTicketListPageClient() {
                           void handlePrintTicket(ticket)
                         }}
                       >
-                        <Printer className="size-3" />
                         {printingTicketId === ticket.id ? 'เตรียม...' : 'พิมพ์'}
                       </button>
                       <button
@@ -473,7 +475,6 @@ export function WeightTicketListPageClient() {
                           openWeightTicketLineShare(ticket)
                         }}
                       >
-                        <Share2 className="size-3" />
                         แชร์
                       </button>
                       {ticket.canEdit ? (
@@ -482,7 +483,6 @@ export function WeightTicketListPageClient() {
                           href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}
                           onClick={(event) => event.stopPropagation()}
                         >
-                          <SquarePen className="size-3" />
                           แก้ไข
                         </Link>
                       ) : null}
@@ -497,7 +497,6 @@ export function WeightTicketListPageClient() {
                             setCancelNote(ticket.cancelNote ?? '')
                           }}
                         >
-                          <XCircle className="size-3" />
                           ยกเลิก
                         </button>
                       ) : null}
@@ -557,6 +556,12 @@ export function WeightTicketListPageClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {detailTicketDocNo ? (
+        <WeightTicketDetailModal
+          ticketId={detailTicketDocNo}
+          onClose={() => setDetailTicketDocNo(null)}
+        />
+      ) : null}
     </div>
   )
 }

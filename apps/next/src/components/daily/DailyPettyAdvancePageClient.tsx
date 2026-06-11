@@ -52,11 +52,11 @@ const pettyAdvanceColumns: Array<ResizableColumnDefinition<PettyAdvanceColumnKey
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
   { key: 'type', defaultWidth: 150, minWidth: 120 },
-  { key: 'recipientName', defaultWidth: 180, minWidth: 130 },
-  { key: 'amount', defaultWidth: 130, minWidth: 110 },
-  { key: 'spent', defaultWidth: 130, minWidth: 110 },
-  { key: 'returned', defaultWidth: 130, minWidth: 110 },
-  { key: 'remaining', defaultWidth: 130, minWidth: 110 },
+  { key: 'recipientName', defaultWidth: 320, minWidth: 130 },
+  { key: 'amount', defaultWidth: 85, minWidth: 80 },
+  { key: 'spent', defaultWidth: 85, minWidth: 80 },
+  { key: 'returned', defaultWidth: 85, minWidth: 80 },
+  { key: 'remaining', defaultWidth: 85, minWidth: 80 },
   { key: 'status', defaultWidth: 120, minWidth: 100 },
   { key: 'action', defaultWidth: 180, minWidth: 160 },
 ]
@@ -438,10 +438,10 @@ export function DailyPettyAdvancePageClient() {
                 <td className="p-2">{formatDateDisplay(row.date)}</td>
                 <td className="p-2"><span className={row.type === 'DIRECTOR_LOAN' ? 'text-purple-700' : 'text-amber-700'}>{typeLabel(row.type)}</span></td>
                 <td className="p-2 font-medium">{row.recipientName}</td>
-                <td className="p-2 text-right">{formatMoney(row.amount)}</td>
-                <td className="p-2 text-right text-blue-700">{row.spent > 0 ? <button className="hover:underline" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>{formatMoney(row.spent)}</button> : '-'}</td>
-                <td className="p-2 text-right text-emerald-700">{formatMoney(row.returned)}</td>
-                <td className={`p-2 text-right font-bold ${row.remaining > 1 ? 'text-red-700' : 'text-emerald-700'}`}>{formatMoney(row.remaining)}</td>
+                <td className="p-2 pr-4 text-right tabular-nums">{formatMoney(row.amount)}</td>
+                <td className="p-2 pr-4 text-right text-blue-700 tabular-nums">{row.spent > 0 ? <button className="hover:underline" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>{formatMoney(row.spent)}</button> : '-'}</td>
+                <td className="p-2 pr-4 text-right text-emerald-700 tabular-nums">{formatMoney(row.returned)}</td>
+                <td className={`p-2 pr-4 text-right font-bold tabular-nums ${row.remaining > 1 ? 'text-red-700' : 'text-emerald-700'}`}>{formatMoney(row.remaining)}</td>
                 <td className="p-2 text-center"><StatusBadge status={row.status} /></td>
                 <td className="space-x-1 whitespace-nowrap p-2 text-right">
                   <button className="text-xs text-blue-600 hover:underline" title="ดูรายละเอียด" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>ดู</button>

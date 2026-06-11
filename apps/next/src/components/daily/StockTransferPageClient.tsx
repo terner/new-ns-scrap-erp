@@ -21,11 +21,11 @@ const numberInputClass = '[appearance:textfield] [&::-webkit-inner-spin-button]:
 const stockTransferColumns: Array<ResizableColumnDefinition<StockTransferColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
-  { key: 'from', defaultWidth: 190, minWidth: 140 },
-  { key: 'to', defaultWidth: 190, minWidth: 140 },
-  { key: 'itemCount', defaultWidth: 110, minWidth: 90 },
-  { key: 'totalQty', defaultWidth: 140, minWidth: 120 },
-  { key: 'notes', defaultWidth: 240, minWidth: 160 },
+  { key: 'from', defaultWidth: 280, minWidth: 140 },
+  { key: 'to', defaultWidth: 280, minWidth: 140 },
+  { key: 'itemCount', defaultWidth: 75, minWidth: 60 },
+  { key: 'totalQty', defaultWidth: 85, minWidth: 80 },
+  { key: 'notes', defaultWidth: 180, minWidth: 160 },
   { key: 'action', defaultWidth: 120, minWidth: 100 },
 ]
 
@@ -456,8 +456,8 @@ export function StockTransferPageClient() {
               <TableCell className="whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
               <TableCell className="text-red-600">{row.from}</TableCell>
               <TableCell className="text-emerald-700">{row.to}</TableCell>
-              <TableCell className="whitespace-nowrap text-right tabular-nums">{row.itemCount.toLocaleString('th-TH')}</TableCell>
-              <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{formatMoney(row.totalQty)} กก.</TableCell>
+              <TableCell className="whitespace-nowrap text-right pr-4 tabular-nums">{row.itemCount.toLocaleString('th-TH')}</TableCell>
+              <TableCell className="whitespace-nowrap text-right pr-4 font-medium tabular-nums">{formatMoney(row.totalQty)} กก.</TableCell>
               <TableCell className="max-w-[280px] truncate text-slate-600">{row.notes || '-'}</TableCell>
               <TableCell className="text-right">
                 <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled title="รอออกแบบ cancel/tombstone flow" type="button">ยกเลิก</button>

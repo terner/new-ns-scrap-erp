@@ -10,6 +10,7 @@ import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input as UiInput } from '@/components/ui/Input'
+import { CollapsedList } from '@/components/ui/CollapsedList'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
@@ -128,38 +129,38 @@ const companyProfilePayloadSchema = z.object({
 const paymentQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
-  { key: 'partyName', defaultWidth: 220, minWidth: 150 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 150 },
   { key: 'bankName', defaultWidth: 150, minWidth: 120 },
   { key: 'accountNo', defaultWidth: 220, minWidth: 160 },
-  { key: 'totalAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'paidAmount', defaultWidth: 140, minWidth: 120 },
-  { key: 'balance', defaultWidth: 170, minWidth: 140 },
-  { key: 'age', defaultWidth: 100, minWidth: 90 },
+  { key: 'totalAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'paidAmount', defaultWidth: 85, minWidth: 80 },
+  { key: 'balance', defaultWidth: 90, minWidth: 80 },
+  { key: 'age', defaultWidth: 75, minWidth: 60 },
   { key: 'action', defaultWidth: 150, minWidth: 140 },
 ]
 const paymentHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 150, minWidth: 120 },
-  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 140 },
   { key: 'billRefs', defaultWidth: 220, minWidth: 160 },
   { key: 'accountName', defaultWidth: 220, minWidth: 160 },
-  { key: 'amount', defaultWidth: 150, minWidth: 120 },
-  { key: 'wht', defaultWidth: 130, minWidth: 110 },
-  { key: 'bankFee', defaultWidth: 130, minWidth: 110 },
-  { key: 'netAmount', defaultWidth: 150, minWidth: 120 },
+  { key: 'amount', defaultWidth: 85, minWidth: 80 },
+  { key: 'wht', defaultWidth: 80, minWidth: 70 },
+  { key: 'bankFee', defaultWidth: 80, minWidth: 70 },
+  { key: 'netAmount', defaultWidth: 85, minWidth: 80 },
   { key: 'status', defaultWidth: 130, minWidth: 110 },
   { key: 'notes', defaultWidth: 180, minWidth: 130 },
 ]
 const receiptHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 150, minWidth: 120 },
-  { key: 'partyName', defaultWidth: 190, minWidth: 140 },
+  { key: 'partyName', defaultWidth: 320, minWidth: 140 },
   { key: 'billRefs', defaultWidth: 220, minWidth: 160 },
   { key: 'accountName', defaultWidth: 220, minWidth: 160 },
-  { key: 'amount', defaultWidth: 150, minWidth: 120 },
-  { key: 'wht', defaultWidth: 130, minWidth: 110 },
-  { key: 'bankFee', defaultWidth: 130, minWidth: 110 },
-  { key: 'netAmount', defaultWidth: 150, minWidth: 120 },
+  { key: 'amount', defaultWidth: 85, minWidth: 80 },
+  { key: 'wht', defaultWidth: 80, minWidth: 70 },
+  { key: 'bankFee', defaultWidth: 80, minWidth: 70 },
+  { key: 'netAmount', defaultWidth: 85, minWidth: 80 },
   { key: 'notes', defaultWidth: 180, minWidth: 130 },
   { key: 'action', defaultWidth: 130, minWidth: 110 },
 ]
@@ -1396,10 +1397,10 @@ export function MoneyMovementPageClient({
                           <span>-</span>
                         )}
                       </TableCell>
-                      <TableCell className="w-40 whitespace-nowrap text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(bill.totalAmount)}</TableCell>
-                      <TableCell className="w-40 whitespace-nowrap text-right text-xs font-semibold text-blue-700 tabular-nums">{formatMoney(bill.paidAmount)}</TableCell>
-                      <TableCell className={`w-40 whitespace-nowrap text-right text-xs font-semibold tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</TableCell>
-                      <TableCell className="w-20 whitespace-nowrap text-right text-xs font-semibold text-slate-700 tabular-nums">{ageInDays(bill.date)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(bill.totalAmount)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-blue-700 tabular-nums">{formatMoney(bill.paidAmount)}</TableCell>
+                      <TableCell className={`whitespace-nowrap text-right pr-4 text-xs font-semibold tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{ageInDays(bill.date)}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -1657,7 +1658,7 @@ export function MoneyMovementPageClient({
                         <TableCell className="text-xs font-semibold text-slate-700">
                           <div className="space-y-1">
                             <div className="font-semibold text-slate-700">{billDocNos.length.toLocaleString('th-TH')} บิล</div>
-                            {billDocNos.map((docNo) => <div key={`${row.id}-bill-${docNo}`} className="text-slate-700">{docNo}</div>)}
+                            <CollapsedList items={billDocNos} />
                             {mode === 'payment' && row.approvalIds?.length ? (
                               <div className="pt-1 text-[11px] text-slate-500">
                                 PMA: {row.approvalIds.map((approvalId, index) => (
@@ -1673,13 +1674,13 @@ export function MoneyMovementPageClient({
                         <TableCell className="text-xs font-semibold text-slate-700">
                           <div className="space-y-1">
                             <div className="font-semibold text-slate-700">{accountSummaries.length.toLocaleString('th-TH')} บัญชี</div>
-                            {accountSummaries.map((summary) => <div key={`${row.id}-account-${summary}`} className="whitespace-nowrap">{summary}</div>)}
+                            <CollapsedList items={accountSummaries} />
                           </div>
                         </TableCell>
-                        <TableCell className="w-44 whitespace-nowrap text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.amount)}</TableCell>
-                        <TableCell className="w-40 whitespace-nowrap text-right text-xs font-semibold text-amber-700 tabular-nums">{formatMoney(row.withholdingTax)}</TableCell>
-                        <TableCell className="w-40 whitespace-nowrap text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.fee)}</TableCell>
-                        <TableCell className={`w-44 whitespace-nowrap text-right text-xs font-semibold tabular-nums ${theme.strong}`}>{formatMoney(row.netAmount)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.amount)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-amber-700 tabular-nums">{formatMoney(row.withholdingTax)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.fee)}</TableCell>
+                        <TableCell className={`whitespace-nowrap text-right pr-4 text-xs font-semibold tabular-nums ${theme.strong}`}>{formatMoney(row.netAmount)}</TableCell>
                         {mode === 'payment' ? (
                           <TableCell>
                             <div className={`inline-flex items-center gap-1.5 text-xs font-semibold ${paymentHistoryStatusTone(row.status)}`}>
