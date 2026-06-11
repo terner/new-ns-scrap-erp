@@ -681,7 +681,7 @@ function PoSellDetailModal({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="po-sell-detail-title">
       <div className="mx-auto my-4 max-w-lg rounded-md bg-white shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between border-b px-5 py-3 bg-slate-50">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3 bg-slate-50">
           <div>
             <h3 id="po-sell-detail-title" className="font-bold text-slate-900">รายละเอียด PO Sell</h3>
             <div className="text-xs text-slate-500 font-mono mt-0.5">{row.docNo}</div>
@@ -689,70 +689,60 @@ function PoSellDetailModal({
           <button className="text-2xl text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>×</button>
         </div>
         <div className="space-y-4 p-5 text-sm">
-          <div className="grid grid-cols-2 gap-3">
-            <DetailItem label="วันที่สร้างเอกสาร" value={formatDateDisplay(row.date)} />
-            <DetailItem label="วันที่กำหนดส่ง" value={formatDateDisplay(row.expectedDelivery)} />
-            <DetailItem className="col-span-2" label="Customer" value={row.customerName} />
-            <DetailItem label="สาขา/คลัง" value={row.branchName || '-'} />
-            <DetailItem label="ช่องทางขาย" value={row.channelName || '-'} />
+          {/* ข้อมูลทั่วไป */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <DetailItem label="วันที่สร้างเอกสาร" value={formatDateDisplay(row.date)} />
+              <DetailItem label="วันที่กำหนดส่ง" value={formatDateDisplay(row.expectedDelivery)} />
+              <DetailItem className="col-span-2" label="Customer" value={row.customerName} />
+              <DetailItem label="สาขา/คลัง" value={row.branchName || '-'} />
+              <DetailItem label="ช่องทางขาย" value={row.channelName || '-'} />
+            </div>
           </div>
 
-          <div className="rounded-md border border-slate-100 bg-slate-50 p-3 space-y-2">
-            <div className="text-xs font-semibold text-slate-500">สถานะรายการ</div>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-slate-500">เอกสาร:</span>
-                <StatusPill label={row.documentStatusLabel} tone={documentStatusPillTone(row.documentStatus)} />
+          {/* สถานะรายการ */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">สถานะรายการ</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="flex flex-col py-1">
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">เอกสาร</div>
+                <div className="mt-1"><StatusPill label={row.documentStatusLabel} tone={documentStatusPillTone(row.documentStatus)} /></div>
               </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-slate-500">Match Cost:</span>
-                <StatusPill label={row.matchStatus} tone="match" />
+              <div className="flex flex-col py-1">
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Match Cost</div>
+                <div className="mt-1"><StatusPill label={row.matchStatus} tone="match" /></div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-100 p-3 space-y-2">
-            <div className="text-xs font-semibold text-slate-500">จำนวนและรายได้</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-xs text-slate-500">จำนวนจองรวม</span>
-                <div className="font-semibold text-slate-800">{formatMoney(row.qty)} กก.</div>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500">รายได้รวม</span>
-                <div className="font-semibold text-emerald-700">{formatMoney(row.totalAmount)} บาท</div>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500">จำนวน Matched</span>
-                <div className="font-semibold text-blue-700">{formatMoney(row.matchedQty)} กก.</div>
-              </div>
-              <div>
-                <span className="text-xs text-slate-500">จำนวนรอส่ง</span>
-                <div className="font-semibold text-amber-700">{formatMoney(row.remainingQty)} กก.</div>
-              </div>
+          {/* จำนวนและรายได้ */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">จำนวนและรายได้</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <DetailItem label="จำนวนจองรวม" value={`${formatMoney(row.qty)} กก.`} />
+              <DetailItem label="รายได้รวม" value={`${formatMoney(row.totalAmount)} บาท`} />
+              <DetailItem label="จำนวน Matched" value={`${formatMoney(row.matchedQty)} กก.`} />
+              <DetailItem label="จำนวนรอส่ง" value={`${formatMoney(row.remainingQty)} กก.`} />
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-100 p-3 space-y-2 bg-emerald-50/30">
-            <div className="text-xs font-semibold text-emerald-800">Deal Margin</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-xs text-emerald-600/80"> Deal Margin </span>
-                <div className={`font-bold ${row.margin < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(row.margin)} บาท</div>
-              </div>
-              <div>
-                <span className="text-xs text-emerald-600/80"> Margin % </span>
-                <div className={`font-bold ${row.marginPct < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatPercent(row.marginPct)}</div>
-              </div>
+          {/* Deal Margin */}
+          <div className="rounded-lg border border-slate-100 bg-emerald-50/30 p-4">
+            <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-3 pb-1 border-b border-emerald-100">Deal Margin</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <DetailItem label="Deal Margin" value={`${formatMoney(row.margin)} บาท`} />
+              <DetailItem label="Margin %" value={formatPercent(row.marginPct)} />
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-100 p-3">
-            <div className="text-xs font-semibold text-slate-500 mb-1">รายการสินค้า</div>
-            <div className="text-slate-800 font-medium">{row.productName || '-'}</div>
+          {/* รายการสินค้า */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">รายการสินค้า</div>
+            <div className="text-slate-800 font-semibold">{row.productName || '-'}</div>
           </div>
         </div>
-        <div className="flex justify-end border-t bg-slate-50 px-5 py-3">
+        <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-5 py-3 rounded-b-md">
           <button className="rounded-md border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
@@ -761,5 +751,10 @@ function PoSellDetailModal({
 }
 
 function DetailItem({ className = '', label, value }: { className?: string; label: string; value: string }) {
-  return <div className={`rounded-md bg-slate-50 p-2.5 ${className}`}><div className="text-xs text-slate-500">{label}</div><div className="mt-0.5 font-semibold text-slate-800">{value}</div></div>
+  return (
+    <div className={`flex flex-col py-1 ${className}`}>
+      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className="mt-0.5 text-xs sm:text-sm font-semibold text-slate-800">{value}</div>
+    </div>
+  )
 }

@@ -213,9 +213,9 @@ function approvalSortValue(
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
+    <div className="flex flex-col py-1">
+      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className="mt-0.5 text-xs sm:text-sm font-semibold text-slate-800">{value}</div>
     </div>
   )
 }
@@ -1076,54 +1076,83 @@ export function PaymentApprovalPageClient() {
           </DialogHeader>
 
           {detail?.tab === 'ap' ? (
-            <div className="space-y-5 px-6 pb-6">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <DetailItem label="เลขที่เอกสารอ้างอิง" value={detail.row.sourceDocNo} />
-                <DetailItem label="ประเภทเอกสารอ้างอิง" value={detail.row.sourceLabel} />
-                <DetailItem label="วันที่" value={formatDateDisplay(detail.row.date)} />
-                <DetailItem label="ผู้ขาย" value={detail.row.supplierName} />
-                <DetailItem label="ยอดเต็ม" value={formatMoney(detail.row.totalAmount)} />
-                <DetailItem label="ชำระแล้ว" value={formatMoney(detail.row.paidAmount)} />
-                <DetailItem label="คงเหลือสุทธิ" value={formatMoney(detail.row.payableBalance)} />
-                <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
+            <div className="space-y-4 px-6 pb-6 pt-2">
+              {/* Reference Document Section */}
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสารอ้างอิง</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <DetailItem label="เลขที่เอกสารอ้างอิง" value={detail.row.sourceDocNo} />
+                  <DetailItem label="ประเภทเอกสารอ้างอิง" value={detail.row.sourceLabel} />
+                  <DetailItem label="วันที่" value={formatDateDisplay(detail.row.date)} />
+                  <DetailItem label="ผู้ขาย" value={detail.row.supplierName} />
+                </div>
+              </div>
+
+              {/* Financial Section */}
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการเงิน</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <DetailItem label="ยอดเต็ม" value={formatMoney(detail.row.totalAmount)} />
+                  <DetailItem label="ชำระแล้ว" value={formatMoney(detail.row.paidAmount)} />
+                  <DetailItem label="คงเหลือสุทธิ" value={formatMoney(detail.row.payableBalance)} />
+                  <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
+                </div>
               </div>
 
               {detail.row.approvalStatus === 'pending' ? renderSplitApprovalSection(detail.row) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <DetailItem label="เลขที่อนุมัติ" value={detail.row.approvalDisplayDocNo ?? detail.row.docNo} />
-                  <DetailItem label="ช่องทางจ่าย / ปลายทาง" value={detail.row.destinationLabel || '-'} />
-                  <DetailItem label="ยอดอนุมัติ" value={formatMoney(detail.row.approvedAmount)} />
-                  <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
-                  {detail.row.voidedAt ? <DetailItem label="วันที่ยกเลิก" value={formatDateDisplay(detail.row.voidedAt)} /> : null}
-                  {detail.row.voidReason ? <DetailItem label="เหตุผลยกเลิก" value={detail.row.voidReason} /> : null}
+                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการอนุมัติ</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    <DetailItem label="เลขที่อนุมัติ" value={detail.row.approvalDisplayDocNo ?? detail.row.docNo} />
+                    <DetailItem label="ช่องทางจ่าย / ปลายทาง" value={detail.row.destinationLabel || '-'} />
+                    <DetailItem label="ยอดอนุมัติ" value={formatMoney(detail.row.approvedAmount)} />
+                    <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
+                    {detail.row.voidedAt ? <DetailItem label="วันที่ยกเลิก" value={formatDateDisplay(detail.row.voidedAt)} /> : null}
+                    {detail.row.voidReason ? <DetailItem label="เหตุผลยกเลิก" value={detail.row.voidReason} /> : null}
+                  </div>
                 </div>
               )}
             </div>
           ) : detail?.tab === 'expense' ? (
-            <div className="space-y-5 px-6 pb-6">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <DetailItem label="เลขที่อนุมัติ" value={detail.row.docNo} />
-                <DetailItem label="เลขที่เอกสารอ้างอิง" value={detail.row.sourceDocNo} />
-                <DetailItem label="วันที่" value={formatDateDisplay(detail.row.date)} />
-                <DetailItem label="ครบกำหนด" value={detail.row.dueDate ? formatDateDisplay(detail.row.dueDate) : '-'} />
-                <DetailItem label="ผู้รับเงิน" value={detail.row.payee} />
-                <DetailItem label="อ้างอิง" value={detail.row.refDocNo || '-'} />
-                <DetailItem label="ช่องทางจ่าย" value={detail.row.destinationLabel || detail.row.accountName || '-'} />
-                <DetailItem label="ยอดเต็ม" value={formatMoney(detail.row.totalAmount)} />
-                <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
+            <div className="space-y-4 px-6 pb-6 pt-2">
+              {/* Reference Document Section */}
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสารอ้างอิง</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <DetailItem label="เลขที่อนุมัติ" value={detail.row.docNo} />
+                  <DetailItem label="เลขที่เอกสารอ้างอิง" value={detail.row.sourceDocNo} />
+                  <DetailItem label="วันที่" value={formatDateDisplay(detail.row.date)} />
+                  <DetailItem label="ครบกำหนด" value={detail.row.dueDate ? formatDateDisplay(detail.row.dueDate) : '-'} />
+                  <DetailItem label="ผู้รับเงิน" value={detail.row.payee} />
+                  <DetailItem label="อ้างอิง" value={detail.row.refDocNo || '-'} />
+                </div>
               </div>
+
+              {/* Financial Section */}
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการเงิน</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <DetailItem label="ช่องทางจ่าย" value={detail.row.destinationLabel || detail.row.accountName || '-'} />
+                  <DetailItem label="ยอดเต็ม" value={formatMoney(detail.row.totalAmount)} />
+                  <DetailItem label="สถานะ" value={approvalStatusLabel(detail.row.approvalStatus)} />
+                </div>
+              </div>
+
               {detail.row.approvalStatus === 'pending' ? renderSplitApprovalSection(detail.row) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <DetailItem label="เลขที่อนุมัติ" value={detail.row.approvalDisplayDocNo ?? detail.row.docNo} />
-                  <DetailItem label="ยอดอนุมัติ" value={formatMoney(detail.row.approvedAmount)} />
-                  {detail.row.voidedAt ? <DetailItem label="วันที่ยกเลิก" value={formatDateDisplay(detail.row.voidedAt)} /> : null}
-                  {detail.row.voidReason ? <DetailItem label="เหตุผลยกเลิก" value={detail.row.voidReason} /> : null}
+                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการอนุมัติ</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    <DetailItem label="เลขที่อนุมัติ" value={detail.row.approvalDisplayDocNo ?? detail.row.docNo} />
+                    <DetailItem label="ยอดอนุมัติ" value={formatMoney(detail.row.approvedAmount)} />
+                    {detail.row.voidedAt ? <DetailItem label="วันที่ยกเลิก" value={formatDateDisplay(detail.row.voidedAt)} /> : null}
+                    {detail.row.voidReason ? <DetailItem label="เหตุผลยกเลิก" value={detail.row.voidReason} /> : null}
+                  </div>
                 </div>
               )}
             </div>
           ) : null}
 
-          <DialogFooter className="px-6 py-4">
+          <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-md">
             {detail && (detail.row.approvalStatus === 'approved' || detail.row.approvalStatus === 'voided') ? (
               <Button
                 className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1"
