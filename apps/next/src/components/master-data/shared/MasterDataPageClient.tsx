@@ -478,7 +478,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
             <div>พบทั้งหมด <span className="font-semibold text-slate-900">{total}</span> รายการ</div>
             <div className="flex flex-wrap items-center gap-2">
               {columnResize.hasCustomWidths ? (
-                <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
+                <Button className="hidden md:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
                   Set col to default
                 </Button>
               ) : null}

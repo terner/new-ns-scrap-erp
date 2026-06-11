@@ -528,7 +528,7 @@ export function CustomersPageClient() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {columnResize.hasCustomWidths ? (
-              <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
+              <Button className="hidden md:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
                 Set col to default
               </Button>
             ) : null}
