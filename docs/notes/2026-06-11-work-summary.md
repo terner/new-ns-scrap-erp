@@ -83,5 +83,13 @@
     - **PO Buy "รายการสินค้า" column**: `307.0px` wide cell, visual gap between text and quantity is exactly **`16px`**!
   - Both tables are now perfectly compact, spacing matches professional standards, and lints/builds compile successfully.
 
+## Table Compact Layout and Right-Alignment Polish (Receipt Vouchers, Suppliers & Master Data)
+- **UI & Layout Standardization:**
+  - **Receipt Vouchers (`ReceiptVouchersPageClient.tsx`):** Compressed default column widths (e.g. set quantities/amounts from `140px` -> `85px`, action buttons from `150px` -> `140px`, and expanded payee `sellerName` to `320px` to prevent text-wrap bloating table rows).
+  - **Suppliers (`SuppliersPageClient.tsx`):** Standardized column widths to match core transaction flows, expanding the primary vendor name to `320px` and shortening phone, type, and active status toggles to clear out empty gaps on wide displays.
+  - **Master Data shared components (`MasterDataPageClient.tsx`):** Added `pr-4 tabular-nums whitespace-nowrap` classes to right-aligned cells (`column.align === 'right'`). This ensures numeric columns (standard cost, process cost, limit) line up perfectly with the resizable header and keep correct spacing relative to the column resize handles.
 
-
+## Payment Approval Default Status Change
+- **Behavior Modification:**
+  - **Payment Approval (`PaymentApprovalPageClient.tsx`):** Modified the initial state filter `approvalStatusFilter` to default to an empty array `[]` ("ทั้งหมด") instead of `['pending']` ("ยังไม่อนุมัติ"). When the user navigates to the page, it will now load and display all records across all statuses by default.
+  - **TypeScript & Schema Alignment:** Ran `npm run prisma:generate` to synchronize database object models after pulling conflict merges from remote. Passed all typescript checks, lints, and production builds successfully.
