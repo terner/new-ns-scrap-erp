@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/Input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getErrorMessage } from '@/lib/api-client'
-import { listImpurities } from '@/lib/impurity'
 import { cn } from '@/lib/utils'
 import {
   calculateLineTotals,
@@ -54,6 +53,17 @@ type FormState = {
   type: WeightTicketType
   vehicleImageFiles: AttachmentPreview[]
   vehicleNo: string
+}
+
+type WeightTicketOptionsPayload = {
+  branches?: Array<{ code?: string | null; id: string; name: string }>
+  customers?: Array<{ code?: string | null; id: string; name: string }>
+  impurities?: Array<{ id: string; label: string }>
+  suppliers?: Array<{ code?: string | null; id: string; name: string }>
+}
+
+type WeightTicketProductsPayload = {
+  rows?: Array<{ code?: string | null; id: string; imageStorageKey?: string | null; name: string; thumbnailUrl?: string | null; type?: string | null; unit?: string | null }>
 }
 
 function createFormWeightTicketLine(id?: string): FormWeightTicketLine {
@@ -145,6 +155,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
   const [suppliers, setSuppliers] = useState<OptionItem[]>([])
   const [customers, setCustomers] = useState<OptionItem[]>([])
   const [products, setProducts] = useState<OptionItem[]>([])
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [impurities, setImpurities] = useState<OptionItem[]>([])
   const [loadedTicket, setLoadedTicket] = useState<WeightTicketRecord | null>(null)
   const [savedTicket, setSavedTicket] = useState<WeightTicketRecord | null>(null)
@@ -161,33 +172,47 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
     () => form.lines.find((line) => line.id === activeLineId) ?? form.lines[0] ?? null,
     [activeLineId, form.lines],
   )
+  const loadProducts = useCallback(async (signal?: AbortSignal) => {
+    setIsLoadingProducts(true)
+    try {
+      const response = await fetch('/api/daily/weight-tickets/products', { cache: 'no-store', signal })
+      if (!response.ok) throw new Error('โหลดรายการสินค้าไม่ได้')
+      const data = await response.json() as WeightTicketProductsPayload
+      if (signal?.aborted) return
+      setProducts((data.rows ?? []).map((product) => ({
+        category: product.type ?? undefined,
+        code: product.code ?? undefined,
+        description: product.type || undefined,
+        id: product.id,
+        imageUrl: product.thumbnailUrl ?? undefined,
+        label: `${product.code ? `${product.code} - ` : ''}${product.name}${product.unit ? ` - ${product.unit}` : ''}`,
+        name: product.name,
+      })))
+    } catch (caught) {
+      if (!signal?.aborted) setLoadError(getErrorMessage(caught, 'โหลดรายการสินค้าไม่ได้'))
+    } finally {
+      if (!signal?.aborted) setIsLoadingProducts(false)
+    }
+  }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
     let cancelled = false
 
     async function loadOptionData() {
       try {
-        const [branchResponse, supplierResponse, customerResponse, productResponse] = await Promise.all([
-          fetch('/api/branches', { cache: 'no-store' }),
-          fetch('/api/master-data/suppliers?all=1', { cache: 'no-store' }),
-          fetch('/api/master-data/customers?all=1', { cache: 'no-store' }),
-          fetch('/api/master-data/products?all=1&active=active', { cache: 'no-store' }),
-        ])
+        const response = await fetch('/api/daily/weight-tickets/options', { cache: 'no-store', signal: controller.signal })
+        if (!response.ok) throw new Error('โหลดข้อมูลอ้างอิงสำหรับใบรับ-ส่งของไม่ได้')
+        const data = await response.json() as WeightTicketOptionsPayload
 
-        if (branchResponse.ok) {
-          const data = await branchResponse.json() as { branches?: Array<{ code?: string | null; id: string; name: string }> }
-          const nextBranches = (data.branches ?? []).map((branch) => ({
+        if (!cancelled) {
+          setBranches((data.branches ?? []).map((branch) => ({
             code: branch.code ?? undefined,
             description: branch.code ? `รหัสสาขา ${branch.code}` : undefined,
             id: branch.id,
             label: branch.name,
-          }))
-          if (!cancelled && nextBranches.length) setBranches(nextBranches)
-        }
-
-        if (supplierResponse.ok) {
-          const data = await supplierResponse.json() as { rows?: Array<{ code?: string | null; id: string; name: string }> }
-          const nextSuppliers = (data.rows ?? []).map((supplier) => {
+          })))
+          setSuppliers((data.suppliers ?? []).map((supplier) => {
             const code = supplier.code?.trim() ?? ''
             return {
               code: code || undefined,
@@ -196,13 +221,8 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
               label: supplier.name,
               searchText: [code, supplier.name].filter(Boolean).join(' '),
             }
-          })
-          if (!cancelled && nextSuppliers.length) setSuppliers(nextSuppliers)
-        }
-
-        if (customerResponse.ok) {
-          const data = await customerResponse.json() as { rows?: Array<{ code?: string | null; id: string; name: string }> }
-          const nextCustomers = (data.rows ?? []).map((customer) => {
+          }))
+          setCustomers((data.customers ?? []).map((customer) => {
             const code = customer.code?.trim() ?? ''
             return {
               code: code || undefined,
@@ -211,32 +231,12 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
               label: customer.name,
               searchText: [code, customer.name].filter(Boolean).join(' '),
             }
-          })
-          if (!cancelled && nextCustomers.length) setCustomers(nextCustomers)
-        }
-
-        if (productResponse.ok) {
-          const data = await productResponse.json() as { rows?: Array<{ code?: string | null; id: string; imageNames?: string[]; name: string; type?: string | null; unit?: string | null }> }
-          const nextProducts = (data.rows ?? []).map((product) => ({
-            category: product.type ?? undefined,
-            code: product.code ?? undefined,
-            description: product.type || undefined,
-            id: product.id,
-            imageUrl: product.imageNames?.[0] ? decodeStoredImageAsset(product.imageNames[0]).url ?? undefined : undefined,
-            label: `${product.code ? `${product.code} - ` : ''}${product.name}${product.unit ? ` - ${product.unit}` : ''}`,
-            name: product.name,
           }))
-          if (!cancelled && nextProducts.length) setProducts(nextProducts)
-        }
-
-        const nextImpurities = await listImpurities()
-        if (!cancelled) {
-          setImpurities(nextImpurities
-            .filter((impurity) => impurity.active)
-            .map((impurity) => ({ id: impurity.id, label: impurity.name })))
+          setImpurities(data.impurities ?? [])
+          void loadProducts(controller.signal)
         }
       } catch (caught) {
-        if (!cancelled) setLoadError(getErrorMessage(caught, 'โหลดข้อมูลอ้างอิงสำหรับใบรับ-ส่งของไม่ได้'))
+        if (!cancelled && !controller.signal.aborted) setLoadError(getErrorMessage(caught, 'โหลดข้อมูลอ้างอิงสำหรับใบรับ-ส่งของไม่ได้'))
       }
     }
 
@@ -244,8 +244,9 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
 
     return () => {
       cancelled = true
+      controller.abort()
     }
-  }, [])
+  }, [loadProducts])
 
   useEffect(() => {
     if (!editingTicketId) {
@@ -582,11 +583,12 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                     >
                       <div className="min-w-0">
                         <SearchCombobox
+                          disabled={isLoadingProducts}
                           error={showError(`line-${line.id}-product`)}
                           inputId={`weight-product-${line.id}`}
                           label="สินค้า*"
                           options={products}
-                          placeholder="เลือกสินค้า"
+                          placeholder={isLoadingProducts ? 'กำลังโหลดสินค้า...' : 'เลือกสินค้า'}
                           value={line.productId}
                           onChange={(value) => {
                             markTouched(`line-${line.id}-product`)
@@ -594,6 +596,8 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                           }}
                         />
                         <ProductImagePicker
+                          key={`${form.branchId}:${form.partyId}:${form.type}`}
+                          disabled={isLoadingProducts}
                           products={products}
                           value={line.productId}
                           onChange={(value) => {
@@ -849,10 +853,12 @@ function FieldBlock({
 }
 
 function ProductImagePicker({
+  disabled,
   products,
   value,
   onChange,
 }: {
+  disabled: boolean
   products: OptionItem[]
   value: string
   onChange: (value: string) => void
@@ -872,66 +878,70 @@ function ProductImagePicker({
     <div className="mt-2">
       <div className="mb-1 block text-xs font-medium text-slate-600">เลือกจากรูปสินค้า</div>
       <div className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-1.5 sm:p-2">
-        <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
-          <button
-            className={cn(
-              'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
-              category === 'all' ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
-            )}
-            type="button"
-            onClick={() => setCategory('all')}
-          >
-            ทั้งหมด
-          </button>
-          {categories.map((item) => (
-            <button
-              className={cn(
-                'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
-                category === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
-              )}
-              key={item}
-              type="button"
-              onClick={() => setCategory(item)}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="mt-1.5 max-h-72 min-w-0 overflow-y-auto pr-1 sm:mt-2 sm:max-h-80">
-          <div className="grid min-w-0 grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6">
-            {filteredProducts.map((product) => {
-              const selected = product.id === value
-              return (
+        {!disabled ? (
+          <>
+            <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+              <button
+                className={cn(
+                  'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
+                  category === 'all' ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+                )}
+                type="button"
+                onClick={() => setCategory('all')}
+              >
+                ทั้งหมด
+              </button>
+              {categories.map((item) => (
                 <button
                   className={cn(
-                    'min-w-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:border-emerald-500',
-                    selected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200',
+                    'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
+                    category === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
                   )}
-                  key={product.id}
+                  key={item}
                   type="button"
-                  onClick={() => onChange(product.id)}
+                  onClick={() => setCategory(item)}
                 >
-                  <div className="h-10 bg-slate-100 sm:h-12">
-                    {product.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt={product.name ?? product.label} className="h-full w-full object-cover" src={product.imageUrl} />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-slate-400">
-                        <ImagePlus className="h-4 w-4" />
-                      </div>
-                    )}
-                  </div>
-                  <div className={cn('min-w-0 px-1 py-1 text-center text-[10px] font-semibold leading-tight sm:text-[11px]', selected ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-50 text-slate-800')}>
-                    <div className="line-clamp-2 min-h-6 min-w-0 break-words">{product.name ?? product.label}</div>
-                  </div>
+                  {item}
                 </button>
-              )
-            })}
-            {filteredProducts.length === 0 ? (
-              <div className="col-span-full rounded-md bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">ไม่พบสินค้า</div>
-            ) : null}
-          </div>
-        </div>
+              ))}
+            </div>
+            <div className="mt-1.5 max-h-72 min-w-0 overflow-y-auto pr-1 sm:mt-2 sm:max-h-80">
+              <div className="grid min-w-0 grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6">
+                {filteredProducts.map((product) => {
+                  const selected = product.id === value
+                  return (
+                    <button
+                      className={cn(
+                        'min-w-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:border-emerald-500',
+                        selected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200',
+                      )}
+                      key={product.id}
+                      type="button"
+                      onClick={() => onChange(product.id)}
+                    >
+                      <div className="h-10 bg-slate-100 sm:h-12">
+                        {product.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img alt={product.name ?? product.label} className="h-full w-full object-cover" src={product.imageUrl} />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-slate-400">
+                            <ImagePlus className="h-4 w-4" />
+                          </div>
+                        )}
+                      </div>
+                      <div className={cn('min-w-0 px-1 py-1 text-center text-[10px] font-semibold leading-tight sm:text-[11px]', selected ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-50 text-slate-800')}>
+                        <div className="line-clamp-2 min-h-6 min-w-0 break-words">{product.name ?? product.label}</div>
+                      </div>
+                    </button>
+                  )
+                })}
+                {filteredProducts.length === 0 ? (
+                  <div className="col-span-full rounded-md bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">ไม่พบสินค้า</div>
+                ) : null}
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   )

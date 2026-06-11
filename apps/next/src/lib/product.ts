@@ -5,8 +5,6 @@ const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim
 const codePattern = /^[A-Za-z0-9_-]+$/
 const productCodePattern = /^SKU\d{3,5}$/
 const productTextPattern = /^[\p{L}\p{M}\p{N}\s.&,()/'"+#%-]+$/u
-const productImageValueSchema = z.string().trim().min(1).max(4_000_000, 'ข้อมูลรูปภาพใหญ่เกินไป')
-
 const optionalProductText = (label: string, maxLength = 160) => z.preprocess(
   blankToNull,
   z.string().trim()
@@ -22,6 +20,9 @@ export const productSchema = z.object({
   name: z.string().min(1),
   active: z.boolean().default(true),
   imageNames: z.array(z.string()).default([]),
+  imageStorageKey: z.string().nullable().default(null),
+  imageThumbnailStorageKey: z.string().nullable().default(null),
+  thumbnailUrl: z.string().nullable().default(null),
   type: z.string().nullable().default(null),
   unit: z.string().nullable().default(null),
   createdAt: z.string().nullable().default(null),
@@ -83,7 +84,14 @@ export const productFormSchema = z.object({
       .nullable()
       .default('กก.'),
   ),
-  imageNames: z.array(productImageValueSchema).max(1, 'สินค้า 1 รายการมีรูปได้ 1 รูป').default([]),
+  imageStorageKey: z.preprocess(
+    blankToNull,
+    z.string().trim().max(500, 'ที่อยู่ไฟล์รูปสินค้ายาวเกินไป').nullable().default(null),
+  ),
+  imageThumbnailStorageKey: z.preprocess(
+    blankToNull,
+    z.string().trim().max(500, 'ที่อยู่ไฟล์รูปย่อสินค้ายาวเกินไป').nullable().default(null),
+  ),
   active: z.boolean().default(true),
 }).superRefine((values, context) => {
   if (values.id && !values.code) {

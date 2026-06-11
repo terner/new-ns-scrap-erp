@@ -1745,6 +1745,8 @@ model products {
   type                            String?
   grade                           String?
   image_names                     String[]                          @default([])
+  image_storage_key               String?
+  image_thumbnail_storage_key     String?
   id                              BigInt                            @id @default(autoincrement())
   grade_adjustments               grade_adjustments[]
   po_buy_allocation_logs          po_buy_allocation_logs[]

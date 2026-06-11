@@ -437,6 +437,16 @@ Reporting rule:
 - [x] ปรับสินค้าให้ไม่ใช้ข้อมูล `metal_group`, `item_status`, `grade`, `std_price`, `std_cost` ใน Next flow แล้ว: เอาออกจาก form/table/filter/API write/export โดยยังไม่ drop column เพื่อไม่ให้ข้อมูลเก่าหาย
 - [x] เพิ่ม master ย่อยใต้สินค้า: `/master-data/product-types` และ `/master-data/product-units`; หน้า Products ใช้ dropdown จาก DB สำหรับประเภทสินค้าและหน่วยสินค้า โดย seed หน่วย `กิโลกรัม (กก.)`, `ลัง` และประเภท `อิเล็กทรอนิกส์`
 - [x] เพิ่มช่อง `รูปสินค้า` แบบ profile upload รูปเดียวใน `/master-data/products` create/edit modal พร้อม preview, replace/remove-before-save, persistence ผ่าน `products.image_names`, และ export เฉพาะชื่อไฟล์
+- [x] แยก `/daily/weight-tickets` option bootstrap ออกจาก master product full-list API: ใช้ `/api/daily/weight-tickets/options` สำหรับ header options แบบเบา และ preload `/api/daily/weight-tickets/products` ต่อทันทีหลัง options สำเร็จโดยไม่รอ user เลือก header โดย route สินค้าคืนรูปสินค้าแรกมาพร้อมแต่ละ product row เพื่อคง requirement รูปโดยไม่เรียก master product full-list
+- [ ] ย้ายรูปสินค้าออกจาก `products.image_names` base64 ไป Storage และสร้าง thumbnail URL สำหรับ product option/picker
+  - [x] เพิ่ม `products.image_storage_key` และ bucket/policy สำหรับ `product-images`
+  - [x] เปลี่ยน `/master-data/products` modal ให้ upload รูปผ่าน Supabase Storage ภายใต้ user session แทนการส่ง base64 เข้า DB
+  - [x] เพิ่ม `products.image_thumbnail_storage_key` และเก็บไฟล์ `original + thumb` แยกกันใน Storage
+  - [x] ย่อ/บีบรูปใน browser ก่อน upload แล้วบันทึกเป็น `.webp`
+  - [x] ให้ `/api/master-data/products` และ `/api/daily/weight-tickets/products` ส่ง `thumbnailUrl` จาก thumb object จริง
+  - [x] ใช้ flow เดียวกันกับ WTI/WTO product picker โดยไม่แยก image API เพิ่ม
+  - [x] backfill รูป legacy จาก `products.image_names` ไป `image_storage_key` + `image_thumbnail_storage_key` สำหรับข้อมูลเดิม
+  - [ ] ล้าง/ตัดข้อมูล legacy `products.image_names` หลังย้าย flow เสร็จ โดยไม่ทำ runtime fallback
 - [x] เพิ่ม master ย่อยใต้บัญชีเงิน: `/master-data/bank-names`; หน้า Accounts ใช้ dropdown ชื่อธนาคารจาก DB และ API validate ว่าชื่อธนาคารต้อง active
 - [x] เปลี่ยน active/inactive form control เป็น toggle ใน customer, supplier, และ shared master-data forms
 - [x] reset branch กลับ checkpoint `d6e8b29` หลังทดลอง sidebar/shadcn design; Tailwind v4/shadcn sidebar ไม่อยู่ใน baseline ปัจจุบัน
@@ -506,7 +516,41 @@ Reporting rule:
 - [ ] map `sales_bills.items jsonb`
 - [ ] design `sales_bill_lines`
 - [x] Document canonical `/sales/bills` create flow before coding: `PO Sell -> WTO -> SB`, select WTO first, show WTO product lines, allocate to PO Sell, split excess as Spot Sale, remove free-text reference/truck fields, reuse PB VAT/totals design, and add Customer advance/deposit section (`docs/notes/Sales Bills Page Flow.md`)
-- [ ] Design and implement `WTO -> Sales Bill` allocation tables/rules, including `sales bill -> WTO`, `sales bill -> PO Sell`, `sales bill -> Spot Sale`, and Customer advance allocation/release
+- [x] `/sales/bills` create-form PB parity slice
+  - [x] Customer search dropdown
+  - [x] required `WTO` search dropdown filtered by branch/Customer
+  - [x] no blank/manual product row before `WTO`
+  - [x] auto-fill STOCK item rows from `WTO` product summary/snapshot
+  - [x] remove free-text reference and vehicle registration display from SB form/detail/print
+  - [x] keep `+ เพิ่มรายการ` only for Trading/manual flow; STOCK uses WTO lines only
+- [x] `/sales/bills` STOCK allocation UX slice
+  - [x] PB-style columns: product, Gross, deduct, net weight, bill qty, PO Sell/Spot Sale source, unit price, discount, amount
+  - [x] line-level `PO Sell / Spot Sale` selector with `Spot Sale` as default
+  - [x] PB-style split rows under the same WTO product with `+ เพิ่มแถว` / `ลบ`
+  - [x] block incomplete WTO allocation and cap selected PO Sell rows by remaining quantity
+  - [x] lock `ราคา/หน่วย` when a row selects `PO Sell`; keep Spot Sale price editable
+- [x] `/sales/bills` totals/deposit/print runtime slice
+  - [x] PB-style VAT/totals section and money-input behavior
+  - [x] Customer advance/deposit selector and interim snapshot allocation marker
+  - [x] per-document SB print with branch-specific Company Profile, A4 portrait, multi-page header/footer, Customer/document panels, VAT/totals, deposit, and receivable balance
+  - [x] SB print item table no longer repeats WTO document number or vehicle registration
+- [ ] Design and implement durable `WTO -> Sales Bill` allocation tables/rules, including `sales bill -> WTO`, `sales bill -> PO Sell`, `sales bill -> Spot Sale`, and Customer advance allocation/release
+  - [ ] current allocation table for `WTO -> SB`
+  - [ ] current allocation table for `SB -> PO Sell`
+  - [ ] current allocation table for `SB -> Spot Sale`
+  - [ ] current allocation table for `Customer advance -> SB`
+  - [ ] transaction-safe release/rebuild on edit/cancel `SB`
+  - [ ] server-side validation reads allocation facts/current tables, not only json snapshots
+- [ ] Add sales-bill timeline/log coverage
+  - [ ] `weight_ticket_usage_logs` for `WTO -> SB` allocate/release
+  - [ ] `sales_bill_status_logs`
+  - [ ] `sales_bill_allocation_logs`
+  - [ ] `PO Sell` allocation logs for billed/released quantity from `SB`
+  - [ ] detail/timeline reads dedicated logs for `WTO`, `PO Sell`, and `SB`
+- [ ] Harden SB detail/print after allocation facts exist
+  - [ ] detail source labels read line allocation facts instead of snapshot/header fallback
+  - [ ] print source labels read line allocation facts
+  - [ ] QA long A4 multi-page print with mixed `PO Sell`/`Spot Sale`
 - [ ] Design Trading sales bill flow as follow-up: choose multiple purchase bills first, auto-fill sale lines, allow manual stock lines, and allocate each line to PO Sell
 - [ ] Define sales bill allocation tables/rules for `sales bill -> purchase bill`, `sales bill -> stock`, and `sales bill -> PO Sell`
 - [ ] define COGS/FIFO rule
