@@ -428,8 +428,12 @@ export function ReceiptVouchersPageClient() {
         {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="จำนวนเอกสาร" tone="slate" value={totalRows.toLocaleString('th-TH')} />
-          <KpiCard label="น้ำหนักรวม (กก.)" tone="blue" value={formatMoney(totals.qty)} />
+          <div className="hidden md:block">
+            <KpiCard label="จำนวนเอกสาร" tone="slate" value={totalRows.toLocaleString('th-TH')} />
+          </div>
+          <div className="hidden md:block">
+            <KpiCard label="น้ำหนักรวม (กก.)" tone="blue" value={formatMoney(totals.qty)} />
+          </div>
           <KpiCard label="จำนวนเงินรวม" tone="emerald" value={formatMoney(totals.amount)} />
           <KpiCard label="ผู้รับเงินไม่ซ้ำ" tone="violet" value={new Set(filteredRows.map((row) => row.sellerName).filter(Boolean)).size.toLocaleString('th-TH')} />
         </div>
