@@ -63,11 +63,13 @@ Legacy baseline confirmed from `old-apps/legacy/index.html` component `view-stoc
 ### Current API
 
 - `GET /api/sales/stock-issue` reads PSALE list and returns WTO options with active stock holds
+- `GET /api/sales/stock-issue` keeps relation payload narrow and fetches list/count/aggregate/options concurrently
 - `POST /api/sales/stock-issue` creates PSALE from WTO, consumes the active WTO hold, and writes `stock_ledger.ref_type = PSALE`
 - `PATCH /api/sales/stock-issue` action `cancel` cancels pending PSALE with `PSALE-CANCEL` reversal ledger rows
 - `POST /api/sales/bills` accepts `pendingStockIssueId` when opening SB from PSALE and must not write duplicate stock-out
 - `stock_issue_status_logs` records PSALE create, convert, and cancel events
 - list row action `ประวัติ` shows PSALE item snapshot and status timeline
+- DB index contract is covered by `20260612123936_optimize_pending_sale_api_indexes.sql` for PSALE list/doc lookup, consumed hold reversal lookup, PSALE/PSALE-CANCEL stock ledger lookup, and Sales Bill usage-log lookup
 
 ### Target API
 
@@ -101,6 +103,7 @@ Legacy baseline confirmed from `old-apps/legacy/index.html` component `view-stoc
 ## Current Code Baseline
 
 - Current `apps/next` page/API code is accepted as the P0 implementation baseline as of 2026-06-11.
+- Runtime API/DB optimization for Pending Sale was applied on 2026-06-12; remaining gap is logged-in browser QA, not query/index wiring.
 - This page belongs to the transaction/stock/payment risk group; accepted baseline means proofed against current code, not target-complete.
 - Runtime changes must preserve documented status, allocation, ledger, payment, lock, and reversal boundaries, or update this page-flow and the canonical flow first.
 - See [[P0 Transaction Stock Payment Current Code Baseline]] for API/permission/side-effect proof notes and open critical gaps.
@@ -119,5 +122,6 @@ Legacy proof details now live in [[Pending Sale Page Flow]]. Current Next suppor
 - [x] Implement WTO-to-PSALE issue target contract
 - [x] Add server-side PSALE status logs and reconciliation checks
 - [x] Add PSALE detail/timeline UI
+- [x] Add PSALE API/DB lookup indexes and reduce list/reversal query payload
 - [ ] Add/adjust tests or browser QA checklist before changing runtime
 - [x] Update this file and canonical reference if contract changes

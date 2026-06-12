@@ -588,11 +588,14 @@ Reporting rule:
   - [ ] QA long A4 multi-page print with mixed `PO Sell`/`Spot Sale`
 - [ ] Design Trading sales bill flow as follow-up: choose multiple purchase bills first, auto-fill sale lines, allow manual stock lines, and allocate each line to PO Sell
 - [ ] Define sales bill allocation tables/rules for `sales bill -> purchase bill`, `sales bill -> stock`, and `sales bill -> PO Sell`
-- [ ] Implement `/sales/stock-issue` pending sale write flow from `docs/notes/Pending Sale Page Flow.md`
-  - [ ] create/edit pending sale validates available stock and writes `PSALE` stock-out ledger because goods physically leave before billing
-  - [ ] cancel pending sale writes reversal/rebuild ledger and unlocks stock only if not converted to Sales Bill
-  - [ ] convert `PSALE -> Sales Bill` links the source pending-sale lines and creates AR only; it must not write duplicate SB stock-out ledger rows
-  - [ ] preserve `PSALE` ledger audit during conversion instead of deleting/replacing it with `SB`
+- [x] Implement `/sales/stock-issue` pending sale write flow from `docs/notes/Pending Sale Page Flow.md`
+  - [x] create pending sale validates active WTO hold availability and writes `PSALE` stock-out ledger because goods physically leave before billing
+  - [x] direct edit is intentionally disabled; pending PSALE corrections use cancel-and-recreate
+  - [x] cancel pending sale appends `PSALE-CANCEL` reversal ledger and reopens the WTO hold only if not converted to Sales Bill
+  - [x] convert `PSALE -> Sales Bill` links the source pending-sale lines and creates AR only; it does not write duplicate SB stock-out ledger rows
+  - [x] preserve `PSALE` ledger audit during conversion instead of deleting/replacing it with `SB`
+  - [x] optimize API/DB lookups with `20260612123936_optimize_pending_sale_api_indexes.sql` and narrow list/reversal query payloads
+  - [ ] logged-in browser QA for create/cancel/convert and SB-from-PSALE cancel
 - [ ] define COGS/FIFO rule
 - [ ] define receipt relation
 
