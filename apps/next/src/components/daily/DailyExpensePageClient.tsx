@@ -826,24 +826,32 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           <div className="space-y-3">
             {/* Table Toolbar & Filters */}
             <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-              {/* Search text (visible everywhere) */}
-              <div className="relative w-full max-w-[240px] flex-1">
-                <input
-                  type="text"
-                  className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus-visible:ring-2 focus-visible:ring-blue-100 text-slate-800 placeholder:text-slate-400"
-                  placeholder="🔍 ค้นหารายการค่าใช้จ่าย..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+              {/* Category SearchCombobox (visible on Desktop/Tablet) / native select (visible on Mobile) */}
+              <div className="hidden md:block w-full max-w-[240px]">
+                <SearchCombobox
+                  hideLabel
+                  inputClassName="h-9 text-xs"
+                  inputId="dashboard-category-filter"
+                  label="หมวดค่าใช้จ่าย"
+                  placeholder="📁 ทุกหมวดค่าใช้จ่าย..."
+                  options={filteredFormCategoryOptions}
+                  value={categoryId}
+                  onChange={(val) => setCategoryId(val || '')}
                 />
-                {search && (
-                  <button
-                    onClick={() => setSearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 hover:text-slate-600"
-                    type="button"
-                  >
-                    ✕
-                  </button>
-                )}
+              </div>
+              <div className="block md:hidden flex-1 max-w-[200px]">
+                <select
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                >
+                  <option value="">📁 ทุกหมวดค่าใช้จ่าย</option>
+                  {categories.filter((cat) => cat.active !== false).map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Mobile Filter Button (visible only on mobile < md) */}
@@ -863,20 +871,6 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
               {/* Desktop & Tablet Filters (hidden on mobile < md) */}
               <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
-                {/* Category SearchCombobox */}
-                <div className="w-full max-w-[220px]">
-                  <SearchCombobox
-                    hideLabel
-                    inputClassName="h-9 text-xs"
-                    inputId="dashboard-category-filter"
-                    label="หมวดค่าใช้จ่าย"
-                    placeholder="📁 ทุกหมวดค่าใช้จ่าย..."
-                    options={filteredFormCategoryOptions}
-                    value={categoryId}
-                    onChange={(val) => setCategoryId(val || '')}
-                  />
-                </div>
-
                 {/* Period Selector */}
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500">📅 ย้อนหลัง:</span>
