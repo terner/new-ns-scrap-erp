@@ -517,7 +517,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
     return `/api/daily/expenses?${params.toString()}`
   }, [accountId, categoryId, dateFrom, dateTo, search, statusFilter])
 
-  const dashboard = useMemo(() => buildLegacyExpenseDashboard(rows, categories, periodMonths), [categories, periodMonths, rows])
+  const dashboard = useMemo(() => buildLegacyExpenseDashboard(filteredRows, categories, periodMonths), [categories, periodMonths, filteredRows])
   const dashboardColumns = useMemo<Array<ResizableColumnDefinition<ExpenseDashboardColumnKey>>>(() => [
     { key: 'category', defaultWidth: 200, minWidth: 150 },
     ...dashboard.monthList.map((month) => ({ key: `month:${month}` as const, defaultWidth: 130, minWidth: 110 })),
@@ -699,45 +699,6 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
       {dashboardOnly ? (
         <>
-          {/* 📅 Filter Row */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-100 bg-white/80 p-4 shadow-sm backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
-                <span>📅</span> ช่วงเวลาดูย้อนหลัง:
-              </span>
-              <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
-                {[3, 6, 12].map((months) => {
-                  const active = periodMonths === months;
-                  return (
-                    <button
-                      key={months}
-                      className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
-                        active
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                      type="button"
-                      onClick={() => setPeriodMonths(months)}
-                    >
-                      {months} เดือน
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {dashboardColumnResize.hasCustomWidths ? (
-              <Button
-                className="h-8 rounded-lg text-xs"
-                size="sm"
-                type="button"
-                variant="outline"
-                onClick={dashboardColumnResize.resetColumnWidths}
-              >
-                รีเซ็ตขนาดคอลัมน์
-              </Button>
-            ) : null}
-          </div>
-
           {/* 💸 KPI Summary Cards */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
@@ -840,7 +801,86 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           )}
 
           {/* 📊 Heatmap Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+          <div className="space-y-3">
+            {/* Table Toolbar & Filters */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                {/* Search Text Input */}
+                <div className="relative w-full max-w-[240px]">
+                  <input
+                    type="text"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus-visible:ring-2 focus-visible:ring-blue-100 text-slate-800 placeholder:text-slate-400"
+                    placeholder="🔍 ค้นหารายการค่าใช้จ่าย..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Category SearchCombobox */}
+                <div className="w-full max-w-[220px]">
+                  <SearchCombobox
+                    hideLabel
+                    inputClassName="h-9 text-xs"
+                    inputId="dashboard-category-filter"
+                    label="หมวดค่าใช้จ่าย"
+                    placeholder="📁 ทุกหมวดค่าใช้จ่าย..."
+                    options={filteredFormCategoryOptions}
+                    value={categoryId}
+                    onChange={(val) => setCategoryId(val || '')}
+                  />
+                </div>
+              </div>
+
+              {/* Time Period & Actions */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500">📅 ย้อนหลัง:</span>
+                  <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+                    {[3, 6, 12].map((months) => {
+                      const active = periodMonths === months;
+                      return (
+                        <button
+                          key={months}
+                          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                            active
+                              ? 'bg-white text-slate-900 shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                          type="button"
+                          onClick={() => setPeriodMonths(months)}
+                        >
+                          {months} เดือน
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {dashboardColumnResize.hasCustomWidths && (
+                  <Button
+                    className="h-8 rounded-lg text-xs"
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={dashboardColumnResize.resetColumnWidths}
+                  >
+                    รีเซ็ตขนาด
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Heatmap Table Container */}
+            <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
             <table className="w-full text-xs" style={{ minWidth: dashboardColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
                 {dashboardColumns.map((column) => <col key={column.key} style={dashboardColumnResize.getColumnStyle(column.key)} />)}
@@ -953,8 +993,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               ) : null}
             </table>
           </div>
+        </div>
 
-          {/* 📋 Footer Notes */}
+        {/* 📋 Footer Notes */}
           <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-xs leading-relaxed text-slate-500">
             <div className="font-semibold text-slate-700 flex items-center gap-1 mb-1">
               <span>📋</span> วิธีประเมินความผิดปกติ (Anomaly Thresholds):
