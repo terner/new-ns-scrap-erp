@@ -598,6 +598,8 @@ const initialSalesForm = (): SalesBillFormValues => ({
   customerId: '',
   deliveryTicketId: null,
   discountTotal: 0,
+  fromPsaleId: null,
+  fromPsaleNo: null,
   hasVat: false,
   items: [blankSalesItem()],
   licensePlate: null,
