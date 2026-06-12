@@ -9,6 +9,7 @@ import { currentActor, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } fro
 import { requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
+import { appendStockIssueStatusLog, STOCK_ISSUE_STATUS_ACTION } from '@/lib/server/stock-issue-history'
 import { consumeActiveWtoStockHolds, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
 import { findActiveWarehouseReferenceByCodeOrId } from '@/lib/server/warehouse-reference'
@@ -896,7 +897,7 @@ export async function POST(request: Request) {
         })
       : null
     if (values.customerAdvanceId && !selectedCustomerAdvance) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ไม่พบเอกสารรับเงินล่วงหน้าที่เลือก' }, { status: 400 })
-    if (selectedCustomerAdvance?.ref_type !== 'CADV') return NextResponse.json({ code: 'BAD_REQUEST', error: 'เอกสารรับเงินล่วงหน้าไม่ถูกต้อง' }, { status: 400 })
+    if (selectedCustomerAdvance && selectedCustomerAdvance.ref_type !== 'CADV') return NextResponse.json({ code: 'BAD_REQUEST', error: 'เอกสารรับเงินล่วงหน้าไม่ถูกต้อง' }, { status: 400 })
     if (selectedCustomerAdvance && String(selectedCustomerAdvance.ref_id ?? '').trim() !== customer.code) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เอกสารรับเงินล่วงหน้าต้องเป็นลูกค้าเดียวกับบิลขาย' }, { status: 400 })
     const customerAdvanceUsedAmount = selectedCustomerAdvance
       ? (await prisma.sales_bills.findMany({
@@ -921,11 +922,51 @@ export async function POST(request: Request) {
 	    if (missingProduct || parsedProductIds.some((productId) => productId == null)) {
 	      return NextResponse.json({ code: 'BAD_REQUEST', error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
 	    }
-		    const productById = new Map(products.map((product) => [product.id, product]))
+	    const productById = new Map(products.map((product) => [product.id, product]))
 		    const productCodeById = new Map(products.map((product) => [product.id, requireBusinessCode(product.code, `สินค้า ${product.id}`)]))
+		    const pendingStockIssue = values.pendingStockIssueId
+		      ? await prisma.stock_issues.findFirst({
+		          include: { branches: true, customers: true },
+		          where: { doc_no: values.pendingStockIssueId },
+		        })
+		      : null
+		    if (values.pendingStockIssueId && !pendingStockIssue) {
+		      return NextResponse.json({ code: 'BAD_REQUEST', error: 'ไม่พบรายการเบิกออกรอบิลที่เลือก' }, { status: 400 })
+		    }
+		    if (pendingStockIssue) {
+		      if ((pendingStockIssue.status ?? 'pending') !== 'pending') {
+		        return NextResponse.json({ code: 'BAD_REQUEST', error: 'รายการเบิกออกรอบิลนี้ถูกเปิดบิลหรือยกเลิกแล้ว' }, { status: 400 })
+		      }
+		      if (pendingStockIssue.branch_id && pendingStockIssue.branch_id !== branch.id) {
+		        return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาของบิลขายไม่ตรงกับรายการเบิกออกรอบิล' }, { status: 400 })
+		      }
+		      if (pendingStockIssue.customer_id && pendingStockIssue.customer_id !== customer.id) {
+		        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ลูกค้าของบิลขายไม่ตรงกับรายการเบิกออกรอบิล' }, { status: 400 })
+		      }
+		      const pendingItems = Array.isArray(pendingStockIssue.items) ? pendingStockIssue.items : []
+		      const pendingQtyByProduct = new Map<string, number>()
+		      pendingItems.forEach((item) => {
+		        if (!item || typeof item !== 'object') return
+		        const record = item as Record<string, unknown>
+		        const productCode = String(record.productCode ?? record.productId ?? '').trim()
+		        const qty = typeof record.qty === 'number' ? record.qty : Number(record.qty ?? 0)
+		        if (!productCode || !Number.isFinite(qty)) return
+		        pendingQtyByProduct.set(productCode, (pendingQtyByProduct.get(productCode) ?? 0) + qty)
+		      })
+		      const requestedQtyByProduct = new Map<string, number>()
+		      values.items.forEach((item) => {
+		        requestedQtyByProduct.set(item.productId, (requestedQtyByProduct.get(item.productId) ?? 0) + item.qty)
+		      })
+		      for (const [productCode, requestedQty] of requestedQtyByProduct) {
+		        const pendingQty = pendingQtyByProduct.get(productCode) ?? 0
+		        if (requestedQty > pendingQty + 0.0001) {
+		          return NextResponse.json({ code: 'BAD_REQUEST', error: `สินค้า ${productCode} มากกว่าจำนวนที่เบิกออกรอบิลไว้` }, { status: 400 })
+		        }
+		      }
+		    }
 		    let deliverySummarySourceMap = new Map<string, DeliverySummarySource>()
 		    let stockDeliveryTicket: DeliveryTicketOptionRow | null = null
-		    if (values.transactionMode === 'STOCK') {
+		    if (values.transactionMode === 'STOCK' && !pendingStockIssue) {
 		      const deliveryValidation = await validateStockDeliverySelection(values, branch?.id ?? null, customer.id, productByCode, productCodeById)
 		      if ('error' in deliveryValidation) {
 		        return NextResponse.json({ code: 'BAD_REQUEST', error: deliveryValidation.error }, { status: 400 })
@@ -1008,7 +1049,29 @@ export async function POST(request: Request) {
         })
 	      }
 
-	      if (values.transactionMode === 'STOCK' && stockDeliveryTicket) {
+	      if (values.transactionMode === 'STOCK' && pendingStockIssue) {
+	        await tx.stock_issues.update({
+	          data: {
+	            converted_to_bill_id: createdBill.id,
+	            status: 'converted',
+	          },
+	          where: { id: pendingStockIssue.id },
+	        })
+	        await appendStockIssueStatusLog(tx, {
+	          action: STOCK_ISSUE_STATUS_ACTION.CONVERTED,
+	          actor,
+	          fromStatus: pendingStockIssue.status ?? 'pending',
+	          meta: {
+	            reason: 'sales_bill_create_from_pending_sale',
+	            salesBillDocNo: createdBill.doc_no,
+	          },
+	          note: values.note || null,
+	          stockIssueId: pendingStockIssue.id,
+	          toStatus: 'converted',
+	        })
+	      }
+
+	      if (values.transactionMode === 'STOCK' && stockDeliveryTicket && !pendingStockIssue) {
 	        await consumeActiveWtoStockHolds(tx, {
 	          actor,
 	          billDate: normalizeDate(billDate),

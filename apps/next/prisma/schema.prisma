@@ -2117,6 +2117,9 @@ model sales_bills {
   bill_date                 DateTime?       @db.Date
   payment_type              String?
   is_opening                Boolean?        @default(false)
+  cancel_note               String?
+  cancelled_at              DateTime?       @db.Timestamptz(6)
+  cancelled_by              String?
   customer_id               BigInt?
   branch_id                 BigInt?
   warehouse_id              BigInt?
@@ -2130,6 +2133,7 @@ model sales_bills {
   sales_channels            sales_channels? @relation(fields: [channel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   customers                 customers?      @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   warehouses                warehouses?     @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales_bill_status_logs    sales_bill_status_logs[]
   trading_deals             trading_deals[]
 
   @@index([doc_no], map: "idx_sales_bills_doc_no")
@@ -2138,6 +2142,29 @@ model sales_bills {
   @@index([date(sort: Desc)], map: "idx_sb_date")
   @@index([transaction_mode], map: "idx_sb_mode")
   @@index([status], map: "idx_sb_status")
+  @@schema("public")
+}
+
+model sales_bill_status_logs {
+  event_key                   String      @unique
+  action                      String
+  sales_bill_doc_no           String
+  total_amount_snapshot       Decimal     @default(0) @db.Decimal
+  received_amount_snapshot    Decimal     @default(0) @db.Decimal
+  receivable_balance_snapshot Decimal     @default(0) @db.Decimal
+  from_status                 String?
+  to_status                   String
+  note                        String?
+  meta                        Json?
+  created_at                  DateTime    @default(now()) @db.Timestamptz(6)
+  created_by                  String?
+  id                          BigInt      @id @default(autoincrement())
+  sales_bill_id               BigInt
+  sales_bills                 sales_bills @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([sales_bill_id, created_at(sort: Desc)], map: "idx_sales_bill_status_logs_bill_created")
+  @@index([sales_bill_doc_no], map: "idx_sales_bill_status_logs_doc_no")
+  @@index([action], map: "idx_sales_bill_status_logs_action")
   @@schema("public")
 }
 
@@ -2382,24 +2409,47 @@ model stock_adjustments {
 }
 
 model stock_issues {
-  doc_no               String
-  date                 DateTime    @db.Date
-  total_cost           Decimal?    @default(0) @db.Decimal
-  total_est_amount     Decimal?    @default(0) @db.Decimal
-  status               String?     @default("pending")
-  items                Json?
-  notes                String?
-  created_by           String?
-  created_at           DateTime?   @default(now()) @db.Timestamptz(6)
-  customer_id          BigInt?
-  branch_id            BigInt?
-  warehouse_id         BigInt?
-  id                   BigInt      @id @default(autoincrement())
-  converted_to_bill_id BigInt?
-  branches             branches?   @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  customers            customers?  @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  warehouses           warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  doc_no                  String
+  date                    DateTime                  @db.Date
+  total_cost              Decimal?                  @default(0) @db.Decimal
+  total_est_amount        Decimal?                  @default(0) @db.Decimal
+  status                  String?                   @default("pending")
+  items                   Json?
+  notes                   String?
+  created_by              String?
+  created_at              DateTime?                 @default(now()) @db.Timestamptz(6)
+  customer_id             BigInt?
+  branch_id               BigInt?
+  warehouse_id            BigInt?
+  id                      BigInt                    @id @default(autoincrement())
+  converted_to_bill_id    BigInt?
+  branches                branches?                 @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customers               customers?                @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stock_issue_status_logs stock_issue_status_logs[]
+  warehouses              warehouses?               @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@schema("public")
+}
+
+model stock_issue_status_logs {
+  event_key                 String       @unique
+  action                    String
+  stock_issue_doc_no        String
+  total_cost_snapshot       Decimal      @default(0) @db.Decimal
+  total_est_amount_snapshot Decimal      @default(0) @db.Decimal
+  from_status               String?
+  to_status                 String
+  note                      String?
+  meta                      Json?
+  created_at                DateTime     @default(now()) @db.Timestamptz(6)
+  created_by                String?
+  id                        BigInt       @id @default(autoincrement())
+  stock_issue_id            BigInt
+  stock_issues              stock_issues @relation(fields: [stock_issue_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([stock_issue_id, created_at(sort: Desc)], map: "idx_stock_issue_status_logs_issue_created")
+  @@index([stock_issue_doc_no], map: "idx_stock_issue_status_logs_doc_no")
+  @@index([action], map: "idx_stock_issue_status_logs_action")
   @@schema("public")
 }
 
