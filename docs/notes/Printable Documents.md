@@ -11,7 +11,7 @@ tags:
   - business-flow
 status: draft
 created: 2026-06-09
-updated: 2026-06-10
+updated: 2026-06-12
 ---
 
 # Printable Documents / เอกสารที่ต้องพิมพ์
@@ -36,8 +36,8 @@ updated: 2026-06-10
 | P0 | `WTI/WTO` ใบรับของ/ใบส่งของจากงานชั่ง | `/daily/weight-ticket-list` | Implemented print, share/audit follow-up | `printWeighingTicket(ticket)` และปุ่ม `ใบชั่ง` ที่ `old-apps/legacy/index.html:52560` ถึง `old-apps/legacy/index.html:52985` | Active helper รองรับ WTI/WTO แล้ว; ต้องคง template ที่เน้นน้ำหนัก/สิ่งเจือปน/รูป/ทะเบียนรถ |
 | P1 | `PMA` ใบอนุมัติจ่ายเงิน / ส่ง Cashier | `/daily/payment-approval`, `/purchase/payments` | Required follow-up | `printApprovalSheet` และปุ่ม `พิมพ์ใบอนุมัติส่ง Cashier` ที่ `old-apps/legacy/index.html:27680` ถึง `old-apps/legacy/index.html:27773` | ต้องพิมพ์จาก approval snapshot หลังเกิด PMA แล้ว ไม่พิมพ์จาก pending source live row |
 | P1 | `PMT` Payment Voucher / ใบสำคัญจ่าย | `/purchase/payments?tab=history` | Partial: daily report implemented, per-voucher print follow-up | Legacy payment-history evidence ไม่ชัดเท่า PB/SB/PMA แต่ active UI มี shell `ดู/พิมพ์` ใน history | ต้องอยู่ในแท็บประวัติเท่านั้น เพราะ PMT เป็นเอกสารหลังจ่ายจริงหรือหลังยกเลิก |
-| P1 | `RV` ใบสำคัญรับเงิน | `/purchase/receipt-vouchers` | Partial / needs hardening | print preview `ใบสำคัญรับเงิน` ที่ `old-apps/legacy/index.html:42980` ถึง `old-apps/legacy/index.html:43240` | Active มี preview แล้ว แต่ต้อง harden ให้ใช้ Company Profile/snapshot และแก้ fallback payment method |
-| P2 | `RCP` Receipt Voucher / ใบรับเงิน Customer | `/sales/receipts` | Required follow-up | Legacy direct evidence ไม่ชัดใน print helper แต่ flow target ต้องมีหลักฐานรับเงินลูกค้า | ควรใช้หลักเดียวกับ PMT: พิมพ์จาก history หลังเกิด receipt แล้ว |
+| P1 | `RV` ใบสำคัญรับเงิน Supplier | `/purchase/receipt-vouchers` | Partial / needs hardening | legacy `view-receiptVoucher` ที่ `old-apps/legacy/index.html:42799` ถึง `old-apps/legacy/index.html:43240` | ใช้ให้ Supplier/ผู้รับเงินเซ็นรับเงินสดจากบริษัทเท่านั้น ดึงข้อมูลจาก PB ได้ แต่ไม่ใช่ payment posting owner และไม่ใช้กับโอนเงิน/เช็ค; active มี preview แล้ว ต้อง harden Company Profile/snapshot, unit, signer/payment method, source PB/cash PMT, และ status/cancel watermark |
+| P2 | `RCP` Receipt Voucher / ใบรับเงิน Customer | `/sales/receipts` | Required follow-up | legacy customer receipt component อยู่ใน flow `รับเงิน Customer` และรองรับหลายบิลต่อ voucher | แยกจาก `RV`; ควรใช้หลักเดียวกับ PMT คือพิมพ์จาก receipt history หลังเกิด receipt แล้ว และผูก bank statement/AR settlement |
 
 ## Payment History Print Status
 
@@ -69,5 +69,5 @@ updated: 2026-06-10
 1. `SB` บิลขาย / ใบส่งของ: print รายใบ implemented แล้ว; follow-up คือ harden line-level `PO Sell`/`Spot Sale` allocation display หลัง sync write flow `WTO -> SB` แยก allocation facts ครบ
 2. `PMT` payment history print: daily report implemented; follow-up คือ per-voucher print รายใบจาก history
 3. `PMA` approval sheet: ทำจาก `payment_approvals` snapshot สำหรับส่ง Cashier/approval record
-4. `RV` hardening: ปรับ receipt voucher print ให้ใช้ Company Profile และ snapshot fields ครบ
+4. `RV` hardening: ปรับ receipt voucher print ให้ใช้ Company Profile และ snapshot fields ครบ พร้อมคง boundary ว่า RV เฉพาะเงินสดและไม่สร้าง PMT/BST/stock ledger
 5. `RCP` customer receipt print: ทำจาก sales receipt history หลัง receipt สำเร็จ

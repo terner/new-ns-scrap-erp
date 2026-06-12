@@ -11,7 +11,7 @@ tags:
   - page-flow
 status: draft
 created: 2026-06-10
-updated: 2026-06-10
+updated: 2026-06-12
 ---
 
 # Sales Bills Page Flow / Flow หน้า `/sales/bills`
@@ -36,6 +36,16 @@ updated: 2026-06-10
 - การรับเงิน Customer; ใช้ `/sales/receipts`
 - การแก้ `WTO` หลังถูกใช้แล้ว; ต้องใช้ reversal/status/usage policy ของเอกสารต้นทาง
 
+## Current Runtime Assessment
+
+ตรวจจาก current code ณ 2026-06-12:
+
+- `GET /api/sales/bills` โหลด list/source options และส่ง `WTO` source เฉพาะสถานะ `delivered` สำหรับบิลขาย STOCK ใหม่
+- `POST /api/sales/bills` create path ทำงานครบสำหรับ `STOCK` baseline: สร้าง `SB`, consume active `WTO` hold, เขียน `stock_ledger.ref_type = SB`, append `weight_ticket_usage_logs`, update `WTO` เป็น `billed`, และ update `PO Sell` remaining/status
+- `GET /api/sales/bills/[id]` เป็น detail/read model เท่านั้น
+- ยังไม่มี write path สำหรับ edit/cancel `SB`; UI ปุ่มแก้ไข/ยกเลิกของบิลขายยัง disabled เพื่อรอ reversal design
+- current allocation ยังพึ่ง sales-bill item JSON + weight-ticket usage logs เป็นหลัก ยังไม่มี dedicated current allocation tables สำหรับ `WTO -> SB`, `SB -> PO Sell`, `SB -> Spot Sale`, และ `Customer advance -> SB`
+
 ## Canonical Create SB Flow
 
 Flow เป้าหมายของการสร้างบิลขายรอบนี้คือ:
@@ -52,14 +62,14 @@ PO Sell
 | Step | User/System | Action | Result |
 |---|---|---|---|
 | 1 | User | เปิด modal สร้างบิลขาย | form เริ่มที่ข้อมูลเอกสารและ Customer/สาขา |
-| 2 | User | เลือกสาขาและ Customer | ใช้กรอง `WTO` ที่ยังออกบิลไม่ครบและ `PO Sell` ที่ยังมี remaining |
-| 3 | User | เลือก `WTO` หนึ่งใบหรือหลายใบที่เป็น Customer/สาขาเดียวกัน | ระบบล็อก source สำคัญจาก `WTO` และดึงรายการสินค้า/น้ำหนักจากเอกสารส่งของ |
+| 2 | User | เลือกสาขาและ Customer | ใช้กรอง `WTO` ที่ยังไม่ถูกออกบิลและ `PO Sell` ที่ยังมี remaining |
+| 3 | User | เลือก `WTO` 1 ใบที่เป็น Customer/สาขาเดียวกัน | ระบบล็อก source สำคัญจาก `WTO` และดึงรายการสินค้า/น้ำหนักจากเอกสารส่งของ |
 | 4 | System | แสดงรายการสินค้าจาก `WTO` | line ต้องมาจาก snapshot ของ `WTO` เท่านั้น; ผู้ใช้ไม่กรอกสินค้าเองใน `STOCK` |
-| 5 | User | เลือก/ยืนยัน `PO Sell` ต่อ line ถ้ามียอด PO ที่ต้องตัด | ระบบแสดงยอดคงเหลือของ PO Sell ที่ตรง Customer/สาขา/สินค้า |
+| 5 | User | เลือก `PO Sell` หรือ `Spot Sale` ต่อ line เหมือนช่อง `อ้างอิง PO` ของบิลซื้อ | ระบบแสดงยอดคงเหลือของ PO Sell ที่ตรง Customer/สาขา/สินค้า |
 | 6 | System/User | แยกยอดเกิน PO Sell เป็น `Spot Sale` | ห้ามตัด PO Sell เกิน remaining; ส่วนเกินต้องเป็น Spot Sale แยก line/source |
 | 7 | User | กรอกราคาขาย, ส่วนลด, VAT, เครดิตเทอม, หมายเหตุ, และมัดจำที่จะหัก | totals ใช้ pattern เดียวกับ PB |
 | 8 | System | บันทึก `SB` | สร้าง `SB...`, AR, usage/allocation logs, PO Sell billed qty, Customer advance allocation ถ้ามี |
-| 9 | System | อัปเดตสถานะ source | `WTO` เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว`; `PO Sell` เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` ตามยอดจริง |
+| 9 | System | อัปเดตสถานะ source | `WTO` เป็น `ออกบิลแล้ว` ทันทีเมื่อบันทึกสำเร็จ; `PO Sell` เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` ตามยอดจริง |
 
 ## Fields To Show
 
@@ -72,8 +82,9 @@ PO Sell
 | เลขเอกสาร `SB` | ระบบ | ไม่ให้ผู้ใช้กรอก; generate เมื่อบันทึก |
 | วันที่เอกสาร | ใช่ | default วันนี้ แต่ผู้ใช้แก้ได้ตามสิทธิ์ |
 | วันที่ครบกำหนด/กำหนดชำระ | ไม่ | คำนวณจาก credit term ได้ แต่แสดงให้แก้/ตรวจตาม business rule |
-| สาขา | ใช่ | ใช้กรอง `WTO`, `PO Sell`, Customer advance และหัวกระดาษ |
+| สาขา/คลัง | ใช่ | Required; ใช้กรอง `WTO`, `PO Sell`, Customer advance และหัวกระดาษ |
 | Customer | ใช่ | ใช้ search dropdown; ค้นหาได้จากรหัส/ชื่อลูกค้า และใช้กรอง `WTO`, `PO Sell`, Customer advance และ AR |
+| ช่องทางขาย | ใช่ | ใช้ search dropdown และต้องเลือกก่อนบันทึก `SB` |
 | เครดิตเทอม | ไม่ | ดึงจาก Customer ได้ แต่ snapshot ลงบิล |
 | หมายเหตุ | ไม่ | ข้อมูลประกอบเอกสาร |
 
@@ -81,10 +92,10 @@ PO Sell
 
 | Field | จำเป็น | หมายเหตุ |
 |---|---:|---|
-| `WTO` ใบส่งของ | ใช่ | เลือกเฉพาะ `WTO` ที่ยังออกบิลไม่ครบ, สาขา/Customer ตรงกัน, ไม่ยกเลิก |
+| `WTO` ใบส่งของ | ใช่ | เลือกเฉพาะ `WTO` ที่ยังไม่ถูกออกบิล, สาขา/Customer ตรงกัน, ไม่ยกเลิก |
 | รายการสินค้า WTO | ระบบ | แสดงจาก `WTO` snapshot; ไม่ให้ผู้ใช้พิมพ์สินค้าใหม่, เพิ่มรายการเอง, หรือลบรายการเองใน `STOCK` |
-| `PO Sell` allocation | เฉพาะ line ที่มี PO | เลือกต่อ line; option ต้องกรองตาม Customer/สาขา/สินค้า/remaining |
-| `Spot Sale` line/source | ระบบ/ผู้ใช้ยืนยัน | ใช้กับยอดที่ไม่มี PO หรือเกินยอด PO Sell remaining |
+| `PO Sell` allocation | เฉพาะ line ที่มี PO | เลือกต่อ line ใน column `อ้างอิง PO Sell`; option ต้องกรองตาม Customer/สาขา/สินค้า/remaining |
+| `Spot Sale` line/source | ใช่ เป็น default ต่อ line | option แรกของ column `อ้างอิง PO Sell`; ใช้กับยอดที่ไม่มี PO หรือเกินยอด PO Sell remaining |
 
 ### รายการสินค้าในหน้า Create/Edit
 
@@ -93,15 +104,21 @@ PO Sell
 - ถ้ายังไม่เลือก `WTO` ให้แสดง empty state ว่าให้เลือกใบส่งของก่อน ไม่แสดงแถวกรอกสินค้าเปล่า
 - เมื่อเลือก `WTO` แล้ว ระบบเติมรายการสินค้าจาก `WTO` product summary/snapshot อัตโนมัติ
 - Product/source fields ในรายการที่มาจาก `WTO` เป็น read-only trace; ผู้ใช้แก้ได้เฉพาะค่าธุรกิจของบิล เช่น จำนวนที่จะตัดบิล, ราคา, ส่วนลด, VAT/totals ตาม rule
+- Columns หลักของ `STOCK` ต้องตาม pattern บิลซื้อ: `สินค้า`, `Gross`, `หัก`, `น้ำหนักสุทธิ`, `จำนวนตัดบิล`, `อ้างอิง PO Sell`, `ราคา/หน่วย`, `ส่วนลด`, `ยอดรวม`
+- `Gross`, `หัก`, และ `น้ำหนักสุทธิ` มาจาก snapshot ของ `WTO` และต้องแสดง/บันทึกเป็น read-only trace ของรายการ
+- แต่ละ line ต้องมี selector `อ้างอิง PO Sell` โดย option แรกคือ `Spot Sale` และ option ถัดไปคือ `PO Sell` ที่ตรง Customer/สาขา/สินค้าและยังมี remaining
+- ถ้า WTO summary เดียวต้องตัดทั้ง `PO Sell` และ `Spot Sale` หรือมีมากกว่า 1 PO Sell ต้อง split เป็นหลาย row ใต้สินค้าเดียวกันแบบเดียวกับบิลซื้อ
+- ระบบต้อง block save ถ้าน้ำหนักคงเหลือจาก `WTO` ยังจัดสรรไม่ครบ หรือจำนวนที่ตัดเข้า `PO Sell` เกิน remaining ต่อสินค้า
+- แถวที่เลือก `PO Sell` ต้องใช้ราคาจาก `PO Sell` และล็อกช่อง `ราคา/หน่วย`; แถว `Spot Sale` ยังแก้ราคาเองได้
 - ไม่แสดงปุ่ม `+ เพิ่มรายการ` และไม่แสดงปุ่ม `ลบ` สำหรับรายการ `STOCK` ที่มาจาก `WTO`
-- การเพิ่ม/split line ในอนาคตต้องเกิดจาก allocation rule (`PO Sell`/`Spot Sale`) หรือ remaining source logic ไม่ใช่ manual product row
+- ปุ่ม `+ เพิ่มแถว` / `ลบ` ใน `STOCK` ใช้ได้เฉพาะการ split allocation ของสินค้าเดิมจาก `WTO`; ไม่ใช่การเพิ่มสินค้า manual
 - `TRADING` เป็นคนละ flow และยังอนุญาต manual line ตาม Trading sales-bill design follow-up ได้
 
 ### Fields ที่ต้องตัดออกจากหน้า SB
 
 - ไม่แสดงช่อง `เลขที่อ้างอิง` แบบ free-text ใน create/edit `SB`; เอกสารอ้างอิงต้อง derive จาก `WTO` และ allocation ไป `PO Sell`
-- ไม่แสดงช่อง `ทะเบียนรถ` ใน create/edit `SB`; ทะเบียนรถเป็นข้อมูลของ `WTO` และอ่านได้จาก detail/print trace เท่านั้น
-- ถ้าต้องแสดงทะเบียนรถเพื่อ audit ให้แสดงแบบ read-only ใน source summary ของ `WTO` ไม่ใช่ field ของบิลขาย
+- ไม่แสดง `ทะเบียนรถ` ใน create/edit/detail/print `SB`
+- ไม่แสดงเลข `WTO` ซ้ำในรายการสินค้า เพราะเลือกและแสดงอยู่ใน section `ใบส่งของ WTO` / `ข้อมูลเอกสาร` แล้ว
 
 ## Line Allocation Rule
 
@@ -128,9 +145,9 @@ Validation:
 - ห้ามบันทึก line ที่ไม่มี allocation source
 - ห้าม allocate เข้า `PO Sell` เกิน remaining
 - ห้ามเลือก `PO Sell` ที่ Customer/สาขา/สินค้าไม่ตรงกับ `WTO` line
-- `WTO` หลายใบใน `SB` เดียวต้องเป็น Customer/สาขาเดียวกัน
+- `SB` แบบ `STOCK` ต้องอ้างอิง `WTO` ได้เพียง 1 ใบต่อ 1 บิล
 - ห้ามเลือก `WTO` ที่ยกเลิกหรือออกบิลครบแล้ว
-- ถ้า `WTO` ถูกออกบิลบางส่วน ต้องแสดงเฉพาะ remaining ที่ยังไม่ถูกใช้ใน SB ก่อนหน้า
+- `WTO` ต้องถูกจัดสรรครบทั้งเอกสารใน `SB` เดียว; ถ้าจัดสรรไม่ครบต้อง block save และห้ามเกิด remaining เพื่อไปออกบิลใบอื่น
 
 ## Totals, VAT, And Deposit
 
@@ -169,16 +186,82 @@ Implemented 2026-06-10: `SB` print ยึด baseline เดียวกับ `
 ต่างจาก `PB`:
 
 - หัวคู่ค้าเป็น Customer ไม่ใช่ Supplier
-- แหล่งสินค้าแสดง `WTO`, `PO Sell`, และ `Spot Sale`
-- ทะเบียนรถถ้ามีให้มาจาก source `WTO` แบบ read-only trace ไม่ใช่ field ของ `SB`
+- แหล่งสินค้าในรายการแสดงเฉพาะ `PO Sell` หรือ `Spot Sale`; เลข `WTO` แสดงในข้อมูลเอกสารด้านบนเท่านั้น
+- ไม่แสดงทะเบียนรถในเอกสาร `SB`
 
 ## Implementation Follow-up
 
-- Implemented: UI create `/sales/bills` เริ่มจากเลือก `WTO`; `STOCK` แสดง product lines จาก `WTO` เท่านั้น ไม่เปิดแถวกรอกสินค้าเองก่อนเลือก source
-- ช่องเลือก Customer ต้องเป็น search dropdown ตาม pattern เดียวกับคู่ค้าในเอกสาร transaction อื่น ไม่ใช้ native select ธรรมดา
-- เพิ่ม line-level allocation UI สำหรับ `PO Sell` และ `Spot Sale`
-- เพิ่ม Customer advance selector/allocation section
-- ตัดช่อง `เลขที่อ้างอิง` และ `ทะเบียนรถ` ออกจาก form `SB`
-- ปรับ API ให้บันทึก `WTO -> SB`, `SB -> PO Sell`, `Spot Sale`, และ Customer advance allocation ใน transaction เดียว
-- เพิ่ม usage/allocation logs สำหรับ `WTO`, `PO Sell`, `SB`, และ Customer advance
-- Hardening print `SB` หลัง write flow ทำ line-level allocation ครบ: แสดง `PO Sell`/`Spot Sale` ต่อ line จาก allocation facts แทนการอ่านจาก header-level `po_sell_id`
+### Task Breakdown
+
+#### Batch SB-1: Create Form Parity With PB
+
+- [x] เลือก Customer เป็น search dropdown ตาม pattern คู่ค้าในเอกสาร transaction อื่น
+- [x] สาขา/คลังเป็น required field
+- [x] เลือก `WTO` ด้วย search dropdown หลังเลือกสาขาและ Customer
+- [x] หลังเลือก `WTO` แล้วล็อก `ประเภทบิล`, Customer, สาขา/คลัง, และช่อง `ใบส่งของ WTO` ตาม pattern บิลซื้อ
+- [x] ก่อนเลือก `WTO` ให้แสดง empty state ไม่สร้างแถวสินค้าเปล่า
+- [x] หลังเลือก `WTO` ให้เติม product summary/snapshot อัตโนมัติ
+- [x] ตัดช่อง `เลขที่อ้างอิง` free-text ออกจาก create/edit `SB`
+- [x] ไม่แสดง `ทะเบียนรถ` ใน create/edit/detail/print `SB`
+- [x] ไม่แสดงเลข `WTO` ซ้ำในรายการสินค้า เพราะแสดงใน source summary/document info แล้ว
+- [x] ช่องทางขายเป็น required search combobox ภายใน modal ไม่ใช้ native select เพื่อไม่ให้รายการ dropdown หลุดออกจาก form
+- [x] รายการ `STOCK` ไม่แสดง `+ เพิ่มรายการ` หรือปุ่มลบสินค้า manual
+
+#### Batch SB-2: Item Allocation UX
+
+- [x] เพิ่ม column `Gross`, `หัก`, `น้ำหนักสุทธิ`, `จำนวนตัดบิล`, `อ้างอิง PO Sell`, `ราคา/หน่วย`, `ส่วนลด`, `ยอดรวม`
+- [x] เพิ่ม selector `PO Sell / Spot Sale` ต่อ line โดย `Spot Sale` เป็น default
+- [x] กรอง `PO Sell` ตาม Customer/สาขา/สินค้า/remaining
+- [x] รองรับ split row ใต้สินค้า WTO เดิมด้วย `+ เพิ่มแถว` / `ลบ`
+- [x] block save เมื่อจัดสรรน้ำหนักจาก `WTO` ไม่ครบ
+- [x] block/cap จำนวนที่ตัดเข้า `PO Sell` ไม่ให้เกิน remaining
+- [x] แถวที่เลือก `PO Sell` ใช้ราคา PO และล็อก `ราคา/หน่วย`
+- [x] แถว `Spot Sale` ยังแก้ราคาเองได้
+
+#### Batch SB-3: Totals, VAT, And Deposit
+
+- [x] ใช้ money input pattern สำหรับ `ราคา/หน่วย`, `ส่วนลด`, และส่วนลดท้ายบิล
+- [x] แสดง VAT/totals ตาม visual baseline ของ `PB`; ใน create form ใช้ checkbox `มี VAT` เป็น control เดียว ไม่แสดง selector `ไม่คิด VAT / VAT แยก / รวม VAT` ซ้ำ และวางช่องมัดจำก่อน `ส่วนลดท้ายบิล`
+- [x] เพิ่ม selector `รับเงินล่วงหน้า/มัดจำ Customer`
+- [x] คำนวณ `ยอดลูกหนี้สุทธิ = ยอดสุทธิ - มัดจำ Customer`
+- [ ] ย้าย Customer advance จาก interim snapshot marker ไป dedicated allocation fact table เมื่อ schema พร้อม
+- [ ] เพิ่ม release/recalculate Customer advance allocation เมื่อแก้/ยกเลิก `SB`
+
+#### Batch SB-4: Write Model And Allocation Facts
+
+- [x] Runtime create `SB` บันทึก line snapshot จาก `WTO` และ line-level `poSellId`
+- [x] Runtime create ตัดยอด `PO Sell` ตาม line source และถือ line ที่ไม่เลือก PO เป็น `Spot Sale`
+- [x] Runtime create `SB Stock` consume active stock hold จาก `WTO` แล้วเพิ่ม stock-out ledger โดยอ้าง `WTO` และ intended warehouse; `WTO` ไม่ตัด stock เอง
+- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `WTO -> SB`
+- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `SB -> PO Sell`
+- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `SB -> Spot Sale`
+- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `Customer advance -> SB`
+- [ ] เพิ่ม transaction-safe release/rebuild allocations ตอน edit/cancel `SB` รวมถึง reverse/reopen stock hold และ reverse stock ledger
+- [ ] เพิ่ม server-side validation ให้ยึด allocation facts/current tables แทนการอ่านเฉพาะ json snapshot
+
+#### Batch SB-5: Status And Timeline Logs
+
+- [x] ต่อ `weight_ticket_usage_logs` สำหรับ `WTO -> SB` allocate ตอน create
+- [ ] ต่อ `weight_ticket_usage_logs` สำหรับ `WTO -> SB` release/reverse ตอน edit/cancel
+- [ ] เพิ่ม `sales_bill_status_logs` สำหรับ create/edit/cancel/status transition
+- [ ] เพิ่ม `sales_bill_allocation_logs` สำหรับ `SB -> PO Sell`, `Spot Sale`, และ Customer advance
+- [ ] เพิ่ม status/allocation logs ฝั่ง `PO Sell` เมื่อถูกตัดหรือ release จาก `SB`
+- [ ] ให้ detail/timeline ของ `WTO`, `PO Sell`, และ `SB` อ่านจาก dedicated logs ไม่ใช้ audit log รวมเป็น source of truth
+
+#### Batch SB-6: Detail And Print Hardening
+
+- [x] เพิ่ม per-document print action สำหรับ `/sales/bills`
+- [x] Print ใช้ Company Profile ตามสาขาเอกสาร
+- [x] Print เป็น A4 portrait รองรับ multi-page, repeat table header, fixed footer
+- [x] Print แสดง Customer/document panels, VAT/totals, Customer advance, receivable balance
+- [x] Print ไม่แสดงทะเบียนรถ และไม่ซ้ำเลข `WTO` ในตารางรายการสินค้า
+- [ ] Detail/print อ่าน source ต่อ line จาก allocation facts หลัง Batch SB-4 แทนการพึ่ง snapshot/header fallback
+- [ ] เพิ่ม QA print ด้วยรายการยาวหลายหน้าและ mixed `PO Sell`/`Spot Sale`
+
+#### Batch SB-7: Trading Sales Bill Follow-up
+
+- [ ] แยก design flow ของ `TRADING` SB: เลือก purchase bills หลายใบก่อน
+- [ ] Auto-fill sale lines จาก purchase bills ที่เลือก
+- [ ] อนุญาตเพิ่ม stock manual lines เฉพาะ Trading ตาม rule
+- [ ] แยก allocation rules สำหรับ `SB -> PB`, `SB -> stock`, และ `SB -> PO Sell`
+- [ ] กำหนด COGS/FIFO rule และ stock-ledger side effects ของ Trading SB

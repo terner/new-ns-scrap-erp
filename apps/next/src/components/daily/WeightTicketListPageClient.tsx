@@ -52,14 +52,13 @@ const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; value
   WTI: [
     { label: 'ทุกสถานะ', values: [] },
     { label: 'รับของแล้ว', values: ['received'] },
-    { label: 'ออกบิลแล้วบางส่วน', values: ['partially_billed'] },
     { label: 'เสร็จสิ้น', values: ['billed'] },
     { label: 'ยกเลิก', values: ['cancelled'] },
   ],
   WTO: [
     { label: 'ทุกสถานะ', values: [] },
     { label: 'ส่งของแล้ว', values: ['delivered'] },
-    { label: 'ออกบิลแล้ว', values: ['partially_billed', 'billed'] },
+    { label: 'ออกบิลแล้ว', values: ['billed'] },
     { label: 'ยกเลิก', values: ['cancelled'] },
   ],
 }
@@ -306,7 +305,7 @@ export function WeightTicketListPageClient() {
     <div className="space-y-5">
       <div className="flex justify-end">
         <Button asChild>
-          <Link href="/daily/weight-tickets">
+          <Link href={`/daily/weight-tickets?type=${typeFilter}`}>
             <Plus className="mr-2 size-4" />
             สร้างใบรับ-ส่งของ
           </Link>
@@ -479,7 +478,7 @@ export function WeightTicketListPageClient() {
                       {ticket.canEdit ? (
                         <Link
                           className={rowActionButtonClass}
-                          href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}
+                          href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}&type=${ticket.type}`}
                           onClick={(event) => event.stopPropagation()}
                         >
                           <SquarePen className="size-3" />

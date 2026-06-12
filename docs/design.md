@@ -211,6 +211,18 @@ rules:
 - legacy-style action text/link ในตารางให้คงโทนที่ผู้ใช้คุ้นเคย เว้นแต่มีปุ่ม page-specific ที่ชัดกว่า
 - status cell ใช้ pattern `dot + สีข้อความ` เป็น baseline กลาง; ใช้ `text-xs font-semibold` และ dot เล็ก (`size-1.5`) เพื่อไม่ดึงสายตาเกิน cell อื่น; หลีกเลี่ยง badge background ถ้าไม่จำเป็นตาม legacy/page override
 
+### Created Date Column
+
+ทุกหน้า list/detail ที่แสดง record หรือเอกสารจากระบบต้องมี `วันที่สร้างรายการ` จาก `created_at` / system-created timestamp ให้ user เห็นเพื่อ audit
+
+Rules:
+
+- `วันที่สร้างรายการ` ต้องแยกจากวันที่ธุรกิจ เช่น `วันที่เอกสาร`, `วันที่จ่าย`, `วันที่รับเงิน`, `วันที่ครบกำหนด`, `วันที่รับของ`, หรือ `วันที่ส่งของ`
+- label ต้องระบุชัดว่าเป็น created date ห้ามใช้คำกว้างว่า `วันที่` เฉย ๆ
+- transaction list ควรแสดงเป็น column; detail/modal/print preview ควรแสดงใน metadata block ของเอกสาร
+- ถ้าตารางรองรับ sort วันที่อยู่แล้ว ให้ `วันที่สร้างรายการ` sortable ได้ แต่ไม่จำเป็นต้องเป็น default sort เว้นแต่ flow นั้นต้องดูรายการล่าสุดตามเวลาที่บันทึก
+- ห้ามใช้ `created_at` เป็น default business aging/date filter แทน business date ยกเว้นหน้า audit/process latency ที่ระบุไว้ชัดเจน
+
 ### Multi-Item Summary Columns
 
 ใช้กับ table column ที่ต้องสรุปรายการย่อยหลายรายการในแถวเดียว เช่น `รายการสินค้า`, source documents, linked bills, allocations, หรือรายการจ่าย/รับที่มีหลายบรรทัด

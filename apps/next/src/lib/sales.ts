@@ -9,6 +9,12 @@ const optionalSafeId = (label: string) => z.preprocess(
   z.string().trim().max(80, `${label}ยาวเกินไป`).regex(safeIdPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
 )
 
+const requiredSafeId = (label: string) => z.string()
+  .trim()
+  .min(1, `เลือก${label}`)
+  .max(80, `${label}ยาวเกินไป`)
+  .regex(safeIdPattern, `${label}มีรูปแบบไม่ถูกต้อง`)
+
 const optionalGeneralText = (label: string, maxLength = 500) => z.preprocess(
   blankToNull,
   z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
@@ -23,16 +29,20 @@ export const salesLineItemSchema = z.object({
   deliverySummaryId: optionalSafeId('สรุปใบส่งของ'),
   deliveryTicketDocNo: optionalGeneralText('เลขใบส่งของ', 80),
   deliveryTicketId: optionalSafeId('ใบส่งของ'),
+  deductWeight: money('หัก').default(0),
   discount: money('ส่วนลด').default(0),
+  grossWeight: money('Gross').default(0),
+  netWeight: money('น้ำหนักสุทธิ').default(0),
   note: optionalGeneralText('หมายเหตุรายการ', 200),
+  poSellId: optionalSafeId('PO Sell'),
   price: positiveNumber('ราคา/หน่วย'),
   productId: z.string().trim().min(1, 'เลือกสินค้า').max(80, 'รหัสสินค้ายาวเกินไป').regex(safeIdPattern, 'รหัสสินค้ามีรูปแบบไม่ถูกต้อง'),
   qty: positiveNumber('จำนวน'),
 })
 
 export const salesBillFormSchema = z.object({
-  branchId: optionalSafeId('สาขา'),
-  channelId: optionalSafeId('ช่องทางขาย'),
+  branchId: requiredSafeId('สาขา'),
+  channelId: requiredSafeId('ช่องทางขาย'),
   customerAdvanceId: optionalSafeId('รับเงินล่วงหน้า Customer'),
   customerId: z.string().trim().min(1, 'เลือกลูกค้า').max(80, 'รหัสลูกค้ายาวเกินไป').regex(safeIdPattern, 'รหัสลูกค้ามีรูปแบบไม่ถูกต้อง'),
   deliveryTicketId: optionalSafeId('ใบส่งของ'),
@@ -74,7 +84,7 @@ export const poSellFormSchema = z.object({
   channelId: optionalSafeId('ช่องทางขาย'),
   customerId: z.string().trim().min(1, 'เลือกลูกค้า').max(80, 'รหัสลูกค้ายาวเกินไป').regex(safeIdPattern, 'รหัสลูกค้ามีรูปแบบไม่ถูกต้อง'),
   expectedDelivery: requiredDate,
-  items: z.array(salesLineItemSchema.omit({ discount: true }).extend({ discount: money('ส่วนลด').default(0) })).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
+  items: z.array(salesLineItemSchema.omit({ deductWeight: true, discount: true, grossWeight: true, netWeight: true, poSellId: true }).extend({ discount: money('ส่วนลด').default(0) })).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
   note: optionalGeneralText('หมายเหตุ', 500),
 })
 

@@ -9,6 +9,7 @@ import { appendPoBuyStatusLog, createInitialPoBuyStatusLog, PO_BUY_STATUS, recon
 import { prisma } from '@/lib/server/prisma'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
+import { activeVatRatePercent } from '@/lib/server/tax-settings'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Prisma } from '../../../../../generated/prisma/client'
 
@@ -46,6 +47,29 @@ function jsonNumber(value: unknown) {
     return Number.isFinite(parsed) ? parsed : 0
   }
   return toNumber(value as { toNumber: () => number } | null | undefined)
+}
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function calculatePoBuyTotals(params: {
+  hasVat: boolean
+  items: ReturnType<typeof poItems>
+  vatRatePercent: number
+}) {
+  const subtotal = roundMoney(params.items.reduce((sum, item) => sum + item.totalCost, 0))
+  const vatAmount = params.hasVat ? roundMoney(subtotal * params.vatRatePercent / 100) : 0
+  const totalAmount = roundMoney(subtotal + vatAmount)
+  return {
+    hasVat: params.hasVat,
+    remainingAmount: totalAmount,
+    subtotal,
+    totalAmount,
+    vatAmount,
+    vatRatePercent: params.vatRatePercent,
+    vatType: params.hasVat ? 'EXCLUDE' : 'NONE',
+  }
 }
 
 function itemsFromPo(row: {
@@ -149,15 +173,19 @@ function buildPoBuyEditMeta(params: {
     qty: Prisma.Decimal | null
     remaining_amount: Prisma.Decimal | null
     remaining_qty: Prisma.Decimal | null
+    subtotal: Prisma.Decimal | null
     supplier_id: bigint | null
     total_amount: Prisma.Decimal | null
+    vat_amount: Prisma.Decimal | null
+    vat_rate_percent: Prisma.Decimal
+    vat_type: string | null
   }
   items: ReturnType<typeof poItems>
   previousBranchCode: string
   previousSupplierCode: string
   issuedDate: string
   supplierCode: string
-  values: { expectedDelivery: string; notes: string | null }
+  values: { expectedDelivery: string; hasVat: boolean; notes: string | null }
 }) {
   const nextItemSnapshots = params.items.map((item) => ({
     productCode: item.productId,
@@ -187,10 +215,19 @@ function buildPoBuyEditMeta(params: {
     notes: params.existing.notes ?? '',
     remainingAmount: toNumber(params.existing.remaining_amount),
     remainingQty: toNumber(params.existing.remaining_qty),
+    subtotal: toNumber(params.existing.subtotal),
     supplierCode: params.previousSupplierCode,
     totalAmount: toNumber(params.existing.total_amount),
     totalQty: toNumber(params.existing.qty),
+    vatAmount: toNumber(params.existing.vat_amount),
+    vatRatePercent: toNumber(params.existing.vat_rate_percent),
+    vatType: params.existing.vat_type ?? 'NONE',
   }
+  const afterTotals = calculatePoBuyTotals({
+    hasVat: params.values.hasVat,
+    items: params.items,
+    vatRatePercent: toNumber(params.existing.vat_rate_percent) || 7,
+  })
   const afterSnapshot = {
     branchCode: params.branchCode,
     docNo: params.existing.doc_no,
@@ -198,11 +235,15 @@ function buildPoBuyEditMeta(params: {
     itemCount: nextItemSnapshots.length,
     items: nextItemSnapshots,
     notes: params.values.notes ?? '',
-    remainingAmount: params.items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0),
+    remainingAmount: afterTotals.remainingAmount,
     remainingQty: params.items.reduce((sum, item) => sum + item.remainingQty, 0),
+    subtotal: afterTotals.subtotal,
     supplierCode: params.supplierCode,
-    totalAmount: params.items.reduce((sum, item) => sum + item.totalCost, 0),
+    totalAmount: afterTotals.totalAmount,
     totalQty: params.items.reduce((sum, item) => sum + item.qty, 0),
+    vatAmount: afterTotals.vatAmount,
+    vatRatePercent: afterTotals.vatRatePercent,
+    vatType: afterTotals.vatType,
   }
   const changedFields = Object.keys(afterSnapshot).filter((key) => {
     const beforeValue = beforeSnapshot[key as keyof typeof beforeSnapshot]
@@ -344,7 +385,8 @@ export async function GET(request: Request) {
       .map((value) => value.trim())
       .filter((value) => value && value !== 'all')
 
-    const poRows = await prisma.po_buys.findMany({
+    const [poRows, vatRatePercent] = await Promise.all([
+      prisma.po_buys.findMany({
       include: {
         po_buy_allocation_logs: { orderBy: [{ created_at: 'desc' }], take: 50 },
         po_buy_status_logs: { orderBy: [{ created_at: 'desc' }], take: 20 },
@@ -352,7 +394,9 @@ export async function GET(request: Request) {
       },
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
       take: 5000,
-    })
+      }),
+      activeVatRatePercent(new Date()),
+    ])
     const productIds = [...new Set(poRows.map((row) => row.product_id).filter((value): value is bigint => value != null))]
     const branchIds = [...new Set(poRows.map((row) => row.branch_id).filter((id): id is bigint => id !== null))]
     const supplierIds = [...new Set(poRows.map((row) => row.supplier_id).filter((id): id is bigint => id != null))]
@@ -370,7 +414,11 @@ export async function GET(request: Request) {
       const items = itemsFromPo(po, productById, productName)
       const qty = items.reduce((sum, item) => sum + item.qty, 0) || toNumber(po.qty)
       const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0) || toNumber(po.remaining_qty)
-      const totalAmount = toNumber(po.total_amount) || items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0)
+      const itemSubtotal = items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0)
+      const subtotal = toNumber(po.subtotal) || itemSubtotal
+      const vatAmount = toNumber(po.vat_amount)
+      const hasVat = Boolean(po.has_vat) || vatAmount > 0
+      const totalAmount = toNumber(po.total_amount) || subtotal + vatAmount
       const remainingAmount = toNumber(po.remaining_amount) || items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0)
       const status = po.status ?? 'Open'
 
@@ -429,9 +477,14 @@ export async function GET(request: Request) {
         supplierId: po.supplier_id ? (supplierById.get(po.supplier_id)?.code ?? '') : '',
         supplierAddress: supplierAddress(po.suppliers),
         supplierName: po.suppliers?.name ?? '-',
+        hasVat,
+        subtotal,
         totalAmount,
         updatedAt: po.updated_at?.toISOString() ?? '',
         updatedBy: po.updated_by ?? '',
+        vatAmount,
+        vatRatePercent: toNumber(po.vat_rate_percent) || vatRatePercent,
+        vatType: po.vat_type ?? (hasVat ? 'EXCLUDE' : 'NONE'),
       }
     })
       .filter((row) => selectedIds.size === 0 || selectedIds.has(row.id))
@@ -452,6 +505,8 @@ export async function GET(request: Request) {
         สินค้า: row.productName,
         จำนวนรายการ: row.itemCount,
         จำนวนรวม: row.qty,
+        'ยอดก่อน VAT': row.subtotal,
+        VAT: row.vatAmount,
         ยอดรวม: row.totalAmount,
         รอรับรวม: row.remainingQty,
         มูลค่าคงเหลือ: row.remainingAmount,
@@ -480,6 +535,7 @@ export async function GET(request: Request) {
         totalAmount: rows.reduce((sum, row) => sum + row.totalAmount, 0),
         totalRows: rows.length,
       },
+      vatRatePercent,
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
@@ -497,10 +553,11 @@ export async function POST(request: Request) {
     const issuedAt = new Date()
     const issuedDate = bangkokDateInput(issuedAt)
     const productIds = [...new Set(values.items.map((item) => item.productId))]
-    const [branch, supplier, resolvedProducts] = await Promise.all([
+    const [branch, supplier, resolvedProducts, vatRatePercent] = await Promise.all([
       findActiveBranchReferenceByCodeOrId(values.branchId),
       findActiveSupplierReferenceByCodeOrId(values.supplierId),
       resolveProductsByCodeOrId(productIds),
+      activeVatRatePercent(normalizeDate(issuedDate)),
     ])
 
     if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน', fieldErrors: { branchId: ['เลือกสาขา'] } }, { status: 400 })
@@ -529,8 +586,7 @@ export async function POST(request: Request) {
       const items = poItems(values, resolvedProducts.rows, docNo)
       const qty = items.reduce((sum, item) => sum + item.qty, 0)
       const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0)
-      const totalAmount = items.reduce((sum, item) => sum + item.totalCost, 0)
-      const remainingAmount = items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0)
+      const totals = calculatePoBuyTotals({ hasVat: values.hasVat, items, vatRatePercent })
       const firstItem = items[0]
       const deliveryDate = normalizeDate(values.expectedDelivery)
 
@@ -546,18 +602,23 @@ export async function POST(request: Request) {
           expected_delivery: deliveryDate,
           is_opening_pool: false,
           items,
+          has_vat: totals.hasVat,
           note: values.notes,
           notes: values.notes,
           product_id: parseInternalBigIntId(firstItem.productIdInternal),
           qty,
-          remaining_amount: remainingAmount,
+          remaining_amount: totals.remainingAmount,
           remaining_qty: remainingQty,
           status: 'Open',
+          subtotal: totals.subtotal,
           supplier_id: supplier.id,
-          total_amount: totalAmount,
+          total_amount: totals.totalAmount,
           unit_price: firstItem.unitPrice,
           updated_at: issuedAt,
           updated_by: actor,
+          vat_amount: totals.vatAmount,
+          vat_rate_percent: totals.vatRatePercent,
+          vat_type: totals.vatType,
           version: 1,
           warehouse_id: null,
         },
@@ -626,8 +687,8 @@ export async function PUT(request: Request) {
     const items = poItems(values, products.rows, existing.doc_no)
     const qty = items.reduce((sum, item) => sum + item.qty, 0)
     const remainingQty = items.reduce((sum, item) => sum + item.remainingQty, 0)
-    const totalAmount = items.reduce((sum, item) => sum + item.totalCost, 0)
-    const remainingAmount = items.reduce((sum, item) => sum + item.remainingQty * item.unitPrice, 0)
+    const vatRatePercent = toNumber(existing.vat_rate_percent) || await activeVatRatePercent(normalizeDate(issuedDate))
+    const totals = calculatePoBuyTotals({ hasVat: values.hasVat, items, vatRatePercent })
     const firstItem = items[0]
     const deliveryDate = normalizeDate(values.expectedDelivery)
 
@@ -639,18 +700,23 @@ export async function PUT(request: Request) {
           branch_id: branch.id,
           delivery_date: deliveryDate,
           expected_delivery: deliveryDate,
+          has_vat: totals.hasVat,
           items,
           note: values.notes,
           notes: values.notes,
           product_id: parseInternalBigIntId(firstItem.productIdInternal),
           qty,
-          remaining_amount: remainingAmount,
+          remaining_amount: totals.remainingAmount,
           remaining_qty: remainingQty,
+          subtotal: totals.subtotal,
           supplier_id: supplier.id,
-          total_amount: totalAmount,
+          total_amount: totals.totalAmount,
           unit_price: firstItem.unitPrice,
           updated_at: updatedAt,
           updated_by: actor,
+          vat_amount: totals.vatAmount,
+          vat_rate_percent: totals.vatRatePercent,
+          vat_type: totals.vatType,
           version: { increment: 1 },
         },
         select: { doc_no: true, id: true, status: true },
@@ -667,7 +733,7 @@ export async function PUT(request: Request) {
           previousSupplierCode: previousSupplier?.code ?? '',
           issuedDate,
           supplierCode: supplier.code,
-          values: { expectedDelivery: values.expectedDelivery, notes: values.notes },
+          values: { expectedDelivery: values.expectedDelivery, hasVat: values.hasVat, notes: values.notes },
         }),
         poBuyDocNo: existing.doc_no,
         poBuyId: existing.id,

@@ -71,6 +71,8 @@ function timelineStatusLabel(type: WeightTicketRecord['type'], status: string) {
 function usageActionLabel(action: string) {
   if (action === 'allocated_to_purchase_bill') return 'นำไปออกบิลรับซื้อ'
   if (action === 'released_from_purchase_bill') return 'คืนยอดจากบิลรับซื้อ'
+  if (action === 'allocated_to_sales_bill') return 'นำไปออกบิลขาย'
+  if (action === 'released_from_sales_bill') return 'คืนยอดจากบิลขาย'
   return action || '-'
 }
 
@@ -82,6 +84,16 @@ function usageWeightLabel(action: string, weight: number) {
 function usageWeightClass(action: string) {
   if (action === 'released_from_purchase_bill') return 'text-emerald-700'
   return 'text-rose-700'
+}
+
+function downstreamDocHref(targetType: 'PURCHASE_BILL' | 'SALES_BILL', targetDocNo: string) {
+  return targetType === 'PURCHASE_BILL'
+    ? `/purchase/bills/${encodeURIComponent(targetDocNo)}`
+    : `/sales/bills/${encodeURIComponent(targetDocNo)}`
+}
+
+function downstreamDocLabel(targetType: 'PURCHASE_BILL' | 'SALES_BILL') {
+  return targetType === 'PURCHASE_BILL' ? 'บิลรับซื้อ' : 'บิลขาย'
 }
 
 export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string }) {
@@ -131,6 +143,18 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
     () => (ticket?.vehicleImageNames ?? []).map(decodeStoredImageAsset),
     [ticket],
   )
+  const summaryTargetDocNos = useMemo(() => {
+    const grouped = new Map<string, string[]>()
+    ticket?.productSummaries.forEach((summary) => {
+      grouped.set(summary.id, [])
+    })
+    ticket?.downstreamAllocations.forEach((allocation) => {
+      const rows = grouped.get(allocation.summaryId)
+      if (!rows || !allocation.targetDocNo) return
+      if (!rows.includes(allocation.targetDocNo)) rows.push(allocation.targetDocNo)
+    })
+    return grouped
+  }, [ticket])
 
   async function handleCancelTicket() {
     if (!ticket) return
@@ -232,6 +256,18 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                 </div>
               </div>
             ) : null}
+            {ticket.type === 'WTO' && ticket.usedInSalesBillDocNos.length > 0 ? (
+              <div className="mt-4 rounded-md bg-slate-50 px-4 py-3">
+                <div className="text-xs font-medium text-slate-500">เลขที่บิลขายที่อ้างอิง</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ticket.usedInSalesBillDocNos.map((docNo) => (
+                    <span className="rounded-md bg-white px-2.5 py-1 text-xs text-slate-700 shadow-sm" key={docNo}>
+                      {docNo}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {ticket.remark ? (
               <div className="mt-4 rounded-md bg-slate-50 px-4 py-3">
                 <div className="text-xs font-medium text-slate-500">
@@ -286,9 +322,10 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
                     <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
                       <tr>
-                        <th className="px-3 py-3 text-left">ลำดับ</th>
-                        <th className="px-3 py-3 text-left">สินค้า</th>
-                        <th className="px-3 py-3 text-left">หมายเหตุ</th>
+	                        <th className="px-3 py-3 text-left">ลำดับ</th>
+	                        <th className="px-3 py-3 text-left">สินค้า</th>
+	                        {ticket.type === 'WTO' ? <th className="px-3 py-3 text-left">คลัง</th> : null}
+	                        <th className="px-3 py-3 text-left">หมายเหตุ</th>
                         <th className="px-3 py-3 text-right">Gross</th>
                         <th className="px-3 py-3 text-right">หัก</th>
                         <th className="px-3 py-3 text-right">Net</th>
@@ -299,9 +336,19 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                     <tbody className="divide-y divide-slate-100">
                       {ticket.lines.map((line, index) => (
                         <tr key={line.id}>
-                          <td className="whitespace-nowrap px-3 py-3 text-slate-500">{index + 1}</td>
-                          <td className="px-3 py-3 font-medium text-slate-900">{line.productName}</td>
-                          <td className="px-3 py-3 text-slate-600">{line.note || '-'}</td>
+	                          <td className="whitespace-nowrap px-3 py-3 text-slate-500">{index + 1}</td>
+	                          <td className="px-3 py-3 font-medium text-slate-900">{line.productName}</td>
+	                          {ticket.type === 'WTO' ? (
+	                            <td className="px-3 py-3 text-slate-600">
+	                              {line.warehouseName ? (
+	                                <div>
+	                                  <div className="font-medium text-slate-800">{line.warehouseName}</div>
+	                                  <div className="mt-0.5 text-xs text-slate-500">{[line.warehouseId, line.warehouseType].filter(Boolean).join(' · ')}</div>
+	                                </div>
+	                              ) : '-'}
+	                            </td>
+	                          ) : null}
+	                          <td className="px-3 py-3 text-slate-600">{line.note || '-'}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatWeight(line.grossWeightValue)}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatWeight(line.deductionWeight)}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-slate-900">{formatWeight(line.netWeight)}</td>
@@ -360,6 +407,9 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                         <th className="px-3 py-3 text-right">Gross รวม</th>
                         <th className="px-3 py-3 text-right">หักรวม</th>
                         <th className="px-3 py-3 text-right">Net รวม</th>
+                        <th className="px-3 py-3 text-right">ออกบิลแล้ว</th>
+                        <th className="px-3 py-3 text-right">คงเหลือ</th>
+                        <th className="px-3 py-3 text-left">เอกสารปลายทาง</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -371,6 +421,21 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatWeight(summary.grossWeight)}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatWeight(summary.deductWeight)}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-slate-900">{formatWeight(summary.netWeight)}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-blue-700">{formatWeight(summary.billedWeight)}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-emerald-700">{formatWeight(summary.remainingWeight)}</td>
+                          <td className="px-3 py-3 text-slate-600">
+                            {summaryTargetDocNos.get(summary.id)?.length ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {summaryTargetDocNos.get(summary.id)?.map((docNo) => (
+                                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-700" key={`${summary.id}-${docNo}`}>
+                                    {docNo}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -405,6 +470,13 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                   {ticket.type === 'WTI' && ticket.usedInPurchaseBillDocNos.length > 0 ? (
                     <div className="mt-2 space-y-1 text-xs text-slate-600">
                       {ticket.usedInPurchaseBillDocNos.map((docNo) => (
+                        <div key={docNo}>{docNo}</div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {ticket.type === 'WTO' && ticket.usedInSalesBillDocNos.length > 0 ? (
+                    <div className="mt-2 space-y-1 text-xs text-slate-600">
+                      {ticket.usedInSalesBillDocNos.map((docNo) => (
                         <div key={docNo}>{docNo}</div>
                       ))}
                     </div>
@@ -481,6 +553,61 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
           </Card>
         ) : null}
 
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <SectionTitle
+              subtitle={ticket.type === 'WTI' ? 'แสดงว่าใบรับของถูกนำไปใช้กับบิลรับซื้อไหนบ้าง' : 'แสดงว่าใบส่งของถูกนำไปใช้กับบิลขายไหนบ้าง'}
+              title={ticket.type === 'WTI' ? 'ปลายทางการใช้งานใบรับของ' : 'ปลายทางการใช้งานใบส่งของ'}
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
+                <tr>
+                  <th className="px-3 py-3 text-left">เวลา</th>
+                  <th className="px-3 py-3 text-left">ประเภทปลายทาง</th>
+                  <th className="px-3 py-3 text-left">เลขที่เอกสาร</th>
+                  <th className="px-3 py-3 text-left">สินค้า</th>
+                  <th className="px-3 py-3 text-right">Gross</th>
+                  <th className="px-3 py-3 text-right">หัก</th>
+                  <th className="px-3 py-3 text-right">Net</th>
+                  <th className="px-3 py-3 text-left">สถานะ</th>
+                  <th className="px-3 py-3 text-left">ผู้ทำรายการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {ticket.downstreamAllocations.length === 0 ? (
+                  <tr>
+                    <td className="px-3 py-8 text-center text-sm text-slate-400" colSpan={9}>
+                      ยังไม่มีปลายทางการใช้งาน
+                    </td>
+                  </tr>
+                ) : ticket.downstreamAllocations.map((allocation) => (
+                  <tr key={allocation.id}>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-500">{formatDateTime(allocation.createdAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">{downstreamDocLabel(allocation.targetType)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-700">
+                      <Link className="font-medium text-blue-700 hover:underline" href={downstreamDocHref(allocation.targetType, allocation.targetDocNo)}>
+                        {allocation.targetDocNo}
+                      </Link>
+                      {allocation.targetLineNo ? <div className="mt-0.5 text-xs text-slate-500">รายการ {allocation.targetLineNo}</div> : null}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="font-medium text-slate-900">{allocation.productName}</div>
+                      {allocation.productCode ? <div className="mt-0.5 text-xs text-slate-500">{allocation.productCode}</div> : null}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatWeight(allocation.allocatedGrossWeight)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatWeight(allocation.allocatedDeductWeight)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-slate-900">{formatWeight(allocation.allocatedNetWeight)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-600">{allocation.status || '-'}</td>
+                    <td className="px-3 py-3 text-slate-600">{allocation.createdBy || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
         <Card className="p-5">
           <SectionTitle subtitle="รวมสถานะเอกสารและประวัติการใช้งาน เรียงจากล่าสุดลงล่าง" title="Timeline เอกสาร" />
           <div className="mt-4 space-y-4">
@@ -512,7 +639,10 @@ export function WeightTicketDetailPageClient({ ticketId }: { ticketId: string })
                     {targetDocNo || productName || allocatedNetWeight != null ? (
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
                         {targetDocNo ? (
-                          <Link className="font-medium text-blue-700 hover:underline" href={`/purchase/bills/${encodeURIComponent(targetDocNo)}`}>
+                          <Link
+                            className="font-medium text-blue-700 hover:underline"
+                            href={downstreamDocHref((metadataString(event.metadata, 'targetType') || 'PURCHASE_BILL') as 'PURCHASE_BILL' | 'SALES_BILL', targetDocNo)}
+                          >
                             {targetDocNo}
                           </Link>
                         ) : null}

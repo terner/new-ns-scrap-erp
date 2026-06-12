@@ -133,34 +133,63 @@ export async function stockBalanceSnapshot(input: {
   asOf?: string | null
   branchId?: string | bigint | null
   lotNo?: string | null
+  onHold?: boolean | null
   productId?: string | bigint | null
   q?: string | null
   status?: string | null
   warehouseId?: string | bigint | null
 }) {
   const normalizedInput = await normalizeStockReferenceInput(input)
-  const where = stockWhere(normalizedInput)
+  const where = stockWhere({
+    asOf: input.asOf,
+    branchId: normalizedInput.branchId,
+    lotNo: input.lotNo,
+    productId: normalizedInput.productId,
+    status: input.status,
+    warehouseId: normalizedInput.warehouseId,
+  })
   const ledgerRows = await prisma.stock_ledger.findMany({
     include: stockLedgerInclude,
     orderBy: [{ date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
     where,
   })
+  const holdSums = await prisma.stock_holds.groupBy({
+    _sum: { qty: true },
+    by: ['branch_id', 'product_id', 'warehouse_id'],
+    where: {
+      status: 'active',
+      ...(normalizedInput.branchId ? { branch_id: normalizedInput.branchId } : {}),
+      ...(normalizedInput.productId ? { product_id: normalizedInput.productId } : {}),
+      ...(normalizedInput.warehouseId ? { warehouse_id: normalizedInput.warehouseId } : {}),
+    },
+  })
+  const holdQtyByStockKey = new Map(
+    holdSums.map((row) => [
+      `${row.product_id ?? '-'}:${row.branch_id ?? '-'}:${row.warehouse_id ?? '-'}`,
+      toNumber(row._sum.qty),
+    ]),
+  )
 
   const grouped = new Map<string, {
     avgCost: number
+    branchInternalId: bigint | null
     branchId: string
     branchName: string
     key: string
     lastDate: string
     lotNo: string
     notAvailable: boolean
+    onHoldQty: number
+    productInternalId: bigint | null
     productCode: string
     productId: string
     productMetalGroup: string
     productName: string
     qty: number
+    readyQty: number
     status: string
     value: number
+    warehouseInternalId: bigint | null
     warehouseId: string
     warehouseName: string
   }>()
@@ -177,19 +206,24 @@ export async function stockBalanceSnapshot(input: {
     })
     const current = grouped.get(key) ?? {
       avgCost: 0,
+      branchInternalId: row.branch_id ?? null,
       branchId: row.branches?.code ?? '',
       branchName: row.branches?.name ?? '-',
       key,
       lastDate: toDateOnly(row.date),
       lotNo: row.lot_no ?? '',
       notAvailable: row.not_available_for_sale === true,
+      onHoldQty: 0,
+      productInternalId: row.product_id ?? null,
       productCode: row.products?.code ?? '',
       productId: row.products?.code ?? '',
       productMetalGroup: row.products?.metal_group ?? 'อื่นๆ',
       productName: row.products?.name ?? '-',
       qty: 0,
+      readyQty: 0,
       status: productStatus,
       value: 0,
+      warehouseInternalId: row.warehouse_id ?? null,
       warehouseId: row.warehouses?.code ?? '',
       warehouseName: row.warehouses?.name ?? '-',
     }
@@ -206,8 +240,24 @@ export async function stockBalanceSnapshot(input: {
     .filter((row) => !query || `${row.productCode} ${row.productName} ${row.productMetalGroup} ${row.branchName} ${row.warehouseName} ${row.lotNo} ${row.status}`.toLowerCase().includes(query))
     .sort((left, right) => left.productMetalGroup.localeCompare(right.productMetalGroup) || left.productCode.localeCompare(right.productCode) || left.branchName.localeCompare(right.branchName) || left.warehouseName.localeCompare(right.warehouseName))
 
-  const summary = rows.reduce((acc, row) => {
+  for (const row of rows) {
+    if (row.notAvailable || row.qty <= 0) {
+      row.readyQty = 0
+      continue
+    }
+    const holdKey = `${row.productInternalId ?? '-'}:${row.branchInternalId ?? '-'}:${row.warehouseInternalId ?? '-'}`
+    const remainingHold = holdQtyByStockKey.get(holdKey) ?? 0
+    row.onHoldQty = Math.min(row.qty, Math.max(0, remainingHold))
+    row.readyQty = Math.max(0, row.qty - row.onHoldQty)
+    holdQtyByStockKey.set(holdKey, Math.max(0, remainingHold - row.onHoldQty))
+  }
+
+  const filteredRows = input.onHold ? rows.filter((row) => row.onHoldQty > 0) : rows
+
+  const summary = filteredRows.reduce((acc, row) => {
+    acc.onHoldQty += row.onHoldQty
     acc.qty += row.qty
+    acc.readyQty += row.readyQty
     acc.value += row.value
     if (row.notAvailable) {
       acc.notAvailableQty += row.qty
@@ -218,10 +268,10 @@ export async function stockBalanceSnapshot(input: {
     }
     if (row.qty < 0) acc.negativeRows += 1
     return acc
-  }, { availableQty: 0, availableValue: 0, count: rows.length, negativeRows: 0, notAvailableQty: 0, notAvailableValue: 0, qty: 0, value: 0 })
+  }, { availableQty: 0, availableValue: 0, count: filteredRows.length, negativeRows: 0, notAvailableQty: 0, notAvailableValue: 0, onHoldQty: 0, qty: 0, readyQty: 0, value: 0 })
 
   const byStatus = ['RM', 'WIP', 'FG'].map((status) => {
-    const statusRows = rows.filter((row) => row.status === status)
+    const statusRows = filteredRows.filter((row) => row.status === status)
     return {
       count: statusRows.length,
       qty: statusRows.reduce((sum, row) => sum + row.qty, 0),
@@ -230,7 +280,9 @@ export async function stockBalanceSnapshot(input: {
     }
   })
 
-  return { byStatus, rows, summary }
+  const publicRows = filteredRows.map(({ branchInternalId: _branchInternalId, productInternalId: _productInternalId, warehouseInternalId: _warehouseInternalId, ...row }) => row)
+
+  return { byStatus, rows: publicRows, summary }
 }
 
 export async function averageCostForStock(input: { branchId?: bigint | null; lotNo?: string | null; productId: string | bigint; warehouseId?: bigint | null }) {

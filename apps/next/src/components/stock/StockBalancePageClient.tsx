@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import type { StockOption } from '@/lib/stock'
 
@@ -12,11 +13,13 @@ type BalanceRow = {
   lastDate: string
   lotNo: string
   notAvailable: boolean
+  onHoldQty: number
   productCode: string
   productId: string
   productMetalGroup: string
   productName: string
   qty: number
+  readyQty: number
   status: string
   value: number
   warehouseId: string
@@ -27,8 +30,10 @@ type BalancePayload = {
   byStatus: Array<{ count: number; qty: number; status: string; value: number }>
   reference: { branches: StockOption[]; products: StockOption[]; warehouses: StockOption[] }
   rows: BalanceRow[]
-  summary: { availableQty: number; availableValue: number; count: number; negativeRows: number; notAvailableQty: number; notAvailableValue: number; qty: number; value: number }
+  summary: { availableQty: number; availableValue: number; count: number; negativeRows: number; notAvailableQty: number; notAvailableValue: number; onHoldQty: number; qty: number; readyQty: number; value: number }
 }
+
+const ON_HOLD_STATUS = 'ON_HOLD'
 
 export function StockBalancePageClient() {
   const [branchId, setBranchId] = useState('')
@@ -52,7 +57,8 @@ export function StockBalancePageClient() {
       if (branchId) params.set('branchId', branchId)
       if (productId) params.set('productId', productId)
       if (warehouseId) params.set('warehouseId', warehouseId)
-      if (status) params.set('status', status)
+      if (status && status !== ON_HOLD_STATUS) params.set('status', status)
+      if (status === ON_HOLD_STATUS) params.set('onHold', '1')
       setData(await dailyFetchJson<BalancePayload>(`/api/stock/balance?${params.toString()}`))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดสต๊อกคงเหลือไม่ได้')
@@ -66,8 +72,10 @@ export function StockBalancePageClient() {
   }, [loadData])
 
   const filteredRows = useMemo(() => {
-    return (data?.rows ?? []).filter((row) => !group || row.productMetalGroup === group)
-  }, [data?.rows, group])
+    return (data?.rows ?? [])
+      .filter((row) => !group || row.productMetalGroup === group)
+      .filter((row) => status !== ON_HOLD_STATUS || row.onHoldQty > 0)
+  }, [data?.rows, group, status])
 
   const summary = useMemo(() => filteredRows.reduce((acc, row) => {
     acc.qty += row.qty
@@ -78,10 +86,12 @@ export function StockBalancePageClient() {
     } else {
       acc.availableQty += row.qty
       acc.availableValue += row.value
+      acc.onHoldQty += row.onHoldQty
+      acc.readyQty += row.readyQty
     }
     if (row.qty < 0) acc.negativeRows += 1
     return acc
-  }, { availableQty: 0, availableValue: 0, negativeRows: 0, notAvailableQty: 0, notAvailableValue: 0, qty: 0, value: 0 }), [filteredRows])
+  }, { availableQty: 0, availableValue: 0, negativeRows: 0, notAvailableQty: 0, notAvailableValue: 0, onHoldQty: 0, qty: 0, readyQty: 0, value: 0 }), [filteredRows])
 
   const byStatus = useMemo(() => ['RM', 'WIP', 'FG'].map((itemStatus) => {
     const rows = filteredRows.filter((row) => row.status === itemStatus)
@@ -117,6 +127,12 @@ export function StockBalancePageClient() {
     ...((data?.reference.products ?? []).map((item) => item.metalGroup).filter(Boolean) as string[]),
     ...((data?.rows ?? []).map((row) => row.productMetalGroup).filter(Boolean)),
   ])).sort(), [data?.reference.products, data?.rows])
+  const productOptions = useMemo<SearchComboboxOption[]>(() => (data?.reference.products ?? []).map((item) => ({
+    description: item.metalGroup || undefined,
+    id: item.id,
+    label: item.code ? `${item.code} - ${item.name}` : item.name,
+    searchText: `${item.code ?? ''} ${item.name} ${item.metalGroup ?? ''}`,
+  })), [data?.reference.products])
 
   const selectedProductRows = useMemo(() => {
     if (!productId) return []
@@ -128,9 +144,13 @@ export function StockBalancePageClient() {
     ? selectedProductRows.reduce((acc, row) => {
         acc.qty += row.qty
         acc.value += row.value
-        if (!row.notAvailable) acc.available += row.qty
+        if (!row.notAvailable) {
+          acc.available += row.qty
+          acc.onHold += row.onHoldQty
+          acc.ready += row.readyQty
+        }
         return acc
-      }, { available: 0, product: selectedProduct, qty: 0, value: 0 })
+      }, { available: 0, onHold: 0, product: selectedProduct, qty: 0, ready: 0, value: 0 })
     : null
   const averageCost = summary.qty > 0 ? summary.value / summary.qty : 0
 
@@ -140,17 +160,19 @@ export function StockBalancePageClient() {
     if (branchId) params.set('branchId', branchId)
     if (productId) params.set('productId', productId)
     if (warehouseId) params.set('warehouseId', warehouseId)
-    if (status) params.set('status', status)
+    if (status && status !== ON_HOLD_STATUS) params.set('status', status)
+    if (status === ON_HOLD_STATUS) params.set('onHold', '1')
     window.location.href = `/api/stock/balance?${params.toString()}`
   }
 
   return (
     <section>
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Metric label="น้ำหนักสต๊อกรวม" value={`${formatMoney(summary.qty)} กก.`} tone="blue" />
         <Metric label="มูลค่าสต๊อกรวม" value={formatMoney(summary.value)} tone="emerald" />
-        <Metric label="✅ พร้อมขาย" sub={`${summary.value > 0 ? (summary.availableValue / summary.value * 100).toFixed(1) : '0'}% ของ Stock`} value={formatMoney(summary.availableValue)} tone="emeraldPanel" />
+        <Metric label="จองไว้" sub="จาก WTO ที่ยังไม่ออกบิล" value={`${formatMoney(summary.onHoldQty)} กก.`} tone="amber" />
+        <Metric label="พร้อมส่ง" sub={`${summary.availableQty > 0 ? (summary.readyQty / summary.availableQty * 100).toFixed(1) : '0'}% ของ Stock ที่พร้อมขาย`} value={`${formatMoney(summary.readyQty)} กก.`} tone="emeraldPanel" />
         <Metric label="⚠ ไม่พร้อมขาย" sub={`${summary.value > 0 ? (summary.notAvailableValue / summary.value * 100).toFixed(1) : '0'}% ของ Stock`} value={formatMoney(summary.notAvailableValue)} tone="redPanel" />
         <Metric label="ราคา/กก. เฉลี่ย" value={formatMoney(averageCost)} />
       </div>
@@ -159,23 +181,29 @@ export function StockBalancePageClient() {
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="flex overflow-hidden rounded-md border">
-          <button className={`px-4 py-2 text-sm ${viewMode === 'summary' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`} type="button" onClick={() => setViewMode('summary')}>📊 Matrix (กลุ่ม × สถานะ)</button>
+          <button className={`px-4 py-2 text-sm ${viewMode === 'summary' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`} type="button" onClick={() => setViewMode('summary')}>📊 Matrix (กลุ่ม × คลัง)</button>
           <button className={`border-l px-4 py-2 text-sm ${viewMode === 'detail' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`} type="button" onClick={() => setViewMode('detail')}>📄 รายสินค้า</button>
         </div>
         <select className="rounded-md border px-3 py-2 text-sm" value={group} onChange={(event) => setGroup(event.target.value)}>
           <option value="">ทุกหมวด</option>{groupOptions.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
         <select className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="">ทุกสถานะ</option><option value="RM">📦 RM</option><option value="WIP">⚙️ WIP</option><option value="FG">✅ FG</option>
+          <option value="">ทุกคลัง</option><option value="RM">📦 RM</option><option value="WIP">⚙️ WIP</option><option value="FG">✅ FG</option><option value={ON_HOLD_STATUS}>On Hold</option>
         </select>
         <select className="rounded-md border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setBranchId(event.target.value); setWarehouseId('') }}>
           <option value="">ทุกสาขา</option>{data?.reference.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
-        <div className="min-w-56">
-          <select className="w-full rounded-md border px-3 py-2 text-sm" value={productId} onChange={(event) => setProductId(event.target.value)}>
-            <option value="">พิมพ์/เลือกสินค้า — กดเพื่อดูรายละเอียด</option>
-            {data?.reference.products.map((item) => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ${item.name}` : item.name}</option>)}
-          </select>
+        <div className="min-w-72">
+          <SearchCombobox
+            hideLabel
+            inputClassName="h-9 text-sm"
+            inputId="stock-balance-product-search"
+            label="สินค้า"
+            options={productOptions}
+            placeholder="ค้นหารหัสหรือชื่อสินค้า"
+            value={productId}
+            onChange={setProductId}
+          />
         </div>
         {productId ? <button className="rounded-md bg-slate-100 px-2 py-1.5 text-xs hover:bg-slate-200" type="button" onClick={() => setProductId('')}>✕ ล้าง</button> : null}
         <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportXlsx}>📥 Export .xlsx</button>
@@ -205,10 +233,12 @@ export function StockBalancePageClient() {
             <div className="flex items-center justify-between border-b px-5 py-4"><h3 className="font-bold">รายละเอียดสต๊อก</h3><button className="text-2xl text-slate-400" type="button" onClick={() => setDetailRow(null)}>&times;</button></div>
             <div className="space-y-2 p-5 text-sm">
               <Info label="สินค้า" value={`${detailRow.productCode} ${detailRow.productName}`} />
-              <Info label="สถานะ" value={detailRow.status || '-'} />
+              <Info label="คลัง" value={stockStatusText(detailRow)} />
               <Info label="สาขา/คลัง" value={`${detailRow.branchName} / ${detailRow.warehouseName}`} />
               <Info label="Lot" value={detailRow.lotNo || '-'} />
               <Info label="คงเหลือ" value={`${formatMoney(detailRow.qty)} กก.`} />
+              <Info label="จองไว้" value={`${formatMoney(detailRow.onHoldQty)} กก.`} />
+              <Info label="พร้อมส่ง" value={`${formatMoney(detailRow.readyQty)} กก.`} />
               <Info label="มูลค่า" value={formatMoney(detailRow.value)} />
               <Info label="ต้นทุนเฉลี่ย" value={formatMoney(detailRow.avgCost)} />
               <Info label="วันที่ล่าสุด" value={detailRow.lastDate} />
@@ -269,7 +299,7 @@ function StatusCard({ item }: { item: StatusSummary }) {
 
 function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
   averageCost: number
-  info: { available: number; product: StockOption; qty: number; value: number }
+  info: { available: number; onHold: number; product: StockOption; qty: number; ready: number; value: number }
   onClose: () => void
   onOpen: (row: BalanceRow) => void
   rows: BalanceRow[]
@@ -283,11 +313,12 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
         </div>
         <button className="text-sm text-slate-500 hover:text-slate-800" type="button" onClick={onClose}>✕ ปิด</button>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
         <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">📊 คงเหลือ</div><div className={`text-2xl font-bold ${info.qty > 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(info.qty)} <span className="text-sm font-normal">กก.</span></div></div>
         <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">💰 มูลค่ารวม (WAC)</div><div className="text-2xl font-bold text-blue-700">{formatMoney(info.value)} <span className="text-sm font-normal">บาท</span></div></div>
         <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">⚖ ราคาเฉลี่ย/กก.</div><div className="text-2xl font-bold text-amber-700">{formatMoney(averageCost)} <span className="text-sm font-normal">บ./กก.</span></div></div>
-        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">✅ พร้อมขาย</div><div className="text-2xl font-bold text-emerald-600">{formatMoney(info.available)} <span className="text-sm font-normal">กก.</span></div></div>
+        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">จองไว้</div><div className="text-2xl font-bold text-amber-700">{formatMoney(info.onHold)} <span className="text-sm font-normal">กก.</span></div></div>
+        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">พร้อมส่ง</div><div className="text-2xl font-bold text-emerald-600">{formatMoney(info.ready)} <span className="text-sm font-normal">กก.</span></div></div>
       </div>
       <div className="mt-3 rounded-md bg-white shadow">
         <div className="flex items-center justify-between border-b bg-slate-50 p-3">
@@ -297,21 +328,23 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
         <div className="max-h-[400px] overflow-x-auto overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-100">
-              <tr><th className="p-2 text-left">วันที่ล่าสุด</th><th className="p-2 text-left">สถานะ</th><th className="p-2 text-left">สาขา/คลัง</th><th className="p-2 text-left">Lot</th><th className="p-2 text-right">คงเหลือ</th><th className="p-2 text-right">มูลค่า</th><th className="p-2 text-center">Action</th></tr>
+              <tr><th className="p-2 text-left">วันที่ล่าสุด</th><th className="p-2 text-left">คลัง</th><th className="p-2 text-left">สาขา/คลัง</th><th className="p-2 text-left">Lot</th><th className="p-2 text-right">คงเหลือ</th><th className="p-2 text-right">จองไว้</th><th className="p-2 text-right">พร้อมส่ง</th><th className="p-2 text-right">มูลค่า</th><th className="p-2 text-center">Action</th></tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.key} className="border-t hover:bg-blue-50/30">
                   <td className="p-2">{row.lastDate}</td>
-                  <td className="p-2"><StatusBadge status={row.status} /></td>
+                  <td className="p-2"><StockStatusCell row={row} /></td>
                   <td className="p-2 text-slate-500">{row.branchName} / {row.warehouseName}</td>
                   <td className="p-2 font-mono">{row.lotNo || '-'}</td>
                   <td className={`p-2 text-right font-medium ${row.qty < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(row.qty)}</td>
+                  <td className="p-2 text-right text-amber-700">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
+                  <td className="p-2 text-right text-emerald-700">{formatMoney(row.readyQty)}</td>
                   <td className="p-2 text-right">{formatMoney(row.value)}</td>
                   <td className="p-2 text-center"><button className="rounded-md bg-blue-50 px-2 py-1 text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
                 </tr>
               ))}
-              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={7}>ยังไม่มีรายการ</td></tr> : null}
+              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={9}>ยังไม่มีรายการ</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -406,27 +439,28 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: 
 function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: (row: BalanceRow) => void; rows: BalanceRow[] }) {
   return (
     <div className="overflow-x-auto rounded-md bg-white shadow">
-      <table className="w-full min-w-[1120px] text-sm">
-        <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-left">หมวด</th><th className="p-2 text-center">สถานะ</th><th className="p-2 text-left">สาขา</th><th className="p-2 text-right">คงเหลือ (กก.)</th><th className="p-2 text-right">ต้นทุน/กก.</th><th className="p-2 text-right">มูลค่า</th><th className="bg-emerald-50 p-2 text-right">✅ พร้อมขาย</th><th className="bg-red-50 p-2 text-right">⚠ ไม่พร้อมขาย</th><th className="p-2 text-center">Action</th></tr></thead>
+      <table className="w-full min-w-[1260px] text-sm">
+        <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-left">หมวด</th><th className="p-2 text-center">คลัง</th><th className="p-2 text-left">สาขา</th><th className="p-2 text-right">คงเหลือ (กก.)</th><th className="bg-amber-50 p-2 text-right">จองไว้</th><th className="bg-emerald-50 p-2 text-right">พร้อมส่ง</th><th className="p-2 text-right">ต้นทุน/กก.</th><th className="p-2 text-right">มูลค่า</th><th className="bg-red-50 p-2 text-right">ไม่พร้อมขาย</th><th className="p-2 text-center">Action</th></tr></thead>
         <tbody>
-          {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
+          {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
           {!isLoading && rows.map((row) => (
             <tr key={row.key} className={`border-t ${row.qty < 0 ? 'bg-red-50/60' : 'hover:bg-slate-50'}`}>
               <td className="p-2"><span className="font-mono text-xs text-slate-500">{row.productCode}</span> {row.productName}<div className="text-xs text-slate-400">Lot: {row.lotNo || '-'}</div></td>
               <td className="p-2">{row.productMetalGroup || 'อื่นๆ'}</td>
-              <td className="p-2 text-center"><StatusBadge status={row.status} /></td>
+              <td className="p-2 text-center"><StockStatusCell row={row} /></td>
               <td className="p-2">{row.branchName}<div className="text-xs text-slate-500">{row.warehouseName}</div></td>
               <td className={`p-2 text-right font-medium ${row.qty < 0 ? 'text-red-600' : ''}`}>{formatMoney(row.qty)}</td>
+              <td className="p-2 text-right text-amber-700">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
+              <td className="p-2 text-right text-emerald-700">{formatMoney(row.readyQty)}</td>
               <td className="p-2 text-right text-slate-500">{formatMoney(row.avgCost)}</td>
               <td className="p-2 text-right font-bold text-emerald-700">{formatMoney(row.value)}</td>
-              <td className="p-2 text-right text-emerald-700">{row.notAvailable ? '-' : formatMoney(row.qty)}</td>
               <td className={`p-2 text-right ${row.notAvailable ? 'font-medium text-red-600' : 'text-slate-400'}`}>{row.notAvailable ? formatMoney(row.qty) : '-'}</td>
               <td className="p-2 text-center"><button className="rounded-md bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
             </tr>
           ))}
-          {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>ไม่มีสต๊อก</td></tr> : null}
+          {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ไม่มีสต๊อก</td></tr> : null}
         </tbody>
-        {rows.length ? <tfoot className="bg-slate-100 font-bold"><tr><td className="p-2" colSpan={4}>รวม</td><td className="p-2 text-right">{formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))}</td><td /><td className="p-2 text-right text-emerald-700">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(rows.filter((row) => !row.notAvailable).reduce((sum, row) => sum + row.qty, 0))}</td><td className="p-2 text-right text-red-700">{formatMoney(rows.filter((row) => row.notAvailable).reduce((sum, row) => sum + row.qty, 0))}</td><td /></tr></tfoot> : null}
+        {rows.length ? <tfoot className="bg-slate-100 font-bold"><tr><td className="p-2" colSpan={4}>รวม</td><td className="p-2 text-right">{formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))}</td><td className="p-2 text-right text-amber-700">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(rows.reduce((sum, row) => sum + row.readyQty, 0))}</td><td /><td className="p-2 text-right text-emerald-700">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td><td className="p-2 text-right text-red-700">{formatMoney(rows.filter((row) => row.notAvailable).reduce((sum, row) => sum + row.qty, 0))}</td><td /></tr></tfoot> : null}
       </table>
     </div>
   )
@@ -435,4 +469,21 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
 function StatusBadge({ status }: { status: string }) {
   const className = status === 'FG' ? 'bg-emerald-100 text-emerald-700' : status === 'WIP' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
   return <span className={`rounded-md px-2 py-0.5 text-xs ${className}`}>{status || '-'}</span>
+}
+
+function HoldBadge() {
+  return <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800">On Hold</span>
+}
+
+function StockStatusCell({ row }: { row: BalanceRow }) {
+  return (
+    <div className="flex flex-wrap justify-center gap-1">
+      <StatusBadge status={row.status} />
+      {row.onHoldQty > 0 ? <HoldBadge /> : null}
+    </div>
+  )
+}
+
+function stockStatusText(row: BalanceRow) {
+  return row.onHoldQty > 0 ? `${row.status || '-'} / On Hold` : row.status || '-'
 }

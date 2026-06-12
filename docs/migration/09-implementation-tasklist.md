@@ -350,6 +350,12 @@ Reporting rule:
   - [x] เพิ่ม `supplier_advance_status_logs` และ `supplier_advance_allocation_logs` สำหรับ lifecycle/status และ ADV -> PB allocation/release timeline
   - [ ] เพิ่ม `payment_approval_status_logs`, `payment_status_logs`, `payment_allocations`, และ `payment_account_splits`
   - [ ] เพิ่ม sales-side status/allocation logs สำหรับ `POS`, `PSALE`, `WTO`, `SB`, และ `RCP`
+- [ ] เพิ่ม Document Aging read model/report สำหรับ `PB/SB/WTI/WTO/POB/POS`
+  - [x] บันทึก target contract ที่ `docs/notes/Document Aging Policy.md`
+  - [ ] ใช้ bucket เดียวกับ AP/AR สำหรับ `PB/SB` financial due aging
+  - [ ] เพิ่ม operational pending aging ให้ `WTI/WTO/POB/POS`
+  - [ ] ตรวจทุกหน้า list/detail ของเอกสารให้แสดง `วันที่สร้างรายการ` จาก `created_at` แยกจากวันที่เอกสาร/วันที่จ่าย/วันที่ครบกำหนด
+  - [ ] ออกแบบ API/report กลางหรือ page-specific fields ก่อนเพิ่ม OpenAPI path ใหม่
 - [ ] ปิด Batch C follow-up สำหรับ support/history tables ที่ยังไม่มี outward business/event key
   - [x] `bill_swap_history`: เพิ่ม `event_key` จริงใน schema/route/UI แทนการประกอบ `billDocNo:itemIndex:swapDate` ใน API
   - [x] `supplier_advance_allocations`: เพิ่ม `allocation_key` จริงใน schema และใช้เป็น outward allocation/timeline key แทน purchase-bill doc no surrogate
@@ -499,7 +505,14 @@ Reporting rule:
 
 - [ ] map `purchase_bills.items jsonb`
 - [ ] design `purchase_bill_lines`
-- [ ] define stock movement trigger/rule
+- [ ] define bill-driven stock movement trigger/rule: `PB Stock = stock in`, `WTO = stock hold`, `SB Stock = consume hold + stock out`, `WTI = source evidence`
+- [ ] keep Stock PB as stock-in owner with `WTI 1 ใบ -> PB 1 ใบ`, reverse/rebuild PB ledger on edit/cancel, and release/recalc WTI usage from active facts
+- [ ] enforce `/purchase/bills` canonical status/filter/runtime contract
+  - [ ] list filter uses only `ยังไม่อนุมัติ`, `รอจ่าย`, `ชำระบางส่วน`, `เสร็จสิ้น`, `ยกเลิก`
+  - [ ] remove `อนุมัติแล้ว` as PB-level filter/status; PMA owns that state
+  - [ ] Stock PB WTI selector accepts only `WTI = รับของแล้ว`
+  - [ ] block legacy partial WTI from new write path selectors
+  - [ ] disable edit/cancel/supplier-swap when active `PMA approved` or `PMT active` exists
 - [ ] define payment relation
 - [x] `/purchase/bills` supplier swap flow
   - [x] แยก page-specific flow doc เป็น `docs/notes/Purchase Bills Page Flow.md`
@@ -535,14 +548,36 @@ Reporting rule:
   - [x] per-document SB print with branch-specific Company Profile, A4 portrait, multi-page header/footer, Customer/document panels, VAT/totals, deposit, and receivable balance
   - [x] SB print item table no longer repeats WTO document number or vehicle registration
 - [ ] Design and implement durable `WTO -> Sales Bill` allocation tables/rules, including `sales bill -> WTO`, `sales bill -> PO Sell`, `sales bill -> Spot Sale`, and Customer advance allocation/release
+  - [x] Batch WTO-A schema/API foundation
+    - [x] add `weight_ticket_lines.warehouse_id` for WTO intended stock location
+    - [x] add durable `stock_holds` table with `active/consumed/released/cancelled` status
+    - [x] add hold-aware availability helper from `stock_ledger + stock_holds`
+    - [x] add `GET /api/daily/weight-tickets/stock-options?branchId=&productId=` for active branch `RM/FG` warehouses with `onHandQty/onHoldQty/availableQty`
+    - [x] enforce WTO server validation on `POST/PUT/PATCH /api/daily/weight-tickets`: require warehouse, validate available qty, create/rebuild/release holds in transaction
+  - [ ] Batch WTO-B create/edit UX
+    - [x] update WTO create/edit UX ให้เลือกสินค้าใน line ก่อน แล้วเลือกคลัง `RM/FG` ต่อ line
+    - [x] show line availability as `คงเหลือจริง / จองไว้ / พร้อมส่ง`
+    - [x] show intended warehouse in WTO detail/print/read models
+    - [x] show hold state in WTO detail where relevant at baseline level
+  - [ ] Batch WTO-C downstream stock-out
+    - [x] add `SB Stock` create flow consume-hold + stock-out ledger write by referencing WTO intended warehouse; WTI/WTO must not write stock ledger rows
+    - [x] show stock balance as `คงเหลือจริง / จองไว้ / พร้อมส่ง` in `/stock/balance`
+    - [x] show hold/consume context in SB create from WTO at baseline level
+    - [ ] transaction-safe release/rebuild on edit/cancel `SB`
   - [ ] current allocation table for `WTO -> SB`
   - [ ] current allocation table for `SB -> PO Sell`
   - [ ] current allocation table for `SB -> Spot Sale`
   - [ ] current allocation table for `Customer advance -> SB`
-  - [ ] transaction-safe release/rebuild on edit/cancel `SB`
   - [ ] server-side validation reads allocation facts/current tables, not only json snapshots
+- [ ] Runtime status/usage cleanup after status decision
+  - [x] WTI/WTO list filters use canonical target status only
+  - [x] WTI has no target partial-billed status in new writes
+  - [x] WTO has no target partial-billed status in new writes
+  - [ ] detail/timeline surfaces downstream usage facts instead of inferring from status string only
+  - [ ] reconciliation report flags legacy partial-billed/status mismatch rows instead of hiding them
 - [ ] Add sales-bill timeline/log coverage
-  - [ ] `weight_ticket_usage_logs` for `WTO -> SB` allocate/release
+  - [x] `weight_ticket_usage_logs` for `WTO -> SB` allocate on create
+  - [ ] `weight_ticket_usage_logs` for `WTO -> SB` release/reverse on edit/cancel
   - [ ] `sales_bill_status_logs`
   - [ ] `sales_bill_allocation_logs`
   - [ ] `PO Sell` allocation logs for billed/released quantity from `SB`
@@ -553,6 +588,11 @@ Reporting rule:
   - [ ] QA long A4 multi-page print with mixed `PO Sell`/`Spot Sale`
 - [ ] Design Trading sales bill flow as follow-up: choose multiple purchase bills first, auto-fill sale lines, allow manual stock lines, and allocate each line to PO Sell
 - [ ] Define sales bill allocation tables/rules for `sales bill -> purchase bill`, `sales bill -> stock`, and `sales bill -> PO Sell`
+- [ ] Implement `/sales/stock-issue` pending sale write flow from `docs/notes/Pending Sale Page Flow.md`
+  - [ ] create/edit pending sale validates available stock and writes `PSALE` stock-out ledger because goods physically leave before billing
+  - [ ] cancel pending sale writes reversal/rebuild ledger and unlocks stock only if not converted to Sales Bill
+  - [ ] convert `PSALE -> Sales Bill` links the source pending-sale lines and creates AR only; it must not write duplicate SB stock-out ledger rows
+  - [ ] preserve `PSALE` ledger audit during conversion instead of deleting/replacing it with `SB`
 - [ ] define COGS/FIFO rule
 - [ ] define receipt relation
 
@@ -563,15 +603,24 @@ Reporting rule:
 - [x] Batch B: `/daily/payment-approval`, `/purchase/payments`, `/purchase/receipt-vouchers`, `/sales/receipts`
 - [x] Batch C: `/stock/transfer`, `/daily/bill-swap-history`
 - [x] Batch D/E read baseline: `/purchase/bills`, `/sales/bills`, `/sales/stock-issue`
+- [x] document active Finance & Debt page contracts for `/daily/petty-advance`, `/finance/ar`, `/finance/ap`, `/finance/bank`, `/finance/cash-position`, and `/finance/customer-advance`
 - [ ] design supplier payment allocations
 - [ ] design customer receipt allocations
 - [ ] define bank statement relation
+- [ ] sync `/finance/ap` and `/finance/ar` with created-date display, source document links, and final allocation facts
+- [ ] design dedicated `customer_advances` and `customer_advance_allocations` tables so `/finance/customer-advance` no longer depends on `bank_statement.ref_type = CADV` only
+- [ ] harden `/daily/petty-advance` with expense allocation, status logs, cancel/reverse policy, and server-side return-over-remaining guard
+- [ ] sync `/finance/bank` and `/finance/cash-position` with complete source links, as-of/currency policy, and read-only/admin-cleanup boundary
 
 ### 6.4 Inventory Prep
 
+- [x] document active Stock category page contracts for `/stock/transfer`, `/stock/balance`, `/stock/ledger`, `/stock/status-convert`, `/stock/convert`, and `/stock/adjust`
 - [ ] design inventory transaction header/lines
 - [ ] map stock ledger movement types
 - [ ] define lot/grade/status behavior
+- [ ] sync `/stock/balance` with hold-aware columns/drilldown from `docs/notes/Stock Balance Page Flow.md`
+- [ ] sync `/stock/ledger` with source links, created-date display, and no-hold-row rule from `docs/notes/Stock Ledger Page Flow.md`
+- [ ] harden stock write pages (`transfer`, `status-convert`, `convert`, `adjust`) with hold-aware available checks, reversal policy, and reconciliation queries from their page flow docs
 
 ### 6.5 Production Prep
 
@@ -584,6 +633,12 @@ Tracker: [16-next-production-progress.md](/Users/watcharathatsrithanesiganon/Doc
 - [x] Batch P2: port `/production/orders` read baseline พร้อม API และ server-side pagination/filter/sort
 - [ ] Batch P3: port production output write flow ให้ใช้ category จาก DB และเขียน `production_outputs`/`stock_ledger`
 - [x] Batch P4: port production dashboard/report/cost/yield/machine utilization read baseline
+- [x] Document production stock flow in `docs/notes/Production Flow.md`, including `PI` input to WIP, `PO2` output from WIP, output category behavior, and current read-baseline gaps
+- [ ] Implement production write ledger contract
+  - [ ] production input writes source warehouse stock-out plus WIP-in in one transaction
+  - [ ] production output writes WIP-out plus destination in/loss movement by `production_output_categories`
+  - [ ] edit/cancel writes explicit reversal/rebuild rows and keeps source document audit
+  - [ ] reports read ledger facts for WIP/FG/RM/return/loss reconciliation
 
 ## Phase 7: Testing and Reconciliation
 
@@ -645,6 +700,8 @@ Tracker หลักสำหรับงานที่เหลือทั้
   - [x] บันทึก canonical decision ใหม่ใน `docs/notes/Payment Flow.md` และ `docs/notes/Purchase Flow.md`: `PB/ADV/EXP` เป็น pending source queue, `PMA` เกิดตอน approve เท่านั้น, `PMT` ต้องจ่ายเต็ม PMA ที่เลือก
   - [x] เพิ่ม Mermaid flow และแยก status matrix ไว้ที่ `docs/notes/Purchase Flow Status Matrix.md` ตั้งแต่ PO/WTI/PB/ADV -> PMA -> PMT รวมถึง void PMA และ cancel PMT
   - [x] แยก ownership เอกสารให้ชัด: `Purchase Flow.md` จบที่ `PB/payable handoff`, ส่วน approval/PMA/PMT/void/cancel/payment history รับช่วงใน `Payment Flow.md`; matrix เป็น acceptance bridge ข้าม flow เท่านั้น
+  - [x] อัปเดต canonical status boundary 2026-06-11: `POB` รองรับ partial, `WTI` ไม่มี partial target state, `PB` filter ใช้ `ยังไม่อนุมัติ / รอจ่าย / ชำระบางส่วน / เสร็จสิ้น / ยกเลิก`, `PMA` ใช้ `อนุมัติแล้ว / ยกเลิกแล้ว`, และ `PMT` ใช้ `เสร็จสิ้น / ยกเลิกแล้ว`
+  - [ ] ตรวจ runtime status labels หลัง decision 2026-06-11: `/purchase/bills`, `/daily/payment-approval`, `/purchase/payments`, WTI/WTO list/detail/print ต้องใช้ชุดสถานะเดียวกับเอกสาร flow
   - [x] normalize legacy `payment_approvals.source_id` data (`PB-...` / `ADV-...`) ให้กลับมาอ้าง internal bigint id string ตาม flow มาตรฐาน ไม่เพิ่ม compatibility code ใน runtime
   - [x] ถอย runtime/schema/data จาก `PMA pending` เป็น source-derived pending queue
   - [x] ปรับ `/daily/payment-approval` แท็บ `ยังไม่อนุมัติ` ให้อ่าน `PB/ADV/EXP` และคำนวณ remaining approval balance จาก source minus active/consumed PMA
@@ -694,6 +751,7 @@ Tracker หลักสำหรับงานที่เหลือทั้
 - [x] `/purchase/po-buy` combobox behavior is restored inside the modal: supplier/product dropdowns are selectable, keyboard-navigable, not clipped by the table section, and create forms default `expectedDelivery` to today while list sort defaults to `docNo desc`
 - [x] `/purchase/po-buy` short-close action is now only enabled for partially received PO rows with remaining quantity; unreceived open rows show the action disabled and the PATCH route rejects direct short-close requests unless the PO is partially received
 - [x] `/purchase/po-buy` Excel export now follows the active purchase export convention: Thai headers, Thai worksheet name, dated filename, branch code included, and search/status/date/selected-row filters preserved
+- [x] `/purchase/po-buy` create/edit modal now has checkbox `มี VAT` like purchase bill create, stores VAT snapshot fields on `po_buys`, and preserves VAT through PO reconciliation
 - [x] Add per-document purchase-bill print for `/purchase/bills` list/detail/direct detail. Use Company Profile as the header source, show a company logo in the header with template default logo fallback if profile logo is missing, support A4 browser print/Save as PDF, show PB status/watermark for cancelled/supplier-swap documents, preserve historical PO/Spot source from PB snapshots, show actual item units, and design a clean corporate A4 landscape template. Use the customer sample image received 2026-06-09 as a data checklist only: delivery grid fields, total summary, document metadata, and item table with gross/deduct/net weight columns must be present.
 - [x] Add per-document sales-bill print for `/sales/bills` list rows. Use branch-specific Company Profile, A4 portrait, multi-page table header repeat, fixed print footer, Customer/document panels, WTO trace, VAT/totals, Customer advance deduction, and final receivable balance from the `SB` snapshot/detail API.
 - [ ] Audit and update quantity/unit display across PO/WTI/PB/SB/receipt/detail/print/export surfaces so `กก.` and `ลัง` are shown from item unit snapshots/master data and mixed-unit summaries are grouped by unit instead of combined into one number.

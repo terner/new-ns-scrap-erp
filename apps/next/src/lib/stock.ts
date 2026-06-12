@@ -23,6 +23,7 @@ export const stockQuerySchema = z.object({
   branchId: z.preprocess(blankToNull, z.string().trim().nullable().default(null)),
   format: z.enum(['json', 'xlsx']).default('json'),
   lotNo: z.preprocess(blankToNull, z.string().trim().max(80).nullable().default(null)),
+  onHold: z.preprocess((value) => value === '1' || value === 'true', z.boolean().default(false)),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(10).max(500).default(50),
   productId: z.preprocess(blankToNull, z.string().trim().nullable().default(null)),

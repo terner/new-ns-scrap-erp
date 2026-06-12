@@ -10,9 +10,11 @@ export type WeightTicketLine = {
   deductionValue: string
   grossWeight: string
   id: string
+  imageNames: string[]
   impurityId: string
   note: string
   productId: string
+  warehouseId: string
 }
 
 export type WeightTicketRecordLine = WeightTicketLine & {
@@ -23,6 +25,8 @@ export type WeightTicketRecordLine = WeightTicketLine & {
   impurityName: string
   netWeight: number
   productName: string
+  warehouseName: string
+  warehouseType: string
 }
 
 export type WeightTicketProductSummary = {
@@ -36,6 +40,23 @@ export type WeightTicketProductSummary = {
   productId: string
   productName: string
   remainingWeight: number
+}
+
+export type WeightTicketDownstreamAllocation = {
+  allocatedDeductWeight: number
+  allocatedGrossWeight: number
+  allocatedNetWeight: number
+  allocatedQty: number
+  createdAt: string | null
+  createdBy: string
+  id: string
+  productCode: string
+  productName: string
+  status: string
+  summaryId: string
+  targetDocNo: string
+  targetLineNo: number | null
+  targetType: 'PURCHASE_BILL' | 'SALES_BILL'
 }
 
 export type WeightTicketRecord = {
@@ -63,6 +84,7 @@ export type WeightTicketRecord = {
     grossWeight: number
     netWeight: number
   }
+  downstreamAllocations: WeightTicketDownstreamAllocation[]
   type: WeightTicketType
   timeline: WeightTicketTimelineEvent[]
   updatedAt: string | null
@@ -146,6 +168,7 @@ const weightTicketLinePayloadSchema = z.object({
   impurityId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
   note: z.preprocess(blankToEmpty, z.string().max(160, 'หมายเหตุรายการยาวเกินไป').default('')),
   productId: z.string().trim().min(1, 'เลือกสินค้า'),
+  warehouseId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
 }).superRefine((value, ctx) => {
   if (value.deductionMode !== 'none' && !value.impurityId) {
     ctx.addIssue({
@@ -184,6 +207,17 @@ export const weightTicketFormSchema = z.object({
     .min(2, 'กรอกทะเบียนรถ')
     .max(24, 'ทะเบียนรถยาวเกินไป')
     .regex(/^[\p{L}\p{M}\p{N}\s.-]+$/u, 'ทะเบียนรถมีรูปแบบไม่ถูกต้อง'),
+}).superRefine((value, ctx) => {
+  if (value.type !== 'WTO') return
+  value.lines.forEach((line, index) => {
+    if (!line.warehouseId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'เลือกคลัง',
+        path: ['lines', index, 'warehouseId'],
+      })
+    }
+  })
 })
 
 const weightTicketRecordLineSchema = z.object({
@@ -201,6 +235,9 @@ const weightTicketRecordLineSchema = z.object({
   note: z.string(),
   productId: z.string(),
   productName: z.string(),
+  warehouseId: z.string(),
+  warehouseName: z.string(),
+  warehouseType: z.string(),
 })
 
 const weightTicketTimelineSchema = z.object({
@@ -247,6 +284,23 @@ const weightTicketProductSummarySchema = z.object({
   remainingWeight: z.number(),
 })
 
+const weightTicketDownstreamAllocationSchema = z.object({
+  allocatedDeductWeight: z.number(),
+  allocatedGrossWeight: z.number(),
+  allocatedNetWeight: z.number(),
+  allocatedQty: z.number(),
+  createdAt: z.string().nullable(),
+  createdBy: z.string(),
+  id: z.string(),
+  productCode: z.string(),
+  productName: z.string(),
+  status: z.string(),
+  summaryId: z.string(),
+  targetDocNo: z.string(),
+  targetLineNo: z.number().int().nullable(),
+  targetType: z.enum(['PURCHASE_BILL', 'SALES_BILL']),
+})
+
 export const weightTicketRecordSchema = z.object({
   branchId: z.string(),
   branchName: z.string(),
@@ -272,6 +326,7 @@ export const weightTicketRecordSchema = z.object({
     grossWeight: z.number(),
     netWeight: z.number(),
   }),
+  downstreamAllocations: z.array(weightTicketDownstreamAllocationSchema).default([]),
   timeline: z.array(weightTicketTimelineSchema).default([]),
   type: typeEnum,
   updatedAt: z.string().nullable(),
@@ -308,9 +363,11 @@ export function createWeightTicketLine(id = crypto.randomUUID()): WeightTicketLi
     deductionValue: '',
     grossWeight: '',
     id,
+    imageNames: [],
     impurityId: '',
     note: '',
     productId: '',
+    warehouseId: '',
   }
 }
 

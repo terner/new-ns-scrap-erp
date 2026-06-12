@@ -41,6 +41,15 @@ type DraftPoItem = {
 
 const EPSILON = 0.0001
 
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function calculateVatAmount(subtotal: number, hasVat: boolean, vatRatePercent: number) {
+  if (!hasVat) return 0
+  return roundMoney(subtotal * vatRatePercent / 100)
+}
+
 function jsonNumber(value: unknown) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0
   if (typeof value === 'string') {
@@ -350,12 +359,18 @@ export async function reconcilePoBuys(
 
     const normalizedItems = normalizePoItems(row)
     const totalQty = normalizedItems.reduce((sum, item) => sum + item.qty, 0)
-    const totalAmount = normalizedItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0)
+    const subtotal = roundMoney(normalizedItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0))
+    const hasVat = Boolean(row.has_vat)
+    const vatRatePercent = toNumber(row.vat_rate_percent) || 7
+    const vatAmount = calculateVatAmount(subtotal, hasVat, vatRatePercent)
+    const totalAmount = roundMoney(subtotal + vatAmount)
     const allocated = allocationsByPo.get(row.id) ?? { amount: 0, qtyByProduct: new Map<string, number>() }
     const hasShortClose = Boolean(row.short_closed_at) && (toNumber(row.short_closed_qty) > EPSILON || toNumber(row.short_closed_amount) > EPSILON)
     const nextItems = remainingItemsAfterAllocation(normalizedItems, allocated.qtyByProduct, hasShortClose)
     const remainingQty = hasShortClose ? 0 : nextItems.reduce((sum: number, item) => sum + jsonNumber(item.remainingQty), 0)
-    const remainingAmount = hasShortClose ? 0 : nextItems.reduce((sum: number, item) => sum + jsonNumber(item.remainingQty) * jsonNumber(item.unitPrice), 0)
+    const remainingSubtotal = hasShortClose ? 0 : roundMoney(nextItems.reduce((sum: number, item) => sum + jsonNumber(item.remainingQty) * jsonNumber(item.unitPrice), 0))
+    const remainingVatAmount = calculateVatAmount(remainingSubtotal, hasVat, vatRatePercent)
+    const remainingAmount = hasShortClose ? 0 : roundMoney(remainingSubtotal + remainingVatAmount)
     const nextStatus = nextPoStatus({
       cancelledAt: row.cancelled_at ?? null,
       hasShortClose,
@@ -372,9 +387,13 @@ export async function reconcilePoBuys(
         remaining_amount: remainingAmount,
         remaining_qty: remainingQty,
         status: nextStatus,
+        subtotal,
         total_amount: totalAmount,
         updated_at: new Date(),
         updated_by: options?.actor ?? row.updated_by ?? row.created_by ?? null,
+        vat_amount: vatAmount,
+        vat_rate_percent: vatRatePercent,
+        vat_type: hasVat ? 'EXCLUDE' : 'NONE',
         version: { increment: 1 },
       },
       where: { id: row.id },
@@ -395,8 +414,11 @@ export async function reconcilePoBuys(
           hasShortClose,
           remainingAmount,
           remainingQty,
+          subtotal,
           totalAmount,
           totalQty,
+          vatAmount,
+          vatRatePercent,
         },
         note: options?.statusNoteByPoId?.get(row.id) ?? (hasShortClose ? row.short_closed_note : null),
         poBuyDocNo: row.doc_no,

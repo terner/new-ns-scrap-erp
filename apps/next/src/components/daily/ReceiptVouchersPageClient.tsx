@@ -48,6 +48,14 @@ type ReceiptVoucherRow = {
 }
 type ReceiptVoucherColumnKey = 'action' | 'date' | 'docNo' | 'licensePlate' | 'purchaseBillDocNo' | 'sellerName' | 'sellerTaxId' | 'totalAmount' | 'totalQty'
 
+type ReceiptVoucherCompanyProfile = {
+  address: string
+  name: string
+  nameEn: string
+  phone: string
+  taxId: string
+} | null
+
 const receiptVoucherColumns: Array<ResizableColumnDefinition<ReceiptVoucherColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
@@ -68,6 +76,7 @@ export function ReceiptVouchersPageClient() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [printingRow, setPrintingRow] = useState<ReceiptVoucherRow | null>(null)
+  const [companyProfile, setCompanyProfile] = useState<ReceiptVoucherCompanyProfile>(null)
   const [rows, setRows] = useState<ReceiptVoucherRow[]>([])
   const [search, setSearch] = useState('')
   const columnResize = useResizableColumns('daily.receipt-vouchers', receiptVoucherColumns)
@@ -76,7 +85,8 @@ export function ReceiptVouchersPageClient() {
     setIsLoading(true)
     setError(null)
     try {
-      const payload = await dailyFetchJson<{ rows: ReceiptVoucherRow[] }>('/api/purchase/receipt-vouchers')
+      const payload = await dailyFetchJson<{ companyProfile: ReceiptVoucherCompanyProfile; rows: ReceiptVoucherRow[] }>('/api/purchase/receipt-vouchers')
+      setCompanyProfile(payload.companyProfile)
       setRows(payload.rows)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดใบสำคัญรับเงินไม่ได้')
@@ -224,7 +234,7 @@ export function ReceiptVouchersPageClient() {
         </Table>
       </section>
 
-      {printingRow ? <PrintPreview row={printingRow} onClose={() => setPrintingRow(null)} /> : null}
+      {printingRow ? <PrintPreview companyProfile={companyProfile} row={printingRow} onClose={() => setPrintingRow(null)} /> : null}
     </>
   )
 }
@@ -244,7 +254,7 @@ function KpiCard({ label, tone, value }: { label: string; tone: 'blue' | 'emeral
   )
 }
 
-function PrintPreview({ onClose, row }: { onClose: () => void; row: ReceiptVoucherRow }) {
+function PrintPreview({ companyProfile, onClose, row }: { companyProfile: ReceiptVoucherCompanyProfile; onClose: () => void; row: ReceiptVoucherRow }) {
   const items = normalizeItems(row)
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-white print:static print:overflow-visible">
@@ -257,8 +267,10 @@ function PrintPreview({ onClose, row }: { onClose: () => void; row: ReceiptVouch
       </div>
       <div className="mx-auto max-w-[210mm] bg-white p-8 text-black" style={{ fontFamily: "'Noto Sans Thai', Arial, sans-serif", fontSize: '14px' }}>
         <div className="mb-4 border-b-2 border-gray-300 pb-3">
-          <div className="text-lg font-bold">NS Scrap ERP</div>
-          <div className="mt-1 text-xs">ข้อมูลบริษัทจาก Company Profile จะแสดงในใบพิมพ์ฉบับ production เมื่อเชื่อม company profile payload กับ preview นี้</div>
+          <div className="text-lg font-bold">{companyProfile?.name || '-'}</div>
+          {companyProfile?.nameEn ? <div className="text-xs text-gray-600">{companyProfile.nameEn}</div> : null}
+          <div className="mt-1 text-xs">{companyProfile?.address || '-'}</div>
+          <div className="text-xs">Tel: {companyProfile?.phone || '-'} · เลขประจำตัวผู้เสียภาษี: {companyProfile?.taxId || '-'}</div>
         </div>
         <div className="mb-3 text-center text-2xl font-bold underline">ใบสำคัญรับเงิน</div>
         <div className="mb-3 text-right text-sm"><b>วันที่</b> {formatDateDisplay(row.date)}</div>
@@ -266,6 +278,9 @@ function PrintPreview({ onClose, row }: { onClose: () => void; row: ReceiptVouch
           <div><b>ข้าพเจ้า</b> {row.sellerName || '-'} <span className="ml-4"><b>เลขประจำตัวผู้เสียภาษี</b> {row.sellerTaxId || '-'}</span></div>
           <div><b>ที่อยู่</b> {row.sellerAddress || '-'}</div>
           <div><b>เบอร์โทร:</b> {row.sellerPhone || '-'} <span className="ml-3"><b>ทะเบียน</b> {row.licensePlate || '-'}</span> <span className="ml-3"><b>ช่องทางติดต่อ Sale:</b> {row.salesPerson || '-'}</span></div>
+          <div className="mt-2"><b>ได้รับเงินจาก</b> {companyProfile?.name || '-'}</div>
+          <div><b>ที่อยู่</b> {companyProfile?.address || '-'}</div>
+          <div><b>เลขประจำตัวผู้เสียภาษี</b> {companyProfile?.taxId || '-'}</div>
           <div className="mt-2"><b>อ้างอิงบิลซื้อ</b> {row.purchaseBillDocNo || '-'}</div>
         </div>
         <div className="mb-1 font-semibold">รายการมีดังต่อไปนี้</div>

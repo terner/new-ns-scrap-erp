@@ -24,18 +24,50 @@ created: 2026-05-16
 - [[2026-05-16-project-decisions|Project Decisions]] - decision log ของโปรเจกต์
 - [[Current Module Status]] - สถานะล่าสุดของ Vue modules ที่ย้ายเข้า `old-apps/vue/`
 - [[Architecture Map]] - map สรุป architecture, tech stack, environment, database และ auth
+- [[System Supporting Flows]] - flow สนับสนุนที่ไม่ใช่ business transaction เช่น auth/session, users, role/permission, branch scope, audit, company profile และ health check
+- [[P0 Transaction Stock Payment Current Code Baseline]] - decision ล่าสุดว่า Transaction/Stock/Payment กลุ่ม P0 proof กับ current Next code/API ครบแล้ว แต่ยังมี runtime hardening gaps ก่อน target-complete
+- [[Master Data Current Code Baseline]] - decision ล่าสุดว่า Master Data ใน current Next code ถูกต้องแล้วและเป็น accepted baseline สำหรับเอกสารรายหน้า ไม่ต้องรอ legacy proof
+- [[P1 Finance Production Current Code Baseline]] - decision ล่าสุดว่า Finance/Production/Daily read-model กลุ่ม P1 ใน current Next code/API ถูกต้องเป็น accepted baseline แล้ว เหลือเฉพาะ source/cutoff/status/write-side-effect reconciliation เมื่อปรับ behavior
+- [[P2 Report Current Code Baseline]] - decision ล่าสุดว่า report/read-model กลุ่ม P2 ใน current Next code/API ถูกต้องเป็น accepted baseline แล้ว เหลือเฉพาะ formula/source/cutoff reconciliation เมื่อมีการปรับ report
 - [[Migration Documents]] - MOC สำหรับเอกสาร migration ทั้งชุด
 - [[Purchase Flow]] - flow ซื้อแบบละเอียด: Stock/Trading, PO/Spot, ใบรับของ/WTI, ใบส่งของ/WTO, กรอกจำนวน/น้ำหนัก, ปิดรับไม่ครบ, เลขเอกสาร, สถานะ, ผลกระทบต่อ PO/PB/Stock/Cost Pool, และ `PB/payable handoff` ไป Payment Flow
+- [[WTI-WTO Flow]] - canonical flow ของหน้า `ชั่งสินค้า / รับ-ส่งของ` และ `รายการใบรับ-ส่งของ`: create/edit/list/detail/timeline, รูปสินค้า/รูปรถ, print/share, product thumbnail preload, และจุดตัด `WTI -> PB` / `WTO -> SB`
+- [[Stock Ledger and Stock Balance]] - canonical note แยกความหมาย `stock_ledger` (movement fact) ออกจาก `stock คงเหลือ` (derived balance), รวม ownership ของ movement, key ที่ใช้ aggregate, และผลกระทบกับ `WTI/WTO/PB/SB`
+- [[Stock Balance Page Flow]] - contract หน้า `/stock/balance`: derived balance, `คงเหลือจริง / จองไว้ / พร้อมใช้`, filter, drilldown และ hold-aware gap
+- [[Stock Ledger Page Flow]] - contract หน้า `/stock/ledger`: movement history, source document links, reconciliation และ rule ว่า stock hold ไม่ใช่ ledger row
+- [[Stock Transfer Page Flow]] - contract หน้า `/stock/transfer`: paired `ST` out/in ledger movement, source/destination validation, hold-aware availability และ reverse gap
+- [[Stock Status Convert Page Flow]] - contract หน้า `/stock/status-convert`: paired `SC` status out/in movement, RM/WIP/FG validation และ reverse/reconciliation gap
+- [[Stock Convert Page Flow]] - contract หน้า `/stock/convert`: grade/product conversion `GA`, source-target cost/yield policy และ deferred confirm/reverse flow
+- [[Stock Adjust Page Flow]] - contract หน้า `/stock/adjust`: stock count adjustment `ADJ`, note-only accounting policy, reason/audit และ reverse gap
+- [[Dual Costing Flow]] - ภาพรวมหมวด Dual Costing ทั้ง 8 เมนู active: scope เฉพาะทองแดง/ทองเหลือง, Cost Pool -> Allocator -> Match Log/Ledger -> Report, และเส้นแบ่ง Deal Cost management view ออกจาก WAC/P&L
 - [[Cost Pool]] - กติกาแยกของ Cost Pool/Dual Costing: eligibility เฉพาะทองแดง/ทองเหลือง, source types, availability, short-close/reversal, API contract และ implementation gap
 - [[Purchase Flow Status Matrix]] - matrix สถานะเอกสารราย use case และราย step สำหรับ PO/WTI/ADV/PB/PMA/PMT ใช้เป็น acceptance criteria ข้าม Purchase Flow กับ Payment Flow
 - [[Payment Flow]] - flow จ่ายเงินแบบละเอียดและเป็นเจ้าของ approval/payment lifecycle: source payable, อนุมัติจ่ายเงิน, split approval, PMA, รอจ่าย, PMT, ประวัติการจ่ายเงิน, จ่ายเงินล่วงหน้า/มัดจำ, และคืนเงินมัดจำฝั่ง Supplier
+- [[Finance Debt Flow]] - ภาพรวมหมวด `การเงิน & หนี้`: Petty Advance, AR, AP, Bank Statement, Cash Position, Customer Advance, current APIs, legacy baseline, side effect boundary และ open gaps
+- [[Petty Advance Page Flow]] - contract หน้า `/daily/petty-advance` ในหมวด `การเงิน & หนี้`: `PADV` ยอดค้าง, `PRET` คืนเงิน, จังหวะสร้าง `BST`, recipient snapshot และ allocation gap
+- [[Finance AP Page Flow]] - contract หน้า `/finance/ap`: AP aging จาก PB/payment, due date, supplier summary, export และ payment-source gap
+- [[Finance AR Page Flow]] - contract หน้า `/finance/ar`: AR aging จาก SB/receipt, due date/customer credit term, pending issue summary และ customer advance allocation gap
+- [[Finance Bank Statement Page Flow]] - contract หน้า `/finance/bank`: read-only cash/bank ledger จาก `bank_statement`, running balance, source refs และ admin cleanup boundary
+- [[Finance Cash Position Page Flow]] - contract หน้า `/finance/cash-position`: liquidity dashboard จาก accounts/bank statement/AR/AP exposure และ as-of/currency gap
+- [[Customer Advance Page Flow]] - contract หน้า `/finance/customer-advance`: current read baseline จาก `CADV` bank statement, remaining/used rule และ target allocation tables
+- [[Main Dashboard Reports Flow]] - ภาพรวมหมวด Main / Dashboard & Reports และ `/reports`: current APIs, source tables/helpers, query params, response sections, management-read boundary, และ gap เรื่องสูตร/drilldown/export
+- [[Finance Accounting Flow]] - ภาพรวมหมวด Finance / Accounting ทั้ง 19 เมนู: current APIs, query params, source builders/tables, write-disabled design states, management-report boundary, และ gap เรื่อง GL/statutory close/tax/asset/loan write flows
+- [[Trading Flow]] - ภาพรวมหมวด `Trading / PO Reports`: Trading Dashboard, Trading Matching, PO Outstanding, ex-VAT GP, PB/SB Trading matching, PO commitment report, และ side-effect boundary ว่า Trading ไม่เขียน stock ledger/WAC
+- [[Tracking 360 Flow]] - ภาพรวมหมวด `Tracking 360`: Customer, Supplier, Product tracking จาก SB/RCP, PB/PMT และ stock ledger พร้อม read-only/export boundary และ gap เรื่อง drilldown/source timeline
 - [[Purchase Flow Test Matrix]] - execution checklist ของ Purchase Flow สำหรับ UAT/smoke/regression ตั้งแต่ PO, WTI, Purchase Bill, Approval, Payment ไปจนถึง stock/reversal
 - [[WTI Product Summary Design]] - design decision สำหรับการแยก `WTI` เป็น raw lot layer + per-product summary layer เพื่อให้ `บิลรับซื้อ` ใช้ยอดรวมต่อสินค้าได้โดยไม่เสีย trace ของ lot ชั่ง
 - [[Document Timeline Policy]] - กฎกลางว่าเอกสารธุรกิจที่มีเลขเอกสารต้องมี timeline/history แบบ append-only แยกจาก current-state table
 - [[Document History Table Design]] - target schema design สำหรับแยก history/status/usage table ตามเอกสารหรือ business flow แทนการรวมทุก event เข้า generic table เดียว
+- [[Document Aging Policy]] - กติกากลางสำหรับ aging เอกสาร `PB/SB/WTI/WTO/POB/POS`: แยก financial due aging จาก operational pending aging, bucket, stop-counting rule, และ API/report direction
+- [[Menu Page Flow Catalog]] - catalog flow ครบ 107 route ตามเมนูใหม่เท่านั้น พร้อม link ไปเอกสารละเอียด และใช้ legacy เป็น baseline เฉพาะหน้าที่อยู่ในเมนูใหม่แต่ Next flow ยังไม่ครบ
+- [[page-flows/README|Page Flow Index]] - index ไฟล์รายหน้า 107 route ในเมนูใหม่ ทุกไฟล์มี minimum detailed contract; batch แรกเริ่มขยายรายละเอียดเฉพาะหน้าแล้วในกลุ่ม Purchase, Sales, Payment และ Stock พร้อม Current API ต่อหน้า
+- [[Page Flow Proof Tracker]] - tracker ว่าไม่เหลือหน้า missing page-flow แล้ว; P0/P1/P2/P3 ทำ current-code proof baseline แล้ว เหลือ runtime hardening หลักใน P0 transaction/stock/payment gaps
+- [[PO Buy Page Flow]] - contract หน้า `/purchase/po-buy`: `POB` เป็น commitment เท่านั้น ไม่สร้าง stock/AP เอง, มี close-short, allocation boundary ไป PB, print, aging และ runtime checklist
 - [[Printable Documents]] - source of truth ของเอกสารที่ต้องพิมพ์/Save as PDF: POB, PB, SB, WTI/WTO, PMA, PMT, RV, RCP และสถานะที่พิมพ์ได้ใน payment history
 - [[Sales Flow]] - flow ขายแบบละเอียด: PO Sell, Pending Sale/PSALE, ใบส่งของ/WTO, บิลขาย Trading จากหลายบิลซื้อพร้อม stock line, Sales Bill, Receipt, เลขเอกสาร, สถานะ, stock/AR effect
+- [[Pending Sale Page Flow]] - contract หน้า `/sales/stock-issue`: เบิกสินค้าออกจริงก่อนเปิดบิล, `PSALE` stock-out, convert เป็น `SB` โดยไม่ตัด stock ซ้ำ, และ gap ที่ Next ยังมีแค่ read/list baseline
 - [[Sales Bills Page Flow]] - contract หน้า `/sales/bills`: สร้าง SB จาก WTO, allocate เข้า PO Sell รายบรรทัด, แยกยอดเกินเป็น Spot Sale, VAT/totals แบบ PB, และหักมัดจำ Customer
+- [[Production Flow]] - canonical flow หมวด `การผลิต`: production order, input, output, process cost, WIP, yield/loss, ref type `PI/PO2`, และสถานะ implementation read baseline
 - [[Daily Cash Flow]] - flow เงินสด/ธนาคารรายวัน โดยเริ่มจาก `/daily/transfer`: field ที่ระบบจัดการเอง, validation, และ paired bank statement side effect
 
 ## Migration Entry Points

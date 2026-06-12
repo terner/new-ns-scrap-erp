@@ -1,0 +1,159 @@
+---
+title: Finance Bank Statement Page Flow
+aliases:
+  - Bank Statement Page
+  - Cash Bank Statement Page
+  - Flow หน้า Bank Statement
+  - หน้า Finance Bank
+tags:
+  - ns-scrap-erp
+  - finance
+  - cash-bank
+  - bank-statement
+  - page-flow
+status: draft
+created: 2026-06-11
+updated: 2026-06-11
+---
+
+# Finance Bank Statement Page Flow / Flow หน้า Cash / Bank Statement
+
+## Scope
+
+- Route: `/finance/bank`
+- API: `GET /api/finance/bank`
+- Owner: Finance & Debt
+- Page type: read-only cash/bank ledger and reconciliation surface
+- Related central flow: [[Daily Cash Flow]]
+
+หน้านี้ใช้ดู statement ของบัญชีเงินสด/ธนาคารทั้งหมดจาก `bank_statement` ไม่ใช่หน้าสร้าง transaction โดยตรง
+
+## Source Of Truth
+
+| Data | Source | Rule |
+|---|---|---|
+| Statement rows | `bank_statement` | ทุกเงินเข้า/ออกต้องมี `doc_no` เป็น outward key |
+| Account metadata | `accounts` | filter ใช้ `accounts.code` |
+| Opening balance | `accounts.opening_balance` | ใช้ตั้ง running balance เริ่มต้น |
+| Running balance | derived or `bank_statement.balance` | ถ้ามี row balance ให้ใช้ row balance; ถ้าไม่มี derive จาก opening + movement |
+
+## Statement Ref Types
+
+ตัวอย่าง source ที่ควรเห็นใน statement:
+
+- `TRF` จากโอนเงินระหว่างบัญชี
+- `PMT` จากจ่ายเงิน Supplier/expense direct payment
+- `RCP` จากรับเงิน Customer
+- `PRET` จากคืนเงินสำรองจ่าย
+- `CADV` จากรับเงินล่วงหน้าจาก Customer
+- cash/bank source อื่นตาม finance write flow
+
+## Main UI Contract
+
+### Summary / KPI
+
+ควรแสดง:
+
+- ยอดเข้า
+- ยอดออก
+- net movement
+- จำนวนบัญชี
+- จำนวน rows
+- balance ตาม account
+
+### Filters
+
+ควรรองรับ:
+
+- Account
+- วันที่จาก-ถึง
+- ref type
+- type
+- search จากบัญชี เลขอ้างอิง description note
+- sort direction
+- page/page size
+
+### Table Columns
+
+คอลัมน์เป้าหมาย:
+
+- วันที่เอกสาร
+- วันที่สร้างรายการ
+- เลข BST
+- Ref type
+- Ref no
+- Account code/name/no
+- Bank
+- Branch
+- Description
+- Type
+- Cash flow category
+- เข้า
+- ออก
+- Running balance
+- Note
+
+ต้องแยก `วันที่เอกสาร` ออกจาก `วันที่สร้างรายการ` เพราะมีรายการย้อนหลังได้
+
+## Row Detail
+
+กด row ควรเปิด read-only detail:
+
+- statement row
+- account detail
+- source ref type/ref no
+- source document link ถ้ามี route รองรับ
+- created by / created at
+- cash flow category
+
+ไม่ควรแก้หรือลบ statement row จาก detail นี้ ถ้าต้อง reverse ให้ทำผ่าน source document หรือ admin reconciliation flow
+
+## API Contract
+
+`GET /api/finance/bank` รับ query:
+
+- `accountId`
+- `from`
+- `to`
+- `refType`
+- `type`
+- `q`
+- `page`
+- `pageSize`
+- `sortDirection`
+- `format=json|xlsx`
+
+Response ควรรวม:
+
+- `rows`
+- `byAccount`
+- `summary`
+- `filters.accounts`
+- `filters.refTypes`
+- `filters.types`
+- `pagination`
+
+## Business Rules
+
+- Statement page เป็น read-only ledger
+- ทุก bank statement row ต้องมี outward `doc_no`
+- filter account ต้องใช้ `accounts.code`, ไม่เปิด internal account id
+- duplicate/orphan cleanup ถ้ามี ต้องเป็น admin-only พร้อม backup, audit, rollback และ permission แยก
+- Transfer ต้องสร้าง paired statement rows ผ่าน source flow ไม่ใช่สร้างมือในหน้านี้
+
+## Current Implementation / Gap
+
+- มี read/export baseline จาก `bank_statement` และ `accounts`
+- running balance ใช้ opening balance + movement หรือ row balance
+- ต้องเพิ่ม/ยืนยัน created-date display ใน list/detail/export
+- source document links ยังต้องทำให้ครบทุก ref type
+- duplicate cleanup ยังควร disabled จนกว่าจะมี reviewed admin flow
+
+## Related Notes
+
+- [[Daily Cash Flow]]
+- [[Finance Cash Position Page Flow]]
+- [[Finance AP Page Flow]]
+- [[Finance AR Page Flow]]
+- [[Customer Advance Page Flow]]
+- [[Petty Advance Page Flow]]

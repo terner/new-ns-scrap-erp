@@ -126,6 +126,10 @@ Cost Allocator uses PO Sell as a sell target for deal-cost matching. New PO Sell
 
 PO Outstanding should show remaining sell commitment while `remainingQty > 0`, excluding cancelled/closed/received-like statuses.
 
+### Document Aging
+
+PO Sell aging follows [[Document Aging Policy]] as `operational_pending_aging`: active PO Sell rows with remaining quantity/amount should expose age from delivery/expected date when available, otherwise from document date. Short-close, cancel, or fully billed status stops the active aging clock.
+
 ### Sales Bill / Stock Issue
 
 Target Sales Flow now says the primary operational fulfillment should proceed through:

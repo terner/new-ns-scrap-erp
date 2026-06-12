@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, ImagePlus, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ImagePlus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Card } from '@/components/ui/Card'
@@ -66,6 +66,25 @@ type WeightTicketProductsPayload = {
   rows?: Array<{ code?: string | null; id: string; imageStorageKey?: string | null; name: string; thumbnailUrl?: string | null; type?: string | null; unit?: string | null }>
 }
 
+type WtoStockWarehouseOption = {
+  availableQty: number
+  code: string
+  id: string
+  name: string
+  onHandQty: number
+  onHoldQty: number
+  type: string
+}
+
+type WtoStockOptionsPayload = {
+  warehouses?: WtoStockWarehouseOption[]
+}
+
+type WtoStockOptionsState = Record<string, {
+  options: OptionItem[]
+  warehousesById: Record<string, WtoStockWarehouseOption>
+}>
+
 function createFormWeightTicketLine(id?: string): FormWeightTicketLine {
   return {
     ...createWeightTicketLine(id),
@@ -73,13 +92,13 @@ function createFormWeightTicketLine(id?: string): FormWeightTicketLine {
   }
 }
 
-function initialForm(): FormState {
+function initialForm(type: WeightTicketType = 'WTI'): FormState {
   return {
     branchId: '',
     lines: [createFormWeightTicketLine('line-1')],
     partyId: '',
     remark: '',
-    type: 'WTI',
+    type,
     vehicleImageFiles: [],
     vehicleNo: '',
   }
@@ -134,10 +153,12 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
       deductionValue: line.deductionValue,
       grossWeight: line.grossWeight,
       id: line.id,
+      imageNames: line.imageNames,
       imageFiles: line.imageNames.map(createAttachmentPreview),
       impurityId: line.impurityId,
       note: line.note,
       productId: line.productId,
+      warehouseId: line.warehouseId,
     })),
     partyId: ticket.partyId,
     remark: ticket.remark,
@@ -147,14 +168,23 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
   }
 }
 
-export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }) {
+export function WeightTicketsPageClient({
+  initialType = 'WTI',
+  lockType = false,
+  ticketId = '',
+}: {
+  initialType?: WeightTicketType
+  lockType?: boolean
+  ticketId?: string
+}) {
   const router = useRouter()
   const editingTicketId = ticketId.trim()
-  const [form, setForm] = useState<FormState>(initialForm)
+  const [form, setForm] = useState<FormState>(() => initialForm(initialType))
   const [branches, setBranches] = useState<OptionItem[]>([])
   const [suppliers, setSuppliers] = useState<OptionItem[]>([])
   const [customers, setCustomers] = useState<OptionItem[]>([])
   const [products, setProducts] = useState<OptionItem[]>([])
+  const [stockOptions, setStockOptions] = useState<WtoStockOptionsState>({})
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [impurities, setImpurities] = useState<OptionItem[]>([])
   const [loadedTicket, setLoadedTicket] = useState<WeightTicketRecord | null>(null)
@@ -168,6 +198,10 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
 
   const partyOptions = form.type === 'WTI' ? suppliers : customers
   const totals = useMemo(() => calculateTicketTotals(form.lines), [form.lines])
+  const wtoProductKeys = useMemo(() => {
+    if (form.type !== 'WTO' || !form.branchId) return []
+    return [...new Set(form.lines.map((line) => line.productId).filter(Boolean))]
+  }, [form.branchId, form.lines, form.type])
   const activeLine = useMemo(
     () => form.lines.find((line) => line.id === activeLineId) ?? form.lines[0] ?? null,
     [activeLineId, form.lines],
@@ -249,6 +283,49 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
   }, [loadProducts])
 
   useEffect(() => {
+    if (form.type !== 'WTO' || !form.branchId || wtoProductKeys.length === 0) {
+      setStockOptions({})
+      return
+    }
+
+    const controller = new AbortController()
+    let cancelled = false
+
+    async function loadStockOptions() {
+      const entries = await Promise.all(wtoProductKeys.map(async (productId) => {
+        const params = new URLSearchParams({ branchId: form.branchId, productId })
+        const response = await fetch(`/api/daily/weight-tickets/stock-options?${params.toString()}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        if (!response.ok) throw new Error('โหลดข้อมูลคลังและคงเหลือไม่ได้')
+        const data = await response.json() as WtoStockOptionsPayload
+        const warehouses = data.warehouses ?? []
+        const key = `${form.branchId}:${productId}`
+        return [key, {
+          options: warehouses.map((warehouse) => ({
+            description: `${warehouse.type} · พร้อมส่ง ${formatWeight(warehouse.availableQty)} กก.`,
+            id: warehouse.id,
+            label: `${warehouse.code} - ${warehouse.name}`,
+            searchText: `${warehouse.code} ${warehouse.name} ${warehouse.type}`,
+          })),
+          warehousesById: Object.fromEntries(warehouses.map((warehouse) => [warehouse.id, warehouse] as const)),
+        }] as const
+      }))
+      if (!cancelled) setStockOptions(Object.fromEntries(entries))
+    }
+
+    void loadStockOptions().catch((caught) => {
+      if (!cancelled && !controller.signal.aborted) setLoadError(getErrorMessage(caught, 'โหลดข้อมูลคลังและคงเหลือไม่ได้'))
+    })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [form.branchId, form.type, wtoProductKeys])
+
+  useEffect(() => {
     if (!editingTicketId) {
       setIsLoadingTicket(false)
       setLoadedTicket(null)
@@ -300,6 +377,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
     form.lines.forEach((line, index) => {
       const lineTotals = calculateLineTotals(line)
       if (!line.productId) next[`line-${line.id}-product`] = `เลือกสินค้าบรรทัดที่ ${index + 1}`
+      if (form.type === 'WTO' && !line.warehouseId) next[`line-${line.id}-warehouse`] = `เลือกคลังบรรทัดที่ ${index + 1}`
       if (lineTotals.grossWeight <= 0) next[`line-${line.id}-gross`] = `กรอกน้ำหนักบรรทัดที่ ${index + 1}`
       if (getLineImages(line).length === 0) next[`line-${line.id}-images`] = `แนบรูปภาพบรรทัดที่ ${index + 1} อย่างน้อย 1 รูป`
       if (line.deductionMode !== 'none' && !getLineImpurityId(line)) {
@@ -330,6 +408,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
         panel: 'bg-rose-50',
         summary: 'ใบส่งของ / Weight Ticket Out',
       }
+  const typeSelectionLocked = lockType || Boolean(editingTicketId)
 
   function showError(key: string) {
     return touched[key] ? errors[key] : undefined
@@ -387,6 +466,10 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
     }))
   }
 
+  function backToList() {
+    router.push(`/daily/weight-ticket-list?type=${form.type}`)
+  }
+
   async function saveTicket() {
     const nextTouched: Record<string, boolean> = {
       branchId: true,
@@ -395,6 +478,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
     }
     form.lines.forEach((line) => {
       nextTouched[`line-${line.id}-product`] = true
+      nextTouched[`line-${line.id}-warehouse`] = true
       nextTouched[`line-${line.id}-gross`] = true
       nextTouched[`line-${line.id}-deduction`] = true
       nextTouched[`line-${line.id}-images`] = true
@@ -417,6 +501,7 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
           impurityId: getLineImpurityId(line),
           note: line.note,
           productId: line.productId,
+          warehouseId: line.warehouseId,
         })),
         partyId: form.partyId,
         remark: form.remark.trim(),
@@ -439,14 +524,29 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
   return (
     <div className="min-w-0 space-y-5 overflow-x-hidden pb-32">
       <div>
-        <div>
-          <Tabs value={form.type} onValueChange={(value) => setForm((current) => ({ ...current, partyId: '', type: value as WeightTicketType }))}>
+        <Button type="button" variant="outline" onClick={backToList}>
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          กลับไปหน้ารายการ
+        </Button>
+      </div>
+      <div>
+        {typeSelectionLocked ? (
+          <div className={cn('inline-flex rounded-md px-3 py-1.5 text-sm font-semibold', ticketTheme.badge)}>
+            {form.type === 'WTI' ? 'ใบรับของ WTI' : 'ใบส่งของ WTO'}
+          </div>
+        ) : (
+          <Tabs value={form.type} onValueChange={(value) => setForm((current) => ({
+            ...current,
+            lines: current.lines.map((line) => ({ ...line, warehouseId: '' })),
+            partyId: '',
+            type: value as WeightTicketType,
+          }))}>
             <TabsList className="w-full justify-start" variant="line">
               <TabsTrigger value="WTI" variant="line">ใบรับของ WTI</TabsTrigger>
               <TabsTrigger value="WTO" variant="line">ใบส่งของ WTO</TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
+        )}
       </div>
 
       {loadError ? (
@@ -470,10 +570,14 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                 label="สาขา*"
                 placeholder="เลือกสาขา"
                 value={form.branchId}
-                onChange={(value) => {
-                  markTouched('branchId')
-                  updateForm('branchId', value ?? '')
-                }}
+	                onChange={(value) => {
+	                  markTouched('branchId')
+	                  setForm((current) => ({
+	                    ...current,
+	                    branchId: value ?? '',
+	                    lines: current.lines.map((line) => ({ ...line, warehouseId: '' })),
+	                  }))
+	                }}
               />
               <SearchCombobox
                 error={showError('partyId')}
@@ -525,9 +629,10 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                     const hasError = Boolean(
                       errors[`line-${line.id}-product`]
                       || errors[`line-${line.id}-gross`]
-                      || errors[`line-${line.id}-images`]
-                      || errors[`line-${line.id}-impurity`]
-                      || errors[`line-${line.id}-deduction`],
+	                      || errors[`line-${line.id}-images`]
+	                      || errors[`line-${line.id}-impurity`]
+	                      || errors[`line-${line.id}-warehouse`]
+	                      || errors[`line-${line.id}-deduction`],
                     )
                     const active = activeLine?.id === line.id
 
@@ -576,9 +681,13 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                     </div>
                     <div className={cn(
                       'grid min-w-0 gap-4',
-                      line.deductionMode === 'none'
-                        ? 'xl:grid-cols-[minmax(0,1.4fr)_10rem_10rem_10rem]'
-                        : 'xl:grid-cols-[minmax(0,1.3fr)_10rem_10rem_minmax(0,1fr)_10rem]',
+	                      line.deductionMode === 'none'
+	                        ? form.type === 'WTO'
+	                          ? 'xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_10rem_10rem_10rem]'
+	                          : 'xl:grid-cols-[minmax(0,1.4fr)_10rem_10rem_10rem]'
+	                        : form.type === 'WTO'
+	                          ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_10rem_10rem_minmax(0,1fr)_10rem]'
+	                          : 'xl:grid-cols-[minmax(0,1.3fr)_10rem_10rem_minmax(0,1fr)_10rem]',
                     )}
                     >
                       <div className="min-w-0">
@@ -590,23 +699,52 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
                           options={products}
                           placeholder={isLoadingProducts ? 'กำลังโหลดสินค้า...' : 'เลือกสินค้า'}
                           value={line.productId}
-                          onChange={(value) => {
-                            markTouched(`line-${line.id}-product`)
-                            updateLine(line.id, (current) => ({ ...current, productId: value }))
-                          }}
+	                          onChange={(value) => {
+	                            markTouched(`line-${line.id}-product`)
+	                            updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
+	                          }}
                         />
                         <ProductImagePicker
                           key={`${form.branchId}:${form.partyId}:${form.type}`}
                           disabled={isLoadingProducts}
                           products={products}
                           value={line.productId}
-                          onChange={(value) => {
-                            markTouched(`line-${line.id}-product`)
-                            updateLine(line.id, (current) => ({ ...current, productId: value }))
-                          }}
-                        />
-                      </div>
-                      <FieldBlock error={showError(`line-${line.id}-gross`)} label="น้ำหนักรวม (กก. / ลัง) *">
+	                          onChange={(value) => {
+	                            markTouched(`line-${line.id}-product`)
+	                            updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
+	                          }}
+	                        />
+	                      </div>
+	                      {form.type === 'WTO' ? (() => {
+	                        const stockKey = `${form.branchId}:${line.productId}`
+	                        const stock = stockOptions[stockKey]
+	                        const selectedWarehouse = line.warehouseId ? stock?.warehousesById[line.warehouseId] : null
+	                        return (
+	                          <div className="min-w-0">
+	                            <SearchCombobox
+	                              disabled={!form.branchId || !line.productId}
+	                              error={showError(`line-${line.id}-warehouse`)}
+	                              inputId={`weight-warehouse-${line.id}`}
+	                              label="คลัง*"
+	                              options={stock?.options ?? []}
+	                              placeholder={!form.branchId ? 'เลือกสาขาก่อน' : !line.productId ? 'เลือกสินค้าก่อน' : 'เลือกคลัง RM/FG'}
+	                              value={line.warehouseId}
+	                              onChange={(value) => {
+	                                markTouched(`line-${line.id}-warehouse`)
+	                                updateLine(line.id, (current) => ({ ...current, warehouseId: value }))
+	                              }}
+	                            />
+	                            {selectedWarehouse ? (
+	                              <div className="mt-1 grid grid-cols-3 gap-1 text-[11px] text-slate-500">
+	                                <span>คงเหลือ {formatWeight(selectedWarehouse.onHandQty)}</span>
+	                                <span>จอง {formatWeight(selectedWarehouse.onHoldQty)}</span>
+	                                <span className="font-medium text-slate-700">พร้อมส่ง {formatWeight(selectedWarehouse.availableQty)}</span>
+	                              </div>
+	                            ) : null}
+	                          </div>
+	                        )
+	                      })() : null}
+	                      <FieldBlock error={showError(`line-${line.id}-gross`)} label="น้ำหนักรวม (กก. / ลัง) *">
                         <Input
                           inputMode="decimal"
                           placeholder="0.00"
@@ -727,6 +865,10 @@ export function WeightTicketsPageClient({ ticketId = '' }: { ticketId?: string }
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button disabled={isLoadingTicket || isSaving} type="button" variant="outline" onClick={backToList}>
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              กลับไปหน้ารายการ
+            </Button>
             <Button className={ticketTheme.button} disabled={isLoadingTicket || isSaving} type="button" onClick={saveTicket}>
               {isSaving
                 ? 'กำลังบันทึก...'

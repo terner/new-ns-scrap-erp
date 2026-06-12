@@ -238,6 +238,7 @@ export function SupplierSearchCombobox({
 
 export function CustomerSearchCombobox({
   className = '',
+  disabled = false,
   error,
   errorKey,
   options,
@@ -245,6 +246,7 @@ export function CustomerSearchCombobox({
   onChange,
 }: {
   className?: string
+  disabled?: boolean
   error?: string
   errorKey?: string
   options: Option[]
@@ -254,6 +256,7 @@ export function CustomerSearchCombobox({
   return (
     <div className={`relative ${className}`}>
       <SearchCombobox
+        disabled={disabled}
         error={error}
         errorKey={errorKey}
         inputId="sales-bill-customer-search"

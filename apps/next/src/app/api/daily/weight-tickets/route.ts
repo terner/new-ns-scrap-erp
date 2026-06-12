@@ -9,6 +9,12 @@ import { findActiveBranchReferenceByCodeOrId, findActiveBranchReferencesByCodes 
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
+import {
+  createActiveWtoStockHolds,
+  resolveWtoWarehousesForLines,
+  validateWtoStockAvailability,
+  WtoStockHoldError,
+} from '@/lib/server/stock-holds'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import {
   bangkokDateInput,
@@ -45,6 +51,9 @@ const ticketInclude = {
     include: {
       products: {
         select: { code: true, id: true },
+      },
+      warehouses: {
+        select: { code: true, id: true, name: true, type: true },
       },
     },
     orderBy: { line_no: 'asc' },
@@ -201,8 +210,32 @@ export async function POST(request: Request) {
           vehicle_no: values.vehicleNo,
         },
       })
-      const lineRows = buildWeightTicketLineRows(createdTicket.id, values, productByCode, impurityById)
+      const warehouseByCode = values.type === 'WTO'
+        ? await resolveWtoWarehousesForLines(tx, { branchId: branch.id, lines: values.lines })
+        : new Map()
+      const lineRows = buildWeightTicketLineRows(createdTicket.id, values, productByCode, impurityById, warehouseByCode)
+      if (values.type === 'WTO') {
+        await validateWtoStockAvailability(tx, {
+          branchId: branch.id,
+          lines: lineRows.map((line, index) => ({
+            index,
+            netWeight: Number(line.net_weight),
+            productId: line.product_id,
+            productName: line.product_name,
+            warehouseId: line.warehouse_id,
+          })),
+        })
+      }
       const createdLines = await Promise.all(lineRows.map((data) => tx.weight_ticket_lines.create({ data })))
+      if (values.type === 'WTO') {
+        await createActiveWtoStockHolds(tx, {
+          actor,
+          branchId: branch.id,
+          documentNo: docNo,
+          lines: createdLines,
+          weightTicketId: createdTicket.id,
+        })
+      }
       const imageCount = values.vehicleImageNames.length + createdLines.reduce((sum, line) => sum + (line.image_count ?? 0), 0)
       const { summaryRows } = buildWeightTicketProductSummaryRows(createdTicket.id, createdLines)
       const createdSummaries = await Promise.all(summaryRows.map(({ lineIds, ...data }) => tx.weight_ticket_product_summaries.create({ data })))
@@ -268,6 +301,9 @@ export async function POST(request: Request) {
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    if (caught instanceof WtoStockHoldError) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: caught.message, fieldErrors: caught.fieldErrors }, { status: 400 })
+    }
     return apiErrorResponse(caught, 'บันทึกใบรับ-ส่งของไม่ได้', 400)
   }
 }

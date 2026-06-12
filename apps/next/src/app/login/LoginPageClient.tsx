@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, KeyboardEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isEmailIdentifier, loginSchema } from '@/lib/auth'
@@ -103,6 +103,12 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
     router.refresh()
   }
 
+  function submitOnPasswordEnter(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing || isLoading) return
+    event.preventDefault()
+    event.currentTarget.form?.requestSubmit()
+  }
+
   return (
     <section className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <div className="w-full max-w-md rounded-md bg-white p-8 shadow-xl">
@@ -148,6 +154,7 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
                 className="w-full rounded-md border border-slate-300 px-3 py-2 pr-12 outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isLoading}
                 onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={submitOnPasswordEnter}
                 placeholder="••••••••"
                 type={showPassword ? 'text' : 'password'}
                 value={password}

@@ -9,6 +9,13 @@ import { findActiveBranchReferencesByCodes } from '@/lib/server/branch-reference
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
+import {
+  closeActiveWtoStockHolds,
+  createActiveWtoStockHolds,
+  resolveWtoWarehousesForLines,
+  validateWtoStockAvailability,
+  WtoStockHoldError,
+} from '@/lib/server/stock-holds'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import {
   branchScopeIds,
@@ -17,6 +24,7 @@ import {
   canMutateWeightTicket,
   defaultTicketStatus,
   getWeightTicketTimeline,
+  getWeightTicketDownstreamAllocations,
   getWeightTicketUsageTimeline,
   getWeightTicketUsageCounts,
   mapWeightTicketRow,
@@ -45,6 +53,9 @@ const ticketInclude = {
       products: {
         select: { code: true, id: true },
       },
+      warehouses: {
+        select: { code: true, id: true, name: true, type: true },
+      },
     },
     orderBy: { line_no: 'asc' },
   },
@@ -71,12 +82,14 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
     const usage = await getWeightTicketUsageCounts(prisma, ticket.id)
     const mapped = mapWeightTicketRow(ticket as WeightTicketRow, usage)
-    const [timeline, usageTimeline] = await Promise.all([
+    const [timeline, usageTimeline, downstreamAllocations] = await Promise.all([
       getWeightTicketTimeline(prisma, ticket.id),
       getWeightTicketUsageTimeline(prisma, ticket.id),
+      getWeightTicketDownstreamAllocations(prisma, ticket.id),
     ])
     return NextResponse.json({
       ...mapped,
+      downstreamAllocations,
       timeline,
       usageTimeline,
     })
@@ -100,6 +113,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const usage = await getWeightTicketUsageCounts(prisma, existing.id)
     if (!canMutateWeightTicket(existing, usage)) {
       return NextResponse.json({ code: 'BAD_REQUEST', error: mutableTicketErrorMessage('edit') }, { status: 400 })
+    }
+    if (values.type !== existing.doc_type) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: 'ไม่สามารถเปลี่ยนประเภทเอกสารหลังสร้างแล้ว',
+        fieldErrors: { type: ['ไม่สามารถเปลี่ยนประเภทเอกสารหลังสร้างแล้ว'] },
+      }, { status: 400 })
     }
     const beforeSnapshot = weightTicketAuditSnapshot(mapWeightTicketRow(existing as WeightTicketRow, usage))
 
@@ -165,7 +185,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const actor = currentActor(auth)
     const documentDate = toDateOnly(existing.document_date)
-    const nextStatus = existing.status === 'partially_billed' || existing.status === 'billed'
+    const nextStatus = existing.status === 'billed'
       ? existing.status
       : defaultTicketStatus(values.type)
     const totals = values.lines.reduce((summary, line) => {
@@ -183,7 +203,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const updated = await prisma.$transaction(async (tx) => {
       const branchCode = String(branch.code ?? '').replace(/\D/g, '').slice(-2).padStart(2, '0')
-      const mustRenumber = existing.branch_id !== branch.id || existing.doc_type !== values.type
+      const mustRenumber = existing.branch_id !== branch.id
       const docNo = mustRenumber
         ? await (async () => {
           await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('weight_tickets.doc_no'))`
@@ -223,10 +243,39 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           },
         },
       })
+      await closeActiveWtoStockHolds(tx, {
+        actor,
+        reason: 'edit',
+        weightTicketId: existing.id,
+      })
       await tx.weight_ticket_product_summaries.deleteMany({ where: { weight_ticket_id: existing.id } })
       await tx.weight_ticket_lines.deleteMany({ where: { weight_ticket_id: existing.id } })
-      const lineRows = buildWeightTicketLineRows(existing.id, values, productByCode, impurityById)
+      const warehouseByCode = values.type === 'WTO'
+        ? await resolveWtoWarehousesForLines(tx, { branchId: branch.id, lines: values.lines })
+        : new Map()
+      const lineRows = buildWeightTicketLineRows(existing.id, values, productByCode, impurityById, warehouseByCode)
+      if (values.type === 'WTO') {
+        await validateWtoStockAvailability(tx, {
+          branchId: branch.id,
+          lines: lineRows.map((line, index) => ({
+            index,
+            netWeight: Number(line.net_weight),
+            productId: line.product_id,
+            productName: line.product_name,
+            warehouseId: line.warehouse_id,
+          })),
+        })
+      }
       const createdLines = await Promise.all(lineRows.map((data) => tx.weight_ticket_lines.create({ data })))
+      if (values.type === 'WTO') {
+        await createActiveWtoStockHolds(tx, {
+          actor,
+          branchId: branch.id,
+          documentNo: docNo,
+          lines: createdLines,
+          weightTicketId: existing.id,
+        })
+      }
       const imageCount = values.vehicleImageNames.length + createdLines.reduce((sum, line) => sum + (line.image_count ?? 0), 0)
       const { summaryRows } = buildWeightTicketProductSummaryRows(existing.id, createdLines)
       const createdSummaries = await Promise.all(summaryRows.map(({ lineIds, ...data }) => tx.weight_ticket_product_summaries.create({ data })))
@@ -295,6 +344,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    if (caught instanceof WtoStockHoldError) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: caught.message, fieldErrors: caught.fieldErrors }, { status: 400 })
+    }
     return apiErrorResponse(caught, 'แก้ไขใบรับ-ส่งของไม่ได้', 400)
   }
 }
@@ -318,6 +370,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const actor = currentActor(auth)
     const cancelledAt = new Date()
     const updated = await prisma.$transaction(async (tx) => {
+      await closeActiveWtoStockHolds(tx, {
+        actor,
+        reason: 'cancel',
+        weightTicketId: existing.id,
+      })
       await tx.weight_tickets.update({
         data: {
           cancel_note: values.note,
@@ -375,6 +432,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    if (caught instanceof WtoStockHoldError) {
+      return NextResponse.json({ code: 'BAD_REQUEST', error: caught.message, fieldErrors: caught.fieldErrors }, { status: 400 })
+    }
     return apiErrorResponse(caught, 'ยกเลิกใบรับ-ส่งของไม่ได้', 400)
   }
 }

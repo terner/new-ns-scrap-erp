@@ -24,6 +24,24 @@ type WeightTicketUsage = {
   salesDocNos: string[]
 }
 
+type WeightTicketDownstreamAllocationRow = {
+  allocated_deduct_weight: Prisma.Decimal | number
+  allocated_gross_weight: Prisma.Decimal | number
+  allocated_qty: Prisma.Decimal | number
+  created_at: Date | null
+  created_by: string | null
+  product_code: string | null
+  product_name: string | null
+  status: string | null
+  summary_code: string | null
+  summary_line_count: number | null
+  summary_product_name: string | null
+  target_doc_no: string | null
+  target_line_no: number | null
+  target_type: 'PURCHASE_BILL' | 'SALES_BILL'
+  weight_ticket_doc_no: string
+}
+
 export type WeightTicketRow = Prisma.weight_ticketsGetPayload<{
   include: {
     branches: true
@@ -48,6 +66,14 @@ export type WeightTicketRow = Prisma.weight_ticketsGetPayload<{
           select: {
             code: true
             id: true
+          }
+        }
+        warehouses: {
+          select: {
+            code: true
+            id: true
+            name: true
+            type: true
           }
         }
       }
@@ -229,6 +255,7 @@ export function buildWeightTicketLineRows(
   values: WeightTicketFormValues,
   productByCode: Map<string, { code: string; id: bigint; name: string }>,
   impurityById: Map<bigint, { id: bigint; name: string }>,
+  warehouseByCode: Map<string, { id: bigint }> = new Map(),
 ) {
   return values.lines.map((line, index) => {
     const lineTotals = calculateLineTotals({
@@ -238,6 +265,8 @@ export function buildWeightTicketLineRows(
     })
     const productCode = line.productId.trim().toUpperCase()
     const product = productByCode.get(productCode)
+    const warehouseCode = line.warehouseId.trim().toUpperCase()
+    const warehouse = warehouseCode ? warehouseByCode.get(warehouseCode) : null
     const impurityId = parseInternalBigIntId(line.impurityId)
     if (!product) {
       throw new Error(`สินค้า ${line.productId} ไม่มี business code ที่ใช้งานได้`)
@@ -258,6 +287,7 @@ export function buildWeightTicketLineRows(
       note: line.note || null,
       product_id: product.id,
       product_name: product.name,
+      warehouse_id: warehouse?.id ?? null,
       weight_ticket_id: ticketId,
     }
   })
@@ -335,21 +365,119 @@ export function buildWeightTicketProductSummaryRows(
 }
 
 export async function getWeightTicketUsageCounts(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {
-  const purchaseRows = await tx.$queryRaw<Array<{ bill_count: number; doc_nos: string[] | null }>>`
-    select count(distinct pb.id)::int as bill_count
-         , array_remove(array_agg(distinct pb.doc_no), null) as doc_nos
-    from public.purchase_bill_receipt_allocations pbra
-    join public.purchase_bills pb on pb.id = pbra.purchase_bill_id
-    where lower(coalesce(pb.status, '')) not in ('cancelled', 'cancelled_supplier_swap')
-      and pbra.weight_ticket_id = ${ticketId}
-  `
+  const [purchaseRows, salesRows] = await Promise.all([
+    tx.$queryRaw<Array<{ bill_count: number; doc_nos: string[] | null }>>`
+      select count(distinct pb.id)::int as bill_count
+           , array_remove(array_agg(distinct pb.doc_no), null) as doc_nos
+      from public.purchase_bill_receipt_allocations pbra
+      join public.purchase_bills pb on pb.id = pbra.purchase_bill_id
+      where lower(coalesce(pb.status, '')) not in ('cancelled', 'cancelled_supplier_swap')
+        and pbra.weight_ticket_id = ${ticketId}
+    `,
+    tx.$queryRaw<Array<{ bill_count: number; doc_nos: string[] | null }>>`
+      select count(distinct sb.id)::int as bill_count
+           , array_remove(array_agg(distinct sb.doc_no), null) as doc_nos
+      from public.sales_bills sb
+      join public.weight_tickets wt on wt.id = ${ticketId}
+      cross join lateral jsonb_array_elements(
+        case
+          when jsonb_typeof(coalesce(sb.items::jsonb, '[]'::jsonb)) = 'array' then coalesce(sb.items::jsonb, '[]'::jsonb)
+          else '[]'::jsonb
+        end
+      ) as item
+      where lower(coalesce(sb.status, '')) not in ('cancelled', 'void', 'voided')
+        and coalesce(item ->> 'deliveryTicketId', '') = wt.doc_no
+    `,
+  ])
 
   return {
     purchaseCount: purchaseRows[0]?.bill_count ?? 0,
     purchaseDocNos: [...(purchaseRows[0]?.doc_nos ?? [])].sort((left, right) => left.localeCompare(right, 'th')),
-    salesCount: 0,
-    salesDocNos: [],
+    salesCount: salesRows[0]?.bill_count ?? 0,
+    salesDocNos: [...(salesRows[0]?.doc_nos ?? [])].sort((left, right) => left.localeCompare(right, 'th')),
   }
+}
+
+export async function getWeightTicketDownstreamAllocations(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {
+  const [purchaseRows, salesRows] = await Promise.all([
+    tx.$queryRaw<WeightTicketDownstreamAllocationRow[]>`
+      select
+        'PURCHASE_BILL'::text as target_type,
+        pb.doc_no as target_doc_no,
+        pbi.line_no as target_line_no,
+        pb.status,
+        pbra.allocated_qty,
+        pbra.allocated_gross_weight,
+        pbra.allocated_deduct_weight,
+        pbra.created_at,
+        pbra.created_by,
+        products.code as product_code,
+        pbi.product_name,
+        summary_products.code as summary_code,
+        wts.line_count as summary_line_count,
+        wts.product_name as summary_product_name
+        , wt.doc_no as weight_ticket_doc_no
+      from public.purchase_bill_receipt_allocations pbra
+      join public.purchase_bills pb on pb.id = pbra.purchase_bill_id
+      join public.purchase_bill_items pbi on pbi.id = pbra.purchase_bill_item_id
+      join public.weight_ticket_product_summaries wts on wts.id = pbra.weight_ticket_product_summary_id
+      join public.weight_tickets wt on wt.id = pbra.weight_ticket_id
+      left join public.products products on products.id = pbi.product_id
+      left join public.products summary_products on summary_products.id = wts.product_id
+      where lower(coalesce(pb.status, '')) not in ('cancelled', 'cancelled_supplier_swap')
+        and pbra.weight_ticket_id = ${ticketId}
+      order by pbra.created_at desc, pb.doc_no desc, pbi.line_no asc
+    `,
+    tx.$queryRaw<WeightTicketDownstreamAllocationRow[]>`
+      select
+        'SALES_BILL'::text as target_type,
+        sb.doc_no as target_doc_no,
+        item_ordinality::int as target_line_no,
+        sb.status,
+        coalesce(nullif(item ->> 'qty', ''), '0')::numeric as allocated_qty,
+        coalesce(nullif(item ->> 'grossWeight', ''), '0')::numeric as allocated_gross_weight,
+        coalesce(nullif(item ->> 'deductWeight', ''), '0')::numeric as allocated_deduct_weight,
+        sb.created_at,
+        sb.created_by,
+        item ->> 'productId' as product_code,
+        item ->> 'productName' as product_name,
+        split_part(coalesce(item ->> 'deliverySummaryId', ''), ':', 2) as summary_code,
+        nullif(split_part(coalesce(item ->> 'deliverySummaryId', ''), ':', 3), '')::int as summary_line_count,
+        item ->> 'productName' as summary_product_name,
+        wt.doc_no as weight_ticket_doc_no
+      from public.sales_bills sb
+      join public.weight_tickets wt on wt.id = ${ticketId}
+      cross join lateral jsonb_array_elements(
+        case
+          when jsonb_typeof(coalesce(sb.items::jsonb, '[]'::jsonb)) = 'array' then coalesce(sb.items::jsonb, '[]'::jsonb)
+          else '[]'::jsonb
+        end
+      ) with ordinality as item(item, item_ordinality)
+      where lower(coalesce(sb.status, '')) not in ('cancelled', 'void', 'voided')
+        and coalesce(item ->> 'deliveryTicketId', '') = wt.doc_no
+      order by sb.created_at desc, sb.doc_no desc, item_ordinality asc
+    `,
+  ])
+
+  return [...purchaseRows, ...salesRows].map((row) => {
+    const summaryCode = requireBusinessCode(row.summary_code, `สรุปสินค้าเอกสาร ${row.summary_product_name ?? row.product_name ?? ''}`)
+    return {
+      allocatedDeductWeight: toNumber(row.allocated_deduct_weight),
+      allocatedGrossWeight: toNumber(row.allocated_gross_weight),
+      allocatedNetWeight: toNumber(row.allocated_qty),
+      allocatedQty: toNumber(row.allocated_qty),
+      createdAt: row.created_at?.toISOString() ?? null,
+      createdBy: row.created_by ?? '-',
+      id: `${row.target_type}:${row.target_doc_no ?? ''}:${row.target_line_no ?? 0}:${summaryCode}`,
+      productCode: row.product_code ?? '',
+      productName: row.product_name ?? row.summary_product_name ?? '-',
+      status: row.status ?? '',
+      summaryId: `${row.weight_ticket_doc_no}:${summaryCode}:${row.summary_line_count ?? 0}`,
+      targetDocNo: row.target_doc_no ?? '',
+      targetLineNo: row.target_line_no,
+      targetType: row.target_type,
+    }
+  })
 }
 
 export async function getWeightTicketTimeline(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {
@@ -509,6 +637,9 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     note: line.note ?? '',
     productId: requireBusinessCode(line.products.code, `สินค้า ${line.products.id}`),
     productName: line.product_name,
+    warehouseId: line.warehouses?.code ?? '',
+    warehouseName: line.warehouses?.name ?? '',
+    warehouseType: line.warehouses?.type ?? '',
   }))
   const lineImageNames = lineRows.flatMap((line: { imageNames: string[] }) => line.imageNames)
   const productSummaries = row.weight_ticket_product_summaries.map((summary) => ({
@@ -534,6 +665,7 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     createdAt: row.created_at.toISOString(),
     documentDate: toDateOnly(row.document_date),
     documentNo: row.doc_no,
+    downstreamAllocations: [],
     enteredBy: row.entered_by ?? row.created_by ?? '-',
     id: row.doc_no,
     imageCount: row.image_count ?? 0,

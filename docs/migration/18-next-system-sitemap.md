@@ -84,14 +84,16 @@ Status terms:
 | `/purchase/bills/[id]` | Purchase bill detail/edit | partial write | `PATCH /api/purchase/bills` | `purchase_bills`, `stock_ledger` | `finance.cash.view` |
 | `/purchase/advance-payments` | จ่ายเงินล่วงหน้า / มัดจำ | partial write baseline | `GET/POST /api/purchase/advance-payments` | `supplier_advance_payments`, `supplier_advance_allocations`, `suppliers`, `branches`, `accounts` | `finance.cash.view` |
 | `/sales/bills` | บิลขาย | read baseline | `GET /api/sales/bills` | `sales_bills`, `customers` | `finance.cash.view` |
-| `/sales/stock-issue` | เบิกออกรอบิล | read baseline | `GET /api/sales/stock-issue` | `stock_issues` | `finance.cash.view` |
+| `/sales/stock-issue` | เบิกออกรอบิล | read baseline / write pending | `GET /api/sales/stock-issue` | `stock_issues`, target `stock_ledger` for `PSALE` | `finance.cash.view` |
 | `/daily/payment-approval` | อนุมัติจ่ายเงิน | partial write | `GET/POST /api/daily/payment-approval` | `payment_approvals`, `purchase_bills`, `supplier_advance_payments`, `expenses` | `finance.cash.view` |
 UI note: compact summary tables; row click opens approval detail modal, and AP approval amount entry now lives in the modal instead of the list grid.
 | `/purchase/payments` | จ่ายเงิน Supplier | partial write | `GET/POST /api/purchase/payments` | `payments`, `purchase_bills`, `accounts` | `finance.cash.view` |
 | `/purchase/receipt-vouchers` | ใบสำคัญรับเงิน | read baseline | `GET /api/purchase/receipt-vouchers` | `receipt_vouchers` | `finance.cash.view` |
 | `/sales/receipts` | รับเงิน Customer | partial write | `GET/POST /api/sales/receipts` | `receipts`, `sales_bills`, `accounts` | `finance.cash.view` |
-| `/daily/weight-tickets` | ชั่งสินค้า / รับ-ส่งของ | UI/localStorage prototype | no API yet; local client state only | create WTI/WTO documents from branch, party, vehicle, product weights, deduction mode, and line-level image names with at least one image per product line; document number/date/time/entered-by are generated on save and not previewed; no plain `WT` document number | `finance.cash.view` |
-| `/daily/weight-ticket-list` | รายการใบรับ-ส่งของ | UI/localStorage prototype | no API yet; local client state only | list/search/filter WTI/WTO documents for office follow-up and bill selection | `finance.cash.view` |
+| `/daily/weight-tickets` | ชั่งสินค้า / รับ-ส่งของ | partial write | `GET /api/daily/weight-tickets/options`, `GET /api/daily/weight-tickets/products`, `POST /api/daily/weight-tickets`, `GET/PATCH /api/daily/weight-tickets/{docNo}` | `weight_tickets`, `weight_ticket_lines`, `weight_ticket_product_summaries`, `weight_ticket_product_summary_lines` | `finance.cash.view` |
+UI note: create/edit WTI/WTO against real DB records; header options load from a page-scoped options API, products preload in the background with thumbnail URLs, and document number/date/time/entered-by remain system-generated on save only.
+| `/daily/weight-ticket-list` | รายการใบรับ-ส่งของ | partial write | `GET /api/daily/weight-tickets`, `GET /api/daily/weight-tickets/{docNo}`, `PATCH /api/daily/weight-tickets/{docNo}` | `weight_tickets`, `weight_ticket_lines`, `weight_ticket_product_summaries`, `weight_ticket_product_summary_lines` | `finance.cash.view` |
+UI note: list/search/filter real WTI/WTO documents, row click opens detail, and edit/cancel lock depends on downstream purchase/sales bill usage.
 | `/daily/transfer` | โอนเงินระหว่างบัญชี | partial write | `GET/POST /api/daily/transfers` | `bank_statement`, `accounts` | `finance.cash.view` |
 | `/daily/expense` | ค่าใช้จ่าย | partial write | `GET/POST /api/daily/expenses` | `expenses`, `bank_statement` | `finance.cash.view` |
 | `/daily/petty-advance` | เงินสำรองจ่าย / กู้กรรมการ | partial write | `GET/POST /api/daily/petty-advances`, `POST /api/daily/petty-advances/returns` | `petty_advances`, `bank_statement` | `finance.cash.view` |
@@ -103,7 +105,7 @@ UI note: compact summary tables; row click opens approval detail modal, and AP a
 
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
-| `/production/orders` | ใบสั่งผลิต | read baseline | `GET /api/production/orders` | `production_orders` | `production.operations.view` |
+| `/production/orders` | ใบสั่งผลิต | read baseline / write pending | `GET /api/production/orders` | `production_orders`, target `production_inputs`, `production_outputs`, `stock_ledger` | `production.operations.view` |
 | `/production/output-categories` | หมวดหมู่ผลผลิต | partial write | `GET/POST /api/production/output-categories`, `PATCH /api/production/output-categories/{id}` | `production_output_categories` | `production.operations.view` |
 | `/production/dashboard` | Production Dashboard | read baseline | `GET /api/production/dashboard` | production aggregate tables | `production.operations.view` |
 | `/production/wip-report` | WIP คงเหลือ | read baseline | `GET /api/production/wip-report` | `production_inputs`, `production_outputs`, `stock_ledger` | `production.operations.view` |

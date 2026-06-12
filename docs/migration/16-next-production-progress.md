@@ -230,3 +230,14 @@ Tasks:
   - `/production/yield-loss-report`
   - `/production/machine-utilization`
 - Next already has production-related master data pages for machines and production lines.
+
+## Docs Checkpoint 2026-06-11
+
+- Added `docs/notes/Production Flow.md` as the canonical flow note for the whole `การผลิต` navigation section.
+- Current Next production runtime remains read baseline for `/production/orders` and report pages.
+- Production write flows are still pending:
+  - Production Order create/update/status
+  - Production Input write with paired `PI` stock ledger
+  - Production Output write with `PO2` stock ledger
+  - Process Cost write and allocation recompute
+  - Reverse/reconciliation/lock rules

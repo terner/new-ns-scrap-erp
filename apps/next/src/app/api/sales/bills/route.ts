@@ -6,11 +6,14 @@ import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requ
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { currentActor, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
-import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
+import { requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
+import { consumeActiveWtoStockHolds, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
 import { findActiveWarehouseReferenceByCodeOrId } from '@/lib/server/warehouse-reference'
+import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
+import { appendWeightTicketUsageLogs, WEIGHT_TICKET_USAGE_ACTION } from '@/lib/server/weight-ticket-usage-history'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 import type { Prisma } from '../../../../../generated/prisma/client'
 
@@ -56,6 +59,8 @@ type DeliveryTicketOptionRow = Prisma.weight_ticketsGetPayload<{
     }
   }
 }>
+
+type DeliverySummarySource = DeliveryTicketOptionRow['weight_ticket_product_summaries'][number]
 
 function parseBillQuery(url: URL, includePaging = true): BillQuery {
   return {
@@ -180,10 +185,20 @@ function salesItems(
   values: SalesBillFormValues,
   parsedProductIds: bigint[],
   productById: Map<bigint, { code: string | null; name: string; unit: string | null }>,
+  deliverySummarySourceMap: Map<string, DeliverySummarySource> = new Map(),
 ) {
   return values.items.map((item, index) => {
     const productId = parsedProductIds[index]
     const product = productById.get(productId)
+    const deliverySummary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
+    const deliverySummaryNetWeight = deliverySummary ? toNumber(deliverySummary.net_weight) : 0
+    const deliveryRatio = deliverySummary && deliverySummaryNetWeight > 0 ? item.qty / deliverySummaryNetWeight : 0
+    const grossWeight = deliverySummary && deliveryRatio > 0
+      ? toNumber(deliverySummary.gross_weight) * deliveryRatio
+      : item.grossWeight
+    const deductWeight = deliverySummary && deliveryRatio > 0
+      ? toNumber(deliverySummary.deduct_weight) * deliveryRatio
+      : item.deductWeight
     const amount = Math.max(0, item.qty * item.price - item.discount)
     return {
       amount,
@@ -192,9 +207,13 @@ function salesItems(
       deliverySummaryId: item.deliverySummaryId,
       deliveryTicketDocNo: item.deliveryTicketDocNo,
       deliveryTicketId: item.deliveryTicketId,
+      deductWeight,
       discount: item.discount,
+      grossWeight,
       id: `${String(index + 1).padStart(2, '0')}`,
+      netWeight: item.qty,
       note: item.note,
+      poSellId: item.poSellId,
       productCode: requireBusinessCode(product?.code, `สินค้า ${productId}`),
       productId: requireBusinessCode(product?.code, `สินค้า ${productId}`),
       productName: product?.name ?? '',
@@ -302,6 +321,70 @@ function deliveryTicketOptionJson(
   }
 }
 
+function deliverySummaryOutwardId(ticketDocNo: string, productCode: string, lineCount: number | null | undefined) {
+  return `${ticketDocNo}:${productCode}:${lineCount ?? 0}`
+}
+
+async function loadDeliveryAvailability(deliveryDocNo: string) {
+  const ticket = await prisma.weight_tickets.findFirst({
+    include: {
+      branches: true,
+      customers: true,
+      weight_ticket_product_summaries: {
+        include: {
+          weight_ticket_product_summary_lines: true,
+        },
+        orderBy: { product_name: 'asc' },
+      },
+      weight_ticket_lines: { orderBy: { line_no: 'asc' } },
+    },
+    where: {
+      doc_no: deliveryDocNo,
+    },
+  })
+  if (!ticket) return { ticket: null, usedQtyBySummaryId: new Map<string, number>() }
+
+  const rows = await prisma.sales_bills.findMany({
+    select: {
+      items: true,
+    },
+    where: {
+      status: { notIn: ['cancelled', 'Cancelled', 'void', 'voided'] },
+    },
+  })
+  const usedQtyBySummaryId = new Map<string, number>()
+  rows.forEach((row) => {
+    if (!Array.isArray(row.items)) return
+    row.items.forEach((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return
+      const record = item as Record<string, unknown>
+      const ticketDocNo = typeof record.deliveryTicketId === 'string' ? record.deliveryTicketId : ''
+      const summaryId = typeof record.deliverySummaryId === 'string' ? record.deliverySummaryId : ''
+      const qty = jsonNumber(record.qty)
+      if (ticketDocNo !== ticket.doc_no || !summaryId || qty <= 0) return
+      usedQtyBySummaryId.set(summaryId, (usedQtyBySummaryId.get(summaryId) ?? 0) + qty)
+    })
+  })
+
+  return { ticket, usedQtyBySummaryId }
+}
+
+function deliveryReferenceMaps(ticket: DeliveryTicketOptionRow, productCodeById: Map<bigint, string>) {
+  const lineToSummaryRef = new Map<string, string>()
+  const deliverySummarySourceMap = new Map<string, DeliverySummarySource>()
+  const outwardLineIdByInternalLineId = new Map(ticket.weight_ticket_lines.map((line) => [line.id, `${ticket.doc_no}:${line.line_no}`] as const))
+  ticket.weight_ticket_product_summaries.forEach((summary) => {
+    const productCode = summary.product_id != null ? productCodeById.get(summary.product_id) ?? '' : ''
+    const outwardSummaryId = deliverySummaryOutwardId(ticket.doc_no, productCode, summary.line_count)
+    deliverySummarySourceMap.set(outwardSummaryId, summary)
+    summary.weight_ticket_product_summary_lines.forEach((bridge) => {
+      const outwardLineId = outwardLineIdByInternalLineId.get(bridge.weight_ticket_line_id)
+      if (outwardLineId) lineToSummaryRef.set(outwardLineId, outwardSummaryId)
+    })
+  })
+  return { deliverySummarySourceMap, lineToSummaryRef }
+}
+
 type PoSellSnapshotItem = {
   discount?: unknown
   id?: unknown
@@ -319,10 +402,15 @@ type PoSellSnapshotItem = {
 }
 
 type PoSellForAllocation = {
+  branch_id?: bigint | null
+  customer_id?: bigint | null
+  doc_no?: string | null
+  id?: bigint
   items: unknown
   qty: unknown
   remaining_amount: unknown
   remaining_qty: unknown
+  status?: string | null
   total_amount: unknown
   unit_price: unknown
 }
@@ -339,6 +427,12 @@ function jsonNumber(value: unknown) {
 function productCodeFromItem(item: PoSellSnapshotItem) {
   const value = item.productCode ?? item.productId
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function poSellSnapshotItems(items: unknown): PoSellSnapshotItem[] {
+  return Array.isArray(items)
+    ? items.filter((item): item is PoSellSnapshotItem => typeof item === 'object' && item !== null && !Array.isArray(item))
+    : []
 }
 
 function isInactivePoSellStatus(status: string | null | undefined) {
@@ -404,8 +498,70 @@ function allocatePoSellForSalesBill(poSell: PoSellForAllocation, billItems: Sale
   }
 }
 
+async function validateStockDeliverySelection(
+  values: SalesBillFormValues,
+  resolvedBranchId: bigint | null,
+  resolvedCustomerId: bigint,
+  productByRef: Map<string, { code: string | null; id: bigint; name: string; unit: string | null }>,
+  productCodeById: Map<bigint, string>,
+) {
+  const deliveryDocNo = values.deliveryTicketId?.trim()
+  if (!deliveryDocNo) {
+    return { error: 'เลือกใบส่งของ WTO' as const }
+  }
+
+  const { ticket, usedQtyBySummaryId } = await loadDeliveryAvailability(deliveryDocNo)
+  if (!ticket || ticket.doc_type !== 'WTO' || ticket.cancelled_at) {
+    return { error: 'ใบส่งของที่เลือกไม่ถูกต้อง' as const }
+  }
+  if (resolvedBranchId && ticket.branch_id !== resolvedBranchId) {
+    return { error: 'ใบส่งของต้องอยู่สาขาเดียวกับบิลขาย' as const }
+  }
+  if (ticket.customer_id !== resolvedCustomerId) {
+    return { error: 'ใบส่งของต้องเป็นลูกค้าเดียวกับบิลขาย' as const }
+  }
+
+  const { deliverySummarySourceMap, lineToSummaryRef } = deliveryReferenceMaps(ticket, productCodeById)
+  const requestedQtyBySummaryId = new Map<string, number>()
+
+  for (const item of values.items) {
+    const resolvedSummaryRef = item.deliverySummaryId ?? (item.deliveryLineId ? lineToSummaryRef.get(item.deliveryLineId) ?? null : null)
+    if (item.deliveryTicketId !== ticket.doc_no || !resolvedSummaryRef) {
+      return { error: 'รายการ Stock ต้องอ้างอิงรายการจากใบส่งของเดียวกัน' as const }
+    }
+    const summarySource = deliverySummarySourceMap.get(resolvedSummaryRef)
+    if (!summarySource) {
+      return { error: 'มีรายการอ้างอิงใบส่งของที่ไม่ถูกต้อง' as const }
+    }
+    const itemProduct = productByRef.get(item.productId)
+    if (!itemProduct) {
+      return { error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' as const }
+    }
+    if (summarySource.product_id !== itemProduct.id) {
+      return { error: 'สินค้าในบิลไม่ตรงกับสินค้าในใบส่งของ' as const }
+    }
+    requestedQtyBySummaryId.set(resolvedSummaryRef, (requestedQtyBySummaryId.get(resolvedSummaryRef) ?? 0) + item.qty)
+  }
+
+  for (const summary of ticket.weight_ticket_product_summaries) {
+    const productCode = summary.product_id != null ? productCodeById.get(summary.product_id) ?? '' : ''
+    const summaryId = deliverySummaryOutwardId(ticket.doc_no, productCode, summary.line_count)
+    const availableQty = Math.max(0, toNumber(summary.net_weight) - (usedQtyBySummaryId.get(summaryId) ?? 0))
+    const requestedQty = requestedQtyBySummaryId.get(summaryId) ?? 0
+    if (requestedQty > availableQty + 0.0001) {
+      return { error: `จำนวนเกินน้ำหนักคงเหลือของ ${summary.product_name}` as const }
+    }
+    if (availableQty > 0.0001 && requestedQty < availableQty - 0.0001) {
+      const remainingQty = Math.max(0, availableQty - requestedQty).toLocaleString('th-TH', { maximumFractionDigits: 2 })
+      return { error: `ใบส่งของต้องจัดสรรให้ครบก่อนบันทึก: ${summary.product_name} ยังเหลือ ${remainingQty} กก.` as const }
+    }
+  }
+
+  return { deliverySummarySourceMap, ticket }
+}
+
 async function salesOptionsPayload() {
-  const [branches, customers, products, salesChannels, warehouses, vatRatePercent, deliveryTickets, customerAdvanceRows, salesBillsWithAdvance] = await Promise.all([
+  const [branches, customers, products, salesChannels, warehouses, vatRatePercent, deliveryTickets, poSellRows, customerAdvanceRows, salesBillsWithAdvance] = await Promise.all([
     prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.customers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
@@ -439,7 +595,28 @@ async function salesOptionsPayload() {
       where: {
         cancelled_at: null,
         doc_type: 'WTO',
-        status: { in: ['delivered', 'partially_billed'] },
+        status: 'delivered',
+      },
+    }),
+    prisma.po_sells.findMany({
+      orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
+      select: {
+        branch_id: true,
+        customer_id: true,
+        doc_no: true,
+        id: true,
+        items: true,
+        product_id: true,
+        qty: true,
+        remaining_amount: true,
+        remaining_qty: true,
+        status: true,
+        total_amount: true,
+        unit_price: true,
+      },
+      take: 500,
+      where: {
+        status: { notIn: ['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'void', 'Cancelled', 'Canceled', 'Closed', 'Completed'] },
       },
     }),
     prisma.bank_statement.findMany({
@@ -465,6 +642,8 @@ async function salesOptionsPayload() {
   ])
   const deliveryUsageMap = await buildDeliveryTicketUsageMap(deliveryTickets)
   const productCodeById = new Map(products.map((product) => [product.id, requireBusinessCode(product.code, `สินค้า ${product.id}`)]))
+  const branchCodeById = new Map(branches.map((branch) => [branch.id, requireBusinessCode(branch.code, `สาขา ${branch.id}`)]))
+  const customerCodeById = new Map(customers.map((customer) => [customer.id, requireBusinessCode(customer.code, `ลูกค้า ${customer.id}`)]))
   const customerByCode = new Map(customers.map((customer) => [requireBusinessCode(customer.code, `ลูกค้า ${customer.id}`), customer] as const))
   const customerAdvanceUsedById = new Map<string, number>()
   salesBillsWithAdvance.forEach((bill) => {
@@ -485,6 +664,39 @@ async function salesOptionsPayload() {
     deliveries: deliveryTickets
       .map((ticket) => deliveryTicketOptionJson(ticket, deliveryUsageMap, productCodeById))
       .filter((ticket) => ticket.productSummaries.length > 0),
+    poSells: poSellRows.flatMap((po) => {
+      const snapshotItems = poSellSnapshotItems(po.items)
+      const rows: PoSellSnapshotItem[] = snapshotItems.length
+        ? snapshotItems
+        : [{
+            productCode: po.product_id ? productCodeById.get(po.product_id) ?? '' : '',
+            productId: po.product_id ? productCodeById.get(po.product_id) ?? '' : '',
+            remainingQty: jsonNumber(po.remaining_qty ?? po.qty),
+            totalRevenue: jsonNumber(po.remaining_amount ?? po.total_amount),
+            unitPrice: jsonNumber(po.unit_price),
+          }]
+      return rows.flatMap((item, index) => {
+        const remainingQty = jsonNumber(item.remainingQty ?? item.qty)
+        if (remainingQty <= 0.0001) return []
+        const productCode = productCodeFromItem(item)
+        const unitPrice = jsonNumber(item.unitPrice)
+        return [{
+          active: true,
+          branch_id: po.branch_id ? branchCodeById.get(po.branch_id) ?? null : null,
+          customer_id: po.customer_id ? customerCodeById.get(po.customer_id) ?? null : null,
+          id: po.doc_no,
+          label: `${po.doc_no} · คงเหลือ ${remainingQty.toLocaleString('th-TH')} · ${unitPrice.toLocaleString('th-TH')} บาท`,
+          line_id: `${po.doc_no}:${index + 1}`,
+          name: po.doc_no,
+          product_id: productCode || null,
+          remainingAmount: jsonNumber(item.totalRevenue) || jsonNumber(po.remaining_amount),
+          remainingQty,
+          status: po.status ?? 'Open',
+          unit: typeof item.unit === 'string' ? item.unit : null,
+          unitPrice,
+        }]
+      })
+    }),
     customerAdvancePayments: customerAdvanceRows.flatMap((advance) => {
       const customerCode = String(advance.ref_id ?? '').trim()
       const customer = customerByCode.get(customerCode)
@@ -617,7 +829,6 @@ export async function POST(request: Request) {
     const billDate = createdAt.toISOString().slice(0, 10)
     const vatRatePercent = await activeVatRatePercent(normalizeDate(billDate))
     const totals = calculateSalesTotals(values, vatRatePercent)
-    const parsedPoSellId = values.poSellId ? parseInternalBigIntId(values.poSellId) : null
     const requestedProductCodes = values.items.map((item) => item.productId?.trim() ?? '')
     const invalidProductIndex = requestedProductCodes.findIndex((productCode) => !productCode)
     if (invalidProductIndex >= 0) {
@@ -625,29 +836,32 @@ export async function POST(request: Request) {
     }
     const productCodes = [...new Set(requestedProductCodes)]
     const [branch, warehouse] = await Promise.all([
-      values.branchId ? findActiveBranchReferenceByCodeOrId(values.branchId) : Promise.resolve(null),
+      findActiveBranchReferenceByCodeOrId(values.branchId),
       values.warehouseId ? findActiveWarehouseReferenceByCodeOrId(values.warehouseId) : Promise.resolve(null),
     ])
 
     const [customer, channel, products] = await Promise.all([
       findActiveCustomerReferenceByCodeOrId(values.customerId),
-      values.channelId ? findActiveSalesChannelReferenceByCode(values.channelId) : Promise.resolve(null),
+      findActiveSalesChannelReferenceByCode(values.channelId),
       prisma.products.findMany({ where: { active: true, code: { in: productCodes } }, select: { code: true, id: true, name: true, unit: true } }),
     ])
 
     if (!customer) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ลูกค้าไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
-    if (values.branchId && !branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
-    if (values.channelId && !channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางขายไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    if (!channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางขายไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (values.warehouseId && !warehouse) return NextResponse.json({ code: 'BAD_REQUEST', error: 'คลังไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (branch?.code && warehouse?.branchCode && warehouse.branchCode !== branch.code) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาและคลังไม่ตรงกัน' }, { status: 400 })
 
-    if (values.poSellId && !parsedPoSellId) return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Sell ไม่ถูกต้อง' }, { status: 400 })
-
-    const poSell = parsedPoSellId
-      ? await prisma.po_sells.findUnique({
+    const requestedPoSellDocNos = Array.from(new Set([
+      ...values.items.map((item) => item.poSellId?.trim() ?? '').filter(Boolean),
+      values.poSellId?.trim() ?? '',
+    ].filter(Boolean)))
+    const poSells = requestedPoSellDocNos.length
+      ? await prisma.po_sells.findMany({
           select: {
             branch_id: true,
             customer_id: true,
+            doc_no: true,
             id: true,
             items: true,
             qty: true,
@@ -657,13 +871,17 @@ export async function POST(request: Request) {
             total_amount: true,
             unit_price: true,
           },
-          where: { id: parsedPoSellId },
+          where: { doc_no: { in: requestedPoSellDocNos } },
         })
-      : null
-    if (parsedPoSellId && !poSell) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ไม่พบ PO Sell ที่เลือก' }, { status: 400 })
-    if (poSell && isInactivePoSellStatus(poSell.status)) return NextResponse.json({ code: 'BAD_REQUEST', error: 'PO Sell นี้ถูกปิดหรือยกเลิกแล้ว' }, { status: 400 })
-    if (poSell?.customer_id && poSell.customer_id !== customer.id) return NextResponse.json({ code: 'BAD_REQUEST', error: 'Customer ของบิลขายไม่ตรงกับ PO Sell' }, { status: 400 })
-    if (poSell?.branch_id && branch?.id && poSell.branch_id !== branch.id) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาของบิลขายไม่ตรงกับ PO Sell' }, { status: 400 })
+      : []
+    const poSellByDocNo = new Map(poSells.map((poSell) => [poSell.doc_no, poSell] as const))
+    const missingPoSell = requestedPoSellDocNos.find((docNo) => !poSellByDocNo.has(docNo))
+    if (missingPoSell) return NextResponse.json({ code: 'BAD_REQUEST', error: `ไม่พบ PO Sell ${missingPoSell}` }, { status: 400 })
+    for (const poSell of poSells) {
+      if (isInactivePoSellStatus(poSell.status)) return NextResponse.json({ code: 'BAD_REQUEST', error: `PO Sell ${poSell.doc_no} ถูกปิดหรือยกเลิกแล้ว` }, { status: 400 })
+      if (poSell.customer_id && poSell.customer_id !== customer.id) return NextResponse.json({ code: 'BAD_REQUEST', error: `Customer ของบิลขายไม่ตรงกับ PO Sell ${poSell.doc_no}` }, { status: 400 })
+      if (poSell.branch_id && branch?.id && poSell.branch_id !== branch.id) return NextResponse.json({ code: 'BAD_REQUEST', error: `สาขาของบิลขายไม่ตรงกับ PO Sell ${poSell.doc_no}` }, { status: 400 })
+    }
 
     const selectedCustomerAdvance = values.customerAdvanceId
       ? await prisma.bank_statement.findUnique({
@@ -697,21 +915,41 @@ export async function POST(request: Request) {
     if (selectedCustomerAdvance && customerAdvanceAvailable <= 0.01) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เอกสารรับเงินล่วงหน้านี้ไม่มียอดคงเหลือสำหรับใช้หักบิลแล้ว' }, { status: 400 })
     const customerAdvanceApplied = selectedCustomerAdvance ? Math.min(totals.totalAmount, customerAdvanceAvailable) : 0
 
-    const productByCode = new Map(products.map((product) => [requireBusinessCode(product.code, `สินค้า ${product.id}`), product]))
-    const parsedProductIds = requestedProductCodes.map((productCode) => productByCode.get(productCode)?.id ?? null)
-    const missingProduct = requestedProductCodes.find((productCode) => !productByCode.has(productCode))
-    if (missingProduct || parsedProductIds.some((productId) => productId == null)) {
-      return NextResponse.json({ code: 'BAD_REQUEST', error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
-    }
-    const productById = new Map(products.map((product) => [product.id, product]))
+	    const productByCode = new Map(products.map((product) => [requireBusinessCode(product.code, `สินค้า ${product.id}`), product]))
+	    const parsedProductIds = requestedProductCodes.map((productCode) => productByCode.get(productCode)?.id ?? null)
+	    const missingProduct = requestedProductCodes.find((productCode) => !productByCode.has(productCode))
+	    if (missingProduct || parsedProductIds.some((productId) => productId == null)) {
+	      return NextResponse.json({ code: 'BAD_REQUEST', error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+	    }
+		    const productById = new Map(products.map((product) => [product.id, product]))
+		    const productCodeById = new Map(products.map((product) => [product.id, requireBusinessCode(product.code, `สินค้า ${product.id}`)]))
+		    let deliverySummarySourceMap = new Map<string, DeliverySummarySource>()
+		    let stockDeliveryTicket: DeliveryTicketOptionRow | null = null
+		    if (values.transactionMode === 'STOCK') {
+		      const deliveryValidation = await validateStockDeliverySelection(values, branch?.id ?? null, customer.id, productByCode, productCodeById)
+		      if ('error' in deliveryValidation) {
+		        return NextResponse.json({ code: 'BAD_REQUEST', error: deliveryValidation.error }, { status: 400 })
+		      }
+		      deliverySummarySourceMap = deliveryValidation.deliverySummarySourceMap
+		      stockDeliveryTicket = deliveryValidation.ticket
+		    }
 
-    const docNo = await nextDailyDocNo('sales_bills', 'SB', billDate)
-    const items = salesItems(values, parsedProductIds as bigint[], productById)
-    const poSellAllocation = poSell ? allocatePoSellForSalesBill(poSell, items) : null
-    if (poSellAllocation && 'error' in poSellAllocation) {
-      return NextResponse.json({ code: 'BAD_REQUEST', error: poSellAllocation.error }, { status: 400 })
+	    const docNo = await nextDailyDocNo('sales_bills', 'SB', billDate)
+	    const items = salesItems(values, parsedProductIds as bigint[], productById, deliverySummarySourceMap)
+    const poSellAllocations = new Map<string, ReturnType<typeof allocatePoSellForSalesBill>>()
+    for (const poSellDocNo of requestedPoSellDocNos) {
+      const poSell = poSellByDocNo.get(poSellDocNo)
+      if (!poSell) continue
+      const poSellItems = items.filter((item) => item.poSellId === poSellDocNo || (!item.poSellId && values.poSellId === poSellDocNo))
+      if (!poSellItems.length) continue
+      const allocation = allocatePoSellForSalesBill(poSell, poSellItems)
+      if ('error' in allocation) {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: `${poSellDocNo}: ${allocation.error}` }, { status: 400 })
+      }
+      poSellAllocations.set(poSellDocNo, allocation)
     }
     const totalCost = 0
+    const selectedHeaderPoSell = poSells.length === 1 ? poSells[0] : null
 
     const created = await prisma.$transaction(async (tx) => {
       const createdBill = await tx.sales_bills.create({
@@ -731,7 +969,7 @@ export async function POST(request: Request) {
           license_plate: values.licensePlate,
           note: values.note,
           notes: values.note,
-          po_sell_id: parsedPoSellId,
+          po_sell_id: selectedHeaderPoSell?.id ?? null,
           paid_amount: customerAdvanceApplied,
           receivable_balance: Math.max(0, totals.totalAmount - customerAdvanceApplied),
           received_amount: customerAdvanceApplied,
@@ -753,27 +991,102 @@ export async function POST(request: Request) {
         select: { doc_no: true, id: true },
       })
 
-      if (poSell && poSellAllocation && !('error' in poSellAllocation)) {
+	      for (const [poSellDocNo, allocation] of poSellAllocations.entries()) {
+        const poSell = poSellByDocNo.get(poSellDocNo)
+        if (!poSell || 'error' in allocation) continue
         await tx.po_sells.update({
           data: {
-            ...(poSellAllocation.items ? { items: poSellAllocation.items as Prisma.InputJsonValue } : {}),
-            cut_amount: { increment: poSellAllocation.usedAmount },
-            remaining_amount: poSellAllocation.remainingAmount,
-            remaining_qty: poSellAllocation.remainingQty,
-            status: poSellAllocation.remainingQty <= 0.001 ? 'Completed' : poSell.status ?? 'Open',
+            ...(allocation.items ? { items: allocation.items as Prisma.InputJsonValue } : {}),
+            cut_amount: { increment: allocation.usedAmount },
+            remaining_amount: allocation.remainingAmount,
+            remaining_qty: allocation.remainingQty,
+            status: allocation.remainingQty <= 0.001 ? 'Completed' : poSell.status ?? 'Open',
             updated_at: createdAt,
             updated_by: actor,
           },
           where: { id: poSell.id },
         })
-      }
+	      }
 
-      return createdBill
-    })
+	      if (values.transactionMode === 'STOCK' && stockDeliveryTicket) {
+	        await consumeActiveWtoStockHolds(tx, {
+	          actor,
+	          billDate: normalizeDate(billDate),
+	          branchId: branch.id,
+	          salesBillDocNo: createdBill.doc_no,
+	          salesChannelId: channel.id,
+	          weightTicketId: stockDeliveryTicket.id,
+	        })
+
+	        const usageEntries = items.flatMap((item, index) => {
+	          const summary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
+	          if (!summary) return []
+	          return [{
+	            action: WEIGHT_TICKET_USAGE_ACTION.ALLOCATED_TO_SALES_BILL,
+	            actor,
+	            allocatedDeductWeight: item.deductWeight,
+	            allocatedGrossWeight: item.grossWeight,
+	            allocatedNetWeight: item.qty,
+	            allocatedQty: item.qty,
+	            meta: { reason: 'sales_bill_create' },
+	            productCodeSnapshot: item.productCode,
+	            productId: item.productId ? productByCode.get(item.productId)?.id ?? null : null,
+	            productNameSnapshot: item.productName,
+	            targetDocNo: createdBill.doc_no,
+	            targetId: createdBill.id,
+	            targetLineNo: index + 1,
+	            targetType: 'SALES_BILL' as const,
+	            weightTicketId: stockDeliveryTicket.id,
+	            weightTicketProductSummaryId: summary.id,
+	          }]
+	        })
+	        await appendWeightTicketUsageLogs(tx, usageEntries)
+
+	        const summaryUsage = new Map<bigint, number>()
+	        items.forEach((item) => {
+	          const summary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
+	          if (!summary) return
+	          summaryUsage.set(summary.id, (summaryUsage.get(summary.id) ?? 0) + item.qty)
+	        })
+	        await Promise.all([...summaryUsage.entries()].map(([summaryId, qty]) => tx.weight_ticket_product_summaries.update({
+	          data: {
+	            billed_weight: { increment: qty },
+	            remaining_weight: { decrement: qty },
+	            updated_at: createdAt,
+	          },
+	          where: { id: summaryId },
+	        })))
+	        await tx.weight_tickets.update({
+	          data: {
+	            status: 'billed',
+	            updated_at: createdAt,
+	            updated_by: actor,
+	          },
+	          where: { id: stockDeliveryTicket.id },
+	        })
+	        await appendWeightTicketStatusLog(tx, {
+	          action: WEIGHT_TICKET_STATUS_ACTION.USAGE_STATUS_CHANGED,
+	          actor,
+	          createdAt,
+	          fromStatus: stockDeliveryTicket.status,
+	          meta: {
+	            reason: 'sales_bill_create',
+	            salesBillDocNo: createdBill.doc_no,
+	          },
+	          toStatus: 'billed',
+	          weightTicketId: stockDeliveryTicket.id,
+	        })
+	      }
+
+	      return createdBill
+	    })
 
     return NextResponse.json({ docNo: created.doc_no, id: created.doc_no }, { status: 201 })
-  } catch (caught) {
-    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
-    return apiErrorResponse(caught, 'บันทึกบิลขายไม่ได้', 500)
-  }
+	  } catch (caught) {
+	    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+	    if (caught instanceof WtoStockHoldError) {
+	      return NextResponse.json({ code: 'BAD_REQUEST', error: caught.message, fieldErrors: caught.fieldErrors }, { status: 400 })
+	    }
+	    return apiErrorResponse(caught, 'บันทึกบิลขายไม่ได้', 500)
+	  }
 }

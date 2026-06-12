@@ -37,6 +37,7 @@ type PoBuyFormItem = {
 type PoBuyFormState = {
   branchId: string
   expectedDelivery: string
+  hasVat: boolean
   items: PoBuyFormItem[]
   notes: string
   supplierId: string
@@ -60,6 +61,7 @@ type PoBuyPayload = {
     totalAmount: number
     totalRows: number
   }
+  vatRatePercent: number
 }
 
 type PoBuyItem = {
@@ -126,9 +128,14 @@ type PoBuyRow = {
   supplierId: string
   supplierAddress: string
   supplierName: string
+  hasVat: boolean
+  subtotal: number
   totalAmount: number
   updatedAt: string
   updatedBy: string
+  vatAmount: number
+  vatRatePercent: number
+  vatType: string
 }
 
 type FieldErrors = Record<string, string>
@@ -150,6 +157,7 @@ function blankForm(): PoBuyFormState {
   return {
     branchId: '',
     expectedDelivery: todayIsoDate(),
+    hasVat: false,
     items: [blankItem()],
     notes: '',
     supplierId: '',
@@ -468,9 +476,12 @@ export function PoBuyPageClient() {
 
   const formTotals = useMemo(() => {
     const totalQty = form.items.reduce((sum, item) => sum + Number(item.qty || 0), 0)
-    const totalCost = form.items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.unitPrice || 0), 0)
-    return { lineCount: form.items.length, totalCost, totalQty }
-  }, [form.items])
+    const subtotal = form.items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.unitPrice || 0), 0)
+    const vatRatePercent = data?.vatRatePercent ?? 7
+    const vatAmount = form.hasVat ? Math.round((subtotal * vatRatePercent / 100 + Number.EPSILON) * 100) / 100 : 0
+    const totalCost = subtotal + vatAmount
+    return { lineCount: form.items.length, subtotal, totalCost, totalQty, vatAmount, vatRatePercent }
+  }, [data?.vatRatePercent, form.hasVat, form.items])
 
   const openCreateForm = () => {
     setEditingPoId(null)
@@ -488,6 +499,7 @@ export function PoBuyPageClient() {
     setForm({
       branchId: row.branchId,
       expectedDelivery: row.expectedDelivery,
+      hasVat: row.hasVat,
       items: row.items.map((item) => ({
         productId: item.productId,
         qty: item.qty,
@@ -1355,7 +1367,7 @@ function PoBuyFormModal({
   branches: Option[]
   errors: FieldErrors
   form: PoBuyFormState
-  formTotals: { lineCount: number; totalCost: number; totalQty: number }
+  formTotals: { lineCount: number; subtotal: number; totalCost: number; totalQty: number; vatAmount: number; vatRatePercent: number }
   heading: string
   isSaving: boolean
   products: Option[]
@@ -1450,11 +1462,28 @@ function PoBuyFormModal({
                   ))}
                 </TableBody>
                 <tfoot className="bg-slate-50 font-bold">
-                  <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.totalCost)}</td><td /></tr>
+                  <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.subtotal)}</td><td /></tr>
                 </tfoot>
               </Table>
             </div>
             {fieldError('items')}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_320px]">
+            <label className={`flex cursor-pointer items-center gap-3 rounded-md border-2 p-3 ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+              <input
+                checked={form.hasVat}
+                className="size-5"
+                type="checkbox"
+                onChange={(event) => onUpdate('hasVat', event.target.checked)}
+              />
+              <span className="font-bold text-slate-700">มี VAT</span>
+            </label>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <SummaryLine label="ยอดก่อน VAT" value={formatMoney(formTotals.subtotal)} />
+              <SummaryLine label={`VAT ${formatMoney(formTotals.vatRatePercent)}%`} value={formatMoney(formTotals.vatAmount)} />
+              <SummaryLine label="ยอดรวม" strong value={formatMoney(formTotals.totalCost)} />
+            </div>
           </div>
 
           <div>
@@ -1500,6 +1529,11 @@ function PoBuyDetailModal({
           <Detail label="Qty" value={formatMoney(row.qty)} />
           <Detail label="คงเหลือ" value={formatMoney(row.remainingQty)} />
           <Detail label="ปิดรับไม่ครบ" value={row.shortClosedQty > 0 ? formatMoney(row.shortClosedQty) : '-'} />
+        </div>
+        <div className="grid gap-3 px-4 pb-4 md:grid-cols-3">
+          <Detail label="ยอดก่อน VAT" value={formatMoney(row.subtotal)} />
+          <Detail label={`VAT ${formatMoney(row.vatRatePercent)}%`} value={formatMoney(row.vatAmount)} />
+          <Detail label="ยอดรวม" value={formatMoney(row.totalAmount)} />
         </div>
         {row.notes.trim() ? (
           <div className="px-4 pb-4">
@@ -1558,4 +1592,13 @@ function PoBuyDetailModal({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return <div className="rounded-md bg-slate-50 p-3"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 font-medium">{value}</div></div>
+}
+
+function SummaryLine({ label, strong = false, value }: { label: string; strong?: boolean; value: string }) {
+  return (
+    <div className={`flex items-center justify-between gap-3 py-1 text-sm ${strong ? 'border-t border-slate-200 pt-2 font-bold text-blue-700' : 'text-slate-700'}`}>
+      <span>{label}</span>
+      <span className="font-mono">{value}</span>
+    </div>
+  )
 }

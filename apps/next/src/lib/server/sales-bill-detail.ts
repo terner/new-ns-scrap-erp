@@ -24,8 +24,11 @@ export type SalesBillDetail = {
     deliveryLineId: string
     deliveryTicketDocNo: string
     deliveryVehicleNo: string
+    deductWeight: number
     discount: number
+    grossWeight: number
     lineNo: number
+    netWeight: number
     note: string
     poSellDocNo: string
     price: number
@@ -134,7 +137,8 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
 
   const snapshots = itemSnapshots(bill.items)
   const deliveryDocNos = Array.from(new Set(snapshots.map((item) => snapshotString(item, 'deliveryTicketDocNo')).filter(Boolean)))
-  const [deliveryTickets, poSell, salesperson, customerAdvance] = await Promise.all([
+  const poSellDocNos = Array.from(new Set(snapshots.map((item) => snapshotString(item, 'poSellId')).filter(Boolean)))
+  const [deliveryTickets, poSells, salesperson, customerAdvance] = await Promise.all([
     deliveryDocNos.length
       ? prisma.weight_tickets.findMany({
           select: {
@@ -146,16 +150,25 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
           },
         })
       : Promise.resolve([]),
-    bill.po_sell_id
-      ? prisma.po_sells.findUnique({
+    poSellDocNos.length
+      ? prisma.po_sells.findMany({
           select: {
             doc_no: true,
           },
           where: {
-            id: bill.po_sell_id,
+            doc_no: { in: poSellDocNos },
           },
         })
-      : Promise.resolve(null),
+      : bill.po_sell_id
+        ? prisma.po_sells.findMany({
+            select: {
+              doc_no: true,
+            },
+            where: {
+              id: bill.po_sell_id,
+            },
+          })
+        : Promise.resolve([]),
     bill.sales_id
       ? prisma.salespersons.findUnique({
           select: {
@@ -180,13 +193,15 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
   ])
 
   const vehicleByDeliveryDocNo = new Map(deliveryTickets.map((ticket) => [ticket.doc_no, ticket.vehicle_no ?? '']))
-  const poSellDocNo = poSell?.doc_no ?? ''
+  const poSellDocNoSet = new Set(poSells.map((poSell) => poSell.doc_no))
+  const fallbackPoSellDocNo = poSells[0]?.doc_no ?? ''
 
   const items = snapshots.map((item, index) => {
     const deliveryTicketDocNo = snapshotString(item, 'deliveryTicketDocNo')
+    const snapshotPoSellDocNo = snapshotString(item, 'poSellId')
+    const poSellDocNo = poSellDocNoSet.has(snapshotPoSellDocNo) ? snapshotPoSellDocNo : fallbackPoSellDocNo
     const sourceType = poSellDocNo ? 'PO Sell' : 'Spot Sale'
     const sourceParts = [
-      deliveryTicketDocNo ? `WTO ${deliveryTicketDocNo}` : null,
       poSellDocNo || 'Spot Sale',
     ].filter(Boolean)
     return {
@@ -194,8 +209,11 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
       deliveryLineId: snapshotString(item, 'deliveryLineId'),
       deliveryTicketDocNo,
       deliveryVehicleNo: vehicleByDeliveryDocNo.get(deliveryTicketDocNo) ?? '',
+      deductWeight: snapshotNumber(item, 'deductWeight'),
       discount: snapshotNumber(item, 'discount'),
+      grossWeight: snapshotNumber(item, 'grossWeight'),
       lineNo: index + 1,
+      netWeight: snapshotNumber(item, 'netWeight') || snapshotNumber(item, 'qty'),
       note: snapshotString(item, 'note'),
       poSellDocNo,
       price: snapshotNumber(item, 'unitPrice') || snapshotNumber(item, 'price'),

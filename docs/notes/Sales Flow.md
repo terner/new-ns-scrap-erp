@@ -20,13 +20,13 @@ updated: 2026-06-10
 
 - เมื่อกดบันทึก ให้ถือว่าออกเอกสารและมีผลทันที
 - ถ้าสินค้าออกจากคลังก่อนเปิดบิล ต้องทำใบเบิกออกรอบิลก่อน
-- ใบเบิกออกรอบิลต้องตัด stock ทันที
+- ใบเบิกออกรอบิลต้องตัด stock ทันทีถ้าเป็นการเบิกสินค้าออกจากคลังจริง แต่ target ต้องเก็บ `PSALE` ledger ไว้และให้ `SB` ที่เปิดจาก `PSALE` ไม่ตัด stock ซ้ำ
 - ถ้าต้องออกเอกสารส่งของ/น้ำหนักขาออก ให้ใช้ `ใบส่งของ / Weight Ticket Out` เลขเอกสาร `WTO{branchCode}{YYMM}-NNNN`; ไม่มีเลข `WT` เดี่ยวใน target
 - flow หลักของการสร้างบิลขายต้องเป็น `PO Sell -> WTO -> Sales Bill`; หน้า `/sales/bills` เลือก `WTO` แล้วแสดงรายการสินค้าจากใบส่งของเพื่อ allocate เข้า `PO Sell`
 - ถ้าปริมาณจาก `WTO` เกิน remaining ของ `PO Sell` ส่วนเกินต้องถูกแยกเป็น `Spot Sale` ไม่ตัด PO เกินยอด
 - บิลขาย Trading จากบิลรับซื้อยังเป็น target follow-up แต่ไม่ใช่แกน create flow รอบนี้
 - บิลขายควรออกจากยอดที่เบิกแล้ว ถ้ามีการเบิกออกรอบิล
-- บิลขายที่ออกจากใบเบิกออกรอบิลต้องไม่ตัด stock ซ้ำ
+- บิลขายที่ออกจากใบเบิกออกรอบิลต้องไม่ตัด stock ซ้ำ และต้อง link ไป `PSALE` source line เพื่อ trace ต้นทุน/ของออก
 - ใบรับเงินต้องตัดลูกหนี้และลง bank statement ใน transaction เดียวกัน
 - เอกสารที่มีผลทาง stock/เงินแล้ว ถ้ายกเลิกต้องทำผ่าน reversal/status log ไม่ลบทิ้งเงียบ ๆ
 
@@ -73,10 +73,12 @@ updated: 2026-06-10
 
 | Use Case | เรื่อง | เหตุผล |
 |---|---|---|
-| `UC-SAL-F01` | allocation ระดับ line ระหว่าง WTO กับ Sales Bill เมื่อ 1 WTO แตกไปหลายบิลขาย | ต้อง implement ตาม [[Sales Bills Page Flow]] |
+| `UC-SAL-F01` | allocation ระดับ line ภายใน Sales Bill เดียวเมื่อ 1 WTO แตกเป็นหลาย PO Sell/Spot rows | ต้อง implement ตาม [[Sales Bills Page Flow]]; target ห้ามใช้ 1 WTO ข้ามหลาย Sales Bill |
 | `UC-SAL-F02` | guard ห้ามแก้ไข/ยกเลิก WTO เมื่อถูกใช้กับบิลขายแล้วครบทุกกรณี | ต้องผูก usage reference และ reversal policy ให้ครบ |
 | `UC-SAL-F03` | print/share ของ WTO | ต้องออกแบบ template พิมพ์, สิทธิ์ใช้งาน, และ audit trail |
 | `UC-SAL-F04` | reconciliation/report ระหว่าง WTO, PSALE, SB, stock ledger, และ receipt | flow หลักมีแล้ว แต่รายงานตรวจสอบและ exception flow ยังต้องแยกเอกสารเพิ่ม |
+
+รายละเอียด target ของ `PSALE` อยู่ที่ [[Pending Sale Page Flow]] โดย decision ล่าสุดคือ legacy มี flow นี้จริง แต่ผิดตรงการลบ `PSALE` ledger แล้วสร้าง `SB` ledger ใหม่ตอน convert; target ต้องเก็บ movement fact เดิมไว้
 
 ## Flow ใบส่งของ / WTO
 
@@ -84,20 +86,23 @@ updated: 2026-06-10
 
 | ขั้นตอน | ผู้ใช้ทำอะไร | กรอกอะไรบ้าง | ระบบออกเลขอะไร | สถานะที่เกิด | ผลกระทบ |
 |---|---|---|---|---|---|
-| 1 | สร้างใบส่งของ / WTO | ประเภท `ขาออก`, เลือก Customer, สาขา, ทะเบียนรถ, สินค้า, น้ำหนัก, วิธีหักสิ่งเจือปน, รูปต่อรายการสินค้า/หมายเหตุ | `WTO...` | WTO = `ส่งของแล้ว` | บันทึกเอกสารส่งของ/ชั่งขาออกเพื่อใช้ตามต่อในงานขาย |
+| 1 | สร้างใบส่งของ / WTO | ประเภท `ขาออก`, เลือก Customer, สาขา, ทะเบียนรถ, สินค้า, คลังต่อรายการ, น้ำหนัก, วิธีหักสิ่งเจือปน, รูปต่อรายการสินค้า/หมายเหตุ | `WTO...` | WTO = `ส่งของแล้ว` / `จองสต็อกแล้ว` | บันทึกเอกสารส่งของ/ชั่งขาออก, intended warehouse ต่อ line, และ active stock hold; ยังไม่เขียน stock ledger |
 | 2 | Office ค้นหา WTO | ค้นหาตามเลขเอกสาร, Customer, สาขา, วันที่ | ไม่มี | WTO ยัง `ส่งของแล้ว` | ใช้ติดตามว่ายังไม่ถูกนำไปออกบิลขาย |
-| 3 | เปิดบิลขายโดยอ้าง WTO | เลือก Customer, สาขา, WTO ที่เกี่ยวข้อง, ตรวจรายการสินค้า/น้ำหนัก, allocate เข้า PO Sell หรือ Spot Sale, กรอกราคา/VAT/เครดิตเทอม/มัดจำ | `SB...` | Sales Bill = `เปิดอยู่` | ตั้งลูกหนี้/AR, บันทึก usage ของ WTO, ตัด PO Sell ตาม line allocation และหัก customer advance ถ้ามี |
-| 4 | ระบบอัปเดต WTO | ไม่ต้องกรอกเพิ่ม | ไม่มี | WTO = `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` | กันการแก้ไข/ยกเลิก WTO ตามยอดที่ถูกใช้ไปออกบิลแล้ว |
+| 3 | เปิดบิลขายโดยอ้าง WTO | เลือก Customer, สาขา, WTO ที่เกี่ยวข้อง, ตรวจรายการสินค้า/น้ำหนัก, allocate เข้า PO Sell หรือ Spot Sale, กรอกราคา/VAT/เครดิตเทอม/มัดจำ | `SB...` | Sales Bill = `เปิดอยู่` | ตั้งลูกหนี้/AR, consume hold, สร้าง stock-out ledger โดยอ้าง WTO/warehouse, บันทึก usage ของ WTO, ตัด PO Sell ตาม line allocation และหัก customer advance ถ้ามี |
+| 4 | ระบบอัปเดต WTO | ไม่ต้องกรอกเพิ่ม | ไม่มี | WTO = `ออกบิลแล้ว` | กันการแก้ไข/ยกเลิก WTO และกันการนำ WTO เดิมไปเปิดบิลขายซ้ำ |
 | 5 | รับเงิน Customer | เลือกบิลขาย, บัญชีรับ, วิธีรับ, ยอดรับ, ค่าธรรมเนียม, WHT, ส่วนลด | `RCP...` | Receipt = `บันทึกรับเงินแล้ว` | บันทึกเงินเข้าและตัดลูกหนี้ |
 
 กติกาสำคัญของ WTO:
 
 - `WTO` เป็นเอกสารขาออกต้นทางของฝั่งส่งของ ไม่ใช่บิลขาย
 - เมื่อ `WTO` ถูกนำไปใช้เปิดบิลขายแล้ว ให้ถือว่าเอกสารถูกใช้งานแล้ว
-- `WTO` ที่ถูกใช้บางส่วนต้องแสดงสถานะ `ออกบิลบางส่วน`; ใช้ครบแล้วจึงเป็น `ออกบิลแล้ว`
+- Target write path ไม่มีสถานะ `ออกบิลบางส่วน` สำหรับ `WTO`; เมื่อถูกใช้ใน Sales Bill ต้องจัดสรรครบและเป็น `ออกบิลแล้ว`
+- `WTO` หนึ่งใบห้ามถูกใช้ข้ามหลาย Sales Bill
 - `WTO` ที่ถูกใช้แล้วต้อง `แก้ไขไม่ได้` และ `ยกเลิกไม่ได้`
 - `WTO` ที่ยังไม่ถูกใช้เปิดบิลขายยังคงอยู่สถานะ `ส่งของแล้ว` และยังอนุญาตให้แก้ไข/ยกเลิกได้ตามสิทธิ์
-- ถ้ายกเลิกหลังมีผลทาง stock หรือเงินแล้ว ต้องทำผ่าน reversal/status log ไม่ลบเอกสารเงียบ ๆ
+- ถ้าแก้ไขก่อนถูกใช้ ต้อง rebuild stock hold
+- ถ้ายกเลิกก่อนถูกใช้ ต้อง release stock hold
+- ไม่ต้อง reverse stock ledger เพราะ `WTO` ไม่ใช่ movement owner แต่ต้องบันทึก status/timeline ไม่ลบเอกสารเงียบ ๆ
 
 ## Flow ขายแบบมี PO Sell ผ่าน WTO
 
@@ -105,9 +110,9 @@ updated: 2026-06-10
 |---|---|---|---|---|---|
 | 1 | สร้าง PO Sell | สาขา, Customer, ช่องทางขาย, วันส่งมอบ, สินค้า, จำนวน, ราคาขาย, หมายเหตุ | `POS...` | PO Sell = `เปิดอยู่` | เก็บยอดจองขายและยอดคงเหลือรอเบิก/รอออกบิล |
 | 2 | เตรียมส่งของให้ Customer | ยังไม่กรอกเพิ่ม | ไม่มี | PO Sell ยัง `เปิดอยู่` | รอเบิกสินค้าจริง |
-| 3 | ออกใบส่งของ / WTO จากการส่งจริง | เลือก Customer, สาขา, ทะเบียนรถ, สินค้า, น้ำหนัก/จำนวนจริง, รูป/หมายเหตุ | `WTO...` | WTO = `ส่งของแล้ว` | บันทึกหลักฐานส่งของ/น้ำหนักจริง |
-| 4 | เปิดบิลขายจาก WTO | เลือก WTO ที่ยังออกบิลไม่ครบ, ตรวจรายการสินค้า, allocate เข้า PO Sell หรือ Spot Sale, กรอกราคา, VAT, เครดิตเทอม, มัดจำ, หมายเหตุ | `SB...` | Sales Bill = `เปิดอยู่` | ตั้งลูกหนี้/AR, ตัด PO Sell ตามยอดที่ allocate, ส่วนเกินเป็น Spot Sale |
-| 5 | ระบบอัปเดต WTO | ไม่ต้องกรอกเพิ่ม | ไม่มี | WTO = `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` | กันการใช้ WTO เกินยอดและทำ usage log |
+| 3 | ออกใบส่งของ / WTO จากการส่งจริง | เลือก Customer, สาขา, ทะเบียนรถ, สินค้า, คลังต่อรายการ, น้ำหนัก/จำนวนจริง, รูป/หมายเหตุ | `WTO...` | WTO = `ส่งของแล้ว` / `จองสต็อกแล้ว` | บันทึกหลักฐานส่งของ/น้ำหนักจริง, intended warehouse ต่อ line, และ active stock hold; ยังไม่เขียน stock ledger |
+| 4 | เปิดบิลขายจาก WTO | เลือก WTO ที่ยังไม่ถูกออกบิล, ตรวจรายการสินค้า, allocate เข้า PO Sell หรือ Spot Sale, กรอกราคา, VAT, เครดิตเทอม, มัดจำ, หมายเหตุ | `SB...` | Sales Bill = `เปิดอยู่` | ตั้งลูกหนี้/AR, consume hold, สร้าง stock-out ledger โดยอ้าง WTO/warehouse, ตัด PO Sell ตามยอดที่ allocate, ส่วนเกินเป็น Spot Sale |
+| 5 | ระบบอัปเดต WTO | ไม่ต้องกรอกเพิ่ม | ไม่มี | WTO = `ออกบิลแล้ว` | กันการใช้ WTO ซ้ำและทำ usage log |
 | 6 | ระบบอัปเดต PO Sell จากบิลขาย | ไม่ต้องกรอกเพิ่ม | ไม่มี | PO Sell = `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` | ปิด flow เมื่อออกบิลครบ; ไม่ปิดจากยอด Spot Sale |
 | 7 | รับเงิน Customer | เลือกบิลค้างรับ, บัญชีรับ, วิธีรับ, ยอดรับ, ค่าธรรมเนียม, WHT, ส่วนลด, หมายเหตุ | `RCP...` | Receipt = `บันทึกรับเงินแล้ว` | บันทึกเงินเข้าและตัดลูกหนี้ |
 | 8 | ระบบอัปเดตบิลขาย | ไม่ต้องกรอกเพิ่ม | ไม่มี | Sales Bill = `รับบางส่วน` หรือ `รับครบ` | ยอดค้างรับลดลง |
@@ -124,13 +129,13 @@ POS012605-0001 เปิดอยู่
 -> SB012605-0001 รับครบ
 ```
 
-### ตัวอย่าง Flow มี PO แบบเบิก/ออกบิลบางส่วน
+### ตัวอย่าง Flow มี PO แบบส่งบางส่วนตาม PO
 
 ```text
 POS012605-0001 เปิดอยู่
 -> WTO012605-0001 ส่งของแล้ว
 -> SB012605-0001 เปิดอยู่
--> WTO012605-0001 ออกบิลบางส่วน
+-> WTO012605-0001 ออกบิลแล้ว
 -> POS012605-0001 ออกบิลบางส่วน
 ```
 
@@ -321,7 +326,7 @@ Target rule สำคัญ:
 
 | ทางเข้า | ใช้เมื่อไหร่ | ผลต่อ stock |
 |---|---|---|
-| เปิดจาก WTO | ออกใบส่งของ/น้ำหนักขาออกแล้ว | ไม่ตัด stock ซ้ำถ้า stock movement ถูก post จาก WTO/stock issue แล้ว; ต้องไม่ duplicate movement |
+| เปิดจาก WTO | ออกใบส่งของ/น้ำหนักขาออกและจอง stock แล้ว | consume hold และตัด stock ตอนบันทึก SB โดยอ้าง intended warehouse จาก WTO |
 | เปิดจาก Pending Sale | follow-up กรณีใช้ PSALE อยู่ | ไม่ตัด stock ซ้ำ |
 | เปิดบิลขายตรง | follow-up กรณีเปิดบิลทันที | ตัด stock ตอนบันทึกบิล |
 | เปิดบิลขาย Trading | follow-up ต้องขายจากบิลรับซื้อ Trading ก่อน และอาจมี stock line เพิ่มเอง | ตัด stock เฉพาะ line ที่ source เป็น stock |
@@ -330,7 +335,7 @@ Target rule สำคัญ:
 
 | Field | จำเป็น | แหล่งข้อมูล | หมายเหตุ |
 |---|---:|---|---|
-| WTO อ้างอิง | ใช่ใน flow หลัก | เลือก WTO | ต้องยังไม่ถูกออกบิลครบ และ Customer/สาขาตรงกัน |
+| WTO อ้างอิง | ใช่ใน flow หลัก | เลือก WTO | ต้องยังไม่ถูกออกบิล และ Customer/สาขาตรงกัน |
 | Pending Sale อ้างอิง | follow-up เปิดจาก PSALE | เลือก PSALE | ต้องยังไม่ถูกออกบิลครบ |
 | บิลรับซื้ออ้างอิง | เฉพาะ Trading sale | เลือกได้หลายบิลรับซื้อ | ใช้เติมรายการสินค้าและต้นทุนตั้งต้น ต้องยังเหลือยอดขาย/จับคู่ได้ |
 | PO Sell allocation | เฉพาะยอดที่ตัด PO | เลือกต่อ line จาก PO Sell remaining | ห้ามตัดเกิน remaining; ส่วนเกินเป็น Spot Sale |
@@ -372,7 +377,7 @@ Target rule สำคัญ:
 | Gross profit | ยอดขายก่อน VAT - ต้นทุนที่ snapshot ไว้ |
 | Pending Sale billed qty | เพิ่มตามจำนวนที่ออกบิล ถ้ามาจาก PSALE |
 | Purchase Bill sold/matched qty | เพิ่มตามจำนวนที่ออกบิล ถ้ามาจากบิลรับซื้อ Trading |
-| Stock ledger | สร้าง stock out เฉพาะรายการขายตรงหรือรายการ Trading sale ที่ source เป็น stock |
+| Stock ledger | สร้าง stock out สำหรับ SB ที่อ้าง WTO, รายการขายตรง, หรือรายการ Trading sale ที่ source เป็น stock; ถ้ามาจาก PSALE ต้องไม่สร้างซ้ำ |
 | PO Sell billed qty | เพิ่มตามจำนวนที่ allocate เข้า PO Sell จาก WTO/SB line |
 | WTO billed qty | เพิ่มตามจำนวนที่ถูกใช้ใน SB |
 
@@ -410,7 +415,7 @@ Target rule สำคัญ:
 | สถานะ | ใช้เมื่อไหร่ |
 |---|---|
 | `ส่งของแล้ว` | สร้าง WTO แล้ว แต่ยังไม่ถูกใช้เปิดบิลขาย |
-| `ออกบิลแล้ว` | WTO ถูกนำไปใช้เปิดบิลขายแล้ว ไม่ว่าจะใช้ครบ line หรือมี usage แล้วอย่างน้อย 1 ครั้ง |
+| `ออกบิลแล้ว` | WTO ถูกนำไปใช้เปิดบิลขายครบทั้งเอกสารใน `SB` เดียวแล้ว |
 | `ยกเลิก` | ยกเลิกเอกสารก่อนถูกใช้ หรือผ่าน reversal ตาม policy ที่อนุญาต |
 
 ### PO Sell
@@ -468,11 +473,12 @@ Target rule สำคัญ:
 
 ### ตอนออกบิลขาย
 
-- flow หลักต้องเลือก `WTO` ที่ยังไม่ออกบิลครบ และดึงรายการสินค้าจาก WTO snapshot
+- flow หลักต้องเลือก `WTO` ที่ยังไม่ถูกออกบิล และดึงรายการสินค้าจาก WTO snapshot
 - line จาก WTO ต้อง allocate เป็น `PO_SELL`, `SPOT_SALE`, หรือ split mixed source ได้ชัดเจน
 - จำนวน/น้ำหนักที่ตัด `PO Sell` ต้องไม่เกิน remaining; ส่วนเกินต้องเป็น `Spot Sale`
 - ห้ามใช้ `เลขที่อ้างอิง` free-text เป็น source control ของ SB
 - ห้ามให้ผู้ใช้กรอก `ทะเบียนรถ` ใน SB; ทะเบียนรถเป็น read-only trace จาก WTO
+- ถ้าเปิดจาก WTO ต้อง validate active hold จาก intended warehouse ของ WTO, consume hold, และสร้าง stock ledger ใน transaction เดียวกับ sales bill
 - ถ้าเปิดจาก PSALE ต้องเลือก PSALE ที่สถานะ `เบิกแล้ว รอออกบิล` หรือ `ออกบิลบางส่วน`
 - ห้ามเลือก PSALE ที่ `ออกบิลแล้ว` หรือ `กลับรายการ`
 - จำนวนที่ออกบิลต้องไม่เกินยอด PSALE ที่ยังไม่ออกบิล
@@ -515,6 +521,7 @@ Target rule สำคัญ:
 | ยอดรับเงิน | `receipts` |
 | ผลต่อเงินสด/ธนาคาร | `bank_statement` |
 | ผลต่อ stock | `stock_ledger` |
+| Aging เอกสาร | อ่านตาม [[Document Aging Policy]]: `SB` ใช้ financial due aging, `WTO/POS` ใช้ operational pending aging |
 | ประวัติสถานะ | แยก status logs ตามเอกสาร เช่น `po_sell_status_logs`, `stock_issue_status_logs`, `sales_bill_status_logs`, `receipt_status_logs` ตาม [[Document History Table Design]] |
 | ประวัติการใช้งาน/ตัดยอด | แยก usage/allocation logs และ fact tables ตาม flow เช่น `po_sell_allocation_logs`, `receipt_allocations`, `weight_ticket_usage_logs` สำหรับ WTO |
 | Summary/KPI | maintained summary current tables |
@@ -529,6 +536,7 @@ Target rule สำคัญ:
 - เพิ่ม Customer advance allocation ใน `/sales/bills`
 - ปรับ `/sales/bills` สำหรับ Trading sale ให้เลือกบิลรับซื้อได้หลายใบ เติมรายการสินค้าอัตโนมัติ เพิ่ม stock line เองได้ และ allocate line กลับบิลรับซื้อ/stock/PO Sell เป็น follow-up หลัง flow WTO -> SB
 - ปรับ `/sales/receipts` ให้ refresh SB received amount, receivable balance, และ status ใน write path
+- เพิ่ม aging read model ตาม [[Document Aging Policy]] สำหรับ `SB` ลูกหนี้ค้างรับ, `WTO` ค้างออกบิลขาย, และ `POS` ค้างส่ง/ค้างออกบิล
 - ทำ write service กลางสำหรับ `create PSALE`, `convert PSALE to SB`, `create direct SB`, `create RCP`
 - ทำ transaction ให้ update current state, append status log, update stock/bank ledger และ refresh summary พร้อมกัน
 - ปรับ UI detail ให้แสดง timeline/history จาก status logs

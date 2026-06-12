@@ -69,10 +69,11 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     return `
       <tr class="item-row">
         <td class="c rank-cell">${index + 1}</td>
-        <td>
-          <div class="item-name">${escapeHtml(line.productName)}</div>
-          <div class="muted">${escapeHtml(line.note || '-')}</div>
-        </td>
+	        <td>
+	          <div class="item-name">${escapeHtml(line.productName)}</div>
+	          ${!isReceipt && line.warehouseName ? `<div class="muted">คลัง: ${escapeHtml(line.warehouseName)}${line.warehouseId ? ` · ${escapeHtml(line.warehouseId)}` : ''}${line.warehouseType ? ` · ${escapeHtml(line.warehouseType)}` : ''}</div>` : ''}
+	          <div class="muted">${escapeHtml(line.note || '-')}</div>
+	        </td>
         <td class="r">${formatPrintableNumber(line.grossWeightValue)}</td>
         <td class="r">${escapeHtml(line.impurityName || '-')} ${line.deductionWeight > 0 ? `(${formatPrintableNumber(line.deductionWeight)} kg${line.deductionMode === 'percent' ? ` / ${escapeHtml(line.deductionValue)}%` : ''})` : ''}</td>
         <td class="r strong">${formatPrintableNumber(line.netWeight)}</td>

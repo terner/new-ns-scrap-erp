@@ -12,7 +12,7 @@ tags:
   - business-flow
 status: draft
 created: 2026-06-06
-updated: 2026-06-08
+updated: 2026-06-11
 ---
 
 # Purchase Flow Status Matrix / Matrix สถานะ Flow ซื้อ
@@ -35,29 +35,48 @@ updated: 2026-06-08
 - void PMA ก่อนออก PMT หรือ cancel PMT ต้องส่งยอดกลับไป source pending candidate และต้องสร้าง PMA ใหม่ก่อนจ่ายใหม่
 - Stock PB ที่เลือก WTI/summary เข้า draft แล้วต้องจัดสรรยอด remaining ของ WTI/summary ที่เลือกให้ครบก่อน save; ถ้า PO ไม่ครอบคลุมยอดที่เหลือต้องเป็น `Spot Buy` line ชัดเจน
 
-คำถามเปิด / partial status wording:
+Resolved target decision 2026-06-11:
 
-- พบว่ายังมีคำหรือสถานะกลุ่ม `รับของแล้วบางส่วน` โผล่ใน flow ได้ ต้อง confirm target wording ก่อนแก้ runtime เพิ่ม
-- สมมติฐานปัจจุบัน: `รับบางส่วน` ควรเป็นสถานะของ `POB` เท่านั้น เพราะ PO ยังรับจาก supplier ไม่ครบ; `WTI` เมื่อบันทึกแล้วคือใบรับของจริงทั้งใบ จึงไม่ควรใช้ความหมายว่า "รับของแล้วบางส่วน"
-- ถ้ายังต้องเก็บ partial ที่ `WTI` ให้หมายถึงการถูกนำไปออกบิลซื้อบางส่วนเท่านั้น และใช้คำ `ออกบิลแล้วบางส่วน`; หลัง rule 2026-06-06 บิลใหม่ต้อง allocate WTI/summary ที่เลือกให้ครบ สถานะนี้จึงควรเหลือเฉพาะ active partial usage เดิม/ข้อมูล legacy หรือผลจาก edit/cancel ที่ recalc แล้วยังมี usage partial จริง
-- Question: จะปรับให้ `POB` ใช้ `รับบางส่วน`, `WTI` ใช้เฉพาะ `รับของแล้ว` / `ออกบิลแล้วบางส่วน` / `เสร็จสิ้น` / `ยกเลิก`, และปิด path ที่สร้างคำว่า `รับของแล้วบางส่วน` ใน WTI หรือไม่?
+- `รับบางส่วน` เป็นสถานะของ `POB` เท่านั้น
+- `WTI` target write path ใช้ `รับของแล้ว`, `เสร็จสิ้น`, และ `ยกเลิก`
+- target ใหม่คือ `WTI 1 ใบ -> PB 1 ใบ`; `PB` แบบ Stock เลือก `WTI` ได้ 1 ใบต่อบิล และภายใน PB เดียวยัง split allocation ไปหลาย PO/Spot rows ได้
+- คำว่า `ออกบิลแล้วบางส่วน` / `partially_billed` ใน `WTI` ให้ถือเป็น legacy/runtime debt ไม่ใช่ business rule เป้าหมาย
+
+## Canonical Status Sets
+
+ตารางนี้เป็นชุดสถานะเป้าหมายที่ list/filter/action ของ flow ซื้อและจ่ายต้องอ้างร่วมกัน:
+
+| เอกสาร | สถานะ | Owner | หมายเหตุ |
+|---|---|---|---|
+| `POB` | `เปิดอยู่`, `รับบางส่วน`, `รับครบ รอออกบิล`, `ออกบิลบางส่วน`, `ออกบิลแล้ว`, `ปิดรับไม่ครบ`, `ยกเลิก` | Purchase Flow | PO รองรับ partial เพราะ PO หนึ่งใบทยอยรับ/ทยอยออกบิลได้ |
+| `WTI` | `รับของแล้ว`, `เสร็จสิ้น`, `ยกเลิก` | WTI/WTO Flow + Purchase handoff | ไม่มี partial target state; ใช้ครบใน PB เดียว |
+| `PB` document | `เปิดอยู่`, `ยกเลิก` | Purchase Flow | สถานะเอกสารหลักของบิล |
+| `PB` payment/source | `ยังไม่อนุมัติ`, `รอจ่าย`, `ชำระบางส่วน`, `เสร็จสิ้น`, `ยกเลิก` | Payment read model | `อนุมัติแล้ว` ไม่ใช่ PB filter หลัก; เป็นสถานะของ PMA |
+| `PMA` | `อนุมัติแล้ว`, `ยกเลิกแล้ว` | Payment Flow | approval snapshot ของยอดที่อนุมัติจริง; void แล้วห้าม reuse |
+| `PMT` | `เสร็จสิ้น`, `ยกเลิกแล้ว` | Payment Flow | payment snapshot; history UI อาจแสดง `จ่ายแล้ว` / `ยกเลิก` เป็น label สั้น |
+
+กติกา lock/action:
+
+- `WTI` ที่ถูกใช้ใน active `PB` แล้วต้อง lock edit/cancel
+- `PB` ที่มี `PMA approved` หรือ `PMT active` ต้อง lock field การเงินและ action ที่กระทบยอด/คู่ค้า/ภาษี/allocation
+- lock state ต้อง derive จาก active facts ไม่ใช่ derive จาก status string อย่างเดียว
 
 ## Use Case Matrix
 
 | Use Case | สถานะ PO/WTI | สถานะ PB/source payable | สถานะ PMA | สถานะ PMT/Payment |
 |---|---|---|---|---|
-| `UC-PUR-01` Stock + PO | `POB` เริ่ม `เปิดอยู่`, หลัง WTI/PB allocation เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว`; `WTI` เป็น `รับของแล้ว` -> `ออกบิลแล้วบางส่วน` หรือ `เสร็จสิ้น` | `PB` หลัง save เป็น source `ยังไม่อนุมัติ` ตามยอดสุทธิหลังหัก ADV | เมื่อ approve เกิด `PMA approved` ตามยอด split จริง; ยอด PB ที่เหลือยังเป็น source `ยังไม่อนุมัติ` | `PMT` จ่ายเต็ม PMA ที่เลือกแล้วเป็น `เสร็จสิ้น`; ถ้า cancel PMT ยอดกลับไป source `ยังไม่อนุมัติ` |
-| `UC-PUR-02` Stock + Spot / No PO | ไม่มี PO; `WTI` เป็น `รับของแล้ว` -> `ออกบิลแล้วบางส่วน` หรือ `เสร็จสิ้น` | `PB` เป็น source `ยังไม่อนุมัติ` ตามยอดสุทธิ | `PMA approved` ตามยอดที่อนุมัติจริง | `PMT เสร็จสิ้น` หรือ `PMT ยกเลิกแล้ว` แล้วกลับไปรออนุมัติใหม่ |
+| `UC-PUR-01` Stock + PO | `POB` เริ่ม `เปิดอยู่`, หลัง PB allocation เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว`; `WTI` เป็น `รับของแล้ว` -> `เสร็จสิ้น` เมื่อถูกใช้ใน PB | `PB` หลัง save เป็น source `ยังไม่อนุมัติ` ตามยอดสุทธิหลังหัก ADV | เมื่อ approve เกิด `PMA approved` ตามยอด split จริง; ยอด PB ที่เหลือยังเป็น source `ยังไม่อนุมัติ` | `PMT` จ่ายเต็ม PMA ที่เลือกแล้วเป็น `เสร็จสิ้น`; ถ้า cancel PMT ยอดกลับไป source `ยังไม่อนุมัติ` |
+| `UC-PUR-02` Stock + Spot / No PO | ไม่มี PO; `WTI` เป็น `รับของแล้ว` -> `เสร็จสิ้น` เมื่อถูกใช้ใน PB | `PB` เป็น source `ยังไม่อนุมัติ` ตามยอดสุทธิ | `PMA approved` ตามยอดที่อนุมัติจริง | `PMT เสร็จสิ้น` หรือ `PMT ยกเลิกแล้ว` แล้วกลับไปรออนุมัติใหม่ |
 | `UC-PUR-03` Trading + PO | `POB` เริ่ม `เปิดอยู่`, หลัง PB trading allocation เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว`; ไม่มี WTI | `PB` trading เป็น source `ยังไม่อนุมัติ` | `PMA approved` ตามยอด split | `PMT` ต้องจ่ายเต็ม PMA ที่เลือก |
 | `UC-PUR-04` Trading + Spot | ไม่มี PO และไม่มี WTI | `PB` trading spot เป็น source `ยังไม่อนุมัติ` | `PMA approved` ตามยอด split | `PMT` ต้องจ่ายเต็ม PMA ที่เลือก |
 | `UC-PUR-05` ปิด PO ส่งของไม่ครบ | `POB` จาก `เปิดอยู่/ออกบิลบางส่วน` เป็น `ปิดรับไม่ครบ`; WTI/PB ที่เกิดแล้วไม่ถูกแก้ย้อนหลัง | PB ที่เกิดก่อนปิด short คงสถานะจ่ายตามจริง; ยอด PO ที่ปิดไม่เข้า payable | ไม่มี PMA ใหม่จากยอด PO ที่ปิด short | ไม่มี PMT จากยอดที่ถูก short close |
-| `UC-PUR-06` WTI 1 ใบตัดหลาย PO | WTI เดียวเป็น `รับของแล้ว` แล้วเปลี่ยนตามยอดที่ถูกออกบิล; PO แต่ละใบเป็น `ออกบิลบางส่วน/ออกบิลแล้ว` ตาม allocation | PB ที่รวม allocation เป็น source `ยังไม่อนุมัติ` | PMA เกิดตามยอด PB ที่ approve จริง | PMT จ่ายเต็ม PMA ที่เลือก |
+| `UC-PUR-06` WTI 1 ใบตัดหลาย PO ใน PB เดียว | WTI เดียวเป็น `รับของแล้ว` แล้วเป็น `เสร็จสิ้น` หลัง PB เดียวที่ allocate ครบ; PO แต่ละใบเป็น `ออกบิลบางส่วน/ออกบิลแล้ว` ตาม allocation | PB ที่รวม allocation จาก WTI เดียวเป็น source `ยังไม่อนุมัติ` | PMA เกิดตามยอด PB ที่ approve จริง | PMT จ่ายเต็ม PMA ที่เลือก |
 | `UC-PUR-07` PO 1 ใบถูกตัดจากหลาย WTI | PO ค้าง `เปิดอยู่/ออกบิลบางส่วน` จน WTI/PB allocation ครบจึงเป็น `ออกบิลแล้ว` | แต่ละ PB เป็น source payable ของตัวเอง | แต่ละรอบ approve สร้าง PMA ของยอดที่อนุมัติจริง | PMT จ่ายเต็ม PMA; หลาย PMA รวมจ่ายได้ถ้า supplier เดียวกัน |
-| `UC-PUR-08` WTI เดียวมี PO + Spot | WTI สถานะตามยอดรวมที่ถูกออกบิล; PO portion ตัด PO, Spot portion ไม่แตะ PO | PB source เป็น `ยังไม่อนุมัติ` หลัง save | PMA split ได้ตามยอดสุทธิของ PB | PMT จ่ายเต็ม PMA ที่เลือก |
+| `UC-PUR-08` WTI เดียวมี PO + Spot | WTI เป็น `เสร็จสิ้น` หลัง PB เดียว allocate ครบ; PO portion ตัด PO, Spot portion ไม่แตะ PO | PB source เป็น `ยังไม่อนุมัติ` หลัง save | PMA split ได้ตามยอดสุทธิของ PB | PMT จ่ายเต็ม PMA ที่เลือก |
 | `UC-PUR-09` เปลี่ยน WTI/สาขา/ผู้ขายกลางทาง | ก่อน save เป็น draft ไม่มีสถานะเอกสาร; หลัง save WTI/PB ใช้สถานะตาม flow จริง | ถ้า PB ยังไม่มี PMA approved แก้ source ได้; ถ้ามี PMA approved แล้ว lock field การเงินทั้งใบ | ไม่มี PMA จนกว่าจะ approve | ไม่มี PMT จนกว่าจะ approve และทำจ่าย |
 | `UC-PUR-10` ดึงราคา PO อัตโนมัติ | PO ยัง `เปิดอยู่/ออกบิลบางส่วน` จน PB save ตัดยอด | PB source ใช้ราคา PO ที่ล็อกไว้ใน line; หลัง save เป็น `ยังไม่อนุมัติ` | PMA snapshot ใช้ยอดที่ approve จริงจาก PB ปัจจุบัน | PMT จ่ายเต็ม PMA |
 | `UC-PUR-11` ส่วนลดท้ายบิลเท่านั้น | PO/WTI สถานะตาม allocation; ส่วนลดไม่เปลี่ยนยอดรับจริง | PB source ยอดสุทธิหลังส่วนลดท้ายบิลเข้า queue `ยังไม่อนุมัติ` | PMA approved จากยอดสุทธิที่อนุมัติ | PMT จ่ายเต็ม PMA; ส่วนลดไม่ลด WAC/Cost Pool |
-| `UC-PUR-12` Stock purchase ลง stock ledger | WTI/PB allocation สำเร็จแล้ว stock ledger ถูกบันทึก | PB source เข้า queue `ยังไม่อนุมัติ`; stock movement เป็นผลของ PB stock ไม่ใช่ผลของ PMA | PMA ไม่กระทบ stock ledger | PMT กระทบเงินจ่ายเท่านั้น ไม่กระทบ stock ledger |
+| `UC-PUR-12` Stock purchase ลง stock ledger | WTI save บันทึก source evidence; PB save สร้าง stock ledger เข้าและทำให้ WTI เป็น `เสร็จสิ้น` เมื่อจัดสรรครบ | PB source เข้า queue `ยังไม่อนุมัติ`; PB เป็น billing/costing/allocation และ stock-in owner | PMA ไม่กระทบ stock ledger | PMT กระทบเงินจ่ายเท่านั้น ไม่กระทบ stock ledger |
 | `UC-PUR-13` Trading purchase ไม่ลง stock | PO ถ้ามีถูกตัดตาม PB trading; ไม่มี WTI/stock ledger | PB trading เป็น source `ยังไม่อนุมัติ` | PMA approved ตามยอด split | PMT จ่ายเต็ม PMA |
 | `UC-PUR-14` อนุมัติและจ่ายเงินจริง | source ที่มียอดค้างอยู่ `ยังไม่อนุมัติ` | ยอดที่ยังไม่อนุมัติคงอยู่กับ source | approve 1 ครั้งสร้าง PMA 1..n rows ตามยอด split; source balance ที่เหลือยัง pending | PMT รวมหลาย PMA ของ supplier เดียวกันได้ แต่ต้องจ่ายเต็มทุก PMA line |
 
@@ -67,13 +86,13 @@ updated: 2026-06-08
 |---|---|---|---|---|---|
 | สร้าง PO Buy | `UC-PUR-01`, `UC-PUR-03`, `UC-PUR-05`, `UC-PUR-06`, `UC-PUR-07`, `UC-PUR-08`, `UC-PUR-10`, `UC-PUR-11`, `UC-PUR-12`, `UC-PUR-13` | `POB = เปิดอยู่` | ไม่มี source payable | ไม่มี | ไม่มี |
 | ปิด PO ส่งของไม่ครบ | `UC-PUR-05` | `POB = ปิดรับไม่ครบ`; WTI/PB ที่เกิดแล้วคงสถานะเดิม | ไม่สร้างยอด payable จากส่วนที่ short close | ไม่มี PMA ใหม่จากยอด short close | ไม่มี PMT จากยอด short close |
-| บันทึก WTI | `UC-PUR-01`, `UC-PUR-02`, `UC-PUR-06`, `UC-PUR-07`, `UC-PUR-08`, `UC-PUR-09`, `UC-PUR-12` | `WTI = รับของแล้ว`; PO ยังไม่ถูกตัดจนกว่า PB save | ไม่มี source payable จาก WTI อย่างเดียว | ไม่มี | ไม่มี |
+| บันทึก WTI | `UC-PUR-01`, `UC-PUR-02`, `UC-PUR-06`, `UC-PUR-07`, `UC-PUR-08`, `UC-PUR-09`, `UC-PUR-12` | `WTI = รับของแล้ว`; ยังไม่เกิด stock ledger; PO ยังไม่ถูกตัดจนกว่า PB save | ไม่มี source payable จาก WTI อย่างเดียว | ไม่มี | ไม่มี |
 | บันทึก ADV | use case ที่มีมัดจำก่อน PB | PO ถ้ามีคงสถานะเดิม | `ADV = source ยังไม่อนุมัติ` | ไม่มีจนกว่าจะ approve | ไม่มี |
 | อนุมัติ ADV | use case ที่มีมัดจำก่อน PB | PO ถ้ามีคงสถานะเดิม | ADV = `อนุมัติแล้วบางส่วน` ถ้า approve ไม่ครบ, หรือ `อนุมัติแล้ว` ถ้าครบ; ยอด ADV ที่ยังไม่ approve ยังเป็น source pending | `PMA approved` ตาม split amount | ไม่มี |
 | จ่าย ADV | use case ที่มีมัดจำก่อน PB | PO ถ้ามีคงสถานะเดิม | ADV ถูก settle ตาม PMA ที่จ่าย; ถ้ามียอดเหลือต้องกลับไป approve ใหม่ | PMA ที่เลือกถูก consumed/paid | `PMT = เสร็จสิ้น` และต้องจ่ายเต็ม PMA |
-| บันทึก PB Stock/Trading | `UC-PUR-01`..`UC-PUR-14` ที่ออก PB | PO/WTI ถูกตัดตาม allocation; WTI ที่เลือกครบในบิลใหม่เป็น `เสร็จสิ้น`, หรือยังเป็น `ออกบิลแล้วบางส่วน` เฉพาะกรณีมี active usage เดิมที่ยังเหลือ; PO เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` | `PB = เปิดอยู่`; payment status = `ยังไม่อนุมัติ` ถ้ายอดสุทธิหลังหัก ADV > 0, หรือ `เสร็จสิ้น` ถ้า ADV ตัดเต็ม | ไม่มีสำหรับยอด PB จนกว่าจะ approve | ไม่มี |
+| บันทึก PB Stock/Trading | `UC-PUR-01`..`UC-PUR-14` ที่ออก PB | PO/WTI ถูกตัดตาม allocation; WTI ที่เลือกครบในบิลใหม่เป็น `เสร็จสิ้น`; PO เป็น `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` | `PB = เปิดอยู่`; payment status = `ยังไม่อนุมัติ` ถ้ายอดสุทธิหลังหัก ADV > 0, หรือ `เสร็จสิ้น` ถ้า ADV ตัดเต็ม | ไม่มีสำหรับยอด PB จนกว่าจะ approve | ไม่มี |
 | แก้ source ก่อนอนุมัติ | `PB / ADV / EXP` ทุกแบบ | PO/WTI recalc ตาม write path ที่ถูกต้อง | แก้ได้เฉพาะเมื่อยังไม่มี `PMA approved` หรือ `PMT active`; pending queue อ่าน source ล่าสุด | ไม่มี | ไม่มี |
-| ยกเลิก source ก่อนอนุมัติ | `PB / ADV / EXP` ทุกแบบ | PO/WTI/stock/ADV allocation ต้อง reverse ตาม source type | source = `ยกเลิก`; หายจาก pending queue | ไม่มี | ไม่มี |
+| ยกเลิก source ก่อนอนุมัติ | `PB / ADV / EXP` ทุกแบบ | PO/WTI/stock/ADV allocation ต้อง reverse ตาม source type; stock reverse อยู่ที่ PB ไม่ใช่ WTI | source = `ยกเลิก`; หายจาก pending queue | ไม่มี | ไม่มี |
 | อนุมัติ source บางส่วน | `UC-PUR-14` และทุก source ที่จ่ายบางส่วน | PO/WTI ไม่เปลี่ยนจากการ approve | source ยังมี pending balance แต่ financial fields ถูก lock ทั้งใบ | `PMA approved` 1..n rows ตามยอด split ที่ approve | ไม่มี |
 | อนุมัติ source เต็มยอด | `UC-PUR-14` และทุก source ที่อนุมัติเต็ม | PO/WTI ไม่เปลี่ยนจากการ approve | source ไม่มี remaining approval balance แต่ยังไม่ใช่ payment เสร็จ | `PMA approved` ครอบคลุมยอด payable | ไม่มี |
 | Void PMA ก่อนออก PMT | PMA approved ที่ยังไม่ถูกจ่าย | PO/WTI ไม่เปลี่ยน | ยอด PMA ที่ void กลับไปเป็น source pending; ADV/PB/EXP recalc เป็น `ยังไม่อนุมัติ` หรือ `อนุมัติแล้วบางส่วน` ตาม active PMA ที่เหลือ | PMA เดิม = `voided`/audit เท่านั้น ไม่ reuse | ไม่มี |
@@ -99,16 +118,16 @@ updated: 2026-06-08
 | 1 สร้าง PO | `เปิดอยู่` | ไม่มี | ไม่มี | ไม่มี | ไม่มี |
 | 2 บันทึก ADV optional | `เปิดอยู่` | ไม่มี | `ยังไม่อนุมัติ` ใน source queue | ไม่มี | ไม่มีจนกว่า approve ADV |
 | 3 Supplier ส่งของ | `เปิดอยู่` | ไม่มี | ตาม ADV lifecycle ถ้ามี | ไม่มี | ไม่มี |
-| 4 บันทึก WTI | `เปิดอยู่` | `รับของแล้ว` | ตาม ADV lifecycle ถ้ามี | ไม่มี | ไม่มี |
+| 4 บันทึก WTI | `เปิดอยู่` | `รับของแล้ว`; ยังไม่เกิด stock ledger | ตาม ADV lifecycle ถ้ามี | ไม่มี | ไม่มี |
 | 5 สร้าง Draft PB | `เปิดอยู่` | `รับของแล้ว` | ตาม ADV lifecycle ถ้ามี | Draft เท่านั้น | ไม่มี |
 | 6 Lock context ใน Draft | `เปิดอยู่` | `รับของแล้ว` | ตาม ADV lifecycle ถ้ามี | Draft locked context | ไม่มี |
 | 7 Allocate WTI เข้า PO/Spot | ยังไม่ตัดจนกว่าจะ save PB | ยังไม่ตัดจนกว่าจะ save PB | ตาม ADV lifecycle ถ้ามี | Draft allocation ต้องครบยอด WTI/summary ที่เลือก; residual หลัง PO ต้องเป็น Spot Buy | ไม่มี |
 | 8 ดึงราคา PO | `เปิดอยู่` | `รับของแล้ว` | ตาม ADV lifecycle ถ้ามี | Draft line ใช้ราคา PO/Spot | ไม่มี |
 | 9 เลือก ADV หักบิล | `เปิดอยู่` | `รับของแล้ว` | ADV available ถูกจองใน draft เท่านั้น | Draft payable net ถูกคำนวณ | ไม่มี |
 | 10 Save PB | รอ recalc จาก allocation | รอ recalc จาก allocation | ADV allocation บันทึกจริงถ้ามี | `เปิดอยู่` หรือ payment status `เสร็จสิ้น` ถ้า ADV ตัดเต็ม | ไม่มีสำหรับยอด PB ที่ยังไม่ approve |
-| 11 Recalc WTI | ไม่เปลี่ยนใน step นี้ | `เสร็จสิ้น` สำหรับ WTI/summary ที่เลือกครบใน PB ใหม่นี้; `ออกบิลแล้วบางส่วน` เหลือใช้กับ active usage เดิม/ข้อมูลก่อน rule ใหม่ | ไม่เปลี่ยน | `เปิดอยู่` หรือ `เสร็จสิ้น` | ไม่มี |
+| 11 Recalc WTI | ไม่เปลี่ยนใน step นี้ | `เสร็จสิ้น` สำหรับ WTI/summary ที่เลือกครบใน PB ใหม่นี้ | ไม่เปลี่ยน | `เปิดอยู่` หรือ `เสร็จสิ้น` | ไม่มี |
 | 12 Recalc PO | `ออกบิลบางส่วน` หรือ `ออกบิลแล้ว` | ตาม step 11 | ไม่เปลี่ยน | `เปิดอยู่` หรือ `เสร็จสิ้น` | ไม่มี |
-| 13 Stock ledger | ตาม step 12 | ตาม step 11 | ไม่เปลี่ยน | `เปิดอยู่` หรือ `เสร็จสิ้น` | ไม่มี |
+| 13 Stock ledger | ตาม step 12 | ตาม step 11 | ไม่เปลี่ยน | PB save สร้าง stock-in ledger โดยอ้าง WTI | ไม่มี |
 | 14 Approve PB payable | ไม่เปลี่ยน | ไม่เปลี่ยน | ไม่เปลี่ยน | financial fields locked; source balance ที่เหลือยัง `ยังไม่อนุมัติ` | `PMA approved` ตาม split amount |
 | 15 ทำจ่าย | ไม่เปลี่ยน | ไม่เปลี่ยน | ไม่เปลี่ยน | payable balance รอ recalc | `PMT = เสร็จสิ้น`; PMA ถูก consumed/paid |
 | 16 Recalc PB payment | ไม่เปลี่ยน | ไม่เปลี่ยน | ไม่เปลี่ยน | `ชำระบางส่วน` หรือ `เสร็จสิ้น` | PMT อยู่ใน history เป็น `เสร็จสิ้น` |
@@ -119,10 +138,10 @@ updated: 2026-06-08
 | Step | WTI | PB/source payable | PMA | PMT | หมายเหตุ |
 |---|---|---|---|---|---|
 | 1 Supplier ส่งของ | ไม่มี | ไม่มี | ไม่มี | ไม่มี | เริ่มจากหน้างาน ไม่มี PO |
-| 2 บันทึก WTI | `รับของแล้ว` | ไม่มี | ไม่มี | ไม่มี | WTI เป็น source ของน้ำหนักเข้า stock |
+| 2 บันทึก WTI | `รับของแล้ว`; ยังไม่เกิด stock ledger | ไม่มี | ไม่มี | ไม่มี | WTI เป็น source ของน้ำหนักจริงสำหรับ PB |
 | 3 Save PB จาก WTI | รอ recalc | `PB = เปิดอยู่`; payment status = `ยังไม่อนุมัติ` | ไม่มี | ไม่มี | ตั้ง AP จากยอด WTI ที่ออกบิล |
 | 4 Recalc WTI | `เสร็จสิ้น` สำหรับ WTI ที่เลือกครบในบิลนี้ | `เปิดอยู่` / `ยังไม่อนุมัติ` | ไม่มี | ไม่มี | บิลใหม่ห้าม save ถ้า WTI/summary ที่เลือกยังจัดสรรไม่ครบ |
-| 5 Stock ledger | ไม่เปลี่ยน | ไม่เปลี่ยน | ไม่มี | ไม่มี | stock movement เกิดจาก PB stock ไม่ใช่ PMA/PMT |
+| 5 Stock ledger | ไม่เปลี่ยน | ไม่เปลี่ยน | ไม่มี | ไม่มี | stock movement เกิดจาก PB save โดยอ้าง WTI |
 | 6 Approve PB | ไม่เปลี่ยน | source financial fields locked; source balance ที่เหลือยัง `ยังไม่อนุมัติ` | `PMA approved` ตาม split amount | ไม่มี | ถ้า approve บางส่วน PB ยังมี pending balance |
 | 7 ทำจ่าย | ไม่เปลี่ยน | payable balance รอ recalc | PMA ถูก consumed/paid | `PMT = เสร็จสิ้น` | PMT ต้องจ่ายเต็ม PMA ที่เลือก |
 | 8 Recalc PB payment | ไม่เปลี่ยน | `ชำระบางส่วน` หรือ `เสร็จสิ้น` | ตาม PMA consumed/paid | PMT อยู่ใน history | ยอดที่ยังไม่อนุมัติกลับไป pending source queue |

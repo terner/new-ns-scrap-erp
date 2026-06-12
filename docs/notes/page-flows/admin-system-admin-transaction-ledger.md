@@ -1,0 +1,89 @@
+---
+title: Transaction Ledger Page Flow
+tags:
+  - page-flow
+  - menu
+  - admin-system
+status: accepted-baseline
+updated: 2026-06-11
+route: /admin/transaction-ledger
+---
+
+# Transaction Ledger Page Flow
+
+## Scope
+
+| Field | Value |
+|---|---|
+| Menu section | Admin / System |
+| Route | `/admin/transaction-ledger` |
+| Page | Transaction Ledger |
+| Current Next | accepted code baseline |
+
+## Canonical References
+
+[[System Supporting Flows]], [[Menu Page Flow Catalog]]
+
+## Flow Baseline
+
+admin read model for cash/bank transaction ledger and duplicate/account reconciliation
+
+## Page Responsibilities
+
+- แสดง transaction ledger จาก bank/payment/cash movement facts
+- โหลดสูงสุด 10000 rows สำหรับหน้า ledger ตาม current code
+- รองรับ filter/search/date/account/ref type ใน client
+- export CSV client-side และ Excel ผ่าน API format=xlsx
+- แสดง account balances, duplicate groups, linked bills
+
+## Non-Responsibilities
+
+- ไม่สร้าง/แก้ transaction
+- ไม่ลบ bank_statement หรือ payment facts
+- ไม่แทน Finance Bank Statement page สำหรับ user workflow
+
+## Lifecycle / Support Flow
+
+| Step | User action | System result |
+|---|---|---|
+| 1 | เปิดหน้า | GET transaction-ledger?limit=10000 |
+| 2 | filter/search | client-side filter จาก rows ที่โหลด |
+| 3 | export CSV | build CSV จาก filtered rows |
+| 4 | export Excel | GET format=xlsx จาก API |
+| 5 | drilldown | ใช้ linkedBills/source refs ตาม payload |
+
+## API / Data Contract
+
+### Current API
+
+- `GET /api/admin/transaction-ledger?limit=10000 - load ledger rows/accounts/duplicateGroups`
+- `GET /api/admin/transaction-ledger?limit=10000&format=xlsx - Excel export`
+
+### Data Contract
+
+- user identity ต้องมาจาก authenticated context ไม่รับ actor จาก form
+- admin/support action ต้อง enforce permission ที่ API ระบุ
+- admin/support pages ต้องไม่เขียน business transaction facts
+- current code ใน `apps/next` เป็น proof baseline ของ P3 admin/system ณ 2026-06-11
+
+## Validation / Status Rules
+
+- requires permission finance.cash.view
+- rows ต้องมี account/source/ref/link เพื่อ audit
+- export ต้อง match API payload/current filter behavior ตาม code
+- current code เป็น proof baseline
+
+## Side Effects
+
+- read/export only ไม่มี transaction side effect
+
+## Current Gap
+
+P3 proof completed from current code. Remaining report/formula proof belongs to finance/bank and payment flows.
+
+## Implementation Checklist
+
+- [x] Verify current page/component API calls
+- [x] Verify current API route methods and permission boundary
+- [x] Keep business transaction side effects out of this page
+- [ ] Update this file if admin/system code changes

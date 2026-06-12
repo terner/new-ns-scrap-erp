@@ -20,11 +20,13 @@ export async function GET(request: Request) {
     if (query.format === 'xlsx') {
       const body = buildStockWorkbook('Stock Balance', snapshot.rows.map((row) => ({
         สินค้า: `${row.productCode} ${row.productName}`.trim(),
-        สถานะ: row.status,
+        คลัง: row.onHoldQty > 0 ? `${row.status} / On Hold` : row.status,
         สาขา: row.branchName,
-        คลัง: row.warehouseName,
+        คลังจัดเก็บ: row.warehouseName,
         Lot: row.lotNo,
         คงเหลือ: row.qty,
+        จองไว้: row.onHoldQty,
+        พร้อมส่ง: row.readyQty,
         มูลค่า: row.value,
         ต้นทุนเฉลี่ย: row.avgCost,
         พร้อมขาย: row.notAvailable ? 'No' : 'Yes',

@@ -11,12 +11,26 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const rows = await prisma.receipt_vouchers.findMany({
-      orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
-      take: 5000,
-    })
+    const [rows, companyProfile] = await Promise.all([
+      prisma.receipt_vouchers.findMany({
+        orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
+        take: 5000,
+      }),
+      prisma.company_profiles.findFirst({
+        orderBy: [{ branch_code: 'asc' }, { created_at: 'asc' }],
+      }),
+    ])
 
     return NextResponse.json({
+      companyProfile: companyProfile
+        ? {
+          address: companyProfile.address,
+          name: companyProfile.name,
+          nameEn: companyProfile.name_en ?? '',
+          phone: companyProfile.phone,
+          taxId: companyProfile.tax_id ?? '',
+        }
+        : null,
       rows: rows.map((row) => ({
         amountInWords: row.amount_in_words ?? '',
         createdAt: row.created_at?.toISOString() ?? '',

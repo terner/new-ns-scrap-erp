@@ -207,3 +207,9 @@ Server ต้อง map `fromAccountId` / `toAccountId` จาก outward accoun
 - ยังไม่มี reviewed cancel / reversal flow สำหรับ transfer; ปุ่ม `ยกเลิก` จึงยัง disabled
 - ยังขาด dedicated `transfer_status_logs` ตาม `Document Timeline Policy`
 - ก่อนเปิด cancel/reversal ต้องออกแบบผลกระทบกลับ `bank_statement` แบบ append-only ไม่ลบ row เงินเดิมเงียบ ๆ
+
+## Related Notes
+
+- [[Petty Advance Page Flow]]
+- [[Finance Bank Statement Page Flow]]
+- [[Customer Advance Page Flow]]

@@ -61,12 +61,11 @@ function itemRows(bill: SalesBillDetail) {
       <td>
         <div class="item-name">${escapeHtml(item.productName)}</div>
         <div class="muted">${escapeHtml([item.productCode || item.productId || null, item.sourceLabel || item.sourceType].filter(Boolean).join(' · '))}</div>
+        ${item.note ? `<div class="muted">${escapeHtml(item.note)}</div>` : ''}
       </td>
-      <td>
-        <div>${escapeHtml(item.deliveryTicketDocNo || '-')}</div>
-        ${item.deliveryVehicleNo ? `<div class="muted">ทะเบียน ${escapeHtml(item.deliveryVehicleNo)}</div>` : ''}
-      </td>
-      <td>${escapeHtml(item.note || '-')}</td>
+      <td class="num">${money(item.grossWeight)}</td>
+      <td class="num">${money(item.deductWeight)}</td>
+      <td class="num strong">${money(item.netWeight || item.qty)}</td>
       <td class="num strong">${money(item.qty)} ${escapeHtml(item.unit)}</td>
       <td class="num">${money(item.price)}</td>
       <td class="num">${money(item.discount)}</td>
@@ -77,7 +76,7 @@ function itemRows(bill: SalesBillDetail) {
 
 function emptyRows(count: number) {
   return Array.from({ length: Math.max(0, count) }, () => (
-    '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'
+    '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'
   )).join('')
 }
 
@@ -240,13 +239,14 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
         <thead>
           <tr>
             <th class="center rank-cell" style="width:5mm">#</th>
-            <th style="width:42mm">สินค้า</th>
-            <th style="width:24mm">WTO</th>
-            <th>หมายเหตุ</th>
-            <th class="num" style="width:20mm">จำนวน</th>
-            <th class="num" style="width:18mm">ราคา</th>
-            <th class="num" style="width:17mm">ส่วนลด</th>
-            <th class="num" style="width:22mm">รวม</th>
+            <th style="width:48mm">สินค้า</th>
+            <th class="num" style="width:16mm">Gross</th>
+            <th class="num" style="width:14mm">หัก</th>
+            <th class="num" style="width:16mm">สุทธิ</th>
+            <th class="num" style="width:18mm">จำนวน</th>
+            <th class="num" style="width:16mm">ราคา</th>
+            <th class="num" style="width:15mm">ส่วนลด</th>
+            <th class="num" style="width:18mm">รวม</th>
           </tr>
         </thead>
         <tbody>

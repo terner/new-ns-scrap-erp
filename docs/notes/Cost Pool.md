@@ -12,7 +12,7 @@ tags:
   - decision
 status: draft
 created: 2026-06-07
-updated: 2026-06-07
+updated: 2026-06-11
 ---
 
 # Cost Pool / ต้นทุนสำหรับ Cost Allocator
@@ -44,6 +44,24 @@ Cost Pool ต้องรับเฉพาะสินค้า eligible กล
 กติกานี้ต้องบังคับใน backend/service/API ที่สร้างหรืออ่าน Cost Pool ไม่ใช่แค่ซ่อนใน UI
 
 สินค้ากลุ่มอื่นยังซื้อเข้า stock ได้ตามปกติ แต่ต้องไม่เข้า Cost Pool และต้องไม่ถูกส่งไปให้ Cost Allocator
+
+## Legacy Evidence
+
+Legacy กำหนด scope ของ Dual Costing ไว้เฉพาะทองแดง/ทองเหลือง:
+
+```text
+DUAL_COSTING_GROUPS: ['ทองแดง', 'ทองเหลือง']
+isDualCostingProduct(productId) => products.metalGroup อยู่ใน DUAL_COSTING_GROUPS
+```
+
+หน้า legacy ที่ยืนยันกติกานี้:
+
+- `view-costPool` filter `erp.buildCostPool()` ด้วย `erp.isDualCostingProduct(product_id)`
+- `view-costAllocator` จำกัดทั้ง `PO_SELL` และ `SPOT_SELL` ให้เลือกเฉพาะสินค้า dual-costing
+- `view-waitingAllocations` แสดง queue สินค้าทองแดง/ทองเหลืองที่ยังค้าง allocate
+- เมนู legacy ใช้ label `Cost Allocator (ทอง/เหลือง)`
+
+ดังนั้น target ต้องถือว่า eligibility เป็น business rule ไม่ใช่ UI preference
 
 ## Source Types
 

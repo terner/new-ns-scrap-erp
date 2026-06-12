@@ -713,6 +713,7 @@ model branches {
   purchase_bills            purchase_bills[]
   receipts                  receipts[]
   sales_bills               sales_bills[]
+  stock_holds               stock_holds[]
   stock_issues              stock_issues[]
   stock_ledger              stock_ledger[]
   supplier_advance_payments supplier_advance_payments[]
@@ -1464,7 +1465,12 @@ model po_buys {
   doc_no                       String
   date                         DateTime                       @db.Date
   expected_delivery            DateTime?                      @db.Date
+  subtotal                     Decimal?                       @default(0) @db.Decimal
   total_amount                 Decimal?                       @default(0) @db.Decimal
+  has_vat                      Boolean?                       @default(false)
+  vat_type                     String?                        @default("NONE")
+  vat_rate_percent             Decimal                        @default(7.00) @db.Decimal(5, 2)
+  vat_amount                   Decimal?                       @default(0) @db.Decimal
   cut_amount                   Decimal?                       @default(0) @db.Decimal
   remaining_amount             Decimal?                       @default(0) @db.Decimal
   status                       String?                        @default("Open")
@@ -1754,6 +1760,7 @@ model products {
   production_orders               production_orders[]
   production_outputs              production_outputs[]
   purchase_bill_items             purchase_bill_items[]
+  stock_holds                     stock_holds[]
   stock_ledger                    stock_ledger[]
   trading_deals                   trading_deals[]
   weight_ticket_usage_logs        weight_ticket_usage_logs[]
@@ -2181,6 +2188,7 @@ model weight_tickets {
   customer_id                       BigInt?
   id                                BigInt                              @id @default(autoincrement())
   purchase_bill_receipt_allocations purchase_bill_receipt_allocations[]
+  stock_holds                       stock_holds[]
   weight_ticket_status_logs         weight_ticket_status_logs[]
   weight_ticket_usage_logs          weight_ticket_usage_logs[]
   weight_ticket_lines               weight_ticket_lines[]
@@ -2215,15 +2223,19 @@ model weight_ticket_lines {
   id                                  BigInt                               @id @default(autoincrement())
   impurity_id                         BigInt?
   product_id                          BigInt
+  warehouse_id                        BigInt?
   weight_ticket_id                    BigInt
   impurities                          impurities?                          @relation(fields: [impurity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   products                            products                             @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses                          warehouses?                          @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   weight_tickets                      weight_tickets                       @relation(fields: [weight_ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  stock_holds                         stock_holds[]
   weight_ticket_product_summary_lines weight_ticket_product_summary_lines?
 
   @@unique([weight_ticket_id, line_no], map: "uq_weight_ticket_lines_ticket_line")
   @@index([impurity_id], map: "idx_weight_ticket_lines_impurity")
   @@index([product_id], map: "idx_weight_ticket_lines_product")
+  @@index([warehouse_id], map: "idx_weight_ticket_lines_warehouse")
   @@index([weight_ticket_id], map: "idx_weight_ticket_lines_ticket")
   @@schema("public")
 }
@@ -2383,6 +2395,49 @@ model stock_issues {
   customers            customers?  @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   warehouses           warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model stock_holds {
+  hold_key              String                @unique @default(dbgenerated("('STH-'::text || gen_random_uuid()::text)"))
+  source_type           String                @default("WTO")
+  source_doc_no         String
+  source_line_no        Int?
+  qty                   Decimal               @default(0) @db.Decimal
+  status                String                @default("active")
+  held_at               DateTime              @default(now()) @db.Timestamptz(6)
+  released_at           DateTime?             @db.Timestamptz(6)
+  consumed_at           DateTime?             @db.Timestamptz(6)
+  cancelled_at          DateTime?             @db.Timestamptz(6)
+  released_by           String?
+  consumed_by           String?
+  cancelled_by          String?
+  release_reason        String?
+  consumed_by_ref_type  String?
+  consumed_by_ref_no    String?
+  note                  String?
+  meta                  Json?
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  created_by            String?
+  updated_at            DateTime?             @db.Timestamptz(6)
+  updated_by            String?
+  id                    BigInt                @id @default(autoincrement())
+  weight_ticket_id      BigInt
+  weight_ticket_line_id BigInt?
+  product_id            BigInt
+  branch_id             BigInt
+  warehouse_id          BigInt
+  branches              branches              @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  products              products              @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  warehouses            warehouses            @relation(fields: [warehouse_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  weight_ticket_lines   weight_ticket_lines?   @relation(fields: [weight_ticket_line_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  weight_tickets        weight_tickets         @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([branch_id, product_id, warehouse_id], map: "idx_stock_holds_active_lookup")
+  @@index([weight_ticket_line_id], map: "idx_stock_holds_line")
+  @@index([source_type, source_doc_no], map: "idx_stock_holds_source_doc")
+  @@index([weight_ticket_id, status], map: "idx_stock_holds_ticket_status")
   @@schema("public")
 }
 
@@ -2799,7 +2854,9 @@ model warehouses {
   purchase_bills    purchase_bills[]
   sales_bills       sales_bills[]
   stock_issues      stock_issues[]
+  stock_holds       stock_holds[]
   stock_ledger      stock_ledger[]
+  weight_ticket_lines weight_ticket_lines[]
   branches          branches?           @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@schema("public")

@@ -5,7 +5,9 @@ import { toNumber } from '@/lib/server/daily'
 type DbClient = Prisma.TransactionClient
 
 export const WEIGHT_TICKET_USAGE_ACTION = {
+  ALLOCATED_TO_SALES_BILL: 'allocated_to_sales_bill',
   ALLOCATED_TO_PURCHASE_BILL: 'allocated_to_purchase_bill',
+  RELEASED_FROM_SALES_BILL: 'released_from_sales_bill',
   RELEASED_FROM_PURCHASE_BILL: 'released_from_purchase_bill',
 } as const
 
@@ -38,6 +40,7 @@ const EPSILON = 0.0001
 
 function isReleaseAction(action: WeightTicketUsageAction) {
   return action === WEIGHT_TICKET_USAGE_ACTION.RELEASED_FROM_PURCHASE_BILL
+    || action === WEIGHT_TICKET_USAGE_ACTION.RELEASED_FROM_SALES_BILL
 }
 
 export async function appendWeightTicketUsageLogs(
