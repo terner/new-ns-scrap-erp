@@ -845,20 +845,54 @@ function PrintPreview({ companyProfile, onClose, row }: { companyProfile: Receip
   const companyPhone = companyProfile?.phone || 'ไม่มีข้อมูล'
   const companyTaxId = companyProfile?.taxId || 'ไม่มีข้อมูล'
 
-  const [scale, setScale] = useState(1)
+  const [autoScale, setAutoScale] = useState(1)
+  const [zoom, setZoom] = useState<number | null>(null)
+
+  const zoomLevels = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5]
 
   useEffect(() => {
     const handleResize = () => {
-      // Calculate available height: window height minus modal header (68px), modal footer (60px), and spacing
-      const availableHeight = window.innerHeight - 170
+      // Calculate available dimensions:
+      // Height: viewport height minus modal header (68px), modal footer (60px), zoom toolbar (45px) and padding
+      const availableHeight = window.innerHeight - 210
+      // Width: viewport width minus modal padding
+      const availableWidth = window.innerWidth - 64
+
       const targetHeight = 1123
-      const s = Math.min(1, availableHeight / targetHeight)
-      setScale(s)
+      const targetWidth = 794
+
+      const scaleHeight = availableHeight / targetHeight
+      const scaleWidth = availableWidth / targetWidth
+
+      const s = Math.min(1, scaleHeight, scaleWidth)
+      setAutoScale(s)
     }
     handleResize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  const currentScale = zoom === null ? autoScale : zoom
+
+  const handleZoomIn = () => {
+    const currentVal = zoom === null ? autoScale : zoom
+    const nextLevel = zoomLevels.find((level) => level > currentVal + 0.01)
+    if (nextLevel) {
+      setZoom(nextLevel)
+    }
+  }
+
+  const handleZoomOut = () => {
+    const currentVal = zoom === null ? autoScale : zoom
+    const prevLevel = [...zoomLevels].reverse().find((level) => level < currentVal - 0.01)
+    if (prevLevel) {
+      setZoom(prevLevel)
+    }
+  }
+
+  const handleResetZoom = () => {
+    setZoom(null)
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/40 p-3 flex justify-center items-center print:static print:p-0 print:bg-transparent overflow-hidden">
@@ -873,26 +907,65 @@ function PrintPreview({ companyProfile, onClose, row }: { companyProfile: Receip
         </div>
 
         {/* Modal Content Preview Sheet */}
-        <div className="h-[calc(100vh-170px)] overflow-hidden p-3 md:p-6 bg-slate-100 flex justify-center items-center print:h-auto print:max-h-none print:overflow-visible print:bg-white print:p-0">
-          {/* Scaled Wrapper */}
-          <div
-            className="relative flex justify-center items-start print:block print:w-full print:h-auto"
-            style={{
-              width: typeof window !== 'undefined' ? `${794 * scale}px` : '100%',
-              height: typeof window !== 'undefined' ? `${1123 * scale}px` : 'auto',
-            }}
-          >
+        <div className="flex flex-col h-[calc(100vh-170px)] bg-slate-100 print:h-auto print:max-h-none print:overflow-visible print:bg-white print:p-0">
+          
+          {/* Zoom Toolbar */}
+          <div className="flex items-center justify-center gap-3 border-b border-slate-200 bg-white px-4 py-2 shadow-sm print:hidden">
+            <button
+              type="button"
+              className="flex size-7 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+              onClick={handleZoomOut}
+              disabled={zoom !== null && zoom <= zoomLevels[0]}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="size-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" />
+              </svg>
+            </button>
+            <span className="min-w-[64px] text-center text-xs font-bold text-slate-700">
+              {zoom === null ? 'พอดีจอ' : `${Math.round(zoom * 100)}%`}
+            </span>
+            <button
+              type="button"
+              className="flex size-7 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+              onClick={handleZoomIn}
+              disabled={zoom !== null && zoom >= zoomLevels[zoomLevels.length - 1]}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="size-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+            <div className="h-4 w-px bg-slate-200" />
+            <button
+              type="button"
+              className="rounded-md px-2.5 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 disabled:opacity-40"
+              onClick={handleResetZoom}
+              disabled={zoom === null}
+            >
+              ปรับให้พอดี
+            </button>
+          </div>
+
+          {/* Scrollable Preview Area */}
+          <div className="flex-1 overflow-auto p-4 md:p-6 flex print:overflow-visible print:p-0">
+            {/* Scaled Wrapper */}
             <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 origin-top bg-white p-[6mm] md:p-[9mm] text-slate-900 shadow-md print:static print:transform-none print:translate-x-0 print:p-0 print:shadow-none print:w-full print:h-auto print:min-h-0"
+              className="relative flex justify-center items-start print:block print:w-full print:h-auto m-auto"
               style={{
-                fontFamily: "'Noto Sans Thai', Arial, sans-serif",
-                fontSize: '11px',
-                lineHeight: 1.35,
-                width: typeof window !== 'undefined' ? '794px' : '100%',
-                height: typeof window !== 'undefined' ? '1123px' : 'auto',
-                transform: typeof window !== 'undefined' ? `scale(${scale})` : 'none',
+                width: typeof window !== 'undefined' ? `${794 * currentScale}px` : '100%',
+                height: typeof window !== 'undefined' ? `${1123 * currentScale}px` : 'auto',
               }}
             >
+              <div
+                className="absolute top-0 left-0 origin-top-left bg-white p-[6mm] md:p-[9mm] text-slate-900 shadow-md print:static print:transform-none print:p-0 print:shadow-none print:w-full print:h-auto print:min-h-0"
+                style={{
+                  fontFamily: "'Noto Sans Thai', Arial, sans-serif",
+                  fontSize: '11px',
+                  lineHeight: 1.35,
+                  width: typeof window !== 'undefined' ? '794px' : '100%',
+                  height: typeof window !== 'undefined' ? '1123px' : 'auto',
+                  transform: typeof window !== 'undefined' ? `scale(${currentScale})` : 'none',
+                }}
+              >
               <div className="mb-3 h-1 rounded-full bg-gradient-to-r from-emerald-800 via-lime-600 to-slate-300 print:mb-2" />
 
               <header className="grid grid-cols-[1fr_0.82fr] gap-4 border-b border-slate-300 pb-3 print:gap-3 print:pb-2">
@@ -1005,6 +1078,7 @@ function PrintPreview({ companyProfile, onClose, row }: { companyProfile: Receip
             </div>
           </div>
         </div>
+      </div>
 
         {/* Modal Footer */}
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 print:hidden">
