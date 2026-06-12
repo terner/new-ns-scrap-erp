@@ -1694,7 +1694,9 @@ function getRecentMonths(count: number) {
   return Array.from({ length: count }, (_, index) => {
     const month = new Date(current)
     month.setMonth(current.getMonth() - (count - 1 - index))
-    return month.toISOString().slice(0, 7)
+    const yyyy = month.getFullYear()
+    const mm = String(month.getMonth() + 1).padStart(2, '0')
+    return `${yyyy}-${mm}`
   })
 }
 
