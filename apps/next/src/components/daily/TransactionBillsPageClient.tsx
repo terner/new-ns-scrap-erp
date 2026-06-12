@@ -2737,8 +2737,8 @@ function PurchaseBillDetailModal({
         <DialogHeader className="border-b p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <DialogTitle id="purchase-bill-detail-title">รายละเอียดบิลรับซื้อ {detail?.docNo ?? docNo}</DialogTitle>
-              <DialogDescription>{detail?.supplierName ?? 'กำลังโหลดข้อมูล'}</DialogDescription>
+              <DialogTitle id="purchase-bill-detail-title">รายละเอียดบิลรับซื้อ</DialogTitle>
+              <DialogDescription className="font-mono text-xs">{detail?.docNo ?? docNo}</DialogDescription>
             </div>
             {detail ? (
               <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(detail)}>
@@ -2756,31 +2756,47 @@ function PurchaseBillDetailModal({
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
           </div>
         ) : detail ? (
-          <div className="space-y-4 p-4">
-            <div className="grid gap-3 md:grid-cols-4">
-              <Detail label="ยอดรวม" value={formatMoney(detail.totalAmount)} />
-              <Detail label="ค้างชำระ" value={formatMoney(detail.payableBalance)} />
-              <Detail label="ชำระแล้ว" value={formatMoney(detail.paidAmount)} />
-              <Detail label="สถานะ" value={detail.statusLabel} />
-            </div>
-
-            <div className="rounded-md border border-slate-200 p-3">
-              <div className="grid gap-3 text-sm md:grid-cols-3">
-                <PlainDetail label="เลขที่บิล" value={detail.docNo} />
-                <PlainDetail label="วันที่สร้างรายการ" value={formatDateDisplay(detail.date)} />
-                <PlainDetail label="ผู้ขาย" value={detail.supplierName} />
-                <PlainDetail label="รหัสผู้ขาย" value={detail.supplierCode} />
-                <PlainDetail label="สาขา/คลัง" value={detail.branchName} />
-                <PlainDetail label="ประเภทบิล" value={detail.transactionMode} />
-                <PlainDetail label="ผู้ทำ" value={detail.createdBy} />
-                <PlainDetail label="ใบรับของ" value={detail.receiptDocNos.join(', ') || '-'} />
-                <PlainDetail label="ADV/มัดจำ" value={detail.advancePaymentDocNo ? `${detail.advancePaymentDocNo} (${formatMoney(detail.advanceAllocatedAmount)})` : '-'} />
+          <div className="space-y-4 p-4 text-sm">
+            {/* ข้อมูลทั่วไป */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                <DetailItem label="เลขที่บิล" value={detail.docNo} />
+                <DetailItem label="วันที่สร้างรายการ" value={formatDateDisplay(detail.date)} />
+                <DetailItem className="col-span-2 sm:col-span-3" label="ผู้ขาย" value={`${detail.supplierCode ? `[${detail.supplierCode}] ` : ''}${detail.supplierName}`} />
+                <DetailItem label="สาขา/คลัง" value={detail.branchName || '-'} />
+                <DetailItem label="ประเภทบิล" value={detail.transactionMode || '-'} />
+                <DetailItem label="ผู้ทำรายการ" value={detail.createdBy || '-'} />
+                <DetailItem className="col-span-2 sm:col-span-3" label="อ้างอิงใบรับของ WTI" value={detail.receiptDocNos.join(', ') || '-'} />
               </div>
             </div>
 
-            <div>
-              <div className="mb-2 text-sm font-medium text-slate-700">สรุปต่อสินค้า</div>
-              <div className="overflow-x-auto rounded-md border border-slate-200">
+            {/* สถานะและการชำระเงิน */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">สถานะและการชำระเงิน</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+                <div className="flex flex-col py-1">
+                  <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">สถานะบิล</div>
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${workflowStatusBadgeClass(detail.status)}`}>
+                      <span className="size-1.5 rounded-full bg-current" />
+                      {detail.statusLabel}
+                    </span>
+                  </div>
+                </div>
+                <DetailItem label="ยอดเงินสุทธิ" value={`${formatMoney(detail.totalAmount)} บาท`} />
+                <DetailItem label="ชำระแล้ว" value={`${formatMoney(detail.paidAmount)} บาท`} />
+                <DetailItem label="ยอดคงเหลือค้างจ่าย" value={`${formatMoney(detail.payableBalance)} บาท`} />
+                {detail.advancePaymentDocNo ? (
+                  <DetailItem className="col-span-2 sm:col-span-4" label="หักเงินล่วงหน้า / มัดจำ" value={`${detail.advancePaymentDocNo} (หักไป ${formatMoney(detail.advanceAllocatedAmount)} บาท)`} />
+                ) : null}
+              </div>
+            </div>
+
+            {/* สรุปต่อสินค้า */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">สรุปต่อสินค้า</div>
+              <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
                 <table className="w-full min-w-[880px] text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
@@ -2813,9 +2829,10 @@ function PurchaseBillDetailModal({
               </div>
             </div>
 
-            <div>
-              <div className="mb-2 text-sm font-medium text-slate-700">รายละเอียด allocation รายแถว</div>
-              <div className="overflow-x-auto rounded-md border border-slate-200">
+            {/* รายละเอียด allocation */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">รายละเอียด allocation รายแถว</div>
+              <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
                 <table className="w-full min-w-[1100px] text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
@@ -3125,4 +3142,13 @@ function RadioCard({ active, disabled = false, label, note, onClick }: { active:
 
 function isStockIssueRow(row: BillRow | StockIssueRow): row is StockIssueRow {
   return 'totalEstAmount' in row
+}
+
+function DetailItem({ className = '', label, value }: { className?: string; label: string; value: string }) {
+  return (
+    <div className={`flex flex-col py-1 ${className}`}>
+      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className="mt-0.5 text-xs sm:text-sm font-semibold text-slate-800">{value}</div>
+    </div>
+  )
 }

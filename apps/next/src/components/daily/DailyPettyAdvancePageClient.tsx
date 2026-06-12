@@ -660,7 +660,7 @@ function DetailModal({ onClose, onReturn, row }: { onClose: () => void; onReturn
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4" onClick={onClose}>
       <div className="mx-auto my-4 max-w-4xl overflow-hidden rounded-md bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
+        <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
           <div>
             <h3 className="text-lg font-bold">รายละเอียด {row.docNo} — {row.recipientName}</h3>
             <div className="mt-0.5 text-xs text-slate-600">{typeLabel(row.type)} · วันที่จ่าย {formatDateDisplay(row.date)} · จำนวน {formatMoney(row.amount)} บาท</div>
@@ -675,55 +675,84 @@ function DetailModal({ onClose, onReturn, row }: { onClose: () => void; onReturn
           </div>
         </div>
         <div className="space-y-4 p-5 text-sm">
-          <div className="grid gap-2 md:grid-cols-4">
-            <div className="rounded-md bg-blue-50 p-2 text-center"><div className="text-xs text-blue-700">ยอดยืม</div><div className="font-bold">{formatMoney(row.amount)}</div></div>
-            <div className="rounded-md bg-amber-50 p-2 text-center"><div className="text-xs text-amber-700">ใช้ไปแล้ว</div><div className="font-bold">{formatMoney(row.spent)}</div></div>
-            <div className="rounded-md bg-emerald-50 p-2 text-center"><div className="text-xs text-emerald-700">คืนแล้ว</div><div className="font-bold">{formatMoney(row.returned)}</div></div>
-            <div className="rounded-md bg-red-50 p-2 text-center"><div className="text-xs text-red-700">คงค้าง</div><div className="font-bold">{formatMoney(row.remaining)}</div></div>
+          {/* สรุปยอดเงิน */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-center">
+              <div className="text-xs text-blue-700 font-semibold">ยอดยืม</div>
+              <div className="text-lg font-bold mt-1 text-blue-900">{formatMoney(row.amount)}</div>
+            </div>
+            <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 text-center">
+              <div className="text-xs text-amber-700 font-semibold">ใช้ไปแล้ว</div>
+              <div className="text-lg font-bold mt-1 text-amber-900">{formatMoney(row.spent)}</div>
+            </div>
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-center">
+              <div className="text-xs text-emerald-700 font-semibold">คืนแล้ว</div>
+              <div className="text-lg font-bold mt-1 text-emerald-900">{formatMoney(row.returned)}</div>
+            </div>
+            <div className="rounded-lg border border-red-100 bg-red-50/50 p-3 text-center">
+              <div className="text-xs text-red-700 font-semibold">คงค้าง</div>
+              <div className="text-lg font-bold mt-1 text-red-900">{formatMoney(row.remaining)}</div>
+            </div>
           </div>
 
-          <div className="grid gap-2">
-            <DetailLine label="บัญชีรับเงิน" value={row.recipientAccountLabel || '-'} />
+          {/* ข้อมูลบัญชีและผู้รับ */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลการยืมและผู้รับ</div>
+            <div className="grid grid-cols-1 gap-y-3">
+              <DetailItem label="บัญชีรับเงินของกรรมการ/พนักงาน" value={row.recipientAccountLabel || '-'} />
+              <DetailItem label="หมายเหตุการยืม" value={row.notes || '-'} />
+            </div>
           </div>
 
           <div>
             <div className="mb-2 font-bold text-slate-800">บิลค่าใช้จ่ายที่จ่ายจากเงินก้อนนี้</div>
-            <div className="rounded-md border border-slate-200 py-4 text-center text-slate-400">ยังไม่มีบิลที่ link อยู่ใน payload ปัจจุบัน</div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4 text-center text-slate-400">ยังไม่มีบิลที่ link อยู่ใน payload ปัจจุบัน</div>
           </div>
 
           <div>
             <div className="mb-2 font-bold text-emerald-700">ประวัติการคืนเงิน ({returns.length} ครั้ง)</div>
             {returns.length ? (
-              <table className="w-full border border-slate-200 text-xs">
-                <thead className="bg-slate-100"><tr><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">จำนวน</th><th className="p-2 text-left">บัญชีรับ</th><th className="p-2 text-left">หมายเหตุ</th></tr></thead>
-                <tbody>
-                  {returns.map((entry) => (
-                    <tr key={entry.id} className="border-t border-slate-200">
-                      <td className="p-2">{entry.date}</td>
-                      <td className="p-2 text-right font-bold text-emerald-700">{formatMoney(entry.amount)}</td>
-                      <td className="p-2">{entry.accountName}</td>
-                      <td className="p-2">{entry.notes || '-'}</td>
+              <div className="overflow-x-auto rounded-lg border border-slate-100 bg-white">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="p-2 text-left">วันที่</th>
+                      <th className="p-2 text-right">จำนวน</th>
+                      <th className="p-2 text-left">บัญชีรับ</th>
+                      <th className="p-2 text-left">หมายเหตุ</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <div className="rounded-md border border-slate-200 py-4 text-center text-slate-400">ยังไม่มีประวัติคืนเงิน</div>}
+                  </thead>
+                  <tbody>
+                    {returns.map((entry) => (
+                      <tr key={entry.id} className="border-t border-slate-100">
+                        <td className="p-2 font-mono">{entry.date}</td>
+                        <td className="p-2 text-right font-bold text-emerald-700 tabular-nums">{formatMoney(entry.amount)}</td>
+                        <td className="p-2 text-slate-700">{entry.accountName}</td>
+                        <td className="p-2 text-slate-600">{entry.notes || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 py-4 text-center text-slate-400">ยังไม่มีประวัติคืนเงิน</div>
+            )}
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3 rounded-b-md">
           {canReturn ? <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700" type="button" onClick={() => onReturn(row)}>คืนเงิน</button> : null}
-          <button className="rounded-md bg-slate-300 px-4 py-2 text-sm" type="button" onClick={onClose}>ปิด</button>
+          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
     </div>
   )
 }
 
-function DetailLine({ label, value }: { label: string; value: string }) {
+function DetailItem({ className = '', label, value }: { className?: string; label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 font-medium text-slate-900">{value || '-'}</div>
+    <div className={`flex flex-col py-1 ${className}`}>
+      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className="mt-0.5 text-xs sm:text-sm font-semibold text-slate-800">{value}</div>
     </div>
   )
 }

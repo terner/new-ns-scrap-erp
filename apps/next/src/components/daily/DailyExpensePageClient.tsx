@@ -1393,7 +1393,8 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
         </div>
 
         <div className="space-y-4 p-5">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          {/* Summary Band */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <SummaryTile emphasize label="Net Pay" value={formatMoney(row.netAmount)} />
             <SummaryTile label="ยอดก่อน VAT" value={formatMoney(row.amount)} />
             <SummaryTile label="VAT" value={formatMoney(row.vat)} />
@@ -1401,9 +1402,10 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-md border border-slate-200 bg-white p-4">
-              <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลเอกสาร</div>
-              <div className="grid gap-3 text-sm md:grid-cols-2">
+            {/* ข้อมูลเอกสาร */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
                 <DetailLine label="เลขที่เอกสาร" value={row.docNo} mono />
                 <DetailLine label="วันที่จ่าย" value={formatDateDisplay(row.date)} />
                 <DetailLine label="ครบกำหนด" value={row.dueDate ? formatDateDisplay(row.dueDate) : '-'} />
@@ -1415,44 +1417,46 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
               </div>
             </div>
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-              <div className="mb-3 text-sm font-semibold text-slate-900">สรุปยอด</div>
-              <div className="space-y-2">
+            {/* สรุปยอด */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">สรุปยอด</div>
+              <div className="space-y-3 pt-1">
                 <SummaryRow label="ยอดก่อน VAT" value={formatMoney(row.amount)} />
                 <SummaryRow label="+ VAT" value={formatMoney(row.vat)} />
                 <SummaryRow label="- WHT" value={formatMoney(row.wht)} />
-                <div className="border-t border-slate-200 pt-2">
+                <div className="border-t border-slate-100/80 pt-3">
                   <SummaryRow strong label="ยอดสุทธิ" value={formatMoney(row.netAmount)} />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">รายการค่าใช้จ่าย</div>
+          {/* รายการค่าใช้จ่าย */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 overflow-hidden">
+            <div className="border-b border-slate-100 px-4 py-3 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">รายการค่าใช้จ่าย</div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-xs">
-                <thead className="bg-slate-100 text-slate-700">
+                <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
                   <tr>
-                    <th className="p-2 text-left font-semibold">หมวด</th>
-                    <th className="p-2 text-left font-semibold">รายละเอียด</th>
-                    <th className="p-2 text-right font-semibold">ยอดก่อน VAT</th>
-                    <th className="p-2 text-right font-semibold">VAT</th>
-                    <th className="p-2 text-right font-semibold">WHT</th>
-                    <th className="p-2 text-right font-semibold">ยอดสุทธิ</th>
+                    <th className="p-2.5 text-left font-semibold">หมวด</th>
+                    <th className="p-2.5 text-left font-semibold">รายละเอียด</th>
+                    <th className="p-2.5 text-right font-semibold">ยอดก่อน VAT</th>
+                    <th className="p-2.5 text-right font-semibold">VAT</th>
+                    <th className="p-2.5 text-right font-semibold">WHT</th>
+                    <th className="p-2.5 text-right font-semibold">ยอดสุทธิ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100/80">
                   {lines.map((line) => {
                     const lineNet = line.amount + line.vatAmount - line.whtAmount
                     return (
-                      <tr key={line.id}>
-                        <td className="p-2 align-top font-semibold text-slate-700">{line.categoryName || row.categoryName || '-'}</td>
-                        <td className="p-2 align-top text-slate-700">{line.description || '-'}</td>
-                        <td className="p-2 text-right font-semibold tabular-nums text-slate-700">{formatMoney(line.amount)}</td>
-                        <td className="p-2 text-right font-semibold tabular-nums text-emerald-700">{line.vatAmount > 0 ? formatMoney(line.vatAmount) : '-'}</td>
-                        <td className="p-2 text-right font-semibold tabular-nums text-amber-700">{line.whtAmount > 0 ? formatMoney(line.whtAmount) : '-'}</td>
-                        <td className="p-2 text-right font-semibold tabular-nums text-red-700">{formatMoney(lineNet)}</td>
+                      <tr key={line.id} className="hover:bg-slate-50/50">
+                        <td className="p-2.5 align-top font-semibold text-slate-700">{line.categoryName || row.categoryName || '-'}</td>
+                        <td className="p-2.5 align-top text-slate-600">{line.description || '-'}</td>
+                        <td className="p-2.5 text-right font-semibold tabular-nums text-slate-700">{formatMoney(line.amount)}</td>
+                        <td className="p-2.5 text-right font-semibold tabular-nums text-emerald-700">{line.vatAmount > 0 ? formatMoney(line.vatAmount) : '-'}</td>
+                        <td className="p-2.5 text-right font-semibold tabular-nums text-amber-700">{line.whtAmount > 0 ? formatMoney(line.whtAmount) : '-'}</td>
+                        <td className="p-2.5 text-right font-semibold tabular-nums text-red-700">{formatMoney(lineNet)}</td>
                       </tr>
                     )
                   })}
@@ -1461,9 +1465,19 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <DetailBlock label="รายละเอียดรวม" value={row.description || '-'} />
-            <DetailBlock label="หมายเหตุ" value={row.notes || '-'} />
+          {/* รายละเอียดรวมและหมายเหตุ */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดเพิ่มเติมและหมายเหตุ</div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">รายละเอียดรวม</div>
+                <div className="whitespace-pre-wrap text-xs sm:text-sm text-slate-700 bg-white/60 rounded-md border border-slate-100/50 p-3 min-h-[60px]">{row.description || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">หมายเหตุ</div>
+                <div className="whitespace-pre-wrap text-xs sm:text-sm text-slate-700 bg-white/60 rounded-md border border-slate-100/50 p-3 min-h-[60px]">{row.notes || '-'}</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1519,8 +1533,8 @@ function formatMonthLabel(month: string) {
 
 function SummaryTile({ emphasize = false, label, value }: { emphasize?: boolean; label: string; value: string }) {
   return (
-    <div className={`rounded-md border p-3 ${emphasize ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
-      <div className={`text-xs font-medium ${emphasize ? 'text-red-700' : 'text-slate-500'}`}>{label}</div>
+    <div className={`rounded-lg border p-3 transition-all ${emphasize ? 'border-red-100 bg-red-50/50' : 'border-slate-100 bg-slate-50/50'}`}>
+      <div className={`text-[10px] font-bold uppercase tracking-wider ${emphasize ? 'text-red-700' : 'text-slate-500'}`}>{label}</div>
       <div className={`mt-1 text-right text-base font-semibold tabular-nums ${emphasize ? 'text-red-700' : 'text-slate-900'}`}>
         {value}
       </div>
@@ -1529,31 +1543,31 @@ function SummaryTile({ emphasize = false, label, value }: { emphasize?: boolean;
 }
 
 function SummaryRow({ label, strong = false, tone = 'slate', value }: { label: string; strong?: boolean; tone?: 'red' | 'slate'; value: string }) {
-  const labelClass = tone === 'red' ? 'text-red-800' : 'text-slate-600'
-  const valueClass = tone === 'red' ? 'text-red-900' : 'text-slate-900'
+  const labelClass = tone === 'red' ? 'text-red-800 font-medium' : 'text-slate-500 font-medium'
+  const valueClass = tone === 'red' ? 'text-red-700 font-semibold' : 'text-slate-800 font-semibold'
 
   return (
-    <div className={`flex items-center justify-between gap-3 ${strong ? 'text-base font-semibold' : 'text-sm'}`}>
+    <div className={`flex items-center justify-between gap-3 text-xs ${strong ? 'text-sm font-semibold' : ''}`}>
       <span className={labelClass}>{label}</span>
-      <span className={`text-right tabular-nums ${strong ? 'text-lg font-bold' : 'font-semibold'} ${valueClass}`}>{value}</span>
+      <span className={`text-right tabular-nums ${strong ? 'text-base font-bold text-slate-900' : valueClass}`}>{value}</span>
     </div>
   )
 }
 
 function DetailLine({ label, mono = false, value }: { label: string; mono?: boolean; value: string }) {
   return (
-    <div>
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={`mt-1 font-semibold text-slate-900 ${mono ? 'font-mono text-xs' : 'text-sm'}`}>{value}</div>
+    <div className="flex flex-col py-1">
+      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className={`mt-0.5 text-xs sm:text-sm font-semibold text-slate-800 ${mono ? 'font-mono' : ''}`}>{value}</div>
     </div>
   )
 }
 
 function DetailBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{value}</div>
+    <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className="mt-2 whitespace-pre-wrap text-xs sm:text-sm text-slate-700">{value}</div>
     </div>
   )
 }
