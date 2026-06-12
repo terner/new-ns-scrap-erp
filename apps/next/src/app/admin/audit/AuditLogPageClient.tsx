@@ -351,44 +351,62 @@ export function AuditLogPageClient() {
       </div>
 
       {selectedRow ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 pt-8" role="dialog" aria-modal="true">
           <div className="w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{eventTitle(selectedRow.eventType)}</h3>
-                <p className="mt-1 text-sm text-slate-500">{formatDate(selectedRow.createdAt)} · {selectedRow.id}</p>
+                <p className="mt-0.5 text-xs text-slate-400">ID: {selectedRow.id}</p>
               </div>
-              <button className="rounded-md px-3 py-1 text-sm text-slate-600 hover:bg-slate-200" type="button" onClick={() => setSelectedRow(null)}>ปิด</button>
+              <button className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-600 hover:bg-slate-200" type="button" onClick={() => setSelectedRow(null)}>ปิด</button>
             </div>
-            <div className="grid gap-4 p-5 text-sm md:grid-cols-2">
-              <div>
-                <div className="text-xs font-semibold uppercase text-slate-500">กลุ่ม</div>
-                <div className="mt-1">{eventGroup(selectedRow.eventType)}</div>
+            
+            <div className="space-y-4 p-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* ข้อมูลเหตุการณ์ */}
+                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเหตุการณ์</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    <DetailItem label="กลุ่ม" value={eventGroup(selectedRow.eventType)} />
+                    <DetailItem label="เวลา" value={formatDate(selectedRow.createdAt)} />
+                    <DetailItem className="col-span-2" label="Event Type" value={selectedRow.eventType} mono />
+                  </div>
+                </div>
+
+                {/* ผู้ทำและเป้าหมาย */}
+                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ผู้ทำและเป้าหมาย</div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <DetailItem label="ผู้ทำรายการ" value={userLabel(selectedRow.actor)} />
+                    <DetailItem label="เป้าหมาย" value={userLabel(selectedRow.target)} />
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="text-xs font-semibold uppercase text-slate-500">Event Type</div>
-                <div className="mt-1 font-mono text-xs">{selectedRow.eventType}</div>
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase text-slate-500">ผู้ทำรายการ</div>
-                <div className="mt-1">{userLabel(selectedRow.actor)}</div>
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase text-slate-500">เป้าหมาย</div>
-                <div className="mt-1">{userLabel(selectedRow.target)}</div>
-              </div>
-              <div className="md:col-span-2">
-                <div className="text-xs font-semibold uppercase text-slate-500">User Agent</div>
-                <div className="mt-1 break-words font-mono text-xs text-slate-600">{selectedRow.userAgent || '-'}</div>
-              </div>
-              <div className="md:col-span-2">
-                <div className="text-xs font-semibold uppercase text-slate-500">Metadata</div>
-                <pre className="mt-2 max-h-80 overflow-auto rounded-md bg-slate-950 p-4 text-xs text-slate-100">{metadataText(selectedRow.metadata)}</pre>
+
+              {/* ข้อมูลระบบและเมทาดาตา */}
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลระบบและเมทาดาตา</div>
+                <div className="space-y-4">
+                  <DetailItem label="User Agent" value={selectedRow.userAgent || '-'} />
+                  <div>
+                    <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">Metadata</div>
+                    <pre className="max-h-60 overflow-auto rounded-md bg-slate-950 p-3.5 font-mono text-[11px] leading-relaxed text-slate-200">{metadataText(selectedRow.metadata)}</pre>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       ) : null}
     </section>
+  )
+}
+
+function DetailItem({ className = '', label, value, mono = false }: { className?: string; label: string; value: string; mono?: boolean }) {
+  return (
+    <div className={`flex flex-col py-1 ${className}`}>
+      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className={`mt-0.5 text-xs sm:text-sm font-semibold text-slate-800 ${mono ? 'font-mono' : ''}`}>{value}</div>
+    </div>
   )
 }

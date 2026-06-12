@@ -302,28 +302,28 @@ export function SystemSettingsPageClient() {
       )}
 
       {pendingSave ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-md rounded-md bg-white shadow-xl">
-            <div className="border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-md bg-white shadow-xl">
+            <div className="border-b border-slate-100 px-5 py-4 bg-white">
               <h2 className="text-lg font-bold text-slate-900">ยืนยันการเปลี่ยนค่าระบบ</h2>
-              <p className="mt-1 text-sm text-slate-600">{pendingSave.record.name}</p>
+              <p className="mt-1 text-sm text-slate-500">{pendingSave.record.name}</p>
             </div>
 
-            <div className="space-y-4 px-5 py-4 text-sm">
-              <div className="font-semibold text-slate-900">{pendingSave.label}</div>
+            <div className="space-y-4 px-5 py-5 text-sm">
+              <div className="font-semibold text-slate-700">{pendingSave.label}</div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md bg-slate-50 p-3">
-                  <div className="text-xs text-slate-500">ค่าเดิม</div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ค่าเดิม</div>
                   <div className="mt-1 text-xl font-bold text-slate-700">{pendingSave.currentValue ?? '-'}%</div>
                 </div>
-                <div className="rounded-md bg-amber-50 p-3">
-                  <div className="text-xs text-amber-700">ค่าใหม่</div>
+                <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3">
+                  <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">ค่าใหม่</div>
                   <div className="mt-1 text-xl font-bold text-amber-800">{pendingSave.nextValue}%</div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 bg-white">
               <Button
                 disabled={savingKey !== null}
                 size="sm"

@@ -401,9 +401,9 @@ export function AdminUsersPageClient() {
       </div>
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-          <form className="mt-10 w-full max-w-2xl overflow-hidden rounded-md border bg-white shadow-xl" onSubmit={saveUser}>
-            <div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4">
+          <form className="mt-10 w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveUser}>
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
               <h3 className="text-lg font-bold text-slate-900">{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้'}</h3>
               <ActiveToggle checked={form.active} onChange={(checked) => setForm((current) => ({ ...current, active: checked }))} />
             </div>
@@ -411,55 +411,55 @@ export function AdminUsersPageClient() {
             <div className="grid gap-4 px-5 py-5 md:grid-cols-2">
               <label className="text-sm font-medium text-slate-700">
                 Username *
-                <input className="mt-1 w-full rounded-md border px-3 py-2" value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} />
+                <input className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-100" value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} />
               </label>
               <label className="text-sm font-medium text-slate-700">
                 Email *
-                <input className="mt-1 w-full rounded-md border px-3 py-2" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+                <input className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-100" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
               </label>
               <label className="md:col-span-2 text-sm font-medium text-slate-700">
                 ชื่อผู้ใช้ *
-                <input className="mt-1 w-full rounded-md border px-3 py-2" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
+                <input className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-100" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
               </label>
 
-              <fieldset className="rounded-md border p-3">
-                <legend className="px-1 text-sm font-bold text-slate-700">Roles *</legend>
-                <div className="mt-2 grid gap-2">
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">Roles *</div>
+                <div className="grid gap-2">
                   {data?.roles.filter((role) => role.active).map((role) => (
-                    <label key={role.id} className="flex items-center gap-2 text-sm text-slate-700">
-                      <input checked={form.roleIds.includes(role.id)} type="checkbox" onChange={() => toggleFormArray('roleIds', role.id)} />
+                    <label key={role.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input checked={form.roleIds.includes(role.id)} type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" onChange={() => toggleFormArray('roleIds', role.id)} />
                       <span>{role.name}</span>
                       <span className="font-mono text-xs text-slate-400">{role.code}</span>
                     </label>
                   ))}
                 </div>
-              </fieldset>
+              </div>
 
-              <fieldset className="rounded-md border p-3">
-                <legend className="px-1 text-sm font-bold text-slate-700">สาขาที่เข้าถึง</legend>
-                <div className="mt-2 grid gap-2">
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">สาขาที่เข้าถึง</div>
+                <div className="grid gap-2">
                   {data?.branches.map((branch) => (
-                    <label key={branch.id} className="flex items-center gap-2 text-sm text-slate-700">
-                      <input checked={form.branchIds.includes(branch.id)} type="checkbox" onChange={() => toggleFormArray('branchIds', branch.id)} />
+                    <label key={branch.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input checked={form.branchIds.includes(branch.id)} type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" onChange={() => toggleFormArray('branchIds', branch.id)} />
                       <span>{branch.name}</span>
                       <span className="font-mono text-xs text-slate-400">{branch.code}</span>
                     </label>
                   ))}
                   {data?.branches.length === 0 ? <span className="text-sm text-slate-500">ยังไม่มีสาขาที่เปิดใช้งาน</span> : null}
                 </div>
-              </fieldset>
+              </div>
 
-              <label className="md:col-span-2 flex items-center gap-2 text-sm text-slate-700">
-                <input checked={form.mustChangePassword} type="checkbox" onChange={(event) => setForm((current) => ({ ...current, mustChangePassword: event.target.checked }))} />
+              <label className="md:col-span-2 flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                <input checked={form.mustChangePassword} type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" onChange={(event) => setForm((current) => ({ ...current, mustChangePassword: event.target.checked }))} />
                 บังคับเปลี่ยน password หลังเข้าสู่ระบบ
               </label>
 
               {formError ? <p className="md:col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p> : null}
             </div>
 
-            <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-4">
-              <button className="rounded-md px-4 py-2 text-sm text-slate-600" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-              <button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={isSaving} type="submit">
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4">
+              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-50" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 transition-colors" disabled={isSaving} type="submit">
                 {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
               </button>
             </div>
