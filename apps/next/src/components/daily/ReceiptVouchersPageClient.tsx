@@ -695,122 +695,145 @@ function ReceiptVoucherFormModal({
   purchaseBillSearchOptions: SearchComboboxOption[]
 }) {
   const totals = formTotals(form)
+  const [showSellerDetails, setShowSellerDetails] = useState(false)
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-3 print:hidden">
-      <div className="mx-auto my-4 max-w-6xl rounded-md bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 md:p-3 print:hidden flex items-stretch md:items-start justify-center">
+      <div className="w-full md:max-w-6xl rounded-none md:rounded-md bg-white shadow-xl flex flex-col h-screen md:h-auto md:max-h-[calc(100vh-80px)] my-0 md:my-4 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 md:px-5 py-3 shrink-0">
           <div>
             <h3 className="text-base font-bold text-slate-900">{mode === 'edit' ? 'แก้ไข' : 'สร้าง'}ใบสำคัญรับเงิน</h3>
-            <p className="text-xs text-slate-500">ใช้สำหรับ Supplier รับเงินสดจากบริษัท กรณีไม่มีใบเสร็จจาก Supplier</p>
+            <p className="hidden md:block text-xs text-slate-500">ใช้สำหรับ Supplier รับเงินสดจากบริษัท กรณีไม่มีใบเสร็จจาก Supplier</p>
           </div>
           <button className="text-2xl leading-none text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>&times;</button>
         </div>
 
-        <div className="max-h-[calc(100vh-150px)] space-y-4 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-4">
           {formError ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{formError}</div> : null}
 
-          <section className="rounded-md border border-amber-200 bg-amber-50 p-3">
-            <div className="mb-3 text-sm font-semibold text-amber-950">ข้อมูลหลัก</div>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_1fr_180px]">
-              <SearchCombobox
-                inputClassName="h-9 bg-white"
-                inputId="rv-supplier"
-                label="Supplier"
-                options={supplierSearchOptions}
-                optionsPanelClassName="max-h-80"
-                placeholder="ค้นรหัส / ชื่อ Supplier / เลขภาษี"
-                value={form.supplierCode}
-                onChange={onPickSupplier}
-              />
-              <SearchCombobox
-                inputClassName="h-9 bg-white"
-                inputId="rv-purchase-bill"
-                label="อ้างอิงบิลซื้อ"
-                options={purchaseBillSearchOptions}
-                optionsPanelClassName="max-h-80"
-                placeholder={form.supplierCode ? 'ค้นเลขบิลซื้อ' : 'เลือก Supplier ก่อน'}
-                value={form.purchaseBillDocNo}
-                onChange={onPickPurchaseBill}
-              />
-              <FormField label="วันที่ออกเอกสาร">
-                <DatePickerInput id="rv-date" value={form.date} onChange={(value) => onUpdateForm({ date: value })} />
-              </FormField>
+          <section className="rounded-md border border-amber-200 bg-amber-50 p-2.5 md:p-3">
+            <div className="mb-2 md:mb-3 text-xs md:text-sm font-semibold text-amber-950">ข้อมูลหลัก</div>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-[1.2fr_1fr_180px] md:gap-3">
+              <div className="col-span-2 md:col-span-1">
+                <SearchCombobox
+                  inputClassName="h-9 bg-white"
+                  inputId="rv-supplier"
+                  label="Supplier"
+                  options={supplierSearchOptions}
+                  optionsPanelClassName="max-h-80"
+                  placeholder="ค้นรหัส / ชื่อ Supplier / เลขภาษี"
+                  value={form.supplierCode}
+                  onChange={onPickSupplier}
+                />
+              </div>
+              <div className="col-span-1">
+                <SearchCombobox
+                  inputClassName="h-9 bg-white"
+                  inputId="rv-purchase-bill"
+                  label="อ้างอิงบิลซื้อ"
+                  options={purchaseBillSearchOptions}
+                  optionsPanelClassName="max-h-80"
+                  placeholder={form.supplierCode ? 'ค้นเลขบิลซื้อ' : 'เลือก Supplier ก่อน'}
+                  value={form.purchaseBillDocNo}
+                  onChange={onPickPurchaseBill}
+                />
+              </div>
+              <div className="col-span-1">
+                <FormField label="วันที่ออกเอกสาร">
+                  <DatePickerInput id="rv-date" value={form.date} onChange={(value) => onUpdateForm({ date: value })} />
+                </FormField>
+              </div>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-2 rounded-md border border-amber-200 bg-white/70 p-3 text-xs text-slate-700 md:grid-cols-2">
-              <ReadOnlyInfo label="ผู้รับเงิน" value={form.sellerName} />
-              <ReadOnlyInfo label="เลขประจำตัวผู้เสียภาษี" value={form.sellerTaxId} />
-              <ReadOnlyInfo label="ที่อยู่" value={form.sellerAddress} wide />
-              <ReadOnlyInfo label="เบอร์โทร" value={form.sellerPhone} />
-              <ReadOnlyInfo label="ช่องทางติดต่อ Sale" value={form.salesPerson} />
-            </div>
+            
+            {/* Seller Info Collapsible on Mobile */}
+            {form.sellerName ? (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-md border border-amber-200 bg-amber-100/50 px-3 py-1.5 text-xs font-semibold text-amber-950 md:hidden focus-visible:outline-none"
+                  onClick={() => setShowSellerDetails(!showSellerDetails)}
+                >
+                  <span>📋 {showSellerDetails ? 'ซ่อนรายละเอียดผู้รับเงิน' : 'ดูรายละเอียดผู้รับเงิน'}</span>
+                  <span className="text-[10px]">{showSellerDetails ? '▲' : '▼'}</span>
+                </button>
+                
+                <div className={`${showSellerDetails ? 'grid' : 'hidden'} md:grid mt-2 md:mt-3 grid-cols-1 gap-2 rounded-md border border-amber-200 bg-white/70 p-3 text-xs text-slate-700 md:grid-cols-2`}>
+                  <ReadOnlyInfo label="ผู้รับเงิน" value={form.sellerName} />
+                  <ReadOnlyInfo label="เลขประจำตัวผู้เสียภาษี" value={form.sellerTaxId} />
+                  <ReadOnlyInfo label="ที่อยู่" value={form.sellerAddress} wide />
+                  <ReadOnlyInfo label="เบอร์โทร" value={form.sellerPhone} />
+                  <ReadOnlyInfo label="ช่องทางติดต่อ Sale" value={form.salesPerson} />
+                </div>
+              </div>
+            ) : null}
           </section>
 
-          <section className="rounded-md border border-slate-200 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-slate-800">รายการค่าใช้จ่าย/สินค้า ({form.items.length})</div>
+          <section className="rounded-md border border-slate-200 p-2.5 md:p-3">
+            <div className="mb-1.5 md:mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs md:text-sm font-semibold text-slate-800">รายการค่าใช้จ่าย/สินค้า ({form.items.length})</div>
             </div>
             <div className="overflow-x-auto rounded-md border border-slate-200">
               <table className="w-full min-w-[820px] text-xs">
                 <thead className="bg-slate-100 text-slate-700">
                   <tr>
-                    <th className="w-10 p-2 text-center">#</th>
-                    <th className="p-2 text-left">รายการ</th>
-                    <th className="w-24 p-2 text-left">หน่วย</th>
-                    <th className="w-32 p-2 text-right">จำนวน</th>
-                    <th className="w-32 p-2 text-right">ราคา/หน่วย</th>
-                    <th className="w-36 p-2 text-right">จำนวนเงิน</th>
+                    <th className="w-10 p-1.5 md:p-2 text-center">#</th>
+                    <th className="p-1.5 md:p-2 text-left">รายการ</th>
+                    <th className="w-24 p-1.5 md:p-2 text-left">หน่วย</th>
+                    <th className="w-32 p-1.5 md:p-2 text-right">จำนวน</th>
+                    <th className="w-32 p-1.5 md:p-2 text-right">ราคา/หน่วย</th>
+                    <th className="w-36 p-1.5 md:p-2 text-right">จำนวนเงิน</th>
                   </tr>
                 </thead>
                 <tbody>
                   {form.items.length === 0 ? (
                     <tr>
-                      <td className="p-6 text-center text-slate-400" colSpan={6}>เลือกบิลซื้อเพื่อเติมรายการสินค้าอัตโนมัติ</td>
+                      <td className="p-4 md:p-6 text-center text-slate-400" colSpan={6}>เลือกบิลซื้อเพื่อเติมรายการสินค้าอัตโนมัติ</td>
                     </tr>
                   ) : form.items.map((item, index) => (
                     <tr key={index} className="border-t border-slate-100">
-                      <td className="p-2 text-center text-slate-400">{index + 1}</td>
-                      <td className="p-2 font-medium text-slate-800">{item.description || '-'}</td>
-                      <td className="p-2 text-slate-600">{item.unit || 'กก.'}</td>
-                      <td className="p-2 text-right tabular-nums">{formatMoney(toNumber(item.qty))}</td>
-                      <td className="p-2 text-right tabular-nums">{formatMoney(toNumber(item.price))}</td>
-                      <td className="p-2 text-right font-semibold text-emerald-700">{formatMoney(itemAmount(item))}</td>
+                      <td className="p-1.5 md:p-2 text-center text-slate-400">{index + 1}</td>
+                      <td className="p-1.5 md:p-2 font-medium text-slate-800">{item.description || '-'}</td>
+                      <td className="p-1.5 md:p-2 text-slate-600">{item.unit || 'กก.'}</td>
+                      <td className="p-1.5 md:p-2 text-right tabular-nums">{formatMoney(toNumber(item.qty))}</td>
+                      <td className="p-1.5 md:p-2 text-right tabular-nums">{formatMoney(toNumber(item.price))}</td>
+                      <td className="p-1.5 md:p-2 text-right font-semibold text-emerald-700">{formatMoney(itemAmount(item))}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-slate-50 font-semibold">
                   <tr>
-                    <td className="p-2 text-right" colSpan={3}>รวม</td>
-                    <td className="p-2 text-right">{formatMoney(totals.qty)}</td>
+                    <td className="p-1.5 md:p-2 text-right" colSpan={3}>รวม</td>
+                    <td className="p-1.5 md:p-2 text-right">{formatMoney(totals.qty)}</td>
                     <td />
-                    <td className="p-2 text-right text-emerald-700">{formatMoney(totals.amount)}</td>
+                    <td className="p-1.5 md:p-2 text-right text-emerald-700">{formatMoney(totals.amount)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
-              <div className="flex min-h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800">
+            <div className="mt-2 md:mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+              <div className="flex min-h-8 md:min-h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2 md:px-3 text-xs md:text-sm text-slate-800">
                 {form.amountInWords || thaiBahtText(totals.amount) || '-'}
               </div>
             </div>
           </section>
 
-          <section className="rounded-md border border-slate-200 p-3">
-            <div className="mb-3 text-sm font-semibold text-slate-800">หมายเหตุและผู้ลงนาม</div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <FormField className="md:col-span-2" label="หมายเหตุ">
+          <section className="rounded-md border border-slate-200 p-2.5 md:p-3">
+            <div className="mb-2 md:mb-3 text-xs md:text-sm font-semibold text-slate-800">หมายเหตุและผู้ลงนาม</div>
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
+              <FormField className="col-span-2" label="หมายเหตุ">
                 <textarea
-                  className="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                  className="h-10 md:h-20 min-h-10 md:min-h-20 w-full rounded-md border border-slate-300 px-3 py-1.5 md:py-2 text-xs md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
                   value={form.note}
                   onChange={(event) => onUpdateForm({ note: event.target.value })}
                 />
               </FormField>
               <FormField label="วิธีรับเงิน">
-                <div className="flex h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800">
+                <div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 md:px-3 text-xs md:text-sm font-semibold text-slate-800">
                   รับเงินสด
                 </div>
               </FormField>
               <FormField label="ผู้จ่ายเงิน (ลายเซ็น)">
-                <div className="flex h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800">
+                <div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 md:px-3 text-xs md:text-sm font-semibold text-slate-800 truncate">
                   {form.payerSignerName || '-'}
                 </div>
               </FormField>
@@ -818,7 +841,7 @@ function ReceiptVoucherFormModal({
           </section>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 md:px-5 py-3 shrink-0">
           <Button disabled={isSaving} type="button" variant="secondary" onClick={onClose}>ยกเลิก</Button>
           <Button disabled={isSaving} type="button" onClick={onSave}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
         </div>
