@@ -26,6 +26,9 @@ type VoucherItem = {
 
 type ReceiptVoucherRow = {
   amountInWords: string
+  cancelNote?: string
+  cancelledAt?: string
+  cancelledBy?: string
   createdAt?: string
   createdBy?: string
   date: string
@@ -43,10 +46,22 @@ type ReceiptVoucherRow = {
   sellerName: string
   sellerPhone: string
   sellerTaxId: string
+  status: string
+  timeline?: ReceiptVoucherTimelineEvent[]
   totalAmount: number
   totalQty: number
   updatedAt?: string
   updatedBy?: string
+}
+type ReceiptVoucherTimelineEvent = {
+  action: string
+  createdAt: string
+  createdBy: string
+  fromStatus: string
+  id: string
+  note: string
+  toStatus: string
+  totalAmount: number
 }
 type ReceiptVoucherFormItem = {
   description: string
@@ -94,7 +109,7 @@ type PurchaseBillOption = {
   sellerTaxId: string
   totalAmount: number
 }
-type ReceiptVoucherColumnKey = 'action' | 'date' | 'docNo' | 'licensePlate' | 'purchaseBillDocNo' | 'sellerName' | 'sellerTaxId' | 'totalAmount' | 'totalQty'
+type ReceiptVoucherColumnKey = 'action' | 'date' | 'docNo' | 'licensePlate' | 'purchaseBillDocNo' | 'sellerName' | 'sellerTaxId' | 'status' | 'totalAmount' | 'totalQty'
 
 type ReceiptVoucherCompanyProfile = {
   address: string
@@ -112,9 +127,10 @@ const receiptVoucherColumns: Array<ResizableColumnDefinition<ReceiptVoucherColum
   { key: 'sellerTaxId', defaultWidth: 130, minWidth: 110 },
   { key: 'purchaseBillDocNo', defaultWidth: 110, minWidth: 90 },
   { key: 'licensePlate', defaultWidth: 100, minWidth: 80 },
+  { key: 'status', defaultWidth: 96, minWidth: 80 },
   { key: 'totalQty', defaultWidth: 85, minWidth: 70 },
   { key: 'totalAmount', defaultWidth: 85, minWidth: 70 },
-  { key: 'action', defaultWidth: 140, minWidth: 100 },
+  { key: 'action', defaultWidth: 180, minWidth: 150 },
 ]
 
 function dateInputToday() {
@@ -215,8 +231,12 @@ function normalizeFormFromRow(row: ReceiptVoucherRow): ReceiptVoucherFormState {
 }
 
 export function ReceiptVouchersPageClient() {
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [cancelNote, setCancelNote] = useState('')
+  const [cancelingRow, setCancelingRow] = useState<ReceiptVoucherRow | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [detailRow, setDetailRow] = useState<ReceiptVoucherRow | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -294,8 +314,8 @@ export function ReceiptVouchersPageClient() {
   })), [filteredPurchaseBillOptions])
 
   const totals = useMemo(() => ({
-    amount: filteredRows.reduce((sum, row) => sum + row.totalAmount, 0),
-    qty: filteredRows.reduce((sum, row) => sum + row.totalQty, 0),
+    amount: filteredRows.filter((row) => row.status !== 'cancelled').reduce((sum, row) => sum + row.totalAmount, 0),
+    qty: filteredRows.filter((row) => row.status !== 'cancelled').reduce((sum, row) => sum + row.totalQty, 0),
   }), [filteredRows])
 
   const totalRows = filteredRows.length
@@ -317,6 +337,7 @@ export function ReceiptVouchersPageClient() {
   }
 
   function openEditForm(row: ReceiptVoucherRow) {
+    if (row.status === 'cancelled') return
     setForm(normalizeFormFromRow(row))
     setFormError(null)
     setFormMode('edit')
@@ -426,6 +447,30 @@ export function ReceiptVouchersPageClient() {
     }
   }
 
+  async function cancelReceiptVoucher() {
+    if (!cancelingRow) return
+    const note = cancelNote.trim()
+    if (!note) {
+      setCancelError('กรุณากรอกเหตุผลการยกเลิก')
+      return
+    }
+    setIsSaving(true)
+    setCancelError(null)
+    try {
+      await dailyFetchJson('/api/purchase/receipt-vouchers', {
+        body: JSON.stringify({ action: 'cancel', docNo: cancelingRow.docNo, note }),
+        method: 'PATCH',
+      })
+      setCancelingRow(null)
+      setCancelNote('')
+      await loadData()
+    } catch (caught) {
+      setCancelError(caught instanceof Error ? caught.message : 'ยกเลิกใบสำคัญรับเงินไม่ได้')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <>
       <section className="space-y-4 print:hidden">
@@ -433,9 +478,9 @@ export function ReceiptVouchersPageClient() {
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <KpiCard label="จำนวนเอกสาร" tone="slate" value={totalRows.toLocaleString('th-TH')} />
-          <KpiCard label="น้ำหนักรวม (กก.)" tone="blue" value={formatMoney(totals.qty)} />
-          <KpiCard label="จำนวนเงินรวม" tone="emerald" value={formatMoney(totals.amount)} />
-          <KpiCard label="ผู้รับเงินไม่ซ้ำ" tone="violet" value={new Set(filteredRows.map((row) => row.sellerName).filter(Boolean)).size.toLocaleString('th-TH')} />
+          <KpiCard label="น้ำหนัก active (กก.)" tone="blue" value={formatMoney(totals.qty)} />
+          <KpiCard label="ยอด active" tone="emerald" value={formatMoney(totals.amount)} />
+          <KpiCard label="ยกเลิก" tone="violet" value={filteredRows.filter((row) => row.status === 'cancelled').length.toLocaleString('th-TH')} />
         </div>
 
         <div className="rounded-md bg-white p-3 shadow">
@@ -549,7 +594,7 @@ export function ReceiptVouchersPageClient() {
             <div
               key={row.id}
               className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
-              onClick={() => setPrintingRow(row)}
+              onClick={() => setDetailRow(row)}
             >
               <div className="flex justify-between items-start mb-2">
                 <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
@@ -558,6 +603,7 @@ export function ReceiptVouchersPageClient() {
               <div className="text-sm font-semibold text-slate-700 mb-2">
                 {row.sellerName || '-'}
               </div>
+              <div className="mb-2"><StatusPill status={row.status} /></div>
               <div className="text-xs text-slate-500 space-y-1 mb-3">
                 {row.sellerTaxId ? <div>เลขประจำตัวผู้เสียภาษี: {row.sellerTaxId}</div> : null}
                 {row.purchaseBillDocNo ? <div>บิลซื้อ: <span className="font-semibold text-slate-700">{row.purchaseBillDocNo}</span></div> : null}
@@ -592,35 +638,37 @@ export function ReceiptVouchersPageClient() {
                 <ResizableTableHead label="เลขประจำตัวผู้เสียภาษี" resizeProps={columnResize.getResizeHandleProps('sellerTaxId', 'เลขประจำตัวผู้เสียภาษี')} />
                 <ResizableTableHead label="บิลซื้อ" resizeProps={columnResize.getResizeHandleProps('purchaseBillDocNo', 'บิลซื้อ')} />
                 <ResizableTableHead label="ทะเบียน" resizeProps={columnResize.getResizeHandleProps('licensePlate', 'ทะเบียน')} />
+                <ResizableTableHead label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
                 <ResizableTableHead align="right" label="น้ำหนัก (กก.)" resizeProps={columnResize.getResizeHandleProps('totalQty', 'น้ำหนัก (กก.)')} />
                 <ResizableTableHead align="right" label="จำนวนเงิน" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'จำนวนเงิน')} />
                 <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
               </tr>
             </TableHeader>
             <TableBody>
-              {isLoading ? <TableRow><td className="p-8 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></TableRow> : null}
+              {isLoading ? <TableRow><td className="p-8 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></TableRow> : null}
               {!isLoading && pagedRows.map((row) => (
-                <TableRow key={row.id} className="hover:bg-slate-50">
+                <TableRow key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setDetailRow(row)}>
                   <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.docNo}</td>
                   <td className="whitespace-nowrap p-2">{formatDateDisplay(row.date)}</td>
                   <td className="p-2 font-medium text-slate-800">{row.sellerName || '-'}</td>
                   <td className="p-2 text-xs text-slate-500">{row.sellerTaxId || '-'}</td>
                   <td className="p-2 text-xs text-slate-700">{row.purchaseBillDocNo || '-'}</td>
                   <td className="p-2 text-xs text-slate-600">{row.licensePlate || '-'}</td>
+                  <td className="p-2"><StatusPill status={row.status} /></td>
                   <TableNumberCell value={formatMoney(row.totalQty)} />
                   <TableNumberCell strong value={formatMoney(row.totalAmount)} />
                   <td className="whitespace-nowrap p-2 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60" type="button" onClick={() => setPrintingRow(row)}>
+                      <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60" type="button" onClick={(event) => { event.stopPropagation(); setPrintingRow(row) }}>
                         พิมพ์
                       </button>
-                      <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => openEditForm(row)}>แก้ไข</button>
-                      <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button">ยกเลิก</button>
+                      <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={row.status === 'cancelled'} type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
+                      <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={row.status === 'cancelled'} type="button" onClick={(event) => { event.stopPropagation(); setCancelingRow(row); setCancelNote(''); setCancelError(null) }}>ยกเลิก</button>
                     </div>
                   </td>
                 </TableRow>
               ))}
-              {!isLoading && totalRows === 0 ? <TableRow><td className="p-8 text-center text-slate-400" colSpan={9}>ยังไม่มีใบสำคัญรับเงิน</td></TableRow> : null}
+              {!isLoading && totalRows === 0 ? <TableRow><td className="p-8 text-center text-slate-400" colSpan={10}>ยังไม่มีใบสำคัญรับเงิน</td></TableRow> : null}
             </TableBody>
           </Table>
         </div>
@@ -642,6 +690,23 @@ export function ReceiptVouchersPageClient() {
         />
       ) : null}
 
+      {detailRow ? <ReceiptVoucherDetailModal row={detailRow} onClose={() => setDetailRow(null)} onPrint={() => setPrintingRow(detailRow)} /> : null}
+      {cancelingRow ? (
+        <CancelReceiptVoucherDialog
+          error={cancelError}
+          isSaving={isSaving}
+          note={cancelNote}
+          row={cancelingRow}
+          onCancel={() => {
+            if (isSaving) return
+            setCancelingRow(null)
+            setCancelNote('')
+            setCancelError(null)
+          }}
+          onConfirm={cancelReceiptVoucher}
+          onNoteChange={setCancelNote}
+        />
+      ) : null}
       {printingRow ? <PrintPreview companyProfile={companyProfile} row={printingRow} onClose={() => setPrintingRow(null)} /> : null}
     </>
   )
@@ -838,6 +903,152 @@ function KpiCard({ label, tone, value }: { label: string; tone: 'blue' | 'emeral
   )
 }
 
+function receiptVoucherStatusLabel(status: string) {
+  if (status === 'cancelled') return 'ยกเลิก'
+  return 'ใช้งาน'
+}
+
+function receiptVoucherActionLabel(action: string) {
+  if (action === 'cancelled') return 'ยกเลิกเอกสาร'
+  if (action === 'edited') return 'แก้ไขเอกสาร'
+  if (action === 'created') return 'สร้างเอกสาร'
+  return action || '-'
+}
+
+function StatusPill({ status }: { status: string }) {
+  const isCancelled = status === 'cancelled'
+  return (
+    <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ${isCancelled ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
+      {receiptVoucherStatusLabel(status)}
+    </span>
+  )
+}
+
+function ReceiptVoucherDetailModal({ onClose, onPrint, row }: { onClose: () => void; onPrint: () => void; row: ReceiptVoucherRow }) {
+  const timeline = row.timeline ?? []
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-3 print:hidden">
+      <div className="mx-auto my-4 max-w-4xl rounded-md bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900">รายละเอียดใบสำคัญรับเงิน {row.docNo}</h3>
+              <StatusPill status={row.status} />
+            </div>
+            <p className="mt-1 text-xs text-slate-500">เอกสารหลักฐานรับเงินสดจาก Supplier ไม่กระทบ PMT/BST/AP/stock</p>
+          </div>
+          <button className="text-2xl leading-none text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>&times;</button>
+        </div>
+
+        <div className="max-h-[calc(100vh-150px)] space-y-4 overflow-y-auto p-5">
+          {row.status === 'cancelled' ? (
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <div className="font-semibold">เหตุผลการยกเลิก</div>
+              <div className="mt-1 whitespace-pre-wrap">{row.cancelNote || '-'}</div>
+              <div className="mt-2 text-xs text-slate-500">ยกเลิกโดย {row.cancelledBy || '-'} เมื่อ {row.cancelledAt ? formatDateDisplay(row.cancelledAt.slice(0, 10)) : '-'}</div>
+            </div>
+          ) : null}
+
+          <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <DetailField label="วันที่ออกเอกสาร" value={formatDateDisplay(row.date)} />
+            <DetailField label="บิลซื้ออ้างอิง" value={row.purchaseBillDocNo || '-'} />
+            <DetailField label="ผู้รับเงิน" value={row.sellerName || '-'} />
+            <DetailField label="เลขประจำตัวผู้เสียภาษี" value={row.sellerTaxId || '-'} />
+            <DetailField label="ที่อยู่" value={row.sellerAddress || '-'} wide />
+            <DetailField label="เบอร์โทร" value={row.sellerPhone || '-'} />
+            <DetailField label="Sale contact" value={row.salesPerson || '-'} />
+            <DetailField label="ยอดเงิน" value={formatMoney(row.totalAmount)} />
+            <DetailField label="น้ำหนักรวม" value={formatMoney(row.totalQty)} />
+            <DetailField label="หมายเหตุ" value={row.note || '-'} wide />
+          </section>
+
+          <section className="rounded-md border border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">Timeline</div>
+            <div className="divide-y divide-slate-100">
+              {timeline.length === 0 ? (
+                <div className="p-4 text-sm text-slate-400">ยังไม่มี timeline</div>
+              ) : timeline.map((event) => (
+                <div key={event.id} className="grid gap-1 p-3 text-sm md:grid-cols-[150px_1fr_140px]">
+                  <div className="text-xs text-slate-500">{event.createdAt ? `${formatDateDisplay(event.createdAt.slice(0, 10))}` : '-'}</div>
+                  <div>
+                    <div className="font-semibold text-slate-800">{receiptVoucherActionLabel(event.action)}</div>
+                    <div className="text-xs text-slate-500">
+                      {event.fromStatus ? `${receiptVoucherStatusLabel(event.fromStatus)} -> ` : ''}{receiptVoucherStatusLabel(event.toStatus)}
+                    </div>
+                    {event.note ? <div className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{event.note}</div> : null}
+                  </div>
+                  <div className="text-right text-xs text-slate-500">{event.createdBy || '-'}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <Button type="button" variant="secondary" onClick={onClose}>ปิด</Button>
+          <Button type="button" onClick={onPrint}>พิมพ์</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DetailField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={`rounded-md border border-slate-200 bg-white p-3 ${wide ? 'md:col-span-2' : ''}`}>
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">{value}</div>
+    </div>
+  )
+}
+
+function CancelReceiptVoucherDialog({
+  error,
+  isSaving,
+  note,
+  onCancel,
+  onConfirm,
+  onNoteChange,
+  row,
+}: {
+  error: string | null
+  isSaving: boolean
+  note: string
+  onCancel: () => void
+  onConfirm: () => void
+  onNoteChange: (value: string) => void
+  row: ReceiptVoucherRow
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 print:hidden">
+      <div className="w-full max-w-lg rounded-md bg-white shadow-xl">
+        <div className="border-b border-slate-200 px-5 py-3">
+          <h3 className="text-base font-bold text-slate-900">ยกเลิกใบสำคัญรับเงิน {row.docNo}</h3>
+          <p className="mt-1 text-xs text-slate-500">{row.sellerName || '-'}</p>
+        </div>
+        <div className="space-y-3 p-5">
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            การยกเลิก RV จะ mark เอกสารเป็นยกเลิกและบันทึก timeline เท่านั้น ไม่ reverse payment หรือ stock
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">เหตุผลการยกเลิก *</span>
+            <textarea
+              className={`min-h-24 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 ${error ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+              value={note}
+              onChange={(event) => onNoteChange(event.target.value)}
+            />
+          </label>
+          {error ? <div className="text-xs text-red-600">{error}</div> : null}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <Button disabled={isSaving} type="button" variant="secondary" onClick={onCancel}>ปิด</Button>
+          <Button className="bg-red-600 hover:bg-red-700" disabled={isSaving} type="button" onClick={onConfirm}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PrintPreview({ companyProfile, onClose, row }: { companyProfile: ReceiptVoucherCompanyProfile; onClose: () => void; row: ReceiptVoucherRow }) {
   const items = normalizeItems(row)
   const printItems = items.length
@@ -859,9 +1070,14 @@ function PrintPreview({ companyProfile, onClose, row }: { companyProfile: Receip
       </div>
 
       <div
-        className="mx-auto my-6 min-h-[297mm] max-w-[210mm] bg-white p-[9mm] text-slate-900 shadow print:my-0 print:min-h-0 print:max-w-none print:p-0 print:shadow-none"
+        className="relative mx-auto my-6 min-h-[297mm] max-w-[210mm] bg-white p-[9mm] text-slate-900 shadow print:my-0 print:min-h-0 print:max-w-none print:p-0 print:shadow-none"
         style={{ fontFamily: "'Noto Sans Thai', Arial, sans-serif", fontSize: '11px', lineHeight: 1.35 }}
       >
+        {row.status === 'cancelled' ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[72px] font-black text-slate-200/70 rotate-[-18deg] print:text-[64px]">
+            ยกเลิก
+          </div>
+        ) : null}
         <div className="mb-3 h-1 rounded-full bg-gradient-to-r from-emerald-800 via-lime-600 to-slate-300 print:mb-2" />
 
         <header className="grid grid-cols-[1fr_0.82fr] gap-4 border-b border-slate-300 pb-3 print:gap-3 print:pb-2">
