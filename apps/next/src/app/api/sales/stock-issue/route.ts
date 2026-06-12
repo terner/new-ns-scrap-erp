@@ -86,6 +86,11 @@ const stockIssueCancelSchema = z.object({
   note: z.string().trim().min(1, 'กรอกเหตุผลการยกเลิก').max(500, 'เหตุผลการยกเลิกยาวเกินไป'),
 })
 
+const stockIssueEditSchema = stockIssueCreateSchema.extend({
+  action: z.literal('edit'),
+  docNo: z.string().trim().min(1, 'ไม่พบเลขที่เบิกออกรอบิล').max(80, 'เลขที่เบิกออกรอบิลยาวเกินไป'),
+})
+
 function parseStockIssueQuery(url: URL): StockIssueQuery {
   return {
     dateFrom: url.searchParams.get('dateFrom') || undefined,
@@ -375,6 +380,7 @@ export async function POST(request: Request) {
         const product = productById.get(line.productId)
         const warehouse = warehouseById.get(line.warehouseId)
         const productCode = requireBusinessCode(product?.code, `สินค้า ${line.productId}`)
+        const warehouseCode = requireBusinessCode(warehouse?.code, `คลัง ${line.warehouseId}`)
         const price = values.prices?.[productCode] ?? 0
         return {
           amount: line.qty * price,
@@ -389,9 +395,9 @@ export async function POST(request: Request) {
           qty: line.qty,
           sourceLineNo: line.sourceLineNo,
           unitCost: line.unitCost,
-          warehouseCode: warehouse?.code ?? '',
-          warehouseId: warehouse?.code ?? '',
-          warehouseName: warehouse?.name ?? '',
+          warehouseCode,
+          warehouseId: warehouseCode,
+          warehouseName: warehouse?.name ?? warehouseCode,
         }
       })
       const totalCost = items.reduce((sum, item) => sum + item.costAmount, 0)
@@ -450,7 +456,159 @@ export async function PATCH(request: Request) {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
     const actor = currentActor(context)
-    const values = stockIssueCancelSchema.parse(await request.json())
+    const payload = await request.json()
+    const action = z.object({ action: z.enum(['cancel', 'edit']) }).parse(payload).action
+
+    if (action === 'edit') {
+      const values = stockIssueEditSchema.parse(payload)
+      const edited = await prisma.$transaction(async (tx) => {
+        const stockIssue = await tx.stock_issues.findFirst({
+          select: {
+            converted_to_bill_id: true,
+            doc_no: true,
+            id: true,
+            items: true,
+            status: true,
+          },
+          where: { doc_no: values.docNo },
+        })
+        if (!stockIssue) throw new Error('ไม่พบรายการเบิกออกรอบิลที่ต้องการแก้ไข')
+        if ((stockIssue.status ?? 'pending') !== 'pending' || stockIssue.converted_to_bill_id) {
+          throw new Error('แก้ไขได้เฉพาะรายการที่ยังไม่ถูกดึงไปเปิดบิลขาย')
+        }
+
+        const existingItems = Array.isArray(stockIssue.items) ? stockIssue.items : []
+        const firstItem = existingItems.find((item) => Boolean(item && typeof item === 'object' && !Array.isArray(item))) as Record<string, unknown> | undefined
+        const originalDeliveryDocNo = typeof firstItem?.deliveryTicketDocNo === 'string' ? firstItem.deliveryTicketDocNo : ''
+        if (!originalDeliveryDocNo) throw new Error('PSALE นี้ไม่มีเลขใบส่งของ WTO ต้นทาง ไม่สามารถแก้ไขได้')
+        if (values.deliveryTicketId !== originalDeliveryDocNo) {
+          throw new Error('แก้ไข PSALE ให้เปลี่ยนใบส่งของ WTO ไม่ได้ ให้ยกเลิกแล้วสร้างรายการใหม่')
+        }
+
+        const issueDate = normalizeDate(values.date)
+        const reversedHolds = await reversePendingSaleStockIssue(tx, {
+          actor,
+          cancelDate: issueDate,
+          note: values.note ?? 'แก้ไขเบิกออกรอบิล',
+          stockIssueDocNo: stockIssue.doc_no,
+        })
+        const ticketIds = [...new Set(reversedHolds.map((hold) => hold.weight_ticket_id))]
+        if (ticketIds.length !== 1) throw new Error('PSALE นี้ผูกกับใบส่งของมากกว่าหนึ่งใบ ไม่สามารถแก้ไขได้')
+
+        const ticket = await tx.weight_tickets.findUnique({
+          include: {
+            customers: { select: { id: true } },
+            stock_holds: {
+              include: {
+                products: { select: { code: true, name: true } },
+                warehouses: { select: { code: true, id: true, name: true } },
+              },
+              orderBy: [{ source_line_no: 'asc' }, { id: 'asc' }],
+              where: { status: 'active' },
+            },
+          },
+          where: { id: ticketIds[0] },
+        })
+        if (!ticket || ticket.doc_type !== 'WTO' || ticket.cancelled_at || ticket.doc_no !== originalDeliveryDocNo) {
+          throw new Error('ไม่พบใบส่งของ WTO ต้นทางที่พร้อมแก้ไข')
+        }
+        if (!ticket.customer_id || !ticket.customers) {
+          throw new Error('ใบส่งของ WTO ต้องมีลูกค้าก่อนแก้ไขเบิกออกรอบิล')
+        }
+        if (!ticket.stock_holds.length) {
+          throw new Error('ใบส่งของนี้ไม่มี stock hold ที่พร้อมใช้หลัง reverse')
+        }
+
+        const consumedLines = await consumeActiveWtoStockHoldsForPendingSale(tx, {
+          actor,
+          branchId: ticket.branch_id,
+          issueDate,
+          stockIssueDocNo: stockIssue.doc_no,
+          weightTicketId: ticket.id,
+        })
+        const productById = new Map(ticket.stock_holds.map((hold) => [hold.product_id, hold.products]))
+        const warehouseById = new Map(ticket.stock_holds.map((hold) => [hold.warehouse_id, hold.warehouses]))
+        const items = consumedLines.map((line, index) => {
+          const product = productById.get(line.productId)
+          const warehouse = warehouseById.get(line.warehouseId)
+          const productCode = requireBusinessCode(product?.code, `สินค้า ${line.productId}`)
+          const warehouseCode = requireBusinessCode(warehouse?.code, `คลัง ${line.warehouseId}`)
+          const price = values.prices?.[productCode] ?? 0
+          return {
+            amount: line.qty * price,
+            costAmount: line.valueOut,
+            deliveryTicketDocNo: ticket.doc_no,
+            deliveryTicketId: ticket.doc_no,
+            lineNo: index + 1,
+            price,
+            productCode,
+            productId: productCode,
+            productName: product?.name ?? productCode,
+            qty: line.qty,
+            sourceLineNo: line.sourceLineNo,
+            unitCost: line.unitCost,
+            warehouseCode,
+            warehouseId: warehouseCode,
+            warehouseName: warehouse?.name ?? warehouseCode,
+          }
+        })
+        const totalCost = items.reduce((sum, item) => sum + item.costAmount, 0)
+        const totalEstAmount = items.reduce((sum, item) => sum + item.amount, 0)
+        const firstWarehouseCode = items.find((item) => item.warehouseCode)?.warehouseCode
+        const warehouse = firstWarehouseCode
+          ? await tx.warehouses.findFirst({ select: { id: true }, where: { code: firstWarehouseCode } })
+          : null
+        await tx.weight_tickets.update({
+          data: {
+            status: 'partially_billed',
+            updated_at: new Date(),
+            updated_by: actor,
+          },
+          where: { id: ticket.id },
+        })
+        await appendWeightTicketStatusLog(tx, {
+          action: WEIGHT_TICKET_STATUS_ACTION.USAGE_STATUS_CHANGED,
+          actor,
+          createdAt: new Date(),
+          fromStatus: ticket.status,
+          meta: { reason: 'pending_sale_edit', stockIssueDocNo: stockIssue.doc_no },
+          note: values.note ?? null,
+          toStatus: 'partially_billed',
+          weightTicketId: ticket.id,
+        })
+
+        const updated = await tx.stock_issues.update({
+          data: {
+            date: issueDate,
+            items: items as Prisma.InputJsonValue,
+            notes: values.note ?? null,
+            total_cost: totalCost,
+            total_est_amount: totalEstAmount,
+            warehouse_id: warehouse?.id ?? null,
+          },
+          select: { doc_no: true },
+          where: { id: stockIssue.id },
+        })
+        await appendStockIssueStatusLog(tx, {
+          action: STOCK_ISSUE_STATUS_ACTION.EDITED,
+          actor,
+          fromStatus: stockIssue.status ?? 'pending',
+          meta: {
+            deliveryTicketDocNo: ticket.doc_no,
+            reason: 'pending_sale_edit',
+            reverseRefType: 'PSALE-CANCEL',
+          },
+          note: values.note ?? null,
+          stockIssueId: stockIssue.id,
+          toStatus: 'pending',
+        })
+        return updated
+      })
+
+      return NextResponse.json({ docNo: edited.doc_no })
+    }
+
+    const values = stockIssueCancelSchema.parse(payload)
 
     const cancelled = await prisma.$transaction(async (tx) => {
       const stockIssue = await tx.stock_issues.findFirst({

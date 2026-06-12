@@ -8,6 +8,7 @@ export const STOCK_ISSUE_STATUS_ACTION = {
   CANCELLED: 'cancelled',
   CONVERTED: 'converted',
   CREATED: 'created',
+  EDITED: 'edited',
 } as const
 
 export type StockIssueStatusAction = typeof STOCK_ISSUE_STATUS_ACTION[keyof typeof STOCK_ISSUE_STATUS_ACTION]

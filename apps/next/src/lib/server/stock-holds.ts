@@ -633,36 +633,44 @@ export async function reversePendingSaleStockIssue(tx: TxClient, input: {
   note?: string | null
   stockIssueDocNo: string
 }) {
-  const existingReverseRow = await tx.stock_ledger.findFirst({
-    select: { id: true },
-    where: {
-      ref_type: 'PSALE-CANCEL',
-      OR: [
-        { ref_id: input.stockIssueDocNo },
-        { ref_no: input.stockIssueDocNo },
-      ],
-    },
-  })
-  if (existingReverseRow) {
-    throw new WtoStockHoldError('รายการเบิกออกรอบิลนี้ถูก reverse stock ledger แล้ว')
-  }
-
-  const ledgerRows = await tx.stock_ledger.findMany({
-    orderBy: [{ date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
-    where: {
-      ref_type: 'PSALE',
-      OR: [
-        { ref_id: input.stockIssueDocNo },
-        { ref_no: input.stockIssueDocNo },
-      ],
-    },
-  })
+  const [ledgerRows, reversalRows] = await Promise.all([
+    tx.stock_ledger.findMany({
+      orderBy: [{ date: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
+      where: {
+        ref_type: 'PSALE',
+        OR: [
+          { ref_id: input.stockIssueDocNo },
+          { ref_no: input.stockIssueDocNo },
+        ],
+      },
+    }),
+    tx.stock_ledger.findMany({
+      select: { notes: true },
+      where: {
+        ref_type: 'PSALE-CANCEL',
+        OR: [
+          { ref_id: input.stockIssueDocNo },
+          { ref_no: input.stockIssueDocNo },
+        ],
+      },
+    }),
+  ])
+  const reversedLedgerKeys = new Set(
+    reversalRows
+      .map((row) => row.notes?.match(/^Reverse (.+)$/)?.[1])
+      .filter((ledgerKey): ledgerKey is string => Boolean(ledgerKey)),
+  )
   if (!ledgerRows.length) {
     throw new WtoStockHoldError('ไม่พบ stock ledger ของรายการเบิกออกรอบิลนี้สำหรับทำ reversal')
   }
 
+  const unreversedLedgerRows = ledgerRows.filter((row) => !reversedLedgerKeys.has(row.ledger_key))
+  if (!unreversedLedgerRows.length) {
+    throw new WtoStockHoldError('รายการเบิกออกรอบิลนี้ถูก reverse stock ledger แล้ว')
+  }
+
   await tx.stock_ledger.createMany({
-    data: ledgerRows.map((row) => ({
+    data: unreversedLedgerRows.map((row) => ({
       branch_id: row.branch_id,
       created_by: input.actor,
       date: input.cancelDate,

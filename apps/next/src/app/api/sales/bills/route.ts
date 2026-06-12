@@ -9,6 +9,7 @@ import { currentActor, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } fro
 import { requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
+import { activeSalesReceiptCountByBillId, salesBillCancelState } from '@/lib/server/sales-bill-cancel-policy'
 import { appendStockIssueStatusLog, STOCK_ISSUE_STATUS_ACTION } from '@/lib/server/stock-issue-history'
 import { consumeActiveWtoStockHolds, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
@@ -80,10 +81,12 @@ function parseBillQuery(url: URL, includePaging = true): BillQuery {
   }
 }
 
-function billJson(row: SalesBillRow) {
+function billJson(row: SalesBillRow, activeReceiptCount = 0) {
+  const cancelState = salesBillCancelState(row.status, activeReceiptCount)
   return {
     branchId: row.branches?.code ?? '',
     branchName: row.branches?.name ?? '-',
+    canCancel: cancelState.canCancel,
     channelId: row.sales_channels?.code ?? '',
     channelName: row.sales_channels?.name ?? '-',
     createdAt: row.created_at?.toISOString(),
@@ -94,6 +97,7 @@ function billJson(row: SalesBillRow) {
     grossProfit: toNumber(row.gross_profit),
     id: row.doc_no,
     itemCount: Array.isArray(row.items) ? row.items.length : 0,
+    lockedReason: cancelState.lockedReason,
     receivableBalance: toNumber(row.receivable_balance),
     receivedAmount: toNumber(row.received_amount),
     refNo: row.ref_no ?? '',
@@ -793,7 +797,8 @@ export async function GET(request: Request) {
       prisma.sales_bills.count({ where }),
       prisma.sales_bills.aggregate({ _sum: { total_amount: true }, where }),
     ])
-    const jsonRows = rows.map(billJson)
+    const activeReceiptCountByBillId = await activeSalesReceiptCountByBillId(prisma, rows.map((row) => row.id))
+    const jsonRows = rows.map((row) => billJson(row, activeReceiptCountByBillId.get(row.id) ?? 0))
 
     if (url.searchParams.get('format') === 'xlsx') {
       const body = buildWorkbook(jsonRows)

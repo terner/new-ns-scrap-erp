@@ -6,6 +6,7 @@ import { currentActor, normalizeDate, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { appendSalesBillStatusLog, SALES_BILL_STATUS_ACTION } from '@/lib/server/sales-bill-history'
 import { getSalesBillDetail } from '@/lib/server/sales-bill-detail'
+import { activeSalesReceiptCount, isSalesBillActiveForCancel } from '@/lib/server/sales-bill-cancel-policy'
 import { appendStockIssueStatusLog, STOCK_ISSUE_STATUS_ACTION } from '@/lib/server/stock-issue-history'
 import { reopenConsumedWtoStockHoldsForSalesBill, reversePendingSaleStockIssue, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
@@ -30,10 +31,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'โหลดรายละเอียดบิลขายไม่ได้', 500)
   }
-}
-
-function activeStatus(status: string | null | undefined) {
-  return !['cancelled', 'canceled', 'void', 'voided', 'reversed'].includes((status ?? '').trim().toLowerCase())
 }
 
 function itemNumber(record: Record<string, unknown>, key: string) {
@@ -180,14 +177,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         where: { doc_no: billRef },
       })
       if (!bill) throw new Error('ไม่พบบิลขายที่ต้องการยกเลิก')
-      if (!activeStatus(bill.status)) throw new Error('บิลขายนี้ถูกยกเลิกแล้ว')
+      if (!isSalesBillActiveForCancel(bill.status)) throw new Error('บิลขายนี้ถูกยกเลิกแล้ว')
 
-      const activeReceiptCount = await tx.receipts.count({
-        where: {
-          bill_id: bill.id,
-          status: { notIn: ['cancelled', 'Canceled', 'void', 'voided', 'reversed'] },
-        },
-      })
+      const activeReceiptCount = await activeSalesReceiptCount(tx, bill.id)
       if (activeReceiptCount > 0) {
         throw new Error('ยกเลิกบิลขายไม่ได้ เพราะมีรายการรับเงินแล้ว')
       }
