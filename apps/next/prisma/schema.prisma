@@ -2357,6 +2357,7 @@ model weight_ticket_usage_logs {
   @@index([weight_ticket_id, created_at(sort: Desc)], map: "idx_weight_ticket_usage_logs_ticket_created")
   @@index([weight_ticket_product_summary_id], map: "idx_weight_ticket_usage_logs_summary")
   @@index([target_type, target_id], map: "idx_weight_ticket_usage_logs_target")
+  @@index([target_type, target_doc_no, action], map: "idx_weight_ticket_usage_logs_sales_bill_doc", where: raw("(target_type = 'SALES_BILL'::text)"))
   @@index([purchase_bill_id], map: "idx_weight_ticket_usage_logs_purchase_bill")
   @@index([product_id], map: "idx_weight_ticket_usage_logs_product")
   @@schema("public")
@@ -2428,6 +2429,10 @@ model stock_issues {
   stock_issue_status_logs stock_issue_status_logs[]
   warehouses              warehouses?               @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@index([converted_to_bill_id, status], map: "idx_stock_issues_converted_bill", where: raw("(converted_to_bill_id IS NOT NULL)"))
+  @@index([date(sort: Desc), doc_no(sort: Desc)], map: "idx_stock_issues_date_doc")
+  @@index([doc_no], map: "idx_stock_issues_doc_no")
+  @@index([status, date(sort: Desc), doc_no(sort: Desc)], map: "idx_stock_issues_status_date_doc")
   @@schema("public")
 }
 
@@ -2490,6 +2495,7 @@ model stock_holds {
   weight_tickets        weight_tickets         @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([branch_id, product_id, warehouse_id], map: "idx_stock_holds_active_lookup")
+  @@index([consumed_by_ref_type, consumed_by_ref_no, status], map: "idx_stock_holds_consumed_ref")
   @@index([weight_ticket_line_id], map: "idx_stock_holds_line")
   @@index([source_type, source_doc_no], map: "idx_stock_holds_source_doc")
   @@index([weight_ticket_id, status], map: "idx_stock_holds_ticket_status")
@@ -2537,7 +2543,9 @@ model stock_ledger {
   warehouses              warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([date(sort: Desc)], map: "idx_stock_date")
-  @@index([ref_type, ref_no, product_id], map: "idx_stock_ledger_ref_lookup", where: raw("(ref_type = ANY (ARRAY['PB'::text, 'SB'::text]))"))
+  @@index([ref_type, ref_no, product_id], map: "idx_stock_ledger_ref_lookup", where: raw("(ref_type = ANY (ARRAY['PB'::text, 'PB-CANCEL'::text, 'PB-EDIT-REV'::text, 'SB'::text, 'SB-CANCEL'::text, 'PSALE'::text, 'PSALE-CANCEL'::text]))"))
+  @@index([ref_no, ref_type, branch_id, warehouse_id, product_id], map: "idx_stock_ledger_sales_reversal_ref", where: raw("(ref_type = ANY (ARRAY['SB'::text, 'SB-CANCEL'::text, 'PSALE'::text, 'PSALE-CANCEL'::text]))"))
+  @@index([ref_type, ref_no, ref_id], map: "idx_stock_ledger_pending_sale_reversal_ref", where: raw("(ref_type = ANY (ARRAY['PSALE'::text, 'PSALE-CANCEL'::text]))"))
   @@index([ref_type, ref_id], map: "idx_stock_ledger_source", where: raw("((ref_type IS NOT NULL) AND (ref_id IS NOT NULL))"))
   @@index([product_id], map: "idx_stock_product")
   @@index([ref_id], map: "idx_stock_ref")

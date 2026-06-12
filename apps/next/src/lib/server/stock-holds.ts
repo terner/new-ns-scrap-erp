@@ -525,7 +525,8 @@ export async function reopenConsumedWtoStockHoldsForSalesBill(tx: TxClient, inpu
   note?: string | null
   salesBillDocNo: string
 }) {
-  const existingReverseRows = await tx.stock_ledger.count({
+  const existingReverseRow = await tx.stock_ledger.findFirst({
+    select: { id: true },
     where: {
       ref_type: 'SB-CANCEL',
       OR: [
@@ -534,7 +535,7 @@ export async function reopenConsumedWtoStockHoldsForSalesBill(tx: TxClient, inpu
       ],
     },
   })
-  if (existingReverseRows > 0) {
+  if (existingReverseRow) {
     throw new WtoStockHoldError('บิลขายนี้ถูก reverse stock ledger แล้ว')
   }
 
@@ -578,6 +579,10 @@ export async function reopenConsumedWtoStockHoldsForSalesBill(tx: TxClient, inpu
   })
 
   const holds = await tx.stock_holds.findMany({
+    select: {
+      id: true,
+      weight_ticket_id: true,
+    },
     where: {
       consumed_by_ref_no: input.salesBillDocNo,
       consumed_by_ref_type: 'SB',
@@ -588,13 +593,14 @@ export async function reopenConsumedWtoStockHoldsForSalesBill(tx: TxClient, inpu
     throw new WtoStockHoldError('ไม่พบ stock hold ที่ถูกใช้โดยบิลขายนี้')
   }
 
-  const activeHoldCount = await tx.stock_holds.count({
+  const activeHold = await tx.stock_holds.findFirst({
+    select: { id: true },
     where: {
       status: 'active',
       weight_ticket_id: { in: [...new Set(holds.map((hold) => hold.weight_ticket_id))] },
     },
   })
-  if (activeHoldCount > 0) {
+  if (activeHold) {
     throw new WtoStockHoldError('ใบส่งของนี้มี stock hold active อยู่แล้ว กรุณาตรวจสอบก่อนยกเลิกซ้ำ')
   }
 
@@ -627,7 +633,8 @@ export async function reversePendingSaleStockIssue(tx: TxClient, input: {
   note?: string | null
   stockIssueDocNo: string
 }) {
-  const existingReverseRows = await tx.stock_ledger.count({
+  const existingReverseRow = await tx.stock_ledger.findFirst({
+    select: { id: true },
     where: {
       ref_type: 'PSALE-CANCEL',
       OR: [
@@ -636,7 +643,7 @@ export async function reversePendingSaleStockIssue(tx: TxClient, input: {
       ],
     },
   })
-  if (existingReverseRows > 0) {
+  if (existingReverseRow) {
     throw new WtoStockHoldError('รายการเบิกออกรอบิลนี้ถูก reverse stock ledger แล้ว')
   }
 
@@ -680,6 +687,10 @@ export async function reversePendingSaleStockIssue(tx: TxClient, input: {
   })
 
   const holds = await tx.stock_holds.findMany({
+    select: {
+      id: true,
+      weight_ticket_id: true,
+    },
     where: {
       consumed_by_ref_no: input.stockIssueDocNo,
       consumed_by_ref_type: 'PSALE',
@@ -690,13 +701,14 @@ export async function reversePendingSaleStockIssue(tx: TxClient, input: {
     throw new WtoStockHoldError('ไม่พบ stock hold ที่ถูกใช้โดยรายการเบิกออกรอบิลนี้')
   }
 
-  const activeHoldCount = await tx.stock_holds.count({
+  const activeHold = await tx.stock_holds.findFirst({
+    select: { id: true },
     where: {
       status: 'active',
       weight_ticket_id: { in: [...new Set(holds.map((hold) => hold.weight_ticket_id))] },
     },
   })
-  if (activeHoldCount > 0) {
+  if (activeHold) {
     throw new WtoStockHoldError('ใบส่งของนี้มี stock hold active อยู่แล้ว กรุณาตรวจสอบก่อนยกเลิกซ้ำ')
   }
 

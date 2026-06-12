@@ -25,12 +25,33 @@ type StockIssueQuery = {
 
 type StockIssueDeliveryRow = Prisma.weight_ticketsGetPayload<{
   include: {
-    branches: true
-    customers: true
-    stock_holds: true
+    branches: {
+      select: {
+        code: true
+        name: true
+      }
+    }
+    customers: {
+      select: {
+        code: true
+        name: true
+      }
+    }
+    stock_holds: {
+      select: {
+        product_id: true
+        qty: true
+        status: true
+      }
+    }
     weight_ticket_product_summaries: {
       include: {
-        products: true
+        products: {
+          select: {
+            code: true
+            name: true
+          }
+        }
         weight_ticket_product_summary_lines: true
       }
       orderBy: {
@@ -39,7 +60,11 @@ type StockIssueDeliveryRow = Prisma.weight_ticketsGetPayload<{
     }
     weight_ticket_lines: {
       include: {
-        products: true
+        products: {
+          select: {
+            code: true
+          }
+        }
       }
       orderBy: {
         line_no: 'asc'
@@ -173,18 +198,18 @@ async function stockIssueOptionsPayload() {
     prisma.customers.findMany({ orderBy: { name: 'asc' }, select: { active: true, code: true, id: true, name: true } }),
     prisma.weight_tickets.findMany({
       include: {
-        branches: true,
-        customers: true,
-        stock_holds: true,
+        branches: { select: { code: true, name: true } },
+        customers: { select: { code: true, name: true } },
+        stock_holds: { select: { product_id: true, qty: true, status: true } },
         weight_ticket_product_summaries: {
           include: {
-            products: true,
+            products: { select: { code: true, name: true } },
             weight_ticket_product_summary_lines: true,
           },
           orderBy: { product_name: 'asc' },
         },
         weight_ticket_lines: {
-          include: { products: true },
+          include: { products: { select: { code: true } } },
           orderBy: { line_no: 'asc' },
         },
       },
@@ -228,16 +253,25 @@ export async function GET(request: Request) {
     const query = parseStockIssueQuery(new URL(request.url))
     const where = stockIssueWhere(query)
 
-    const [rows, totalRows, totals] = await Promise.all([
+    const [rows, totalRows, totals, optionsPayload] = await Promise.all([
       prisma.stock_issues.findMany({
         include: {
-          branches: true,
-          customers: true,
+          branches: { select: { code: true, name: true } },
+          customers: { select: { code: true, name: true } },
           stock_issue_status_logs: {
             orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+            select: {
+              action: true,
+              created_at: true,
+              created_by: true,
+              event_key: true,
+              from_status: true,
+              note: true,
+              to_status: true,
+            },
             take: 20,
           },
-          warehouses: true,
+          warehouses: { select: { code: true, name: true } },
         },
         orderBy: stockIssueOrderBy(query),
         skip: (query.page - 1) * query.pageSize,
@@ -246,6 +280,7 @@ export async function GET(request: Request) {
       }),
       prisma.stock_issues.count({ where }),
       prisma.stock_issues.aggregate({ _sum: { total_est_amount: true }, where }),
+      stockIssueOptionsPayload(),
     ])
 
     return NextResponse.json({
@@ -283,7 +318,7 @@ export async function GET(request: Request) {
       })),
       totalAmount: toNumber(totals._sum.total_est_amount),
       totalRows,
-      ...await stockIssueOptionsPayload(),
+      ...optionsPayload,
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
@@ -301,12 +336,11 @@ export async function POST(request: Request) {
     const created = await prisma.$transaction(async (tx) => {
       const ticket = await tx.weight_tickets.findUnique({
         include: {
-          branches: true,
-          customers: true,
+          customers: { select: { id: true } },
           stock_holds: {
             include: {
-              products: true,
-              warehouses: true,
+              products: { select: { code: true, name: true } },
+              warehouses: { select: { code: true, id: true, name: true } },
             },
             orderBy: [{ source_line_no: 'asc' }, { id: 'asc' }],
             where: { status: 'active' },

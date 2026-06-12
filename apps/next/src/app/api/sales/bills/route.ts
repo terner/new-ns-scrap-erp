@@ -924,12 +924,18 @@ export async function POST(request: Request) {
 	    }
 	    const productById = new Map(products.map((product) => [product.id, product]))
 		    const productCodeById = new Map(products.map((product) => [product.id, requireBusinessCode(product.code, `สินค้า ${product.id}`)]))
-		    const pendingStockIssue = values.pendingStockIssueId
-		      ? await prisma.stock_issues.findFirst({
-		          include: { branches: true, customers: true },
-		          where: { doc_no: values.pendingStockIssueId },
-		        })
-		      : null
+	    const pendingStockIssue = values.pendingStockIssueId
+	      ? await prisma.stock_issues.findFirst({
+	          select: {
+	            branch_id: true,
+	            customer_id: true,
+	            id: true,
+	            items: true,
+	            status: true,
+	          },
+	          where: { doc_no: values.pendingStockIssueId },
+	        })
+	      : null
 		    if (values.pendingStockIssueId && !pendingStockIssue) {
 		      return NextResponse.json({ code: 'BAD_REQUEST', error: 'ไม่พบรายการเบิกออกรอบิลที่เลือก' }, { status: 400 })
 		    }
