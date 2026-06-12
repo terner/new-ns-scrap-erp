@@ -240,7 +240,7 @@ async function qaPendingSaleCancel(): Promise<QaResult> {
   const net = ledger.reduce((sum, row) => sum + toNumber(row._sum.qty_in) - toNumber(row._sum.qty_out), 0)
   assert(Math.abs(net) <= 0.000001, `PSALE QA ${result.docNo} net qty is not zero`)
 
-  return { docNo: result.docNo, kind: 'PSALE_CANCEL', refs: [result.ticketDocNo, `holds:${result.holdCount}`] }
+  return { docNo: result.docNo, kind: 'PSALE_EDIT_CANCEL', refs: [result.ticketDocNo, `holds:${result.holdCount}`] }
 }
 
 async function findProductionQaScenario(): Promise<ProductionQaScenario> {
