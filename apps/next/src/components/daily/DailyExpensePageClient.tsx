@@ -397,6 +397,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
   const [vatRatePercent, setVatRatePercent] = useState(7)
   const [whtRatePercent, setWhtRatePercent] = useState(3)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [anomaliesExpanded, setAnomaliesExpanded] = useState(false)
   const formRef = useRef<HTMLFormElement | null>(null)
   const columnResize = useResizableColumns('daily.expense', expenseColumns)
 
@@ -747,45 +748,69 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           {/* 🚨 Anomaly Panel */}
           {dashboard.anomalies.length > 0 ? (
-            <div className="overflow-hidden rounded-xl border border-red-100 bg-red-50/10 p-5 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 text-red-800">
-                <span className="text-xl">🚨</span>
-                <h3 className="font-bold text-base">ระบบตรวจพบความผิดปกติจำนวน {dashboard.anomalies.length} หมวด</h3>
+            !anomaliesExpanded ? (
+              <div className="rounded-xl border border-red-100 bg-red-50/10 px-4 py-2.5 shadow-sm flex items-center justify-between text-xs text-red-800">
+                <div className="flex items-center gap-2 font-medium">
+                  <span>🚨</span>
+                  <span>ตรวจพบความผิดปกติของยอดใช้จ่ายจำนวน {dashboard.anomalies.length} หมวด</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAnomaliesExpanded(true)}
+                  className="text-xs font-bold text-red-700 hover:text-red-900 transition-colors underline"
+                >
+                  ดูรายละเอียด →
+                </button>
               </div>
-              <p className="text-xs text-slate-500">ข้อมูลค่าใช้จ่ายเดือนล่าสุดมีความเบี่ยงเบนจากค่าเฉลี่ยอย่างมีนัยสำคัญ</p>
-              
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {dashboard.anomalies.map((item) => {
-                  const isHigh = item.anomaly === 'high';
-                  const border = isHigh ? 'border-red-100/60 bg-red-50/30' : 'border-amber-100/60 bg-amber-50/30';
-                  const text = isHigh ? 'text-red-700' : 'text-amber-700';
-                  const icon = isHigh ? '📈 สูงกว่าปกติ' : '📉 ต่ำกว่าปกติ';
-                  return (
-                    <div key={item.id} className={`rounded-xl border p-4 transition-all duration-200 hover:shadow-sm ${border}`}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider ${isHigh ? 'bg-red-100/80 text-red-800' : 'bg-amber-100/80 text-amber-800'}`}>
-                            {icon}
-                          </span>
-                          <div className="text-sm font-bold text-slate-900 mt-1">{item.name}</div>
-                          <div className="text-xs text-slate-500">
-                            เดือนนี้: <span className="font-semibold text-slate-900 tabular-nums">{formatMoney(item.latest)}</span> · 
-                            เฉลี่ย: <span className="font-semibold text-slate-900 tabular-nums">{formatMoney(item.avg)}</span>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-red-100 bg-red-50/10 p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-red-800">
+                    <span>🚨</span>
+                    <h3 className="font-bold text-xs">ระบบตรวจพบความผิดปกติจำนวน {dashboard.anomalies.length} หมวด</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAnomaliesExpanded(false)}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors underline"
+                  >
+                    ซ่อนรายละเอียด
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {dashboard.anomalies.map((item) => {
+                    const isHigh = item.anomaly === 'high';
+                    const border = isHigh ? 'border-red-100/60 bg-white' : 'border-amber-100/60 bg-white';
+                    const text = isHigh ? 'text-red-600' : 'text-amber-600';
+                    const icon = isHigh ? '📈 สูงกว่าปกติ' : '📉 ต่ำกว่าปกติ';
+                    return (
+                      <div key={item.id} className={`rounded-lg border p-3 transition-all duration-200 hover:shadow-sm ${border}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider ${isHigh ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'}`}>
+                              {icon}
+                            </span>
+                            <div className="text-xs font-bold text-slate-800 mt-0.5">{item.name}</div>
+                            <div className="text-[10px] text-slate-500">
+                              เดือนนี้: <span className="font-semibold text-slate-900 tabular-nums">{formatMoney(item.latest)}</span> · 
+                              เฉลี่ย: <span className="font-semibold text-slate-900 tabular-nums">{formatMoney(item.avg)}</span>
+                            </div>
+                          </div>
+                          <div className={`text-base font-extrabold ${text} tabular-nums`}>
+                            {item.deviation > 0 ? '+' : ''}{item.deviation.toFixed(0)}%
                           </div>
                         </div>
-                        <div className={`text-xl font-extrabold ${text} tabular-nums`}>
-                          {item.deviation > 0 ? '+' : ''}{item.deviation.toFixed(0)}%
-                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )
           ) : (
-            <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/20 p-4 text-sm text-emerald-800 shadow-sm">
-              <span className="text-lg">🌿</span>
-              <span className="font-medium">ไม่พบความผิดปกติ — ยอดการใช้จ่ายในแต่ละหมวดอยู่ในเกณฑ์ปกติอย่างสม่ำเสมอ</span>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 shadow-sm">
+              <span className="text-sm">🌿</span>
+              <span>ไม่พบความผิดปกติของยอดใช้จ่ายในแต่ละหมวด</span>
             </div>
           )}
 
