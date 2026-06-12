@@ -434,7 +434,8 @@ export function ReceiptVouchersPageClient() {
           <KpiCard label="ผู้รับเงินไม่ซ้ำ" tone="violet" value={new Set(filteredRows.map((row) => row.sellerName).filter(Boolean)).size.toLocaleString('th-TH')} />
         </div>
 
-        <div className="rounded-md bg-white p-3 shadow">
+        {/* Desktop Toolbar (Hidden on Mobile) */}
+        <div className="hidden md:block rounded-md bg-white p-3 shadow">
           <div className="flex flex-wrap items-center gap-2">
             <Input
               className="min-w-[260px] flex-1 rounded-md"
@@ -444,16 +445,7 @@ export function ReceiptVouchersPageClient() {
               onChange={(event) => setSearch(event.target.value)}
             />
 
-            {/* Mobile Filter Button */}
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
-              onClick={() => setShowMobileFilters(true)}
-            >
-              <span>🔍</span> ตัวกรอง {(dateFrom || dateTo) ? '(1)' : ''}
-            </button>
-
-            <div className="hidden md:flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">วันที่:</span>
               <DatePickerInput id="receipt-vouchers-date-from" value={dateFrom} onChange={setDateFrom} />
               <span className="text-slate-400">→</span>
@@ -461,8 +453,28 @@ export function ReceiptVouchersPageClient() {
             </div>
 
             {hasActiveFilter ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
-            <Button className="hidden md:inline-flex" type="button" onClick={openCreateForm}>+ สร้างใบสำคัญรับเงิน</Button>
-            <Button className="inline-flex md:hidden" size="sm" type="button" onClick={openCreateForm}>+ สร้าง</Button>
+            <Button type="button" onClick={openCreateForm}>+ สร้างใบสำคัญรับเงิน</Button>
+          </div>
+        </div>
+
+        {/* Mobile Toolbar (Hidden on Desktop) */}
+        <div className="block md:hidden rounded-md bg-white p-3 shadow">
+          <div className="flex items-center gap-2">
+            <Input
+              className="flex-1 min-w-0 rounded-md"
+              placeholder="ค้นหาเลขที่ / ผู้รับ / บิลซื้อ..."
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 shrink-0"
+              onClick={() => setShowMobileFilters(true)}
+            >
+              <span>🔍</span> ตัวกรอง {(dateFrom || dateTo) ? '(1)' : ''}
+            </button>
+            {hasActiveFilter ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕</Button> : null}
           </div>
         </div>
 
@@ -639,6 +651,20 @@ export function ReceiptVouchersPageClient() {
       ) : null}
 
       {printingRow ? <PrintPreview companyProfile={companyProfile} row={printingRow} onClose={() => setPrintingRow(null)} /> : null}
+
+      {/* Floating Action Button (FAB) for Mobile */}
+      <div className="fixed bottom-6 right-6 z-40 md:hidden print:hidden">
+        <button
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
+          onClick={openCreateForm}
+          type="button"
+          aria-label="สร้างใบสำคัญรับเงินใหม่"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="size-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+      </div>
     </>
   )
 }
