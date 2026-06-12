@@ -702,7 +702,6 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           {/* 💸 KPI Summary Cards */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-slate-400 to-indigo-500" />
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">💸 ยอดรวม {periodMonths} เดือน</span>
                 <span className="text-lg">📊</span>
@@ -712,24 +711,22 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               </div>
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-blue-50 bg-blue-50/20 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-blue-400 to-cyan-500" />
+            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-blue-700">📈 เฉลี่ยรายเดือน</span>
+                <span className="text-xs font-semibold text-slate-500">📈 เฉลี่ยรายเดือน</span>
                 <span className="text-lg">📉</span>
               </div>
-              <div className="mt-3 text-2xl font-extrabold tracking-tight text-blue-900 tabular-nums">
+              <div className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">
                 {formatMoney(dashboard.avg)}
               </div>
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-violet-50 bg-violet-50/20 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-violet-400 to-fuchsia-500" />
+            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-violet-700">📅 ยอดใช้จ่ายเดือนนี้</span>
+                <span className="text-xs font-semibold text-slate-500">📅 ยอดใช้จ่ายเดือนนี้</span>
                 <span className="text-lg">🗓️</span>
               </div>
-              <div className="mt-3 text-2xl font-extrabold tracking-tight text-violet-900 tabular-nums">
+              <div className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">
                 {formatMoney(dashboard.latest)}
               </div>
             </div>
@@ -737,15 +734,11 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             {(() => {
               const isHigh = dashboard.vsAvg > 20;
               const isLow = dashboard.vsAvg < -20;
-              const cardBorder = isHigh ? 'border-red-100' : isLow ? 'border-emerald-100' : 'border-slate-100';
-              const cardBg = isHigh ? 'bg-red-50/20' : isLow ? 'bg-emerald-50/20' : 'bg-slate-50/20';
-              const accentColor = isHigh ? 'text-red-700' : isLow ? 'text-emerald-700' : 'text-slate-700';
-              const barColor = isHigh ? 'bg-gradient-to-r from-red-400 to-rose-500' : isLow ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : 'bg-gradient-to-r from-slate-400 to-slate-500';
+              const accentColor = isHigh ? 'text-red-600' : isLow ? 'text-emerald-600' : 'text-slate-700';
               return (
-                <div className={`group relative overflow-hidden rounded-xl border ${cardBorder} ${cardBg} p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md`}>
-                  <div className={`absolute top-0 left-0 h-1 w-full ${barColor}`} />
+                <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-semibold ${accentColor}`}>⚖️ เทียบค่าเฉลี่ย</span>
+                    <span className="text-xs font-semibold text-slate-500">⚖️ เทียบค่าเฉลี่ย</span>
                     <span className="text-lg">{isHigh ? '⚠️' : isLow ? '✅' : 'ℹ️'}</span>
                   </div>
                   <div className={`mt-3 text-2xl font-extrabold tracking-tight ${accentColor} tabular-nums`}>
