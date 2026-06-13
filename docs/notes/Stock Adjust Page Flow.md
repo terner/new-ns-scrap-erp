@@ -13,7 +13,7 @@ tags:
   - stock-adjust
 status: draft
 created: 2026-06-11
-updated: 2026-06-11
+updated: 2026-06-13
 ---
 
 # Stock Adjust Page Flow / Flow หน้านับสต๊อกและปรับยอด
@@ -28,11 +28,22 @@ updated: 2026-06-11
 
 หน้านี้ใช้บันทึกผลนับจริงเมื่อยอดในระบบไม่ตรงกับของจริง เป็น audit-sensitive flow และควรใช้เฉพาะกรณีปรับยอดจากการนับ ไม่ใช่ใช้แทน transfer, sale, purchase, return, หรือ production
 
+Requirement update 2026-06-13:
+
+- ใช้ตรวจนับ stock จริงและปรับยอดให้ตรงระบบ
+- ใช้เมื่อ `stock หาย`, `stock เกิน`, `audit`, และ `cycle count`
+- สิ่งที่ระบบสร้างคือ `adjustment ledger` และ `stock correction`
+- สินค้าทุกประเภท/ทุก bucket ที่ระบบมี stock ต้องปรับได้
+- แก้ไขรายการนับ stock ได้ไม่เกิน 7 วันนับจากวันที่เอกสาร/วันที่นับ
+- การแก้ไขต้อง trace ได้ด้วย `updated_by` / `updated_at` หรือ correction trail
+- การปรับยอดและมูลค่า correction อาจกระทบ WAC และ margin ได้ จึงต้องแยกจาก policy note-only เดิมให้ชัด
+
 ## Source Of Truth
 
 - audit/header: `stock_adjustments`
 - movement: `stock_ledger.ref_type = 'ADJ'`
 - จำนวนคงเหลือหลังปรับต้อง derive จาก `stock_ledger`
+- value/cost target: มูลค่า correction ต้อง derive จาก unit price/kg ของวันนับหรือ price policy ที่อนุมัติ ไม่ใช่ข้อความ note ลอยๆ
 
 ## Main UI Contract
 
@@ -50,21 +61,23 @@ updated: 2026-06-11
 - นับจริง
 - ส่วนต่าง
 - ประเภท: `LOSS` / `GAIN`
-- มูลค่าประกอบการพิจารณา
+- ราคาต่อกก.
+- มูลค่ารวม (บาท) เป็น signed amount: `LOSS` ต้องติดลบ, `GAIN` ต้องเป็นบวก
 - เหตุผล
-- สถานะ
+- แก้ไขล่าสุดโดย / เวลาแก้ไขล่าสุด
 - สร้างโดย
 
 ### Filters
 
 ควรรองรับ:
 
-- ค้นหาเลขที่ / สินค้า / เหตุผล
+- ค้นหาเลขที่ / สินค้า / เหตุผล / ผู้แก้ไข
 - สาขา
 - คลัง
 - ประเภท `LOSS` / `GAIN`
 - วันที่จาก-ถึง
 - สินค้า
+- สถานะไม่ใช่ filter หลักตาม requirement ล่าสุด เพราะรายการ posted ต้องแก้ไข/correct ได้ภายใน 7 วันโดยไม่ผูกกับ status display เดิม
 
 ## Create Modal Contract
 
@@ -77,6 +90,9 @@ updated: 2026-06-11
 - Lot
 - ยอดในระบบ
 - นับจริง
+- Diff preview
+- ราคาต่อกก.
+- มูลค่ารวม preview
 - เหตุผล
 - หมายเหตุ
 
@@ -84,10 +100,18 @@ Target validation:
 
 - สาขา/คลัง/สินค้า active และสัมพันธ์ถูกต้อง
 - นับจริงต้องไม่ติดลบ
-- ต้องมีเหตุผลอย่างน้อยตาม rule validation
+- เหตุผลต้องเลือกจาก fixed options ในหน้า ไม่ต้องมี master แยก:
+  - `หาของไม่เจอ (Missing)`
+  - `นับจริง 0 แต่ระบบมี (Lost/Damaged)`
+  - `นับได้เกินระบบ (Found Excess)`
+  - `สูญหาย (Lost)`
+  - `เสียหาย (Damaged)`
+  - `ผิดสาขา/คลัง (Wrong Branch)`
+  - `อื่นๆ (Other)`
 - ถ้านับจริงเท่ากับยอดในระบบ ห้ามสร้างเอกสาร
 - ยอดในระบบควรคำนวณจาก stock balance ปัจจุบัน ไม่ให้ user แก้เองโดยไม่มีเหตุผล
 - ถ้ามี active hold ต้องแสดงให้เห็นก่อนบันทึก เพราะการปรับยอดอาจทำให้ `พร้อมใช้` ติดลบ
+- แก้ไขรายการนับย้อนหลังได้เฉพาะรายการที่อายุไม่เกิน 7 วัน; หลังจากนั้นต้องใช้ approval/reconciliation policy แยก
 
 ## Ledger Side Effect
 
@@ -102,24 +126,34 @@ Target validation:
   - `adjust_type = LOSS`
   - `stock_ledger.qty_out = abs(diff)`
   - `movement_type = STOCK_COUNT_LOSS`
-- `value_in` / `value_out` ควรเป็น 0 ตาม note-only accounting policy จนกว่าจะมี accounting policy
-- `value_note` เก็บมูลค่าประกอบการตรวจสอบได้ แต่ไม่ใช่ P&L posting
+- target value policy:
+  - `unit_price_per_kg` ต้องแสดงบนหน้าและบันทึกกับเอกสาร
+  - `LOSS`: `total_value = -1 * unit_price_per_kg * abs(diff_qty)`
+  - `GAIN`: `total_value = unit_price_per_kg * diff_qty`
+  - wording หน้าและ report ใช้ `มูลค่ารวม (บาท)` ไม่ใช้ `มูลค่า Note`
+- ถ้า runtime ยังไม่พร้อมลง value ใน `stock_ledger.value_in/value_out` ต้องระบุเป็น compatibility gap; target ล่าสุดถือว่า correction value กระทบ WAC/margin ได้
 
 ## Accounting Policy
 
-Target ปัจจุบัน:
+Target ล่าสุด:
 
-- Stock adjust เป็น note-only ต่อบัญชี
-- ไม่ลง P&L อัตโนมัติ
-- ถ้าจะลงบัญชีภายหลัง ต้องมี accounting approval และ GL posting policy แยก
+- Stock adjust เป็น stock correction ที่มีมูลค่า ไม่ใช่ note-only เพียงอย่างเดียว
+- การ correction อาจกระทบ WAC และ margin ได้
+- ต้องนิยาม source unit price/kg ให้ชัดก่อน implement:
+  - ใช้ราคาเฉลี่ยต่อกก. ของสินค้านั้น ณ วันที่นับ/วันที่เอกสาร
+  - ถ้าจะใช้ WTI/latest purchase/weighing price เป็น source ต้อง query ตามวันที่เอกสาร ไม่ยึด stock ledger ที่ข้อมูลปัจจุบันยังผิด
+  - ถ้าไม่มีราคาในวันนั้น ต้องมี fallback/approval rule แยก ห้าม silently ใช้ 0 โดยไม่แจ้ง
+- GL/P&L posting ถ้ามี ต้องแยก approval policy แต่ stock value/WAC/margin impact ต้องไม่ถูกซ่อนด้วย wording `Note`
 
 ## Cancel / Reverse Policy
 
 Target ที่ควรใช้:
 
 - ไม่แก้ ledger row เก่าโดยตรง
-- ถ้าบันทึกผิด ให้สร้าง adjustment กลับหรือ reversal document ตาม policy
-- ต้อง audit ว่าใครสร้าง ใครอนุมัติ และเหตุผลอะไร
+- ถ้าบันทึกผิดภายใน 7 วัน ให้แก้ไข/correct ได้ โดยต้อง trace ว่าใครแก้ เมื่อไร และแก้จากค่าเดิมเป็นค่าใหม่
+- วิธีที่ปลอดภัยคือ append-only correction: reverse/cancel effect เดิม แล้วสร้าง `ADJ` ใหม่หรือ `ADJ-REV` + replacement document แทนการ rewrite ledger เดิม
+- หลัง 7 วันต้องใช้ approval/reconciliation policy แยก
+- ต้อง audit ว่าใครสร้าง ใครแก้ ใครอนุมัติ และเหตุผลอะไร
 - ควรจำกัด permission ให้ role ที่ได้รับอนุญาตเท่านั้น
 
 ## API Contract
@@ -130,6 +164,8 @@ Target ที่ควรใช้:
 - `reference.branches`
 - `reference.warehouses`
 - `reference.products`
+- `reasonOptions`
+- row ต้องมี `docNo`, `date`, `branchWarehouse`, `productCode`, `productName`, `lotNo`, `systemQty`, `countedQty`, `diffQty`, `unitPricePerKg`, `totalValue`, `adjustType`, `reason`, `createdBy`, `updatedBy`, `updatedAt`
 
 `POST /api/stock/adjust` รับ:
 
@@ -143,19 +179,32 @@ Target ที่ควรใช้:
 - `countedQty`
 - `reason`
 - `remark`
+- `unitPricePerKg` ถ้า UI preview ใช้ราคาเดียวกับ server; server ต้อง recalculate/validate อีกครั้ง
 
 Server ต้องคำนวณ/ยืนยัน `systemQty` จาก source of truth อีกครั้ง ไม่เชื่อ payload ฝั่ง client เพียงอย่างเดียว
-Server ต้อง snapshot `onHoldQty`, `readyQty`, และ `accountingImpactPolicy = NOTE_ONLY` ตอน post
+Server ต้อง snapshot `onHoldQty`, `readyQty`, และ `accountingImpactPolicy = STOCK_CORRECTION` ตอน post
+Server ต้องคำนวณ `unitPricePerKg` เองจาก stock/WAC ตามวันที่เอกสาร และต้อง reject non-zero correction ถ้าราคาเป็นศูนย์หรือหาไม่ได้ เพื่อไม่ให้เกิด correction value ที่ทำให้ WAC/margin ผิด
+
+Target API เพิ่มเติม:
+
+- `GET /api/stock/adjust?snapshot=1&branchId&warehouseId&productId&lotNo&status&date&countedQty`
+  - คืน `systemQty`, `onHoldQty`, `readyQty`, `unitPricePerKg`, `priceSource`, `diffQty`, `totalValue`
+  - ใช้สำหรับ modal preview ให้ตรงกับ server
+- `PATCH /api/stock/adjust`
+  - ใช้แก้/correct เอกสารภายใน 7 วัน
+  - รับ `docNo`, `countedQty`, `reason`, `remark`
+  - server ต้อง validate อายุเอกสาร, recalculate diff/value, และสร้าง correction/reversal trail
 
 ## Current Implementation / Gap
 
 - มี write baseline ที่สร้าง `stock_adjustments` และ `ADJ` ledger row แล้ว
-- current policy เป็น note-only value impact: `stock_ledger.value_in/value_out = 0`, ส่วน `value_note` อยู่ที่ header เพื่อ analysis เท่านั้น
-- Runtime ปัจจุบันบันทึก `output_category`, `on_hold_qty`, `ready_qty_snapshot`, และ `accounting_impact_policy`
+- Runtime ใหม่ใช้ `accounting_impact_policy = STOCK_CORRECTION`: `stock_adjustments.value_note` เก็บ signed total value, `stock_ledger.value_in/value_out` เก็บมูลค่า correction ตามทิศทาง GAIN/LOSS, และ UI แสดงเป็น `มูลค่ารวม (บาท)` แทน `มูลค่า Note`
+- Runtime ปัจจุบันบันทึก `output_category`, `on_hold_qty`, `ready_qty_snapshot`, `unit_cost_used`, `updated_by`, `updated_at`, และ `accounting_impact_policy`
 - Runtime ปัจจุบัน block direct posted adjustment เมื่อ `countedQty < active hold` เพื่อไม่ให้ available stock ติดลบ; เคสนี้ต้องปลด hold หรือใช้ reconciliation/approval policy แยกก่อน
-- Stock reconciliation ตรวจ header/ledger mismatch และ ADJ ledger value ที่ไม่เป็นศูนย์แล้ว
-- Reverse policy ปัจจุบันยังไม่เปิดปุ่มแก้ ledger เดิม; หากผิดให้ทำ adjustment กลับพร้อมเหตุผลจนกว่าจะมี approval/reversal document แยก
-- ต้องยืนยัน list/detail/export แสดง `วันที่สร้างรายการ`
+- Stock reconciliation ตรวจ header/ledger mismatch, `ADJ`/`ADJ-REV` net integrity, และ value policy ตาม `NOTE_ONLY` vs `STOCK_CORRECTION`
+- `PATCH /api/stock/adjust` เปิด correction ได้ภายใน 7 วัน โดยสร้าง append-only `ADJ-REV` เพื่อ reverse diff เดิม แล้วสร้าง replacement `ADJ` สำหรับ diff ใหม่
+- Modal preview ใช้ server snapshot: system qty auto, on-hold, ready, counted qty, diff, unit price/kg, total value
+- List/detail แสดง `ราคาต่อกก.`, `มูลค่ารวม (บาท)`, `updated_by`, `updated_at`; CSV/export ยังเป็น delivery follow-up
 
 ## Related Notes
 

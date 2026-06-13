@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
+import { stockAdjustReasonOptions } from '@/lib/stock'
 import type { StatusConvertFormValues, StockAdjustFormValues, StockConvertFormValues, StockCostPoolOption, StockOption } from '@/lib/stock'
 
 type Mode = 'adjust' | 'convert' | 'status-convert'
 type Payload = {
+  reasonOptions?: string[]
   reference: { branches: StockOption[]; costPoolEntries?: StockCostPoolOption[]; customers?: StockOption[]; products: StockOption[]; warehouses: StockOption[] }
   rows: Array<Record<string, string | number | boolean | null>>
 }
@@ -35,6 +37,18 @@ type StatusConvertSortKey =
   | 'value'
 
 const STATUS_CONVERT_PAGE_SIZES = [10, 20, 50, 100]
+
+type StockAdjustSnapshot = {
+  adjustType: 'NONE' | 'LOSS' | 'GAIN'
+  countedQty: number
+  diffQty: number
+  onHoldQty: number
+  priceSource: string
+  readyQty: number
+  systemQty: number
+  totalValue: number
+  unitPricePerKg: number
+}
 
 type StockConvertDetailLine = {
   allocationStatus: string
@@ -171,6 +185,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     const startIndex = (statusConvertPage - 1) * statusConvertPageSize
     return statusConvertSortedRows.slice(startIndex, startIndex + statusConvertPageSize)
   }, [mode, rows, statusConvertPage, statusConvertPageSize, statusConvertSortedRows])
+  const hasAdjustFilters = Boolean(adjustBranchFilter || adjustTypeFilter || fromDateFilter || toDateFilter)
 
   function toggleStatusConvertSort(nextKey: StatusConvertSortKey) {
     if (statusConvertSortKey === nextKey) {
@@ -224,6 +239,37 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     }
   }
 
+  async function correctAdjust(row: Record<string, string | number | boolean | null>) {
+    const docNo = String(row.docNo ?? row.id ?? '')
+    if (!docNo) return
+    const countedText = window.prompt(`แก้ไข Stock Count ${docNo}\nกรอกจำนวนนับจริงใหม่`, String(row.countedQty ?? '0'))
+    if (countedText === null) return
+    const countedQty = Number(countedText)
+    if (!Number.isFinite(countedQty) || countedQty < 0) {
+      window.alert('นับจริงต้องเป็นตัวเลขและไม่ติดลบ')
+      return
+    }
+    const reasonText = window.prompt(`เลือกเหตุผลโดยใส่หมายเลข:\n${stockAdjustReasonOptions.map((reason, index) => `${index + 1}. ${reason}`).join('\n')}`, '1')
+    if (reasonText === null) return
+    const reasonIndex = Number(reasonText) - 1
+    const reason = stockAdjustReasonOptions[reasonIndex]
+    if (!reason) {
+      window.alert('เหตุผลไม่ถูกต้อง')
+      return
+    }
+    const remark = window.prompt('หมายเหตุเพิ่มเติม (เว้นว่างได้)', '') ?? ''
+    setError(null)
+    setIsSaving(true)
+    try {
+      await dailyFetchJson(meta.api, { body: JSON.stringify({ countedQty, docNo, reason, remark }), method: 'PATCH' })
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'แก้ไขปรับสต๊อกไม่สำเร็จ')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   async function openConvertDetail(refNo: string) {
     setError(null)
     setIsConvertDetailLoading(true)
@@ -251,7 +297,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       {mode === 'adjust' ? <AdjustPrincipleBox /> : null}
       <SummaryCards mode={mode} rows={rows} />
-      <div className="rounded-md bg-white p-3 shadow">
+      <div className="space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
             <input className="h-9 w-full min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder={mode === 'convert' ? 'ค้นหา doc/source/target/ref...' : mode === 'adjust' ? 'ค้นหา doc/สินค้า/เหตุผล...' : 'ค้นหาเลขที่/วันที่/สินค้า/เหตุผล...'} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -285,13 +331,22 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
                 <option value="">ทุกสาขา</option>
                 {data.reference.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
               </select>
-              <select className="h-9 rounded-md border px-3 py-2 text-sm" value={adjustTypeFilter} onChange={(event) => setAdjustTypeFilter(event.target.value)}>
-                <option value="">ทุกประเภท</option>
-                <option value="LOSS">📉 นับขาด</option>
-                <option value="GAIN">📈 นับเกิน</option>
-              </select>
               <DatePickerInput className="w-[130px]" title="จากวันที่" value={fromDateFilter} onChange={setFromDateFilter} />
               <DatePickerInput className="w-[130px]" title="ถึงวันที่" value={toDateFilter} onChange={setToDateFilter} />
+              {hasAdjustFilters ? (
+                <button
+                  className="h-9 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  type="button"
+                  onClick={() => {
+                    setAdjustBranchFilter('')
+                    setAdjustTypeFilter('')
+                    setFromDateFilter('')
+                    setToDateFilter('')
+                  }}
+                >
+                  ล้างตัวกรอง
+                </button>
+              ) : null}
               <button className="h-9 rounded-md bg-slate-700 px-3 py-2 text-sm text-white opacity-60" disabled title="รอ export contract สำหรับ stock adjustment" type="button">📥 CSV</button>
             </>
           ) : null}
@@ -319,6 +374,14 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             )}
           </div>
         </div>
+        {mode === 'adjust' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">ประเภท:</span>
+            <SegmentedButton active={!adjustTypeFilter} label="ทั้งหมด" onClick={() => setAdjustTypeFilter('')} />
+            <SegmentedButton active={adjustTypeFilter === 'LOSS'} label="นับขาด" onClick={() => setAdjustTypeFilter('LOSS')} />
+            <SegmentedButton active={adjustTypeFilter === 'GAIN'} label="นับเกิน" onClick={() => setAdjustTypeFilter('GAIN')} />
+          </div>
+        ) : null}
       </div>
       {mode === 'status-convert' ? (
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
@@ -360,10 +423,10 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       ) : null}
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
-          <div className="w-full max-w-3xl overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0">
-              <h3 className="font-bold text-slate-100">{meta.title}</h3>
-              <a className="text-2xl text-slate-400 hover:text-white" href={pathname}>&times;</a>
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-md bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 shrink-0">
+              <h3 className="font-bold text-slate-900">{meta.title}</h3>
+              <a className="text-2xl text-slate-400 hover:text-slate-700" href={pathname}>&times;</a>
             </div>
             {mode === 'status-convert' ? <StatusConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
             {mode === 'convert' ? <ConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
@@ -378,6 +441,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
         sortDirection={mode === 'status-convert' ? statusConvertSortDirection : undefined}
         sortKey={mode === 'status-convert' ? statusConvertSortKey : undefined}
         onConvertDetail={mode === 'convert' ? openConvertDetail : undefined}
+        onAdjustCorrect={mode === 'adjust' ? correctAdjust : undefined}
         onSortChange={mode === 'status-convert' ? toggleStatusConvertSort : undefined}
         onConvertReverse={mode === 'convert' ? reverseConvert : undefined}
         onStatusConvertReverse={mode === 'status-convert' ? reverseStatusConvert : undefined}
@@ -398,7 +462,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
 function descriptionFor(mode: Mode) {
   if (mode === 'status-convert') return 'แปลง stock bucket RM ↔ FG ของสินค้าเดิม · ลดต้นทางเพิ่มปลายทางทันที · ใช้ source WAC และบันทึก Stock Ledger 2 ฝั่ง'
   if (mode === 'convert') return 'ตัดสินค้าต้นทางจาก Cost Pool ด้วย FIFO/LIFO/Cost/Manual แล้วเพิ่มสินค้าปลายทางกลับเข้า Cost Pool เป็น Regrade'
-  return 'หาของไม่เจอ · สต๊อกตัด 0 แล้ว แต่ในระบบยังมี · นับเกินระบบ — Quick Adjust ทีละ row · Note-only ไม่ลง P&L'
+  return 'หาของไม่เจอ · สต๊อกตัด 0 แล้ว แต่ในระบบยังมี · นับเกินระบบ — Quick Adjust ทีละ row · กระทบ stock value/WAC'
 }
 
 function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
@@ -427,15 +491,15 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
     const gainRows = rows.filter((row) => Number(row.diffQty ?? 0) > 0)
     const lossQty = lossRows.reduce((sum, row) => sum + Math.abs(Number(row.diffQty ?? 0)), 0)
     const gainQty = gainRows.reduce((sum, row) => sum + Number(row.diffQty ?? 0), 0)
-    const lossValue = lossRows.reduce((sum, row) => sum + Number(row.valueNote ?? 0), 0)
-    const gainValue = gainRows.reduce((sum, row) => sum + Number(row.valueNote ?? 0), 0)
+    const lossValue = lossRows.reduce((sum, row) => sum + signedAdjustValue(row), 0)
+    const gainValue = gainRows.reduce((sum, row) => sum + signedAdjustValue(row), 0)
     return (
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 text-sm">
         <Metric emoji="📋" iconBg="bg-slate-100" label="รายการทั้งหมด" value={String(rows.length)} valueClassName="text-slate-900" />
         <Metric emoji="📉" iconBg="bg-red-100 text-red-700" label="นับขาด (LOSS)" value={`-${formatMoney(lossQty)} กก.`} valueClassName="text-red-600" />
-        <Metric emoji="💸" iconBg="bg-red-100 text-red-700" label="มูลค่าขาด (Note)" value={formatMoney(lossValue)} valueClassName="text-red-600" />
+        <Metric emoji="💸" iconBg="bg-red-100 text-red-700" label="มูลค่าขาด (รวม)" value={formatMoney(lossValue)} valueClassName="text-red-600" />
         <Metric emoji="📈" iconBg="bg-emerald-100 text-emerald-700" label="นับเกิน (GAIN)" value={`+${formatMoney(gainQty)} กก.`} valueClassName="text-emerald-700" />
-        <Metric emoji="💰" iconBg="bg-emerald-100 text-emerald-700" label="มูลค่าเกิน (Note)" value={formatMoney(gainValue)} valueClassName="text-emerald-700" className="col-span-2 lg:col-span-1" />
+        <Metric emoji="💰" iconBg="bg-emerald-100 text-emerald-700" label="มูลค่าเกิน (รวม)" value={formatMoney(gainValue)} valueClassName="text-emerald-700" className="col-span-2 lg:col-span-1" />
       </div>
     )
   }
@@ -453,11 +517,11 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
 function AdjustPrincipleBox() {
   return (
     <div className="rounded-md border-l-4 border-amber-500 bg-amber-50 p-3 text-xs text-slate-700">
-      <div className="mb-1 font-bold">📒 หลักการทำงาน — Note-only (ไม่ลง P&L)</div>
+      <div className="mb-1 font-bold">📒 หลักการทำงาน — Stock correction value</div>
       <ul className="ml-5 list-disc space-y-0.5">
         <li>ปรับสต๊อกจริง (qty) ตาม &quot;นับจริง&quot; ของคุณ — ตัดออกหรือเพิ่มเข้า stock_ledger</li>
-        <li><strong>มูลค่า (value) = 0</strong> ใน ledger — ไม่กระทบ Stock Value · ไม่ลง P&L · ไม่กระโดด WAC</li>
-        <li>มูลค่าที่หาย/เกินเก็บเป็น <strong>Note</strong> สำหรับ analysis เท่านั้น และแสดงใน column &quot;มูลค่า Note&quot;</li>
+        <li><strong>มูลค่ารวม</strong> คำนวณจากราคาต่อกก. ณ วันที่นับ — LOSS ติดลบ, GAIN เป็นบวก</li>
+        <li>รายการ correction อาจกระทบ WAC และ margin จึงต้องตรวจเหตุผลและราคาให้ครบก่อนบันทึก</li>
         <li>ใช้เมื่อ &quot;หาของไม่เจอ&quot; / &quot;นับจริง 0 แต่ระบบมี&quot; / &quot;นับเกินระบบ&quot;</li>
       </ul>
     </div>
@@ -472,7 +536,7 @@ function AdjustUsageBox() {
         <li><strong>หาของไม่เจอ</strong> — ระบบมี 100 กก. แต่นับจริงเหลือ 80 → ใส่ &quot;นับจริง&quot; 80 → ขาด 20 กก. (Note)</li>
         <li><strong>สต๊อกตัด 0 แต่ในระบบยังมี</strong> — ระบบมี 50 กก. แต่นับจริง 0 → ใส่ &quot;นับจริง&quot; 0 → ขาด 50 กก. (Note)</li>
         <li><strong>นับเกินระบบ</strong> — ระบบมี 10 กก. แต่นับจริงได้ 25 → ใส่ &quot;นับจริง&quot; 25 → เกิน 15 กก. (Note)</li>
-        <li>เคลื่อนไหวจะเข้า Stock Ledger เป็น <code>STOCK_COUNT_LOSS</code> หรือ <code>STOCK_COUNT_GAIN</code> · qty จริง · value=0</li>
+        <li>เคลื่อนไหวจะเข้า Stock Ledger เป็น <code>STOCK_COUNT_LOSS</code> หรือ <code>STOCK_COUNT_GAIN</code> · qty จริง · value ตาม correction policy</li>
       </ul>
     </div>
   )
@@ -481,6 +545,7 @@ function AdjustUsageBox() {
 function OperationTable({
   isLoading,
   mode,
+  onAdjustCorrect,
   onConvertDetail,
   onConvertReverse,
   onStatusConvertReverse,
@@ -491,6 +556,7 @@ function OperationTable({
 }: {
   isLoading: boolean
   mode: Mode
+  onAdjustCorrect?: (row: Record<string, string | number | boolean | null>) => void
   onConvertDetail?: (refNo: string) => void
   onConvertReverse?: (refNo: string) => void
   onStatusConvertReverse?: (refNo: string) => void
@@ -502,7 +568,7 @@ function OperationTable({
   const columns = columnsFor(mode)
   return (
     <div className="overflow-x-auto rounded-md bg-white shadow">
-      <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1280px] text-sm' : 'w-full min-w-[1000px] text-sm'}>
+      <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1280px] text-sm' : 'w-full min-w-[1500px] text-xs'}>
         <thead className="bg-slate-100">
           <tr>
             {columns.map((column) => (
@@ -525,7 +591,7 @@ function OperationTable({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
-          {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="border-t hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse)}</td>)}</tr>)}
+          {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="border-t hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 align-top ${mode === 'adjust' ? 'font-semibold text-slate-700' : ''} ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse, onAdjustCorrect)}</td>)}</tr>)}
           {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
         </tbody>
       </table>
@@ -537,6 +603,18 @@ function emptyTextFor(mode: Mode) {
   if (mode === 'convert') return 'ยังไม่มีรายการปรับเกรด'
   if (mode === 'status-convert') return 'ยังไม่เคยปรับสถานะ — กดปุ่ม "+ ปรับสถานะใหม่"'
   return 'ยังไม่มีรายการ'
+}
+
+function SegmentedButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+      type="button"
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
 }
 
 function columnsFor(mode: Mode): OperationColumn[] {
@@ -585,9 +663,11 @@ function columnsFor(mode: Mode): OperationColumn[] {
     { key: 'countedQty', label: 'นับจริง', cellClassName: 'text-right font-mono' },
     { key: 'diffQty', label: 'Diff', cellClassName: 'text-right font-mono' },
     { key: 'adjustType', label: 'ประเภท' },
-    { key: 'valueNote', label: 'มูลค่า Note', cellClassName: 'text-right font-mono' },
+    { key: 'unitPricePerKg', label: 'ราคา/กก.', cellClassName: 'text-right font-mono' },
+    { key: 'totalValue', label: 'มูลค่ารวม', cellClassName: 'text-right font-mono' },
     { key: 'reason', label: 'เหตุผล' },
-    { key: 'status', label: 'สถานะ', cellClassName: 'text-center' },
+    { key: 'createdAt', label: 'วันที่สร้างรายการ' },
+    { key: 'updatedBy', label: 'แก้ไขโดย' },
     { key: 'action', label: 'การกระทำ', cellClassName: 'text-center' },
   ]
   return []
@@ -640,7 +720,7 @@ function compareStatusConvertRows(
   return direction === 'asc' ? result : result * -1
 }
 
-function formatOperationCell(mode: Mode, row: Record<string, string | number | boolean | null>, key: string, onConvertReverse?: (refNo: string) => void, onConvertDetail?: (refNo: string) => void, onStatusConvertReverse?: (refNo: string) => void) {
+function formatOperationCell(mode: Mode, row: Record<string, string | number | boolean | null>, key: string, onConvertReverse?: (refNo: string) => void, onConvertDetail?: (refNo: string) => void, onStatusConvertReverse?: (refNo: string) => void, onAdjustCorrect?: (row: Record<string, string | number | boolean | null>) => void) {
   if (mode === 'status-convert') {
     if (key === 'productDisplay') return <><b>{formatCell(row.productCode)}</b><div className="text-xs text-slate-500">{formatCell(row.productName)}</div></>
     if (key === 'locationDisplay') return <span className="text-xs">{formatCell(row.branchName)}<br />{formatCell(row.warehouseName)}</span>
@@ -711,8 +791,9 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
   }
   if (mode === 'adjust') {
     if (key === 'action') {
-      return <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60" disabled title="รอออกแบบ reverse/audit/rollback ก่อนเปิดใช้งาน" type="button">จัดการ</button>
+      return <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60" disabled={!row.canEdit || !onAdjustCorrect} title={row.canEdit ? 'แก้ไขได้ภายใน 7 วัน' : 'หมดช่วงแก้ไข 7 วันแล้ว'} type="button" onClick={() => onAdjustCorrect?.(row)}>แก้ไข</button>
     }
+    if (key === 'createdAt') return formatDateTime(row.createdAt)
     if (key === 'adjustType') {
       const value = String(row[key] ?? '')
       const color = value === 'LOSS' ? 'bg-red-100 text-red-700' : value === 'GAIN' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
@@ -730,8 +811,18 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
       const value = Number(row[key] ?? 0)
       return <span className={value < 0 ? 'font-mono text-red-600' : value > 0 ? 'font-mono text-emerald-700' : 'font-mono text-slate-500'}>{formatMoney(value)}</span>
     }
+    if (key === 'totalValue') {
+      const value = signedAdjustValue(row)
+      return <span className={value < 0 ? 'font-mono text-red-600' : value > 0 ? 'font-mono text-emerald-700' : 'font-mono text-slate-500'}>{formatMoney(value)}</span>
+    }
   }
   return formatCell(row[key])
+}
+
+function signedAdjustValue(row: Record<string, string | number | boolean | null>) {
+  const rawValue = Number(row.totalValue ?? row.valueNote ?? 0)
+  if (String(row.adjustType ?? '') === 'LOSS' && rawValue > 0) return rawValue * -1
+  return rawValue
 }
 
 function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: StockConvertDetail; isLoading: boolean; onClose: () => void; onExport: () => void }) {
@@ -846,17 +937,47 @@ function Metric({
 }
 
 function Field(props: { label: string; onChange: (value: string) => void; type?: string; value: string }) {
-  return <label className="block text-xs font-semibold text-slate-600">{props.label}{props.type === 'date' ? <DatePickerInput className="mt-1.5 w-full font-normal" value={props.value} onChange={props.onChange} /> : <input className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-800 bg-white outline-none focus:border-slate-900" type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange(event.target.value)} />}</label>
+  return (
+    <label className="block text-xs font-semibold text-slate-600">
+      {props.label}
+      {props.type === 'date' ? (
+        <DatePickerInput className="mt-1.5 w-full font-normal" value={props.value} onChange={props.onChange} />
+      ) : (
+        <input
+          className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-slate-900"
+          inputMode={props.type === 'number' ? 'decimal' : undefined}
+          min={props.type === 'number' ? 0 : undefined}
+          step={props.type === 'number' ? 'any' : undefined}
+          type={props.type ?? 'text'}
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+        />
+      )}
+    </label>
+  )
 }
 
-function Select(props: { label: string; onChange: (value: string) => void; options: StockOption[]; value: string }) {
-  return <label className="block text-xs font-semibold text-slate-600">{props.label}<select className="mt-1.5 w-full h-10 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-800 bg-white outline-none focus:border-slate-900" value={props.value} onChange={(event) => props.onChange(event.target.value)}><option value="">เลือก</option>{props.options.filter((option) => option.active !== false).map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} - ${option.name}` : option.name}</option>)}</select></label>
+function Select(props: { disabled?: boolean; label: string; onChange: (value: string) => void; options: StockOption[]; placeholder?: string; value: string }) {
+  return (
+    <label className="block text-xs font-semibold text-slate-600">
+      {props.label}
+      <select
+        className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        disabled={props.disabled}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      >
+        <option value="">{props.placeholder ?? 'เลือก'}</option>
+        {props.options.filter((option) => option.active !== false).map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} - ${option.name}` : option.name}</option>)}
+      </select>
+    </label>
+  )
 }
 
 function BranchWarehouseFields({ branchId, reference, setBranchId, setWarehouseId, warehouseId }: { branchId: string; reference: Payload['reference']; setBranchId: (value: string) => void; setWarehouseId: (value: string) => void; warehouseId: string }) {
   return <>
-    <Select label="สาขา" options={reference.branches} value={branchId} onChange={(value) => { setBranchId(value); setWarehouseId('') }} />
-    <Select label="คลัง" options={reference.warehouses.filter((item) => !branchId || item.branchId === branchId)} value={warehouseId} onChange={setWarehouseId} />
+    <Select label="สาขา" options={reference.branches} value={branchId} onChange={setBranchId} />
+    <Select disabled={!branchId} label="คลัง" options={reference.warehouses.filter((item) => !branchId || item.branchId === branchId)} placeholder={branchId ? 'เลือก' : 'เลือกสาขาก่อน'} value={warehouseId} onChange={setWarehouseId} />
   </>
 }
 
@@ -1136,21 +1257,71 @@ function ConvertForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (
 }
 
 function AdjustForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (values: StockAdjustFormValues) => void; reference: Payload['reference'] }) {
-  const [values, setValues] = useState<StockAdjustFormValues>({ branchId: '', countedQty: 0, date: todayDateInput(), docNo: null, lotNo: null, productId: '', reason: '', remark: null, status: 'RM', systemQty: 0, warehouseId: '' })
+  const [values, setValues] = useState<StockAdjustFormValues>({ branchId: '', countedQty: 0, date: todayDateInput(), docNo: null, lotNo: null, productId: '', reason: stockAdjustReasonOptions[0], remark: null, status: 'RM', systemQty: 0, warehouseId: '' })
+  const [snapshot, setSnapshot] = useState<StockAdjustSnapshot | null>(null)
+  const [snapshotError, setSnapshotError] = useState<string | null>(null)
+  const [isSnapshotLoading, setIsSnapshotLoading] = useState(false)
+  const reasonOptions = props.reference ? stockAdjustReasonOptions : stockAdjustReasonOptions
+  const snapshotReady = Boolean(values.branchId && values.warehouseId && values.productId && values.status && values.date)
+
+  useEffect(() => {
+    if (!snapshotReady) {
+      setSnapshot(null)
+      setSnapshotError(null)
+      return
+    }
+    const controller = new AbortController()
+    const params = new URLSearchParams({
+      branchId: values.branchId,
+      countedQty: String(values.countedQty),
+      date: values.date,
+      productId: values.productId,
+      snapshot: '1',
+      status: values.status,
+      warehouseId: values.warehouseId,
+    })
+    if (values.lotNo) params.set('lotNo', values.lotNo)
+    setIsSnapshotLoading(true)
+    setSnapshotError(null)
+    dailyFetchJson<{ snapshot: StockAdjustSnapshot }>(`/api/stock/adjust?${params.toString()}`, { signal: controller.signal })
+      .then((payload) => {
+        setSnapshot(payload.snapshot)
+        setValues((currentValues) => ({ ...currentValues, systemQty: payload.snapshot.systemQty, totalValue: payload.snapshot.totalValue, unitPricePerKg: payload.snapshot.unitPricePerKg }))
+      })
+      .catch((caught) => {
+        if (controller.signal.aborted) return
+        setSnapshot(null)
+        setSnapshotError(caught instanceof Error ? caught.message : 'โหลด stock snapshot ไม่ได้')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsSnapshotLoading(false)
+      })
+    return () => controller.abort()
+  }, [snapshotReady, values.branchId, values.countedQty, values.date, values.lotNo, values.productId, values.status, values.warehouseId])
+
   return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} onSubmit={() => props.onSubmit(values)}>
     <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
       <BaseDateDoc values={values} setValues={setValues} />
       <Select label="สินค้า" options={props.reference.products} value={values.productId} onChange={(productId) => setValues({ ...values, productId })} />
       <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
-      <Select label="คลังสินค้า" options={[{ active: true, id: 'RM', name: 'RM' }, { active: true, id: 'WIP', name: 'WIP' }, { active: true, id: 'FG', name: 'FG' }]} value={values.status} onChange={(status) => setValues({ ...values, status: status as StockAdjustFormValues['status'] })} />
+      <Select label="สถานะสินค้า" options={[{ active: true, id: 'RM', name: 'RM' }, { active: true, id: 'WIP', name: 'WIP' }, { active: true, id: 'FG', name: 'FG' }]} value={values.status} onChange={(status) => setValues({ ...values, status: status as StockAdjustFormValues['status'] })} />
       <Field label="Lot" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
-      <Field label="ยอดในระบบ (server จะตรวจซ้ำ)" type="number" value={String(values.systemQty)} onChange={(systemQty) => setValues({ ...values, systemQty: Number(systemQty) })} />
       <Field label="นับจริง" type="number" value={String(values.countedQty)} onChange={(countedQty) => setValues({ ...values, countedQty: Number(countedQty) })} />
+      <div className="md:col-span-2 grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs md:grid-cols-5">
+        <ReadOnlyBox label="ระบบมี" value={isSnapshotLoading ? 'กำลังโหลด' : `${formatMoney(snapshot?.systemQty ?? values.systemQty)} กก.`} />
+        <ReadOnlyBox label="จองไว้" value={`${formatMoney(snapshot?.onHoldQty ?? 0)} กก.`} />
+        <ReadOnlyBox label="พร้อมใช้" value={`${formatMoney(snapshot?.readyQty ?? 0)} กก.`} />
+        <ReadOnlyBox label="ราคา/กก." value={formatMoney(snapshot?.unitPricePerKg ?? values.unitPricePerKg ?? 0)} />
+        <ReadOnlyBox label="มูลค่ารวม" value={formatMoney(snapshot?.totalValue ?? values.totalValue ?? 0)} valueClassName={(snapshot?.totalValue ?? values.totalValue ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'} />
+        <div className="md:col-span-5 text-slate-600">
+          {snapshotError ? <span className="text-red-700">{snapshotError}</span> : <>Diff: <b className={(snapshot?.diffQty ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}>{formatMoney(snapshot?.diffQty ?? 0)} กก.</b> · Price source: {snapshot?.priceSource ?? '-'}</>}
+        </div>
+      </div>
       <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-        ระบบจะใช้ยอดจาก Stock Ledger จริงตาม bucket ที่เลือก และ block ถ้านับจริงต่ำกว่า active hold เพื่อไม่ให้พร้อมใช้ติดลบ
+        ระบบจะใช้ยอดจาก Stock Ledger จริงตาม bucket/วันที่ที่เลือก และ block ถ้านับจริงต่ำกว่า active hold เพื่อไม่ให้พร้อมใช้ติดลบ
       </div>
       <div className="md:col-span-2">
-        <Field label="เหตุผล *" value={values.reason} onChange={(reason) => setValues({ ...values, reason })} />
+        <label className="block text-xs font-semibold text-slate-600">เหตุผล *<select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-slate-900" value={values.reason} onChange={(event) => setValues({ ...values, reason: event.target.value as StockAdjustFormValues['reason'] })}>{reasonOptions.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select></label>
       </div>
       <div className="md:col-span-2">
         <Field label="หมายเหตุ" value={values.remark ?? ''} onChange={(remark) => setValues({ ...values, remark })} />
@@ -1166,8 +1337,8 @@ function BaseDateDoc<T extends { date: string; docNo?: string | null }>({ setVal
   </>
 }
 
-function ReadOnlyBox({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md border border-white/70 bg-white/80 px-3 py-2"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-sm font-semibold text-slate-800">{value}</div></div>
+function ReadOnlyBox({ label, value, valueClassName = 'text-slate-800' }: { label: string; value: string; valueClassName?: string }) {
+  return <div className="rounded-md border border-white/70 bg-white/80 px-3 py-2"><div className="text-xs text-slate-500">{label}</div><div className={`mt-1 text-sm font-semibold ${valueClassName}`}>{value}</div></div>
 }
 
 function FormShell({ cancelHref, children, isSaving, mode, onSubmit }: { cancelHref: string; children: React.ReactNode; isSaving: boolean; mode?: Mode; onSubmit: () => void }) {

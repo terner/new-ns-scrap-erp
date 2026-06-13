@@ -112,7 +112,7 @@ Source:
 | `/stock/ledger` | Stock Ledger | [[Stock Ledger Page Flow]], [[Stock Ledger and Stock Balance]] | accepted code baseline | target ledger shows physical stock movements only; hold is not ledger | finish source links and no-hold-row rule |
 | `/stock/status-convert` | ปรับสถานะสินค้า (RM/FG) | [[Stock Status Convert Page Flow]] | accepted code baseline | target `SC`: RM<->FG status bucket conversion with paired stock ledger, ready-stock validation, source WAC carry-forward, and Production reporting source label | finish hold-aware validation and reversal policy |
 | `/stock/convert` | Grade Adjustment / ปรับเกรด | [[Stock Convert Page Flow]] | accepted code baseline | legacy `gradeAdjustment`: convert product/grade using source WAC | finish cost allocation and reversal |
-| `/stock/adjust` | นับสต๊อก / Stock Count Adjust | [[Stock Adjust Page Flow]] | accepted code baseline | legacy `stockAdjust`: count adjustment with reason and note-only/P&L policy | finalize approval/reconciliation boundary |
+| `/stock/adjust` | นับสต๊อก / Stock Count Adjust | [[Stock Adjust Page Flow]] | accepted code baseline | target `stockAdjust`: cycle count/stock correction with fixed reasons, 7-day correction, unit price/kg, signed value, and WAC/margin impact policy | implement correction/value policy and approval boundary |
 
 ## Trading & PO Reports
 

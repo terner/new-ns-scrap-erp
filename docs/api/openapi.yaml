@@ -2382,26 +2382,43 @@ paths:
     get:
       tags: [Stock]
       operationId: listStockAdjustments
-      summary: List stock count adjustments
+      summary: List stock count/cycle count corrections
       responses:
         "200":
           description: Stock count adjustment rows and stock reference options
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StockOperationListResponse"
+                $ref: "#/components/schemas/StockAdjustListResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
       tags: [Stock]
       operationId: createStockAdjustment
-      summary: Create stock count adjustment and ledger movement
+      summary: Create stock count correction and ledger movement
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/StockAdjustRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/StockWriteOk"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      tags: [Stock]
+      operationId: correctStockAdjustment
+      summary: Correct a posted stock count adjustment within the 7-day correction window
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockAdjustCorrectionRequest"
       responses:
         "200":
           $ref: "#/components/responses/StockWriteOk"
@@ -4160,15 +4177,146 @@ components:
               type: number
               minimum: 0
             reason:
-              type: string
-              minLength: 3
-              maxLength: 240
+              $ref: "#/components/schemas/StockAdjustReason"
             remark:
               type: [string, "null"]
               maxLength: 500
             systemQty:
               type: number
               minimum: 0
+              description: Client preview value only; server recalculates from stock ledger before writing.
+            unitPricePerKg:
+              type: number
+              minimum: 0
+              description: Target requirement field. Server must recalculate/validate the approved price per kg for the document date.
+            totalValue:
+              type: number
+              description: "Target requirement field. Signed correction value: negative for LOSS, positive for GAIN."
+    StockAdjustReason:
+      type: string
+      enum:
+        - หาของไม่เจอ (Missing)
+        - นับจริง 0 แต่ระบบมี (Lost/Damaged)
+        - นับได้เกินระบบ (Found Excess)
+        - สูญหาย (Lost)
+        - เสียหาย (Damaged)
+        - ผิดสาขา/คลัง (Wrong Branch)
+        - อื่นๆ (Other)
+    StockAdjustCorrectionRequest:
+      type: object
+      required: [countedQty, docNo, reason]
+      properties:
+        countedQty:
+          type: number
+          minimum: 0
+        docNo:
+          type: string
+        reason:
+          $ref: "#/components/schemas/StockAdjustReason"
+        remark:
+          type: [string, "null"]
+          maxLength: 500
+    StockAdjustRow:
+      type: object
+      required: [adjustType, countedQty, date, diffQty, docNo, productName, reason, systemQty]
+      properties:
+        adjustType:
+          type: string
+          enum: [LOSS, GAIN, NONE]
+        branchId:
+          type: string
+        branchName:
+          type: string
+        branchWarehouse:
+          type: string
+        countedQty:
+          type: number
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+        createdBy:
+          type: [string, "null"]
+        canEdit:
+          type: boolean
+        date:
+          type: string
+          format: date
+        diffQty:
+          type: number
+        docNo:
+          type: string
+        id:
+          type: string
+        lotNo:
+          type: string
+        onHoldQty:
+          type: number
+        outputCategory:
+          $ref: "#/components/schemas/StockStatus"
+        policy:
+          type: string
+          description: Runtime policy is STOCK_CORRECTION for new rows. Older rows may still show NOTE_ONLY from historical data.
+        productCode:
+          type: string
+        productName:
+          type: string
+        readyQty:
+          type: number
+        reason:
+          $ref: "#/components/schemas/StockAdjustReason"
+        status:
+          type: string
+        systemQty:
+          type: number
+        totalValue:
+          type: number
+          description: Signed correction value; negative for LOSS and positive for GAIN.
+        unitPricePerKg:
+          type: number
+          description: Price per kg used by the server for the document date. The server rejects non-zero corrections when this price is missing or zero.
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+        updatedBy:
+          type: [string, "null"]
+        editableUntil:
+          type: [string, "null"]
+          format: date-time
+        valueNote:
+          type: number
+          deprecated: true
+          description: Legacy/current wording. Replace in UI with totalValue / มูลค่ารวม (บาท).
+        warehouseName:
+          type: string
+    StockAdjustListResponse:
+      type: object
+      required: [reference, rows]
+      properties:
+        reasonOptions:
+          type: array
+          description: Fixed in-page reason options for stock count adjustment.
+          items:
+            $ref: "#/components/schemas/StockAdjustReason"
+        reference:
+          type: object
+          required: [branches, products, warehouses]
+          properties:
+            branches:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+            products:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+            warehouses:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockOption"
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockAdjustRow"
     StockBalanceResponse:
       type: object
       required: [byStatus, page, pageSize, rows, summary, total]

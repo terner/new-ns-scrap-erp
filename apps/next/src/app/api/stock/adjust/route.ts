@@ -4,9 +4,11 @@ import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requ
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { averageCostForStock, normalizeStockReferenceInput, quantityForStock, stockReferenceData } from '@/lib/server/stock'
-import { stockAdjustFormSchema } from '@/lib/stock'
+import { stockAdjustCorrectionSchema, stockAdjustFormSchema, stockAdjustReasonOptions } from '@/lib/stock'
 
 export const runtime = 'nodejs'
+const CORRECTION_WINDOW_DAYS = 7
+const MIN_VALUE_PRICE = 0.000001
 
 async function nextDocNo() {
   const prefix = 'ADJ-'
@@ -19,12 +21,80 @@ async function nextDocNo() {
   return `${prefix}${String(Number.isFinite(lastNumber) ? lastNumber + 1 : 1).padStart(6, '0')}`
 }
 
-export async function GET() {
+async function stockAdjustSnapshot(input: {
+  branchId?: string | null
+  countedQty?: string | null
+  date?: string | null
+  lotNo?: string | null
+  productId?: string | null
+  status?: string | null
+  warehouseId?: string | null
+}) {
+  const references = await normalizeStockReferenceInput({
+    branchId: input.branchId,
+    productId: input.productId,
+    warehouseId: input.warehouseId,
+  })
+  if (!references.branchId) return { error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน' }
+  if (!references.warehouseId) return { error: 'คลังไม่ถูกต้องหรือถูกปิดใช้งาน' }
+  if (!references.productId) return { error: 'สินค้าไม่ถูกต้องหรือถูกปิดใช้งาน' }
+
+  const status = input.status || 'RM'
+  const asOf = input.date || null
+  const [systemQty, readyQty, unitPricePerKg] = await Promise.all([
+    quantityForStock({ asOf, branchId: references.branchId, lotNo: input.lotNo, productId: references.productId, status, warehouseId: references.warehouseId }),
+    quantityForStock({ asOf, branchId: references.branchId, lotNo: input.lotNo, productId: references.productId, quantityType: 'ready', status, warehouseId: references.warehouseId }),
+    averageCostForStock({ asOf, branchId: references.branchId, lotNo: input.lotNo, productId: references.productId, status, warehouseId: references.warehouseId }),
+  ])
+  const countedQty = input.countedQty == null || input.countedQty === '' ? systemQty : Number(input.countedQty)
+  const diffQty = Number.isFinite(countedQty) ? countedQty - systemQty : 0
+  return {
+    adjustType: Math.abs(diffQty) < 0.000001 ? 'NONE' : diffQty < 0 ? 'LOSS' : 'GAIN',
+    countedQty: Number.isFinite(countedQty) ? countedQty : systemQty,
+    diffQty,
+    onHoldQty: Math.max(0, systemQty - readyQty),
+    priceSource: 'STOCK_WAC_AS_OF_DATE',
+    readyQty,
+    systemQty,
+    totalValue: diffQty * unitPricePerKg,
+    unitPricePerKg,
+  }
+}
+
+function correctionDeadline(date: Date | null) {
+  if (!date) return null
+  const deadline = new Date(date)
+  deadline.setDate(deadline.getDate() + CORRECTION_WINDOW_DAYS)
+  deadline.setHours(23, 59, 59, 999)
+  return deadline
+}
+
+function canCorrectAdjustment(date: Date | null) {
+  const deadline = correctionDeadline(date)
+  return Boolean(deadline && deadline.getTime() >= Date.now())
+}
+
+export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'stock.ledger.view')
+    const searchParams = new URL(request.url).searchParams
+    if (searchParams.get('snapshot') === '1') {
+      const snapshot = await stockAdjustSnapshot({
+        branchId: searchParams.get('branchId'),
+        countedQty: searchParams.get('countedQty'),
+        date: searchParams.get('date'),
+        lotNo: searchParams.get('lotNo'),
+        productId: searchParams.get('productId'),
+        status: searchParams.get('status'),
+        warehouseId: searchParams.get('warehouseId'),
+      })
+      if ('error' in snapshot) return NextResponse.json({ error: snapshot.error }, { status: 400 })
+      return NextResponse.json({ snapshot })
+    }
+
     const [reference, adjustments] = await Promise.all([
-      stockReferenceData(),
+      stockReferenceData({ includeCustomers: false }),
       prisma.stock_adjustments.findMany({ orderBy: [{ date: 'desc' }, { created_at: 'desc' }], take: 500 }),
     ])
     const [branches, warehouses, products] = await Promise.all([
@@ -37,15 +107,22 @@ export async function GET() {
     const productById = new Map(products.map((row) => [row.id, row]))
 
     return NextResponse.json({
+      reasonOptions: stockAdjustReasonOptions,
       reference,
       rows: adjustments.map((row) => {
         const product = row.product_id ? productById.get(row.product_id) : null
+        const unitPricePerKg = toNumber(row.unit_cost_used)
+        const rawTotalValue = toNumber(row.value_note)
+        const totalValue = row.adjust_type === 'LOSS' && rawTotalValue > 0 ? -rawTotalValue : rawTotalValue
         return {
           adjustType: row.adjust_type ?? '',
           branchId: row.branch_id ? branchById.get(row.branch_id)?.code ?? '' : '',
           branchName: row.branch_id ? branchById.get(row.branch_id)?.name ?? '-' : '-',
           branchWarehouse: `${row.branch_id ? branchById.get(row.branch_id)?.name ?? '-' : '-'} / ${row.warehouse_id ? warehouseById.get(row.warehouse_id)?.name ?? '-' : '-'}`,
           countedQty: toNumber(row.counted_qty),
+          canEdit: canCorrectAdjustment(row.date),
+          createdAt: row.created_at ? row.created_at.toISOString() : null,
+          createdBy: row.created_by ?? '',
           date: row.date ? toDateOnly(row.date) : '',
           diffQty: toNumber(row.diff_qty),
           docNo: row.doc_no ?? '',
@@ -60,7 +137,12 @@ export async function GET() {
           reason: row.reason ?? '',
           status: row.status ?? '',
           systemQty: toNumber(row.system_qty),
-          valueNote: toNumber(row.value_note),
+          totalValue,
+          unitPricePerKg,
+          updatedAt: row.updated_at ? row.updated_at.toISOString() : null,
+          updatedBy: row.updated_by ?? '',
+          editableUntil: correctionDeadline(row.date)?.toISOString() ?? null,
+          valueNote: totalValue,
           warehouseName: row.warehouse_id ? warehouseById.get(row.warehouse_id)?.name ?? '-' : '-',
         }
       }),
@@ -87,8 +169,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'สินค้าไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     }
     const [systemQty, readyQty] = await Promise.all([
-      quantityForStock({ branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, status: values.status, warehouseId: references.warehouseId }),
-      quantityForStock({ branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, quantityType: 'ready', status: values.status, warehouseId: references.warehouseId }),
+      quantityForStock({ asOf: values.date, branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, status: values.status, warehouseId: references.warehouseId }),
+      quantityForStock({ asOf: values.date, branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, quantityType: 'ready', status: values.status, warehouseId: references.warehouseId }),
     ])
     const onHoldQty = Math.max(0, systemQty - readyQty)
     if (values.countedQty < onHoldQty - 0.000001) {
@@ -99,10 +181,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'นับจริงเท่ากับยอดในระบบ ไม่ต้องสร้างรายการปรับ' }, { status: 400 })
     }
 
-    const unitCost = await averageCostForStock({ branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, status: values.status, warehouseId: references.warehouseId })
+    const unitCost = await averageCostForStock({ asOf: values.date, branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, status: values.status, warehouseId: references.warehouseId })
+    if (unitCost <= MIN_VALUE_PRICE) {
+      return NextResponse.json({ error: 'ไม่พบราคาต่อกก. สำหรับสินค้า/วันที่นี้ จึงยังบันทึก stock correction ที่กระทบ WAC/margin ไม่ได้' }, { status: 400 })
+    }
     const docNo = values.docNo ?? await nextDocNo()
     const actor = currentActor(context)
     const adjustType = diffQty < 0 ? 'LOSS' : 'GAIN'
+    const totalValue = diffQty * unitCost
+    const now = new Date()
 
     await prisma.$transaction(async (tx) => {
       const adjustment = await tx.stock_adjustments.create({
@@ -115,7 +202,7 @@ export async function POST(request: Request) {
           diff_qty: diffQty,
           doc_no: docNo,
           lot_no: values.lotNo,
-          accounting_impact_policy: 'NOTE_ONLY',
+          accounting_impact_policy: 'STOCK_CORRECTION',
           on_hold_qty: onHoldQty,
           output_category: values.status,
           product_id: references.productId,
@@ -125,8 +212,9 @@ export async function POST(request: Request) {
           status: 'posted',
           system_qty: systemQty,
           unit_cost_used: unitCost,
+          updated_at: now,
           updated_by: actor,
-          value_note: Math.abs(diffQty) * unitCost,
+          value_note: totalValue,
           warehouse_id: references.warehouseId,
         },
       })
@@ -146,8 +234,8 @@ export async function POST(request: Request) {
           ref_no: docNo,
           ref_type: 'ADJ',
           unit_cost: unitCost,
-          value_in: 0,
-          value_out: 0,
+          value_in: diffQty > 0 ? totalValue : 0,
+          value_out: diffQty < 0 ? Math.abs(totalValue) : 0,
           warehouse_id: references.warehouseId,
         },
       })
@@ -157,9 +245,121 @@ export async function POST(request: Request) {
       })
     })
 
-    return NextResponse.json({ id: docNo, refNo: docNo })
+    return NextResponse.json({ id: docNo, refNo: docNo, totalValue, unitPricePerKg: unitCost })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'บันทึกปรับสต๊อกไม่ได้', 400)
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'stock.ledger.view')
+    const values = stockAdjustCorrectionSchema.parse(await request.json())
+    const actor = currentActor(context)
+    const now = new Date()
+
+    const existing = await prisma.stock_adjustments.findFirst({
+      where: { doc_no: values.docNo },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'ไม่พบเอกสารปรับสต๊อกนี้' }, { status: 404 })
+    }
+    if (existing.status !== 'posted') {
+      return NextResponse.json({ error: 'แก้ไขได้เฉพาะรายการ posted เท่านั้น' }, { status: 400 })
+    }
+    if (!canCorrectAdjustment(existing.date)) {
+      return NextResponse.json({ error: `แก้ไขรายการนับ stock ได้ไม่เกิน ${CORRECTION_WINDOW_DAYS} วันนับจากวันที่เอกสาร` }, { status: 400 })
+    }
+
+    const systemQty = toNumber(existing.system_qty)
+    const onHoldQty = toNumber(existing.on_hold_qty)
+    if (values.countedQty < onHoldQty - 0.000001) {
+      return NextResponse.json({ error: `บันทึกไม่ได้: นับจริงต่ำกว่า stock ที่ถูกจองไว้ (${onHoldQty.toLocaleString('th-TH')}) ต้องปลด/ยกเลิก hold หรือทำ reconciliation approval ก่อน` }, { status: 400 })
+    }
+
+    const oldDiffQty = toNumber(existing.diff_qty)
+    const newDiffQty = values.countedQty - systemQty
+    const unitCost = toNumber(existing.unit_cost_used)
+    if (Math.abs(newDiffQty) > 0.000001 && unitCost <= MIN_VALUE_PRICE) {
+      return NextResponse.json({ error: 'รายการเดิมไม่มีราคาต่อกก. จึงยังแก้ไข stock correction ที่กระทบ WAC/margin ไม่ได้' }, { status: 400 })
+    }
+    const oldTotalValue = oldDiffQty * unitCost
+    const newTotalValue = newDiffQty * unitCost
+    const newAdjustmentType = newDiffQty < 0 ? 'LOSS' : newDiffQty > 0 ? 'GAIN' : 'NONE'
+
+    await prisma.$transaction(async (tx) => {
+      if (Math.abs(oldDiffQty) > 0.000001) {
+        await tx.stock_ledger.create({
+          data: {
+            branch_id: existing.branch_id,
+            created_by: actor,
+            date: normalizeDate(toDateOnly(now)),
+            lot_no: existing.lot_no,
+            movement_type: oldDiffQty < 0 ? 'STOCK_COUNT_REVERSE_IN' : 'STOCK_COUNT_REVERSE_OUT',
+            notes: `Correction reverse ${values.docNo}: ${values.reason}${values.remark ? ` · ${values.remark}` : ''}`,
+            output_category: existing.output_category,
+            product_id: existing.product_id,
+            qty_in: oldDiffQty < 0 ? Math.abs(oldDiffQty) : 0,
+            qty_out: oldDiffQty > 0 ? oldDiffQty : 0,
+            ref_id: String(existing.id),
+            ref_no: values.docNo,
+            ref_type: 'ADJ-REV',
+            unit_cost: unitCost,
+            value_in: oldDiffQty < 0 ? Math.abs(oldTotalValue) : 0,
+            value_out: oldDiffQty > 0 ? Math.abs(oldTotalValue) : 0,
+            warehouse_id: existing.warehouse_id,
+          },
+        })
+      }
+
+      let replacementLedgerId = existing.stock_ledger_id
+      if (Math.abs(newDiffQty) > 0.000001) {
+        const replacementLedger = await tx.stock_ledger.create({
+          data: {
+            branch_id: existing.branch_id,
+            created_by: actor,
+            date: normalizeDate(toDateOnly(now)),
+            lot_no: existing.lot_no,
+            movement_type: newDiffQty < 0 ? 'STOCK_COUNT_LOSS' : 'STOCK_COUNT_GAIN',
+            notes: `Correction replacement ${values.docNo}: ${values.reason}${values.remark ? ` · ${values.remark}` : ''}`,
+            output_category: existing.output_category,
+            product_id: existing.product_id,
+            qty_in: newDiffQty > 0 ? newDiffQty : 0,
+            qty_out: newDiffQty < 0 ? Math.abs(newDiffQty) : 0,
+            ref_id: String(existing.id),
+            ref_no: values.docNo,
+            ref_type: 'ADJ',
+            unit_cost: unitCost,
+            value_in: newDiffQty > 0 ? newTotalValue : 0,
+            value_out: newDiffQty < 0 ? Math.abs(newTotalValue) : 0,
+            warehouse_id: existing.warehouse_id,
+          },
+        })
+        replacementLedgerId = replacementLedger.id
+      }
+
+      await tx.stock_adjustments.update({
+        data: {
+          adjust_type: newAdjustmentType,
+          counted_qty: values.countedQty,
+          diff_qty: newDiffQty,
+          reason: values.reason,
+          remark: values.remark,
+          stock_ledger_id: replacementLedgerId,
+          updated_at: now,
+          updated_by: actor,
+          value_note: newTotalValue,
+          version: (existing.version ?? 1) + 1,
+        },
+        where: { id: existing.id },
+      })
+    })
+
+    return NextResponse.json({ id: values.docNo, refNo: values.docNo, totalValue: newTotalValue, unitPricePerKg: unitCost })
+  } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'แก้ไขปรับสต๊อกไม่ได้', 400)
   }
 }

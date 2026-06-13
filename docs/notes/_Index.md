@@ -38,7 +38,7 @@ created: 2026-05-16
 - [[Stock Transfer Page Flow]] - contract หน้า `/stock/transfer`: paired `ST` out/in ledger movement, no-revenue transfer, source/destination validation, source available/cost preview, doc/date/weight filters, total value และ draft-only edit/cancel policy
 - [[Stock Status Convert Page Flow]] - contract หน้า `/stock/status-convert`: paired `SC` RM/FG status out/in movement, ready-stock validation, RM<->FG validation, source WAC carry-forward และ reverse/reconciliation gap
 - [[Stock Convert Page Flow]] - contract หน้า `/stock/convert`: grade/product conversion `GA`, source-target cost/yield policy และ deferred confirm/reverse flow
-- [[Stock Adjust Page Flow]] - contract หน้า `/stock/adjust`: stock count adjustment `ADJ`, note-only accounting policy, reason/audit และ reverse gap
+- [[Stock Adjust Page Flow]] - contract หน้า `/stock/adjust`: stock count/cycle count correction `ADJ`, fixed reason options, แก้ไขได้ภายใน 7 วัน, ราคาต่อกก., มูลค่ารวม signed และ WAC/margin impact gap
 - [[Dual Costing Flow]] - ภาพรวมหมวด Dual Costing ทั้ง 8 เมนู active: scope เฉพาะทองแดง/ทองเหลือง, Cost Pool -> Allocator -> Match Log/Ledger -> Report, และเส้นแบ่ง Deal Cost management view ออกจาก WAC/P&L
 - [[Cost Pool]] - กติกาแยกของ Cost Pool/Dual Costing: eligibility เฉพาะทองแดง/ทองเหลือง, source types, availability, short-close/reversal, API contract และ implementation gap
 - [[Purchase Flow Status Matrix]] - matrix สถานะเอกสารราย use case และราย step สำหรับ PO/WTI/ADV/PB/PMA/PMT ใช้เป็น acceptance criteria ข้าม Purchase Flow กับ Payment Flow
