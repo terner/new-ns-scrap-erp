@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, ImagePlus, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronDown, ImagePlus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Card } from '@/components/ui/Card'
@@ -1019,6 +1019,7 @@ function ProductImagePicker({
   value: string
   onChange: (value: string) => void
 }) {
+  const [isOpen, setIsOpen] = useState(false)
   const [category, setCategory] = useState('all')
   const categories = useMemo(
     () => Array.from(new Set(products.map((product) => product.category?.trim()).filter((item): item is string => Boolean(item)))).sort((a, b) => a.localeCompare(b, 'th', { numeric: true })),
@@ -1030,75 +1031,89 @@ function ProductImagePicker({
     })
   }, [category, products])
 
+  if (disabled) return null
+
   return (
     <div className="mt-2">
-      <div className="mb-1 block text-xs font-medium text-slate-600">เลือกจากรูปสินค้า</div>
-      <div className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white p-1.5 sm:p-2">
-        {!disabled ? (
-          <>
-            <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400",
+          isOpen && "rounded-b-none border-b-0"
+        )}
+      >
+        <span className="flex items-center gap-1.5">
+          <ImagePlus className="h-3.5 w-3.5 text-slate-500" />
+          <span>เลือกสินค้าจากรูปภาพ</span>
+        </span>
+        <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform duration-200", isOpen && "rotate-180")} />
+      </button>
+
+      {isOpen ? (
+        <div className="min-w-0 overflow-hidden rounded-b-md border border-slate-200 bg-white p-1.5 sm:p-2">
+          <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+            <button
+              className={cn(
+                'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
+                category === 'all' ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+              )}
+              type="button"
+              onClick={() => setCategory('all')}
+            >
+              ทั้งหมด
+            </button>
+            {categories.map((item) => (
               <button
                 className={cn(
                   'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
-                  category === 'all' ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+                  category === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
                 )}
+                key={item}
                 type="button"
-                onClick={() => setCategory('all')}
+                onClick={() => setCategory(item)}
               >
-                ทั้งหมด
+                {item}
               </button>
-              {categories.map((item) => (
-                <button
-                  className={cn(
-                    'shrink-0 rounded-md border px-2 py-1 text-xs font-medium',
-                    category === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
-                  )}
-                  key={item}
-                  type="button"
-                  onClick={() => setCategory(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-            <div className="mt-1.5 max-h-72 min-w-0 overflow-y-auto pr-1 sm:mt-2 sm:max-h-80">
-              <div className="grid min-w-0 grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6">
-                {filteredProducts.map((product) => {
-                  const selected = product.id === value
-                  return (
-                    <button
-                      className={cn(
-                        'min-w-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:border-emerald-500',
-                        selected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200',
+            ))}
+          </div>
+          <div className="mt-1.5 max-h-72 min-w-0 overflow-y-auto pr-1 sm:mt-2 sm:max-h-80">
+            <div className="grid min-w-0 grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6">
+              {filteredProducts.map((product) => {
+                const selected = product.id === value
+                return (
+                  <button
+                    className={cn(
+                      'min-w-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:border-emerald-500',
+                      selected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200',
+                    )}
+                    key={product.id}
+                    type="button"
+                    onClick={() => onChange(product.id)}
+                  >
+                    <div className="h-10 bg-slate-100 sm:h-12">
+                      {product.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt={product.name ?? product.label} className="h-full w-full object-cover" src={product.imageUrl} />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-slate-400">
+                          <ImagePlus className="h-4 w-4" />
+                        </div>
                       )}
-                      key={product.id}
-                      type="button"
-                      onClick={() => onChange(product.id)}
-                    >
-                      <div className="h-10 bg-slate-100 sm:h-12">
-                        {product.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt={product.name ?? product.label} className="h-full w-full object-cover" src={product.imageUrl} />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-slate-400">
-                            <ImagePlus className="h-4 w-4" />
-                          </div>
-                        )}
-                      </div>
-                      <div className={cn('min-w-0 px-1 py-1 text-center text-[10px] font-semibold leading-tight sm:text-[11px]', selected ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-50 text-slate-800')}>
-                        <div className="line-clamp-2 min-h-6 min-w-0 break-words">{product.name ?? product.label}</div>
-                      </div>
-                    </button>
-                  )
-                })}
-                {filteredProducts.length === 0 ? (
-                  <div className="col-span-full rounded-md bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">ไม่พบสินค้า</div>
-                ) : null}
-              </div>
+                    </div>
+                    <div className={cn('min-w-0 px-1 py-1 text-center text-[10px] font-semibold leading-tight sm:text-[11px]', selected ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-50 text-slate-800')}>
+                      <div className="line-clamp-2 min-h-6 min-w-0 break-words">{product.name ?? product.label}</div>
+                    </div>
+                  </button>
+                )
+              })}
+              {filteredProducts.length === 0 ? (
+                <div className="col-span-full rounded-md bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">ไม่พบสินค้า</div>
+              ) : null}
             </div>
-          </>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
