@@ -638,6 +638,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [cancelNoteError, setCancelNoteError] = useState('')
   const [cancelingBill, setCancelingBill] = useState<BillRow | StockIssueRow | null>(null)
   const [detailBill, setDetailBill] = useState<PurchaseBillDetail | null>(null)
+  const [salesDetailBill, setSalesDetailBill] = useState<SalesBillDetail | null>(null)
   const [detailBillDocNo, setDetailBillDocNo] = useState<string | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [branchFilter, setBranchFilter] = useState('')
@@ -1223,21 +1224,28 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   }
 
   async function openRow(row: BillRow | StockIssueRow) {
-    if (mode !== 'purchase' || isStockIssueRow(row)) return
+    if ((mode !== 'purchase' && mode !== 'sales') || isStockIssueRow(row)) return
     const docNo = row.docNo || row.id
     const requestId = latestDetailRequestRef.current + 1
     latestDetailRequestRef.current = requestId
     setDetailBillDocNo(docNo)
     setDetailBill(null)
+    setSalesDetailBill(null)
     setDetailError(null)
     setIsDetailLoading(true)
     try {
+      if (mode === 'sales') {
+        const detail = await dailyFetchJson<SalesBillDetail>(`/api/sales/bills/${encodeURIComponent(docNo)}`)
+        if (latestDetailRequestRef.current !== requestId) return
+        setSalesDetailBill(detail)
+        return
+      }
       const detail = await dailyFetchJson<PurchaseBillDetail>(`/api/purchase/bills/${encodeURIComponent(docNo)}`)
       if (latestDetailRequestRef.current !== requestId) return
       setDetailBill(detail)
     } catch (caught) {
       if (latestDetailRequestRef.current !== requestId) return
-      setDetailError(caught instanceof Error ? caught.message : 'โหลดรายละเอียดบิลรับซื้อไม่ได้')
+      setDetailError(caught instanceof Error ? caught.message : mode === 'sales' ? 'โหลดรายละเอียดบิลขายไม่ได้' : 'โหลดรายละเอียดบิลรับซื้อไม่ได้')
     } finally {
       if (latestDetailRequestRef.current !== requestId) return
       setIsDetailLoading(false)
@@ -2188,14 +2196,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   return (
     <section className="space-y-4">
       {mode === 'stock-issue' ? (
-        <>
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <TransactionKpi label="⏰ Pending / รายการ" tone="amber" value={`${totalRows.toLocaleString('th-TH')} ใบ`} />
             <TransactionKpi label="น้ำหนักรวมในหน้า" tone="blue" value={`${formatMoney(stockIssueQty)} กก.`} />
             <TransactionKpi label="ต้นทุน (WAC)" tone="red" value={formatMoney(stockIssueCost)} />
             <TransactionKpi label="ยอดขายคาด" tone="emerald" value={formatMoney(stockIssueEst || total)} />
           </div>
-        </>
+        </div>
       ) : null}
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -2614,7 +2622,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <TableBody className="divide-y divide-slate-100">
             {isLoading ? <TableRow><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>กำลังโหลดข้อมูล</td></TableRow> : null}
             {!isLoading && pageRows.map((row) => (
-              <TableRow key={row.id} className={`hover:bg-slate-50 ${mode === 'purchase' && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
+              <TableRow key={row.id} className={`hover:bg-slate-50 ${(mode === 'purchase' || mode === 'sales') && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
                 <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.docNo}</td>
                 {mode === 'purchase' && !isStockIssueRow(row) ? (
                   <td className="p-2 text-xs font-semibold text-slate-700">
@@ -3632,7 +3640,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           </div>
         </div>
       ) : null}
-	      {detailBillDocNo ? (
+	      {detailBillDocNo && mode === 'purchase' ? (
 	        <PurchaseBillDetailModal
           detail={detailBill}
           docNo={detailBillDocNo}
@@ -3643,10 +3651,29 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             latestDetailRequestRef.current += 1
             setDetailBillDocNo(null)
             setDetailBill(null)
+            setSalesDetailBill(null)
             setDetailError(null)
             setIsDetailLoading(false)
           }}
           onPrint={(detail) => void printPurchaseBill(detail)}
+	        />
+	      ) : null}
+	      {detailBillDocNo && mode === 'sales' ? (
+	        <SalesBillDetailModal
+          detail={salesDetailBill}
+          docNo={detailBillDocNo}
+          error={detailError}
+          isLoading={isDetailLoading}
+          isPrinting={printingBillDocNo === detailBillDocNo}
+          onClose={() => {
+            latestDetailRequestRef.current += 1
+            setDetailBillDocNo(null)
+            setDetailBill(null)
+            setSalesDetailBill(null)
+            setDetailError(null)
+            setIsDetailLoading(false)
+          }}
+          onPrint={(detail) => void printSalesBill(detail)}
 	        />
 	      ) : null}
 	      {showStockIssueDetail ? (
@@ -3719,7 +3746,7 @@ function PurchaseBillDetailModal({
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
     }}>
-      <DialogContent aria-labelledby="purchase-bill-detail-title" className="max-h-[90vh] max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col" hideClose>
+      <DialogContent aria-labelledby="purchase-bill-detail-title" className="max-h-[90vh] max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-none" hideClose>
         <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -3729,7 +3756,7 @@ function PurchaseBillDetailModal({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-slate-50">
 
         {isLoading ? (
           <div className="p-8 text-center text-sm text-slate-500">กำลังโหลดรายละเอียดบิลรับซื้อ</div>
@@ -3740,7 +3767,7 @@ function PurchaseBillDetailModal({
         ) : detail ? (
           <div className="space-y-4 p-4 text-sm">
             {/* ข้อมูลทั่วไป */}
-            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
                 <DetailItem label="เลขที่บิล" value={detail.docNo} />
@@ -3754,7 +3781,7 @@ function PurchaseBillDetailModal({
             </div>
 
             {/* สถานะและการชำระเงิน */}
-            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">สถานะและการชำระเงิน</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
                 <div className="flex flex-col py-1">
@@ -3776,7 +3803,7 @@ function PurchaseBillDetailModal({
             </div>
 
             {/* สรุปต่อสินค้า */}
-            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">สรุปต่อสินค้า</div>
               <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
                 <table className="w-full min-w-[880px] text-sm">
@@ -3907,6 +3934,166 @@ function PurchaseBillDetailModal({
   )
 }
 
+function SalesBillDetailModal({
+  detail,
+  docNo,
+  error,
+  isLoading,
+  isPrinting,
+  onClose,
+  onPrint,
+}: {
+  detail: SalesBillDetail | null
+  docNo: string
+  error: string | null
+  isLoading: boolean
+  isPrinting: boolean
+  onClose: () => void
+  onPrint: (detail: SalesBillDetail) => void
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => {
+      if (!open) onClose()
+    }}>
+      <DialogContent aria-labelledby="sales-bill-detail-title" className="max-h-[90vh] max-w-6xl overflow-y-auto rounded-md p-0" hideClose>
+        <DialogHeader className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <DialogTitle id="sales-bill-detail-title">รายละเอียดบิลขาย</DialogTitle>
+              <DialogDescription className="font-mono text-xs">{detail?.docNo ?? docNo}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-slate-500">กำลังโหลดรายละเอียดบิลขาย</div>
+        ) : error ? (
+          <div className="p-4">
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          </div>
+        ) : detail ? (
+          <div className="space-y-4 p-4 text-sm">
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="mb-3 border-b border-slate-100/80 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">ข้อมูลเอกสาร</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                <DetailItem label="เลขที่บิล" value={detail.docNo} />
+                <DetailItem label="วันที่เอกสาร" value={formatDateDisplay(detail.date)} />
+                <DetailItem label="วันที่ครบกำหนด" value={detail.dueDate ? formatDateDisplay(detail.dueDate) : '-'} />
+                <DetailItem className="col-span-2 sm:col-span-3" label="ลูกค้า" value={`${detail.customerCode ? `[${detail.customerCode}] ` : ''}${detail.customerName}`} />
+                <DetailItem label="สาขา/คลัง" value={[detail.branchName, detail.warehouseName].filter((value) => value && value !== '-').join(' / ') || '-'} />
+                <DetailItem label="ช่องทางขาย" value={detail.channelName || '-'} />
+                <DetailItem label="ประเภทบิล" value={detail.transactionMode || '-'} />
+                <DetailItem label="ผู้ขาย" value={detail.salesName || '-'} />
+                <DetailItem label="ผู้ทำรายการ" value={detail.createdBy || '-'} />
+                <DetailItem className="col-span-2 sm:col-span-3" label="อ้างอิงใบส่งของ WTO" value={detail.deliveryDocNos.join(', ') || '-'} />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="mb-3 border-b border-slate-100/80 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">สถานะและการรับเงิน</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+                <div className="flex flex-col py-1">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400">สถานะรับเงิน</div>
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusBadgeClass(detail.status)}`}>
+                      <span className="size-1.5 rounded-full bg-current" />
+                      {detail.statusLabel}
+                    </span>
+                  </div>
+                </div>
+                <DetailItem label="ยอดเงินสุทธิ" value={`${formatMoney(detail.totalAmount)} บาท`} />
+                <DetailItem label="รับแล้ว" value={`${formatMoney(detail.receivedAmount || detail.paidAmount)} บาท`} />
+                <DetailItem label="ยอดคงเหลือค้างรับ" value={`${formatMoney(detail.receivableBalance)} บาท`} />
+                {detail.customerAdvanceDocNo ? (
+                  <DetailItem className="col-span-2 sm:col-span-4" label="หักมัดจำ / เงินล่วงหน้า Customer" value={detail.customerAdvanceDocNo} />
+                ) : null}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">รายการสินค้า / Source</div>
+              <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                <table className="w-full min-w-[1100px] text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">สินค้า</th>
+                      <th className="px-3 py-2 text-left font-medium">ใบส่งของ WTO</th>
+                      <th className="px-3 py-2 text-left font-medium">PO / ที่มา</th>
+                      <th className="px-3 py-2 text-right font-medium">Gross</th>
+                      <th className="px-3 py-2 text-right font-medium">หัก</th>
+                      <th className="px-3 py-2 text-right font-medium">จำนวนสุทธิ</th>
+                      <th className="px-3 py-2 text-right font-medium">ราคา/หน่วย</th>
+                      <th className="px-3 py-2 text-right font-medium">ส่วนลด</th>
+                      <th className="px-3 py-2 text-right font-medium">ยอดรวม</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.items.map((item) => (
+                      <tr key={`${item.lineNo}-${item.productCode}-${item.deliveryLineId}`} className="border-t border-slate-200">
+                        <td className="px-3 py-2 align-top">
+                          <div className="font-medium text-slate-900">{item.productName}</div>
+                          <div className="text-xs text-slate-500">{[item.productCode || null, `line ${item.lineNo}`].filter(Boolean).join(' · ')}</div>
+                          {item.note ? <div className="mt-1 text-xs text-slate-500">{item.note}</div> : null}
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <div className="text-slate-900">{item.deliveryTicketDocNo || '-'}</div>
+                          <div className="text-xs text-slate-500">{item.deliveryVehicleNo || '-'}</div>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <div className="text-slate-900">{item.sourceLabel || '-'}</div>
+                          <div className="text-xs text-slate-500">{item.poSellDocNo ? 'ตัดตาม PO Sell' : 'ขายแบบ Spot Sale'}</div>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.grossWeight)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.deductWeight)}</td>
+                        <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(item.qty || item.netWeight)} {item.unit}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.price)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.discount)}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-blue-700 tabular-nums">{formatMoney(item.amount)}</td>
+                      </tr>
+                    ))}
+                    {detail.items.length === 0 ? <tr><td className="px-6 py-6 text-center text-slate-500" colSpan={9}>ไม่มีรายการสินค้าในบิล</td></tr> : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-md border border-slate-200 p-3">
+                <div className="mb-2 text-sm font-medium text-slate-700">VAT / ยอดรวม</div>
+                <div className="space-y-2 text-sm">
+                  <SummaryLine label="ยอดก่อนส่วนลด" value={formatMoney(detail.subtotal)} />
+                  <SummaryLine label="ส่วนลดท้ายบิล" tone="red" value={`-${formatMoney(detail.discount)}`} />
+                  <SummaryLine label="VAT" value={formatMoney(detail.vatAmount)} />
+                  <SummaryLine label="ยอดสุทธิ" value={formatMoney(detail.totalAmount)} />
+                </div>
+              </div>
+              <div className="rounded-md border border-slate-200 p-3">
+                <div className="mb-2 text-sm font-medium text-slate-700">ใบกำกับภาษี / หมายเหตุ</div>
+                <div className="grid gap-3 text-sm md:grid-cols-2">
+                  <PlainDetail label="ออกใบกำกับภาษี" value={detail.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ได้ออก'} />
+                  <PlainDetail label="เลขที่ใบกำกับภาษี" value={detail.vatInvoiceNo || '-'} />
+                  <PlainDetail label="วันที่ใบกำกับภาษี" value={detail.vatInvoiceDate ? formatDateDisplay(detail.vatInvoiceDate) : '-'} />
+                  <PlainDetail label="หมายเหตุ" value={detail.note || '-'} />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          {detail ? (
+            <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(detail)}>
+              <Printer className="size-4" />
+              {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
+            </Button>
+          ) : null}
+          <Button className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PurchaseBillDetailTimeline({ detail }: { detail: PurchaseBillDetail }) {
   const timelineEvents = detail.timeline.length > 0
     ? detail.timeline
@@ -4009,7 +4196,7 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
     }}>
-      <DialogContent aria-labelledby="stock-issue-detail-title" className="max-h-[90vh] max-w-5xl rounded-md !p-0 overflow-hidden flex flex-col" hideClose>
+      <DialogContent aria-labelledby="stock-issue-detail-title" className="max-h-[90vh] max-w-5xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-none" hideClose>
         <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -4020,7 +4207,7 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-slate-50">
         <div className="space-y-4 p-4 text-sm">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <TransactionKpi label="สถานะ" tone={row.status === 'cancelled' ? 'slate' : row.status === 'converted' ? 'emerald' : 'amber'} value={statusText(row.status)} />
@@ -4028,16 +4215,20 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
             <TransactionKpi label="ต้นทุน" tone="amber" value={formatMoney(row.totalCost)} />
             <TransactionKpi label="ยอดคาด" tone="emerald" value={formatMoney(row.totalEstAmount)} />
           </div>
-          <div className="grid gap-3 text-xs text-slate-700 md:grid-cols-2">
-            <div><span className="font-semibold">วันที่เอกสาร:</span> {formatDateDisplay(row.date)}</div>
-            <div><span className="font-semibold">ลูกค้า:</span> {row.customerName || '-'}</div>
-            <div><span className="font-semibold">สาขา:</span> {row.branchName || '-'}</div>
-            <div><span className="font-semibold">คลัง:</span> {row.warehouseName || '-'}</div>
-            <div className="md:col-span-2"><span className="font-semibold">หมายเหตุ:</span> {row.note || '-'}</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+              <DetailItem label="วันที่เอกสาร" value={formatDateDisplay(row.date)} />
+              <DetailItem label="ลูกค้า" value={row.customerName || '-'} />
+              <DetailItem label="สาขา" value={row.branchName || '-'} />
+              <DetailItem label="คลัง" value={row.warehouseName || '-'} />
+              <DetailItem className="col-span-2 sm:col-span-3" label="หมายเหตุ" value={row.note || '-'} />
+            </div>
           </div>
-          <div>
-            <h4 className="mb-2 text-xs font-semibold text-slate-600">รายการสินค้า</h4>
-            <div className="overflow-x-auto rounded-md border border-slate-200">
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">รายการสินค้า</div>
+            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
               <table className="min-w-full text-xs">
                 <thead className="bg-slate-100 text-slate-600">
                   <tr>
@@ -4070,11 +4261,12 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
               </table>
             </div>
           </div>
-          <div>
-            <h4 className="mb-2 text-xs font-semibold text-slate-600">ประวัติสถานะ</h4>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">ประวัติสถานะ</div>
             <div className="space-y-2">
               {timeline.map((event) => (
-                <div key={event.eventKey} className="rounded-md border border-slate-200 p-3">
+                <div key={event.eventKey} className="rounded-md border border-slate-200 p-3 bg-slate-50/50">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-xs font-semibold text-slate-800">{stockIssueActionText(event.action)}</div>
                     <div className="text-[11px] text-slate-500">{formatDateTime(event.createdAt)}</div>
@@ -4086,7 +4278,7 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
                   {event.note ? <div className="mt-1 text-xs text-slate-500">{event.note}</div> : null}
                 </div>
               ))}
-              {timeline.length === 0 ? <div className="rounded-md border border-slate-200 p-4 text-center text-xs text-slate-500">ยังไม่มีประวัติสถานะ</div> : null}
+              {timeline.length === 0 ? <div className="p-4 text-center text-xs text-slate-500">ยังไม่มีประวัติสถานะ</div> : null}
             </div>
           </div>
         </div>
@@ -4097,14 +4289,42 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
 }
 
 function TransactionKpi({ label, tone, value }: { label: string; tone: 'amber' | 'blue' | 'emerald' | 'red' | 'slate'; value: string }) {
-  const className = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-700',
-    blue: 'border-blue-200 bg-blue-50 text-blue-700',
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    red: 'border-red-200 bg-red-50 text-red-700',
-    slate: 'border-slate-200 bg-white text-slate-700',
-  }[tone]
-  return <div className={`rounded-md border p-3 shadow-sm ${className}`}><div className="text-xs opacity-75">{label}</div><div className="mt-1 break-words text-xl font-bold">{value}</div></div>
+  let emoji = '📄'
+  const text = label.toLowerCase()
+  if (text.includes('pending') || text.includes('ใบ') || text.includes('จำนวน') || text.includes('รายการ')) {
+    emoji = '📋'
+  } else if (text.includes('น้ำหนัก')) {
+    emoji = '📦'
+  } else if (text.includes('ต้นทุน') || text.includes('wac')) {
+    emoji = '💰'
+  } else if (text.includes('ยอดขาย') || text.includes('ยอดคาด') || text.includes('ยอดรวม')) {
+    emoji = '📈'
+  } else if (text.includes('สถานะ')) {
+    emoji = '⚙️'
+  }
+
+  const config = {
+    amber: { iconBg: 'bg-amber-100 text-amber-700', color: 'text-amber-700' },
+    blue: { iconBg: 'bg-blue-100 text-blue-700', color: 'text-blue-700' },
+    emerald: { iconBg: 'bg-emerald-100 text-emerald-700', color: 'text-emerald-700' },
+    red: { iconBg: 'bg-red-100 text-red-700', color: 'text-red-600' },
+    slate: { iconBg: 'bg-slate-100 text-slate-700', color: 'text-slate-900' },
+  }[tone] || { iconBg: 'bg-slate-100 text-slate-700', color: 'text-slate-900' }
+
+  // Clean label from prefix emojis to prevent duplicate symbols on circular icons
+  const cleanLabel = label.replace(/[⏰⚖💰📈⊘✓]/g, '').trim()
+
+  return (
+    <div className="bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-3">
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${config.iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
+        {emoji}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold text-slate-500 truncate">{cleanLabel}</div>
+        <div className={`text-sm font-bold ${config.color} mt-0.5 tabular-nums`}>{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function statusBadgeClass(status: string) {
