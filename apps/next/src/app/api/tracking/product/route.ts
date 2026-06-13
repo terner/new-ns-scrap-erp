@@ -5,9 +5,11 @@ import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
+import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
+import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 
 export const runtime = 'nodejs'
@@ -61,8 +63,6 @@ type ProductAgg = {
   name: string
   sellBills: Set<string>
   sellQty: number
-  stockQty: number
-  stockValue: number
   type: string
   unit: string
   revenue: number
@@ -160,8 +160,6 @@ function createAgg(product: ProductRef | undefined, fallbackName: string, matchK
     revenue: 0,
     sellBills: new Set<string>(),
     sellQty: 0,
-    stockQty: 0,
-    stockValue: 0,
     type: product?.type ?? '',
     unit: product?.unit ?? 'kg',
   }
@@ -178,8 +176,12 @@ export async function GET(request: Request) {
     const productId = url.searchParams.get('productId')
     const metalGroup = url.searchParams.get('metalGroup')
     const branchId = url.searchParams.get('branchId')
+    const supplierId = url.searchParams.get('supplierId')
+    const customerId = url.searchParams.get('customerId')
     const search = url.searchParams.get('q')?.trim().toLowerCase()
     const branch = branchId ? await findActiveBranchReferenceByCodeOrId(branchId) : null
+    const supplier = supplierId ? await findActiveSupplierReferenceByCodeOrId(supplierId) : null
+    const customer = customerId ? await findActiveCustomerReferenceByCodeOrId(customerId) : null
     const normalizedProductId = productId ? await prisma.products.findFirst({
       select: { id: true },
       where: {
@@ -190,7 +192,7 @@ export async function GET(request: Request) {
       },
     }) : null
 
-    const [products, purchaseBills, salesBills, stockRows] = await Promise.all([
+    const [products, purchaseBills, salesBills, suppliers, customers] = await Promise.all([
       prisma.products.findMany({
         orderBy: [{ code: 'asc' }, { name: 'asc' }],
         select: { active: true, code: true, id: true, metal_group: true, name: true, type: true, unit: true },
@@ -204,18 +206,23 @@ export async function GET(request: Request) {
         include: { purchase_bill_items: { orderBy: { line_no: 'asc' }, where: { item_status: 'active' } } },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
-        where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] }, ...(branch?.id != null ? { branch_id: branch.id } : {}) },
+        where: {
+          status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] },
+          ...(branch?.id != null ? { branch_id: branch.id } : {}),
+          ...(supplier ? { supplier_id: supplier.id } : {}),
+        },
       }),
       prisma.sales_bills.findMany({
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
-        where: { NOT: { status: 'cancelled' }, ...(branch?.id != null ? { branch_id: branch.id } : {}) },
+        where: {
+          NOT: { status: 'cancelled' },
+          ...(branch?.id != null ? { branch_id: branch.id } : {}),
+          ...(customer ? { customer_id: customer.id } : {}),
+        },
       }),
-      prisma.stock_ledger.findMany({
-        orderBy: [{ date: 'desc' }],
-        take: 20000,
-        where: { ...(normalizedProductId?.id != null ? { product_id: normalizedProductId.id } : {}), ...(branch?.id != null ? { branch_id: branch.id } : {}) },
-      }),
+      prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true }, where: { active: { not: false } } }),
+      prisma.customers.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, code: true, id: true, name: true }, where: { active: { not: false } } }),
     ])
 
     const productsByKey = new Map<string, ProductRef>()
@@ -263,17 +270,6 @@ export async function GET(request: Request) {
           })
       })
 
-    stockRows.forEach((stock) => {
-      if (!stock.product_id) return
-      const product = productsByKey.get(String(stock.product_id).trim().toLowerCase())
-      if (!product) return
-      const productKey = String(product.id)
-      if (!rowsByKey.has(productKey)) rowsByKey.set(productKey, createAgg(product, product.name, productKey))
-      const row = rowsByKey.get(productKey)!
-      row.stockQty += toNumber(stock.qty_in) - toNumber(stock.qty_out)
-      row.stockValue += toNumber(stock.value_in) - toNumber(stock.value_out)
-    })
-
     const rows = Array.from(rowsByKey.values())
       .map((row) => ({
         avgBuy: row.buyQty > 0 ? row.buyAmount / row.buyQty : 0,
@@ -299,16 +295,12 @@ export async function GET(request: Request) {
         salesAmount: row.revenue,
         salesBillCount: row.sellBills.size,
         salesQty: row.sellQty,
-        stockQty: row.stockQty,
-        stockValue: row.stockValue,
-        stockWac: row.stockQty > 0 ? row.stockValue / row.stockQty : 0,
         type: row.type,
         unit: row.unit,
         revenue: row.revenue,
-        turnoverPct: row.stockQty > 0 ? (row.sellQty / row.stockQty) * 100 : 0,
       }))
       .filter((row) => !search || `${row.code} ${row.name} ${row.metalGroup} ${row.itemStatus}`.toLowerCase().includes(search))
-      .filter((row) => row.buyQty > 0 || row.sellQty > 0 || row.stockQty !== 0 || row.stockValue !== 0)
+      .filter((row) => row.buyQty > 0 || row.sellQty > 0)
       .sort((left, right) => (right.revenue - left.revenue) || (right.buyAmount - left.buyAmount))
 
     const monthly = Array.from({ length: 12 }, (_, index) => {
@@ -355,10 +347,6 @@ export async function GET(request: Request) {
         Product: row.name,
         Revenue: row.revenue,
         SellQty: row.sellQty,
-        StockQty: row.stockQty,
-        StockValue: row.stockValue,
-        StockWAC: row.stockWac,
-        TurnoverPct: row.turnoverPct,
       }))), `tracking_product_${year}${month ? `_${month}` : ''}.xlsx`)
     }
 
@@ -366,6 +354,8 @@ export async function GET(request: Request) {
       filters: {
         metalGroups: Array.from(new Set(products.map((product) => product.metal_group).filter(Boolean))).sort(),
         products: products.map((product) => ({ active: product.active, code: product.code, id: requireBusinessCode(product.code, `สินค้า ${product.id}`), metalGroup: product.metal_group, name: product.name })),
+        suppliers: suppliers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ผู้ขาย ${row.id}`), name: row.name })),
+        customers: customers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ลูกค้า ${row.id}`), name: row.name })),
       },
       monthly,
       rows,
@@ -381,34 +371,12 @@ export async function GET(request: Request) {
         salesAmount: rows.reduce((sum, row) => sum + row.revenue, 0),
         salesQty: rows.reduce((sum, row) => sum + row.sellQty, 0),
         sellQty: rows.reduce((sum, row) => sum + row.sellQty, 0),
-        stockQty: rows.reduce((sum, row) => sum + row.stockQty, 0),
-        stockValue: rows.reduce((sum, row) => sum + row.stockValue, 0),
       },
       top: {
         byBuy: [...rows].sort((left, right) => right.buyAmount - left.buyAmount).slice(0, 10),
         byGp: [...rows].sort((left, right) => right.gp - left.gp).slice(0, 10),
         byRevenue: [...rows].sort((left, right) => right.revenue - left.revenue).slice(0, 10),
-        slowMovers: rows.filter((row) => row.stockQty > 0 && row.turnoverPct < 50).sort((left, right) => right.stockValue - left.stockValue).slice(0, 10).map((row) => ({
-          amount: row.stockValue,
-          avgSell: row.avgSell,
-          billCount: row.salesBillCount,
-          code: row.code,
-          id: row.id,
-          productName: row.productName,
-          qty: row.stockQty,
-          salesAmount: row.salesAmount,
-        })),
       },
-      slowMovers: rows.filter((row) => row.stockQty > 0 && row.turnoverPct < 50).sort((left, right) => right.stockValue - left.stockValue).slice(0, 10).map((row) => ({
-        amount: row.stockValue,
-        avgSell: row.avgSell,
-        billCount: row.salesBillCount,
-        code: row.code,
-        id: row.id,
-        productName: row.productName,
-        qty: row.stockQty,
-        salesAmount: row.salesAmount,
-      })),
       topMovers: [...rows].sort((left, right) => right.revenue - left.revenue).slice(0, 10).map((row) => ({
         amount: row.revenue,
         avgSell: row.avgSell,
