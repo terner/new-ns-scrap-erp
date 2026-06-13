@@ -36,7 +36,7 @@ created: 2026-05-16
 - [[Stock Balance Page Flow]] - contract หน้า `/stock/balance`: derived balance, `คงเหลือจริง / จองไว้ / พร้อมใช้`, filter, drilldown และ hold-aware gap
 - [[Stock Ledger Page Flow]] - contract หน้า `/stock/ledger`: movement history, source document links, reconciliation และ rule ว่า stock hold ไม่ใช่ ledger row
 - [[Stock Transfer Page Flow]] - contract หน้า `/stock/transfer`: paired `ST` out/in ledger movement, source/destination validation, hold-aware availability และ reverse gap
-- [[Stock Status Convert Page Flow]] - contract หน้า `/stock/status-convert`: paired `SC` status out/in movement, RM/WIP/FG validation และ reverse/reconciliation gap
+- [[Stock Status Convert Page Flow]] - contract หน้า `/stock/status-convert`: paired `SC` RM/FG status out/in movement, ready-stock validation, source WAC carry-forward และ reverse/reconciliation gap
 - [[Stock Convert Page Flow]] - contract หน้า `/stock/convert`: grade/product conversion `GA`, source-target cost/yield policy และ deferred confirm/reverse flow
 - [[Stock Adjust Page Flow]] - contract หน้า `/stock/adjust`: stock count adjustment `ADJ`, note-only accounting policy, reason/audit และ reverse gap
 - [[Dual Costing Flow]] - ภาพรวมหมวด Dual Costing ทั้ง 8 เมนู active: scope เฉพาะทองแดง/ทองเหลือง, Cost Pool -> Allocator -> Match Log/Ledger -> Report, และเส้นแบ่ง Deal Cost management view ออกจาก WAC/P&L
