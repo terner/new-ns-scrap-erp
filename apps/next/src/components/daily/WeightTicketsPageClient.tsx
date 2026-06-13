@@ -718,16 +718,6 @@ export function WeightTicketsPageClient({
 	                            updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
 	                          }}
                         />
-                        <ProductImagePicker
-                          key={`${form.branchId}:${form.partyId}:${form.type}`}
-                          disabled={isLoadingProducts}
-                          products={products}
-                          value={line.productId}
-	                          onChange={(value) => {
-	                            markTouched(`line-${line.id}-product`)
-	                            updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
-	                          }}
-	                        />
 	                      </div>
 	                      {form.type === 'WTO' ? (() => {
 	                        const stockKey = `${form.branchId}:${line.productId}`
@@ -812,6 +802,18 @@ export function WeightTicketsPageClient({
                         </FieldBlock>
                       ) : null}
                     </div>
+
+                    <ProductImagePicker
+                      key={`${form.branchId}:${form.partyId}:${form.type}`}
+                      disabled={isLoadingProducts}
+                      products={products}
+                      value={line.productId}
+                      onChange={(value) => {
+                        markTouched(`line-${line.id}-product`)
+                        updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
+                      }}
+                    />
+
                     <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-4">
                       <MiniMetric label="Gross" value={`${formatWeight(lineTotals.grossWeight)} กก.`} />
                       <MiniMetric label="Deduct" value={`${formatWeight(lineTotals.deductionWeight)} กก.`} />
@@ -1093,7 +1095,7 @@ function ProductImagePicker({
                     type="button"
                     onClick={() => onChange(product.id)}
                   >
-                    <div className="h-10 bg-slate-100 sm:h-12">
+                    <div className="aspect-[4/3] w-full bg-slate-100">
                       {product.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img alt={product.name ?? product.label} className="h-full w-full object-cover" src={product.imageUrl} />
