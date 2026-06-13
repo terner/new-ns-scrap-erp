@@ -406,7 +406,7 @@ export function CustomersPageClient() {
             </select>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 w-full md:w-auto">
-            <label className={`inline-flex h-9 flex-1 md:flex-none justify-center cursor-pointer items-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-medium text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
+            <label className={`hidden md:inline-flex h-9 flex-1 md:flex-none justify-center cursor-pointer items-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-medium text-white ${isImporting || isLoading ? 'pointer-events-none opacity-60' : ''}`}>
               <Upload aria-hidden="true" className="h-4 w-4" />
               <span className="text-xs sm:text-sm">{isImporting ? 'กำลัง Import...' : 'Import Excel'}</span>
               <input
@@ -420,7 +420,7 @@ export function CustomersPageClient() {
                 }}
               />
             </label>
-            <button className="inline-flex h-9 flex-1 md:flex-none justify-center items-center gap-1 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
+            <button className="hidden md:inline-flex h-9 flex-1 md:flex-none justify-center items-center gap-1 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white disabled:opacity-60" disabled={isExporting || isLoading} type="button" onClick={() => void handleExport()}>
               <Download aria-hidden="true" className="h-4 w-4" />
               <span className="text-xs sm:text-sm">{isExporting ? 'กำลัง Export...' : 'Export Excel'}</span>
             </button>

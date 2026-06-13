@@ -542,7 +542,7 @@ function ExportButton({ isExporting, onClick }: { isExporting: boolean; onClick:
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button aria-label="Export" className="ml-auto gap-2" disabled={isExporting} type="button" variant="export" onClick={onClick}>
+          <Button aria-label="Export" className="hidden md:inline-flex ml-auto gap-2" disabled={isExporting} type="button" variant="export" onClick={onClick}>
             <Download aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span className="hidden sm:inline">{isExporting ? 'กำลัง Export...' : 'ส่งออก Excel'}</span>
           </Button>
@@ -666,6 +666,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   const [showStockIssueDetail, setShowStockIssueDetail] = useState<StockIssueRow | null>(null)
   const [showStockIssueForm, setShowStockIssueForm] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [stockIssueForm, setStockIssueForm] = useState<StockIssueFormValues>({ date: new Date().toISOString().slice(0, 10), deliveryTicketId: '', note: '', prices: {} })
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [sortKey, setSortKey] = useState<SortKey>('date')
@@ -2199,7 +2200,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="space-y-2 rounded-md bg-white p-3 shadow">
+      {/* Desktop Toolbar (Hidden on Mobile) */}
+      <div className="hidden md:block space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <Input
             className="min-w-[260px] flex-1 rounded-md"
@@ -2227,9 +2229,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           ) : null}
           {(search || branchFilter || dateFrom || dateTo || filterMode || statusFilter.length > 0) ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
           {mode === 'purchase' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
-          {mode === 'purchase' ? <Button type="button" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</Button> : null}
+          {mode === 'purchase' ? <Button type="button" className="hidden md:inline-flex" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</Button> : null}
           {mode === 'sales' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
-          {mode === 'sales' ? <Button disabled={isSaving} type="button" onClick={openSalesForm}>+ บิลขายใหม่</Button> : null}
+          {mode === 'sales' ? <Button disabled={isSaving} type="button" className="hidden md:inline-flex" onClick={openSalesForm}>+ บิลขายใหม่</Button> : null}
           {mode === 'stock-issue' ? (
             <>
               <Select className="w-auto" value={filterMode} onChange={(event) => setFilterMode(event.target.value)}>
@@ -2238,7 +2240,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <option value="converted">✓ เปิดบิลแล้ว</option>
                 <option value="cancelled">⊘ ยกเลิก</option>
               </Select>
-              <Button className="ml-auto bg-amber-600 hover:bg-amber-700" disabled={isSaving} type="button" onClick={openStockIssueForm}>+ เบิกออกใหม่</Button>
+              <Button className="hidden md:inline-flex ml-auto bg-amber-600 hover:bg-amber-700" disabled={isSaving} type="button" onClick={openStockIssueForm}>+ เบิกออกใหม่</Button>
             </>
           ) : null}
         </div>
@@ -2260,10 +2262,124 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         ) : null}
       </div>
 
+      {/* Mobile Toolbar (Hidden on Desktop) */}
+      <div className="space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+        <div className="flex gap-2 items-center">
+          <Input
+            className="min-w-[200px] flex-1 rounded-md h-9"
+            placeholder={mode === 'purchase' ? 'ค้นหาเลขบิล / ผู้ขาย...' : mode === 'sales' ? 'ค้นหาเลขบิล / ลูกค้า...' : 'ค้นหาเลขที่ / ชื่อ...'}
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => setShowMobileFilters(true)}
+          >
+            ตัวกรอง {activeFilters ? '(มี)' : ''}
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom Sheet Filter for Mobile */}
+      {showMobileFilters ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h4 className="font-bold text-slate-800">ตัวกรองรายการ</h4>
+              <button
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
+                onClick={() => setShowMobileFilters(false)}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
+                <div className="flex items-center gap-2">
+                  <DatePickerInput className="flex-1" value={dateFrom} onChange={setDateFrom} />
+                  <span className="text-slate-400">→</span>
+                  <DatePickerInput className="flex-1" value={dateTo} onChange={setDateTo} />
+                </div>
+              </div>
+
+              {mode === 'purchase' ? (
+                <div>
+                  <span className="mb-1 block text-xs font-semibold text-slate-600">สาขา</span>
+                  <BranchSelectCombobox
+                    allOptionLabel="ทุกสาขา"
+                    branches={activeBranches}
+                    className="w-full"
+                    includeAllOption
+                    inputId="mobile-purchase-bills-branch-filter"
+                    label=""
+                    placeholder="เลือกสาขา"
+                    value={branchFilter || null}
+                    onChange={(branchId) => setBranchFilter(branchId ?? '')}
+                  />
+                </div>
+              ) : null}
+
+              {mode === 'purchase' || mode === 'sales' ? (
+                <>
+                  <div>
+                    <span className="mb-1 block text-xs font-semibold text-slate-600">ประเภท</span>
+                    <div className="flex flex-wrap gap-2">
+                      <Segment value="" current={filterMode} label="ทุกประเภท" onClick={setFilterMode} />
+                      <Segment value="STOCK" current={filterMode} label="📦 STOCK" onClick={setFilterMode} />
+                      <Segment value="TRADING" current={filterMode} label="🔄 TRADING" onClick={setFilterMode} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {statusOptions.map((option) => (
+                        <SegmentMulti key={option.label} current={statusFilter} label={option.label} onClick={setStatusFilter} values={option.values} />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะ</span>
+                  <Select className="w-full" value={filterMode} onChange={(event) => setFilterMode(event.target.value)}>
+                    <option value="">ทุกสถานะ</option>
+                    <option value="pending">⏰ Pending</option>
+                    <option value="converted">✓ เปิดบิลแล้ว</option>
+                    <option value="cancelled">⊘ ยกเลิก</option>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  clearFilters()
+                  setShowMobileFilters(false)
+                }}
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                type="button"
+                className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden md:inline-flex" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
           <Select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto px-2 py-1"
@@ -2280,7 +2396,188 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <Button disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</Button>
         </div>
       </div>
-      <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+
+      {/* Mobile Card List (Hidden on Desktop) */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        
+        {!isLoading && pageRows.map((row) => {
+          const isStockIssue = isStockIssueRow(row)
+          const name = isStockIssue ? row.customerName : ('supplierName' in row ? row.supplierName : row.customerName)
+          const subValue = isStockIssue ? row.totalCost : ('payableBalance' in row ? (mode === 'purchase' ? row.payableBalance : row.receivableBalance) : 0)
+          const totalVal = isStockIssue ? row.totalEstAmount : (row.totalAmount ?? 0)
+          
+          return (
+            <div
+              key={row.id}
+              className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+              onClick={() => !isStockIssue && openRow(row)}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
+                <span className="text-xs text-slate-500">{formatDateDisplay(row.date)}</span>
+              </div>
+              
+              <div className="text-xs text-slate-600 mb-3 space-y-1">
+                <div>
+                  <span className="font-semibold text-slate-500">{mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'}: </span>
+                  <span className="text-slate-800">{name}</span>
+                </div>
+                {!isStockIssue && (
+                  <div>
+                    <span className="font-semibold text-slate-500">ประเภท: </span>
+                    <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>
+                      {row.transactionMode ?? '-'}
+                    </span>
+                  </div>
+                )}
+                {isStockIssue ? (
+                  <div>
+                    <span className="font-semibold text-slate-500">สาขา/คลัง: </span>
+                    <span className="text-slate-800">{formatBranchWarehouse(row)}</span>
+                  </div>
+                ) : (
+                  row.note?.trim() ? (
+                    <div className="text-[11px] text-slate-400 truncate">
+                      หมายเหตุ: {row.note}
+                    </div>
+                  ) : null
+                )}
+              </div>
+
+              <div className="flex justify-between items-end pt-2 border-t border-slate-100">
+                <div>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${isStockIssue ? (row.status === 'cancelled' ? 'text-slate-500' : row.status === 'converted' ? 'text-emerald-700' : 'text-amber-700') : (mode === 'purchase' ? workflowStatusBadgeClass(row.paymentWorkflowStatus ?? 'pending_approval') : statusBadgeClass(row.status))}`}>
+                    <span className="size-1.5 rounded-full bg-current" />
+                    {isStockIssue ? statusText(row.status) : (mode === 'purchase' ? workflowStatusText(row.paymentWorkflowStatus ?? 'pending_approval') : statusText(row.status))}
+                  </span>
+                  <div className="mt-1 text-[11px] font-bold text-blue-700">
+                    {formatMoney(totalVal)} บาท
+                  </div>
+                </div>
+                <div className="text-right">
+                  {isStockIssue ? (
+                    <>
+                      <span className="text-[10px] text-slate-400 block">ต้นทุน (WAC)</span>
+                      <span className="font-bold text-slate-900 text-sm tabular-nums">
+                        {formatMoney(subValue ?? 0)} บาท
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[10px] text-slate-400 block">ค้างจ่าย/ค้างรับ</span>
+                      <span className="font-bold text-amber-600 text-sm tabular-nums">
+                        {formatMoney(subValue ?? 0)} บาท
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile Action Buttons (Inline in Card) */}
+              <div className="flex justify-end gap-2 mt-3 pt-2 border-t border-slate-100/60" onClick={(e) => e.stopPropagation()}>
+                {mode === 'purchase' && !isStockIssue ? (
+                  <>
+                    <button
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                      disabled={printingBillDocNo === row.docNo}
+                      type="button"
+                      onClick={() => void printPurchaseBill(row)}
+                    >
+                      พิมพ์
+                    </button>
+                    <button
+                      className="rounded-md border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+                      disabled={row.canEdit === false}
+                      type="button"
+                      onClick={() => openEditPurchaseForm(row)}
+                    >
+                      แก้ไข
+                    </button>
+                    <button
+                      className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      disabled={row.canEdit === false}
+                      type="button"
+                      onClick={() => openCancelPurchaseBill(row)}
+                    >
+                      ยกเลิก
+                    </button>
+                  </>
+                ) : null}
+
+                {mode === 'sales' && !isStockIssue ? (
+                  <>
+                    <button
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                      disabled={printingBillDocNo === row.docNo}
+                      type="button"
+                      onClick={() => void printSalesBill(row)}
+                    >
+                      พิมพ์
+                    </button>
+                    <button
+                      className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      disabled={row.canCancel === false}
+                      type="button"
+                      onClick={() => openCancelSalesBill(row)}
+                    >
+                      ยกเลิก
+                    </button>
+                  </>
+                ) : null}
+
+                {mode === 'stock-issue' && isStockIssue ? (
+                  <>
+                    <button
+                      className="rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                      disabled={row.status !== 'pending'}
+                      type="button"
+                      onClick={() => openSalesFromStockIssue(row)}
+                    >
+                      เปิดบิลขาย
+                    </button>
+                    <button
+                      className="rounded-md border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50"
+                      type="button"
+                      onClick={() => setShowStockIssueDetail(row)}
+                    >
+                      ประวัติ
+                    </button>
+                    <button
+                      className="rounded-md border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+                      disabled={row.status !== 'pending' || Boolean(row.convertedToBillId)}
+                      type="button"
+                      onClick={() => openEditStockIssue(row)}
+                    >
+                      แก้ไข
+                    </button>
+                    <button
+                      className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      disabled={row.status !== 'pending'}
+                      type="button"
+                      onClick={() => openCancelStockIssue(row)}
+                    >
+                      ยกเลิก
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
+
+        {!isLoading && totalRows === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+            ยังไม่มีรายการ
+          </div>
+        ) : null}
+      </div>
+
+      {/* Desktop Table (Hidden on Mobile) */}
+      <div className="hidden md:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
+        <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {tableColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
           </colgroup>
@@ -2437,7 +2734,31 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             ))}
             {!isLoading && totalRows === 0 ? <TableRow><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>ยังไม่มีรายการ</td></TableRow> : null}
           </TableBody>
-      </Table>
+        </Table>
+      </div>
+
+      {/* Floating Action Button for Mobile */}
+      {mode !== 'stock-issue' ? (
+        <div className="fixed bottom-6 right-6 md:hidden z-10">
+          <button
+            className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
+            onClick={mode === 'purchase' ? openPurchaseForm : openSalesForm}
+            type="button"
+          >
+            <Plus className="size-8" />
+          </button>
+        </div>
+      ) : (
+        <div className="fixed bottom-6 right-6 md:hidden z-10">
+          <button
+            className="flex size-14 items-center justify-center rounded-full bg-amber-600 text-white shadow-lg hover:bg-amber-700 active:scale-95 transition-transform"
+            onClick={openStockIssueForm}
+            type="button"
+          >
+            <Plus className="size-8" />
+          </button>
+        </div>
+      )}
 
       {showForm && mode === 'purchase' ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
@@ -3336,7 +3657,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           setCancelNoteError('')
         }}>
           <DialogContent aria-labelledby={`${mode}-bill-cancel-title`} hideClose className="w-full rounded-md-t-md p-0 md:rounded-md">
-            <DialogHeader className="border-b">
+            <DialogHeader className="">
               <DialogTitle id={`${mode}-bill-cancel-title`}>ยกเลิก{mode === 'sales' ? 'บิลขาย' : mode === 'stock-issue' ? 'เบิกออกรอบิล' : 'บิลรับซื้อ'} {cancelingBill.docNo}</DialogTitle>
               <DialogDescription>{cancelDialogPartyName}</DialogDescription>
             </DialogHeader>
@@ -3393,18 +3714,12 @@ function PurchaseBillDetailModal({
       if (!open) onClose()
     }}>
       <DialogContent aria-labelledby="purchase-bill-detail-title" className="max-h-[90vh] max-w-6xl overflow-y-auto rounded-md p-0" hideClose>
-        <DialogHeader className="border-b p-4">
+        <DialogHeader className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <DialogTitle id="purchase-bill-detail-title">รายละเอียดบิลรับซื้อ</DialogTitle>
               <DialogDescription className="font-mono text-xs">{detail?.docNo ?? docNo}</DialogDescription>
             </div>
-            {detail ? (
-              <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(detail)}>
-                <Printer className="size-4" />
-                {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์บิลรับซื้อ'}
-              </Button>
-            ) : null}
           </div>
         </DialogHeader>
 
@@ -3685,7 +4000,7 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
       if (!open) onClose()
     }}>
       <DialogContent aria-labelledby="stock-issue-detail-title" className="max-h-[90vh] max-w-5xl overflow-y-auto rounded-md p-0" hideClose>
-        <DialogHeader className="border-b p-4">
+        <DialogHeader className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <DialogTitle id="stock-issue-detail-title">รายละเอียดเบิกออกรอบิล</DialogTitle>

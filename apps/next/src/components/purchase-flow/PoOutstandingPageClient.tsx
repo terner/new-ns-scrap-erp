@@ -80,7 +80,7 @@ export function PoOutstandingPageClient() {
         <button className={`rounded-md px-5 py-2 text-sm font-medium ${tab === 'buy' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('buy'); setPartnerFilter(''); setProductFilter('') }}>PO ซื้อ คงเหลือ ({data?.summary.buyCount ?? 0})</button>
         <button className={`rounded-md px-5 py-2 text-sm font-medium ${tab === 'sell' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('sell'); setPartnerFilter(''); setProductFilter('') }}>PO ขาย คงเหลือ ({data?.summary.sellCount ?? 0})</button>
         <span className="flex-1" />
-        <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCsv}>Export CSV</button>
+        <button className="hidden md:inline-flex rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCsv}>Export CSV</button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -103,7 +103,7 @@ export function PoOutstandingPageClient() {
       </div>
 
       {tab === 'buy' ? (
-        <div className="overflow-x-auto rounded-md bg-white shadow">
+        <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
           <div className="border-l-4 border-amber-500 bg-amber-50 p-2 text-xs text-amber-700">
             ตัดต้นทุนเป็น write/cost-pool side effect ใน legacy จึงแสดงเป็นคอลัมน์อ่านอย่างเดียวใน Next จนกว่าจะออกแบบ audit และ permission
           </div>
@@ -118,7 +118,7 @@ export function PoOutstandingPageClient() {
           </table>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md bg-white shadow">
+        <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
           <table className="w-full text-sm">
             <thead className="bg-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Customer</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">จำนวนขาย</th><th className="p-2 text-right">ราคาขาย</th><th className="p-2 text-right">ขายแล้ว</th><th className="p-2 text-right">รอส่ง</th><th className="p-2 text-right">มูลค่ารอส่ง</th><th className="p-2 text-left">วันส่งมอบ</th><th className="p-2 text-center">สถานะ</th></tr></thead>
             <tbody>
@@ -130,6 +130,69 @@ export function PoOutstandingPageClient() {
           </table>
         </div>
       )}
+
+      {/* Mobile Card list */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        
+        {!isLoading && rows.map((row) => (
+          <div key={row.id} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
+              <span className="text-xs text-slate-500">{formatDateDisplay(row.date)}</span>
+            </div>
+            
+            <div className="text-xs text-slate-600 space-y-1">
+              <div>
+                <span className="font-semibold text-slate-500">{tab === 'buy' ? 'Supplier' : 'Customer'}: </span>
+                <span className="text-slate-800">{row.partnerName}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-slate-500">สินค้า: </span>
+                <span className="text-slate-800">{row.productName || '-'}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <span className="font-semibold text-slate-500 block">ราคา/หน่วย: </span>
+                  <span className="text-slate-800">{formatMoney(row.unitPrice)} บาท</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 block">จำนวนสั่ง: </span>
+                  <span className="text-slate-800">{formatMoney(row.qty)} กก.</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+                <div>
+                  <span className="font-semibold text-slate-400 block">{tab === 'buy' ? 'รับแล้ว' : 'ส่งแล้ว'}: </span>
+                  <span className="text-emerald-600 tabular-nums">
+                    {formatMoney(tab === 'buy' ? (row.receivedQty ?? row.qty - row.remainingQty) : (row.soldQty ?? row.qty - row.remainingQty))}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 block">{tab === 'buy' ? 'รอรับ' : 'รอส่ง'}: </span>
+                  <span className="text-amber-700 font-bold tabular-nums">{formatMoney(row.remainingQty)}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 block">มูลค่าคงค้าง: </span>
+                  <span className={`font-bold tabular-nums ${tab === 'buy' ? 'text-blue-700' : 'text-emerald-700'}`}>{formatMoney(row.remainingValue)}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-100/60 mt-1">
+                <span>ส่งมอบ: {formatDateDisplay(row.expectedDelivery)}</span>
+                <span className="font-semibold text-slate-500">{row.status}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {!isLoading && rows.length === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+            {tab === 'buy' ? 'ไม่มี PO ซื้อค้างรับ' : 'ไม่มี PO ขายค้างส่ง'}
+          </div>
+        ) : null}
+      </div>
     </section>
   )
 }

@@ -176,7 +176,7 @@ export function TradingMatchingPageClient() {
           <DatePickerInput ariaLabel="วันที่สิ้นสุด" className="w-[130px]" value={toDate} onChange={setToDate} />
           <input className="min-w-64 flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา deal / PB / SB / คู่ค้า / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           {hasFilters ? <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={resetFilters}>ล้าง</button> : null}
-          <a className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
+          <a className="hidden md:inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
         </div>
       </div>
 
@@ -187,21 +187,143 @@ export function TradingMatchingPageClient() {
           {cancelledDeals.length > 0 ? <label className="ml-auto mr-4 flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"><input checked={showCancelled} type="checkbox" onChange={(event) => setShowCancelled(event.target.checked)} /><span>👁 แสดง Cancelled ({cancelledDeals.length})</span></label> : null}
         </div>
         {tab === 'match' ? (
-          <div className="overflow-x-auto p-5">
-            <table className="w-full min-w-[1220px] text-sm">
-              <thead className="bg-slate-100"><tr><th className="p-2 text-left">Deal No</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Purchase</th><th className="p-2 text-left">Supplier</th><th className="p-2 text-left">Sales</th><th className="p-2 text-left">Customer</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Cost</th><th className="p-2 text-right">Sales Amt</th><th className="p-2 text-right">GP</th><th className="p-2 text-right">GP%</th><th className="p-2 text-center">Status</th><th></th></tr></thead>
-              <tbody>
-                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
-                {!isLoading && !error && visibleDeals.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={13}>ยังไม่มีดีล Trading — กด + จับคู่ใหม่</td></tr> : null}
-                {!isLoading && visibleDeals.map((row) => <tr key={row.id} className={`border-t hover:bg-slate-50 ${row.status.toLowerCase().includes('cancel') ? 'bg-slate-50 text-slate-400 line-through' : ''}`}><td className="p-2 font-mono text-xs">{row.dealNo}</td><td className="p-2 text-xs">{formatDateDisplay(row.date)}</td><td className="p-2 font-mono text-xs">{row.purchaseBillNo || '-'}</td><td className="p-2 text-xs">{row.supplierName}</td><td className="p-2 font-mono text-xs">{row.salesBillNo || '-'}</td><td className="p-2 text-xs">{row.customerName}</td><td className="p-2 text-right">{formatMoney(row.matchedQty)}</td><td className={`p-2 text-right ${row.status.toLowerCase().includes('cancel') ? '' : 'text-red-600'}`}>{formatMoney(row.matchedPurchaseAmount)}</td><td className={`p-2 text-right ${row.status.toLowerCase().includes('cancel') ? '' : 'text-emerald-700'}`}>{formatMoney(row.matchedSalesAmount)}</td><td className={`p-2 text-right font-bold ${row.status.toLowerCase().includes('cancel') ? '' : row.grossProfit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>{formatMoney(row.grossProfit)}</td><td className="p-2 text-right">{row.grossProfitPct.toFixed(2)}%</td><td className="p-2 text-center"><span className={`rounded-md px-2 py-0.5 text-xs ${statusBadge(row.status)}`}>{row.status}</span></td><td className="whitespace-nowrap p-2"><button className="mr-2 rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={() => setSelectedDeal(row)}>จัดการ</button><button className="mr-2 rounded-md border border-slate-300 px-2 py-1 text-xs text-blue-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled>🔄 Recalc</button><button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled>Reverse</button></td></tr>)}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Mobile Card list for Matches */}
+            <div className="block md:hidden space-y-3 p-4">
+              {isLoading ? (
+                <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+              ) : null}
+              
+              {!isLoading && visibleDeals.map((row) => (
+                <div
+                  key={row.id}
+                  className={`rounded-md border p-4 shadow-sm space-y-2 active:bg-slate-50 cursor-pointer ${row.status.toLowerCase().includes('cancel') ? 'border-slate-200 bg-slate-50/50 line-through opacity-70' : 'border-slate-100 bg-white'}`}
+                  onClick={() => setSelectedDeal(row)}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="font-bold text-slate-800 text-sm">{row.dealNo}</span>
+                    <span className="text-xs text-slate-500">{formatDateDisplay(row.date)}</span>
+                  </div>
+                  
+                  <div className="text-xs text-slate-600 space-y-1">
+                    <div>
+                      <span className="font-semibold text-slate-500">ดีล: </span>
+                      <span className="text-slate-800">{row.supplierName} ➔ {row.customerName}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500">สินค้า: </span>
+                      <span className="text-slate-800">{row.productName}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <span className="font-semibold text-slate-500 block">น้ำหนัก: </span>
+                        <span className="text-slate-800 font-semibold">{formatMoney(row.matchedQty)} กก.</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500 block">สถานะ: </span>
+                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${statusBadge(row.status)}`}>
+                          {row.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+                      <div>
+                        <span className="font-semibold text-slate-400 block">ต้นทุน: </span>
+                        <span className="text-red-600 tabular-nums">{formatMoney(row.matchedPurchaseAmount)}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-400 block">ยอดขาย: </span>
+                        <span className="text-emerald-700 tabular-nums">{formatMoney(row.matchedSalesAmount)}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500 block">GP: </span>
+                        <span className={`font-bold tabular-nums ${row.grossProfit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>
+                          {formatMoney(row.grossProfit)} ({row.grossProfitPct.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {!isLoading && visibleDeals.length === 0 ? (
+                <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+                  ยังไม่มีดีล Trading — กด + จับคู่ใหม่
+                </div>
+              ) : null}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto p-5">
+              <table className="w-full min-w-[1220px] text-sm">
+                <thead className="bg-slate-100"><tr><th className="p-2 text-left">Deal No</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Purchase</th><th className="p-2 text-left">Supplier</th><th className="p-2 text-left">Sales</th><th className="p-2 text-left">Customer</th><th className="p-2 text-right">Qty</th><th className="p-2 text-right">Cost</th><th className="p-2 text-right">Sales Amt</th><th className="p-2 text-right">GP</th><th className="p-2 text-right">GP%</th><th className="p-2 text-center">Status</th><th></th></tr></thead>
+                <tbody>
+                  {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
+                  {!isLoading && !error && visibleDeals.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={13}>ยังไม่มีดีล Trading — กด + จับคู่ใหม่</td></tr> : null}
+                  {!isLoading && visibleDeals.map((row) => <tr key={row.id} className={`border-t hover:bg-slate-50 ${row.status.toLowerCase().includes('cancel') ? 'bg-slate-50 text-slate-400 line-through' : ''}`}><td className="p-2 font-mono text-xs">{row.dealNo}</td><td className="p-2 text-xs">{formatDateDisplay(row.date)}</td><td className="p-2 font-mono text-xs">{row.purchaseBillNo || '-'}</td><td className="p-2 text-xs">{row.supplierName}</td><td className="p-2 font-mono text-xs">{row.salesBillNo || '-'}</td><td className="p-2 text-xs">{row.customerName}</td><td className="p-2 text-right">{formatMoney(row.matchedQty)}</td><td className={`p-2 text-right ${row.status.toLowerCase().includes('cancel') ? '' : 'text-red-600'}`}>{formatMoney(row.matchedPurchaseAmount)}</td><td className={`p-2 text-right ${row.status.toLowerCase().includes('cancel') ? '' : 'text-emerald-700'}`}>{formatMoney(row.matchedSalesAmount)}</td><td className={`p-2 text-right font-bold ${row.status.toLowerCase().includes('cancel') ? '' : row.grossProfit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>{formatMoney(row.grossProfit)}</td><td className="p-2 text-right">{row.grossProfitPct.toFixed(2)}%</td><td className="p-2 text-center"><span className={`rounded-md px-2 py-0.5 text-xs ${statusBadge(row.status)}`}>{row.status}</span></td><td className="whitespace-nowrap p-2"><button className="mr-2 rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={() => setSelectedDeal(row)}>จัดการ</button><button className="mr-2 rounded-md border border-slate-300 px-2 py-1 text-xs text-blue-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled>🔄 Recalc</button><button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled>Reverse</button></td></tr>)}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
-          <div className="grid gap-3 p-5 lg:grid-cols-2">
-            <TradingBillTable rows={unmatchedPurchases} title="📥 Trading Purchases — รอจับคู่ขาย" type="purchases" />
-            <TradingBillTable rows={unmatchedSales} title="📤 Trading Sales — รอจับคู่ต้นทุน" type="sales" />
-          </div>
+          <>
+            {/* Mobile Card list for Unmatched */}
+            <div className="block md:hidden space-y-4 p-4">
+              <div>
+                <h4 className="font-bold text-slate-800 text-xs mb-2">📥 Trading Purchases — รอจับคู่ขาย (มือถือ)</h4>
+                <div className="space-y-2">
+                  {unmatchedPurchases.map((row) => (
+                    <div key={row.id} className="rounded-md border border-slate-100 bg-white p-3 shadow-sm text-xs space-y-1">
+                      <div className="flex justify-between font-bold text-slate-800">
+                        <span>{row.docNo}</span>
+                        <span>{formatDateDisplay(row.date)}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500">Supplier: </span>
+                        <span className="text-slate-800">{row.supplierName}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-50 pt-1 mt-1 font-semibold">
+                        <span>ยอดบิล: {formatMoney(row.totalAmount)}</span>
+                        <span className="text-amber-700">เหลือจับ: {formatMoney(row.remainingAmount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {unmatchedPurchases.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-slate-400">ทั้งหมด matched ✓</div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 text-xs mb-2">📤 Trading Sales — รอจับคู่ต้นทุน (มือถือ)</h4>
+                <div className="space-y-2">
+                  {unmatchedSales.map((row) => (
+                    <div key={row.id} className="rounded-md border border-slate-100 bg-white p-3 shadow-sm text-xs space-y-1">
+                      <div className="flex justify-between font-bold text-slate-800">
+                        <span>{row.docNo}</span>
+                        <span>{formatDateDisplay(row.date)}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-500">Customer: </span>
+                        <span className="text-slate-800">{row.customerName}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-50 pt-1 mt-1 font-semibold">
+                        <span>ยอดขาย: {formatMoney(row.totalAmount)}</span>
+                        <span className="text-amber-700">รอ match: {formatMoney(row.remainingAmount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {unmatchedSales.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-slate-400">ทั้งหมด matched ✓</div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden md:grid gap-3 p-5 lg:grid-cols-2">
+              <TradingBillTable rows={unmatchedPurchases} title="📥 Trading Purchases — รอจับคู่ขาย" type="purchases" />
+              <TradingBillTable rows={unmatchedSales} title="📤 Trading Sales — รอจับคู่ต้นทุน" type="sales" />
+            </div>
+          </>
         )}
       </div>
       {selectedDeal ? <DealDetailModal deal={selectedDeal} onClose={() => setSelectedDeal(null)} /> : null}

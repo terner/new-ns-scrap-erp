@@ -4,7 +4,7 @@ import type { FocusEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Search } from 'lucide-react'
+import { Search, Sun, Moon } from 'lucide-react'
 import { AppNavigation } from '@/components/layout/AppNavigation'
 import { AuthStatus } from '@/components/layout/AuthStatus'
 import { breadcrumbsForPath, canAccessPath, navigationItems, navigationSections, pageSubtitleForPath, pageTitleForPath, type NavigationItem } from '@/lib/navigation'
@@ -70,6 +70,27 @@ export function AppShell({ children }: AppShellProps) {
   const [menuSearchFocused, setMenuSearchFocused] = useState(false)
   const [subtitleOverride, setSubtitleOverride] = useState<string | null>(null)
   const [titleOverride, setTitleOverride] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    const activeTheme = savedTheme || systemTheme
+    setTheme(activeTheme)
+    setMounted(true)
+  }, [])
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(nextTheme)
+    localStorage.setItem('theme', nextTheme)
+    if (nextTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
   const lastActivityPathRef = useRef<string | null>(null)
   const title = titleOverride ?? pageTitleForPath(pathname)
   const subtitle = subtitleOverride ?? pageSubtitleForPath(pathname)
@@ -252,42 +273,59 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </div>
 
-          <div className="relative hidden w-[min(360px,38vw)] min-w-64 shrink-0 md:block" onBlur={handleMenuSearchBlur}>
-            <label className="relative block">
-              <span className="sr-only">ค้นหาเมนู</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <input
-                className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                placeholder="ค้นหาเมนู..."
-                type="search"
-                value={menuSearch}
-                onChange={(event) => {
-                  setMenuSearch(event.target.value)
-                  setMenuSearchFocused(true)
-                }}
-                onFocus={() => setMenuSearchFocused(true)}
-              />
-            </label>
-            {menuSearchFocused && menuSearch.trim() ? (
-              <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
-                {menuSearchResults.length ? menuSearchResults.map((item) => (
-                  <Link
-                    className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none"
-                    href={item.href}
-                    key={`${item.href}-${item.label}`}
-                    onClick={clearMenuSearch}
-                  >
-                    <span className="w-5 shrink-0 text-center">{item.icon}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{item.label}</span>
-                      <span className="block truncate text-xs text-slate-500">{item.parentLabel ? `${item.parentLabel} / ` : ''}{item.sectionLabel}</span>
-                    </span>
-                  </Link>
-                )) : (
-                  <div className="px-3 py-4 text-center text-sm text-slate-500">ไม่พบเมนูที่ค้นหา</div>
-                )}
-              </div>
-            ) : null}
+          <div className="flex items-center gap-3">
+            <div className="relative hidden w-[min(360px,38vw)] min-w-64 shrink-0 md:block" onBlur={handleMenuSearchBlur}>
+              <label className="relative block">
+                <span className="sr-only">ค้นหาเมนู</span>
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                  placeholder="ค้นหาเมนู..."
+                  type="search"
+                  value={menuSearch}
+                  onChange={(event) => {
+                    setMenuSearch(event.target.value)
+                    setMenuSearchFocused(true)
+                  }}
+                  onFocus={() => setMenuSearchFocused(true)}
+                />
+              </label>
+              {menuSearchFocused && menuSearch.trim() ? (
+                <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                  {menuSearchResults.length ? menuSearchResults.map((item) => (
+                    <Link
+                      className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none"
+                      href={item.href}
+                      key={`${item.href}-${item.label}`}
+                      onClick={clearMenuSearch}
+                    >
+                      <span className="w-5 shrink-0 text-center">{item.icon}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{item.label}</span>
+                        <span className="block truncate text-xs text-slate-500">{item.parentLabel ? `${item.parentLabel} / ` : ''}{item.sectionLabel}</span>
+                      </span>
+                    </Link>
+                  )) : (
+                    <div className="px-3 py-4 text-center text-sm text-slate-500">ไม่พบเมนูที่ค้นหา</div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <button
+              aria-label="เปลี่ยนธีม"
+              className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500/15"
+              type="button"
+              onClick={toggleTheme}
+            >
+              {!mounted ? (
+                <span className="h-5 w-5 shrink-0" />
+              ) : theme === 'dark' ? (
+                <Sun className="h-5 w-5 text-amber-500" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </button>
           </div>
         </header>
 

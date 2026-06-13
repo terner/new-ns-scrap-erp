@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-scrap-ink: #172033;
   --color-scrap-muted: #64748b;
@@ -11,6 +13,116 @@
 :root {
   color: #172033;
   background: #f3f6f9;
+}
+
+.dark {
+  color-scheme: dark;
+  color: #f8fafc;
+  background: #0f172a;
+  
+  /* Redefine Tailwind's base theme variables */
+  --color-white: #1e293b;
+  --color-slate-50: #0f172a;
+  --color-slate-100: #090d16;
+  --color-slate-200: #334155;
+  --color-slate-300: #475569;
+  --color-slate-400: #64748b;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #f1f5f9;
+  --color-slate-900: #f8fafc;
+  --color-slate-950: #ffffff;
+  
+  /* Redefine custom theme variables */
+  --color-scrap-ink: #f8fafc;
+  --color-scrap-muted: #94a3b8;
+  --color-scrap-line: #334155;
+  --color-scrap-panel: #1e293b;
+  --color-scrap-accent: #2dd4bf;
+}
+
+.dark aside {
+  /* Keep original light mode colors for the dark sidebar in dark mode */
+  --color-white: #ffffff;
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+  
+  --color-scrap-ink: #172033;
+  --color-scrap-muted: #64748b;
+  --color-scrap-line: #d9e2ec;
+  --color-scrap-panel: #f8fafc;
+  --color-scrap-accent: #0f766e;
+}
+
+/* Prevent text colors from being inverted in dark mode on light/colored elements (like buttons, badges) */
+.dark .text-white,
+.dark .hover\:text-white:hover,
+.dark .focus\:text-white:focus,
+.dark .group-hover\:text-white:hover {
+  color: #ffffff !important;
+}
+
+.dark .text-slate-50,
+.dark .hover\:text-slate-50:hover,
+.dark .focus\:text-slate-50:focus {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-100,
+.dark .hover\:text-slate-100:hover,
+.dark .focus\:text-slate-100:focus {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-200,
+.dark .hover\:text-slate-200:hover,
+.dark .focus\:text-slate-200:focus {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-300,
+.dark .hover\:text-slate-300:hover,
+.dark .focus\:text-slate-300:focus {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-400,
+.dark .hover\:text-slate-400:hover,
+.dark .focus\:text-slate-400:focus {
+  color: #94a3b8 !important;
+}
+
+/* In dark mode, light/slate background utilities become light. Any light text classes inside them must become dark for readability. We exclude the sidebar (aside) from these overrides. */
+.dark .bg-slate-700:not(aside).text-white, .dark .bg-slate-700:not(aside) .text-white,
+.dark .bg-slate-700:not(aside) [class*="text-slate-50"], .dark .bg-slate-700:not(aside) [class*="text-slate-100"],
+.dark .bg-slate-700:not(aside) [class*="text-slate-200"], .dark .bg-slate-700:not(aside) [class*="text-slate-300"],
+.dark .bg-slate-700:not(aside) [class*="text-slate-400"],
+
+.dark .bg-slate-800:not(aside).text-white, .dark .bg-slate-800:not(aside) .text-white,
+.dark .bg-slate-800:not(aside) [class*="text-slate-50"], .dark .bg-slate-800:not(aside) [class*="text-slate-100"],
+.dark .bg-slate-800:not(aside) [class*="text-slate-200"], .dark .bg-slate-800:not(aside) [class*="text-slate-300"],
+.dark .bg-slate-800:not(aside) [class*="text-slate-400"],
+
+.dark .bg-slate-900:not(aside).text-white, .dark .bg-slate-900:not(aside) .text-white,
+.dark .bg-slate-900:not(aside) [class*="text-slate-50"], .dark .bg-slate-900:not(aside) [class*="text-slate-100"],
+.dark .bg-slate-900:not(aside) [class*="text-slate-200"], .dark .bg-slate-900:not(aside) [class*="text-slate-300"],
+.dark .bg-slate-900:not(aside) [class*="text-slate-400"],
+
+.dark .bg-slate-950:not(aside).text-white, .dark .bg-slate-950:not(aside) .text-white,
+.dark .bg-slate-950:not(aside) [class*="text-slate-50"], .dark .bg-slate-950:not(aside) [class*="text-slate-100"],
+.dark .bg-slate-950:not(aside) [class*="text-slate-200"], .dark .bg-slate-950:not(aside) [class*="text-slate-300"],
+.dark .bg-slate-950:not(aside) [class*="text-slate-400"] {
+  color: #0f172a !important;
 }
 
 html,
@@ -40,13 +152,13 @@ textarea {
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 select,
 textarea {
-  border-color: #cbd5e1;
+  border-color: var(--color-slate-300);
 }
 
 input.border:not([class*="bg-"]),
 select.border:not([class*="bg-"]),
 textarea.border:not([class*="bg-"]) {
-  background-color: #ffffff;
+  background-color: var(--color-white);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
@@ -54,12 +166,12 @@ select:focus,
 textarea:focus {
   border-color: #3b82f6;
   outline: none;
-  box-shadow: 0 0 0 2px #dbeafe;
+  box-shadow: 0 0 0 2px var(--color-slate-200);
 }
 
 input.border:not([class*="bg-"]):read-only,
 textarea.border:not([class*="bg-"]):read-only {
-  background-color: #f8fafc;
+  background-color: var(--color-slate-50);
 }
 
 input[type="search"] {
@@ -103,4 +215,33 @@ input[type="search"]::-webkit-search-results-decoration {
 .custom-scrollbar-dark {
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+}
+
+/* Global Custom Scrollbars for Dark Mode */
+.dark *::-webkit-scrollbar,
+.dark::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark *::-webkit-scrollbar-track,
+.dark::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb,
+.dark::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+
+.dark *::-webkit-scrollbar-thumb:hover,
+.dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.dark *,
+.dark {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
 }
