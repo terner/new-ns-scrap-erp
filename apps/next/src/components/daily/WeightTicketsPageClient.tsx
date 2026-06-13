@@ -534,8 +534,9 @@ export function WeightTicketsPageClient({
   }
 
   return (
-    <div className={cn("min-w-0 space-y-5 overflow-x-hidden", onClose ? "pb-6" : "pb-32")}>
-      {!onClose && (
+    <div className="min-w-0 overflow-x-hidden">
+      <div className={cn("min-w-0 space-y-5", onClose ? "p-4 sm:p-5 pb-6" : "pb-32")}>
+        {!onClose && (
         <div>
           <Button type="button" variant="outline" onClick={backToList}>
             <ArrowLeft className="mr-1 h-4 w-4" />
@@ -861,6 +862,7 @@ export function WeightTicketsPageClient({
             />
           </Card>
         </div>
+      </div>
       </div>
 
       <div className={cn(
