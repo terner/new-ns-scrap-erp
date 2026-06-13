@@ -2694,6 +2694,10 @@ model stock_adjustments {
   counted_qty     Decimal?  @default(0) @db.Decimal
   diff_qty        Decimal?  @default(0) @db.Decimal
   adjust_type     String?
+  output_category String?
+  on_hold_qty     Decimal?  @default(0) @db.Decimal
+  ready_qty_snapshot Decimal? @default(0) @db.Decimal
+  accounting_impact_policy String? @default("NOTE_ONLY")
   reason          String?
   remark          String?
   unit_cost_used  Decimal?  @default(0) @db.Decimal
@@ -2715,6 +2719,7 @@ model stock_adjustments {
   @@index([branch_id], map: "idx_stock_adjustments_branch")
   @@index([date(sort: Desc)], map: "idx_stock_adjustments_date")
   @@index([product_id], map: "idx_stock_adjustments_product")
+  @@index([output_category], map: "idx_stock_adjustments_output_category")
   @@index([status], map: "idx_stock_adjustments_status")
   @@schema("public")
 }

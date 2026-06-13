@@ -33,6 +33,24 @@ export function stockKey(input: StockBalanceKey) {
   ].join('|')
 }
 
+function stockBucketInternalKey(input: {
+  branchId: bigint | null
+  lotNo: string | null
+  notAvailable: boolean
+  productId: bigint | null
+  status: string | null
+  warehouseId: bigint | null
+}) {
+  return [
+    input.productId?.toString() ?? '-',
+    input.branchId?.toString() ?? '-',
+    input.warehouseId?.toString() ?? '-',
+    input.lotNo ?? '-',
+    input.status ?? '-',
+    input.notAvailable ? 'NA' : 'A',
+  ].join('|')
+}
+
 export function stockWhere(input: {
   asOf?: string | null
   branchId?: bigint | null
@@ -157,7 +175,7 @@ export async function stockBalanceSnapshot(input: {
   })
   const holdSums = await prisma.stock_holds.groupBy({
     _sum: { qty: true },
-    by: ['branch_id', 'product_id', 'warehouse_id'],
+    by: ['branch_id', 'product_id', 'warehouse_id', 'output_category', 'lot_no', 'not_available_for_sale'],
     where: {
       status: 'active',
       ...(normalizedInput.branchId ? { branch_id: normalizedInput.branchId } : {}),
@@ -167,7 +185,14 @@ export async function stockBalanceSnapshot(input: {
   })
   const holdQtyByStockKey = new Map(
     holdSums.map((row) => [
-      `${row.product_id ?? '-'}:${row.branch_id ?? '-'}:${row.warehouse_id ?? '-'}`,
+      stockBucketInternalKey({
+        branchId: row.branch_id,
+        lotNo: row.lot_no,
+        notAvailable: row.not_available_for_sale === true,
+        productId: row.product_id,
+        status: row.output_category,
+        warehouseId: row.warehouse_id,
+      }),
       toNumber(row._sum.qty),
     ]),
   )
@@ -247,7 +272,14 @@ export async function stockBalanceSnapshot(input: {
       row.readyQty = 0
       continue
     }
-    const holdKey = `${row.productInternalId ?? '-'}:${row.branchInternalId ?? '-'}:${row.warehouseInternalId ?? '-'}`
+    const holdKey = stockBucketInternalKey({
+      branchId: row.branchInternalId,
+      lotNo: row.lotNo || null,
+      notAvailable: row.notAvailable,
+      productId: row.productInternalId,
+      status: row.status || null,
+      warehouseId: row.warehouseInternalId,
+    })
     const remainingHold = holdQtyByStockKey.get(holdKey) ?? 0
     row.onHoldQty = Math.min(row.qty, Math.max(0, remainingHold))
     row.readyQty = Math.max(0, row.qty - row.onHoldQty)
@@ -285,6 +317,85 @@ export async function stockBalanceSnapshot(input: {
   const publicRows = filteredRows.map(({ branchInternalId: _branchInternalId, productInternalId: _productInternalId, warehouseInternalId: _warehouseInternalId, ...row }) => row)
 
   return { byStatus, rows: publicRows, summary }
+}
+
+export async function stockBalanceDetail(input: {
+  branchId: string | bigint
+  lotNo?: string | null
+  notAvailable?: boolean
+  productId: string | bigint
+  status?: string | null
+  warehouseId: string | bigint
+}) {
+  const normalizedInput = await normalizeStockReferenceInput(input)
+  if (!normalizedInput.branchId || !normalizedInput.productId || !normalizedInput.warehouseId) {
+    throw new Error('ระบุสินค้า สาขา และคลังให้ครบก่อนดูรายละเอียด')
+  }
+  const lotNo = input.lotNo?.trim() || null
+  const status = input.status?.trim() || null
+  const notAvailable = input.notAvailable === true
+
+  const [ledgerRows, holdRows] = await Promise.all([
+    prisma.stock_ledger.findMany({
+      include: stockLedgerInclude,
+      orderBy: [{ date: 'desc' }, { created_at: 'desc' }, { id: 'desc' }],
+      take: 80,
+      where: {
+        branch_id: normalizedInput.branchId,
+        lot_no: lotNo,
+        ...(notAvailable ? { not_available_for_sale: true } : { OR: [{ not_available_for_sale: false }, { not_available_for_sale: null }] }),
+        output_category: status,
+        product_id: normalizedInput.productId,
+        warehouse_id: normalizedInput.warehouseId,
+      },
+    }),
+    prisma.stock_holds.findMany({
+      include: {
+        weight_ticket_lines: { select: { line_no: true, net_weight: true, product_name: true } },
+        weight_tickets: { include: { customers: { select: { code: true, name: true } } } },
+      },
+      orderBy: [{ held_at: 'desc' }, { id: 'desc' }],
+      take: 80,
+      where: {
+        branch_id: normalizedInput.branchId,
+        lot_no: lotNo,
+        not_available_for_sale: notAvailable,
+        output_category: status,
+        product_id: normalizedInput.productId,
+        status: 'active',
+        warehouse_id: normalizedInput.warehouseId,
+      },
+    }),
+  ])
+
+  return {
+    holds: holdRows.map((row) => ({
+      customerCode: row.weight_tickets.customers?.code ?? '',
+      customerName: row.weight_tickets.customers?.name ?? '-',
+      heldAt: row.held_at.toISOString(),
+      holdKey: row.hold_key,
+      lotNo: row.lot_no ?? '',
+      qty: toNumber(row.qty),
+      sourceDocNo: row.source_doc_no,
+      sourceLineNo: row.source_line_no ?? row.weight_ticket_lines?.line_no ?? null,
+      status: row.status,
+      weightTicketDate: toDateOnly(row.weight_tickets.document_date),
+    })),
+    ledgerRows: ledgerRows.map((row) => ({
+      createdAt: row.created_at ? row.created_at.toISOString() : '',
+      date: toDateOnly(row.date),
+      id: row.ledger_key,
+      movementType: row.movement_type,
+      note: row.note ?? row.notes ?? '',
+      qtyIn: toNumber(row.qty_in),
+      qtyOut: toNumber(row.qty_out),
+      refNo: row.ref_no ?? row.ref_id ?? '',
+      refType: row.ref_type ?? '',
+      unitCost: toNumber(row.unit_cost),
+      valueIn: toNumber(row.value_in),
+      valueOut: toNumber(row.value_out),
+    })),
+  }
 }
 
 export async function averageCostForStock(input: { branchId?: bigint | null; lotNo?: string | null; productId: string | bigint; status?: string | null; warehouseId?: bigint | null }) {
