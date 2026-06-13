@@ -201,7 +201,7 @@ export function StockLedgerPageClient() {
             <button className={`px-3 font-bold ${balanceMode === 'product' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`} title="คำนวณยอดต่อสินค้าเท่านั้น (ตรงกับหน้า Stock Balance + Drilldown)" type="button" onClick={() => { setPage(1); setBalanceMode('product') }}>ต่อสินค้า</button>
             <button className={`border-l border-slate-300 px-3 font-bold ${balanceMode === 'warehouse' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`} title="คำนวณยอดต่อสินค้า × สาขา × คลัง" type="button" onClick={() => { setPage(1); setBalanceMode('warehouse') }}>ต่อคลัง</button>
           </div>
-          <button className="hidden md:inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-bold text-white" type="button" onClick={exportXlsx}><Download className="h-3.5 w-3.5" />.xlsx</button>
+          <button className="hidden md:inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-bold text-white ml-auto" type="button" onClick={exportXlsx}><Download className="h-3.5 w-3.5" />.xlsx</button>
         </div>
       </div>
       {movementType ? (
@@ -439,7 +439,7 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="max-h-[90vh] max-w-3xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-none">
-        <DialogHeader className="p-4 bg-slate-900 text-white shrink-0 flex flex-row items-start justify-between gap-3">
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white shrink-0 flex flex-row items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <DialogTitle className="text-lg font-bold text-white">รายละเอียด Stock Ledger</DialogTitle>
