@@ -572,7 +572,7 @@ export function WeightTicketsPageClient({
 
       <div>
         <div className="space-y-5">
-          <Card className="p-5">
+          <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
             <SectionHeader title="ข้อมูลหัวเอกสาร" subtitle="ผู้ใช้เลือกเฉพาะข้อมูลหน้างาน ส่วนวันที่ เวลา และผู้กรอกเป็นข้อมูลระบบ" />
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <BranchSelectCombobox
@@ -627,7 +627,7 @@ export function WeightTicketsPageClient({
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
             <SectionHeader title="สินค้าและน้ำหนัก" subtitle="เลือกสินค้า กรอกน้ำหนัก และเลือกวิธีหักสิ่งเจือปนต่อรายการ" />
             <div className="mt-4 grid min-w-0 items-start gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
               <div className="min-w-0 space-y-3 xl:max-h-[calc(100vh-16rem)] xl:overflow-hidden">
@@ -852,7 +852,7 @@ export function WeightTicketsPageClient({
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
             <SectionHeader title="หมายเหตุท้ายเอกสาร" subtitle="ใช้บันทึกข้อมูลหน้างานที่ office ต้องเห็นตอนเลือกเอกสารไปออกบิล" />
             <textarea
               className="mt-4 min-h-28 w-full rounded-md border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-400"
@@ -1105,7 +1105,7 @@ function ProductImagePicker({
           <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-lg">📦</span>
-              <DialogTitle className="text-base font-bold text-slate-900">เพิ่มสินค้า</DialogTitle>
+              <DialogTitle className="text-base font-bold text-white">เพิ่มสินค้า</DialogTitle>
             </div>
           </DialogHeader>
 
@@ -1150,7 +1150,7 @@ function ProductImagePicker({
 
             {/* Grid of products */}
             <div className="max-h-[50vh] overflow-y-auto pr-1">
-              <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {filteredProducts.map((product) => {
                   const selected = product.id === tempSelectedId
                   return (
@@ -1165,7 +1165,7 @@ function ProductImagePicker({
                       type="button"
                       onClick={() => setTempSelectedId(product.id)}
                     >
-                      <div className="aspect-[4/3] w-full bg-slate-50 overflow-hidden border-b border-slate-100 relative">
+                      <div className="aspect-square w-full bg-slate-50 overflow-hidden border-b border-slate-100 relative">
                         {product.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img alt={product.name ?? product.label} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" src={product.imageUrl} />
@@ -1176,8 +1176,8 @@ function ProductImagePicker({
                         )}
                       </div>
                       <div className={cn(
-                        'w-full px-2 py-2 text-center text-[10px] sm:text-xs font-bold leading-snug flex-1 flex items-center justify-center min-h-[2.5rem]',
-                        selected ? 'bg-blue-50 text-blue-900' : 'bg-slate-50 text-slate-700 group-hover:bg-slate-100'
+                        'w-full px-2.5 py-2 text-center text-xs sm:text-sm font-bold leading-tight flex-1 flex items-center justify-center min-h-[3rem]',
+                        selected ? 'bg-blue-50 text-blue-900' : 'bg-slate-50 text-slate-800 group-hover:bg-slate-100'
                       )}>
                         <span className="line-clamp-2 break-words">{product.name ?? product.label}</span>
                       </div>
