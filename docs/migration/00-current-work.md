@@ -2116,3 +2116,10 @@ Tailwind dependency check:
   - `GET /api/purchase/bills` now uses DB `skip/take`, `count`, and `sum(total_amount)` for normal list paging; it keeps in-memory workflow status sort/filter only where PMA/PMT-derived status is required.
   - Validation passed: Prisma generate, targeted ESLint for PB lifecycle files, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `npm run verify:stock-ledger` with all totals `0`.
   - Remaining PB QA: logged-in browser QA for PB edit/cancel/supplier-swap against real data, plus explicit API smoke that confirms released/superseded rows are retained after each action.
+- 2026-06-13: KPI Summary Cards Outer Gray Wrapper Removal Across All Modules
+  - Removed the outer gray wrapper container (`bg-slate-50 border-slate-200 shadow-inner p-3 sm:p-4 rounded-xl border` or similar wrapper classes) of KPI cards across all modules in 4 sections: Master Data, Inventory, Production, System, and Daily Transactions.
+  - Replaced the container layouts directly with Grid Layout configurations (`grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 md:grid-cols-3` etc.) to let the white metrics cards float cleanly without an additional gray border box.
+  - Verified and ensured responsive layout consistency, font styling, and internal components on both mobile and desktop screens.
+  - Modified 18 files including TransactionLedgerPageClient, AdminUsersPageClient, DailyExpensePageClient, DailyPettyAdvancePageClient, MoneyMovementPageClient, PaymentApprovalPageClient, ReceiptVouchersPageClient, TransactionBillsPageClient, ProductionReconciliationPageClient, ProductionReportPageClient, AccountsPayablePageClient, AdvancePaymentsPageClient, PoBuyPageClient, TradingMatchingPageClient, PoSellPageClient, StockBalancePageClient, StockOperationPageClient, StockReconciliationPageClient.
+  - Validation passed: TypeScript type check (`npm run type-check`) and Next.js production build (`npm run build`) completed with 0 errors. ESLint lint check passed with 0 errors and 1 unrelated pre-existing LCP warning.
+
