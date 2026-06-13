@@ -253,7 +253,7 @@ export function StockTransferPageClient() {
       {showMobileFilters ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
               <button
                 className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -312,7 +312,7 @@ export function StockTransferPageClient() {
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -360,99 +360,107 @@ export function StockTransferPageClient() {
       </div>
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4">
-          <form noValidate className="mx-auto my-4 w-full max-w-5xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={save}>
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 md:p-3 flex items-stretch md:items-start justify-center">
+          <form noValidate className="w-full md:max-w-5xl rounded-none md:rounded-md bg-white shadow-xl flex flex-col h-screen md:h-auto md:max-h-[calc(100vh-80px)] my-0 md:my-4 overflow-hidden" onSubmit={save}>
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6 py-3 shrink-0">
               <div>
-                <h3 className="text-xl font-bold text-slate-800">โอนสินค้าระหว่างสาขา</h3>
-                <p className="mt-1 text-xs text-slate-500">บันทึกการย้ายสินค้าระหว่างต้นทางและปลายทางโดยเก็บรายการน้ำหนักรายสินค้า</p>
+                <h3 className="text-base md:text-xl font-bold text-slate-800">โอนสินค้าระหว่างสาขา</h3>
+                <p className="hidden md:block mt-1 text-xs text-slate-500">บันทึกการย้ายสินค้าระหว่างต้นทางและปลายทางโดยเก็บรายการน้ำหนักรายสินค้า</p>
               </div>
               <button className="text-3xl leading-none text-slate-400 hover:text-slate-700" type="button" onClick={() => setFormOpen(false)}>&times;</button>
             </div>
 
-            <div className="space-y-4 bg-slate-50 p-6 text-sm">
-              <div className="rounded-md bg-white p-4 shadow">
-                <h4 className="mb-3 font-bold text-slate-700">1. ข้อมูลเอกสาร</h4>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <FormField label="เลขที่เอกสาร">
-                    <Input className="h-9 bg-slate-50 font-mono text-sm" placeholder="ระบบจะออกเลขให้อัตโนมัติ" readOnly value={form.docNo ?? ''} />
+            <div className="flex-1 overflow-y-auto space-y-3 bg-slate-50 p-3 md:p-6 text-sm">
+              <div className="rounded-md bg-white p-3 md:p-4 shadow">
+                <h4 className="mb-2 md:mb-3 text-xs md:text-sm font-bold text-slate-700">1. ข้อมูลเอกสาร</h4>
+                <div className="grid grid-cols-2 gap-2 md:gap-3">
+                  <FormField className="col-span-1" label="เลขที่เอกสาร">
+                    <Input className="h-9 bg-slate-50 font-mono text-xs md:text-sm" placeholder="อัตโนมัติ" readOnly value={form.docNo ?? ''} />
                   </FormField>
-                  <FormField error={fieldErrors.date} errorKey="date" label="วันที่ *">
+                  <FormField className="col-span-1" error={fieldErrors.date} errorKey="date" label="วันที่ *">
                     <DatePickerInput className={`${fieldErrors.date ? '[&_input]:border-red-400 [&_input]:bg-red-50 [&_[data-slot="input-group"]]:border-red-400' : ''} w-full`} value={form.date} onChange={(value) => updateForm('date', value)} />
                   </FormField>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-md border border-red-200 bg-white p-4 shadow">
-                  <h4 className="mb-3 font-bold text-red-700">2. ต้นทาง</h4>
-                  <div className="grid gap-3">
-                    <SelectField
-                      error={fieldErrors.fromBranchId}
-                      errorKey="fromBranchId"
-                      label="สาขาต้นทาง *"
-                      options={branchOptions}
-                      placeholder="เลือกสาขาต้นทาง"
-                      value={form.fromBranchId}
-                      onChange={(value) => updateForm('fromBranchId', value)}
-                    />
-                    <SelectField
-                      error={fieldErrors.fromWarehouseId}
-                      errorKey="fromWarehouseId"
-                      label="คลังต้นทาง *"
-                      options={sourceWarehouseOptions}
-                      placeholder="เลือกคลังต้นทาง"
-                      value={form.fromWarehouseId}
-                      onChange={(value) => updateForm('fromWarehouseId', value)}
-                    />
+              <div className="grid gap-3 md:gap-4 md:grid-cols-2">
+                <div className="rounded-md border border-red-200 bg-white p-3 md:p-4 shadow">
+                  <h4 className="mb-2 md:mb-3 text-xs md:text-sm font-bold text-red-700">2. ต้นทาง</h4>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-1 md:gap-3">
+                    <div className="col-span-1 md:col-span-1">
+                      <SelectField
+                        error={fieldErrors.fromBranchId}
+                        errorKey="fromBranchId"
+                        label="สาขาต้นทาง *"
+                        options={branchOptions}
+                        placeholder="เลือกสาขา"
+                        value={form.fromBranchId}
+                        onChange={(value) => updateForm('fromBranchId', value)}
+                      />
+                    </div>
+                    <div className="col-span-1 md:col-span-1">
+                      <SelectField
+                        error={fieldErrors.fromWarehouseId}
+                        errorKey="fromWarehouseId"
+                        label="คลังต้นทาง *"
+                        options={sourceWarehouseOptions}
+                        placeholder="เลือกคลัง"
+                        value={form.fromWarehouseId}
+                        onChange={(value) => updateForm('fromWarehouseId', value)}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-md border border-emerald-200 bg-white p-4 shadow">
-                  <h4 className="mb-3 font-bold text-emerald-700">3. ปลายทาง</h4>
-                  <div className="grid gap-3">
-                    <SelectField
-                      error={fieldErrors.toBranchId}
-                      errorKey="toBranchId"
-                      label="สาขาปลายทาง *"
-                      options={branchOptions}
-                      placeholder="เลือกสาขาปลายทาง"
-                      value={form.toBranchId}
-                      onChange={(value) => updateForm('toBranchId', value)}
-                    />
-                    <SelectField
-                      error={fieldErrors.toWarehouseId}
-                      errorKey="toWarehouseId"
-                      label="คลังปลายทาง *"
-                      options={destinationWarehouseOptions}
-                      placeholder="เลือกคลังปลายทาง"
-                      value={form.toWarehouseId}
-                      onChange={(value) => updateForm('toWarehouseId', value)}
-                    />
+                <div className="rounded-md border border-emerald-200 bg-white p-3 md:p-4 shadow">
+                  <h4 className="mb-2 md:mb-3 text-xs md:text-sm font-bold text-emerald-700">3. ปลายทาง</h4>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-1 md:gap-3">
+                    <div className="col-span-1 md:col-span-1">
+                      <SelectField
+                        error={fieldErrors.toBranchId}
+                        errorKey="toBranchId"
+                        label="สาขาปลายทาง *"
+                        options={branchOptions}
+                        placeholder="เลือกสาขา"
+                        value={form.toBranchId}
+                        onChange={(value) => updateForm('toBranchId', value)}
+                      />
+                    </div>
+                    <div className="col-span-1 md:col-span-1">
+                      <SelectField
+                        error={fieldErrors.toWarehouseId}
+                        errorKey="toWarehouseId"
+                        label="คลังปลายทาง *"
+                        options={destinationWarehouseOptions}
+                        placeholder="เลือกคลัง"
+                        value={form.toWarehouseId}
+                        onChange={(value) => updateForm('toWarehouseId', value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-md bg-white p-4 shadow">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h4 className="font-bold text-slate-700">4. รายการสินค้า ({form.items.length})</h4>
+              <div className="rounded-md bg-white p-3 md:p-4 shadow">
+                <div className="mb-2 md:mb-3 flex items-center justify-between gap-2">
+                  <h4 className="text-xs md:text-sm font-bold text-slate-700">4. รายการสินค้า ({form.items.length})</h4>
                   <Button size="sm" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, { lotNo: null, productId: '', qty: 0 }] }))}>+ เพิ่มรายการ</Button>
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
                 <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
-                  <table className="w-full min-w-[860px] text-sm">
+                  <table className="w-full min-w-[860px] text-xs md:text-sm">
                     <thead className="bg-slate-200/80 border-b border-slate-300/80">
                       <tr>
-                        <th className="p-2 text-left">สินค้า</th>
-                        <th className="p-2 text-left">Lot</th>
-                        <th className="p-2 text-right">น้ำหนัก</th>
-                        <th className="p-2 text-right">จัดการ</th>
+                        <th className="p-1.5 md:p-2 text-left">สินค้า</th>
+                        <th className="p-1.5 md:p-2 text-left">Lot</th>
+                        <th className="p-1.5 md:p-2 text-right">น้ำหนัก</th>
+                        <th className="p-1.5 md:p-2 text-right">จัดการ</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {form.items.map((item, index) => (
                         <tr key={index} className="align-top hover:bg-slate-50">
-                          <td className="p-2">
+                          <td className="p-1.5 md:p-2">
                             <SelectField
                               error={fieldErrors[`items.${index}.productId`]}
                               errorKey={`items.${index}.productId`}
@@ -463,7 +471,7 @@ export function StockTransferPageClient() {
                               onChange={(value) => updateItem(index, 'productId', value)}
                             />
                           </td>
-                          <td className="p-2">
+                          <td className="p-1.5 md:p-2">
                             <InputField
                               error={fieldErrors[`items.${index}.lotNo`]}
                               errorKey={`items.${index}.lotNo`}
@@ -472,7 +480,7 @@ export function StockTransferPageClient() {
                               onChange={(value) => updateItem(index, 'lotNo', value || null)}
                             />
                           </td>
-                          <td className="p-2">
+                          <td className="p-1.5 md:p-2">
                             <InputField
                               error={fieldErrors[`items.${index}.qty`]}
                               errorKey={`items.${index}.qty`}
@@ -483,7 +491,7 @@ export function StockTransferPageClient() {
                               onChange={(value) => updateItem(index, 'qty', Number(value || 0))}
                             />
                           </td>
-                          <td className="p-2 text-right">
+                          <td className="p-1.5 md:p-2 text-right">
                             <Button
                               className="mt-6"
                               disabled={form.items.length <= 1}
@@ -500,38 +508,42 @@ export function StockTransferPageClient() {
                     </tbody>
                     <tfoot className="bg-slate-50 font-semibold">
                       <tr>
-                        <td className="p-2 text-right text-slate-600" colSpan={2}>น้ำหนักรวม</td>
-                        <td className="p-2 text-right tabular-nums text-blue-700">{formatMoney(form.items.reduce((sum, item) => sum + item.qty, 0))}</td>
-                        <td className="p-2" />
+                        <td className="p-1.5 md:p-2 text-right text-slate-600" colSpan={2}>น้ำหนักรวม</td>
+                        <td className="p-1.5 md:p-2 text-right tabular-nums text-blue-700">{formatMoney(form.items.reduce((sum, item) => sum + item.qty, 0))}</td>
+                        <td className="p-1.5 md:p-2" />
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               </div>
 
-              <div className="rounded-md bg-white p-4 shadow">
-                <h4 className="mb-3 font-bold text-slate-700">5. ผู้รับผิดชอบและหมายเหตุ</h4>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <InputField
-                    error={fieldErrors.sender}
-                    errorKey="sender"
-                    label="ผู้ส่ง"
-                    value={form.sender ?? ''}
-                    onChange={(value) => updateForm('sender', value || null)}
-                  />
-                  <InputField
-                    error={fieldErrors.receiver}
-                    errorKey="receiver"
-                    label="ผู้รับ"
-                    value={form.receiver ?? ''}
-                    onChange={(value) => updateForm('receiver', value || null)}
-                  />
+              <div className="rounded-md bg-white p-3 md:p-4 shadow">
+                <h4 className="mb-2 md:mb-3 text-xs md:text-sm font-bold text-slate-700">5. ผู้รับผิดชอบและหมายเหตุ</h4>
+                <div className="grid grid-cols-2 gap-2 md:gap-3">
+                  <div className="col-span-1">
+                    <InputField
+                      error={fieldErrors.sender}
+                      errorKey="sender"
+                      label="ผู้ส่ง"
+                      value={form.sender ?? ''}
+                      onChange={(value) => updateForm('sender', value || null)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <InputField
+                      error={fieldErrors.receiver}
+                      errorKey="receiver"
+                      label="ผู้รับ"
+                      value={form.receiver ?? ''}
+                      onChange={(value) => updateForm('receiver', value || null)}
+                    />
+                  </div>
                 </div>
-                <FormField className="mt-3" error={fieldErrors.notes} errorKey="notes" label="หมายเหตุ">
+                <FormField className="mt-2.5 md:mt-3" error={fieldErrors.notes} errorKey="notes" label="หมายเหตุ">
                   <textarea
                     data-error-key="notes"
-                    className={`w-full rounded-md border px-3 py-2 ${fieldErrors.notes ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white'}`}
-                    rows={3}
+                    className={`w-full rounded-md border px-3 py-1.5 md:py-2 text-xs md:text-sm h-10 md:h-16 min-h-10 md:min-h-16 ${fieldErrors.notes ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white'}`}
+                    rows={2}
                     value={form.notes ?? ''}
                     onChange={(event) => updateForm('notes', event.target.value || null)}
                   />
@@ -539,7 +551,7 @@ export function StockTransferPageClient() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
+            <div className="flex justify-end gap-2 border-t border-slate-200 bg-white px-4 md:px-6 py-3 shrink-0">
               <Button size="sm" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
               <Button disabled={isSaving} size="sm" type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
             </div>
@@ -569,7 +581,7 @@ export function StockTransferPageClient() {
             {row.notes ? (
               <p className="text-xs text-slate-500 italic mb-3">หมายเหตุ: {row.notes}</p>
             ) : null}
-            <div className="flex justify-between items-end border-t border-slate-100 pt-2.5">
+            <div className="flex justify-between items-end border-t border-slate-200 pt-2.5">
               <div className="text-xs text-slate-500">
                 <span>รายการสินค้า: <span className="font-semibold text-slate-700">{row.itemCount}</span> รายการ</span>
               </div>

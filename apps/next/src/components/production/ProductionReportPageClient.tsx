@@ -407,7 +407,7 @@ function ChartPanel({ rows, title, type }: { rows: Array<{ input: number; label:
   return (
     <div className="rounded-md bg-white p-4 shadow-lg">
       <h3 className="mb-2 font-bold text-slate-700">{title}</h3>
-      <div className="flex h-[300px] items-end gap-2 overflow-x-auto border-b border-slate-100 pb-8">
+      <div className="flex h-[300px] items-end gap-2 overflow-x-auto border-b border-slate-200 pb-8">
         {rows.map((row) => (
           <div key={row.label} className="relative flex min-w-10 flex-1 items-end justify-center gap-1">
             <div className={`${type === 'line' ? 'rounded-md-t' : 'rounded-md-t'} w-2 bg-blue-500`} style={{ height: `${Math.max(2, (row.input / max) * 240)}px` }} title={`Input ${formatMoney(row.input)}`} />

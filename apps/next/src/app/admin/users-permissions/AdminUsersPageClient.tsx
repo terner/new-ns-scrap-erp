@@ -403,7 +403,7 @@ export function AdminUsersPageClient() {
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4">
           <form className="mt-10 w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveUser}>
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
               <h3 className="text-lg font-bold text-slate-900">{editingUser ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้'}</h3>
               <ActiveToggle checked={form.active} onChange={(checked) => setForm((current) => ({ ...current, active: checked }))} />
             </div>
@@ -422,8 +422,8 @@ export function AdminUsersPageClient() {
                 <input className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-300 focus:ring-2 focus:ring-slate-100" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
               </label>
 
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">Roles *</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">Roles *</div>
                 <div className="grid gap-2">
                   {data?.roles.filter((role) => role.active).map((role) => (
                     <label key={role.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
@@ -435,8 +435,8 @@ export function AdminUsersPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">สาขาที่เข้าถึง</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">สาขาที่เข้าถึง</div>
                 <div className="grid gap-2">
                   {data?.branches.map((branch) => (
                     <label key={branch.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
@@ -457,7 +457,7 @@ export function AdminUsersPageClient() {
               {formError ? <p className="md:col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p> : null}
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4">
+            <div className="flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
               <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-50" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
               <button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50 transition-colors" disabled={isSaving} type="submit">
                 {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}

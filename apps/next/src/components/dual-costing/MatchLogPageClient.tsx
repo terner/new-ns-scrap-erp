@@ -163,7 +163,7 @@ export function MatchLogPageClient() {
 
       <DualCostingCountRow countValue={visibleRows.length} />
 
-      <Table className="[&_tbody_tr]:border-slate-100">
+      <Table className="[&_tbody_tr]:border-slate-200">
         <TableHeader>
           <tr>
             <TableHead>Match Type</TableHead>

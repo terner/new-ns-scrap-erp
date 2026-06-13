@@ -346,7 +346,7 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
       <div className="w-full max-w-2xl rounded-md bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 mb-4">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3 mb-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{row.docNo}</h2>
             <p className="text-sm text-slate-500">{row.customerName}</p>
@@ -355,8 +355,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
         </div>
         <div className="space-y-4">
           {/* ข้อมูลเอกสาร */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลเอกสาร</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="วันที่บิล" value={formatDateDisplay(row.date)} />
               <DetailItem label="ครบกำหนด" value={row.dueDate ? formatDateDisplay(row.dueDate) : '-'} />
@@ -369,8 +369,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
           </div>
 
           {/* ข้อมูลการเงิน */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลการเงิน</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลการเงิน</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
               <DetailItem label="ยอดบิล" value={`${formatMoney(row.totalAmount)} บาท`} />
               <DetailItem label="รับแล้ว" value={`${formatMoney(row.receivedAmount)} บาท`} />

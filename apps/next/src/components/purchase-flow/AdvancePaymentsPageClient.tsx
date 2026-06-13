@@ -531,15 +531,21 @@ export function AdvancePaymentsPageClient() {
                 description="ระบุผู้ขาย สาขา และยอดเงินที่ต้องจ่ายล่วงหน้า"
                 title="ข้อมูลการเงิน"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <SearchCombobox error={fieldErrors.supplierId} errorKey="supplierId" inputId="advance-supplier" label="ผู้ขาย *" options={supplierOptions} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
-                  <Field error={fieldErrors.branchId} label="สาขา *">
-                    <Select className={`h-9 w-full px-2 py-1.5 ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)}>
-                      <option disabled value="">เลือกสาขา</option>
-                      {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                    </Select>
-                  </Field>
-                  <MoneyInputField error={fieldErrors.amount} label="ยอดมัดจำ *" value={form.amount} onChange={(value) => updateForm('amount', value)} />
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-3 md:gap-3">
+                  <div className="col-span-2 md:col-span-1">
+                    <SearchCombobox error={fieldErrors.supplierId} errorKey="supplierId" inputId="advance-supplier" label="ผู้ขาย *" options={supplierOptions} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <Field error={fieldErrors.branchId} label="สาขา *">
+                      <Select className={`h-9 w-full px-2 py-1.5 ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)}>
+                        <option disabled value="">เลือกสาขา</option>
+                        {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                      </Select>
+                    </Field>
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <MoneyInputField error={fieldErrors.amount} label="ยอดมัดจำ *" value={form.amount} onChange={(value) => updateForm('amount', value)} />
+                  </div>
                 </div>
               </FormSection>
 
@@ -547,10 +553,16 @@ export function AdvancePaymentsPageClient() {
                 description="ผูกเอกสาร ADV กับข้อมูลอ้างอิงจากรถเข้า/ใบชั่งใหญ่"
                 title="อ้างอิงใบชั่งใหญ่"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <InputField error={fieldErrors.largeScaleDocNo} label="เลขที่ใบชั่งใหญ่" value={form.largeScaleDocNo} onChange={(value) => updateForm('largeScaleDocNo', value)} />
-                  <InputField className="max-w-[220px]" error={fieldErrors.inDate} label="วันที่รถเข้า" step="60" type="datetime-local" value={form.inDate} onChange={(value) => updateForm('inDate', value)} />
-                  <InputField className="max-w-[220px]" error={fieldErrors.outDate} label="วันที่รถออก" step="60" type="datetime-local" value={form.outDate} onChange={(value) => updateForm('outDate', value)} />
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-3 md:gap-3">
+                  <div className="col-span-2 md:col-span-1">
+                    <InputField error={fieldErrors.largeScaleDocNo} label="เลขที่ใบชั่งใหญ่" value={form.largeScaleDocNo} onChange={(value) => updateForm('largeScaleDocNo', value)} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <InputField className="w-full" error={fieldErrors.inDate} label="วันที่รถเข้า" step="60" type="datetime-local" value={form.inDate} onChange={(value) => updateForm('inDate', value)} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <InputField className="w-full" error={fieldErrors.outDate} label="วันที่รถออก" step="60" type="datetime-local" value={form.outDate} onChange={(value) => updateForm('outDate', value)} />
+                  </div>
                 </div>
               </FormSection>
 
@@ -558,21 +570,31 @@ export function AdvancePaymentsPageClient() {
                 description="กรอกข้อมูลสินค้า น้ำหนัก และราคาที่ใช้คำนวณอ้างอิง"
                 title="สินค้าและน้ำหนัก"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <SearchCombobox
-                    error={fieldErrors.productName}
-                    errorKey="productName"
-                    inputId="advance-product"
-                    label="ชื่อสินค้า"
-                    options={productOptions}
-                    placeholder="พิมพ์รหัส/ชื่อสินค้า..."
-                    value={form.productId}
-                    onChange={(value) => updateForm('productId', value)}
-                  />
-                  <InputField error={fieldErrors.weightIn} label="น้ำหนักเข้า *" min="0" step="0.01" type="number" value={form.weightIn} onChange={(value) => updateForm('weightIn', value)} />
-                  <InputField error={fieldErrors.weightOut} label="น้ำหนักออก *" min="0" step="0.01" type="number" value={form.weightOut} onChange={(value) => updateForm('weightOut', value)} />
-                  <InputField readOnly className="bg-slate-50 text-slate-700" error={fieldErrors.netWeight} label="น้ำหนักสุทธิ *" min="0" step="0.01" type="number" value={derivedNetWeight} onChange={() => undefined} />
-                  <MoneyInputField error={fieldErrors.pricePerKg} label="ราคา/กก. *" value={form.pricePerKg} onChange={(value) => updateForm('pricePerKg', value)} />
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-4 md:gap-3">
+                  <div className="col-span-2 md:col-span-1">
+                    <SearchCombobox
+                      error={fieldErrors.productName}
+                      errorKey="productName"
+                      inputId="advance-product"
+                      label="ชื่อสินค้า"
+                      options={productOptions}
+                      placeholder="พิมพ์รหัส/ชื่อสินค้า..."
+                      value={form.productId}
+                      onChange={(value) => updateForm('productId', value)}
+                    />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <InputField error={fieldErrors.weightIn} label="น้ำหนักเข้า *" min="0" step="0.01" type="number" value={form.weightIn} onChange={(value) => updateForm('weightIn', value)} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <InputField error={fieldErrors.weightOut} label="น้ำหนักออก *" min="0" step="0.01" type="number" value={form.weightOut} onChange={(value) => updateForm('weightOut', value)} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <InputField readOnly className="bg-slate-50 text-slate-700" error={fieldErrors.netWeight} label="น้ำหนักสุทธิ *" min="0" step="0.01" type="number" value={derivedNetWeight} onChange={() => undefined} />
+                  </div>
+                  <div className="col-span-1 md:col-span-1">
+                    <MoneyInputField error={fieldErrors.pricePerKg} label="ราคา/กก. *" value={form.pricePerKg} onChange={(value) => updateForm('pricePerKg', value)} />
+                  </div>
                 </div>
               </FormSection>
 
@@ -580,9 +602,11 @@ export function AdvancePaymentsPageClient() {
                 description="รวบรวมข้อมูลตัวรถและรูปประกอบในจุดเดียว"
                 title="ข้อมูลรถ"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <InputField error={fieldErrors.plateNo} label="ทะเบียนรถ" value={form.plateNo} onChange={(value) => updateForm('plateNo', value)} />
-                  <div className="md:col-span-2 xl:col-span-3">
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-3 md:gap-3">
+                  <div className="col-span-2 md:col-span-1">
+                    <InputField error={fieldErrors.plateNo} label="ทะเบียนรถ" value={form.plateNo} onChange={(value) => updateForm('plateNo', value)} />
+                  </div>
+                  <div className="col-span-2 md:col-span-2 xl:col-span-3">
                     <Field error={fieldErrors.vehiclePhotoNames} label="รูปภาพรถ">
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <label className="block bg-white p-6 border-2 border-dashed border-slate-300 rounded-xl text-center hover:border-emerald-400 hover:bg-slate-50 cursor-pointer transition-colors">
@@ -605,7 +629,7 @@ export function AdvancePaymentsPageClient() {
                             <div className="text-center text-xs text-slate-400 py-2">ยังไม่มีรูปภาพรถที่แนบมา</div>
                           ) : null}
                           {vehiclePhotoFiles.map((file) => (
-                            <div key={file.id} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-xs">
+                            <div key={file.id} className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
                               {file.url ? (
                                 <button
                                   className="min-w-0 flex-1 truncate text-left font-medium text-slate-700 hover:text-emerald-700 hover:underline"
@@ -634,9 +658,9 @@ export function AdvancePaymentsPageClient() {
                 description="ข้อมูลเสริมสำหรับการติดตามเอกสารและการตรวจสอบย้อนหลัง"
                 title="ข้อมูลประกอบ"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="md:col-span-2 xl:col-span-4">
-                    <TextAreaField error={fieldErrors.remark} label="หมายเหตุ" rows={3} value={form.remark} onChange={(value) => updateForm('remark', value)} />
+                <div className="grid grid-cols-2 gap-2 md:gap-3">
+                  <div className="col-span-2">
+                    <TextAreaField error={fieldErrors.remark} label="หมายเหตุ" rows={2} value={form.remark} onChange={(value) => updateForm('remark', value)} />
                   </div>
                 </div>
               </FormSection>
@@ -731,7 +755,7 @@ export function AdvancePaymentsPageClient() {
           {showMobileFilters ? (
             <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
               <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                   <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
                   <button
                     className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -789,7 +813,7 @@ export function AdvancePaymentsPageClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
                   <button
                     type="button"
                     className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -852,7 +876,7 @@ export function AdvancePaymentsPageClient() {
                   {row.largeScaleDocNo ? <div>ใบชั่งใหญ่: <span className="font-semibold text-slate-700">{row.largeScaleDocNo}</span></div> : null}
                   {row.plateNo ? <div>ทะเบียนรถ: <span className="font-semibold text-slate-700">{row.plateNo}</span></div> : null}
                 </div>
-                <div className="flex justify-between items-end border-t border-slate-100 pt-2.5">
+                <div className="flex justify-between items-end border-t border-slate-200 pt-2.5">
                   <div className="text-xs text-slate-500 space-y-0.5">
                     <span>น้ำหนักสุทธิ: <span className="font-semibold text-slate-700">{formatMoney(row.netWeight)}</span> กก.</span>
                     <div className="block">ยอดมัดจำ: <span className="font-semibold text-slate-700">{formatMoney(row.amount)}</span></div>

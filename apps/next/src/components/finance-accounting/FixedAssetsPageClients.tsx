@@ -130,7 +130,7 @@ export function AssetRegisterPageClient() {
           <tbody>
             <LoadingOrEmpty colSpan={11} isLoading={isLoading} rows={rows.length} />
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={row.id} className="border-t border-slate-200 hover:bg-slate-50">
                 <Td><span className="font-mono font-semibold text-amber-700">{row.code}</span></Td>
                 <Td><div className="font-medium text-slate-900">{row.name}</div><div className="text-slate-400">{row.location || '-'}</div></Td>
                 <Td>{row.category}</Td><Td>{row.branchName}</Td><Td>{row.purchaseDate || '-'}</Td>
@@ -195,7 +195,7 @@ export function DepreciationPageClient() {
           <tbody>
             <LoadingOrEmpty colSpan={8} isLoading={isLoading} rows={data?.rows.length ?? 0} />
             {(data?.rows ?? []).map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={row.id} className="border-t border-slate-200 hover:bg-slate-50">
                 <Td><span className="font-mono text-red-700">{row.refNo}</span></Td><Td>{row.period}</Td><Td><div className="font-medium">{row.assetCode}</div><div className="text-slate-400">{row.assetName}</div></Td>
                 <Td align="right">{formatMoney(row.accumAfter)}</Td><Td align="right">{formatMoney(row.depreciationAmount)}</Td><Td align="right">{formatMoney(row.nbvAfter)}</Td>
                 <Td align="center"><Chip tone="emerald">posted</Chip></Td><Td align="center"><span className="text-slate-400">Reverse</span></Td>
@@ -253,7 +253,7 @@ function FilterPanel({ children }: { children: ReactNode }) {
 }
 
 function TableShell({ children, title }: { children: ReactNode; title?: string }) {
-  return <div className="overflow-hidden rounded-md bg-white shadow">{title ? <h2 className="border-b border-slate-100 px-4 py-3 font-semibold text-slate-900">{title}</h2> : null}<div className="max-h-[60vh] overflow-auto">{children}</div></div>
+  return <div className="overflow-hidden rounded-md bg-white shadow">{title ? <h2 className="border-b border-slate-200 px-4 py-3 font-semibold text-slate-900">{title}</h2> : null}<div className="max-h-[60vh] overflow-auto">{children}</div></div>
 }
 
 function StatCard({ label, tone, value }: { label: string; tone?: 'amber' | 'emerald' | 'red'; value: number | string }) {
@@ -271,7 +271,7 @@ function Bar({ label, max, value }: { label: string; max: number; value: number 
 }
 
 function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: DepreciationPayload['pendingAssets'] }) {
-  return <div className="overflow-x-auto"><table className="w-full text-xs"><thead className="bg-amber-50 text-amber-800"><tr><Th>รหัส</Th><Th>ชื่อ</Th><Th align="right">Net Cost</Th><Th align="right">Acc Dep ปัจจุบัน</Th><Th align="right">NBV</Th><Th align="right">ค่าเสื่อม/เดือน</Th><Th align="center">สถานะ</Th></tr></thead><tbody><LoadingOrEmpty colSpan={7} isLoading={isLoading} rows={rows.length} />{rows.map((row) => <tr key={row.id} className="border-t border-slate-100"><Td><span className="font-mono">{row.code}</span></Td><Td>{row.name}</Td><Td align="right">{formatMoney(row.netAssetCost)}</Td><Td align="right">{formatMoney(row.accumDep)}</Td><Td align="right">{formatMoney(row.nbv)}</Td><Td align="right">{formatMoney(row.monthlyDep)}</Td><Td align="center"><StatusPill status={row.assetStatus} /></Td></tr>)}</tbody></table></div>
+  return <div className="overflow-x-auto"><table className="w-full text-xs"><thead className="bg-amber-50 text-amber-800"><tr><Th>รหัส</Th><Th>ชื่อ</Th><Th align="right">Net Cost</Th><Th align="right">Acc Dep ปัจจุบัน</Th><Th align="right">NBV</Th><Th align="right">ค่าเสื่อม/เดือน</Th><Th align="center">สถานะ</Th></tr></thead><tbody><LoadingOrEmpty colSpan={7} isLoading={isLoading} rows={rows.length} />{rows.map((row) => <tr key={row.id} className="border-t border-slate-200"><Td><span className="font-mono">{row.code}</span></Td><Td>{row.name}</Td><Td align="right">{formatMoney(row.netAssetCost)}</Td><Td align="right">{formatMoney(row.accumDep)}</Td><Td align="right">{formatMoney(row.nbv)}</Td><Td align="right">{formatMoney(row.monthlyDep)}</Td><Td align="center"><StatusPill status={row.assetStatus} /></Td></tr>)}</tbody></table></div>
 }
 
 function LoadingOrEmpty({ colSpan, emptyText = 'ยังไม่มีข้อมูล', isLoading, rows }: { colSpan: number; emptyText?: string; isLoading: boolean; rows: number }) {

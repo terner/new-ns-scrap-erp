@@ -304,7 +304,7 @@ export function SystemSettingsPageClient() {
       {pendingSave ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
           <div className="w-full max-w-md overflow-hidden rounded-md bg-white shadow-xl">
-            <div className="border-b border-slate-100 px-5 py-4 bg-white">
+            <div className="border-b border-slate-200 px-5 py-4 bg-white">
               <h2 className="text-lg font-bold text-slate-900">ยืนยันการเปลี่ยนค่าระบบ</h2>
               <p className="mt-1 text-sm text-slate-500">{pendingSave.record.name}</p>
             </div>
@@ -312,7 +312,7 @@ export function SystemSettingsPageClient() {
             <div className="space-y-4 px-5 py-5 text-sm">
               <div className="font-semibold text-slate-700">{pendingSave.label}</div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ค่าเดิม</div>
                   <div className="mt-1 text-xl font-bold text-slate-700">{pendingSave.currentValue ?? '-'}%</div>
                 </div>
@@ -323,7 +323,7 @@ export function SystemSettingsPageClient() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 bg-white">
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 bg-white">
               <Button
                 disabled={savingKey !== null}
                 size="sm"

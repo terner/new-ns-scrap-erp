@@ -244,7 +244,7 @@ function ChartPanel({ rows, title, variant }: { rows: BankRow[]; title: string; 
   return (
     <div className="rounded-md bg-white p-4 shadow-lg">
       <h3 className="mb-2 font-bold text-slate-700">{title}</h3>
-      <div className="flex h-[280px] items-end gap-1 rounded-md border border-slate-100 bg-gradient-to-b from-slate-50 to-white p-3">
+      <div className="flex h-[280px] items-end gap-1 rounded-md border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-3">
         {chartRows.length === 0 ? <div className="m-auto text-sm text-slate-400">ไม่มีรายการ</div> : null}
         {variant === 'balance'
           ? chartRows.map((row) => (
@@ -316,7 +316,7 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
       <div className="w-full max-w-2xl rounded-md bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 mb-4">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3 mb-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{row.refNo || row.id}</h2>
             <p className="text-sm text-slate-500">{row.accountName}</p>
@@ -325,8 +325,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
         </div>
         <div className="space-y-4">
           {/* ข้อมูลบัญชีและอ้างอิง */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลบัญชีและอ้างอิง</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลบัญชีและอ้างอิง</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="วันที่" value={formatDateDisplay(row.date)} />
               <DetailItem label="บัญชี" value={row.accountName || '-'} />
@@ -339,8 +339,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
           </div>
 
           {/* ข้อมูลการเงิน */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลการเงิน</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลการเงิน</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="เงินเข้า" value={`${formatMoney(row.amountIn)} บาท`} />
               <DetailItem label="เงินออก" value={`${formatMoney(row.amountOut)} บาท`} />
@@ -349,8 +349,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
           </div>
 
           {/* รายละเอียดและหมายเหตุ */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดและหมายเหตุ</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">รายละเอียดและหมายเหตุ</div>
             <div className="grid grid-cols-1 gap-y-3">
               <DetailItem label="คำอธิบาย" value={row.description || '-'} />
               <DetailItem label="หมายเหตุ" value={row.note || '-'} />

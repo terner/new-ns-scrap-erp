@@ -705,7 +705,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           {/* 💸 KPI Summary Cards */}
           {/* Desktop Version (Separated Cards) */}
           <div className="hidden lg:grid grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">ยอดรวม {periodMonths} เดือน</span>
               </div>
@@ -715,7 +715,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">เฉลี่ยรายเดือน</span>
               </div>
@@ -725,7 +725,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">ยอดใช้จ่ายเดือนนี้</span>
               </div>
@@ -740,7 +740,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               const isLow = dashboard.vsAvg < -20;
               const accentColor = isHigh ? 'text-red-600' : isLow ? 'text-emerald-600' : 'text-slate-700';
               return (
-                <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+                <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-500">เทียบค่าเฉลี่ย</span>
                   </div>
@@ -757,7 +757,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           {/* Mobile/Tablet Version (Separated Cards) */}
           <div className="grid grid-cols-2 gap-3 md:gap-4 lg:hidden">
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">ยอดรวม {periodMonths} เดือน</span>
               </div>
@@ -767,7 +767,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">เฉลี่ยรายเดือน</span>
               </div>
@@ -777,7 +777,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
             </div>
 
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500">ยอดใช้จ่ายเดือนนี้</span>
               </div>
@@ -792,7 +792,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               const isLow = dashboard.vsAvg < -20;
               const accentColor = isHigh ? 'text-red-600' : isLow ? 'text-emerald-600' : 'text-slate-700';
               return (
-                <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+                <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-500">เทียบค่าเฉลี่ย</span>
                   </div>
@@ -869,7 +869,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               </div>
             )
           ) : (
-            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-xs text-slate-600 shadow-sm">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600 shadow-sm">
               <span className="text-sm">🌿</span>
               <span>ไม่พบความผิดปกติของยอดใช้จ่ายในแต่ละหมวด</span>
             </div>
@@ -878,7 +878,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           {/* 📊 Heatmap Table */}
           <div className="space-y-3">
             {/* Table Toolbar & Filters */}
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               {/* Category SearchCombobox (visible on Desktop/Tablet) / native select (visible on Mobile) */}
               <div className="hidden md:block w-full max-w-[240px]">
                 <SearchCombobox
@@ -963,12 +963,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* 1. Desktop Layout (Large Heatmap Table) - Visible on lg screens */}
-            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-xs" style={{ minWidth: dashboardColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
                   {dashboardColumns.map((column) => <col key={column.key} style={dashboardColumnResize.getColumnStyle(column.key)} />)}
                 </colgroup>
-                <thead className="bg-slate-50/75 border-b border-slate-100">
+                <thead className="bg-slate-50/75 border-b border-slate-200">
                   <tr>
                     <ResizableTableHead label="หมวดค่าใช้จ่าย" resizeProps={dashboardColumnResize.getResizeHandleProps('category', 'หมวดค่าใช้จ่าย')} />
                     {dashboard.monthList.map((month) => (
@@ -992,7 +992,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   ) : null}
                   {!isLoading && dashboard.heatmapRows.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="sticky left-0 bg-white/95 backdrop-blur-sm px-4 py-3 font-semibold text-slate-900 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                      <td className="sticky left-0 bg-white/95 backdrop-blur-sm px-4 py-3 font-semibold text-slate-900 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                         {item.name}
                       </td>
                       {dashboard.monthList.map((month) => {
@@ -1052,7 +1052,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 {dashboard.heatmapRows.length > 0 ? (
                   <tfoot className="bg-slate-50/50 font-bold border-t border-slate-200">
                     <tr className="divide-y divide-slate-100">
-                      <td className="sticky left-0 bg-slate-50/90 backdrop-blur-sm px-4 py-3.5 text-slate-900 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                      <td className="sticky left-0 bg-slate-50/90 backdrop-blur-sm px-4 py-3.5 text-slate-900 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                         รวมทุกหมวด
                       </td>
                       {dashboard.monthList.map((month) => (
@@ -1070,9 +1070,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* 2. Tablet Layout (Simplified Table) - Visible on md & lg screens */}
-            <div className="hidden md:block lg:hidden overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="hidden md:block lg:hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50/75 border-b border-slate-100">
+                <thead className="bg-slate-50/75 border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700 w-1/3">หมวดค่าใช้จ่าย</th>
                     <th className="px-3 py-3 text-right font-semibold text-slate-700">เดือนล่าสุด ({formatMonthLabel(dashboard.monthList[dashboard.monthList.length - 1])})</th>
@@ -1142,7 +1142,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedCategoryRow(item)}
-                  className="w-full text-left rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-200 active:scale-[0.98] hover:shadow-md space-y-3 block"
+                  className="w-full text-left rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 active:scale-[0.98] hover:shadow-md space-y-3 block"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1187,7 +1187,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 </button>
               ))}
               {!isLoading && dashboard.heatmapRows.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 bg-white border border-slate-100 rounded-xl text-xs">
+                <div className="py-8 text-center text-slate-400 bg-white border border-slate-200 rounded-xl text-xs">
                   ยังไม่มีข้อมูลบันทึกค่าใช้จ่ายในช่วงเวลานี้
                 </div>
               ) : null}
@@ -1197,7 +1197,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             {selectedCategoryRow ? (
               <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
                 <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 animate-slide-up max-h-[85vh] overflow-y-auto">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">{getCategoryIcon(selectedCategoryRow.name)}</span>
                       <h4 className="font-bold text-slate-800 text-sm">{selectedCategoryRow.name}</h4>
@@ -1213,7 +1213,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
                   <div className="space-y-4">
                     {/* Summary section */}
-                    <div className="space-y-3 bg-slate-50/70 rounded-xl p-4 border border-slate-100">
+                    <div className="space-y-3 bg-slate-50/70 rounded-xl p-4 border border-slate-200">
                       <div>
                         <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">เดือนล่าสุด ({formatMonthLabelShort(dashboard.monthList[dashboard.monthList.length - 1])})</div>
                         <div className="flex items-baseline gap-2 mt-1">
@@ -1256,7 +1256,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     {/* Sparkline / Bar Chart */}
                     <div className="space-y-2">
                       <span className="block text-xs font-semibold text-slate-600">แนวโน้มรายเดือน (บาท)</span>
-                      <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
                         {/* Bar chart container */}
                         <div className="flex items-end justify-between h-24 px-1">
                           {(() => {
@@ -1292,7 +1292,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     </div>
 
                     {/* Anomaly Analysis Info */}
-                    <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3.5 space-y-1.5">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-1.5">
                       <span className="block text-xs font-semibold text-slate-600">การวิเคราะห์ความผิดปกติ</span>
                       <div className="flex items-start gap-2">
                         <span className="text-sm">
@@ -1321,7 +1321,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-slate-100">
+                  <div className="mt-5 pt-3 border-t border-slate-200">
                     <button
                       type="button"
                       className="w-full h-10 rounded-lg bg-slate-800 text-xs font-semibold text-white hover:bg-slate-700 transition-colors"
@@ -1338,7 +1338,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             {showDashboardMobileFilters ? (
               <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
                 <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                     <h4 className="font-bold text-slate-800 text-xs">ตัวกรองข้อมูลวิเคราะห์</h4>
                     <button
                       className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -1390,7 +1390,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+                  <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
                     <button
                       type="button"
                       className="h-10 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
@@ -1416,7 +1416,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           </div>
 
         {/* 📋 Footer Notes */}
-          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-xs leading-relaxed text-slate-500">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-xs leading-relaxed text-slate-500">
             <div className="font-semibold text-slate-700 flex items-center gap-1 mb-1">
               <span>📋</span> วิธีประเมินความผิดปกติ (Anomaly Thresholds):
             </div>
@@ -1490,7 +1490,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* Desktop Status Filters */}
-            <div className="mt-1 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 hidden md:flex">
+            <div className="mt-1 flex-wrap items-center gap-2 border-t border-slate-200 pt-3 hidden md:flex">
               <span className="text-xs text-slate-500">สถานะ:</span>
               {expenseStatusOptions.map((option) => (
                 <SegmentMulti key={option.label} current={statusFilter} label={option.label} onClick={setStatusFilter} values={option.values} />
@@ -1514,7 +1514,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           {showMobileFilters ? (
             <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
               <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                   <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
                   <button
                     className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -1581,7 +1581,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
                   <button
                     type="button"
                     className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -1623,13 +1623,13 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           </div>
 
           {formOpen ? (
-            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-              <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
-                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="fixed inset-0 z-50 flex items-stretch md:items-start justify-center bg-slate-950/50 md:p-4 md:pt-8">
+              <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-none md:rounded-md bg-white shadow-xl flex flex-col h-full md:h-auto max-h-screen md:max-h-[90vh]" onSubmit={saveForm}>
+                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
                   <h3 className="font-bold">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
                   <button className="text-2xl text-slate-400" type="button" onClick={() => setFormOpen(false)}>&times;</button>
                 </div>
-                <div className="space-y-4 bg-slate-50 p-4">
+                <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-4">
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">วิธีดำเนินการ</div>
                     <div className="flex flex-wrap gap-2">
@@ -1664,8 +1664,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลหลัก</div>
-                    <div className="grid gap-3 md:grid-cols-4">
-                      <div className="md:col-span-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+                      <div className="col-span-2">
                         <PayeeField
                           error={fieldErrors.supplierId ?? fieldErrors.payee}
                           options={payeeOptions}
@@ -1682,7 +1682,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                         />
                       </div>
                       {form.paymentAction === 'pay_now' ? (
-                        <label className="block md:col-span-2" data-field="supplierPaymentDestinationId">
+                        <label className="block col-span-2" data-field="supplierPaymentDestinationId">
                           <span className="mb-1 block text-xs font-medium text-slate-600">ช่องทางรับเงินของ Supplier{renderRequiredMark(true)}</span>
                           <select
                             aria-invalid={Boolean(fieldErrors.supplierPaymentDestinationId)}
@@ -1699,7 +1699,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       <TextField error={fieldErrors.date} fieldName="date" label="วันที่จ่าย" required type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
                       <TextField error={fieldErrors.dueDate} fieldName="dueDate" label="ครบกำหนด" type="date" value={form.dueDate ?? ''} onChange={(value) => setForm({ ...form, dueDate: value })} />
                       {form.id ? (
-                        <div data-field="status">
+                        <div className="col-span-2 md:col-span-1" data-field="status">
                           <label className="mb-1 block text-xs font-medium text-slate-600">
                             สถานะเอกสาร
                           </label>
@@ -1732,8 +1732,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   {form.paymentAction === 'pay_now' ? (
                     <div className="rounded-md bg-white p-4 shadow">
                       <div className="mb-3 text-sm font-semibold text-slate-900">วิธีการจ่าย</div>
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <label className="block" data-field="paymentMethod">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+                        <label className="block col-span-2 md:col-span-1" data-field="paymentMethod">
                           <span className="mb-1 block text-xs font-medium text-slate-600">วิธีจ่าย{renderRequiredMark(true)}</span>
                           <select
                             className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none"
@@ -1744,7 +1744,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                             {paymentMethods.map((method) => <option key={method.id} value={method.name}>{method.name}</option>)}
                           </select>
                         </label>
-                        <label className="block md:col-span-2" data-field="accountId">
+                        <label className="block col-span-2" data-field="accountId">
                           <span className="mb-1 block text-xs font-medium text-slate-600">บัญชีที่จ่ายของบริษัท{renderRequiredMark(true)}</span>
                           <select
                             aria-invalid={Boolean(fieldErrors.accountId)}
@@ -1757,19 +1757,19 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                           </select>
                           {fieldErrors.accountId ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.accountId}</span> : null}
                         </label>
-                        <label className="block" data-field="discount">
+                        <label className="block col-span-1" data-field="discount">
                           <span className="mb-1 block text-xs font-medium text-slate-600">Discount</span>
                           <MoneyInputControl className="h-9 text-sm" error={fieldErrors.discount} value={Number(form.discount) || 0} onChange={(value) => setForm({ ...form, discount: value })} />
                           {fieldErrors.discount ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.discount}</span> : null}
                         </label>
                         {selectedPaymentMethodGroup === 'cash' ? null : (
-                          <label className="block" data-field="bankFee">
+                          <label className="block col-span-1" data-field="bankFee">
                             <span className="mb-1 block text-xs font-medium text-slate-600">Bank fee</span>
                             <MoneyInputControl className="h-9 text-sm" error={fieldErrors.bankFee} value={Number(form.bankFee) || 0} onChange={(value) => setForm({ ...form, bankFee: value })} />
                             {fieldErrors.bankFee ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.bankFee}</span> : null}
                           </label>
                         )}
-                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 md:col-span-2">
+                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 col-span-2">
                           <div>ยอด EXP: <b>{formatMoney(formTotals.netAmount)}</b></div>
                           <div>ยอดจ่าย Supplier หลัง Discount: <b>{formatMoney(formPaymentAmount)}</b></div>
                           <div>เงินออกจากบัญชีรวม Bank fee: <b className="text-red-700">{formatMoney(formCashOutAmount)}</b></div>
@@ -1780,17 +1780,17 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">เอกสารอ้างอิงและหมายเหตุ</div>
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-2 md:gap-3 md:grid-cols-3">
                       <TextField error={fieldErrors.refDocNo} fieldName="refDocNo" label="เลขอ้างอิง" value={form.refDocNo ?? ''} onChange={(value) => setForm({ ...form, refDocNo: value })} />
                       <TextField error={fieldErrors.taxInvoiceNo} fieldName="taxInvoiceNo" label="เลขใบกำกับภาษี" value={form.taxInvoiceNo ?? ''} onChange={(value) => setForm({ ...form, taxInvoiceNo: value })} />
-                      <div className="md:col-span-3">
+                      <div className="col-span-2 md:col-span-3">
                         <TextAreaField error={fieldErrors.notes} fieldName="notes" label="หมายเหตุ" rows={3} value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
                       </div>
                     </div>
                   </div>
 
                   <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow">
-                    <div className="border-b border-slate-100 bg-slate-900 px-4 py-3 text-white">
+                    <div className="border-b border-slate-200 bg-slate-900 px-4 py-3 text-white">
                       <div className="text-sm font-semibold">สรุปก่อนบันทึก</div>
                       <div className="text-xs text-slate-300">{form.paymentAction === 'pay_now' ? 'ตรวจยอดเอกสารและยอดเงินออกจากบัญชี' : 'ตรวจยอด EXP ก่อนส่งอนุมัติจ่ายเงิน'}</div>
                     </div>
@@ -1853,7 +1853,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     ) : null}
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 shrink-0 bg-white">
                   <Button className="h-9" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
                   <Button className="h-9" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
                 </div>
@@ -1908,7 +1908,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   <div className="text-sm font-semibold text-slate-700 mb-3">
                     ผู้รับ: {row.payee}
                   </div>
-                  <div className="flex justify-between items-end border-t border-slate-100 pt-2.5">
+                  <div className="flex justify-between items-end border-t border-slate-200 pt-2.5">
                     <div className="text-xs text-slate-500">
                       <span>ยอดก่อน VAT: {formatMoney(row.amount)}</span>
                       {row.vat > 0 ? <span className="block text-emerald-700">+VAT: {formatMoney(row.vat)}</span> : null}
@@ -2008,9 +2008,9 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
   const canEdit = canMutateExpense(row.status)
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="expense-detail-title">
-      <div className="mx-auto my-4 w-full max-w-5xl overflow-hidden rounded-md bg-white shadow-xl">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+    <div className="fixed inset-0 z-50 bg-slate-950/50 flex items-stretch md:items-start justify-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="expense-detail-title">
+      <div className="w-full max-w-5xl bg-white shadow-xl flex flex-col h-screen md:h-auto max-h-screen md:max-h-[90vh] md:rounded-md overflow-hidden">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 shrink-0">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 id="expense-detail-title" className="text-lg font-bold text-slate-900">รายละเอียดค่าใช้จ่าย {row.docNo}</h3>
@@ -2021,10 +2021,10 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
             </div>
             <p className="mt-1 text-xs text-slate-500">อ่านอย่างเดียวจากรายการค่าใช้จ่ายที่แสดงในตาราง</p>
           </div>
-          <button className="text-3xl leading-none text-slate-400 hover:text-slate-700" type="button" onClick={onClose}>&times;</button>
+          <button className="text-3xl leading-none text-slate-400 hover:text-slate-700 font-light" type="button" onClick={onClose}>&times;</button>
         </div>
 
-        <div className="space-y-4 p-5">
+        <div className="flex-1 overflow-y-auto space-y-4 p-5 bg-slate-50/30">
           {/* Summary Band */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <SummaryTile emphasize label="Net Pay" value={formatMoney(row.netAmount)} />
@@ -2035,8 +2035,8 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
 
           <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
             {/* ข้อมูลเอกสาร */}
-            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลเอกสาร</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
                 <DetailLine label="เลขที่เอกสาร" value={row.docNo} mono />
                 <DetailLine label="วันที่จ่าย" value={formatDateDisplay(row.date)} />
@@ -2050,13 +2050,13 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
             </div>
 
             {/* สรุปยอด */}
-            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">สรุปยอด</div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">สรุปยอด</div>
               <div className="space-y-3 pt-1">
                 <SummaryRow label="ยอดก่อน VAT" value={formatMoney(row.amount)} />
                 <SummaryRow label="+ VAT" value={formatMoney(row.vat)} />
                 <SummaryRow label="- WHT" value={formatMoney(row.wht)} />
-                <div className="border-t border-slate-100/80 pt-3">
+                <div className="border-t border-slate-200/80 pt-3">
                   <SummaryRow strong label="ยอดสุทธิ" value={formatMoney(row.netAmount)} />
                 </div>
               </div>
@@ -2064,11 +2064,11 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
           </div>
 
           {/* รายการค่าใช้จ่าย */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 overflow-hidden">
-            <div className="border-b border-slate-100 px-4 py-3 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">รายการค่าใช้จ่าย</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 overflow-hidden">
+            <div className="border-b border-slate-200 px-4 py-3 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">รายการค่าใช้จ่าย</div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-xs">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                   <tr>
                     <th className="p-2.5 text-left font-semibold">หมวด</th>
                     <th className="p-2.5 text-left font-semibold">รายละเอียด</th>
@@ -2098,22 +2098,22 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
           </div>
 
           {/* รายละเอียดรวมและหมายเหตุ */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดเพิ่มเติมและหมายเหตุ</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">รายละเอียดเพิ่มเติมและหมายเหตุ</div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">รายละเอียดรวม</div>
-                <div className="whitespace-pre-wrap text-xs sm:text-sm text-slate-700 bg-white/60 rounded-md border border-slate-100/50 p-3 min-h-[60px]">{row.description || '-'}</div>
+                <div className="whitespace-pre-wrap text-xs sm:text-sm text-slate-700 bg-white/60 rounded-md border border-slate-200/50 p-3 min-h-[60px]">{row.description || '-'}</div>
               </div>
               <div>
                 <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">หมายเหตุ</div>
-                <div className="whitespace-pre-wrap text-xs sm:text-sm text-slate-700 bg-white/60 rounded-md border border-slate-100/50 p-3 min-h-[60px]">{row.notes || '-'}</div>
+                <div className="whitespace-pre-wrap text-xs sm:text-sm text-slate-700 bg-white/60 rounded-md border border-slate-200/50 p-3 min-h-[60px]">{row.notes || '-'}</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
           <Button className="h-9 font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
           {canEdit ? <Button className="h-9" type="button" onClick={() => onEdit(row)}>แก้ไข</Button> : null}
         </div>
@@ -2186,7 +2186,7 @@ function getCategoryIcon(name: string): string {
 
 function SummaryTile({ emphasize = false, label, value }: { emphasize?: boolean; label: string; value: string }) {
   return (
-    <div className={`rounded-lg border p-3 transition-all ${emphasize ? 'border-red-100 bg-red-50/50' : 'border-slate-100 bg-slate-50/50'}`}>
+    <div className={`rounded-lg border p-3 transition-all ${emphasize ? 'border-red-100 bg-red-50/50' : 'border-slate-200 bg-slate-50/50'}`}>
       <div className={`text-[10px] font-bold uppercase tracking-wider ${emphasize ? 'text-red-700' : 'text-slate-500'}`}>{label}</div>
       <div className={`mt-1 text-right text-base font-semibold tabular-nums ${emphasize ? 'text-red-700' : 'text-slate-900'}`}>
         {value}
@@ -2218,7 +2218,7 @@ function DetailLine({ label, mono = false, value }: { label: string; mono?: bool
 
 function DetailBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+    <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
       <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
       <div className="mt-2 whitespace-pre-wrap text-xs sm:text-sm text-slate-700">{value}</div>
     </div>

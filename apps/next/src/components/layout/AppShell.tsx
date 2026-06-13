@@ -70,6 +70,8 @@ export function AppShell({ children }: AppShellProps) {
   const [menuSearchFocused, setMenuSearchFocused] = useState(false)
   const [subtitleOverride, setSubtitleOverride] = useState<string | null>(null)
   const [titleOverride, setTitleOverride] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [companyName, setCompanyName] = useState('NS Scrap ERP')
   const lastActivityPathRef = useRef<string | null>(null)
   const title = titleOverride ?? pageTitleForPath(pathname)
   const subtitle = subtitleOverride ?? pageSubtitleForPath(pathname)
@@ -160,6 +162,31 @@ export function AppShell({ children }: AppShellProps) {
   }, [isAuthPage])
 
   useEffect(() => {
+    if (isAuthPage) return
+
+    let mounted = true
+
+    async function loadCompanyLogo() {
+      try {
+        const response = await fetch('/api/company-logo', { cache: 'no-store' })
+        if (response.ok && mounted) {
+          const payload = await response.json()
+          setLogoUrl(payload?.logoUrl || null)
+          if (payload?.name) setCompanyName(payload.name)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    void loadCompanyLogo()
+
+    return () => {
+      mounted = false
+    }
+  }, [isAuthPage])
+
+  useEffect(() => {
     if (isAuthPage || pathname === '/admin/change-password') return
 
     let mounted = true
@@ -218,9 +245,17 @@ export function AppShell({ children }: AppShellProps) {
         onMouseLeave={handleSidebarMouseLeave}
       >
         <div className={`flex items-center border-b border-slate-700 p-4 ${desktopSidebarExpanded ? 'gap-3' : 'lg:justify-center lg:gap-0'}`}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white">NS</div>
+          {logoUrl ? (
+            <img
+              alt="Company Logo"
+              className="h-10 w-10 rounded-md object-contain bg-white p-0.5"
+              src={logoUrl}
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white">NS</div>
+          )}
           <div className={desktopSidebarExpanded ? '' : 'lg:hidden'}>
-            <div className="font-bold text-white">NS Scrap ERP</div>
+            <div className="font-bold text-white truncate max-w-[170px]">{companyName}</div>
             <div className="text-xs text-slate-400">ระบบบริหารจัดการ</div>
           </div>
         </div>

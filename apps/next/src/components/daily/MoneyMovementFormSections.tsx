@@ -88,8 +88,8 @@ export function PaymentSplitsSection({
           const splitAmountKey = `split-${split.id ?? splitIndex}-amount`
           return (
             <div key={split.id ?? splitIndex} className="grid grid-cols-12 items-center gap-2 rounded-md border border-slate-200 bg-white p-2">
-              <div className="col-span-1 text-center text-xs font-bold text-slate-500">#{splitIndex + 1}</div>
-              <div className="col-span-6">
+              <div className="col-span-2 md:col-span-1 text-center text-xs font-bold text-slate-500">#{splitIndex + 1}</div>
+              <div className="col-span-10 md:col-span-6">
                 <UiSelect
                   className="h-9 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                   required
@@ -100,7 +100,7 @@ export function PaymentSplitsSection({
                   {activeAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} (คงเหลือ {formatMoney(account.balance ?? 0)})</option>)}
                 </UiSelect>
               </div>
-              <div className="col-span-4">
+              <div className="col-span-9 col-start-3 md:col-start-auto md:col-span-4">
                 <UiInput
                   className="h-9 w-full rounded-md border border-slate-300 px-2 py-1.5 text-right text-sm"
                   inputMode="decimal"
@@ -112,7 +112,7 @@ export function PaymentSplitsSection({
                   onFocus={() => onStartMoneyInput(splitAmountKey, splitAmount)}
                 />
               </div>
-              <div className="col-span-1 text-center">
+              <div className="col-span-3 md:col-span-1 text-center">
                 <UiButton
                   className="h-8 w-8 px-0 font-bold text-red-500 hover:text-red-700 disabled:text-slate-300"
                   disabled={paymentSplits.length <= 1}
@@ -144,8 +144,8 @@ export function PaymentSplitsSection({
           )
         })}
       </div>
-      <div className="mt-2 flex flex-wrap items-end justify-end gap-3 border-t border-slate-200 pt-2">
-        <label className="block min-w-32 text-left text-xs font-medium text-slate-600">
+      <div className="mt-2 grid grid-cols-2 md:flex md:flex-wrap items-end md:justify-end gap-2 md:gap-3 border-t border-slate-200 pt-2">
+        <label className="block w-full md:min-w-32 text-left text-xs font-medium text-slate-600">
           <span>Discount</span>
           <UiInput
             className="mt-1 h-8 w-full px-2 py-1 text-right"
@@ -157,7 +157,7 @@ export function PaymentSplitsSection({
             onFocus={() => onStartMoneyInput(formDiscountKey, Number(form.discount) || 0)}
           />
         </label>
-        <label className="block min-w-32 text-left text-xs font-medium text-slate-600">
+        <label className="block w-full md:min-w-32 text-left text-xs font-medium text-slate-600">
           <span>Bank Fee</span>
           <UiInput
             className="mt-1 h-8 w-full px-2 py-1 text-right"
@@ -170,18 +170,18 @@ export function PaymentSplitsSection({
           />
         </label>
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 border-t border-slate-200 pt-2 text-sm">
-        <div className="rounded-md bg-slate-100 p-2">
-          <div className="text-xs text-slate-600">💰 รวมแยกบัญชี</div>
-          <div className="font-bold">{formatMoney(paymentSplitTotal)}</div>
+      <div className="mt-2 grid grid-cols-3 gap-1 md:gap-2 border-t border-slate-200 pt-2 text-[10px] sm:text-xs md:text-sm">
+        <div className="rounded-md bg-slate-100 p-1.5 md:p-2">
+          <div className="text-[9px] sm:text-xs text-slate-600">💰 รวมแยกบัญชี</div>
+          <div className="font-bold truncate">{formatMoney(paymentSplitTotal)}</div>
         </div>
-        <div className="rounded-md bg-amber-50 p-2">
-          <div className="text-xs text-amber-700">🎯 ยอดสุทธิที่ต้องจ่าย</div>
-          <div className="font-bold text-amber-700">{formatMoney(formNetAmount)}</div>
+        <div className="rounded-md bg-amber-50 p-1.5 md:p-2">
+          <div className="text-[9px] sm:text-xs text-amber-700">🎯 ยอดต้องจ่าย</div>
+          <div className="font-bold text-amber-700 truncate">{formatMoney(formNetAmount)}</div>
         </div>
-        <div className={`rounded-md p-2 ${Math.abs(paymentSplitTotal - formNetAmount) < 0.01 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-          <div className="text-xs">{Math.abs(paymentSplitTotal - formNetAmount) < 0.01 ? 'ตรงกัน' : '⚠️ ผลต่าง'}</div>
-          <div className="font-bold">{formatMoney(formNetAmount - paymentSplitTotal)}</div>
+        <div className={`rounded-md p-1.5 md:p-2 ${Math.abs(paymentSplitTotal - formNetAmount) < 0.01 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+          <div className="text-[9px] sm:text-xs">{Math.abs(paymentSplitTotal - formNetAmount) < 0.01 ? 'ตรงกัน' : '⚠️ ผลต่าง'}</div>
+          <div className="font-bold truncate">{formatMoney(formNetAmount - paymentSplitTotal)}</div>
         </div>
       </div>
     </div>
@@ -222,78 +222,80 @@ export function PaymentLinesSection({
         <UiButton className="bg-emerald-600 font-semibold hover:bg-emerald-700" size="xs" type="button" variant="default" onClick={onAddPaymentLine}>+ เพิ่มบรรทัด</UiButton>
       </div>
       {paymentSelectableBills.length === 0 ? <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">ไม่มี PMA ค้างจ่ายของผู้รับเงินนี้</div> : null}
-      <Table className="min-w-[640px] text-xs">
-        <TableHeader className="text-slate-700">
-          <tr>
-            <TableHead className="p-1 text-left align-top">PMA / เอกสารต้นทาง / ผู้รับเงิน / ช่องทางรับเงิน</TableHead>
-            <TableHead className="p-1 text-right align-top">ค้าง</TableHead>
-            <TableHead className="w-10 p-1 align-top" />
-          </tr>
-        </TableHeader>
-        <TableBody>
-          {paymentLines.map((line, lineIndex) => {
-            const lineBill = line.billId ? billMap.get(line.billId) : null
-            const lineBalance = lineBill?.payableBalance ?? 0
-            const lineBillOptions = paymentSelectableBillsForLine(lineIndex)
-            const approvalPaymentMethod = lineBill?.approvalPaymentMethod?.trim() || '-'
-            const approvalAccountNo = lineBill?.approvalAccountNo?.trim()
-            const approvalBankName = lineBill?.approvalBankName?.trim()
-            const destinationAccount = approvalAccountNo
-              ? `${approvalBankName || '-'} ${approvalAccountNo}`
-              : approvalBankName || '-'
-            const inputValue = paymentLineInputValue(line)
-            const displayValue = inputValue ? `#${lineIndex + 1} ${inputValue}` : ''
-            return (
-              <TableRow key={line.id ?? lineIndex}>
-                <TableCell className="p-1 align-top">
-                  {isBillLocked && lineIndex === 0 && selectedBill ? (
-                    <UiInput className="h-8 w-full bg-slate-50 px-1 py-1 text-xs disabled:opacity-100" disabled value={displayValue} />
-                  ) : (
-                    <UiInput
-                      autoComplete="off"
-                      className="h-8 w-full px-1 py-1 text-xs"
-                      list={`payment-bill-options-${line.id ?? lineIndex}`}
-                      placeholder="พิมพ์เลข PMA / เอกสารต้นทาง / ผู้รับเงิน..."
-                      value={displayValue}
-                      onChange={(event) => onSelectPaymentLineBill(lineIndex, event.target.value.replace(/^#\d+\s+/, ''))}
-                    />
-                  )}
-                  <datalist id={`payment-bill-options-${line.id ?? lineIndex}`}>
-                    {lineBillOptions.map((bill, optionIndex) => {
-                      const optionKey = `${bill.id}:${bill.approvalId ?? bill.docNo}:${optionIndex}`
-                      const sourceLabel = bill.sourceDocNo && bill.sourceDocNo !== bill.docNo ? ` / อ้างอิง ${bill.sourceDocNo}` : ''
-                      const methodLabel = bill.approvalPaymentMethod ? ` | ${bill.approvalPaymentMethod}` : ''
-                      const accountLabel = bill.approvalAccountNo ? ` | ${bill.approvalBankName || '-'} ${bill.approvalAccountNo}` : ''
-                      return (
-                        <option
-                          key={optionKey}
-                          value={`${bill.docNo}${sourceLabel} | ${partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}${methodLabel}${accountLabel} | ค้าง ${formatMoney(bill.payableBalance ?? 0)}`}
-                        />
-                      )
-                    })}
-                  </datalist>
-                  {lineBill ? (
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                      <span>เอกสารต้นทาง: <span className="font-medium text-slate-700">{lineBill.sourceDocNo || lineBill.docNo}</span></span>
-                      <span>ช่องทางรับเงิน: <span className="font-medium text-slate-700">{approvalPaymentMethod}</span></span>
-                      <span>บัญชีรับเงิน: <span className="font-medium text-slate-700">{destinationAccount}</span></span>
-                    </div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="p-1 align-top"><UiInput className="h-8 w-full bg-slate-50 px-1 py-1 text-right text-amber-700 disabled:opacity-100" disabled type="text" value={formatMoney(lineBalance)} /></TableCell>
-                <TableCell className="p-1 text-center align-top"><UiButton className="h-8 w-8 px-0 text-red-500 disabled:text-slate-300" disabled={paymentLines.length <= 1 || (isBillLocked && lineIndex === 0)} size="icon" type="button" variant="ghost" onClick={() => onRemovePaymentLine(lineIndex)}>×</UiButton></TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-        <tfoot className="bg-slate-50 font-semibold">
-          <tr>
-            <td className="p-2 text-right">รวม</td>
-            <td className="p-2 text-right text-amber-700">{formatMoney(paymentLineBalanceTotal)}</td>
-            <td />
-          </tr>
-        </tfoot>
-      </Table>
+      <div className="overflow-x-auto border border-slate-200 rounded-md">
+        <Table className="min-w-[640px] text-xs">
+          <TableHeader className="text-slate-700">
+            <tr>
+              <TableHead className="p-1 text-left align-top">PMA / เอกสารต้นทาง / ผู้รับเงิน / ช่องทางรับเงิน</TableHead>
+              <TableHead className="p-1 text-right align-top">ค้าง</TableHead>
+              <TableHead className="w-10 p-1 align-top" />
+            </tr>
+          </TableHeader>
+          <TableBody>
+            {paymentLines.map((line, lineIndex) => {
+              const lineBill = line.billId ? billMap.get(line.billId) : null
+              const lineBalance = lineBill?.payableBalance ?? 0
+              const lineBillOptions = paymentSelectableBillsForLine(lineIndex)
+              const approvalPaymentMethod = lineBill?.approvalPaymentMethod?.trim() || '-'
+              const approvalAccountNo = lineBill?.approvalAccountNo?.trim()
+              const approvalBankName = lineBill?.approvalBankName?.trim()
+              const destinationAccount = approvalAccountNo
+                ? `${approvalBankName || '-'} ${approvalAccountNo}`
+                : approvalBankName || '-'
+              const inputValue = paymentLineInputValue(line)
+              const displayValue = inputValue ? `#${lineIndex + 1} ${inputValue}` : ''
+              return (
+                <TableRow key={line.id ?? lineIndex}>
+                  <TableCell className="p-1 align-top">
+                    {isBillLocked && lineIndex === 0 && selectedBill ? (
+                      <UiInput className="h-8 w-full bg-slate-50 px-1 py-1 text-xs disabled:opacity-100" disabled value={displayValue} />
+                    ) : (
+                      <UiInput
+                        autoComplete="off"
+                        className="h-8 w-full px-1 py-1 text-xs"
+                        list={`payment-bill-options-${line.id ?? lineIndex}`}
+                        placeholder="พิมพ์เลข PMA / เอกสารต้นทาง / ผู้รับเงิน..."
+                        value={displayValue}
+                        onChange={(event) => onSelectPaymentLineBill(lineIndex, event.target.value.replace(/^#\d+\s+/, ''))}
+                      />
+                    )}
+                    <datalist id={`payment-bill-options-${line.id ?? lineIndex}`}>
+                      {lineBillOptions.map((bill, optionIndex) => {
+                        const optionKey = `${bill.id}:${bill.approvalId ?? bill.docNo}:${optionIndex}`
+                        const sourceLabel = bill.sourceDocNo && bill.sourceDocNo !== bill.docNo ? ` / อ้างอิง ${bill.sourceDocNo}` : ''
+                        const methodLabel = bill.approvalPaymentMethod ? ` | ${bill.approvalPaymentMethod}` : ''
+                        const accountLabel = bill.approvalAccountNo ? ` | ${bill.approvalBankName || '-'} ${bill.approvalAccountNo}` : ''
+                        return (
+                          <option
+                            key={optionKey}
+                            value={`${bill.docNo}${sourceLabel} | ${partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}${methodLabel}${accountLabel} | ค้าง ${formatMoney(bill.payableBalance ?? 0)}`}
+                          />
+                        )
+                      })}
+                    </datalist>
+                    {lineBill ? (
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                        <span>เอกสารต้นทาง: <span className="font-medium text-slate-700">{lineBill.sourceDocNo || lineBill.docNo}</span></span>
+                        <span>ช่องทางรับเงิน: <span className="font-medium text-slate-700">{approvalPaymentMethod}</span></span>
+                        <span>บัญชีรับเงิน: <span className="font-medium text-slate-700">{destinationAccount}</span></span>
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="p-1 align-top"><UiInput className="h-8 w-full bg-slate-50 px-1 py-1 text-right text-amber-700 disabled:opacity-100" disabled type="text" value={formatMoney(lineBalance)} /></TableCell>
+                  <TableCell className="p-1 text-center align-top"><UiButton className="h-8 w-8 px-0 text-red-500 disabled:text-slate-300" disabled={paymentLines.length <= 1 || (isBillLocked && lineIndex === 0)} size="icon" type="button" variant="ghost" onClick={() => onRemovePaymentLine(lineIndex)}>×</UiButton></TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+          <tfoot className="bg-slate-50 font-semibold">
+            <tr>
+              <td className="p-2 text-right">รวม</td>
+              <td className="p-2 text-right text-amber-700">{formatMoney(paymentLineBalanceTotal)}</td>
+              <td />
+            </tr>
+          </tfoot>
+        </Table>
+      </div>
     </div>
   )
 }

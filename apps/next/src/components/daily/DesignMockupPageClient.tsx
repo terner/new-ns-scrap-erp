@@ -35,7 +35,7 @@ export function DesignMockupPageClient() {
 
         {/* 1. Page Header & Actions */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">1. ส่วนหัวของหน้าจอ (Page Header)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">1. ส่วนหัวของหน้าจอ (Page Header)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left: Current */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -88,7 +88,7 @@ export function DesignMockupPageClient() {
 
         {/* 2. Filters & Search */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">2. แถบค้นหาและตัวกรอง (Filters & Search)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">2. แถบค้นหาและตัวกรอง (Filters & Search)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left: Current */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -142,7 +142,7 @@ export function DesignMockupPageClient() {
 
         {/* 3. Status Badges */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">3. ป้ายสถานะ (Status Badges)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">3. ป้ายสถานะ (Status Badges)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -184,7 +184,7 @@ export function DesignMockupPageClient() {
 
         {/* 4. Action Buttons (in tables) */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">4. ปุ่มจัดการในตาราง (Action Buttons)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">4. ปุ่มจัดการในตาราง (Action Buttons)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -225,7 +225,7 @@ export function DesignMockupPageClient() {
 
         {/* 5. Text Inputs */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">5. ช่องกรอกข้อความ (Text Inputs)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">5. ช่องกรอกข้อความ (Text Inputs)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -260,7 +260,7 @@ export function DesignMockupPageClient() {
 
         {/* 6. Selects & Dropdowns */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">6. ตัวเลือก (Select & Dropdown)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">6. ตัวเลือก (Select & Dropdown)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -301,7 +301,7 @@ export function DesignMockupPageClient() {
 
         {/* 7. Toggles & Checkboxes */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">7. สวิตช์เปิดปิด (Toggles & Checkboxes)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">7. สวิตช์เปิดปิด (Toggles & Checkboxes)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -342,7 +342,7 @@ export function DesignMockupPageClient() {
 
         {/* 8. File Uploads */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">8. อัปโหลดไฟล์ (File Upload)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">8. อัปโหลดไฟล์ (File Upload)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -379,7 +379,7 @@ export function DesignMockupPageClient() {
 
         {/* 9. Dynamic Rows / Split Items */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">9. ตารางกรอกรายการย่อย (Dynamic Rows / Split Items)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">9. ตารางกรอกรายการย่อย (Dynamic Rows / Split Items)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -418,7 +418,7 @@ export function DesignMockupPageClient() {
             <div className="border-2 border-dashed border-indigo-200 p-4 rounded-lg bg-slate-50">
               <div className="mb-4 inline-block bg-gradient-to-r from-indigo-500 to-purple-500 px-3 py-1 text-sm font-semibold text-white rounded-full shadow-md">💎 Ultimate SaaS</div>
               <div className="bg-white p-2 border border-slate-200/60 rounded-2xl shadow-sm">
-                <div className="group relative bg-slate-50 border border-slate-100 rounded-xl p-3 flex gap-3 items-center hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer">
+                <div className="group relative bg-slate-50 border border-slate-200 rounded-xl p-3 flex gap-3 items-center hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer">
                   <div className="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center text-xs font-bold text-slate-400 cursor-move">⋮⋮</div>
                   <div className="flex-1">
                     <div className="text-xs font-bold text-slate-700 mb-0.5">รายการค่าใช้จ่ายทั่วไป</div>
@@ -439,7 +439,7 @@ export function DesignMockupPageClient() {
 
         {/* 10. Modals & Dialogs */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">10. ป๊อปอัป / หน้าต่าง (Modals & Dialogs)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">10. ป๊อปอัป / หน้าต่าง (Modals & Dialogs)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50 relative">
@@ -463,7 +463,7 @@ export function DesignMockupPageClient() {
                   <h3 className="text-lg font-bold text-slate-900">ยืนยันการลบข้อมูล</h3>
                   <p className="text-sm text-slate-500 mt-1">ข้อมูลนี้จะไม่สามารถกู้คืนได้ คุณแน่ใจหรือไม่?</p>
                 </div>
-                <div className="bg-slate-50 px-5 py-3 flex justify-end gap-2 border-t border-slate-100">
+                <div className="bg-slate-50 px-5 py-3 flex justify-end gap-2 border-t border-slate-200">
                   <button className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50">ยกเลิก</button>
                   <button className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">ลบข้อมูล</button>
                 </div>
@@ -474,7 +474,7 @@ export function DesignMockupPageClient() {
             <div className="border-2 border-dashed border-indigo-200 p-4 rounded-lg bg-slate-50 relative overflow-hidden">
               <div className="mb-4 inline-block bg-gradient-to-r from-indigo-500 to-purple-500 px-3 py-1 text-sm font-semibold text-white rounded-full shadow-md relative z-10">💎 Ultimate SaaS</div>
               <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-0"></div>
-              <div className="bg-white rounded-2xl shadow-2xl mx-4 mt-8 relative z-10 overflow-hidden transform scale-100 border border-slate-100 text-center p-6">
+              <div className="bg-white rounded-2xl shadow-2xl mx-4 mt-8 relative z-10 overflow-hidden transform scale-100 border border-slate-200 text-center p-6">
                 <div className="mx-auto w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-4">
                   <span className="text-red-500 text-xl">⚠️</span>
                 </div>
@@ -491,7 +491,7 @@ export function DesignMockupPageClient() {
 
         {/* 11. Alerts & Notifications */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">11. ข้อความแจ้งเตือน (Alerts & Toasts)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">11. ข้อความแจ้งเตือน (Alerts & Toasts)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -533,7 +533,7 @@ export function DesignMockupPageClient() {
 
         {/* 12. Advanced UI (Steppers, Autocomplete) */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">12. ฟังก์ชันขั้นสูง (Advanced UI / Steppers / Autocomplete)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">12. ฟังก์ชันขั้นสูง (Advanced UI / Steppers / Autocomplete)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -604,7 +604,7 @@ export function DesignMockupPageClient() {
                     <input className="bg-transparent flex-1 outline-none text-sm font-medium text-slate-900" defaultValue="สมช" />
                     <span className="text-[10px] font-bold text-slate-400 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-sm">⌘K</span>
                   </div>
-                  <div className="absolute top-12 left-0 w-full bg-white border border-slate-100 shadow-xl shadow-slate-200/50 rounded-xl overflow-hidden z-20">
+                  <div className="absolute top-12 left-0 w-full bg-white border border-slate-200 shadow-xl shadow-slate-200/50 rounded-xl overflow-hidden z-20">
                     <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">ลูกค้าระบบ</div>
                     <div className="px-3 py-2.5 text-sm hover:bg-indigo-50 cursor-pointer flex items-center gap-3">
                       <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">ส</div>
@@ -619,7 +619,7 @@ export function DesignMockupPageClient() {
 
         {/* 13. Summary Cards / Stats Widgets */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">13. การ์ดสรุปข้อมูลสถิติ (Stats / Summary Cards)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">13. การ์ดสรุปข้อมูลสถิติ (Stats / Summary Cards)</h2>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             {/* Left: Current */}
             <div className="border-2 border-dashed border-slate-300 p-4 rounded-lg bg-slate-50">
@@ -668,7 +668,7 @@ export function DesignMockupPageClient() {
 
         {/* 14. Before vs After Comparison (Real Component) */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">14. เปรียบเทียบ UI บันทึกเบิกเงินสำรองจ่าย</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">14. เปรียบเทียบ UI บันทึกเบิกเงินสำรองจ่าย</h2>
           <p className="mb-6 text-sm text-slate-500">เปรียบเทียบฟอร์ม &quot;บันทึกเบิกเงินสำรองจ่าย&quot; ระหว่างสไตล์เดิม, แบบปรับปรุงใหม่ที่ทำวันนี้ (AcexPOS - Dark Header), และสไตล์ AcexPOS แท้ (Modern SaaS)</p>
 
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -764,7 +764,7 @@ export function DesignMockupPageClient() {
                 <div className="p-6 space-y-6">
                   {/* Card 1: ข้อมูลหลัก */}
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ข้อมูลหลัก</div>
+                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">ข้อมูลหลัก</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <label className="block">
                         <span className="mb-1.5 block text-xs font-semibold text-slate-600">ประเภท <span className="text-red-500">*</span></span>
@@ -785,7 +785,7 @@ export function DesignMockupPageClient() {
 
                   {/* Card 2: ข้อมูลการเงิน */}
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">รายละเอียดการเงิน</div>
+                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">รายละเอียดการเงิน</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <label className="block">
                         <span className="mb-1.5 block text-xs font-semibold text-slate-600">ยอดเงิน (บาท) <span className="text-red-500">*</span></span>
@@ -802,7 +802,7 @@ export function DesignMockupPageClient() {
                 </div>
 
                 {/* Footer Style (AcexPOS - Dark Header) */}
-                <div className="bg-white px-6 py-4 flex items-center justify-end gap-3.5 border-t border-slate-100">
+                <div className="bg-white px-6 py-4 flex items-center justify-end gap-3.5 border-t border-slate-200">
                   <button className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors" disabled>
                     ยกเลิก
                   </button>
@@ -833,7 +833,7 @@ export function DesignMockupPageClient() {
                 <div className="p-6 space-y-6">
                   {/* Card 1: ข้อมูลหลัก */}
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ข้อมูลหลัก</div>
+                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">ข้อมูลหลัก</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <label className="block">
                         <span className="mb-1.5 block text-xs font-semibold text-slate-600">ประเภท <span className="text-red-500">*</span></span>
@@ -854,7 +854,7 @@ export function DesignMockupPageClient() {
 
                   {/* Card 2: ข้อมูลการเงิน */}
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">รายละเอียดการเงิน</div>
+                    <div className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">รายละเอียดการเงิน</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <label className="block">
                         <span className="mb-1.5 block text-xs font-semibold text-slate-600">ยอดเงิน (บาท) <span className="text-red-500">*</span></span>
@@ -895,7 +895,7 @@ export function DesignMockupPageClient() {
 
         {/* 15. Card vs Section Layout Comparison */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">15. เปรียบเทียบ Layout สำหรับ &quot;หน้ารายละเอียด&quot; (PMA012606-0008)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">15. เปรียบเทียบ Layout สำหรับ &quot;หน้ารายละเอียด&quot; (PMA012606-0008)</h2>
           <p className="mb-6 text-sm text-slate-500">เปรียบเทียบการนำเสนอข้อมูลชุดเดียวกัน (หน้ารายละเอียดคิวอนุมัติจ่ายเงิน) ออกมาเป็น 3 รูปแบบ เพื่อให้เห็นว่า Layout ส่งผลต่อการอ่านอย่างไร</p>
 
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -968,7 +968,7 @@ export function DesignMockupPageClient() {
                 </div>
 
                 {/* Footer */}
-                <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex items-center justify-end gap-3">
+                <div className="border-t border-slate-200 bg-slate-50 px-6 py-4 flex items-center justify-end gap-3">
                   <button className="h-10 px-6 inline-flex items-center justify-center rounded-md border border-amber-600 bg-amber-600 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition-colors">
                     🖨️ พิมพ์ใบอนุมัตินี้
                   </button>
@@ -1003,7 +1003,7 @@ export function DesignMockupPageClient() {
 
                   {/* Card 1 */}
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">ข้อมูลเอกสารอ้างอิง</h4>
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4">ข้อมูลเอกสารอ้างอิง</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-5">
                       <div>
                         <div className="text-xs font-medium text-slate-500 mb-0.5">เลขที่เอกสารอ้างอิง</div>
@@ -1026,7 +1026,7 @@ export function DesignMockupPageClient() {
 
                   {/* Card 2 */}
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">รายละเอียดการเงิน</h4>
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4">รายละเอียดการเงิน</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-5">
                       <div>
                         <div className="text-xs font-medium text-slate-500 mb-0.5">ยอดเต็ม (บาท)</div>
@@ -1073,7 +1073,7 @@ export function DesignMockupPageClient() {
 
               <div className="rounded-xl border border-slate-200 bg-white shadow-md overflow-hidden">
 
-                <div className="border-b border-slate-100 bg-white px-6 py-5 flex items-center justify-between">
+                <div className="border-b border-slate-200 bg-white px-6 py-5 flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-bold tracking-tight text-slate-900">PMA012606-0008</h3>
                     <p className="mt-1 text-sm text-slate-500">รายละเอียดรายการในคิวอนุมัติจ่ายเงิน</p>
@@ -1124,7 +1124,7 @@ export function DesignMockupPageClient() {
                 </div>
 
                 {/* Footer */}
-                <div className="border-t border-slate-100 bg-white px-6 py-4 flex items-center justify-end gap-3">
+                <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-end gap-3">
                   <button className="h-10 px-6 inline-flex items-center justify-center rounded-md border border-amber-600 bg-amber-600 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition-colors">
                     🖨️ พิมพ์ใบอนุมัตินี้
                   </button>
@@ -1144,7 +1144,7 @@ export function DesignMockupPageClient() {
 
         {/* 16. Full Page (Table & Filter) Comparison */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">16. เปรียบเทียบหน้าต่างรวม (List View & Table)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">16. เปรียบเทียบหน้าต่างรวม (List View & Table)</h2>
           <p className="mb-6 text-sm text-slate-500">จำลองหน้า <strong>รายการใบชั่งน้ำหนัก (Weight Tickets)</strong> เพื่อดูภาพรวมทั้งหน้า ตั้งแต่ส่วนค้นหา (Filter) ไปจนถึงตารางข้อมูล</p>
 
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -1386,7 +1386,7 @@ export function DesignMockupPageClient() {
                   </div>
 
                   <div className="flex-1 overflow-auto space-y-2 px-2 pb-2">
-                    <div className="bg-white rounded-xl p-4 grid grid-cols-12 gap-4 items-center shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group">
+                    <div className="bg-white rounded-xl p-4 grid grid-cols-12 gap-4 items-center shadow-sm border border-slate-200 hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group">
                       <div className="col-span-3 font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">WT-2606-001 <span className="block text-xs font-normal text-slate-400 mt-0.5">10/06/2026</span></div>
                       <div className="col-span-4 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">สม</div>
@@ -1400,7 +1400,7 @@ export function DesignMockupPageClient() {
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-xl p-4 grid grid-cols-12 gap-4 items-center shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group">
+                    <div className="bg-white rounded-xl p-4 grid grid-cols-12 gap-4 items-center shadow-sm border border-slate-200 hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group">
                       <div className="col-span-3 font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">WT-2606-002 <span className="block text-xs font-normal text-slate-400 mt-0.5">10/06/2026</span></div>
                       <div className="col-span-4 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">เจ๊</div>
@@ -1439,7 +1439,7 @@ export function DesignMockupPageClient() {
 
         {/* 17. Tabs Comparison */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">17. เปรียบเทียบ Tabs (แท็บเมนูย่อย)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">17. เปรียบเทียบ Tabs (แท็บเมนูย่อย)</h2>
           <p className="mb-6 text-sm text-slate-500">เวลาต้องสลับหน้าจอในหน้าเดียวกัน</p>
 
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -1478,7 +1478,7 @@ export function DesignMockupPageClient() {
             <div className="border-2 border-dashed border-indigo-200 p-4 rounded-lg bg-slate-50">
               <div className="mb-4 inline-block bg-gradient-to-r from-indigo-500 to-purple-500 px-3 py-1 text-sm font-semibold text-white rounded-full shadow-md">💎 Ultimate SaaS (Segmented Control)</div>
 
-              <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/40 overflow-hidden border border-slate-100">
+              <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/40 overflow-hidden border border-slate-200">
                 <div className="p-4 bg-[#F8FAFC]">
                   <div className="flex bg-slate-200/70 p-1 rounded-xl w-fit">
                     <button className="px-6 py-2 text-sm font-bold text-slate-900 bg-white rounded-lg shadow-sm">ข้อมูลทั่วไป</button>
@@ -1497,7 +1497,7 @@ export function DesignMockupPageClient() {
 
         {/* 18. Empty State Comparison */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">18. เปรียบเทียบ Empty State (หน้าจอตอนไม่มีข้อมูล)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">18. เปรียบเทียบ Empty State (หน้าจอตอนไม่มีข้อมูล)</h2>
           <p className="mb-6 text-sm text-slate-500">ตอนที่ค้นหาไม่เจอ หรือยังไม่เคยสร้างรายการใดๆ</p>
 
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -1524,7 +1524,7 @@ export function DesignMockupPageClient() {
               <div className="mb-4 inline-block bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800 rounded-full shadow-sm">✨ สไตล์ AcexPOS (Illustration & Call-to-action)</div>
 
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 flex flex-col items-center justify-center text-center">
-                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100 shadow-inner">
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-200 shadow-inner">
                   <span className="text-4xl opacity-50">📦</span>
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-1">ยังไม่มีรายการใบชั่งน้ำหนัก</h3>
@@ -1558,7 +1558,7 @@ export function DesignMockupPageClient() {
 
         {/* 19. Sidebar Comparison */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">19. เปรียบเทียบ Sidebar (เมนูนำทางหลัก)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">19. เปรียบเทียบ Sidebar (เมนูนำทางหลัก)</h2>
           <p className="mb-6 text-sm text-slate-500">โครงสร้างเมนูด้านซ้ายที่พนักงานเห็นตลอดเวลา</p>
 
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -1583,7 +1583,7 @@ export function DesignMockupPageClient() {
               <div className="mb-4 inline-block bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800 rounded-full shadow-sm">✨ สไตล์ AcexPOS (Clean White + Icons)</div>
 
               <div className="w-64 bg-white border-r border-slate-200 h-96 flex flex-col">
-                <div className="h-16 flex items-center px-6 border-b border-slate-100">
+                <div className="h-16 flex items-center px-6 border-b border-slate-200">
                   <div className="font-black text-xl text-emerald-600 tracking-tight">NS<span className="text-slate-800">ERP</span></div>
                 </div>
 
@@ -1610,7 +1610,7 @@ export function DesignMockupPageClient() {
                   </button>
                 </div>
 
-                <div className="p-4 border-t border-slate-100">
+                <div className="p-4 border-t border-slate-200">
                   <button className="flex items-center gap-3 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
                     <span className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center border border-slate-300 text-xs">U</span>
                     พนักงานทดสอบ
@@ -1670,7 +1670,7 @@ export function DesignMockupPageClient() {
 
         {/* 20. Brand Colors & Theme Comparison */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">20. สีประจำแบรนด์และธีม (Brand Colors & Theme)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">20. สีประจำแบรนด์และธีม (Brand Colors & Theme)</h2>
           <p className="mb-6 text-sm text-slate-500">เปรียบเทียบการเลือกใช้สีหลัก (Primary Color) ที่ให้ความรู้สึกแตกต่างกัน</p>
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {/* Blue */}
@@ -1723,7 +1723,7 @@ export function DesignMockupPageClient() {
 
         {/* 21. Responsive Design */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">21. การแสดงผลบนมือถือ (Responsive Design)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">21. การแสดงผลบนมือถือ (Responsive Design)</h2>
           <p className="mb-6 text-sm text-slate-500">เปรียบเทียบการแสดงผลตารางเมื่ออยู่ในจอคอมพิวเตอร์ กับการแปลงร่างเป็น &quot;Card&quot; เมื่ออยู่ในจอมือถือ (เพื่อให้อ่านง่าย ไม่ต้องเลื่อนซ้ายขวา)</p>
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             {/* Desktop Table */}
@@ -1740,7 +1740,7 @@ export function DesignMockupPageClient() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr className="border-b border-slate-200 hover:bg-slate-50">
                       <td className="py-3 px-3 font-medium text-indigo-600">WT-001</td>
                       <td className="py-3 px-3">บจก. สมชาย</td>
                       <td className="py-3 px-3 text-right font-medium">1,500 kg</td>
@@ -1777,7 +1777,7 @@ export function DesignMockupPageClient() {
 
         {/* 22. Error Handling */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">22. การจัดการข้อผิดพลาด (Error Handling & Validation)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">22. การจัดการข้อผิดพลาด (Error Handling & Validation)</h2>
           <p className="mb-6 text-sm text-slate-500">เปรียบเทียบการบอก User ว่ากรอกข้อมูลผิด ระหว่างแบบดั้งเดิม (รอตรวจตอนกดปุ่ม) กับแบบเรียลไทม์ (ตรวจทันที)</p>
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             {/* Submit Error */}
@@ -1825,7 +1825,7 @@ export function DesignMockupPageClient() {
 
         {/* 23. Dark Mode vs Light Mode */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">23. โหมดการแสดงผล (Dark Mode vs Light Mode)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">23. โหมดการแสดงผล (Dark Mode vs Light Mode)</h2>
           <p className="mb-6 text-sm text-slate-500">จำลองหน้าตาของระบบหากเรามีการทำโหมดมืด (Dark Mode) สำหรับใช้งานในเวลากลางคืนหรือที่แสงน้อย</p>
           <div className="grid grid-cols-1 gap-0 lg:grid-cols-2 rounded-2xl overflow-hidden border border-slate-300 shadow-lg">
             {/* Light Mode */}
@@ -1862,7 +1862,7 @@ export function DesignMockupPageClient() {
         </div>
         {/* 24. Advanced Data Tables & Bulk Actions */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">24. ตารางข้อมูลขั้นสูง (Advanced Data Tables & Bulk Actions)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">24. ตารางข้อมูลขั้นสูง (Advanced Data Tables & Bulk Actions)</h2>
           <p className="mb-6 text-sm text-slate-500">จำลองตารางที่มี Checkbox สำหรับทำ Bulk Actions (เลือกหลายรายการ) และ Frozen Column</p>
           <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
             <div className="bg-slate-50 p-3 border-b border-slate-200 flex justify-between items-center">
@@ -1932,7 +1932,7 @@ export function DesignMockupPageClient() {
 
         {/* 25. Data Visualization & Charts */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">25. กราฟและการแสดงผลข้อมูล (Data Visualization)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">25. กราฟและการแสดงผลข้อมูล (Data Visualization)</h2>
           <p className="mb-6 text-sm text-slate-500">จำลองการแทรกกราฟเข้าไปในหน้า Dashboard เพื่อให้เห็นภาพรวมธุรกิจ</p>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-sm flex flex-col items-center justify-center min-h-[250px] relative overflow-hidden">
@@ -1964,7 +1964,7 @@ export function DesignMockupPageClient() {
 
         {/* 26. Drawer / Slide-over */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">26. พาเนลแบบลิ้นชักเปิดด้านข้าง (Drawer / Slide-over)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">26. พาเนลแบบลิ้นชักเปิดด้านข้าง (Drawer / Slide-over)</h2>
           <p className="mb-6 text-sm text-slate-500">ทางเลือกที่ดีกว่า Modal ตรงกลาง เพราะไม่บังข้อมูลตารางหลัก และดูข้อมูลได้ยาวๆ</p>
           <div className="relative h-[400px] border border-slate-200 rounded-xl overflow-hidden bg-slate-100">
             {/* Fake Main App Background */}
@@ -1980,14 +1980,14 @@ export function DesignMockupPageClient() {
             <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px]"></div>
             {/* Drawer Panel */}
             <div className="absolute top-0 right-0 h-full w-80 bg-white shadow-2xl border-l border-slate-200 flex flex-col transform transition-transform">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+              <div className="p-4 border-b border-slate-200 flex justify-between items-center">
                 <div className="font-bold text-slate-800">รายละเอียดใบชั่ง WT-001</div>
                 <button className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold hover:bg-slate-200">✕</button>
               </div>
               <div className="p-4 flex-1 overflow-y-auto space-y-4">
                 <div>
                   <div className="text-xs text-slate-500 mb-1">ข้อมูลลูกค้า</div>
-                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">บจก. สมชาย (รหัส: C009)</div>
+                  <div className="text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-200">บจก. สมชาย (รหัส: C009)</div>
                 </div>
                 <div>
                   <div className="text-xs text-slate-500 mb-1">สถานะปัจจุบัน</div>
@@ -1995,7 +1995,7 @@ export function DesignMockupPageClient() {
                 </div>
                 <div className="h-32 bg-slate-50 rounded border border-slate-200 border-dashed flex items-center justify-center text-xs text-slate-400">รูปภาพทะเบียนรถ</div>
               </div>
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2">
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-2">
                 <button className="flex-1 py-2 border border-slate-300 rounded-lg text-sm font-semibold bg-white text-slate-700">พิมพ์</button>
                 <button className="flex-1 py-2 bg-indigo-600 rounded-lg text-sm font-semibold text-white shadow-sm shadow-indigo-600/20">แก้ไขข้อมูล</button>
               </div>
@@ -2005,7 +2005,7 @@ export function DesignMockupPageClient() {
 
         {/* 27. Display Density */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">27. โหมดปรับความหนาแน่นของข้อมูล (Display Density)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">27. โหมดปรับความหนาแน่นของข้อมูล (Display Density)</h2>
           <p className="mb-6 text-sm text-slate-500">ตอบโจทย์พนักงานบัญชีที่ต้องการเห็นข้อมูลจำนวนมากในหน้าเดียว (ลดช่องว่าง หดขนาดตัวอักษรเล็กน้อย)</p>
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             <div>
@@ -2013,7 +2013,7 @@ export function DesignMockupPageClient() {
               <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
                 <thead className="bg-slate-50"><tr className="border-b border-slate-200"><th className="p-4 text-left">รายการ</th><th className="p-4 text-right">ยอดเงิน</th></tr></thead>
                 <tbody>
-                  <tr className="border-b border-slate-100"><td className="p-4">ชำระค่าสินค้า</td><td className="p-4 text-right">15,000</td></tr>
+                  <tr className="border-b border-slate-200"><td className="p-4">ชำระค่าสินค้า</td><td className="p-4 text-right">15,000</td></tr>
                   <tr><td className="p-4">ค่าบริการ</td><td className="p-4 text-right">500</td></tr>
                 </tbody>
               </table>
@@ -2023,9 +2023,9 @@ export function DesignMockupPageClient() {
               <table className="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
                 <thead className="bg-slate-50"><tr className="border-b border-slate-200"><th className="p-2 text-left">รายการ</th><th className="p-2 text-right">ยอดเงิน</th></tr></thead>
                 <tbody>
-                  <tr className="border-b border-slate-100"><td className="p-2">ชำระค่าสินค้า</td><td className="p-2 text-right">15,000</td></tr>
-                  <tr className="border-b border-slate-100"><td className="p-2">ค่าบริการ</td><td className="p-2 text-right">500</td></tr>
-                  <tr className="border-b border-slate-100"><td className="p-2">ภาษีหัก ณ ที่จ่าย</td><td className="p-2 text-right">-150</td></tr>
+                  <tr className="border-b border-slate-200"><td className="p-2">ชำระค่าสินค้า</td><td className="p-2 text-right">15,000</td></tr>
+                  <tr className="border-b border-slate-200"><td className="p-2">ค่าบริการ</td><td className="p-2 text-right">500</td></tr>
+                  <tr className="border-b border-slate-200"><td className="p-2">ภาษีหัก ณ ที่จ่าย</td><td className="p-2 text-right">-150</td></tr>
                   <tr><td className="p-2 font-bold bg-slate-50">สุทธิ</td><td className="p-2 text-right font-bold bg-slate-50">15,350</td></tr>
                 </tbody>
               </table>
@@ -2035,7 +2035,7 @@ export function DesignMockupPageClient() {
 
         {/* 28. Audit Trail / Activity Log */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">28. ประวัติการทำรายการ (Audit Trail / Activity Log)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">28. ประวัติการทำรายการ (Audit Trail / Activity Log)</h2>
           <p className="mb-6 text-sm text-slate-500">แสดง Timeline การเปลี่ยนแปลงข้อมูล เพื่อความโปร่งใสและตรวจสอบย้อนหลังได้ (ใคร-ทำอะไร-เมื่อไหร่)</p>
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-md">
             <div className="space-y-6 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
@@ -2075,7 +2075,7 @@ export function DesignMockupPageClient() {
 
         {/* 29. Print-friendly Layout */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">29. มุมมองสำหรับสั่งพิมพ์ (Print-friendly Layout)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">29. มุมมองสำหรับสั่งพิมพ์ (Print-friendly Layout)</h2>
           <p className="mb-6 text-sm text-slate-500">แสดงแนวคิดเวลาผู้ใช้กด Ctrl+P เพื่อสั่งพิมพ์หน้าจอ (ระบบต้องซ่อนเมนู และจัดหน้าให้สะอาดพอดีกระดาษ)</p>
           <div className="bg-slate-200 p-8 rounded-xl flex items-center justify-center">
             {/* Simulated A4 Paper */}
@@ -2124,7 +2124,7 @@ export function DesignMockupPageClient() {
 
         {/* 30. Command Palette */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">30. การค้นหาแบบครอบจักรวาล (Command Palette / Global Search)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">30. การค้นหาแบบครอบจักรวาล (Command Palette / Global Search)</h2>
           <p className="mb-6 text-sm text-slate-500">กด Ctrl+K เพื่อเปิดช่องค้นหาแบบเร่งด่วน หาได้ทั้งหน้าจอ (Pages), ข้อมูลลูกค้า, หรือเลขที่เอกสาร ทันทีโดยไม่ต้องใช้เมาส์คลิก</p>
           <div className="relative h-[350px] bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center p-4">
             {/* Background Blur */}
@@ -2132,7 +2132,7 @@ export function DesignMockupPageClient() {
 
             {/* Command Palette Modal */}
             <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden relative z-10 flex flex-col border border-slate-200">
-              <div className="flex items-center px-4 border-b border-slate-100 h-14">
+              <div className="flex items-center px-4 border-b border-slate-200 h-14">
                 <span className="text-slate-400 mr-3 text-lg">🔍</span>
                 <input className="flex-1 outline-none text-slate-900 placeholder:text-slate-400 bg-transparent" placeholder="พิมพ์เพื่อค้นหา (เช่น 'สมชาย', 'เบิกเงิน')..." defaultValue="สมช" />
                 <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold border border-slate-200">ESC</span>
@@ -2161,7 +2161,7 @@ export function DesignMockupPageClient() {
 
         {/* 31. Form Modal Header Comparison */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 border-b border-slate-100 pb-2 text-lg font-semibold text-slate-800">31. เปรียบเทียบส่วนหัวของฟอร์ม (Form Modal Header)</h2>
+          <h2 className="mb-4 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-800">31. เปรียบเทียบส่วนหัวของฟอร์ม (Form Modal Header)</h2>
           <p className="mb-6 text-sm text-slate-500">เปรียบเทียบรูปแบบการดีไซน์ส่วนหัวของหน้ากากฟอร์ม (Modal Header) และระบบสวิตช์ Toggle สถานะ</p>
 
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -2217,7 +2217,7 @@ export function DesignMockupPageClient() {
                 💎 Ultimate SaaS (Premium Glass)
               </div>
 
-              <div className="bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-100">
+              <div className="bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200">
                 <div className="flex flex-col gap-3 border-b border-indigo-950/20 bg-gradient-to-r from-[#0F172A] via-[#1E1B4B] to-[#0F172A] px-5 py-4 sm:flex-row sm:items-center sm:justify-between relative">
                   <h3 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
                     แก้ไขลูกค้า
@@ -2244,7 +2244,7 @@ export function DesignMockupPageClient() {
       {/* Actual Working Dialog */}
       <Dialog open={isMockModalOpen} onOpenChange={setIsMockModalOpen}>
         <DialogContent className="max-w-3xl" fallbackTitle="หัวข้อของ Popup">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200">
             <DialogTitle>หัวข้อของ Popup (Interactive Modal)</DialogTitle>
             <DialogDescription>นี่คือ Dialog ที่ทำงานได้จริง (เปิด/ปิด ได้ตามต้องการ)</DialogDescription>
           </DialogHeader>
@@ -2267,7 +2267,7 @@ export function DesignMockupPageClient() {
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+          <DialogFooter className="px-6 py-4 bg-slate-50 border-t border-slate-200">
             <Button variant="outline" className="bg-white" onClick={() => setIsMockModalOpen(false)}>ยกเลิก (Cancel)</Button>
             <Button className="bg-blue-600 text-white" onClick={() => { alert('บันทึกสำเร็จ!'); setIsMockModalOpen(false) }}>บันทึกข้อมูล (Submit)</Button>
           </DialogFooter>

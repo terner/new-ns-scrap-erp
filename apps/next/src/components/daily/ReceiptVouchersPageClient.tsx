@@ -486,7 +486,7 @@ export function ReceiptVouchersPageClient() {
         {showMobileFilters ? (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
             <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                 <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
                 <button
                   className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -508,7 +508,7 @@ export function ReceiptVouchersPageClient() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -575,7 +575,7 @@ export function ReceiptVouchersPageClient() {
                 {row.purchaseBillDocNo ? <div>บิลซื้อ: <span className="font-semibold text-slate-700">{row.purchaseBillDocNo}</span></div> : null}
                 {row.licensePlate ? <div>ทะเบียน: <span className="font-semibold text-slate-700">{row.licensePlate}</span></div> : null}
               </div>
-              <div className="flex justify-between items-end border-t border-slate-100 pt-2.5">
+              <div className="flex justify-between items-end border-t border-slate-200 pt-2.5">
                 <div className="text-xs text-slate-500">
                   <span>น้ำหนัก: <span className="font-semibold text-slate-700">{formatMoney(row.totalQty)}</span> กก.</span>
                 </div>
@@ -592,7 +592,7 @@ export function ReceiptVouchersPageClient() {
         </div>
 
         <div className="hidden md:block overflow-x-auto">
-          <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <Table className="[&_tbody_tr]:border-slate-200" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
               {receiptVoucherColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
             </colgroup>
@@ -659,7 +659,7 @@ export function ReceiptVouchersPageClient() {
       {/* Floating Action Button (FAB) for Mobile */}
       <div className="fixed bottom-6 right-6 z-40 md:hidden print:hidden">
         <button
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
           onClick={openCreateForm}
           type="button"
           aria-label="สร้างใบสำคัญรับเงินใหม่"
@@ -702,8 +702,8 @@ function ReceiptVoucherFormModal({
   const [showSellerDetails, setShowSellerDetails] = useState(false)
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 md:p-3 print:hidden flex items-stretch md:items-start justify-center">
-      <div className="w-full md:max-w-6xl rounded-none md:rounded-md bg-white shadow-xl flex flex-col h-screen md:h-auto md:max-h-[calc(100vh-80px)] my-0 md:my-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 md:p-4 print:hidden">
+      <div className="w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl flex flex-col bg-white md:rounded-md shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 md:px-5 py-3 shrink-0">
           <div>
             <h3 className="text-base font-bold text-slate-900">{mode === 'edit' ? 'แก้ไข' : 'สร้าง'}ใบสำคัญรับเงิน</h3>
@@ -794,7 +794,7 @@ function ReceiptVoucherFormModal({
                       <td className="p-4 md:p-6 text-center text-slate-400" colSpan={6}>เลือกบิลซื้อเพื่อเติมรายการสินค้าอัตโนมัติ</td>
                     </tr>
                   ) : form.items.map((item, index) => (
-                    <tr key={index} className="border-t border-slate-100">
+                    <tr key={index} className="border-t border-slate-200">
                       <td className="p-1.5 md:p-2 text-center text-slate-400">{index + 1}</td>
                       <td className="p-1.5 md:p-2 font-medium text-slate-800">{item.description || '-'}</td>
                       <td className="p-1.5 md:p-2 text-slate-600">{item.unit || 'กก.'}</td>

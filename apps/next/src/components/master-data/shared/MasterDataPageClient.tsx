@@ -442,7 +442,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
       {/* Floating Action Button (FAB) for Mobile */}
       <div className="fixed bottom-6 right-6 z-40 md:hidden">
         <button
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
           onClick={openCreateForm}
           type="button"
           aria-label={config.createLabel}
@@ -452,8 +452,8 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
       </div>
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <div className="w-full max-w-4xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 md:p-4 md:pt-8">
+          <div className="w-full h-full md:h-auto md:max-h-[90vh] max-w-4xl">
             <MasterDataForm
               config={resolvedConfig}
               isSaving={isSaving}
@@ -504,7 +504,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
           {/* Desktop Table View */}
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm hidden md:block">
             <div className="overflow-x-auto">
-              <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <Table className="[&_tbody_tr]:border-slate-200" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
                   {config.columns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
                   <col style={columnResize.getColumnStyle('__action')} />
@@ -530,7 +530,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                 {paginatedRecords.map((record) => (
                   <TableRow
                     key={record.id}
-                    className="cursor-pointer border-slate-100 hover:bg-slate-50 focus-within:bg-slate-50"
+                    className="cursor-pointer border-slate-200 hover:bg-slate-50 focus-within:bg-slate-50"
                     tabIndex={0}
                     onClick={() => openEditForm(record)}
                     onKeyDown={(event) => {
@@ -617,7 +617,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                   ) : null}
                 </div>
 
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4 border-t border-slate-100 pt-2.5 mt-2.5 text-xs text-slate-600">
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4 border-t border-slate-200 pt-2.5 mt-2.5 text-xs text-slate-600">
                   {config.columns
                     .filter((col) => col.key !== 'code' && col.key !== 'name' && col.format !== 'status')
                     .slice(0, 3)
@@ -766,18 +766,18 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
   }
 
   return (
-    <form noValidate className="overflow-hidden rounded-md bg-white shadow-xl" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-3 bg-slate-900 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <form noValidate className="w-full h-full md:h-auto md:max-h-[90vh] flex flex-col bg-white md:rounded-md shadow-xl overflow-hidden" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-3 bg-slate-900 px-5 py-4 sm:flex-row sm:items-center sm:justify-between flex-none">
         <h3 className="text-lg font-bold text-slate-100">{form.id ? `แก้ไข${config.entityName}` : config.createLabel}</h3>
         {supportsActive ? <ActiveToggle checked={form.active} labelClassName="text-sm font-medium text-slate-200" onChange={(checked) => update('active', checked)} /> : null}
       </div>
 
-      <div className="max-h-[76vh] overflow-y-auto bg-slate-50 px-5 py-5">
+      <div className="flex-1 overflow-y-auto bg-slate-50 px-5 py-5">
         {hasFieldSections ? (
           <div className="space-y-5">
             {fieldSections.map((section, index) => (
               <section key={`${section.title ?? 'default'}-${index}`} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-                {section.title ? <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">{section.title}</h4> : null}
+                {section.title ? <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">{section.title}</h4> : null}
                 <div className="grid gap-4 md:grid-cols-3">
                   {section.fields.map(renderField)}
                 </div>
@@ -793,7 +793,7 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
         )}
       </div>
 
-      <div className="flex flex-wrap justify-end gap-3.5 border-t border-slate-100 bg-white px-5 py-4">
+      <div className="flex flex-wrap justify-end gap-3.5 border-t border-slate-200 bg-white px-5 py-4 flex-none">
         <button className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors" type="button" onClick={onCancel}>
           ยกเลิก
         </button>

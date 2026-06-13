@@ -227,7 +227,7 @@ export function CostAllocatorPageClient() {
 
       {showPreview && hasCandidates ? (
         <DualCostingPanel title="③ Preview การ Match">
-          <Table className="[&_tbody_tr]:border-slate-100">
+          <Table className="[&_tbody_tr]:border-slate-200">
             <TableHeader>
               <tr>
                 <TableHead>Source</TableHead>

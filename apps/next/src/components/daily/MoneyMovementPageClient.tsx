@@ -1371,7 +1371,7 @@ export function MoneyMovementPageClient({
                       อายุเอกสาร: {ageInDays(bill.date)} วัน
                     </div>
                   </div>
-                  <div className="flex justify-between items-end pt-2 border-t border-slate-100">
+                  <div className="flex justify-between items-end pt-2 border-t border-slate-200">
                     <div>
                       <span className="text-[10px] text-slate-400 block">ค้างชำระ</span>
                       <span className={`font-bold text-sm tabular-nums ${balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(balance)}</span>
@@ -1516,18 +1516,18 @@ export function MoneyMovementPageClient({
         <Dialog open onOpenChange={(open) => {
           if (!open && !isSaving) setFormOpen(false)
         }}>
-          <DialogContent className={`top-[max(2rem,50%)] max-h-[90vh] overflow-y-auto p-0 ${mode === 'payment' ? 'max-w-5xl' : 'max-w-4xl'}`} hideClose>
-            <form noValidate onSubmit={save}>
-            <DialogHeader className={`${mode === 'payment' ? 'bg-white text-slate-900' : theme.muted} flex-row items-center justify-between border-b px-5 py-4`}>
+          <DialogContent className={`top-0 md:top-[max(2rem,50%)] translate-y-0 md:-translate-y-1/2 h-screen md:h-auto max-h-screen md:max-h-[90vh] w-full md:max-w-5xl flex flex-col overflow-hidden p-0 ${mode === 'payment' ? 'max-w-5xl' : 'max-w-4xl'}`} hideClose>
+            <form noValidate className="flex flex-col h-full md:h-auto overflow-hidden" onSubmit={save}>
+            <DialogHeader className={`${mode === 'payment' ? 'bg-white text-slate-900' : theme.muted} flex-row items-center justify-between border-b px-5 py-4 shrink-0`}>
               <div>
                 <DialogTitle className="font-bold">{mode === 'payment' ? 'สร้าง Payment Voucher' : title}</DialogTitle>
                 {mode === 'payment' ? null : <p className="text-xs opacity-80">{subtitle}</p>}
               </div>
               <UiButton className="h-8 w-8 px-0 text-2xl text-slate-500" size="icon" type="button" variant="ghost" onClick={() => setFormOpen(false)}>&times;</UiButton>
             </DialogHeader>
-            {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div> : null}
+            {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 shrink-0">{error}</div> : null}
             {mode === 'payment' ? (
-              <div className="flex flex-col gap-4 p-5 text-sm">
+              <div className="flex flex-col gap-4 p-4 md:p-5 text-sm flex-1 overflow-y-auto">
                 <PaymentSplitsSection
                   activeAccounts={activeAccounts}
                   form={form}
@@ -1564,43 +1564,53 @@ export function MoneyMovementPageClient({
                 </div>
               </div>
             ) : (
-              <>
-                <div className="grid gap-4 p-5 md:grid-cols-2">
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-2 md:gap-4 p-4 md:p-5 text-sm">
                   <Field label="วันที่" type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
-                  <BillSelect
-                    bills={outstandingBills}
-                    label="บิลขาย"
-                    mode={mode}
-                    partyMap={partyMap}
-                    value={form.billId ?? ''}
-                    onChange={selectBill}
-                  />
-                  <SelectField label={partyLabel} value={partyValue} onChange={(value) => setForm({ ...form, [partyKey]: value } as MoneyForm)} options={parties.filter((party) => party.active !== false)} />
-                  <SelectField label={accountLabel} value={form.accountId} onChange={(value) => setForm({ ...form, accountId: value })} options={activeAccounts} />
+                  <div className="col-span-2">
+                    <BillSelect
+                      bills={outstandingBills}
+                      label="บิลขาย"
+                      mode={mode}
+                      partyMap={partyMap}
+                      value={form.billId ?? ''}
+                      onChange={selectBill}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <SelectField label={partyLabel} value={partyValue} onChange={(value) => setForm({ ...form, [partyKey]: value } as MoneyForm)} options={parties.filter((party) => party.active !== false)} />
+                  </div>
+                  <div className="col-span-2">
+                    <SelectField label={accountLabel} value={form.accountId} onChange={(value) => setForm({ ...form, accountId: value })} options={activeAccounts} />
+                  </div>
                   <Field label={amountLabel} type="number" value={String(form.amount)} onChange={(value) => setForm({ ...form, amount: Number(value) })} />
                   <Field label="WHT" type="number" value={String(form.withholdingTax)} onChange={(value) => setForm({ ...form, withholdingTax: Number(value) })} />
                   <Field label="ส่วนลด" type="number" value={String(form.discount)} onChange={(value) => setForm({ ...form, discount: Number(value) })} />
                   <Field label="ค่าธรรมเนียม" type="number" value={String(form.fee)} onChange={(value) => setForm({ ...form, fee: Number(value) })} />
-                  <label className="block">
-                    <span className="mb-1 block text-xs text-slate-600">วิธีจ่าย/รับเงิน</span>
-                    <UiSelect className="h-9 rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
-                      <option value="">ไม่ระบุ</option>
-                      {paymentMethods.map((method) => (
-                        <option key={method.name} value={method.name}>{method.name}</option>
-                      ))}
-                    </UiSelect>
-                  </label>
-                  <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+                  <div className="col-span-2">
+                    <label className="block">
+                      <span className="mb-1 block text-xs text-slate-600">วิธีจ่าย/รับเงิน</span>
+                      <UiSelect className="h-9 rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
+                        <option value="">ไม่ระบุ</option>
+                        {paymentMethods.map((method) => (
+                          <option key={method.name} value={method.name}>{method.name}</option>
+                        ))}
+                      </UiSelect>
+                    </label>
+                  </div>
+                  <div className="col-span-2">
+                    <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+                  </div>
                 </div>
-                <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 md:gap-3 border-t border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
                   <SummaryPill label={amountLabel} value={formatMoney(form.amount)} />
                   <SummaryPill label="WHT" value={formatMoney(form.withholdingTax)} />
                   <SummaryPill label="Fee / Discount" value={`${formatMoney(form.fee)} / ${formatMoney(form.discount)}`} />
                   <SummaryPill label="Net" value={formatMoney(formNetAmount)} />
                 </div>
-              </>
+              </div>
             )}
-            <DialogFooter className="border-t border-slate-200 px-5 py-4">
+            <DialogFooter className="border-t border-slate-200 px-5 py-4 shrink-0 bg-white">
               <UiButton className="font-normal text-slate-600" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ยกเลิก</UiButton>
               <UiButton className={`px-5 font-semibold text-white disabled:opacity-60 ${theme.action}`} disabled={isSaving} type="submit" variant="default">บันทึก</UiButton>
             </DialogFooter>
@@ -1701,7 +1711,7 @@ export function MoneyMovementPageClient({
           {showMobileFilters ? (
             <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
               <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                   <h4 className="font-bold text-slate-800">ตัวกรองประวัติ</h4>
                   <button
                     className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -1773,7 +1783,7 @@ export function MoneyMovementPageClient({
                   ) : null}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+                <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
                   <button
                     type="button"
                     className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -1851,7 +1861,7 @@ export function MoneyMovementPageClient({
                         </div>
                       ) : null}
                     </div>
-                    <div className="flex justify-between items-end pt-2 border-t border-slate-100">
+                    <div className="flex justify-between items-end pt-2 border-t border-slate-200">
                       <div>
                         {mode === 'payment' ? (
                           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${paymentHistoryStatusTone(row.status)}`}>
@@ -2042,7 +2052,7 @@ export function MoneyMovementPageClient({
       {mode === 'receipt' && showEntrySection ? (
         <div className="fixed bottom-6 right-6 z-40 md:hidden">
           <button
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg active:scale-95 transition-transform"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
             onClick={openForm}
             type="button"
             aria-label="รับเงิน Customer ใหม่"
@@ -2074,8 +2084,8 @@ function PaymentHistoryDetailDialog({
   const summary = detail?.summary
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto bg-slate-50 p-0" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+      <DialogContent className="top-0 md:top-[max(2rem,50%)] translate-y-0 md:-translate-y-1/2 h-screen md:h-auto max-h-screen md:max-h-[90vh] w-full md:max-w-6xl flex flex-col overflow-hidden bg-slate-50 p-0" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 shrink-0">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-slate-900">{detail?.heading ?? 'รายละเอียดการจ่ายเงิน'}</DialogTitle>
             <div className="mt-1 truncate font-mono text-xs text-slate-500">{detail?.docNo ?? row?.docNo ?? '-'}</div>
@@ -2092,12 +2102,12 @@ function PaymentHistoryDetailDialog({
           </UiButton>
         </DialogHeader>
 
-        <div className="space-y-4 p-5 text-sm">
+        <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4">
           {isLoading ? <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow">กำลังโหลดรายละเอียด</div> : null}
           {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-800">{error}</div> : null}
           {!isLoading && !error && detail && summary ? (
             <>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 <div className="rounded-md bg-white p-3 shadow">
                   <div className="text-xs text-slate-500">{detail.type === 'approval' ? 'ยอดอนุมัติ' : 'ยอดจ่าย'}</div>
                   <div className="text-lg font-bold text-slate-900">{formatMoney(summary.amount)}</div>
@@ -2131,7 +2141,7 @@ function PaymentHistoryDetailDialog({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2 md:gap-3">
                 {detail.detailCards.map((card) => (
                   <div key={`${card.label}-${card.value}`} className="rounded-md border border-slate-200 bg-white p-3">
                     <div className="text-xs text-slate-500">{card.label}</div>

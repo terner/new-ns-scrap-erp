@@ -372,7 +372,7 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="รายละเอียด Stock Ledger">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-md bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 bg-slate-50">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 bg-slate-50">
           <div>
             <h2 className="text-lg font-bold text-slate-900">รายละเอียด Stock Ledger</h2>
             <p className="mt-1 text-xs text-slate-500">อ่านอย่างเดียวจากรายการ ledger ที่แสดงในตาราง</p>
@@ -423,7 +423,7 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
           </DetailPanel>
         </div>
 
-        <div className="border-t border-slate-100 bg-slate-50 px-5 py-4 text-sm rounded-b-md">
+        <div className="border-t border-slate-200 bg-slate-50 px-5 py-4 text-sm rounded-b-md">
           <div className="font-semibold text-slate-700">หมายเหตุ</div>
           <div className="mt-1 whitespace-pre-wrap text-slate-600">{row.note || '-'}</div>
           <div className="mt-3 text-xs text-slate-500">คู่ค้า/ที่มา: {row.counterpartyName || '-'}</div>
@@ -435,8 +435,8 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
 
 function DetailPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-      <div className="mb-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100/80">{title}</div>
+    <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+      <div className="mb-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-200/80">{title}</div>
       <div className="space-y-2">{children}</div>
     </div>
   )

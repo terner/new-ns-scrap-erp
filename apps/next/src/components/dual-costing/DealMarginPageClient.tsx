@@ -158,7 +158,7 @@ export function DealMarginPageClient() {
 
       <DualCostingCountRow countValue={data?.rows.length ?? 0} />
 
-      <Table className="[&_tbody_tr]:border-slate-100">
+      <Table className="[&_tbody_tr]:border-slate-200">
         <TableHeader>
           <tr>
             <TableHead>PO Sell</TableHead>

@@ -353,7 +353,7 @@ export function AuditLogPageClient() {
       {selectedRow ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 pt-8" role="dialog" aria-modal="true">
           <div className="w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{eventTitle(selectedRow.eventType)}</h3>
                 <p className="mt-0.5 text-xs text-slate-400">ID: {selectedRow.id}</p>
@@ -364,8 +364,8 @@ export function AuditLogPageClient() {
             <div className="space-y-4 p-5">
               <div className="grid gap-4 md:grid-cols-2">
                 {/* ข้อมูลเหตุการณ์ */}
-                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเหตุการณ์</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลเหตุการณ์</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <DetailItem label="กลุ่ม" value={eventGroup(selectedRow.eventType)} />
                     <DetailItem label="เวลา" value={formatDate(selectedRow.createdAt)} />
@@ -374,8 +374,8 @@ export function AuditLogPageClient() {
                 </div>
 
                 {/* ผู้ทำและเป้าหมาย */}
-                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ผู้ทำและเป้าหมาย</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ผู้ทำและเป้าหมาย</div>
                   <div className="grid grid-cols-1 gap-3">
                     <DetailItem label="ผู้ทำรายการ" value={userLabel(selectedRow.actor)} />
                     <DetailItem label="เป้าหมาย" value={userLabel(selectedRow.target)} />
@@ -384,8 +384,8 @@ export function AuditLogPageClient() {
               </div>
 
               {/* ข้อมูลระบบและเมทาดาตา */}
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลระบบและเมทาดาตา</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลระบบและเมทาดาตา</div>
                 <div className="space-y-4">
                   <DetailItem label="User Agent" value={selectedRow.userAgent || '-'} />
                   <div>

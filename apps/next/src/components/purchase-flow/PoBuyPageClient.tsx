@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import { Download, Printer } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
@@ -830,7 +830,7 @@ export function PoBuyPageClient() {
           {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
           {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</TableCell></TableRow> : null}
           {!isLoading && pageRows.map((row, index) => (
-            <TableRow key={row.id} className={`cursor-pointer border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
+            <TableRow key={row.id} className={`cursor-pointer border-slate-200 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
                 <TableCell className="text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></TableCell>
                 <TableCell className="w-36 whitespace-nowrap font-mono">{row.docNo}</TableCell>
                 <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
@@ -863,7 +863,6 @@ export function PoBuyPageClient() {
                     type="button"
                     onClick={(event) => { event.stopPropagation(); void printPoBuy(row) }}
                   >
-                    <Printer className="size-3" />
                     {printingPoDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
                   </button>
                   {shouldShowShortCloseButton(row) ? (
@@ -1069,7 +1068,7 @@ function PoBuyCancelModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-cancel-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
-        <DialogHeader className="border-b">
+        <DialogHeader className="border-b border-slate-200">
           <DialogTitle id="po-buy-cancel-title">ยกเลิก PO Buy {row.docNo}</DialogTitle>
           <DialogDescription>{row.supplierName}</DialogDescription>
         </DialogHeader>
@@ -1116,7 +1115,7 @@ function PoBuyShortCloseModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-short-close-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
-        <DialogHeader className="border-b">
+        <DialogHeader className="border-b border-slate-200">
           <DialogTitle id="po-buy-short-close-title">ปิดรับไม่ครบ {row.docNo}</DialogTitle>
           <DialogDescription>{row.supplierName} · คงเหลือ {formatMoney(row.remainingQty)} กก.</DialogDescription>
         </DialogHeader>
@@ -1396,7 +1395,7 @@ function PoBuyFormModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-5xl overflow-y-auto rounded-md p-0" data-combobox-portal-root="true" hideClose>
-        <DialogHeader className="border-b px-5 py-3">
+        <DialogHeader className="border-b border-slate-200 px-5 py-3">
           <DialogTitle id="po-buy-form-title">{heading}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 p-5 text-sm">
@@ -1517,7 +1516,7 @@ function PoBuyDetailModal({
       if (!open) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-detail-title" className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-md p-0" hideClose>
-        <DialogHeader className="border-b p-4">
+        <DialogHeader className="border-b border-slate-200 p-4">
           <div>
             <DialogTitle id="po-buy-detail-title">รายละเอียด {row.docNo}</DialogTitle>
             <DialogDescription>{row.supplierName}</DialogDescription>

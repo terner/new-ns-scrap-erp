@@ -158,19 +158,23 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
       </div>
 
       <div className="rounded-md bg-white p-3 shadow">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Input
-            className="min-w-[260px] flex-1 rounded-md"
+            className="min-w-[260px] flex-1 rounded-md h-9"
             placeholder="ค้นหาชื่อ Supplier / สินค้า / บิล..."
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <span className="text-xs text-slate-500">วันที่:</span>
-          <DatePickerInput id="bill-swap-history-date-from" value={dateFrom} onChange={setDateFrom} />
-          <span className="text-slate-400">→</span>
-          <DatePickerInput id="bill-swap-history-date-to" value={dateTo} onChange={setDateTo} />
-          {hasActiveFilter ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <span className="text-xs text-slate-500 shrink-0">วันที่:</span>
+            <div className="flex items-center gap-1 flex-1 sm:flex-initial">
+              <DatePickerInput className="flex-1 sm:w-[130px]" id="bill-swap-history-date-from" value={dateFrom} onChange={setDateFrom} />
+              <span className="text-slate-400 shrink-0">→</span>
+              <DatePickerInput className="flex-1 sm:w-[130px]" id="bill-swap-history-date-to" value={dateTo} onChange={setDateTo} />
+            </div>
+          </div>
+          {hasActiveFilter ? <Button className="h-9" size="sm" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
         </div>
       </div>
 
@@ -195,7 +199,52 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
+      {/* Mobile Card List */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && pagedRows.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 transition-colors"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="font-bold text-slate-800 text-sm">{row.billDocNo || row.billId}</span>
+              <span className="text-xs text-slate-500">{row.swapDate}</span>
+            </div>
+            <div className="text-xs text-slate-500 mb-2">
+              สินค้า: <span className="font-semibold text-slate-700">{row.productName}</span> · น้ำหนัก: <span className="font-semibold text-slate-700">{formatMoney(row.weight)} กก.</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs border-t border-b border-slate-200 py-2 my-2">
+              <div>
+                <span className="text-slate-400 block">Supplier เดิม</span>
+                <span className="font-semibold text-rose-600 truncate block">{row.beforeSupplierName}</span>
+                <span className="text-slate-500 text-[10px]">ราคา: {formatMoney(row.beforePrice)} | ยอด: {formatMoney(row.beforeAmount)}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Supplier ใหม่</span>
+                <span className="font-semibold text-emerald-700 truncate block">{row.afterSupplierName}</span>
+                <span className="text-slate-500 text-[10px]">ราคา: {formatMoney(row.afterPrice)} | ยอด: {formatMoney(row.afterAmount)}</span>
+              </div>
+            </div>
+            <div className="flex justify-between items-end text-xs">
+              <span className="text-slate-500 truncate max-w-[180px] block">เหตุผล: {row.reason || '-'}</span>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] text-slate-400 block">ส่วนต่าง (Ex VAT)</span>
+                <span className={`font-bold tabular-nums ${row.diffExVat >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {formatMoney(row.diffExVat)}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+        {!isLoading && pagedRows.length === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มีประวัติการเปลี่ยน Supplier</div>
+        ) : null}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-xs" style={{ minWidth: tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {billSwapColumns.map((column) => <col key={column.key} style={getColumnStyle(column.key)} />)}

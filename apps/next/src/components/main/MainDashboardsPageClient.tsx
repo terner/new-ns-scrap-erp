@@ -350,7 +350,7 @@ function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: 
 }
 
 function DashboardChartCard({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-md border border-slate-100 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
+  return <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
 }
 
 function OwnerDailyView({ data }: { data: MainPayload | null }) {

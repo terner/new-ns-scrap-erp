@@ -195,7 +195,7 @@ export function CostPoolPageClient() {
         <span className="text-xs text-slate-500">เรียงตาม {sort}</span>
       </DualCostingCountRow>
 
-      <Table className="[&_tbody_tr]:border-slate-100">
+      <Table className="[&_tbody_tr]:border-slate-200">
         <TableHeader>
           <tr>
             <TableHead>Cost Type</TableHead>

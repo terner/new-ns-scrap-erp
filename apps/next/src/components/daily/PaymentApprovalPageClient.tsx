@@ -629,7 +629,7 @@ export function PaymentApprovalPageClient() {
       </div>
 
       <div className="overflow-hidden rounded-md bg-white shadow">
-        <div className="flex border-b border-slate-100">
+        <div className="flex border-b border-slate-200">
           <button className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'ap' ? 'border-red-600 text-red-700' : 'border-transparent text-slate-500'}`} type="button" onClick={() => setTab('ap')}>
             ต้นทุน / Supplier <span className="ml-2 rounded-md-full bg-red-100 px-2 py-0.5 text-xs text-red-700">{purchaseApprovalRows.length}</span>
           </button>
@@ -642,7 +642,7 @@ export function PaymentApprovalPageClient() {
         </div>
 
         {/* Desktop Filters (Hidden on Mobile) */}
-        <div className="hidden md:block space-y-3 border-b border-slate-100 p-3">
+        <div className="hidden md:block space-y-3 border-b border-slate-200 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <Input className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลขที่ / ชื่อ / ช่องทางจ่าย..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <label className="text-xs text-slate-500">วันที่:</label>
@@ -672,7 +672,7 @@ export function PaymentApprovalPageClient() {
         </div>
 
         {/* Mobile Toolbar (Hidden on Desktop) */}
-        <div className="space-y-2 border-b border-slate-100 p-3 md:hidden">
+        <div className="space-y-2 border-b border-slate-200 p-3 md:hidden">
           <div className="flex gap-2 items-center">
             <Input className="min-w-[200px] flex-1 rounded-md h-9" placeholder="ค้นหาเลขที่ / ชื่อ / ช่องทาง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <button
@@ -713,7 +713,7 @@ export function PaymentApprovalPageClient() {
       {showMobileFilters ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการอนุมัติ</h4>
               <button
                 className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -756,7 +756,7 @@ export function PaymentApprovalPageClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -821,7 +821,7 @@ export function PaymentApprovalPageClient() {
               </div>
             </div>
 
-            <div className="flex justify-between items-end pt-2 border-t border-slate-100">
+            <div className="flex justify-between items-end pt-2 border-t border-slate-200">
               <div>
                 <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${approvalStatusTone(row.approvalStatus)}`}>
                   <span className={`size-1.5 rounded-full ${approvalStatusDot(row.approvalStatus)}`} />
@@ -883,7 +883,7 @@ export function PaymentApprovalPageClient() {
                 ) : null}
               </div>
 
-              <div className="flex justify-between items-end pt-2 border-t border-slate-100">
+              <div className="flex justify-between items-end pt-2 border-t border-slate-200">
                 <div>
                   <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${approvalStatusTone(row.approvalStatus)}`}>
                     <span className={`size-1.5 rounded-full ${approvalStatusDot(row.approvalStatus)}`} />
@@ -1078,8 +1078,8 @@ export function PaymentApprovalPageClient() {
           {detail?.tab === 'ap' ? (
             <div className="space-y-4 px-6 pb-6 pt-2">
               {/* Reference Document Section */}
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสารอ้างอิง</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลเอกสารอ้างอิง</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <DetailItem label="เลขที่เอกสารอ้างอิง" value={detail.row.sourceDocNo} />
                   <DetailItem label="ประเภทเอกสารอ้างอิง" value={detail.row.sourceLabel} />
@@ -1089,8 +1089,8 @@ export function PaymentApprovalPageClient() {
               </div>
 
               {/* Financial Section */}
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการเงิน</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">รายละเอียดการเงิน</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <DetailItem label="ยอดเต็ม" value={formatMoney(detail.row.totalAmount)} />
                   <DetailItem label="ชำระแล้ว" value={formatMoney(detail.row.paidAmount)} />
@@ -1100,8 +1100,8 @@ export function PaymentApprovalPageClient() {
               </div>
 
               {detail.row.approvalStatus === 'pending' ? renderSplitApprovalSection(detail.row) : (
-                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการอนุมัติ</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">รายละเอียดการอนุมัติ</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <DetailItem label="เลขที่อนุมัติ" value={detail.row.approvalDisplayDocNo ?? detail.row.docNo} />
                     <DetailItem label="ช่องทางจ่าย / ปลายทาง" value={detail.row.destinationLabel || '-'} />
@@ -1116,8 +1116,8 @@ export function PaymentApprovalPageClient() {
           ) : detail?.tab === 'expense' ? (
             <div className="space-y-4 px-6 pb-6 pt-2">
               {/* Reference Document Section */}
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสารอ้างอิง</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">ข้อมูลเอกสารอ้างอิง</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <DetailItem label="เลขที่อนุมัติ" value={detail.row.docNo} />
                   <DetailItem label="เลขที่เอกสารอ้างอิง" value={detail.row.sourceDocNo} />
@@ -1129,8 +1129,8 @@ export function PaymentApprovalPageClient() {
               </div>
 
               {/* Financial Section */}
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการเงิน</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">รายละเอียดการเงิน</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <DetailItem label="ช่องทางจ่าย" value={detail.row.destinationLabel || detail.row.accountName || '-'} />
                   <DetailItem label="ยอดเต็ม" value={formatMoney(detail.row.totalAmount)} />
@@ -1139,8 +1139,8 @@ export function PaymentApprovalPageClient() {
               </div>
 
               {detail.row.approvalStatus === 'pending' ? renderSplitApprovalSection(detail.row) : (
-                <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดการอนุมัติ</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200/80">รายละเอียดการอนุมัติ</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <DetailItem label="เลขที่อนุมัติ" value={detail.row.approvalDisplayDocNo ?? detail.row.docNo} />
                     <DetailItem label="ยอดอนุมัติ" value={formatMoney(detail.row.approvedAmount)} />
@@ -1152,7 +1152,7 @@ export function PaymentApprovalPageClient() {
             </div>
           ) : null}
 
-          <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-md">
+          <DialogFooter className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-md">
             {detail && (detail.row.approvalStatus === 'approved' || detail.row.approvalStatus === 'voided') ? (
               <Button
                 className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1"

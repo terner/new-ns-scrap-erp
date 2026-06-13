@@ -592,7 +592,7 @@ export function SuppliersPageClient() {
       {/* Floating Action Button (FAB) for Mobile */}
       <div className="fixed bottom-6 right-6 z-40 lg:hidden">
         <button
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
           onClick={() => void openCreateForm()}
           type="button"
           aria-label="เพิ่มรายการผู้ขาย"
@@ -605,7 +605,7 @@ export function SuppliersPageClient() {
       {showMobileFilters ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
               <button
                 className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
@@ -703,7 +703,7 @@ export function SuppliersPageClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -764,8 +764,8 @@ export function SuppliersPageClient() {
       ) : null}
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <div className="w-full max-w-5xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 md:p-4 md:pt-8">
+          <div className="w-full h-full md:h-auto md:max-h-[90vh] max-w-5xl">
             <SupplierForm
               supplier={selectedSupplier}
               districts={districts}
@@ -792,7 +792,7 @@ export function SuppliersPageClient() {
           {/* Desktop Table View */}
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm hidden lg:block">
             <div className="overflow-x-auto">
-              <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <Table className="[&_tbody_tr]:border-slate-200" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
                   {supplierColumns.map((column) => (
                     <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
@@ -818,7 +818,7 @@ export function SuppliersPageClient() {
                     return (
                       <TableRow
                         key={supplier.id}
-                        className="cursor-pointer border-slate-100 hover:bg-slate-50"
+                        className="cursor-pointer border-slate-200 hover:bg-slate-50"
                         role="button"
                         tabIndex={0}
                         onClick={() => void openEditForm(supplier)}
@@ -929,7 +929,7 @@ export function SuppliersPageClient() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 border-t border-slate-100 pt-2.5 mt-2.5 text-xs text-slate-600">
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 border-t border-slate-200 pt-2.5 mt-2.5 text-xs text-slate-600">
                     <div>
                       <span className="block text-slate-400 font-medium">ประเภท</span>
                       <span className="font-semibold text-slate-700">{displayValue(supplier.type)}</span>
@@ -946,7 +946,7 @@ export function SuppliersPageClient() {
                           {receivingLines.map((line, index) => {
                             const accountKey = `${supplier.id}-account-mobile-${index}`
                             return (
-                              <div key={accountKey} className="flex items-center justify-between gap-2 bg-slate-50 px-2.5 py-1.5 rounded-md border border-slate-100">
+                              <div key={accountKey} className="flex items-center justify-between gap-2 bg-slate-50 px-2.5 py-1.5 rounded-md border border-slate-200">
                                 <div className="truncate">
                                   <div className="font-semibold text-slate-700">{line.bankName}</div>
                                   <div className="font-mono text-[11px] text-slate-500 mt-0.5">{line.accountNo}</div>
@@ -1191,15 +1191,15 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
   }
 
   return (
-    <form className="overflow-hidden rounded-md bg-white shadow-xl" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-3 bg-slate-900 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <form className="w-full h-full md:h-auto md:max-h-[90vh] flex flex-col bg-white md:rounded-md shadow-xl overflow-hidden" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-3 bg-slate-900 px-5 py-4 sm:flex-row sm:items-center sm:justify-between flex-none">
         <h3 className="text-lg font-bold text-slate-100">{form.id ? 'แก้ไขผู้ขาย' : 'เพิ่มผู้ขาย'}</h3>
         <ActiveToggle checked={form.active} labelClassName="text-sm font-medium text-slate-200" onChange={(checked) => update('active', checked)} />
       </div>
 
-      <div className="max-h-[76vh] space-y-5 overflow-y-auto bg-slate-50 px-5 py-5">
+      <div className="flex-1 space-y-5 overflow-y-auto bg-slate-50 px-5 py-5">
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h4 className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ข้อมูลผู้ขาย</h4>
+          <h4 className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">ข้อมูลผู้ขาย</h4>
           <div className="grid gap-4 md:grid-cols-4">
             <SelectField required error={errors.type} label="ประเภทผู้ขาย" value={form.type} onChange={(value) => updateSupplierType(value as SupplierFormValues['type'])}>
               <option value="บุคคล">บุคคล</option>
@@ -1231,7 +1231,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h4 className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ที่อยู่</h4>
+          <h4 className="mb-4 text-sm font-bold text-slate-800 border-b border-slate-200 pb-2">ที่อยู่</h4>
           <div className="grid gap-4 md:grid-cols-4">
             <SelectField required className="md:col-span-2" error={errors.marketScope} label="ประเทศ/ตลาด" placeholder="เลือกประเทศ/ตลาด" value={form.marketScope} onChange={(value) => updateMarketScope(value as SupplierFormValues['marketScope'] | '')}>
               <option value="ในประเทศ">ในประเทศ</option>
@@ -1286,7 +1286,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
             <h4 className="text-sm font-bold text-slate-800">ข้อมูลบัญชีและสาขา</h4>
             <button className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={addBankAccount}>
               + เพิ่มบัญชี
@@ -1327,7 +1327,7 @@ function SupplierForm({ supplier, bankNames, paymentMethods, districts, isSaving
         </section>
       </div>
 
-      <div className="flex flex-wrap justify-end gap-3.5 border-t border-slate-100 bg-white px-5 py-4">
+      <div className="flex flex-wrap justify-end gap-3.5 border-t border-slate-200 bg-white px-5 py-4 flex-none">
         <button className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
