@@ -641,10 +641,7 @@ export function WeightTicketsPageClient({
                     เพิ่ม
                   </Button>
                 </div>
-                <div className={cn(
-                  "space-y-2 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-1",
-                  !activeLine && "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 space-y-0"
-                )}>
+                <div className="space-y-2 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-1">
                   {form.lines.map((line, index) => {
                     const lineTotals = calculateLineTotals(line)
                     const hasError = Boolean(
