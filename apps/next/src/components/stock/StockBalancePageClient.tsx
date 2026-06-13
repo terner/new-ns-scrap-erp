@@ -185,7 +185,7 @@ export function StockBalancePageClient() {
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       
       {/* Metric Cards */}
-      <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-6 text-sm">
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-6 text-sm">
         <Metric emoji="⚖️" iconBg="bg-blue-100 text-blue-700" label="น้ำหนักสต๊อกรวม" value={`${formatMoney(summary.qty)} กก.`} tone="blue" />
         <Metric emoji="💰" iconBg="bg-emerald-100 text-emerald-700" label="มูลค่าสต๊อกรวม" value={formatMoney(summary.value)} tone="emerald" />
         <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="จองไว้" sub="จาก WTO ที่ยังไม่ออกบิล" value={`${formatMoney(summary.onHoldQty)} กก.`} tone="amber" />

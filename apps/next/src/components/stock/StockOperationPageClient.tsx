@@ -394,7 +394,7 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
     const autoCount = rows.filter((row) => String(row.sourceType ?? '').startsWith('Auto')).length
     const reversed = rows.filter((row) => row.status === 'reversed').length
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 lg:grid-cols-7 text-sm">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 lg:grid-cols-7 text-sm">
         <Metric emoji="📋" iconBg="bg-slate-100" label="รายการทั้งหมด" value={String(rows.length)} valueClassName="text-slate-900" />
         <Metric emoji="✅" iconBg="bg-emerald-100 text-emerald-700" label="Posted" value={String(posted)} valueClassName="text-emerald-700" />
         <Metric emoji="⏳" iconBg="bg-amber-100 text-amber-700" label="Pending Cost" value={String(pendingCost)} valueClassName="text-amber-700" />
@@ -413,7 +413,7 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
     const lossValue = lossRows.reduce((sum, row) => sum + Number(row.valueNote ?? 0), 0)
     const gainValue = gainRows.reduce((sum, row) => sum + Number(row.valueNote ?? 0), 0)
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 text-sm">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 text-sm">
         <Metric emoji="📋" iconBg="bg-slate-100" label="รายการทั้งหมด" value={String(rows.length)} valueClassName="text-slate-900" />
         <Metric emoji="📉" iconBg="bg-red-100 text-red-700" label="นับขาด (LOSS)" value={`-${formatMoney(lossQty)} กก.`} valueClassName="text-red-600" />
         <Metric emoji="💸" iconBg="bg-red-100 text-red-700" label="มูลค่าขาด (Note)" value={formatMoney(lossValue)} valueClassName="text-red-600" />
@@ -424,7 +424,7 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
   }
   if (mode === 'status-convert') return null
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm">
       <Metric emoji="📋" iconBg="bg-slate-100" label="รายการ" value={String(rows.length)} />
       <Metric emoji="⚖️" iconBg="bg-slate-100" label="น้ำหนักรวม" value={`${formatMoney(totalQty)} กก.`} />
       <Metric emoji="💰" iconBg="bg-slate-100" label="มูลค่า" value={formatMoney(totalValue)} />
