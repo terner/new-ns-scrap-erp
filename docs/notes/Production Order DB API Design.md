@@ -437,6 +437,8 @@ where po2.status = 'active'
 
 ### Batch P3F: Reports and Reconciliation
 
+- [x] Update production order detail/list cards to read active input/output/WIP fact metrics from the API.
+- [x] Update WIP report metrics to reconcile from active `PI`/`PO2` stock ledger refs.
 - [x] Add `GET /api/production/reconciliation` read API for PI/PO2 ledger mismatch, completed order WIP mismatch, open order movement mismatch, and missing reversal ledger checks.
 - [x] Run logged-in browser QA for create -> repeated input rounds -> repeated output/loss rounds -> complete -> reverse-block -> reconciliation.
 - [x] Confirm legacy parity: repeated modal saves are sufficient for MVP; an in-modal multi-line editor is not required.
@@ -457,3 +459,10 @@ where po2.status = 'active'
 - Added Production navigation item `Production Reconciliation`.
 - Page displays total issue count, ref-type counts, issue-type filter, search, refresh, and issue details table.
 - Authenticated browser QA passed with `GET /api/production/reconciliation = 200`, `issueCount=0`, empty state rendered, and no browser console errors.
+
+## 2026-06-13 Active-Fact Report Evidence
+
+- `/api/production/orders` now returns active input/output/WIP metrics for list/detail cards: `inputQty`, `inputCost`, `outputQty`, `outputValue`, `lossQty`, `consumedWipQty`, `wipQty`, `wipValue`, `variance`, and `yieldPct`.
+- `/production/orders` uses these API metrics directly for card/detail display instead of calculating WIP in the browser from `input - output`.
+- `loadProductionMetrics()` now derives WIP report quantities and values from `stock_ledger` rows for active `PI`/`PO2` refs, including `WIP_IN`, `PRODUCTION_OUTPUT_WIP_OUT`, `PRODUCTION_OUTPUT_IN`, `PRODUCTION_OUTPUT_RM_IN`, and `PRODUCTION_LOSS`.
+- Production report/reconciliation surfaces must keep WIP and ledger mismatch visible where relevant; `/production/wip-report` is retired and must not be exposed as a standalone route.

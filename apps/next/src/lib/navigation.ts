@@ -199,7 +199,6 @@ export const navigationItems: NavigationItem[] = [
   { href: '/production/orders', icon: '🏭', label: 'ใบสั่งผลิต', section: 'production' },
   { href: '/production/output-categories', icon: '🏷️', label: 'หมวดหมู่ผลผลิต', section: 'production' },
   { href: '/production/dashboard', icon: '📊', label: 'Production Dashboard', section: 'production' },
-  { href: '/production/wip-report', icon: '⏳', label: 'WIP คงเหลือ', section: 'production' },
   { href: '/production/report', icon: '📐', label: 'รายงานการผลิต / Yield', section: 'production' },
   { href: '/production/production-cost-report', icon: '💴', label: 'Production Cost Report', section: 'production' },
   { href: '/production/reconciliation', icon: '✅', label: 'Production Reconciliation', pageSubtitle: 'ตรวจความสมดุล PI/PO2/WIP ระหว่างเอกสารผลิตกับ Stock Ledger', section: 'production' },

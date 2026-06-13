@@ -53,28 +53,19 @@ export async function GET(request: Request) {
       } : {}),
     }
 
-    const [total, rows, aggregate, categories, warehouses] = await Promise.all([
+    const [total, rows, categories, warehouses] = await Promise.all([
       prisma.production_orders.count({ where }),
       prisma.production_orders.findMany({
         include: {
           branches: true,
           products: true,
-          production_inputs: { include: { products: true }, orderBy: [{ date: 'asc' }, { id: 'asc' }] },
-          production_outputs: { include: { products: true }, orderBy: [{ date: 'asc' }, { id: 'asc' }] },
+          production_inputs: { include: { products: true }, orderBy: [{ date: 'asc' }, { id: 'asc' }], where: { status: 'active' } },
+          production_outputs: { include: { products: true }, orderBy: [{ date: 'asc' }, { id: 'asc' }], where: { status: 'active' } },
           warehouses: true,
         },
         orderBy: orderBy(sort, direction),
         skip: (page - 1) * pageSize,
         take: pageSize,
-        where,
-      }),
-      prisma.production_orders.aggregate({
-        _sum: {
-          qty_planned: true,
-          total_input_cost: true,
-          total_output_value: true,
-          variance: true,
-        },
         where,
       }),
       prisma.production_output_categories.findMany({
@@ -90,7 +81,20 @@ export async function GET(request: Request) {
     const warehouseById = new Map(warehouses.map((warehouse) => [warehouse.id.toString(), warehouse]))
     const payloadRows = rows.map((row) => {
       const inputQty = row.production_inputs.reduce((sum, input) => sum + toNumber(input.qty), 0)
-      const outputQty = row.production_outputs.reduce((sum, output) => sum + toNumber(output.qty), 0)
+      const inputCost = row.production_inputs.reduce((sum, input) => sum + toNumber(input.total_cost), 0)
+      const outputQty = row.production_outputs
+        .filter((output) => output.category_code !== 'LOSS')
+        .reduce((sum, output) => sum + toNumber(output.qty), 0)
+      const consumedWipQty = row.production_outputs.reduce((sum, output) => sum + toNumber(output.source_wip_qty), 0)
+      const lossQty = row.production_outputs
+        .filter((output) => output.category_code === 'LOSS')
+        .reduce((sum, output) => sum + (toNumber(output.source_wip_qty) || toNumber(output.qty)), 0)
+      const outputValue = row.production_outputs
+        .filter((output) => output.category_code !== 'LOSS')
+        .reduce((sum, output) => sum + toNumber(output.total_cost), 0)
+      const consumedWipValue = row.production_outputs.reduce((sum, output) => sum + toNumber(output.total_cost), 0)
+      const wipQty = inputQty - consumedWipQty
+      const wipValue = inputCost - consumedWipValue
       const outputCategories = [...new Set(row.production_outputs.map((output) => String(output.output_category ?? '')).filter((value) => value.length > 0))]
 
       return {
@@ -99,7 +103,8 @@ export async function GET(request: Request) {
         date: toDateOnly(row.date),
         docNo: row.doc_no,
         id: row.doc_no,
-        inputCost: toNumber(row.total_input_cost),
+        consumedWipQty,
+        inputCost,
         inputCount: row.production_inputs.length,
         inputs: row.production_inputs.map((input) => ({
           date: toDateOnly(input.date),
@@ -116,6 +121,7 @@ export async function GET(request: Request) {
           warehouseName: input.source_warehouse_id ? warehouseById.get(input.source_warehouse_id.toString())?.name ?? '-' : '-',
         })),
         inputQty,
+        lossQty,
         notes: row.notes ?? '',
         outputCategories: outputCategories.map((code) => ({
           code,
@@ -138,16 +144,26 @@ export async function GET(request: Request) {
           warehouseName: output.destination_warehouse_id ? warehouseById.get(output.destination_warehouse_id.toString())?.name ?? '-' : '-',
         })),
         outputQty,
-        outputValue: toNumber(row.total_output_value),
+        outputValue,
         productCode: row.products?.code ?? '',
         productId: row.products?.code ? requireBusinessCode(row.products.code, `สินค้า ${row.product_id}`) : '',
         productName: row.products?.name ?? '-',
         qtyPlanned: toNumber(row.qty_planned),
         status: row.status ?? 'Open',
-        variance: toNumber(row.variance),
+        variance: outputValue - inputCost,
         warehouseName: row.warehouses?.name ?? '-',
+        wipQty,
+        wipValue,
+        yieldPct: inputQty > 0 ? outputQty / inputQty * 100 : 0,
       }
     })
+    const summary = payloadRows.reduce((acc, row) => {
+      acc.inputCost += row.inputCost
+      acc.outputValue += row.outputValue
+      acc.qtyPlanned += row.qtyPlanned
+      acc.variance += row.variance
+      return acc
+    }, { inputCost: 0, outputValue: 0, qtyPlanned: 0, variance: 0 })
 
     return NextResponse.json({
       categories: categories.map((category) => ({
@@ -160,12 +176,12 @@ export async function GET(request: Request) {
       pageSize,
       rows: payloadRows,
       summary: {
-        inputCost: toNumber(aggregate._sum.total_input_cost),
-        outputValue: toNumber(aggregate._sum.total_output_value),
-        qtyPlanned: toNumber(aggregate._sum.qty_planned),
+        inputCost: summary.inputCost,
+        outputValue: summary.outputValue,
+        qtyPlanned: summary.qtyPlanned,
         total,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
-        variance: toNumber(aggregate._sum.variance),
+        variance: summary.variance,
       },
     })
   } catch (caught) {

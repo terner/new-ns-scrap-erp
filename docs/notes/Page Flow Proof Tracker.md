@@ -96,7 +96,6 @@ P1 ทำเสร็จตาม current-code baseline แล้ว ดู [[P1
 | `/production/orders` | ใบสั่งผลิต | [[page-flows/production-production-orders]] |
 | `/production/output-categories` | หมวดหมู่ผลผลิต | [[page-flows/production-production-output-categories]] |
 | `/production/dashboard` | Production Dashboard | [[page-flows/production-production-dashboard]] |
-| `/production/wip-report` | WIP คงเหลือ | [[page-flows/production-production-wip-report]] |
 | `/production/report` | รายงานการผลิต / Yield | [[page-flows/production-production-report]] |
 | `/production/production-cost-report` | Production Cost Report | [[page-flows/production-production-production-cost-report]] |
 

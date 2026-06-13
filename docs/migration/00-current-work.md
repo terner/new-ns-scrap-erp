@@ -2112,3 +2112,10 @@ Tailwind dependency check:
   - `GET /api/purchase/bills` now uses DB `skip/take`, `count`, and `sum(total_amount)` for normal list paging; it keeps in-memory workflow status sort/filter only where PMA/PMT-derived status is required.
   - Validation passed: Prisma generate, targeted ESLint for PB lifecycle files, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `npm run verify:stock-ledger` with all totals `0`.
   - Remaining PB QA: logged-in browser QA for PB edit/cancel/supplier-swap against real data, plus explicit API smoke that confirms released/superseded rows are retained after each action.
+- 2026-06-13: Production P3F active-fact report checkpoint
+  - `/api/production/orders` list/detail payload now calculates production card metrics from active production facts only: input qty/cost, output qty/value excluding loss, loss qty, consumed WIP, WIP qty/value, variance, and yield.
+  - `/production/orders` cards and detail metrics now consume the API-provided active-fact fields instead of recomputing WIP in the browser as `input - output`.
+  - `loadProductionMetrics()` now derives WIP/report rows from active `PI`/`PO2` stock ledger refs, including WIP in/out, FG/RM stock-in, and loss rows.
+  - `/production/wip-report` now shows `lossQty` and `ledgerMismatchQty`, making PI/PO2 fact-vs-ledger drift visible instead of hiding it with table-only totals.
+  - Docs updated: `docs/migration/16-next-production-progress.md`, `docs/notes/Production Order DB API Design.md`, and `docs/notes/page-flows/production-production-orders.md`.
+  - Validation passed: `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, and unauthenticated protected-route smoke for `/production/orders`, `/api/production/orders`, and retired `/production/wip-report` middleware behavior.

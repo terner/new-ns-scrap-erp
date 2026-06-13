@@ -276,8 +276,8 @@ Tasks:
 
 Tasks:
 
-- [ ] Update order detail cards from active input/output/WIP facts.
-- [ ] Update WIP report to reconcile with `PI/PO2` stock ledger refs.
+- [x] Update order detail cards from active input/output/WIP facts.
+- [x] Update WIP report to reconcile with `PI/PO2` stock ledger refs.
 - [ ] Update production dashboard and yield/loss status definitions.
 - [x] Add reconciliation report/query for PI/PO2 imbalance.
 - [x] Add read API for production reconciliation issues.
@@ -301,6 +301,21 @@ Tasks:
 - UI reads `GET /api/production/reconciliation` and displays total issue count, ref-type counts, issue filter, search, refresh, and issue table.
 - Authenticated browser QA on local Next dev server passed: API returned 200 with `issueCount=0`, page rendered empty state, desktop overflow check passed, and browser console errors were none.
 
+#### 2026-06-13 Production P3F Active-Fact Report Closure
+
+- `/api/production/orders` now calculates list/detail card metrics from active input/output facts only: input qty/cost, output qty/value excluding loss, loss qty, consumed WIP, WIP qty/value, variance, and yield.
+- `/production/orders` cards/detail metrics now consume the API-provided active-fact metrics instead of recomputing WIP as `input - output`.
+- `loadProductionMetrics()` now calculates WIP/report rows from `stock_ledger` rows for active `PI` and `PO2` refs: `WIP_IN`, `PRODUCTION_OUTPUT_WIP_OUT`, `PRODUCTION_OUTPUT_IN`, `PRODUCTION_OUTPUT_RM_IN`, and `PRODUCTION_LOSS`.
+- Production report/reconciliation surfaces now keep WIP and PI/PO2 ledger mismatch visible where relevant instead of hiding mismatches behind table-only totals.
+- Validation passed: `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, and `git diff --check`.
+
+#### 2026-06-13 WIP Report Route Retirement
+
+- Per product decision, standalone `WIP คงเหลือ` is no longer used.
+- Removed `/production/wip-report` from navigation, report catalog, OpenAPI, sitemap, page inventory, and page-flow docs.
+- Removed the Next page/API route files for `/production/wip-report` and `/api/production/wip-report`.
+- WIP remains an internal production-order/reconciliation metric for completion guards, detail cards, dashboard/report summaries, and ledger checks.
+
 ### Batch P4: Production Reports Baseline
 
 Scope:
@@ -310,7 +325,6 @@ Scope:
 - `/production/production-cost-report`
 - `/production/yield-loss-report`
 - `/production/machine-utilization`
-- `/production/wip-report`
 
 Status: Done read baseline on 2026-05-18.
 
@@ -323,7 +337,6 @@ Tasks:
 - [x] Add shared production report helper for input/output/loss/WIP/yield/cost calculations.
 - [x] Add pages and APIs:
   - `/production/dashboard` + `/api/production/dashboard`
-  - `/production/wip-report` + `/api/production/wip-report`
   - `/production/report` + `/api/production/report`
   - `/production/production-cost-report` + `/api/production/production-cost-report`
   - `/production/yield-loss-report` + `/api/production/yield-loss-report`
@@ -350,7 +363,6 @@ Tasks:
 - Next has `/production/output-categories`, `/api/production/output-categories`, `/production/orders`, and `/api/production/orders`.
 - Next now has every production menu page from legacy as a DB-connected read baseline:
   - `/production/dashboard`
-  - `/production/wip-report`
   - `/production/report`
   - `/production/production-cost-report`
   - `/production/yield-loss-report`

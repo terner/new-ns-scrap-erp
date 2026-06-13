@@ -28,11 +28,12 @@ Routes ปัจจุบัน:
 | ใบสั่งผลิต | `/production/orders` | `GET /api/production/orders` | read baseline |
 | หมวดหมู่ผลผลิต | `/production/output-categories` | `GET/POST /api/production/output-categories`, `PATCH /api/production/output-categories/[id]` | master baseline |
 | Production Dashboard | `/production/dashboard` | `GET /api/production/dashboard` | read baseline |
-| WIP คงเหลือ | `/production/wip-report` | `GET /api/production/wip-report` | read baseline |
 | รายงานการผลิต / Yield | `/production/report` | `GET /api/production/report` | read baseline |
 | Production Cost Report | `/production/production-cost-report` | `GET /api/production/production-cost-report` | read baseline |
 | Yield/Loss Report | `/production/yield-loss-report` | `GET /api/production/yield-loss-report` | read baseline |
 | Machine Utilization | `/production/machine-utilization` | `GET /api/production/machine-utilization` | read baseline |
+
+`/production/wip-report` is retired and should not be exposed in navigation or docs. WIP remains an internal production-order/reconciliation metric, not a standalone page.
 
 ## Business Purpose
 

@@ -135,7 +135,6 @@ const reports: ReportLink[] = [
   { category: 'tracking', href: '/tracking/product', label: 'Product Tracking', owner: 'Tracking', status: 'read/export', summary: 'Product movement and slow mover report' },
   { category: 'production', href: '/production/dashboard', label: 'Production Dashboard', owner: 'Production', status: 'read baseline', summary: 'Production KPIs and open order status' },
   { category: 'production', href: '/production/report', label: 'รายงานการผลิต / Yield', owner: 'Production', status: 'read baseline', summary: 'Production yield report' },
-  { category: 'production', href: '/production/wip-report', label: 'WIP คงเหลือ', owner: 'Production', status: 'read baseline', summary: 'WIP balance report' },
   { category: 'daily', href: '/po-reports/outstanding', label: 'PO ซื้อ/ขาย คงเหลือ', owner: 'PO Reports', status: 'read baseline', summary: 'Outstanding PO buy/sell report' },
   { category: 'daily', href: '/admin/transaction-ledger', label: 'Transaction Ledger', owner: 'Admin', status: 'read/export', summary: 'เงินเข้าออกทุกบัญชีพร้อม voucher refs' },
 ]

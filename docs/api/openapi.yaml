@@ -1859,14 +1859,6 @@ paths:
         "200":
           $ref: "#/components/responses/ListOk"
 
-  /api/production/wip-report:
-    get:
-      tags: [Production]
-      summary: Read WIP report baseline
-      responses:
-        "200":
-          $ref: "#/components/responses/ListOk"
-
   /api/production/production-cost-report:
     get:
       tags: [Production]

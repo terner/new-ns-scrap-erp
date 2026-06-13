@@ -115,6 +115,8 @@ production order เป็น owner ของ input/WIP/output lifecycle target.
 - Stock reconciliation follow-up on 2026-06-12 repaired the WIP-side product dimension for active production ledger rows and hardened runtime WIP-side PI/PO2 writes to use `production_orders.product_id`; source/destination rows remain line-product specific.
 - Legacy parity confirmed: input/output are multi-round by repeated one-document modal saves from the order detail, not an in-modal editable multi-line grid.
 - Production reconciliation is now surfaced in `/production/reconciliation` as a read-only report over active `PI/PO2` facts and stock ledger checks.
+- Production order cards/detail metrics now read active input/output/WIP facts from `/api/production/orders`, including `lossQty`, `consumedWipQty`, `wipQty`, `wipValue`, and `yieldPct`.
+- Production report/reconciliation read models now reconcile WIP from active `PI`/`PO2` stock ledger refs and surface `ledgerMismatchQty` when production facts and ledger rows diverge; standalone `/production/wip-report` is retired.
 
 ## Implementation Checklist
 
