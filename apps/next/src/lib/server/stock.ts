@@ -45,6 +45,18 @@ export function stockWhere(input: {
   to?: string | null
   warehouseId?: bigint | null
 }): Prisma.stock_ledgerWhereInput {
+  const statusWhere = input.status
+    ? {
+        OR: [
+          { output_category: input.status },
+          {
+            output_category: null,
+            warehouses: { type: input.status },
+          },
+        ],
+      }
+    : {}
+
   return {
     ...(input.productId ? { product_id: input.productId } : {}),
     ...(input.branchId ? { branch_id: input.branchId } : {}),
@@ -52,9 +64,16 @@ export function stockWhere(input: {
     ...(input.movementType ? { movement_type: input.movementType } : {}),
     ...(input.refType ? { ref_type: input.refType } : {}),
     ...(input.lotNo ? { lot_no: { contains: input.lotNo, mode: 'insensitive' } } : {}),
-    ...(input.status ? { output_category: input.status } : {}),
+    ...statusWhere,
     ...dateWhere(input),
   }
+}
+
+function stockStatusForLedgerRow(row: { output_category: string | null; warehouses: { type: string | null } | null }) {
+  const explicitStatus = row.output_category?.trim()
+  if (explicitStatus) return explicitStatus
+  const warehouseType = row.warehouses?.type?.trim().toUpperCase()
+  return warehouseType === 'RM' || warehouseType === 'WIP' || warehouseType === 'FG' ? warehouseType : '-'
 }
 
 export async function normalizeStockReferenceInput(input: {
@@ -195,7 +214,7 @@ export async function stockBalanceSnapshot(input: {
   }>()
 
   for (const row of ledgerRows) {
-    const productStatus = row.output_category ?? '-'
+    const productStatus = stockStatusForLedgerRow(row)
     const key = stockKey({
       branchId: row.branches?.code ?? null,
       lotNo: row.lot_no ?? null,
