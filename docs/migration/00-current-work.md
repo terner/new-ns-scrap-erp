@@ -2119,3 +2119,10 @@ Tailwind dependency check:
   - `/production/wip-report` now shows `lossQty` and `ledgerMismatchQty`, making PI/PO2 fact-vs-ledger drift visible instead of hiding it with table-only totals.
   - Docs updated: `docs/migration/16-next-production-progress.md`, `docs/notes/Production Order DB API Design.md`, and `docs/notes/page-flows/production-production-orders.md`.
   - Validation passed: `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `git diff --check`, and unauthenticated protected-route smoke for `/production/orders`, `/api/production/orders`, and retired `/production/wip-report` middleware behavior.
+- 2026-06-13: Dev-target transaction cleanup checkpoint
+  - User approved deleting all transaction data while preserving config and master data.
+  - Scope was dev-target Supabase project `fhglqymcdmrgbsbadnwr` only, using the active Next app `DATABASE_URL`; legacy-prod-source was not touched.
+  - Cleanup used an explicit whitelist of 62 transaction/document/ledger/log tables and pre-checked FK cascade risk before running `TRUNCATE ... RESTART IDENTITY CASCADE`.
+  - Post-check: `transaction_tables_checked = 62`, `transaction_tables_nonzero = 0`.
+  - Master/config sanity counts after cleanup: `products = 234`, `suppliers = 1888`, `customers = 51`, `accounts = 11`, `branches = 2`, `warehouses = 4`, `app_users = 29`, `app_roles = 7`, `app_permissions = 29`, `payment_methods = 7`, `vat_settings = 1`, `wht_settings = 6`, `production_machines = 4`, `production_lines = 3`, `company_profiles = 3`.
+  - Validation passed with env loaded from `apps/next/.env.local`: `npm run verify:stock-ledger --workspace @ns-scrap-erp/next` returned all stock totals `0` and production `issueCount = 0`.
