@@ -2383,6 +2383,56 @@ paths:
       tags: [Stock]
       operationId: listStockAdjustments
       summary: List stock count/cycle count corrections
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search document no, lot, reason, actor, product code, or product name.
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: warehouseId
+          in: query
+          schema:
+            type: string
+        - name: productId
+          in: query
+          schema:
+            type: string
+        - name: adjustType
+          in: query
+          schema:
+            type: string
+            enum: [LOSS, GAIN]
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: snapshot
+          in: query
+          schema:
+            type: string
+            enum: ["1"]
+          description: When `1`, returns a server-side stock/count/value preview instead of the list.
       responses:
         "200":
           description: Stock count adjustment rows and stock reference options
@@ -4290,8 +4340,18 @@ components:
           type: string
     StockAdjustListResponse:
       type: object
-      required: [reference, rows]
+      required: [pagination, reference, rows]
       properties:
+        pagination:
+          type: object
+          required: [page, pageSize, total]
+          properties:
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            total:
+              type: integer
         reasonOptions:
           type: array
           description: Fixed in-page reason options for stock count adjustment.

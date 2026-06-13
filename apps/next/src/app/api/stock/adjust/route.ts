@@ -1,24 +1,84 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '../../../../../generated/prisma/client'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
-import { averageCostForStock, normalizeStockReferenceInput, quantityForStock, stockReferenceData } from '@/lib/server/stock'
+import { normalizeStockReferenceInput, stockBalanceSnapshot, stockReferenceData } from '@/lib/server/stock'
 import { stockAdjustCorrectionSchema, stockAdjustFormSchema, stockAdjustReasonOptions } from '@/lib/stock'
 
 export const runtime = 'nodejs'
 const CORRECTION_WINDOW_DAYS = 7
 const MIN_VALUE_PRICE = 0.000001
 
-async function nextDocNo() {
+const stockAdjustmentSelect = {
+  accounting_impact_policy: true,
+  adjust_type: true,
+  branch_id: true,
+  counted_qty: true,
+  created_at: true,
+  created_by: true,
+  date: true,
+  diff_qty: true,
+  doc_no: true,
+  id: true,
+  lot_no: true,
+  on_hold_qty: true,
+  output_category: true,
+  product_id: true,
+  ready_qty_snapshot: true,
+  reason: true,
+  status: true,
+  system_qty: true,
+  unit_cost_used: true,
+  updated_at: true,
+  updated_by: true,
+  value_note: true,
+  warehouse_id: true,
+} satisfies Prisma.stock_adjustmentsSelect
+
+async function nextDocNo(tx: Prisma.TransactionClient) {
   const prefix = 'ADJ-'
-  const last = await prisma.stock_adjustments.findFirst({
+  await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('stock_adjustments.doc_no'))`
+  const last = await tx.stock_adjustments.findFirst({
     orderBy: { doc_no: 'desc' },
     select: { doc_no: true },
     where: { doc_no: { startsWith: prefix } },
   })
   const lastNumber = Number(String(last?.doc_no ?? '').slice(prefix.length))
   return `${prefix}${String(Number.isFinite(lastNumber) ? lastNumber + 1 : 1).padStart(6, '0')}`
+}
+
+async function stockAdjustMetrics(input: {
+  asOf?: string | null
+  branchId: bigint
+  lotNo?: string | null
+  productId: bigint
+  status?: string | null
+  warehouseId: bigint
+}) {
+  const snapshot = await stockBalanceSnapshot({
+    asOf: input.asOf,
+    branchId: input.branchId,
+    lotNo: input.lotNo,
+    productId: input.productId,
+    status: input.status,
+    warehouseId: input.warehouseId,
+  })
+  const totals = snapshot.rows.reduce(
+    (acc, row) => {
+      acc.readyQty += row.readyQty
+      acc.systemQty += row.qty
+      acc.value += row.value
+      return acc
+    },
+    { readyQty: 0, systemQty: 0, value: 0 },
+  )
+  return {
+    readyQty: totals.readyQty,
+    systemQty: totals.systemQty,
+    unitPricePerKg: totals.systemQty > 0 ? totals.value / totals.systemQty : 0,
+  }
 }
 
 async function stockAdjustSnapshot(input: {
@@ -41,11 +101,14 @@ async function stockAdjustSnapshot(input: {
 
   const status = input.status || 'RM'
   const asOf = input.date || null
-  const [systemQty, readyQty, unitPricePerKg] = await Promise.all([
-    quantityForStock({ asOf, branchId: references.branchId, lotNo: input.lotNo, productId: references.productId, status, warehouseId: references.warehouseId }),
-    quantityForStock({ asOf, branchId: references.branchId, lotNo: input.lotNo, productId: references.productId, quantityType: 'ready', status, warehouseId: references.warehouseId }),
-    averageCostForStock({ asOf, branchId: references.branchId, lotNo: input.lotNo, productId: references.productId, status, warehouseId: references.warehouseId }),
-  ])
+  const { readyQty, systemQty, unitPricePerKg } = await stockAdjustMetrics({
+    asOf,
+    branchId: references.branchId,
+    lotNo: input.lotNo,
+    productId: references.productId,
+    status,
+    warehouseId: references.warehouseId,
+  })
   const countedQty = input.countedQty == null || input.countedQty === '' ? systemQty : Number(input.countedQty)
   const diffQty = Number.isFinite(countedQty) ? countedQty - systemQty : 0
   return {
@@ -74,6 +137,64 @@ function canCorrectAdjustment(date: Date | null) {
   return Boolean(deadline && deadline.getTime() >= Date.now())
 }
 
+async function buildListWhere(searchParams: URLSearchParams) {
+  const q = searchParams.get('q')?.trim() || ''
+  const branchParam = searchParams.get('branchId')?.trim()
+  const productParam = searchParams.get('productId')?.trim()
+  const warehouseParam = searchParams.get('warehouseId')?.trim()
+  const references = await normalizeStockReferenceInput({
+    branchId: branchParam,
+    productId: productParam,
+    warehouseId: warehouseParam,
+  })
+  if (branchParam && !references.branchId) return { error: 'สาขา filter ไม่ถูกต้องหรือถูกปิดใช้งาน' }
+  if (warehouseParam && !references.warehouseId) return { error: 'คลัง filter ไม่ถูกต้องหรือถูกปิดใช้งาน' }
+  if (productParam && !references.productId) return { error: 'สินค้า filter ไม่ถูกต้องหรือถูกปิดใช้งาน' }
+
+  const dateFrom = searchParams.get('dateFrom')?.trim()
+  const dateTo = searchParams.get('dateTo')?.trim()
+  const adjustType = searchParams.get('adjustType')?.trim()
+  const productIdsBySearch = q
+    ? await prisma.products.findMany({
+        select: { id: true },
+        take: 100,
+        where: {
+          OR: [
+            { code: { contains: q, mode: 'insensitive' } },
+            { name: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+      })
+    : []
+  const where: Prisma.stock_adjustmentsWhereInput = {
+    ...(references.branchId ? { branch_id: references.branchId } : {}),
+    ...(references.productId ? { product_id: references.productId } : {}),
+    ...(references.warehouseId ? { warehouse_id: references.warehouseId } : {}),
+    ...(adjustType === 'LOSS' || adjustType === 'GAIN' ? { adjust_type: adjustType } : {}),
+    ...(dateFrom || dateTo
+      ? {
+          date: {
+            ...(dateFrom ? { gte: normalizeDate(dateFrom) } : {}),
+            ...(dateTo ? { lte: normalizeDate(dateTo) } : {}),
+          },
+        }
+      : {}),
+    ...(q
+      ? {
+          OR: [
+            { doc_no: { contains: q, mode: 'insensitive' } },
+            { lot_no: { contains: q, mode: 'insensitive' } },
+            { reason: { contains: q, mode: 'insensitive' } },
+            { created_by: { contains: q, mode: 'insensitive' } },
+            { updated_by: { contains: q, mode: 'insensitive' } },
+            ...(productIdsBySearch.length > 0 ? [{ product_id: { in: productIdsBySearch.map((row) => row.id) } }] : []),
+          ],
+        }
+      : {}),
+  }
+  return { where }
+}
+
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
@@ -93,20 +214,41 @@ export async function GET(request: Request) {
       return NextResponse.json({ snapshot })
     }
 
-    const [reference, adjustments] = await Promise.all([
+    const listFilter = await buildListWhere(searchParams)
+    if ('error' in listFilter) return NextResponse.json({ error: listFilter.error }, { status: 400 })
+    const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
+    const pageSize = Math.min(500, Math.max(1, Number(searchParams.get('pageSize') ?? '500') || 500))
+    const [reference, adjustments, total] = await Promise.all([
       stockReferenceData({ includeCustomers: false }),
-      prisma.stock_adjustments.findMany({ orderBy: [{ date: 'desc' }, { created_at: 'desc' }], take: 500 }),
+      prisma.stock_adjustments.findMany({
+        orderBy: [{ date: 'desc' }, { created_at: 'desc' }, { id: 'desc' }],
+        select: stockAdjustmentSelect,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: listFilter.where,
+      }),
+      prisma.stock_adjustments.count({ where: listFilter.where }),
     ])
     const [branches, warehouses, products] = await Promise.all([
-      prisma.branches.findMany({ where: { id: { in: adjustments.map((row) => row.branch_id).filter((id): id is bigint => id !== null) } } }),
-      prisma.warehouses.findMany({ where: { id: { in: adjustments.map((row) => row.warehouse_id).filter((id): id is bigint => id !== null) } } }),
-      prisma.products.findMany({ where: { id: { in: adjustments.map((row) => row.product_id).filter((id): id is bigint => id !== null) } } }),
+      prisma.branches.findMany({
+        select: { code: true, id: true, name: true },
+        where: { id: { in: [...new Set(adjustments.map((row) => row.branch_id).filter((id): id is bigint => id !== null))] } },
+      }),
+      prisma.warehouses.findMany({
+        select: { id: true, name: true },
+        where: { id: { in: [...new Set(adjustments.map((row) => row.warehouse_id).filter((id): id is bigint => id !== null))] } },
+      }),
+      prisma.products.findMany({
+        select: { code: true, id: true, name: true },
+        where: { id: { in: [...new Set(adjustments.map((row) => row.product_id).filter((id): id is bigint => id !== null))] } },
+      }),
     ])
     const branchById = new Map(branches.map((row) => [row.id, row]))
     const warehouseById = new Map(warehouses.map((row) => [row.id, row]))
     const productById = new Map(products.map((row) => [row.id, row]))
 
     return NextResponse.json({
+      pagination: { page, pageSize, total },
       reasonOptions: stockAdjustReasonOptions,
       reference,
       rows: adjustments.map((row) => {
@@ -168,10 +310,14 @@ export async function POST(request: Request) {
     if (!references.productId) {
       return NextResponse.json({ error: 'สินค้าไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     }
-    const [systemQty, readyQty] = await Promise.all([
-      quantityForStock({ asOf: values.date, branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, status: values.status, warehouseId: references.warehouseId }),
-      quantityForStock({ asOf: values.date, branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, quantityType: 'ready', status: values.status, warehouseId: references.warehouseId }),
-    ])
+    const { readyQty, systemQty, unitPricePerKg: unitCost } = await stockAdjustMetrics({
+      asOf: values.date,
+      branchId: references.branchId,
+      lotNo: values.lotNo,
+      productId: references.productId,
+      status: values.status,
+      warehouseId: references.warehouseId,
+    })
     const onHoldQty = Math.max(0, systemQty - readyQty)
     if (values.countedQty < onHoldQty - 0.000001) {
       return NextResponse.json({ error: `บันทึกไม่ได้: นับจริงต่ำกว่า stock ที่ถูกจองไว้ (${onHoldQty.toLocaleString('th-TH')}) ต้องปลด/ยกเลิก hold หรือทำ reconciliation approval ก่อน` }, { status: 400 })
@@ -181,17 +327,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'นับจริงเท่ากับยอดในระบบ ไม่ต้องสร้างรายการปรับ' }, { status: 400 })
     }
 
-    const unitCost = await averageCostForStock({ asOf: values.date, branchId: references.branchId, lotNo: values.lotNo, productId: references.productId, status: values.status, warehouseId: references.warehouseId })
     if (unitCost <= MIN_VALUE_PRICE) {
       return NextResponse.json({ error: 'ไม่พบราคาต่อกก. สำหรับสินค้า/วันที่นี้ จึงยังบันทึก stock correction ที่กระทบ WAC/margin ไม่ได้' }, { status: 400 })
     }
-    const docNo = values.docNo ?? await nextDocNo()
     const actor = currentActor(context)
     const adjustType = diffQty < 0 ? 'LOSS' : 'GAIN'
     const totalValue = diffQty * unitCost
     const now = new Date()
 
-    await prisma.$transaction(async (tx) => {
+    const saved = await prisma.$transaction(async (tx) => {
+      const docNo = values.docNo?.trim() || await nextDocNo(tx)
+      if (values.docNo) {
+        const duplicate = await tx.stock_adjustments.findFirst({
+          select: { id: true },
+          where: { doc_no: docNo },
+        })
+        if (duplicate) return { error: 'เลขที่เอกสารปรับสต๊อกซ้ำ' }
+      }
       const adjustment = await tx.stock_adjustments.create({
         data: {
           adjust_type: adjustType,
@@ -243,9 +395,11 @@ export async function POST(request: Request) {
         data: { stock_ledger_id: ledger.id },
         where: { id: adjustment.id },
       })
+      return { docNo }
     })
+    if ('error' in saved) return NextResponse.json({ error: saved.error }, { status: 409 })
 
-    return NextResponse.json({ id: docNo, refNo: docNo, totalValue, unitPricePerKg: unitCost })
+    return NextResponse.json({ id: saved.docNo, refNo: saved.docNo, totalValue, unitPricePerKg: unitCost })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'บันทึกปรับสต๊อกไม่ได้', 400)

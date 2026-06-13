@@ -161,11 +161,18 @@ Target ที่ควรใช้:
 `GET /api/stock/adjust` ควรส่ง:
 
 - `rows`
+- `pagination.page`, `pagination.pageSize`, `pagination.total`
 - `reference.branches`
 - `reference.warehouses`
 - `reference.products`
 - `reasonOptions`
 - row ต้องมี `docNo`, `date`, `branchWarehouse`, `productCode`, `productName`, `lotNo`, `systemQty`, `countedQty`, `diffQty`, `unitPricePerKg`, `totalValue`, `adjustType`, `reason`, `createdBy`, `updatedBy`, `updatedAt`
+- query params ที่รองรับ runtime:
+  - `q`: ค้นหาเลขที่เอกสาร, lot, เหตุผล, ผู้สร้าง/ผู้แก้ไข, รหัสสินค้า, ชื่อสินค้า
+  - `branchId`, `warehouseId`, `productId`
+  - `adjustType = LOSS | GAIN`
+  - `dateFrom`, `dateTo`
+  - `page`, `pageSize` โดย default ยังคืน 500 rows เพื่อไม่เปลี่ยนพฤติกรรม UI เดิม
 
 `POST /api/stock/adjust` รับ:
 
@@ -190,6 +197,7 @@ Target API เพิ่มเติม:
 - `GET /api/stock/adjust?snapshot=1&branchId&warehouseId&productId&lotNo&status&date&countedQty`
   - คืน `systemQty`, `onHoldQty`, `readyQty`, `unitPricePerKg`, `priceSource`, `diffQty`, `totalValue`
   - ใช้สำหรับ modal preview ให้ตรงกับ server
+  - runtime ใช้ `stockBalanceSnapshot()` ครั้งเดียวเพื่อรวม `systemQty`, `readyQty`, และ WAC/value แทนการ query aggregate ซ้ำหลายรอบ
 - `PATCH /api/stock/adjust`
   - ใช้แก้/correct เอกสารภายใน 7 วัน
   - รับ `docNo`, `countedQty`, `reason`, `remark`
@@ -205,6 +213,13 @@ Target API เพิ่มเติม:
 - `PATCH /api/stock/adjust` เปิด correction ได้ภายใน 7 วัน โดยสร้าง append-only `ADJ-REV` เพื่อ reverse diff เดิม แล้วสร้าง replacement `ADJ` สำหรับ diff ใหม่
 - Modal preview ใช้ server snapshot: system qty auto, on-hold, ready, counted qty, diff, unit price/kg, total value
 - List/detail แสดง `ราคาต่อกก.`, `มูลค่ารวม (บาท)`, `updated_by`, `updated_at`; CSV/export ยังเป็น delivery follow-up
+- API/DB optimization checkpoint 2026-06-13:
+  - `GET /api/stock/adjust` รองรับ server-side filter/pagination และคืน `pagination.total`
+  - list query เลือกเฉพาะ field ที่ใช้จริงจาก `stock_adjustments` แล้ว batch-load branch/warehouse/product เฉพาะ id ที่ปรากฏในหน้านั้น
+  - snapshot และ POST ใช้ stock balance aggregate ครั้งเดียวต่อ bucket เพื่อคำนวณ `systemQty`, `readyQty`, `unitPricePerKg`
+  - `ADJ-` doc no generation ย้ายเข้า transaction และใช้ `pg_advisory_xact_lock('stock_adjustments.doc_no')`; user-supplied `docNo` ถูก reject เมื่อซ้ำ
+  - migration `20260613213000_optimize_stock_adjust_queries.sql` เพิ่ม unique/pattern index ของ `doc_no`, composite list/filter indexes บน `stock_adjustments`, และ `ADJ/ADJ-REV` lookup index บน `stock_ledger`
+  - dev-target verification: duplicate `doc_no` = 0; EXPLAIN with `enable_seqscan = off` ใช้ `idx_stock_adjustments_list_date_created`, `idx_stock_adjustments_branch_date_created`, `idx_stock_adjustments_type_date_created`, `idx_stock_adjustments_doc_no_pattern`, และ `idx_stock_ledger_adj_ref_lookup`
 
 ## Related Notes
 
