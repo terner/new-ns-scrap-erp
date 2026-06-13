@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
@@ -41,6 +42,18 @@ const emptyForm: StockTransferFormValues = {
   sender: null,
   toBranchId: '',
   toWarehouseId: '',
+}
+
+function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
+  const activeClass = {
+    amber: 'border-amber-600 bg-amber-600 text-white',
+    dark: 'border-slate-700 bg-slate-700 text-white',
+    emerald: 'border-emerald-600 bg-emerald-600 text-white',
+    red: 'border-red-600 bg-red-600 text-white',
+    slate: 'border-slate-500 bg-slate-500 text-white',
+  }[tone]
+  const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-100'
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
 }
 
 export function StockTransferPageClient() {
@@ -191,7 +204,7 @@ export function StockTransferPageClient() {
       <div className="space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <Input
-            className="h-9 min-w-[260px] flex-1"
+            className="h-9 min-w-[260px] flex-1 text-sm"
             placeholder="ค้นหาเลขที่ / ต้นทาง / ปลายทาง / หมายเหตุ..."
             type="search"
             value={search}
@@ -204,43 +217,43 @@ export function StockTransferPageClient() {
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
             onClick={() => setShowMobileFilters(true)}
           >
-            <span>🔍</span> ตัวกรอง {(dateFrom || dateTo || fromBranchId || toBranchId) ? '(1)' : ''}
+            <span>🔍</span> ตัวกรอง {(dateFrom || dateTo || fromBranchId || toBranchId) ? '(มี)' : ''}
           </button>
 
           <div className="hidden md:flex flex-wrap items-center gap-2">
-            <DatePickerInput className="w-[130px]" value={dateFrom} onChange={(value) => { setDateFrom(value); setPeriod('') }} />
+            <DatePickerInput className="w-[130px] !h-9 text-sm" value={dateFrom} onChange={(value) => { setDateFrom(value); setPeriod('') }} />
             <span className="text-slate-400">→</span>
-            <DatePickerInput className="w-[130px]" value={dateTo} onChange={(value) => { setDateTo(value); setPeriod('') }} />
-            <select className="h-9 rounded-md border border-slate-300 px-2 py-2 text-sm bg-white" value={fromBranchId} onChange={(event) => setFromBranchId(event.target.value)}>
+            <DatePickerInput className="w-[130px] !h-9 text-sm" value={dateTo} onChange={(value) => { setDateTo(value); setPeriod('') }} />
+            <select className="h-9 rounded-md border border-slate-300 px-2 py-2 text-sm bg-white text-slate-800" value={fromBranchId} onChange={(event) => setFromBranchId(event.target.value)}>
               <option value="">ทุกสาขาต้นทาง</option>
               {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select>
-            <select className="h-9 rounded-md border border-slate-300 px-2 py-2 text-sm bg-white" value={toBranchId} onChange={(event) => setToBranchId(event.target.value)}>
+            <select className="h-9 rounded-md border border-slate-300 px-2 py-2 text-sm bg-white text-slate-800" value={toBranchId} onChange={(event) => setToBranchId(event.target.value)}>
               <option value="">ทุกสาขาปลายทาง</option>
               {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select>
           </div>
 
           {(search || dateFrom || dateTo || fromBranchId || toBranchId) ? (
-            <Button size="sm" type="button" variant="secondary" onClick={clearFilters}>ล้าง</Button>
+            <button className="h-9 rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200 flex items-center" type="button" onClick={clearFilters}>✕ ล้างทั้งหมด</button>
           ) : null}
-          <Button className="hidden md:inline-flex ml-auto" size="sm" type="button" onClick={openCreateForm}>+ โอนใหม่</Button>
+          <button className="hidden md:inline-flex ml-auto h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800" type="button" onClick={openCreateForm}>+ โอนใหม่</button>
         </div>
 
         {/* Desktop Period Filters */}
-        <div className="hidden md:flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500">ช่วง:</span>
-          <PeriodButton active={period === ''} label="ทั้งหมด" onClick={() => applyPeriod('')} />
-          <PeriodButton active={period === 'today'} label="วันนี้" onClick={() => applyPeriod('today')} />
-          <PeriodButton active={period === 'week'} label="7 วัน" onClick={() => applyPeriod('week')} />
-          <PeriodButton active={period === 'month'} label="เดือนนี้" onClick={() => applyPeriod('month')} />
+        <div className="hidden md:flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+          <span className="text-xs text-slate-500">ช่วงเวลา:</span>
+          <MatchButton active={period === ''} label="ทั้งหมด" onClick={() => applyPeriod('')} />
+          <MatchButton active={period === 'today'} label="วันนี้" onClick={() => applyPeriod('today')} />
+          <MatchButton active={period === 'week'} label="7 วัน" onClick={() => applyPeriod('week')} />
+          <MatchButton active={period === 'month'} label="เดือนนี้" onClick={() => applyPeriod('month')} />
         </div>
       </div>
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+      <div className="fixed bottom-6 right-6 z-40 md:hidden animate-fade-in">
         <button
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg active:scale-95 transition-transform"
           onClick={openCreateForm}
           type="button"
           aria-label="โอนใหม่"
@@ -251,8 +264,8 @@ export function StockTransferPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden animate-fade-in">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
               <button
@@ -273,7 +286,7 @@ export function StockTransferPageClient() {
                     return (
                       <button
                         key={p}
-                        className={`rounded-md border px-3 py-1.5 text-xs font-medium flex-1 h-11 ${
+                        className={`rounded-md border px-3 py-1.5 text-xs font-medium flex-1 h-10 ${
                           period === p ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700'
                         }`}
                         type="button"
@@ -297,7 +310,7 @@ export function StockTransferPageClient() {
 
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-slate-600">สาขาต้นทาง</span>
-                <select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm bg-white" value={fromBranchId} onChange={(event) => setFromBranchId(event.target.value)}>
+                <select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={fromBranchId} onChange={(event) => setFromBranchId(event.target.value)}>
                   <option value="">ทุกสาขาต้นทาง</option>
                   {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                 </select>
@@ -305,7 +318,7 @@ export function StockTransferPageClient() {
 
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-slate-600">สาขาปลายทาง</span>
-                <select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm bg-white" value={toBranchId} onChange={(event) => setToBranchId(event.target.value)}>
+                <select className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={toBranchId} onChange={(event) => setToBranchId(event.target.value)}>
                   <option value="">ทุกสาขาปลายทาง</option>
                   {branchOptions.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                 </select>
@@ -325,7 +338,7 @@ export function StockTransferPageClient() {
               </button>
               <button
                 type="button"
-                className="h-11 rounded-md bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
                 onClick={() => setShowMobileFilters(false)}
               >
                 ใช้ตัวกรอง
@@ -341,10 +354,10 @@ export function StockTransferPageClient() {
           <span className="ml-2 text-slate-500">· น้ำหนักรวม <span className="font-semibold text-blue-700">{formatMoney(totalWeight)}</span> กก.</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+          {columnResize.hasCustomWidths ? <button className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50 animate-fade-in" type="button" onClick={columnResize.resetColumnWidths}>Set col to default</button> : null}
           <select
             aria-label="จำนวนรายการต่อหน้า"
-            className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
+            className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm bg-white text-slate-800"
             value={pageSize}
             onChange={(event) => setPageSize(Number(event.target.value))}
           >
@@ -353,29 +366,29 @@ export function StockTransferPageClient() {
             <option value={50}>50 / หน้า</option>
             <option value={100}>100 / หน้า</option>
           </select>
-          <Button disabled={currentPage <= 1} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</Button>
-          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-          <Button disabled={currentPage >= totalPages} size="sm" type="button" variant="outline" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</Button>
+          <button disabled={currentPage <= 1} className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-40 bg-white text-slate-700 hover:bg-slate-50" type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          <span className="px-1 text-sm font-medium">หน้า {currentPage} / {totalPages}</span>
+          <button disabled={currentPage >= totalPages} className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-40 bg-white text-slate-700 hover:bg-slate-50" type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
         </div>
       </div>
 
-      {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
-          <form noValidate className="w-full max-w-5xl overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col max-h-[90vh]" onSubmit={save}>
-            <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0">
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-w-5xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 animate-fade-in" hideClose>
+          <form noValidate className="w-full overflow-hidden flex flex-col max-h-[90vh]" onSubmit={save}>
+            <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0 border-b border-slate-800">
               <div>
-                <h3 className="font-bold text-slate-100 text-lg">โอนสินค้าระหว่างสาขา</h3>
-                <p className="mt-1 text-xs text-slate-400">บันทึกการย้ายสินค้าระหว่างต้นทางและปลายทางโดยเก็บรายการน้ำหนักรายสินค้า</p>
+                <DialogTitle className="font-bold text-slate-100 text-lg">โอนสินค้าระหว่างสาขา</DialogTitle>
+                <p className="mt-0.5 text-xs text-slate-400">บันทึกการย้ายสินค้าระหว่างต้นทางและปลายทางโดยเก็บรายการน้ำหนักรายสินค้า</p>
               </div>
               <button className="text-2xl text-slate-400 hover:text-white" type="button" onClick={() => setFormOpen(false)}>&times;</button>
             </div>
 
             <div className="max-h-[76vh] overflow-y-auto bg-slate-50 p-4 sm:p-5 space-y-4 text-sm flex-1">
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <h4 className="mb-3 font-bold text-slate-700">1. ข้อมูลเอกสาร</h4>
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm animate-fade-in">
+                <h4 className="mb-3 font-bold text-slate-700 border-b border-slate-100 pb-2">1. ข้อมูลเอกสาร</h4>
                 <div className="grid gap-3 md:grid-cols-2">
                   <FormField label="เลขที่เอกสาร">
-                    <Input className="h-9 bg-slate-50 font-mono text-sm" placeholder="ระบบจะออกเลขให้อัตโนมัติ" readOnly value={form.docNo ?? ''} />
+                    <Input className="h-9 bg-slate-50 font-mono text-sm border-slate-200" placeholder="ระบบจะออกเลขให้อัตโนมัติ" readOnly value={form.docNo ?? ''} />
                   </FormField>
                   <FormField error={fieldErrors.date} errorKey="date" label="วันที่ *">
                     <DatePickerInput className={`${fieldErrors.date ? '[&_input]:border-red-400 [&_input]:bg-red-50 [&_[data-slot="input-group"]]:border-red-400' : ''} w-full`} value={form.date} onChange={(value) => updateForm('date', value)} />
@@ -384,8 +397,8 @@ export function StockTransferPageClient() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                  <h4 className="mb-3 font-bold text-slate-700">2. ต้นทาง</h4>
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm animate-fade-in">
+                  <h4 className="mb-3 font-bold text-slate-700 border-b border-slate-100 pb-2">2. ต้นทาง</h4>
                   <div className="grid gap-3">
                     <SelectField
                       error={fieldErrors.fromBranchId}
@@ -408,8 +421,8 @@ export function StockTransferPageClient() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                  <h4 className="mb-3 font-bold text-slate-700">3. ปลายทาง</h4>
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm animate-fade-in">
+                  <h4 className="mb-3 font-bold text-slate-700 border-b border-slate-100 pb-2">3. ปลายทาง</h4>
                   <div className="grid gap-3">
                     <SelectField
                       error={fieldErrors.toBranchId}
@@ -433,10 +446,10 @@ export function StockTransferPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm animate-fade-in">
+                <div className="mb-3 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
                   <h4 className="font-bold text-slate-700">4. รายการสินค้า ({form.items.length})</h4>
-                  <Button size="sm" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, { lotNo: null, productId: '', qty: 0 }] }))}>+ เพิ่มรายการ</Button>
+                  <button className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, { lotNo: null, productId: '', qty: 0 }] }))}>+ เพิ่มรายการ</button>
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
                 <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
@@ -484,16 +497,14 @@ export function StockTransferPageClient() {
                             />
                           </td>
                           <td className="p-2 text-right">
-                            <Button
-                              className="mt-6"
+                            <button
+                              className="mt-6 h-8 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
                               disabled={form.items.length <= 1}
-                              size="xs"
                               type="button"
-                              variant="outline"
                               onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}
                             >
                               ลบ
-                            </Button>
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -509,8 +520,8 @@ export function StockTransferPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <h4 className="mb-3 font-bold text-slate-700">5. ผู้รับผิดชอบและหมายเหตุ</h4>
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm animate-fade-in">
+                <h4 className="mb-3 font-bold text-slate-700 border-b border-slate-100 pb-2">5. ผู้รับผิดชอบและหมายเหตุ</h4>
                 <div className="grid gap-3 md:grid-cols-2">
                   <InputField
                     error={fieldErrors.sender}
@@ -540,12 +551,12 @@ export function StockTransferPageClient() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-              <Button size="sm" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
-              <Button disabled={isSaving} size="sm" type="submit" className="bg-slate-900 hover:bg-slate-800 text-white font-normal">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+              <button className="rounded-md border border-slate-300 bg-white px-5 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
+              <button disabled={isSaving} className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50" type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
             </div>
           </form>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
 
       {/* Mobile Card List */}
       <div className="block md:hidden space-y-3">
@@ -585,7 +596,8 @@ export function StockTransferPageClient() {
         ) : null}
       </div>
 
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow animate-fade-in">
         <Table style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {stockTransferColumns.map((column, index) => {
@@ -629,18 +641,6 @@ export function StockTransferPageClient() {
         </Table>
       </div>
     </section>
-  )
-}
-
-function PeriodButton(props: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      className={`rounded-md border px-3 py-1 text-xs font-medium ${props.active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
-      type="button"
-      onClick={props.onClick}
-    >
-      {props.label}
-    </button>
   )
 }
 
@@ -693,7 +693,7 @@ function SelectField(props: {
     <FormField error={props.error} errorKey={props.errorKey} label={props.label}>
       <select
         data-error-key={props.errorKey}
-        className={`h-9 w-full rounded-md border px-3 py-2 text-sm outline-none ${props.error ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white'}`}
+        className={`h-9 w-full rounded-md border px-3 py-2 text-sm bg-white text-slate-800 outline-none ${props.error ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300'}`}
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
       >
@@ -703,3 +703,4 @@ function SelectField(props: {
     </FormField>
   )
 }
+

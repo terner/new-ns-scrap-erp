@@ -2,9 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { Plus } from 'lucide-react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
-import type { StatusConvertFormValues, StockAdjustFormValues, StockConvertFormValues, StockOption } from '@/lib/stock'
+import {
+  statusConvertFormSchema,
+  stockAdjustFormSchema,
+  stockConvertFormSchema,
+  type StatusConvertFormValues,
+  type StockAdjustFormValues,
+  type StockConvertFormValues,
+  type StockOption,
+} from '@/lib/stock'
 
 type Mode = 'adjust' | 'convert' | 'status-convert'
 type Payload = {
@@ -70,6 +80,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
   const [statusConvertPageSize, setStatusConvertPageSize] = useState(20)
   const [statusConvertSortDirection, setStatusConvertSortDirection] = useState<SortDirection>('desc')
   const [statusConvertSortKey, setStatusConvertSortKey] = useState<StatusConvertSortKey>('date')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -137,12 +148,37 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     setStatusConvertSortDirection(nextKey === 'date' ? 'desc' : 'asc')
   }
 
+  const resetFilters = useCallback(() => {
+    setSearch('')
+    setSourceTypeFilter('')
+    setCostStatusFilter('')
+    setAdjustBranchFilter('')
+    setAdjustTypeFilter('')
+    setFromDateFilter('')
+    setToDateFilter('')
+    if (mode === 'status-convert') setStatusConvertPage(1)
+  }, [mode])
+
+  const hasFilters = useMemo(() => {
+    return Boolean(
+      search.trim() ||
+      sourceTypeFilter ||
+      costStatusFilter ||
+      adjustBranchFilter ||
+      adjustTypeFilter ||
+      fromDateFilter ||
+      toDateFilter
+    )
+  }, [search, sourceTypeFilter, costStatusFilter, adjustBranchFilter, adjustTypeFilter, fromDateFilter, toDateFilter])
+
   async function submit(values: StatusConvertFormValues | StockConvertFormValues | StockAdjustFormValues) {
     setError(null)
     setIsSaving(true)
     try {
       await dailyFetchJson(meta.api, { body: JSON.stringify(values), method: 'POST' })
       setFormOpen(false)
+      // Clear query params to prevent reopening on reload
+      window.history.replaceState({}, '', pathname)
       await loadData()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'บันทึกข้อมูลไม่ได้')
@@ -156,71 +192,216 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
       {mode === 'adjust' ? <AdjustPrincipleBox /> : null}
       <SummaryCards mode={mode} rows={rows} />
-      <div className="rounded-md bg-white p-3 shadow">
+      
+      {/* Desktop Toolbar (Hidden on Mobile) */}
+      <div className="hidden md:block mb-4 space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
-            <input className="h-9 w-full flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder={mode === 'convert' ? 'ค้นหา doc/source/target/ref...' : mode === 'adjust' ? 'ค้นหา doc/สินค้า/เหตุผล...' : 'ค้นหาเลขที่/สินค้า/หมายเหตุ...'} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-            {mode === 'status-convert' && search ? (
-              <button className="h-9 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={() => setSearch('')}>
-                ล้างค้นหา
-              </button>
-            ) : null}
-          </div>
-          {mode === 'convert' ? (
-            <>
-              <select className="h-9 rounded-md border bg-amber-50 px-3 py-2 text-sm font-medium" value={sourceTypeFilter} onChange={(event) => setSourceTypeFilter(event.target.value)}>
-                <option value="">ทุก Source Type</option>
-                <option value="Manual">📝 Manual</option>
-                <option value="Production Order">🏭 Production Order</option>
-              </select>
-              <select className="h-9 rounded-md border px-3 py-2 text-sm" value={costStatusFilter} onChange={(event) => setCostStatusFilter(event.target.value)}>
-                <option value="">ทุก Cost Status</option>
-                <option value="allocated">✓ Allocated</option>
-                <option value="pending_cost">⏳ Pending Cost</option>
-                <option value="partial">📋 Partial</option>
-              </select>
-            </>
-          ) : mode === 'adjust' ? (
-            <>
-              <select className="h-9 rounded-md border px-3 py-2 text-sm" value={adjustBranchFilter} onChange={(event) => setAdjustBranchFilter(event.target.value)}>
-                <option value="">ทุกสาขา</option>
-                {data.reference.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-              </select>
-              <select className="h-9 rounded-md border px-3 py-2 text-sm" value={adjustTypeFilter} onChange={(event) => setAdjustTypeFilter(event.target.value)}>
-                <option value="">ทุกประเภท</option>
-                <option value="LOSS">📉 นับขาด</option>
-                <option value="GAIN">📈 นับเกิน</option>
-              </select>
-              <DatePickerInput className="w-[130px]" title="จากวันที่" value={fromDateFilter} onChange={setFromDateFilter} />
-              <DatePickerInput className="w-[130px]" title="ถึงวันที่" value={toDateFilter} onChange={setToDateFilter} />
-              <button className="h-9 rounded-md bg-slate-700 px-3 py-2 text-sm text-white opacity-60" disabled title="รอ export contract สำหรับ stock adjustment" type="button">📥 CSV</button>
-            </>
+          <input
+            className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm h-9"
+            placeholder={mode === 'convert' ? 'ค้นหา doc/source/target/ref...' : mode === 'adjust' ? 'ค้นหา doc/สินค้า/เหตุผล...' : 'ค้นหาเลขที่/สินค้า/หมายเหตุ...'}
+            type="search"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              if (mode === 'status-convert') setStatusConvertPage(1)
+            }}
+          />
+          {hasFilters ? (
+            <button className="rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200 h-9" type="button" onClick={resetFilters}>
+              ✕ ล้าง
+            </button>
           ) : null}
           
-          <div className="flex items-center gap-2 ml-auto">
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors" type="button" onClick={() => void loadData()}>
-              Refresh
-            </button>
-            {mode === 'adjust' ? (
-              <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors" href={`${pathname}?new=1`}>
-                + ปรับสต๊อกใหม่
-              </a>
-            ) : mode === 'convert' ? (
-              <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors" href={`${pathname}?new=1`}>
-                + ปรับเกรดใหม่
-              </a>
-            ) : mode === 'status-convert' ? (
-              <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors" href={`${pathname}?new=1`}>
-                + ปรับสถานะใหม่
-              </a>
-            ) : (
-              <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors" href={`${pathname}?new=1`}>
-                + เพิ่มรายการ
-              </a>
+          <button className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors" type="button" onClick={() => void loadData()}>
+            Refresh
+          </button>
+
+          <button
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-60 h-9 flex items-center justify-center font-normal ml-auto"
+            type="button"
+            onClick={() => setFormOpen(true)}
+          >
+            {mode === 'adjust' ? '+ ปรับสต๊อกใหม่' : mode === 'convert' ? '+ ปรับเกรดใหม่' : '+ ปรับสถานะใหม่'}
+          </button>
+        </div>
+
+        {(mode === 'convert' || mode === 'adjust') && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            {mode === 'convert' && (
+              <>
+                <span className="text-xs text-slate-500">Source Type:</span>
+                <MatchButton active={sourceTypeFilter === ''} label="ทั้งหมด" onClick={() => setSourceTypeFilter('')} />
+                <MatchButton active={sourceTypeFilter === 'Manual'} label="Manual" tone="dark" onClick={() => setSourceTypeFilter('Manual')} />
+                <MatchButton active={sourceTypeFilter === 'Production Order'} label="Production Order" tone="emerald" onClick={() => setSourceTypeFilter('Production Order')} />
+
+                <span className="text-xs text-slate-500 ml-4">Cost Status:</span>
+                <MatchButton active={costStatusFilter === ''} label="ทั้งหมด" onClick={() => setCostStatusFilter('')} />
+                <MatchButton active={costStatusFilter === 'allocated'} label="Allocated" tone="emerald" onClick={() => setCostStatusFilter('allocated')} />
+                <MatchButton active={costStatusFilter === 'pending_cost'} label="Pending Cost" tone="amber" onClick={() => setCostStatusFilter('pending_cost')} />
+                <MatchButton active={costStatusFilter === 'partial'} label="Partial" tone="slate" onClick={() => setCostStatusFilter('partial')} />
+              </>
+            )}
+
+            {mode === 'adjust' && (
+              <>
+                <span className="text-xs text-slate-500">ประเภท:</span>
+                <MatchButton active={adjustTypeFilter === ''} label="ทั้งหมด" onClick={() => setAdjustTypeFilter('')} />
+                <MatchButton active={adjustTypeFilter === 'LOSS'} label="นับขาด" tone="red" onClick={() => setAdjustTypeFilter('LOSS')} />
+                <MatchButton active={adjustTypeFilter === 'GAIN'} label="นับเกิน" tone="emerald" onClick={() => setAdjustTypeFilter('GAIN')} />
+
+                <span className="text-xs text-slate-500 ml-4">สาขา:</span>
+                <select className="h-7 rounded-md border border-slate-300 px-2 py-0.5 text-xs bg-white text-slate-800" value={adjustBranchFilter} onChange={(event) => setAdjustBranchFilter(event.target.value)}>
+                  <option value="">ทุกสาขา</option>
+                  {data.reference.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                </select>
+
+                <span className="text-xs text-slate-500 ml-4">ช่วงวันที่:</span>
+                <DatePickerInput className="w-[120px] [&_input]:h-7 [&_input]:text-xs" value={fromDateFilter} onChange={setFromDateFilter} />
+                <span className="text-slate-400">→</span>
+                <DatePickerInput className="w-[120px] [&_input]:h-7 [&_input]:text-xs" value={toDateFilter} onChange={setToDateFilter} />
+              </>
             )}
           </div>
+        )}
+      </div>
+
+      {/* Mobile Toolbar (Hidden on Desktop) */}
+      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+        <div className="flex gap-2 items-center">
+          <input
+            className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm h-9"
+            placeholder="ค้นหา..."
+            type="search"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              if (mode === 'status-convert') setStatusConvertPage(1)
+            }}
+          />
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => void loadData()}
+          >
+            Refresh
+          </button>
+          {(mode === 'convert' || mode === 'adjust') && (
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              onClick={() => setShowMobileFilters(true)}
+            >
+              ตัวกรอง {hasFilters ? '(มี)' : ''}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Floating Action Button (FAB) for Mobile */}
+      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+        <button
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg active:scale-95 transition-transform"
+          onClick={() => setFormOpen(true)}
+          type="button"
+          aria-label="สร้างรายการใหม่"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* Bottom Sheet Filter for Mobile */}
+      {showMobileFilters && (mode === 'convert' || mode === 'adjust') ? (
+        <div className="fixed inset-0 z-55 flex items-end justify-center bg-slate-950/40 md:hidden">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto animate-slide-up">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
+              <button
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
+                onClick={() => setShowMobileFilters(false)}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {mode === 'convert' && (
+                <>
+                  <div>
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">Source Type</span>
+                    <div className="flex flex-wrap gap-2">
+                      <MatchButton active={sourceTypeFilter === ''} label="ทั้งหมด" onClick={() => setSourceTypeFilter('')} />
+                      <MatchButton active={sourceTypeFilter === 'Manual'} label="Manual" tone="dark" onClick={() => setSourceTypeFilter('Manual')} />
+                      <MatchButton active={sourceTypeFilter === 'Production Order'} label="Production Order" tone="emerald" onClick={() => setSourceTypeFilter('Production Order')} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">Cost Status</span>
+                    <div className="flex flex-wrap gap-2">
+                      <MatchButton active={costStatusFilter === ''} label="ทั้งหมด" onClick={() => setCostStatusFilter('')} />
+                      <MatchButton active={costStatusFilter === 'allocated'} label="Allocated" tone="emerald" onClick={() => setCostStatusFilter('allocated')} />
+                      <MatchButton active={costStatusFilter === 'pending_cost'} label="Pending Cost" tone="amber" onClick={() => setCostStatusFilter('pending_cost')} />
+                      <MatchButton active={costStatusFilter === 'partial'} label="Partial" tone="slate" onClick={() => setCostStatusFilter('partial')} />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {mode === 'adjust' && (
+                <>
+                  <div>
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">ประเภท</span>
+                    <div className="flex flex-wrap gap-2">
+                      <MatchButton active={adjustTypeFilter === ''} label="ทั้งหมด" onClick={() => setAdjustTypeFilter('')} />
+                      <MatchButton active={adjustTypeFilter === 'LOSS'} label="นับขาด" tone="red" onClick={() => setAdjustTypeFilter('LOSS')} />
+                      <MatchButton active={adjustTypeFilter === 'GAIN'} label="นับเกิน" tone="emerald" onClick={() => setAdjustTypeFilter('GAIN')} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">สาขา</span>
+                    <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={adjustBranchFilter} onChange={(event) => setAdjustBranchFilter(event.target.value)}>
+                      <option value="">ทุกสาขา</option>
+                      {data.reference.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">ช่วงวันที่</span>
+                    <div className="flex items-center gap-2">
+                      <DatePickerInput className="flex-1" value={fromDateFilter} onChange={setFromDateFilter} />
+                      <span className="text-slate-400">→</span>
+                      <DatePickerInput className="flex-1" value={toDateFilter} onChange={setToDateFilter} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  resetFilters()
+                  setShowMobileFilters(false)
+                }}
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                type="button"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {mode === 'status-convert' ? (
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
           <span>พบทั้งหมด {rows.length} รายการ</span>
@@ -259,19 +440,27 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
           </div>
         </div>
       ) : null}
-      {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
-          <div className="w-full max-w-3xl overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0">
-              <h3 className="font-bold text-slate-100">{meta.title}</h3>
-              <a className="text-2xl text-slate-400 hover:text-white" href={pathname}>&times;</a>
-            </div>
-            {mode === 'status-convert' ? <StatusConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
-            {mode === 'convert' ? <ConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
-            {mode === 'adjust' ? <AdjustForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
+
+      <Dialog open={formOpen} onOpenChange={(open) => {
+        if (!open) {
+          setFormOpen(false)
+          window.history.replaceState({}, '', pathname)
+        }
+      }}>
+        <DialogContent className="max-w-3xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 animate-fade-in" hideClose>
+          <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0 border-b border-slate-800">
+            <h3 className="font-bold text-slate-100 text-[16px]">{meta.title}</h3>
+            <button className="text-2xl text-slate-400 hover:text-white" type="button" onClick={() => {
+              setFormOpen(false)
+              window.history.replaceState({}, '', pathname)
+            }}>&times;</button>
           </div>
-        </div>
-      ) : null}
+          {mode === 'status-convert' ? <StatusConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
+          {mode === 'convert' ? <ConvertForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
+          {mode === 'adjust' ? <AdjustForm cancelHref={pathname} isSaving={isSaving} reference={data.reference} onSubmit={submit} /> : null}
+        </DialogContent>
+      </Dialog>
+
       <OperationTable
         isLoading={isLoading}
         mode={mode}
@@ -379,35 +568,138 @@ function OperationTable({
 }) {
   const columns = columnsFor(mode)
   return (
-    <div className="overflow-x-auto rounded-md bg-white shadow">
-      <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1120px] text-sm' : 'w-full min-w-[1000px] text-sm'}>
-        <thead className="bg-slate-100">
-          <tr>
-            {columns.map((column) => (
-              <th key={column.key} className={`p-2 text-left ${column.headerClassName ?? ''}`}>
-                {mode === 'status-convert' && column.sortable && onSortChange ? (
-                  <button
-                    className="inline-flex items-center gap-1 font-medium text-slate-700 hover:text-slate-900"
-                    type="button"
-                    onClick={() => onSortChange(column.key as StatusConvertSortKey)}
-                  >
-                    <span>{column.label}</span>
-                    <span className="text-xs text-slate-400">{sortKey === column.key ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
-                  </button>
-                ) : (
-                  column.label
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
-          {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key)}</td>)}</tr>)}
-          {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+        <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1120px] text-sm' : 'w-full min-w-[1000px] text-sm'}>
+          <thead className="bg-slate-100">
+            <tr>
+              {columns.map((column) => (
+                <th key={column.key} className={`p-2 text-left ${column.headerClassName ?? ''}`}>
+                  {mode === 'status-convert' && column.sortable && onSortChange ? (
+                    <button
+                      className="inline-flex items-center gap-1 font-medium text-slate-700 hover:text-slate-900"
+                      type="button"
+                      onClick={() => onSortChange(column.key as StatusConvertSortKey)}
+                    >
+                      <span>{column.label}</span>
+                      <span className="text-xs text-slate-400">{sortKey === column.key ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                    </button>
+                  ) : (
+                    column.label
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key)}</td>)}</tr>)}
+            {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-6 text-center text-sm text-slate-500 shadow">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && rows.map((row, index) => (
+          <div key={String(row.id ?? index)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-2">
+            {mode === 'status-convert' && (
+              <>
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-slate-800 text-sm">{formatCell(row.refNo)}</span>
+                  <span className="text-xs text-slate-500">{formatCell(row.date)}</span>
+                </div>
+                <div className="text-xs text-slate-600 space-y-1">
+                  <div>
+                    <span className="font-semibold text-slate-500">สินค้า: </span>
+                    <span className="text-slate-800">{formatCell(row.productCode)} - {formatCell(row.productName)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-slate-500">เส้นทาง: </span>
+                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700">{formatCell(row.statusFrom)}</span>
+                    <span className="text-amber-600">→</span>
+                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700">{formatCell(row.statusTo)}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500">สาขา/คลัง: </span>
+                    <span className="text-slate-800">{formatCell(row.branchName)} / {formatCell(row.warehouseName)}</span>
+                  </div>
+                  <div className="flex justify-between items-end pt-1 border-t border-slate-100/60 mt-1">
+                    <span className="text-[11px] text-slate-400">Lot: {formatCell(row.lotNo)}</span>
+                    <span className="font-bold text-purple-700 text-sm">{formatCell(row.qty)} กก.</span>
+                  </div>
+                </div>
+              </>
+            )}
+            {mode === 'convert' && (
+              <>
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-slate-800 text-sm">{formatCell(row.refNo)}</span>
+                  <span className="text-xs text-slate-500">{formatCell(row.date)}</span>
+                </div>
+                <div className="text-xs text-slate-600 space-y-1">
+                  <div>
+                    <span className="font-semibold text-slate-500">Source: </span>
+                    <span className="text-red-700 font-semibold">{formatCell(row.sourceProduct)} ({formatMoney(Number(row.sourceQty))} กก.)</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500">Target: </span>
+                    <span className="text-emerald-700 font-semibold">{formatCell(row.targetProduct)} ({formatMoney(Number(row.targetQty))} กก.)</span>
+                  </div>
+                  <div className="flex justify-between items-end pt-1 border-t border-slate-100/60 mt-1">
+                    <span className="text-[11px] text-slate-400">Loss: {formatMoney(Number(row.lossQty))} กก.</span>
+                    <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">{formatCell(row.sourceType)}</span>
+                  </div>
+                </div>
+              </>
+            )}
+            {mode === 'adjust' && (
+              <>
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-slate-800 text-sm">{formatCell(row.docNo)}</span>
+                  <span className="text-xs text-slate-500">{formatCell(row.date)}</span>
+                </div>
+                <div className="text-xs text-slate-600 space-y-1">
+                  <div>
+                    <span className="font-semibold text-slate-500">สินค้า: </span>
+                    <span className="text-slate-800">{formatCell(row.productName)} (Lot: {formatCell(row.lotNo)})</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 py-1">
+                    <div>
+                      <span className="text-slate-500 block">ระบบ:</span>
+                      <span className="font-mono text-slate-800 font-semibold">{formatCell(row.systemQty)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">นับจริง:</span>
+                      <span className="font-mono text-slate-800 font-semibold">{formatCell(row.countedQty)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Diff:</span>
+                      <span className={`font-mono font-semibold ${Number(row.diffQty) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatCell(row.diffQty)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-slate-100/60 mt-1">
+                    <span className="text-[11px] text-slate-400">สาขา/คลัง: {formatCell(row.branchWarehouse)}</span>
+                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${row.adjustType === 'LOSS' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {row.adjustType === 'LOSS' ? '📉 นับขาด' : '📈 นับเกิน'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        {!isLoading && rows.length === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">
+            {emptyTextFor(mode)}
+          </div>
+        ) : null}
+      </div>
+    </>
   )
 }
 
@@ -589,11 +881,11 @@ function Metric({
 }
 
 function Field(props: { label: string; onChange: (value: string) => void; type?: string; value: string }) {
-  return <label className="block text-xs font-semibold text-slate-600">{props.label}{props.type === 'date' ? <DatePickerInput className="mt-1.5 w-full font-normal" value={props.value} onChange={props.onChange} /> : <input className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-800 bg-white outline-none focus:border-slate-900" type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange(event.target.value)} />}</label>
+  return <label className="block text-xs font-semibold text-slate-600">{props.label}{props.type === 'date' ? <DatePickerInput className="mt-1.5 w-full font-normal" value={props.value} onChange={props.onChange} /> : <input className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-800 bg-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" type={props.type ?? 'text'} value={props.value} onChange={(event) => props.onChange(event.target.value)} />}</label>
 }
 
 function Select(props: { label: string; onChange: (value: string) => void; options: StockOption[]; value: string }) {
-  return <label className="block text-xs font-semibold text-slate-600">{props.label}<select className="mt-1.5 w-full h-10 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-800 bg-white outline-none focus:border-slate-900" value={props.value} onChange={(event) => props.onChange(event.target.value)}><option value="">เลือก</option>{props.options.filter((option) => option.active !== false).map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} - ${option.name}` : option.name}</option>)}</select></label>
+  return <label className="block text-xs font-semibold text-slate-600">{props.label}<select className="mt-1.5 w-full h-10 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-800 bg-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value={props.value} onChange={(event) => props.onChange(event.target.value)}><option value="">เลือก</option>{props.options.filter((option) => option.active !== false).map((option) => <option key={option.id} value={option.id}>{option.code ? `${option.code} - ${option.name}` : option.name}</option>)}</select></label>
 }
 
 function BranchWarehouseFields({ branchId, reference, setBranchId, setWarehouseId, warehouseId }: { branchId: string; reference: Payload['reference']; setBranchId: (value: string) => void; setWarehouseId: (value: string) => void; warehouseId: string }) {
@@ -604,72 +896,269 @@ function BranchWarehouseFields({ branchId, reference, setBranchId, setWarehouseI
 }
 
 function StatusConvertForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (values: StatusConvertFormValues) => void; reference: Payload['reference'] }) {
-  const [values, setValues] = useState<StatusConvertFormValues>({ branchId: '', date: todayDateInput(), docNo: null, fromStatus: 'RM', lotNo: null, notes: null, productId: '', qty: 0, reason: null, toStatus: 'FG', warehouseId: '' })
-  return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
-      <BaseDateDoc values={values} setValues={setValues} />
-      <Select label="สินค้า" options={props.reference.products} value={values.productId} onChange={(productId) => setValues({ ...values, productId })} />
-      <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
-      <Select label="จากสถานะ" options={statusOptions()} value={values.fromStatus} onChange={(fromStatus) => setValues({ ...values, fromStatus: fromStatus as StatusConvertFormValues['fromStatus'] })} />
-      <Select label="เป็นสถานะ" options={statusOptions()} value={values.toStatus} onChange={(toStatus) => setValues({ ...values, toStatus: toStatus as StatusConvertFormValues['toStatus'] })} />
-      <Field label="น้ำหนัก (กก.)" type="number" value={String(values.qty)} onChange={(qty) => setValues({ ...values, qty: Number(qty) })} />
-      <Field label="Lot" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
-      <div className="md:col-span-2">
-        <Field label="เหตุผล" value={values.reason ?? ''} onChange={(reason) => setValues({ ...values, reason })} />
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<StatusConvertFormValues>({
+    branchId: '',
+    date: todayDateInput(),
+    docNo: null,
+    fromStatus: 'RM',
+    lotNo: null,
+    notes: null,
+    productId: '',
+    qty: 0,
+    reason: null,
+    toStatus: 'FG',
+    warehouseId: '',
+  })
+
+  function update<K extends keyof StatusConvertFormValues>(key: K, value: StatusConvertFormValues[K]) {
+    setValues((current) => ({ ...current, [key]: value }))
+    setErrors((current) => ({ ...current, [key]: '' }))
+  }
+
+  function handleSubmit() {
+    const parsed = statusConvertFormSchema.safeParse(values)
+    if (!parsed.success) {
+      setErrors(Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])))
+      return
+    }
+    setErrors({})
+    props.onSubmit(parsed.data)
+  }
+
+  return (
+    <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} onSubmit={handleSubmit}>
+      <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ข้อมูลเอกสาร</h4>
+        <BaseDateDoc values={values} setValues={(next) => setValues(next)} />
+        
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mt-2">สาขาและคลัง</h4>
+        <BranchWarehouseFields 
+          branchId={values.branchId} 
+          reference={props.reference} 
+          setBranchId={(branchId) => {
+            update('branchId', branchId)
+            update('warehouseId', '')
+          }} 
+          setWarehouseId={(warehouseId) => update('warehouseId', warehouseId)} 
+          warehouseId={values.warehouseId} 
+        />
+        {errors.branchId ? <span className="text-xs text-red-700 md:col-span-2">{errors.branchId}</span> : null}
+        {errors.warehouseId ? <span className="text-xs text-red-700 md:col-span-2">{errors.warehouseId}</span> : null}
       </div>
-    </div>
-  </FormShell>
+
+      <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ข้อมูลสินค้าและสถานะ</h4>
+        <div className="md:col-span-2">
+          <Select label="สินค้า *" options={props.reference.products} value={values.productId} onChange={(productId) => update('productId', productId)} />
+          {errors.productId ? <span className="text-xs text-red-700 mt-1 block">{errors.productId}</span> : null}
+        </div>
+        <Field label="Lot" value={values.lotNo ?? ''} onChange={(lotNo) => update('lotNo', lotNo || null)} />
+        <Field label="น้ำหนัก (กก.) *" type="number" value={String(values.qty)} onChange={(qty) => update('qty', Number(qty))} />
+        {errors.qty ? <span className="text-xs text-red-700 mt-1 block md:col-span-2">{errors.qty}</span> : null}
+
+        <Select label="จากสถานะ *" options={statusOptions()} value={values.fromStatus} onChange={(fromStatus) => update('fromStatus', fromStatus as StatusConvertFormValues['fromStatus'])} />
+        <Select label="เป็นสถานะ *" options={statusOptions()} value={values.toStatus} onChange={(toStatus) => update('toStatus', toStatus as StatusConvertFormValues['toStatus'])} />
+        {errors.toStatus ? <span className="text-xs text-red-700 mt-1 block md:col-span-2">{errors.toStatus}</span> : null}
+      </div>
+
+      <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">หมายเหตุและเหตุผล</h4>
+        <div className="md:col-span-2">
+          <Field label="เหตุผล" value={values.reason ?? ''} onChange={(reason) => update('reason', reason || null)} />
+        </div>
+        <div className="md:col-span-2">
+          <Field label="หมายเหตุเพิ่มเติม" value={values.notes ?? ''} onChange={(notes) => update('notes', notes || null)} />
+        </div>
+      </div>
+    </FormShell>
+  )
 }
 
 function ConvertForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (values: StockConvertFormValues) => void; reference: Payload['reference'] }) {
-  const [values, setValues] = useState<StockConvertFormValues>({ branchId: '', date: todayDateInput(), docNo: null, lotNo: null, notes: null, reason: null, sourceProductId: '', sourceQty: 0, targetLotNo: null, targetProductId: '', targetQty: 0, warehouseId: '' })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<StockConvertFormValues>({
+    branchId: '',
+    date: todayDateInput(),
+    docNo: null,
+    lotNo: null,
+    notes: null,
+    reason: null,
+    sourceProductId: '',
+    sourceQty: 0,
+    targetLotNo: null,
+    targetProductId: '',
+    targetQty: 0,
+    warehouseId: '',
+  })
+
+  function update<K extends keyof StockConvertFormValues>(key: K, value: StockConvertFormValues[K]) {
+    setValues((current) => ({ ...current, [key]: value }))
+    setErrors((current) => ({ ...current, [key]: '' }))
+  }
+
+  function handleSubmit() {
+    const parsed = stockConvertFormSchema.safeParse(values)
+    if (!parsed.success) {
+      setErrors(Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])))
+      return
+    }
+    setErrors({})
+    props.onSubmit(parsed.data)
+  }
+
   const sourceProduct = props.reference.products.find((item) => item.id === values.sourceProductId)
   const targetProduct = props.reference.products.find((item) => item.id === values.targetProductId)
   const lossQty = Math.max(0, Number(values.sourceQty) - Number(values.targetQty))
   const yieldPct = Number(values.sourceQty) > 0 ? (Number(values.targetQty) / Number(values.sourceQty)) * 100 : 0
-  return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} mode="convert" onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2 animate-fade-in">
-      <BaseDateDoc values={values} setValues={setValues} />
-      <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
-    </div>
-    <div className="rounded-xl border border-red-200 bg-red-50/40 p-5 shadow-sm md:col-span-2">
-      <div className="mb-3 text-sm font-bold text-red-700">Source (ออก)</div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Select label="สินค้าต้นทาง" options={props.reference.products} value={values.sourceProductId} onChange={(sourceProductId) => setValues({ ...values, sourceProductId })} />
-        <Field label="น้ำหนักต้นทาง (กก.)" type="number" value={String(values.sourceQty)} onChange={(sourceQty) => setValues({ ...values, sourceQty: Number(sourceQty) })} />
-        <Field label="Lot ต้นทาง" value={values.lotNo ?? ''} onChange={(lotNo) => setValues({ ...values, lotNo })} />
-        <ReadOnlyBox label="Source Product" value={sourceProduct ? `${sourceProduct.code ? `${sourceProduct.code} - ` : ''}${sourceProduct.name}` : '-'} />
+
+  return (
+    <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} mode="convert" onSubmit={handleSubmit}>
+      <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ข้อมูลเอกสาร</h4>
+        <BaseDateDoc values={values} setValues={(next) => setValues(next)} />
+        
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mt-2">สาขาและคลัง</h4>
+        <BranchWarehouseFields 
+          branchId={values.branchId} 
+          reference={props.reference} 
+          setBranchId={(branchId) => {
+            update('branchId', branchId)
+            update('warehouseId', '')
+          }} 
+          setWarehouseId={(warehouseId) => update('warehouseId', warehouseId)} 
+          warehouseId={values.warehouseId} 
+        />
+        {errors.branchId ? <span className="text-xs text-red-700 md:col-span-2">{errors.branchId}</span> : null}
+        {errors.warehouseId ? <span className="text-xs text-red-700 md:col-span-2">{errors.warehouseId}</span> : null}
       </div>
-    </div>
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm md:col-span-2">
-      <div className="mb-3 text-sm font-bold text-emerald-700">Target (เข้า)</div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Select label="สินค้าปลายทาง" options={props.reference.products} value={values.targetProductId} onChange={(targetProductId) => setValues({ ...values, targetProductId })} />
-        <Field label="น้ำหนักปลายทาง (กก.)" type="number" value={String(values.targetQty)} onChange={(targetQty) => setValues({ ...values, targetQty: Number(targetQty) })} />
-        <Field label="Lot ปลายทาง" value={values.targetLotNo ?? ''} onChange={(targetLotNo) => setValues({ ...values, targetLotNo })} />
-        <ReadOnlyBox label="Target Product" value={targetProduct ? `${targetProduct.code ? `${targetProduct.code} - ` : ''}${targetProduct.name}` : '-'} />
+
+      <div className="rounded-xl border border-red-200 bg-red-50/40 p-5 shadow-sm md:col-span-2">
+        <div className="mb-3 text-sm font-bold text-red-700">Source (ออก)</div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Select label="สินค้าต้นทาง *" options={props.reference.products} value={values.sourceProductId} onChange={(sourceProductId) => update('sourceProductId', sourceProductId)} />
+          <Field label="น้ำหนักต้นทาง (กก.) *" type="number" value={String(values.sourceQty)} onChange={(sourceQty) => update('sourceQty', Number(sourceQty))} />
+          <Field label="Lot ต้นทาง" value={values.lotNo ?? ''} onChange={(lotNo) => update('lotNo', lotNo || null)} />
+          <ReadOnlyBox label="Source Product" value={sourceProduct ? `${sourceProduct.code ? `${sourceProduct.code} - ` : ''}${sourceProduct.name}` : '-'} />
+        </div>
+        {errors.sourceProductId ? <span className="text-xs text-red-700 mt-1 block">{errors.sourceProductId}</span> : null}
+        {errors.sourceQty ? <span className="text-xs text-red-700 mt-1 block">{errors.sourceQty}</span> : null}
       </div>
-    </div>
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
-      <div className="mb-3 text-sm font-bold text-slate-700">Loss / Yield / Cost Flow</div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <ReadOnlyBox label="Loss" value={`${formatMoney(lossQty)} กก.`} />
-        <ReadOnlyBox label="Yield" value={`${formatMoney(yieldPct)}%`} />
-        <ReadOnlyBox label="Allocation" value="Manual WAC" />
+
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm md:col-span-2">
+        <div className="mb-3 text-sm font-bold text-emerald-700">Target (เข้า)</div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Select label="สินค้าปลายทาง *" options={props.reference.products} value={values.targetProductId} onChange={(targetProductId) => update('targetProductId', targetProductId)} />
+          <Field label="น้ำหนักปลายทาง (กก.) *" type="number" value={String(values.targetQty)} onChange={(targetQty) => update('targetQty', Number(targetQty))} />
+          <Field label="Lot ปลายทาง" value={values.targetLotNo ?? ''} onChange={(targetLotNo) => update('targetLotNo', targetLotNo || null)} />
+          <ReadOnlyBox label="Target Product" value={targetProduct ? `${targetProduct.code ? `${targetProduct.code} - ` : ''}${targetProduct.name}` : '-'} />
+        </div>
+        {errors.targetProductId ? <span className="text-xs text-red-700 mt-1 block">{errors.targetProductId}</span> : null}
+        {errors.targetQty ? <span className="text-xs text-red-700 mt-1 block">{errors.targetQty}</span> : null}
       </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Field label="เหตุผล" value={values.reason ?? ''} onChange={(reason) => setValues({ ...values, reason })} />
-        <Field label="หมายเหตุ" value={values.notes ?? ''} onChange={(notes) => setValues({ ...values, notes })} />
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
+        <div className="mb-3 text-sm font-bold text-slate-700">Loss / Yield / Cost Flow</div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <ReadOnlyBox label="Loss" value={`${formatMoney(lossQty)} กก.`} />
+          <ReadOnlyBox label="Yield" value={`${formatMoney(yieldPct)}%`} />
+          <ReadOnlyBox label="Allocation" value="Manual WAC" />
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Field label="เหตุผล" value={values.reason ?? ''} onChange={(reason) => update('reason', reason || null)} />
+          </div>
+          <div className="md:col-span-2">
+            <Field label="หมายเหตุ" value={values.notes ?? ''} onChange={(notes) => update('notes', notes || null)} />
+          </div>
+        </div>
       </div>
-    </div>
-  </FormShell>
+    </FormShell>
+  )
 }
 
 function AdjustForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (values: StockAdjustFormValues) => void; reference: Payload['reference'] }) {
-  const [values, setValues] = useState<StockAdjustFormValues>({ branchId: '', countedQty: 0, date: todayDateInput(), docNo: null, lotNo: null, productId: '', reason: '', remark: null, systemQty: 0, warehouseId: '' })
-  return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} onSubmit={() => props.onSubmit(values)}>
-    <Field label="เหตุผล" value={values.reason} onChange={(reason) => setValues({ ...values, reason })} />
-  </FormShell>
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<StockAdjustFormValues>({
+    branchId: '',
+    countedQty: 0,
+    date: todayDateInput(),
+    docNo: null,
+    lotNo: null,
+    productId: '',
+    reason: '',
+    remark: null,
+    systemQty: 0,
+    warehouseId: '',
+  })
+
+  function update<K extends keyof StockAdjustFormValues>(key: K, value: StockAdjustFormValues[K]) {
+    setValues((current) => ({ ...current, [key]: value }))
+    setErrors((current) => ({ ...current, [key]: '' }))
+  }
+
+  function handleSubmit() {
+    const parsed = stockAdjustFormSchema.safeParse(values)
+    if (!parsed.success) {
+      setErrors(Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])))
+      return
+    }
+    setErrors({})
+    props.onSubmit(parsed.data)
+  }
+
+  const diffQty = Number(values.countedQty) - Number(values.systemQty)
+
+  return (
+    <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} onSubmit={handleSubmit}>
+      <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ข้อมูลเอกสาร</h4>
+        <BaseDateDoc values={values} setValues={(next) => setValues(next)} />
+        
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mt-2">สาขาและคลัง</h4>
+        <BranchWarehouseFields 
+          branchId={values.branchId} 
+          reference={props.reference} 
+          setBranchId={(branchId) => {
+            update('branchId', branchId)
+            update('warehouseId', '')
+          }} 
+          setWarehouseId={(warehouseId) => update('warehouseId', warehouseId)} 
+          warehouseId={values.warehouseId} 
+        />
+        {errors.branchId ? <span className="text-xs text-red-700 md:col-span-2">{errors.branchId}</span> : null}
+        {errors.warehouseId ? <span className="text-xs text-red-700 md:col-span-2">{errors.warehouseId}</span> : null}
+      </div>
+
+      <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">รายละเอียดสินค้าและจำนวน</h4>
+        <div className="md:col-span-2">
+          <Select label="สินค้า *" options={props.reference.products} value={values.productId} onChange={(productId) => update('productId', productId)} />
+          {errors.productId ? <span className="text-xs text-red-700 mt-1 block">{errors.productId}</span> : null}
+        </div>
+        <Field label="Lot" value={values.lotNo ?? ''} onChange={(lotNo) => update('lotNo', lotNo || null)} />
+        <div className="md:col-span-1" />
+
+        <Field label="จำนวนในระบบ (ระบบ)" type="number" value={String(values.systemQty)} onChange={(val) => update('systemQty', Number(val))} />
+        <Field label="จำนวนที่นับจริง (นับจริง) *" type="number" value={String(values.countedQty)} onChange={(val) => update('countedQty', Number(val))} />
+        
+        <div className="md:col-span-2">
+          <ReadOnlyBox label="ผลต่าง (Diff Qty)" value={`${formatMoney(diffQty)} กก.`} />
+        </div>
+      </div>
+
+      <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+        <h4 className="md:col-span-2 text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">เหตุผลและหมายเหตุ</h4>
+        <div className="md:col-span-2">
+          <Field label="เหตุผลในการปรับสต๊อก *" value={values.reason} onChange={(reason) => update('reason', reason)} />
+          {errors.reason ? <span className="text-xs text-red-700 mt-1 block">{errors.reason}</span> : null}
+        </div>
+        <div className="md:col-span-2">
+          <Field label="หมายเหตุเพิ่มเติม" value={values.remark ?? ''} onChange={(remark) => update('remark', remark || null)} />
+        </div>
+      </div>
+    </FormShell>
+  )
 }
 
 function BaseDateDoc<T extends { date: string; docNo?: string | null }>({ setValues, values }: { setValues: (values: T) => void; values: T }) {
@@ -690,7 +1179,7 @@ function FormShell({ cancelHref, children, isSaving, mode, onSubmit }: { cancelH
         <div className="grid gap-4 md:grid-cols-2">{children}</div>
       </div>
       <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-        <a className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 flex items-center justify-center" href={cancelHref}>
+        <a className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 flex items-center justify-center animate-fade-in" href={cancelHref}>
           ยกเลิก
         </a>
         <button
@@ -708,3 +1197,16 @@ function FormShell({ cancelHref, children, isSaving, mode, onSubmit }: { cancelH
 function statusOptions(): StockOption[] {
   return [{ active: true, id: 'RM', name: 'RM' }, { active: true, id: 'WIP', name: 'WIP' }, { active: true, id: 'FG', name: 'FG' }]
 }
+
+function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
+  const activeClass = {
+    amber: 'border-amber-600 bg-amber-600 text-white',
+    dark: 'border-slate-700 bg-slate-700 text-white',
+    emerald: 'border-emerald-600 bg-emerald-600 text-white',
+    red: 'border-red-600 bg-red-600 text-white',
+    slate: 'border-slate-500 bg-slate-500 text-white',
+  }[tone]
+  const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-100'
+  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
+}
+

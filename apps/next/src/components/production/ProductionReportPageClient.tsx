@@ -219,18 +219,68 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             </div>
           </div>
         </div>
-        <div className="overflow-x-auto rounded-md bg-white shadow">
+
+        <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow border border-slate-200/60">
           <table className="w-full text-sm">
-            <thead className="bg-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
+            <thead className="bg-slate-100 border-b border-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
             <tbody>
               {isLoading ? <tr><td className="py-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
               {!isLoading && costRows.map((row, index) => {
                 const costs = costBreakdown(row)
-                return <tr key={String(row.id ?? index)} className="border-t hover:bg-slate-50"><td className="p-2 font-mono text-xs">{String(row.docNo ?? '')}</td><td className="p-2">{formatDateDisplay(String(row.date ?? ''))}</td><td className="p-2 text-right">{formatMoney(Number(row.inputCost ?? 0))}</td><td className="p-2 text-right">{formatMoney(costs.labor)}</td><td className="p-2 text-right">{formatMoney(costs.electricity)}</td><td className="p-2 text-right">{formatMoney(costs.machine)}</td><td className="p-2 text-right">{formatMoney(costs.fuel)}</td><td className="p-2 text-right">{formatMoney(costs.maintenance)}</td><td className="p-2 text-right">{formatMoney(costs.otherProc)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))}</td><td className="p-2 text-right text-slate-700">{formatMoney(Number(row.costPerKg ?? 0))}</td><td className="p-2 text-xs">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</td></tr>
+                return <tr key={String(row.id ?? index)} className="border-t border-slate-100 hover:bg-slate-50"><td className="p-2 font-mono text-xs">{String(row.docNo ?? '')}</td><td className="p-2">{formatDateDisplay(String(row.date ?? ''))}</td><td className="p-2 text-right">{formatMoney(Number(row.inputCost ?? 0))}</td><td className="p-2 text-right">{formatMoney(costs.labor)}</td><td className="p-2 text-right">{formatMoney(costs.electricity)}</td><td className="p-2 text-right">{formatMoney(costs.machine)}</td><td className="p-2 text-right">{formatMoney(costs.fuel)}</td><td className="p-2 text-right">{formatMoney(costs.maintenance)}</td><td className="p-2 text-right">{formatMoney(costs.otherProc)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))}</td><td className="p-2 text-right text-slate-700">{formatMoney(Number(row.costPerKg ?? 0))}</td><td className="p-2 text-xs">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</td></tr>
               })}
               {!isLoading && costRows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={13}>ไม่มีข้อมูล</td></tr> : null}
             </tbody>
           </table>
+        </div>
+
+        {/* Cost Mobile Card List View */}
+        <div className="lg:hidden space-y-3">
+          {costRows.map((row, index) => {
+            const costs = costBreakdown(row)
+            return (
+              <div key={String(row.id ?? index)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="font-mono text-sm font-bold text-slate-800">{String(row.docNo ?? '')}</span>
+                  <span className="text-xs text-slate-500 font-medium">{formatDateDisplay(String(row.date ?? ''))}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">RM Cost</span>
+                    <span className="text-sm font-semibold text-slate-800">{formatMoney(Number(row.inputCost ?? 0))} ฿</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">Labor Cost</span>
+                    <span className="text-sm font-semibold text-slate-800">{formatMoney(costs.labor)} ฿</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">Electricity</span>
+                    <span className="text-sm font-semibold text-slate-800">{formatMoney(costs.electricity)} ฿</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">Machine / Fuel</span>
+                    <span className="text-sm font-semibold text-slate-800">{formatMoney(costs.machine + costs.fuel)} ฿</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">Output (kg)</span>
+                    <span className="text-sm font-bold text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))} กก.</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">Allocation Method</span>
+                    <span className="text-sm font-semibold text-slate-700">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-2 mt-1">
+                  <span className="text-xs font-semibold text-slate-500">Total Cost / ฿/kg</span>
+                  <div className="text-right">
+                    <div className="text-base font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))} ฿</div>
+                    <div className="text-xs text-slate-500 font-medium">{formatMoney(Number(row.costPerKg ?? 0))} ฿/กก.</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          {costRows.length === 0 ? <div className="py-6 text-center text-slate-400 bg-white rounded-md shadow border border-slate-200">ไม่มีข้อมูล</div> : null}
         </div>
       </section>
     )
@@ -282,34 +332,131 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-md bg-white p-4 shadow-lg">
-            <h3 className="mb-3 font-bold text-slate-700">สถานะใบสั่งผลิต</h3>
+          <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+            <h3 className="mb-3 font-bold text-slate-700 text-sm">สถานะใบสั่งผลิต</h3>
             <div className="space-y-2">
               {byStatus.map((item) => <StatusBar key={item.status} count={item.count} max={Math.max(1, ...byStatus.map((row) => row.count))} status={item.status} />)}
               {!byStatus.length ? <div className="py-6 text-center text-sm text-slate-400">ยังไม่มีข้อมูล</div> : null}
             </div>
           </div>
-          <div className="overflow-hidden rounded-md bg-white shadow-lg lg:col-span-2">
-            <div className="border-b bg-emerald-50 p-3"><h3 className="font-bold text-emerald-700">Top 10 สินค้าที่ผลิตมากสุด</h3></div>
+          <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm lg:col-span-2 flex flex-col overflow-hidden">
+            <div className="border-b border-slate-100 bg-emerald-50/50 p-3"><h3 className="font-bold text-emerald-700 text-sm">Top 10 สินค้าที่ผลิตมากสุด</h3></div>
+            
+            {/* Desktop View */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr className="border-slate-100">
+                    <th className="w-8 p-2 text-left text-xs font-semibold text-slate-500">#</th>
+                    <th className="p-2 text-left text-xs font-semibold text-slate-500">Code</th>
+                    <th className="p-2 text-left text-xs font-semibold text-slate-500">สินค้า</th>
+                    <th className="p-2 text-right text-xs font-semibold text-slate-500">รอบ</th>
+                    <th className="p-2 text-right text-xs font-semibold text-slate-500">น้ำหนัก</th>
+                    <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุนรวม</th>
+                    <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุน/กก.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topProducts.map((item, index) => (
+                    <tr key={item.name} className="border-t border-slate-100 hover:bg-slate-50">
+                      <td className="p-2 font-bold text-emerald-700 text-xs">{index + 1}</td>
+                      <td className="p-2 font-mono text-xs">{item.code || '-'}</td>
+                      <td className="p-2 text-xs">{item.name}</td>
+                      <td className="p-2 text-right text-xs">{item.batches}</td>
+                      <td className="p-2 text-right font-bold text-xs">{formatMoney(item.qty)}</td>
+                      <td className="p-2 text-right text-xs">{formatMoney(item.cost)}</td>
+                      <td className="p-2 text-right text-xs text-slate-600">{formatMoney(item.avgCost ?? (item.qty > 0 ? item.cost / item.qty : 0))}</td>
+                    </tr>
+                  ))}
+                  {!topProducts.length ? <tr><td className="py-6 text-center text-slate-400" colSpan={7}>ยังไม่มีข้อมูลในช่วงนี้</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile View */}
+            <div className="lg:hidden p-3 space-y-3 bg-slate-50/30 flex-1">
+              {topProducts.map((item, index) => (
+                <div key={item.name} className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                  <div className="border-b border-slate-100 pb-1.5 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
+                        {index + 1}
+                      </span>
+                      <span className="font-semibold text-slate-800 text-sm">{item.name}</span>
+                    </div>
+                    <span className="font-mono text-xs text-slate-400">{item.code || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+                    <div>
+                      <span className="text-slate-500 block text-xs font-semibold">รอบการผลิต</span>
+                      <span className="text-sm font-semibold text-slate-800">{item.batches} รอบ</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-xs font-semibold">น้ำหนักรวม</span>
+                      <span className="text-sm font-bold text-emerald-700">{formatMoney(item.qty)} กก.</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-xs font-semibold">ต้นทุนรวม</span>
+                      <span className="text-sm font-semibold text-slate-800">{formatMoney(item.cost)} ฿</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-xs font-semibold">ต้นทุนเฉลี่ย</span>
+                      <span className="text-sm font-semibold text-slate-600">
+                        {formatMoney(item.avgCost ?? (item.qty > 0 ? item.cost / item.qty : 0))} ฿/กก.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {!topProducts.length ? <div className="py-4 text-center text-xs text-slate-400">ยังไม่มีข้อมูลในช่วงนี้</div> : null}
+            </div>
+          </div>
+        </div>
+ 
+        <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col overflow-hidden">
+          <div className="border-b border-slate-100 bg-indigo-50/50 p-3"><h3 className="font-bold text-indigo-700 text-sm">Machine Utilization (ปริมาณผลิตต่อเครื่อง)</h3></div>
+          
+          {/* Desktop View */}
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50"><tr><th className="w-8 p-2 text-left">#</th><th className="p-2 text-left">Code</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">รอบ</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ต้นทุนรวม</th><th className="p-2 text-right">ต้นทุน/กก.</th></tr></thead>
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr className="border-slate-100">
+                  <th className="p-2 text-left text-xs font-semibold text-slate-500">เครื่องจักร</th>
+                  <th className="p-2 text-right text-xs font-semibold text-slate-500">รอบที่ใช้</th>
+                  <th className="p-2 text-right text-xs font-semibold text-slate-500">น้ำหนักผลิต</th>
+                </tr>
+              </thead>
               <tbody>
-                {topProducts.map((item, index) => <tr key={item.name} className="border-t"><td className="p-2 font-bold text-emerald-700">{index + 1}</td><td className="p-2 font-mono text-xs">{item.code || '-'}</td><td className="p-2 text-xs">{item.name}</td><td className="p-2 text-right text-xs">{item.batches}</td><td className="p-2 text-right font-bold">{formatMoney(item.qty)}</td><td className="p-2 text-right text-xs">{formatMoney(item.cost)}</td><td className="p-2 text-right text-xs text-slate-600">{formatMoney(item.avgCost ?? (item.qty > 0 ? item.cost / item.qty : 0))}</td></tr>)}
-                {!topProducts.length ? <tr><td className="py-6 text-center text-slate-400" colSpan={7}>ยังไม่มีข้อมูลในช่วงนี้</td></tr> : null}
+                {machineUtil.map((item) => (
+                  <tr key={item.name} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="p-2 text-xs">{item.name}</td>
+                    <td className="p-2 text-right text-xs">{item.batches}</td>
+                    <td className="p-2 text-right font-bold text-indigo-700 text-xs">{formatMoney(item.qty)}</td>
+                  </tr>
+                ))}
+                {!machineUtil.length ? <tr><td className="py-6 text-center text-slate-400" colSpan={3}>ยังไม่มีข้อมูล</td></tr> : null}
               </tbody>
             </table>
           </div>
-        </div>
 
-        <div className="overflow-hidden rounded-md bg-white shadow-lg">
-          <div className="border-b bg-indigo-50 p-3"><h3 className="font-bold text-indigo-700">Machine Utilization (ปริมาณผลิตต่อเครื่อง)</h3></div>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50"><tr><th className="p-2 text-left">เครื่องจักร</th><th className="p-2 text-right">รอบที่ใช้</th><th className="p-2 text-right">น้ำหนักผลิต</th></tr></thead>
-            <tbody>
-              {machineUtil.map((item) => <tr key={item.name} className="border-t"><td className="p-2">{item.name}</td><td className="p-2 text-right">{item.batches}</td><td className="p-2 text-right font-bold text-indigo-700">{formatMoney(item.qty)}</td></tr>)}
-              {!machineUtil.length ? <tr><td className="py-6 text-center text-slate-400" colSpan={3}>ยังไม่มีข้อมูล</td></tr> : null}
-            </tbody>
-          </table>
+          {/* Mobile View */}
+          <div className="lg:hidden p-3 space-y-3 bg-slate-50/30">
+            {machineUtil.map((item) => (
+              <div key={item.name} className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                <div className="border-b border-slate-100 pb-1.5 flex justify-between items-center">
+                  <span className="font-semibold text-slate-800 text-sm">{item.name}</span>
+                  <span className="text-sm font-bold text-indigo-700">{formatMoney(item.qty)} กก.</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 text-xs font-semibold">รอบที่ใช้งาน</span>
+                  <span className="text-sm font-semibold text-slate-800 bg-slate-50 px-2.5 py-0.5 rounded-md border border-slate-100">
+                    {item.batches} รอบ
+                  </span>
+                </div>
+              </div>
+            ))}
+            {!machineUtil.length ? <div className="py-4 text-center text-xs text-slate-400">ยังไม่มีข้อมูล</div> : null}
+          </div>
         </div>
 
         {isLoading ? <div className="text-center text-sm text-slate-500">กำลังโหลดข้อมูล</div> : null}
@@ -320,12 +467,12 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="rounded-md bg-white p-4 shadow">
+      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <DatePickerInput className="w-[130px]" value={dateFrom} onChange={setDateFrom} />
           <DatePickerInput className="w-[130px]" value={dateTo} onChange={setDateTo} />
-          <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
-          {config.exportable ? <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" type="button" onClick={exportCsv}>Export CSV</button> : null}
+          <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 focus:outline-none" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
+          {config.exportable ? <button className="ml-auto rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white focus:outline-none" type="button" onClick={exportCsv}>Export CSV</button> : null}
         </div>
       </div>
       {mode === 'yieldLoss' ? (
@@ -338,7 +485,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           <b>Machine Utilization</b> = ชั่วโมงประมาณการ / (8 ชม./วัน x จำนวนวัน) | <b>Yield Diff</b> = Actual Yield - Normal Yield
         </div>
       ) : null}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 xl:grid-cols-6 text-sm">
+      <div className="rounded-xl border border-slate-200/60 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 xl:grid-cols-6 text-sm">
         {metricItems.map((metric, index) => (
           <Metric
             key={metric.key}
@@ -351,41 +498,146 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
         ))}
       </div>
       {mode === 'yieldLoss' ? (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-4 text-sm mt-4">
+        <div className="rounded-xl border border-slate-200/60 bg-slate-50 p-3 sm:p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-4 text-sm mt-4">
           <ImpactCard label="Yield Gain (Output > คาดหวัง)" tone="gain" value={Number(data?.summary?.yieldGainValue ?? 0)} />
           <ImpactCard label="Abnormal Loss (Output < Normal)" tone="loss" value={Number(data?.summary?.abnormalLossValue ?? 0)} />
           <ImpactCard label="Net P&L Impact" tone={Number(data?.summary?.netPnL ?? 0) >= 0 ? 'netGood' : 'netBad'} value={Number(data?.summary?.netPnL ?? 0)} />
         </div>
       ) : null}
       {mode === 'report' ? (
-        <div className="overflow-hidden rounded-md bg-white shadow">
-          <h3 className="border-b px-4 py-3 font-semibold">📦 ผลผลิตแยกตามสินค้า</h3>
-          <div className="overflow-x-auto">
+        <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col overflow-hidden">
+          <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3"><h3 className="font-bold text-slate-700 text-sm">📦 ผลผลิตแยกตามสินค้า</h3></div>
+          
+          {/* Desktop View */}
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">รอบ</th><th className="p-2 text-right">น้ำหนักรวม</th><th className="p-2 text-right">ต้นทุนรวม</th><th className="p-2 text-right">ต้นทุน/กก.</th></tr></thead>
+              <thead className="bg-slate-100 border-b border-slate-100">
+                <tr className="border-slate-100">
+                  <th className="p-2 text-left text-xs font-semibold text-slate-500">สินค้า</th>
+                  <th className="p-2 text-right text-xs font-semibold text-slate-500">รอบ</th>
+                  <th className="p-2 text-right text-xs font-semibold text-slate-500">น้ำหนักรวม</th>
+                  <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุนรวม</th>
+                  <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุน/กก.</th>
+                </tr>
+              </thead>
               <tbody>
-                {productSummary.map((item) => <tr key={item.name} className="border-t"><td className="p-2">{item.name}</td><td className="p-2 text-right">{item.count}</td><td className="p-2 text-right font-medium text-emerald-700">{formatMoney(item.qty)}</td><td className="p-2 text-right">{formatMoney(item.cost)}</td><td className="p-2 text-right">{formatMoney(item.unitCost)}</td></tr>)}
+                {productSummary.map((item) => (
+                  <tr key={item.name} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="p-2 text-xs">{item.name}</td>
+                    <td className="p-2 text-right text-xs">{item.count}</td>
+                    <td className="p-2 text-right font-medium text-emerald-700 text-xs">{formatMoney(item.qty)}</td>
+                    <td className="p-2 text-right text-xs">{formatMoney(item.cost)}</td>
+                    <td className="p-2 text-right text-xs">{formatMoney(item.unitCost)}</td>
+                  </tr>
+                ))}
                 {!productSummary.length ? <tr><td className="py-6 text-center text-slate-400" colSpan={5}>ไม่มีข้อมูล</td></tr> : null}
               </tbody>
             </table>
           </div>
+
+          {/* Mobile View */}
+          <div className="lg:hidden p-3 space-y-3 bg-slate-50/30">
+            {productSummary.map((item) => (
+              <div key={item.name} className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                <div className="border-b border-slate-100 pb-1.5 flex justify-between items-center">
+                  <span className="font-semibold text-slate-800 text-sm">{item.name}</span>
+                  <span className="text-xs font-semibold bg-slate-100 px-2 py-0.5 rounded text-slate-600 shrink-0">
+                    {item.count} รอบ
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">น้ำหนักรวม</span>
+                    <span className="text-sm font-bold text-emerald-700">{formatMoney(item.qty)} กก.</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">ต้นทุนรวม</span>
+                    <span className="text-sm font-semibold text-slate-800">{formatMoney(item.cost)} ฿</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs font-semibold">ต้นทุน/กก.</span>
+                    <span className="text-sm font-semibold text-slate-800">{formatMoney(item.unitCost)} ฿/กก.</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!productSummary.length ? <div className="py-4 text-center text-xs text-slate-400">ไม่มีข้อมูล</div> : null}
+          </div>
         </div>
       ) : null}
-      <div className="overflow-x-auto rounded-md bg-white shadow">
+
+      {/* Desktop view for other modes */}
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow border border-slate-200/60">
         <table className="w-full text-sm table-zebra">
-          <thead className="bg-slate-100">
-            <tr>{config.columns.map((column) => <th key={column.key} className="whitespace-nowrap p-2 text-left">{column.label}</th>)}</tr>
+          <thead className="bg-slate-100 border-b border-slate-100">
+            <tr className="border-slate-100">
+              {config.columns.map((column) => (
+                <th key={column.key} className="whitespace-nowrap p-2 text-left text-xs font-semibold text-slate-500">
+                  {column.label}
+                </th>
+              ))}
+            </tr>
           </thead>
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && rows.map((row, index) => (
-              <tr key={String(row.id ?? index)} className={`border-t hover:bg-slate-50 ${mode === 'wip' ? wipAgeClass(Number(row.ageDays ?? 0)) : ''}`}>
-                {config.columns.map((column) => <td key={column.key} className={`whitespace-nowrap p-2 ${cellTone(row[column.key], column, mode)}`}>{formatCell(row[column.key], column.type)}</td>)}
+              <tr key={String(row.id ?? index)} className={`border-t border-slate-100 hover:bg-slate-50 ${mode === 'wip' ? wipAgeClass(Number(row.ageDays ?? 0)) : ''}`}>
+                {config.columns.map((column) => (
+                  <td key={column.key} className={`whitespace-nowrap p-2 text-xs ${cellTone(row[column.key], column, mode)}`}>
+                    {formatCell(row[column.key], column.type)}
+                  </td>
+                ))}
               </tr>
             ))}
             {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>ไม่มีข้อมูล</td></tr> : null}
           </tbody>
         </table>
+      </div>
+
+      {/* Dynamic Mobile Card List View for other modes */}
+      <div className="lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="py-6 text-center text-slate-500 bg-white rounded-xl border border-slate-200 shadow-sm">
+            กำลังโหลดข้อมูล
+          </div>
+        ) : null}
+        {!isLoading && rows.map((row, index) => {
+          const firstCol = config.columns[0]
+          const secondCol = config.columns[1]
+          const titleValue = String(row[firstCol?.key] ?? '')
+          const subTitleValue = secondCol ? formatCell(row[secondCol.key], secondCol.type) : ''
+          const restColumns = config.columns.slice(2)
+          return (
+            <div 
+              key={String(row.id ?? index)} 
+              className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3 ${mode === 'wip' ? wipAgeClass(Number(row.ageDays ?? 0)) : ''}`}
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="font-mono text-sm font-bold text-slate-800">{titleValue}</span>
+                {subTitleValue && <span className="text-xs text-slate-500 font-medium">{subTitleValue}</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                {restColumns.map((col) => {
+                  const val = row[col.key]
+                  const toneClass = cellTone(val, col, mode)
+                  return (
+                    <div key={col.key} className="min-w-0">
+                      <span className="text-slate-500 block text-xs font-semibold">{col.label}</span>
+                      <span className={`text-sm font-semibold text-slate-800 truncate block mt-0.5 ${toneClass}`}>
+                        {formatCell(val, col.type)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+        {!isLoading && rows.length === 0 ? (
+          <div className="py-6 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
+            ไม่มีข้อมูล
+          </div>
+        ) : null}
       </div>
     </section>
   )
