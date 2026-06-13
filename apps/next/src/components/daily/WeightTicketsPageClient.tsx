@@ -863,7 +863,7 @@ export function WeightTicketsPageClient({
 
       <div className={cn(
         onClose
-          ? "sticky bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-sm"
+          ? "sticky bottom-0 z-20 border-t border-slate-200 bg-slate-50 px-4 py-3 shrink-0"
           : "fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-sm lg:left-64"
       )}>
         <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -882,7 +882,7 @@ export function WeightTicketsPageClient({
               </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 justify-end sm:justify-end ml-auto">
             <Button disabled={isLoadingTicket || isSaving} type="button" variant="outline" onClick={backToList}>
               {!onClose && <ArrowLeft className="mr-1 h-4 w-4" />}
               {onClose ? 'ปิด' : 'กลับไปหน้ารายการ'}
