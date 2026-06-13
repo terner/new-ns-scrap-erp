@@ -5,7 +5,7 @@ tags:
   - menu
   - tracking
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-13
 route: /tracking/customer
 ---
 
@@ -41,10 +41,22 @@ Legacy `view-customerTracking`:
 - มี drilldown detail ต่อ customer: sales list, receipts list, product breakdown, monthly breakdown
 - Export CSV ใช้ filter/view ปัจจุบัน
 
+## Requirement Update 2026-06-13
+
+Latest user screenshot changes the target from a simple customer sales summary into a decision page for customer behavior, credit, and movement.
+
+- Purpose: ติดตามพฤติกรรมลูกค้า ยอดซื้อ/ขาย กำไร เครดิต และ movement ทั้งหมดของ customer
+- Required data groups: Sales Bill, Receipt, Margin, Return, Pending AR
+- Decision questions: ลูกค้าคนไหนซื้อเยอะ, margin ดีไหม, จ่ายช้าไหม, มี return บ่อยไหม
+- Business actions supported: เพิ่มเครดิต, ลดเครดิต, ต้นยอดขาย, blacklist
+- Local vs legacy finding: legacy row click opens customer detail with sales list, receipt list, product breakdown, and monthly breakdown. Current Next local page/API is still aggregate-only; rows are not detail-openable and API does not return detail timelines.
+- Target UI direction: list remains high-density, but each customer row/card should open a detail view/modal with SB/RCP/source links, product breakdown, monthly movement, return count/value when source is finalized, pending AR/receivable exposure, and credit decision signals.
+
 ## Page Responsibilities
 
 - แสดงภาพรวมลูกค้าจากยอดขาย รับเงิน ลูกหนี้ และ GP
 - ใช้สำหรับตรวจ customer performance, receivable exposure, margin risk
+- ใช้สนับสนุนการตัดสินใจด้านเครดิต ยอดขาย และ blacklist โดยอ้างอิง behavior/movement จริง
 - แสดง monthly trend ของยอดขาย/GP ต่อปี
 - Export row set ปัจจุบันเป็น `.xlsx`
 - Target drilldown: customer -> SB/RCP/product breakdown/source document links
@@ -96,6 +108,14 @@ Row fields:
 - `qty`, `revenue`, `cogs`, `gp`, `gpPct`, `profitPerKg`, `avgSell`
 - `receivedAmount`, `receivable`, `creditLimit`
 
+Target detail payload fields:
+
+- `sales`: SB doc no/date/channel/qty/revenue/COGS/GP/received/receivable/source link
+- `receipts`: RCP doc no/date/account/amount/source link
+- `products`: product code/name/qty/revenue/COGS/GP/GP%
+- `monthly`: bill count/qty/revenue/GP/received/receivable by month
+- `signals`: margin quality, payment delay/pending AR, return frequency when source exists, credit-limit utilization
+
 ## Calculation Rules
 
 - Sales bill amount uses item JSON total first: `netAmount`, `amount`, `total`; fallback `subtotal`, then `total_amount`.
@@ -115,7 +135,7 @@ Row fields:
 | 2 | เลือก year/month/customer/search | API recalculates rows, monthly, summary with same filters |
 | 3 | ดู top/summary | User identifies revenue, margin, receivable risk |
 | 4 | Export | Download `tracking_customer_<year>[_month].xlsx` |
-| 5 | Future drilldown | Open customer detail with SB/RCP/product breakdown |
+| 5 | เปิด detail | Open customer detail with SB/RCP/product/monthly movement and credit decision signals |
 
 ## Validation / Status Rules
 
@@ -134,8 +154,31 @@ Row fields:
 
 - API does not yet return drilldown source rows per customer.
 - API does not yet return product/channel breakdown that legacy detail view had.
+- Return signal/count is not wired yet; source ownership must be confirmed before adding it.
+- Credit decision signals are not yet exposed as structured fields.
 - AR aging buckets and due-date logic remain owned by [[Finance AR Page Flow]].
 - Customer advance allocation is out of scope here and should come from Sales/Payment flow facts.
+
+## Implementation Tasks
+
+### API
+
+- [ ] Extend `GET /api/tracking/customer` with customer detail mode or detail payload keyed by customer business code.
+- [ ] Return SB source rows with doc no, date, channel, qty, revenue, COGS, GP, received, receivable, and source link.
+- [ ] Return RCP source rows with doc no, date, account, amount, and source link.
+- [ ] Return product breakdown per customer for selected period: product code/name, qty, revenue, COGS, GP, GP%.
+- [ ] Return monthly movement per customer for selected year: bill count, qty, revenue, GP, received, receivable.
+- [ ] Add structured decision signals: low margin, negative margin, pending AR, credit utilization, return frequency once source contract is confirmed.
+- [ ] Keep `year/month/customerId/q` filter and `format=xlsx` export aligned with the JSON result.
+
+### UI
+
+- [ ] Keep `docs/design.md` ordering: KPI cards, filter shell, tabs, pagination/summary if row count grows, data area.
+- [ ] Use compact filter shell with year, month, customer, search, and XLSX export button.
+- [ ] Make desktop rows clickable and keyboard-openable; add dense mobile cards that open the same customer detail.
+- [ ] Add detail modal/view sections: decision signals, SB list, RCP list, product breakdown, monthly movement.
+- [ ] Add source document links as read-only navigation; no mutation actions.
+- [ ] Preserve table density with `text-sm`, `p-2`, `bg-slate-100` header, and no nested cards.
 
 ## Implementation Checklist
 
@@ -145,4 +188,5 @@ Row fields:
 - [ ] Add customer detail/read endpoint or drilldown payload
 - [ ] Add source links to SB/RCP/customer documents
 - [ ] Add product/channel breakdown after source contract is finalized
+- [ ] Add customer behavior signals for margin, late/pending AR, return frequency, and credit utilization
 - [ ] Add AR aging only when due-date rules are reconciled

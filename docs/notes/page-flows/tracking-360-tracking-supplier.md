@@ -5,7 +5,7 @@ tags:
   - menu
   - tracking
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-13
 route: /tracking/supplier
 ---
 
@@ -41,10 +41,22 @@ Legacy `view-supplierTracking`:
 - มี drilldown detail ต่อ supplier: bills, payments, product breakdown, monthly breakdown
 - Export CSV ใช้ filter/view ปัจจุบัน
 
+## Requirement Update 2026-06-13
+
+Latest user screenshot changes the target from purchase/payable summary into a supplier quality and reliability page.
+
+- Purpose: ติดตาม supplier ด้านต้นทุน คุณภาพ และ reliability
+- Required data groups: Purchase Bill, WT/WTI, Grade Adjust, Payment, Return
+- Decision questions: supplier ไหนต้นทุนดี, ส่งครบไหม, quality ดีไหม, จ่ายดีไหม
+- Business importance: ธุรกิจ scrap ต้องเห็น supplier quality เพราะ supplier แต่ละรายไม่เท่ากัน
+- Local vs legacy finding: legacy row click opens supplier detail with PB list, payment list, product breakdown, and monthly breakdown. Current Next local page has client-side supplier/search filtering only after aggregate load; API has no `supplierId`/`q` filter and no supplier detail payload.
+- Target UI direction: each supplier row/card should open a detail view/modal with PB/PMT/source links, WTI/grade-adjust/return signals when source ownership is finalized, product mix, monthly purchase/payment trend, and reliability/quality signals.
+
 ## Page Responsibilities
 
 - แสดงภาพรวมผู้ขายจากยอดรับซื้อ จ่ายเงิน เจ้าหนี้ และราคาเฉลี่ยซื้อ
 - ใช้ตรวจ supplier performance, purchase concentration, payable exposure, avg buy risk
+- ใช้ตรวจ supplier quality/reliability เพื่อช่วยเลือกซื้อจาก supplier ที่ต้นทุนดี ส่งครบ และคุณภาพสม่ำเสมอ
 - แสดง product mix จาก purchase bill items
 - Export supplier row set เป็น `.xlsx`
 - Target drilldown: supplier -> PB/PMT/product breakdown/source document links
@@ -69,9 +81,11 @@ Query:
 |---|---|
 | `year` | ปี ค.ศ.; default ปีปัจจุบัน |
 | `month` | เดือน `1-12` หรือ `01-12`; optional |
+| `supplierId` | supplier business code หรือ internal id |
+| `q` | ค้นหา supplier code/name |
 | `format=xlsx` | export workbook |
 
-Current API does not have `supplierId` or `q` server-side filter.
+Server-side `supplierId` and `q` now apply to rows, byProduct, monthly, summary, and export.
 
 Source tables:
 
@@ -83,6 +97,7 @@ Response:
 
 | Field | Meaning |
 |---|---|
+| `filters.suppliers` | active supplier options using business code as id |
 | `rows` | aggregate supplier rows |
 | `byProduct` | product-level purchase summary across selected period |
 | `monthly` | 12-month purchase amount/qty series for selected year |
@@ -95,6 +110,14 @@ Row fields:
 - `billCount`, `paymentCount`
 - `qty`, `purchaseAmount`, `avgBuy`
 - `paidAmount`, `payable`, `paidPct`
+
+Target detail payload fields:
+
+- `bills`: PB doc no/date/product qty/amount/avg buy/paid/payable/status/source link
+- `payments`: PMT/PMA doc no/date/account/amount/status/source link
+- `products`: product code/name/qty/purchase amount/avg buy/bill count
+- `monthly`: bill count/qty/purchase amount/paid/payable by month
+- `signals`: cost rank, delivery completeness from WTI/WT source when available, grade adjustment/quality signal, return frequency, payment reliability
 
 ## Calculation Rules
 
@@ -112,10 +135,10 @@ Row fields:
 | Step | User action | System result |
 |---|---|---|
 | 1 | เปิดหน้า | โหลด supplier tracking ของปีปัจจุบัน |
-| 2 | เลือก year/month | API recalculates rows, byProduct, monthly, summary |
+| 2 | เลือก year/month/supplier/search | API recalculates rows, byProduct, monthly, summary |
 | 3 | ดู top/payable | User identifies purchase concentration and payable exposure |
 | 4 | Export | Download `tracking_supplier_<year>[_month].xlsx` |
-| 5 | Future drilldown | Open supplier detail with PB/PMT/product breakdown |
+| 5 | เปิด detail | Open supplier detail with PB/PMT/product/monthly trend and quality/reliability signals |
 
 ## Validation / Status Rules
 
@@ -132,17 +155,40 @@ Row fields:
 
 ## Current Gap
 
-- Current API has no supplier/search server-side filter.
+- Supplier/search server-side filter is now implemented for aggregate rows, product mix, monthly, summary, and export.
 - API does not yet return supplier detail rows for PB/payment drilldown.
-- Product mix is global for the selected period, not per selected supplier because no supplier detail filter exists.
+- Product mix follows the active supplier/filter, but no supplier detail payload exists yet.
+- WTI/WT delivery completeness, Grade Adjust quality, Return frequency, and reliability signals are not wired into the API yet.
 - AP aging/payment-cycle locks remain outside this page.
+
+## Implementation Tasks
+
+### API
+
+- [x] Add `supplierId` and `q` server-side filters to `GET /api/tracking/supplier`.
+- [x] Keep aggregate JSON rows, product mix, monthly trend, and `format=xlsx` export on the same filter contract.
+- [ ] Return PB source rows with doc no, date, product summary, qty, purchase amount, avg buy, paid, payable, status, and source link.
+- [ ] Return PMT/PMA payment rows with doc no, date, account/method, amount, status, and source link.
+- [ ] Return product mix scoped by selected supplier when supplier filter/detail is active.
+- [ ] Add quality/reliability signal fields from confirmed source facts: WTI/WT delivery completeness, Grade Adjust, Return, and payment reliability.
+- [ ] Keep AP aging out until [[Finance AP Page Flow]] due-date rules are reconciled.
+
+### UI
+
+- [ ] Use `docs/design.md` list pattern: KPI cards, compact filter shell, tabs, desktop table, dense mobile cards.
+- [x] Make supplier filter and search server-backed, not only client-side after aggregate load.
+- [ ] Make desktop rows and mobile cards clickable to open supplier detail.
+- [ ] Add detail modal/view sections: reliability signals, PB list, payment list, product mix, monthly trend.
+- [ ] Keep product breakdown visible but scoped to the active supplier/filter.
+- [ ] Keep all interactions read-only; source document links navigate to owner pages only.
 
 ## Implementation Checklist
 
 - [x] Verify current API response shape and source tables
 - [x] Record legacy supplier tracking/detail baseline
 - [x] Mark read-only/export side-effect boundary
-- [ ] Add supplier/search filter if UI needs server-side filter
+- [x] Add supplier/search filter if UI needs server-side filter
 - [ ] Add supplier detail/read endpoint or drilldown payload
 - [ ] Add source links to PB/PMT/PMA/ADV documents
+- [ ] Add WTI/WT delivery completeness, Grade Adjust quality, Return frequency, and supplier reliability signals
 - [ ] Reconcile paid/payable formulas with final payment allocation facts

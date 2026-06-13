@@ -19,6 +19,7 @@ type SupplierTrackingRow = {
 
 type SupplierTrackingPayload = {
   byProduct: Array<{ amount: number; avgBuy: number; billCount: number; productName: string; qty: number; suppliers: number }>
+  filters?: { suppliers: Array<{ active: boolean | null; code: string | null; id: string; name: string }> }
   monthly: Array<{ amount: number; month: string; qty: number }>
   rows: SupplierTrackingRow[]
   summary: { paidAmount: number; payable: number; purchaseAmount: number; qty: number; suppliers: number }
@@ -38,32 +39,31 @@ export function SupplierTrackingPageClient() {
   const [view, setView] = useState<'list' | 'top10' | 'yearCompare'>('list')
   const [year, setYear] = useState(String(new Date().getFullYear()))
 
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams({ year })
+    if (month) params.set('month', month)
+    if (supplierId) params.set('supplierId', supplierId)
+    if (search.trim()) params.set('q', search.trim())
+    return params.toString()
+  }, [month, search, supplierId, year])
+
   const loadData = useCallback(async () => {
     setError(null)
     setIsLoading(true)
     try {
-      const params = new URLSearchParams({ year })
-      if (month) params.set('month', month)
-      setData(await dailyFetchJson<SupplierTrackingPayload>(`/api/tracking/supplier?${params.toString()}`))
+      setData(await dailyFetchJson<SupplierTrackingPayload>(`/api/tracking/supplier?${queryString}`))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลด Supplier Tracking ไม่ได้')
     } finally {
       setIsLoading(false)
     }
-  }, [month, year])
+  }, [queryString])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
 
-  const rows = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return (data?.rows ?? []).filter((row) => {
-      const matchesSupplier = !supplierId || row.id === supplierId
-      const matchesSearch = !query || `${row.code} ${row.supplierName}`.toLowerCase().includes(query)
-      return matchesSupplier && matchesSearch
-    })
-  }, [data?.rows, search, supplierId])
+  const rows = data?.rows ?? []
 
   const topFive = rows.slice(0, 5)
   const topPurchase = [...rows].sort((left, right) => right.purchaseAmount - left.purchaseAmount).slice(0, 10)
@@ -72,7 +72,7 @@ export function SupplierTrackingPageClient() {
   const expensive = [...rows].filter((row) => row.avgBuy > 0).sort((left, right) => right.avgBuy - left.avgBuy).slice(0, 10)
   const topPayable = [...rows].sort((left, right) => right.payable - left.payable).slice(0, 10)
   const maxMonthAmount = Math.max(1, ...(data?.monthly ?? []).map((item) => item.amount))
-  const exportHref = `/api/tracking/supplier?${new URLSearchParams({ year, ...(month ? { month } : {}), format: 'xlsx' }).toString()}`
+  const exportHref = `/api/tracking/supplier?${queryString}&format=xlsx`
   const paidAmount = rows.reduce((sum, row) => sum + row.paidAmount, 0)
   const payable = rows.reduce((sum, row) => sum + row.payable, 0)
 
@@ -89,7 +89,7 @@ export function SupplierTrackingPageClient() {
           </select>
           <select className="rounded-md border px-3 py-2 text-sm md:col-span-2" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
             <option value="">Supplier ทั้งหมด</option>
-            {(data?.rows ?? []).map((row) => <option key={row.id} value={row.id}>{row.code ? `${row.code} - ${row.supplierName}` : row.supplierName}</option>)}
+            {(data?.filters?.suppliers ?? []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.code ? `${supplier.code} - ${supplier.name}` : supplier.name}</option>)}
           </select>
           <input className="rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา Supplier" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <a className="hidden md:inline-flex items-center justify-center rounded-md bg-blue-700 px-4 py-2 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>

@@ -7,6 +7,7 @@ import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requ
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
+import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 
 export const runtime = 'nodejs'
@@ -82,6 +83,9 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const year = url.searchParams.get('year') || String(new Date().getFullYear())
     const month = url.searchParams.get('month')
+    const supplierId = url.searchParams.get('supplierId')
+    const search = url.searchParams.get('q')?.trim().toLowerCase()
+    const supplier = supplierId ? await findActiveSupplierReferenceByCodeOrId(supplierId) : null
 
     const [suppliers, bills, payments] = await Promise.all([
       prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], where: { active: { not: false } } }),
@@ -89,12 +93,12 @@ export async function GET(request: Request) {
         include: { purchase_bill_items: { orderBy: { line_no: 'asc' }, where: { item_status: 'active' } } },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
-        where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] } },
+        where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] }, ...(supplier ? { supplier_id: supplier.id } : {}) },
       }),
       prisma.payments.findMany({
         orderBy: [{ date: 'desc' }],
         take: 10000,
-        where: { NOT: { status: 'cancelled' } },
+        where: { NOT: { status: 'cancelled' }, ...(supplier ? { supplier_id: supplier.id } : {}) },
       }),
     ])
 
@@ -125,7 +129,9 @@ export async function GET(request: Request) {
         qty: purchase.qty,
         supplierName: supplier.name,
       }
-    }).filter((row) => row.billCount > 0 || row.qty > 0 || row.payable > 0).sort((left, right) => right.purchaseAmount - left.purchaseAmount)
+    }).filter((row) => row.billCount > 0 || row.qty > 0 || row.payable > 0)
+      .filter((row) => !search || `${row.code} ${row.supplierName}`.toLowerCase().includes(search))
+      .sort((left, right) => right.purchaseAmount - left.purchaseAmount)
 
     const productMap = new Map<string, { amount: number; bills: Set<string>; productName: string; qty: number; suppliers: Set<bigint> }>()
     bills
@@ -183,6 +189,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       byProduct,
+      filters: {
+        suppliers: suppliers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ผู้ขาย ${row.id}`), name: row.name })),
+      },
       monthly,
       rows: supplierRows,
       summary: {
