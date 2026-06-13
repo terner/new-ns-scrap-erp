@@ -2702,6 +2702,9 @@ model stock_holds {
   cancelled_at          DateTime?             @db.Timestamptz(6)
   released_by           String?
   consumed_by           String?
+  output_category       String?
+  lot_no                String?
+  not_available_for_sale Boolean              @default(false)
   cancelled_by          String?
   release_reason        String?
   consumed_by_ref_type  String?
@@ -2724,7 +2727,7 @@ model stock_holds {
   weight_ticket_lines   weight_ticket_lines?   @relation(fields: [weight_ticket_line_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   weight_tickets        weight_tickets         @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
-  @@index([branch_id, product_id, warehouse_id], map: "idx_stock_holds_active_lookup")
+  @@index([branch_id, product_id, warehouse_id, output_category], map: "idx_stock_holds_active_lookup")
   @@index([consumed_by_ref_type, consumed_by_ref_no, status], map: "idx_stock_holds_consumed_ref")
   @@index([weight_ticket_line_id], map: "idx_stock_holds_line")
   @@index([source_type, source_doc_no], map: "idx_stock_holds_source_doc")
