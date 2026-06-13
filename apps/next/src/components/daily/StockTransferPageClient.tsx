@@ -353,20 +353,20 @@ export function StockTransferPageClient() {
       </div>
 
       {formOpen ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4">
-          <form noValidate className="mx-auto my-4 w-full max-w-5xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={(event) => event.preventDefault()}>
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
+          <form noValidate className="w-full max-w-5xl overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
+            <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0">
               <div>
-                <h3 className="text-xl font-bold text-slate-800">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
-                <p className="mt-1 text-xs text-slate-500">ระบบจะตัด stock ต้นทางและรับเข้าปลายทางเมื่อส่งเข้าสต๊อกเท่านั้น</p>
+                <h3 className="font-bold text-slate-100 text-lg">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
+                <p className="mt-1 text-xs text-slate-400">ระบบจะตัด stock ต้นทางและรับเข้าปลายทางเมื่อส่งเข้าสต๊อกเท่านั้น</p>
               </div>
-              <button className="text-3xl leading-none text-slate-400 hover:text-slate-700" type="button" onClick={() => setFormOpen(false)}>&times;</button>
+              <button className="text-2xl text-slate-400 hover:text-white" type="button" onClick={() => setFormOpen(false)}>&times;</button>
             </div>
 
-            <div className="space-y-4 bg-slate-50 p-6 text-sm">
+            <div className="max-h-[76vh] overflow-y-auto bg-slate-50 p-4 sm:p-5 space-y-4 text-sm flex-1">
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-md border border-red-200 bg-white p-4 shadow">
-                  <h4 className="mb-3 font-bold text-red-700">1. ต้นทาง</h4>
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                  <h4 className="mb-3 font-bold text-slate-700">1. ต้นทาง</h4>
                   <div className="grid gap-3">
                     <SelectField displayMode="name" error={fieldErrors.fromBranchId} errorKey="fromBranchId" label="สาขาต้นทาง *" options={branchOptions} placeholder="เลือกสาขาต้นทาง" value={form.fromBranchId} onChange={(value) => updateForm('fromBranchId', value)} />
                     <SelectField
@@ -382,8 +382,8 @@ export function StockTransferPageClient() {
                   </div>
                 </div>
 
-                <div className="rounded-md border border-emerald-200 bg-white p-4 shadow">
-                  <h4 className="mb-3 font-bold text-emerald-700">2. ปลายทาง</h4>
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                  <h4 className="mb-3 font-bold text-slate-700">2. ปลายทาง</h4>
                   <div className="grid gap-3">
                     <SelectField displayMode="name" error={fieldErrors.toBranchId} errorKey="toBranchId" label="สาขาปลายทาง *" options={branchOptions} placeholder="เลือกสาขาปลายทาง" value={form.toBranchId} onChange={(value) => updateForm('toBranchId', value)} />
                     <SelectField
@@ -400,7 +400,7 @@ export function StockTransferPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-md bg-white p-4 shadow">
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div>
                     <h4 className="font-bold text-slate-700">3. รายการสินค้า ({form.items.length})</h4>
@@ -471,7 +471,8 @@ export function StockTransferPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-md bg-white p-4 shadow">
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-3 font-bold text-slate-700">4. หมายเหตุ</h4>
                 <FormField error={fieldErrors.notes} errorKey="notes" label="หมายเหตุ">
                   <textarea
                     data-error-key="notes"
@@ -484,8 +485,8 @@ export function StockTransferPageClient() {
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
-              <Button size="sm" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ปิด</Button>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
+              <Button size="sm" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
               <Button disabled={isSaving} size="sm" type="button" variant="outline" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
               <Button disabled={isSaving} size="sm" type="button" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
             </div>
@@ -525,7 +526,15 @@ export function StockTransferPageClient() {
 
       <div className="hidden overflow-x-auto rounded-md bg-white shadow md:block">
         <Table style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
-          <colgroup>{stockTransferColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}</colgroup>
+          <colgroup>
+            {stockTransferColumns.map((column, index) => {
+              const style = columnResize.getColumnStyle(column.key)
+              if (index === stockTransferColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
+              return <col key={column.key} style={style} />
+            })}
+          </colgroup>
           <TableHeader>
             <tr>
               <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
