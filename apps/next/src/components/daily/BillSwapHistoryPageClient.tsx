@@ -177,7 +177,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={resetColumnWidths}>Set col to default</Button> : null}
+          {hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden md:inline-flex" onClick={resetColumnWidths}>Set col to default</Button> : null}
           <Select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto px-2 py-1"
@@ -195,7 +195,71 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
+      {/* Mobile Card List (Hidden on Desktop) */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        
+        {!isLoading && pagedRows.map((row) => (
+          <div key={row.id} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800 text-sm">{row.billDocNo || row.billId}</span>
+              <span className="text-xs text-slate-500">{row.swapDate}</span>
+            </div>
+            
+            <div className="text-xs text-slate-600 space-y-1">
+              <div>
+                <span className="font-semibold text-slate-500">Supplier เดิม: </span>
+                <span className="text-rose-600">{row.beforeSupplierName}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-slate-500">Supplier ใหม่: </span>
+                <span className="text-emerald-700">{row.afterSupplierName}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-slate-500">สินค้า/รายการ: </span>
+                <span className="text-slate-800">{row.productName}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <span className="font-semibold text-slate-500 block">น้ำหนัก: </span>
+                  <span className="text-slate-800">{formatMoney(row.weight)} กก.</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 block">ส่วนต่าง (ก่อน VAT): </span>
+                  <span className={`font-bold tabular-nums ${row.diffExVat >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                    {formatMoney(row.diffExVat)} บาท
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+                <div>
+                  <span className="font-semibold text-slate-400 block">ยอดเก่า: </span>
+                  <span className="text-rose-600 tabular-nums">{formatMoney(row.beforeAmount)} บาท</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-400 block">ยอดใหม่: </span>
+                  <span className="text-emerald-700 tabular-nums">{formatMoney(row.afterAmount)} บาท</span>
+                </div>
+              </div>
+              {row.reason?.trim() ? (
+                <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-100/60 mt-1 truncate">
+                  เหตุผล: {row.reason}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ))}
+
+        {!isLoading && totalRows === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+            ยังไม่มีประวัติการเปลี่ยน Supplier
+          </div>
+        ) : null}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-xs" style={{ minWidth: tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {billSwapColumns.map((column) => <col key={column.key} style={getColumnStyle(column.key)} />)}

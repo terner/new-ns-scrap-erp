@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
-import { Download, Printer } from 'lucide-react'
+import type { ButtonHTMLAttributes, Dispatch, SetStateAction } from 'react'
+import { Download, Plus, Printer } from 'lucide-react'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { Button as UiButton } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
@@ -272,6 +274,24 @@ const rowActionButtonClass = 'rounded-md border border-slate-300 px-2 py-1 text-
 const rowDangerActionButtonClass = 'rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
 const rowWarningActionButtonClass = 'rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50'
 
+type PoBuyColumnKey = 'action' | 'checkbox' | 'date' | 'docNo' | 'expectedDelivery' | 'note' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
+
+const poBuyColumns: Array<ResizableColumnDefinition<PoBuyColumnKey>> = [
+  { key: 'checkbox', defaultWidth: 40, minWidth: 40 },
+  { key: 'docNo', defaultWidth: 120, minWidth: 90 },
+  { key: 'date', defaultWidth: 90, minWidth: 80 },
+  { key: 'supplierName', defaultWidth: 420, minWidth: 120 },
+  { key: 'productName', defaultWidth: 280, minWidth: 100 },
+  { key: 'qty', defaultWidth: 75, minWidth: 70 },
+  { key: 'totalAmount', defaultWidth: 80, minWidth: 80 },
+  { key: 'remainingQty', defaultWidth: 75, minWidth: 70 },
+  { key: 'expectedDelivery', defaultWidth: 95, minWidth: 80 },
+  { key: 'note', defaultWidth: 70, minWidth: 60 },
+  { key: 'status', defaultWidth: 90, minWidth: 90 },
+  { key: 'updatedAt', defaultWidth: 90, minWidth: 90 },
+  { key: 'action', defaultWidth: 110, minWidth: 100 },
+]
+
 function poBuyAllocationActionLabel(action: string) {
   switch (action) {
     case 'allocated_to_purchase_bill':
@@ -431,6 +451,7 @@ function ExportButton({ href }: { href: string }) {
 }
 
 export function PoBuyPageClient() {
+  const columnResize = useResizableColumns('daily.po-buy', poBuyColumns)
   const [cancelNote, setCancelNote] = useState('')
   const [cancelNoteError, setCancelNoteError] = useState('')
   const [cancelingRow, setCancelingRow] = useState<PoBuyRow | null>(null)
@@ -453,6 +474,7 @@ export function PoBuyPageClient() {
   const [shortCloseNoteError, setShortCloseNoteError] = useState('')
   const [shortClosingRow, setShortClosingRow] = useState<PoBuyRow | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [sortDirection, setSortDirection] = useState<PoBuySortDirection>('desc')
   const [sortKey, setSortKey] = useState<PoBuySortKey>('docNo')
   const [statuses, setStatuses] = useState<string[]>([])
@@ -753,7 +775,8 @@ export function PoBuyPageClient() {
         />
       </div>
 
-      <div className="space-y-2 rounded-md bg-white p-3 shadow">
+      {/* Desktop Toolbar (Hidden on Mobile) */}
+      <div className="hidden md:block space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <UiInput className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลข PO / ชื่อผู้ขาย / ชื่อสินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-xs text-slate-500">วันที่:</label>
@@ -804,9 +827,34 @@ export function PoBuyPageClient() {
         </div>
       </div>
 
+      {/* Mobile Toolbar (Hidden on Desktop) */}
+      <div className="space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+        <div className="flex gap-2 items-center">
+          <UiInput className="min-w-[200px] flex-1 rounded-md h-9" placeholder="ค้นหาเลข PO / ผู้ขาย / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => setShowMobileFilters(true)}
+          >
+            ตัวกรอง {hasFilters ? '(มี)' : ''}
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? (
+            <UiButton
+              className="h-9 font-normal hidden md:inline-flex"
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={columnResize.resetColumnWidths}
+            >
+              Set col to default
+            </UiButton>
+          ) : null}
           <UiSelect
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto min-w-[96px] px-2"
@@ -824,13 +872,184 @@ export function PoBuyPageClient() {
         </div>
       </div>
 
-      <Table className="min-w-[1240px] text-xs font-semibold" style={{ fontFamily: "'Noto Sans Thai', Arial, sans-serif" }}>
-        <TableHeader><tr><TableHead className="text-center font-semibold text-slate-700"><input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} /></TableHead><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="เลขที่ PO ซื้อ" sortKey="docNo" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่สร้างเอกสาร" sortKey="date" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-36" direction={sortDirection} label="ผู้ขาย" sortKey="supplierName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-[280px]" direction={sortDirection} label="รายการสินค้า" sortKey="productName" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" sortKey="qty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" sortKey="totalAmount" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" sortKey="remainingQty" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="วันที่กำหนดส่ง" sortKey="expectedDelivery" onSort={changeSort} /><TableHead className="w-16 text-center font-semibold text-slate-700">หมายเหตุ</TableHead><PoBuySortHeader activeKey={sortKey} align="center" className="w-28" direction={sortDirection} label="สถานะ" sortKey="status" onSort={changeSort} /><PoBuySortHeader activeKey={sortKey} className="w-28" direction={sortDirection} label="อัพเดตล่าสุด" sortKey="updatedAt" onSort={changeSort} /><TableHead className="text-right font-semibold text-slate-700">จัดการ</TableHead></tr></TableHeader>
-        <TableBody>
-          {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
-          {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</TableCell></TableRow> : null}
-          {!isLoading && pageRows.map((row, index) => (
-            <TableRow key={row.id} className={`cursor-pointer border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
+      {/* Bottom Sheet Filter for Mobile */}
+      {showMobileFilters ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h4 className="font-bold text-slate-800">ตัวกรองรายการจองซื้อ</h4>
+              <button
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
+                onClick={() => setShowMobileFilters(false)}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
+                <div className="flex items-center gap-2">
+                  <DatePickerInput className="flex-1" value={fromDate} onChange={setFromDate} />
+                  <span className="text-slate-400">→</span>
+                  <DatePickerInput className="flex-1" value={toDate} onChange={setToDate} />
+                </div>
+              </div>
+
+              <div>
+                <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะ</span>
+                <div className="flex flex-wrap gap-2">
+                  <PoBuySegment
+                    active={statuses.length === 0}
+                    label="ทุกสถานะ"
+                    onClick={() => setStatuses([])}
+                  />
+                  <PoBuySegment
+                    active={statuses.includes('Open')}
+                    label="ยังไม่รับ"
+                    onClick={() => toggleStatusFilter('Open', setStatuses)}
+                    tone="open"
+                  />
+                  <PoBuySegment
+                    active={statuses.includes('Partially Received')}
+                    label="บางส่วน"
+                    onClick={() => toggleStatusFilter('Partially Received', setStatuses)}
+                    tone="partial"
+                  />
+                  <PoBuySegment
+                    active={statuses.includes('Received')}
+                    label="รับครบ"
+                    onClick={() => toggleStatusFilter('Received', setStatuses)}
+                    tone="received"
+                  />
+                  <PoBuySegment
+                    active={statuses.includes('Short Closed')}
+                    label="ปิดรับไม่ครบ"
+                    onClick={() => toggleStatusFilter('Short Closed', setStatuses)}
+                    tone="shortClosed"
+                  />
+                  <PoBuySegment
+                    active={statuses.includes('Cancelled')}
+                    label="ยกเลิก"
+                    onClick={() => toggleStatusFilter('Cancelled', setStatuses)}
+                    tone="cancelled"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  resetFilters()
+                  setShowMobileFilters(false)
+                }}
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                type="button"
+                className="h-11 rounded-md bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Mobile Card List (Hidden on Desktop) */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        
+        {!isLoading && pageRows.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+            onClick={() => setSelectedRow(row)}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
+              <span className="text-xs text-slate-500">{formatDateDisplay(row.date)}</span>
+            </div>
+            
+            <div className="text-xs text-slate-600 mb-3 space-y-1">
+              <div>
+                <span className="font-semibold text-slate-500">ผู้ขาย: </span>
+                <span className="text-slate-800">{row.supplierName}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-slate-500">สินค้า: </span>
+                <span className="text-slate-800">{row.productName}</span>
+              </div>
+              {row.notes.trim() ? (
+                <div className="text-[11px] text-slate-400 truncate">
+                  หมายเหตุ: {row.notes}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex justify-between items-end pt-2 border-t border-slate-100">
+              <div>
+                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusBadge(row.status)}`}>
+                  <span className="size-1.5 rounded-full bg-current" />
+                  {poBuyStatusLabel(row.status)}
+                </span>
+                <div className="mt-1 text-[11px] font-bold text-blue-700">
+                  {formatMoney(row.totalAmount)} บาท
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 block">จำนวนรวม / ยอดคงเหลือ</span>
+                <span className="font-bold text-slate-900 text-sm tabular-nums">
+                  {formatMoney(row.qty)} / <span className="text-amber-600">{formatMoney(row.remainingQty)}</span> กก.
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {!isLoading && totalRows === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+            ยังไม่มี PO Buy
+          </div>
+        ) : null}
+      </div>
+
+      {/* Desktop Table (Hidden on Mobile) */}
+      <div className="hidden md:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
+        <Table className="text-xs font-semibold" style={{ fontFamily: "'Noto Sans Thai', Arial, sans-serif", tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
+          <colgroup>
+            {poBuyColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}
+          </colgroup>
+          <TableHeader>
+            <tr>
+              <ResizableTableHead align="center" label={<input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} />} resizeProps={columnResize.getResizeHandleProps('checkbox', 'เลือก')} />
+              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่ PO ซื้อ" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่ PO ซื้อ')} sortKey="docNo" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่สร้างเอกสาร" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่สร้างเอกสาร')} sortKey="date" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="ผู้ขาย" resizeProps={columnResize.getResizeHandleProps('supplierName', 'ผู้ขาย')} sortKey="supplierName" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการสินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'รายการสินค้า')} sortKey="productName" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวนรวม')} sortKey="qty" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="มูลค่ารวม" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'มูลค่ารวม')} sortKey="totalAmount" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="รอรับรวม" resizeProps={columnResize.getResizeHandleProps('remainingQty', 'รอรับรวม')} sortKey="remainingQty" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่กำหนดส่ง" resizeProps={columnResize.getResizeHandleProps('expectedDelivery', 'วันที่กำหนดส่ง')} sortKey="expectedDelivery" onSort={changeSort} />
+              <ResizableTableHead align="center" label="หมายเหตุ" resizeProps={columnResize.getResizeHandleProps('note', 'หมายเหตุ')} />
+              <PoBuySortHeader activeKey={sortKey} align="center" direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="อัพเดตล่าสุด" resizeProps={columnResize.getResizeHandleProps('updatedAt', 'อัพเดตล่าสุด')} sortKey="updatedAt" onSort={changeSort} />
+              <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
+            </tr>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+            {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</TableCell></TableRow> : null}
+            {!isLoading && pageRows.map((row, index) => (
+              <TableRow key={row.id} className={`cursor-pointer border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
                 <TableCell className="text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></TableCell>
                 <TableCell className="w-36 whitespace-nowrap font-mono">{row.docNo}</TableCell>
                 <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
@@ -879,9 +1098,21 @@ export function PoBuyPageClient() {
                   ) : null}
                 </TableCell>
               </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="fixed bottom-6 right-6 md:hidden">
+        <button
+          className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
+          onClick={openCreateForm}
+          type="button"
+        >
+          <Plus className="size-8" />
+        </button>
+      </div>
+
       {showForm ? (
         <PoBuyFormModal
           branches={data?.options.branches ?? []}
@@ -944,6 +1175,9 @@ export function PoBuyPageClient() {
           isPrinting={printingPoDocNo === selectedRow.docNo}
           row={selectedRow}
           onClose={() => setSelectedRow(null)}
+          onEdit={openEditForm}
+          onCancel={openCancelDialog}
+          onShortClose={openShortCloseDialog}
           onPrint={(rowToPrint) => void printPoBuy(rowToPrint)}
         />
       ) : null}
@@ -1069,7 +1303,7 @@ function PoBuyCancelModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-cancel-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
-        <DialogHeader className="border-b">
+        <DialogHeader className="">
           <DialogTitle id="po-buy-cancel-title">ยกเลิก PO Buy {row.docNo}</DialogTitle>
           <DialogDescription>{row.supplierName}</DialogDescription>
         </DialogHeader>
@@ -1116,7 +1350,7 @@ function PoBuyShortCloseModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-short-close-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
-        <DialogHeader className="border-b">
+        <DialogHeader className="">
           <DialogTitle id="po-buy-short-close-title">ปิดรับไม่ครบ {row.docNo}</DialogTitle>
           <DialogDescription>{row.supplierName} · คงเหลือ {formatMoney(row.remainingQty)} กก.</DialogDescription>
         </DialogHeader>
@@ -1161,6 +1395,7 @@ function PoBuySortHeader({
   className = '',
   direction,
   label,
+  resizeProps,
   sortKey,
   onSort,
 }: {
@@ -1169,18 +1404,20 @@ function PoBuySortHeader({
   className?: string
   direction: PoBuySortDirection
   label: string
+  resizeProps?: ButtonHTMLAttributes<HTMLButtonElement>
   sortKey: PoBuySortKey
   onSort: (key: PoBuySortKey) => void
 }) {
-  const active = activeKey === sortKey
-  const alignClass = align === 'right' ? 'justify-end text-right' : align === 'center' ? 'justify-center text-center' : 'justify-start text-left'
   return (
-    <th className={`p-0 ${className}`}>
-      <button className={`flex w-full items-center gap-1 p-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 ${alignClass}`} type="button" onClick={() => onSort(sortKey)}>
-        <span>{label}</span>
-        <span className="text-slate-400">{active ? (direction === 'asc' ? '▲' : '▼') : '↕'}</span>
-      </button>
-    </th>
+    <ResizableTableHead
+      activeSortKey={activeKey}
+      align={align}
+      direction={direction}
+      label={label}
+      resizeProps={resizeProps}
+      sortKey={sortKey}
+      onSort={onSort}
+    />
   )
 }
 
@@ -1396,7 +1633,7 @@ function PoBuyFormModal({
       if (!open && !isSaving) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-5xl overflow-y-auto rounded-md p-0" data-combobox-portal-root="true" hideClose>
-        <DialogHeader className="border-b px-5 py-3">
+        <DialogHeader className="px-5 py-3">
           <DialogTitle id="po-buy-form-title">{heading}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 p-5 text-sm">
@@ -1504,11 +1741,17 @@ function PoBuyFormModal({
 function PoBuyDetailModal({
   isPrinting,
   onClose,
+  onEdit,
+  onCancel,
+  onShortClose,
   onPrint,
   row,
 }: {
   isPrinting: boolean
   onClose: () => void
+  onEdit?: (row: PoBuyRow) => void
+  onCancel?: (row: PoBuyRow) => void
+  onShortClose?: (row: PoBuyRow) => void
   onPrint: (row: PoBuyRow) => void
   row: PoBuyRow
 }) {
@@ -1517,7 +1760,7 @@ function PoBuyDetailModal({
       if (!open) onClose()
     }}>
       <DialogContent aria-labelledby="po-buy-detail-title" className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-md p-0" hideClose>
-        <DialogHeader className="border-b p-4">
+        <DialogHeader className="p-4">
           <div>
             <DialogTitle id="po-buy-detail-title">รายละเอียด {row.docNo}</DialogTitle>
             <DialogDescription>{row.supplierName}</DialogDescription>
@@ -1579,7 +1822,48 @@ function PoBuyDetailModal({
             <PoBuyStatusTimeline row={row} />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex flex-wrap gap-2 justify-end">
+          {onEdit && onCancel && row.status === 'Open' && row.qty === row.remainingQty ? (
+            <>
+              <UiButton
+                className="font-normal border-red-200 text-red-700 hover:bg-red-50"
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onClose()
+                  onCancel(row)
+                }}
+              >
+                ยกเลิก PO
+              </UiButton>
+              <UiButton
+                className="font-normal"
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onClose()
+                  onEdit(row)
+                }}
+              >
+                แก้ไข
+              </UiButton>
+            </>
+          ) : null}
+          {onShortClose && shouldShowShortCloseButton(row) ? (
+            <UiButton
+              className="font-normal border-amber-200 text-amber-700 hover:bg-amber-50"
+              disabled={!canShortClosePoBuy(row)}
+              title={canShortClosePoBuy(row) ? undefined : 'เปิดใช้ได้เมื่อรับสินค้าบางส่วนแล้ว'}
+              type="button"
+              variant="outline"
+              onClick={() => {
+                onClose()
+                onShortClose(row)
+              }}
+            >
+              ปิดรับไม่ครบ
+            </UiButton>
+          ) : null}
           <UiButton className="font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(row)}>
             {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์ PO Buy'}
           </UiButton>

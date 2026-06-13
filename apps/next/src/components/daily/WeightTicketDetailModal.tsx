@@ -162,7 +162,7 @@ export function WeightTicketDetailModal({ ticketId, onClose }: { ticketId: strin
       if (!open) onClose()
     }}>
       <DialogContent aria-labelledby="weight-ticket-detail-title" className="max-h-[90vh] max-w-6xl overflow-y-auto rounded-md p-0" hideClose>
-        <DialogHeader className="border-b border-slate-200 p-4">
+        <DialogHeader className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <DialogTitle id="weight-ticket-detail-title">
@@ -170,20 +170,14 @@ export function WeightTicketDetailModal({ ticketId, onClose }: { ticketId: strin
               </DialogTitle>
               <DialogDescription>{ticket?.partyName ?? (isLoading ? 'กำลังโหลดข้อมูล' : '-')}</DialogDescription>
             </div>
-            {ticket ? (
+            {ticket && ticket.canEdit ? (
               <div className="flex gap-2">
-                <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
-                  <Printer className="size-4" />
-                  {isPrinting ? 'กำลังเตรียม...' : ticket.type === 'WTI' ? 'พิมพ์ใบรับสินค้า' : 'พิมพ์ใบส่งของ'}
+                <Button asChild type="button" variant="outline" className="font-normal">
+                  <Link href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}>
+                    <SquarePen className="mr-2 size-4" />
+                    แก้ไข
+                  </Link>
                 </Button>
-                {ticket.canEdit ? (
-                  <Button asChild type="button" variant="outline" className="font-normal">
-                    <Link href={`/daily/weight-tickets?id=${encodeURIComponent(ticket.id)}`}>
-                      <SquarePen className="mr-2 size-4" />
-                      แก้ไข
-                    </Link>
-                  </Button>
-                ) : null}
               </div>
             ) : null}
           </div>

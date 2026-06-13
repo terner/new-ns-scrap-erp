@@ -302,7 +302,7 @@ export function AccountsPayablePageClient() {
             <option value="61-90">61-90</option>
             <option value=">90">&gt;90</option>
           </select>
-          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : '📥 Export .xlsx'}</button>
+          <button className="hidden md:inline-flex ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : '📥 Export .xlsx'}</button>
         </div>
         <div className="grid gap-3 lg:grid-cols-6">
           <input className="rounded-md border px-3 py-2 text-sm lg:col-span-2" placeholder="ค้นหาเลขบิล / ผู้ขาย / ช่องทาง / สาขา" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
@@ -328,8 +328,118 @@ export function AccountsPayablePageClient() {
       </div>
       {tab === 'summary' ? <SummaryTable buckets={bucketRows} rows={data?.bySupplier ?? []} summary={data?.summary} isLoading={isLoading} /> : null}
       {tab === 'detail' ? <DetailTable isLoading={isLoading} onSort={changeSort} rows={data?.rows ?? []} selectedSort={sortKey} sortDirection={sortDirection} summaryTotal={data?.summary.total ?? 0} onOpen={setSelectedRow} /> : null}
+
+      {/* Mobile Card list for Summary tab */}
+      {tab === 'summary' && (
+        <div className="block md:hidden space-y-3">
+          {isLoading ? (
+            <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          ) : null}
+          
+          {!isLoading && (data?.bySupplier ?? []).map((row) => (
+            <div key={row.supplierName} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
+              <div className="flex justify-between items-start">
+                <span className="font-bold text-slate-800 text-sm">{row.supplierName}</span>
+                <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${row.oldest > 30 ? 'bg-red-100 text-red-700' : row.oldest > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
+                  {row.oldest > 0 ? `เกินกำหนด ${row.oldest} วัน` : 'ยังไม่ถึงกำหนด'}
+                </span>
+              </div>
+              
+              <div className="text-xs text-slate-600 space-y-1">
+                <div>
+                  <span className="font-semibold text-slate-500">จำนวนบิล: </span>
+                  <span className="text-slate-800">{row.bills} ใบ</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+                  <div>
+                    <span className="font-semibold text-slate-500 block">ยอดค้างจ่ายรวม: </span>
+                    <span className="text-red-700 font-bold tabular-nums">{formatMoney(row.total)} บาท</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-400 block">Current (ไม่ถึงกำหนด): </span>
+                    <span className="text-slate-600 tabular-nums">{formatMoney(row.current)} บาท</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {!isLoading && (data?.bySupplier ?? []).length === 0 ? (
+            <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+              ไม่มีเจ้าหนี้คงค้าง
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* Mobile Card list for Detail tab */}
+      {tab === 'detail' && (
+        <div className="block md:hidden space-y-3">
+          {isLoading ? (
+            <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          ) : null}
+          
+          {!isLoading && (data?.rows ?? []).map((row) => (
+            <div
+              key={row.id}
+              className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2 active:bg-slate-50 cursor-pointer"
+              onClick={() => setSelectedRow(row)}
+            >
+              <div className="flex justify-between items-start">
+                <span className="font-bold text-slate-800 text-sm text-blue-600">{row.docNo}</span>
+                <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${bucketClass(row.bucket)}`}>
+                  {row.bucket} ({row.aging} วัน)
+                </span>
+              </div>
+              
+              <div className="text-xs text-slate-600 space-y-1">
+                <div>
+                  <span className="font-semibold text-slate-500">Supplier: </span>
+                  <span className="text-slate-800">{row.supplierName}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <span className="font-semibold text-slate-500 block">วันที่บิล: </span>
+                    <span className="text-slate-800">{formatDateDisplay(row.date)}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 block">ครบกำหนด: </span>
+                    <span className="text-slate-800">{formatDateDisplay(row.dueDate)}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+                  <div>
+                    <span className="font-semibold text-slate-400 block">ยอดรวม: </span>
+                    <span className="text-slate-800 tabular-nums">{formatMoney(row.totalAmount)}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-400 block">จ่ายแล้ว: </span>
+                    <span className="text-emerald-600 tabular-nums">{formatMoney(row.paidAmount)}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 block">ค้างจ่าย: </span>
+                    <span className="text-red-700 font-bold tabular-nums">{formatMoney(row.payableBalance)}</span>
+                  </div>
+                </div>
+                {row.channelName && (
+                  <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-100/60 mt-1">
+                    ช่องทาง: {row.channelName}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {!isLoading && (data?.rows ?? []).length === 0 ? (
+            <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+              ไม่มีเจ้าหนี้คงค้าง
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {tab === 'detail' ? (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 mt-4">
           <button className="rounded-md bg-slate-100 px-3 py-2 text-sm disabled:opacity-50" disabled={page <= 1 || isLoading} type="button" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</button>
           <span className="text-sm text-slate-600">หน้า {page} / {totalPages}</span>
           <button className="rounded-md bg-slate-100 px-3 py-2 text-sm disabled:opacity-50" disabled={page >= totalPages || isLoading} type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</button>
@@ -375,7 +485,7 @@ function SummaryTable({
   const bucketTotal = (bucket: string) => buckets.find((item) => item.bucket === bucket)?.total ?? 0
 
   return (
-    <div className="overflow-x-auto rounded-md bg-white shadow">
+    <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
       <table className="w-full text-sm">
         <thead className="bg-slate-100">
           <tr><th className="p-2 text-left">Supplier</th><th className="p-2 text-right">บิล</th><th className="p-2 text-right">Current</th><th className="p-2 text-right">1-30 วัน</th><th className="p-2 text-right">31-60</th><th className="p-2 text-right">61-90</th><th className="p-2 text-right">&gt;90</th><th className="p-2 text-right">รวมค้างจ่าย</th><th className="p-2 text-right">เกินกำหนดสุด</th></tr>
@@ -436,7 +546,7 @@ function DetailTable({
 }) {
   const sortLabel = (key: SortKey) => selectedSort === key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''
   return (
-    <div className="overflow-x-auto rounded-md bg-white shadow">
+    <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
       <table className="w-full text-sm">
         <thead className="bg-slate-100">
           <tr>

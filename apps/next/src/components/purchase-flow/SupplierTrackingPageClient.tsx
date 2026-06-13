@@ -92,7 +92,7 @@ export function SupplierTrackingPageClient() {
             {(data?.rows ?? []).map((row) => <option key={row.id} value={row.id}>{row.code ? `${row.code} - ${row.supplierName}` : row.supplierName}</option>)}
           </select>
           <input className="rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา Supplier" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <a className="rounded-md bg-blue-700 px-4 py-2 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>
+          <a className="hidden md:inline-flex items-center justify-center rounded-md bg-blue-700 px-4 py-2 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>
         </div>
       </div>
 
@@ -144,7 +144,57 @@ export function SupplierTrackingPageClient() {
 
       {view === 'list' ? (
         <>
-          <div className="overflow-x-auto rounded-md bg-white shadow">
+          {/* Mobile Card list for main tracking list */}
+          <div className="block md:hidden space-y-3 mb-4">
+            {isLoading ? (
+              <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+            ) : null}
+            
+            {!isLoading && rows.map((row) => (
+              <div key={row.id} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-slate-800 text-sm">{row.supplierName}</span>
+                  <span className="text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{row.code || '-'}</span>
+                </div>
+                
+                <div className="text-xs text-slate-600 space-y-1">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <span className="font-semibold text-slate-500 block">บิล: </span>
+                      <span className="text-slate-800">{row.billCount} ใบ</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500 block">น้ำหนัก: </span>
+                      <span className="text-slate-800 font-semibold">{formatMoney(row.qty)} กก.</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500 block">เฉลี่ย/กก: </span>
+                      <span className="text-slate-800">{formatMoney(row.avgBuy)} บาท</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+                    <div>
+                      <span className="font-semibold text-slate-400 block">ยอดซื้อ: </span>
+                      <span className="text-blue-700 font-bold tabular-nums">{formatMoney(row.purchaseAmount)} บาท</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-500 block">ค้างจ่าย: </span>
+                      <span className="text-red-700 font-bold tabular-nums">{formatMoney(row.payable)} ({row.paidPct.toFixed(0)}% จ่าย)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {!isLoading && rows.length === 0 ? (
+              <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+                ไม่มีข้อมูล Supplier Tracking
+              </div>
+            ) : null}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow mb-4">
             <table className="w-full min-w-[960px] text-sm">
               <thead className="bg-slate-100">
                 <tr>
@@ -178,7 +228,44 @@ export function SupplierTrackingPageClient() {
               </tbody>
             </table>
           </div>
-          <div className="overflow-x-auto rounded-md bg-white shadow">
+
+          {/* Mobile Card list for Product breakdown */}
+          <div className="block md:hidden space-y-3">
+            <div className="border-b bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 rounded-t-md">Product breakdown จากบิลรับซื้อ (มือถือ)</div>
+            {(data?.byProduct ?? []).slice(0, 20).map((row) => (
+              <div key={row.productName} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
+                <span className="font-bold text-slate-800 text-sm block">{row.productName}</span>
+                
+                <div className="text-xs text-slate-600 grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <span className="font-semibold text-slate-500">คู่ค้า / บิล: </span>
+                    <span className="text-slate-800">{row.suppliers} ราย / {row.billCount} ใบ</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500">ราคาเฉลี่ย: </span>
+                    <span className="text-slate-800 font-semibold">{formatMoney(row.avgBuy)} บาท</span>
+                  </div>
+                  <div className="col-span-2 grid grid-cols-2 gap-2 pt-1 border-t border-slate-100/60">
+                    <div>
+                      <span className="font-semibold text-slate-400 block">น้ำหนักรวม: </span>
+                      <span className="text-slate-800 tabular-nums">{formatMoney(row.qty)} กก.</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-400 block">ยอดซื้อรวม: </span>
+                      <span className="text-slate-900 font-bold tabular-nums">{formatMoney(row.amount)} บาท</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!isLoading && (data?.byProduct ?? []).length === 0 ? (
+              <div className="rounded-md bg-white p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-200">
+                ไม่มี item detail สำหรับ product breakdown
+              </div>
+            ) : null}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
             <div className="border-b bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">Product breakdown จากบิลรับซื้อ</div>
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">Supplier</th><th className="p-2 text-right">บิล</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
@@ -227,11 +314,35 @@ function TopPanel({ rows, title }: { rows: { label: string; value: number }[]; t
 
 function YearCompare({ monthly }: { monthly: SupplierTrackingPayload['monthly'] }) {
   return (
-    <div className="overflow-x-auto rounded-md bg-white shadow">
-      <table className="w-full min-w-[680px] text-sm">
-        <thead className="bg-slate-100"><tr><th className="p-2 text-left">เดือน</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
-        <tbody>{monthly.map((row, index) => <tr key={row.month} className="border-t"><td className="p-2">{monthLabels[index]}</td><td className="p-2 text-right">{formatMoney(row.qty)}</td><td className="p-2 text-right font-semibold text-blue-700">{formatMoney(row.amount)}</td><td className="p-2 text-right">{formatMoney(row.qty > 0 ? row.amount / row.qty : 0)}</td></tr>)}</tbody>
-      </table>
-    </div>
+    <>
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+        <table className="w-full min-w-[680px] text-sm">
+          <thead className="bg-slate-100"><tr><th className="p-2 text-left">เดือน</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
+          <tbody>{monthly.map((row, index) => <tr key={row.month} className="border-t"><td className="p-2">{monthLabels[index]}</td><td className="p-2 text-right">{formatMoney(row.qty)}</td><td className="p-2 text-right font-semibold text-blue-700">{formatMoney(row.amount)}</td><td className="p-2 text-right">{formatMoney(row.qty > 0 ? row.amount / row.qty : 0)}</td></tr>)}</tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card list */}
+      <div className="block md:hidden space-y-3">
+        {monthly.map((row, index) => (
+          <div key={row.month} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-slate-800 text-sm">{monthLabels[index]}</span>
+              <span className="text-xs font-semibold text-blue-700 tabular-nums">{formatMoney(row.amount)} บาท</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+              <div>
+                <span className="text-slate-400 font-medium">น้ำหนัก: </span>
+                <span className="font-semibold text-slate-700">{formatMoney(row.qty)} กก.</span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-medium">ราคาเฉลี่ย: </span>
+                <span className="font-semibold text-slate-700">{formatMoney(row.qty > 0 ? row.amount / row.qty : 0)} บาท/กก.</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }

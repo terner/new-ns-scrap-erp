@@ -1713,7 +1713,7 @@ export function MoneyMovementPageClient({
         }}>
           <DialogContent className={`top-[max(2rem,50%)] max-h-[90vh] overflow-y-auto p-0 ${mode === 'payment' ? 'max-w-5xl' : 'max-w-4xl'}`} hideClose>
             <form noValidate onSubmit={save}>
-            <DialogHeader className={`${mode === 'payment' ? 'bg-white text-slate-900' : theme.muted} flex-row items-center justify-between border-b px-5 py-4`}>
+            <DialogHeader className={`${mode === 'payment' ? 'bg-white text-slate-900' : theme.muted} flex-row items-center justify-between px-5 py-4`}>
               <div>
                 <DialogTitle className="font-bold">
                   {mode === 'payment' ? 'สร้าง Payment Voucher' : (form.id ? 'แก้ไข Receipt Voucher' : title)}
@@ -2317,7 +2317,7 @@ export function MoneyMovementPageClient({
           }
         }}>
           <DialogContent className="max-w-lg p-0" hideClose>
-            <DialogHeader className="border-b border-slate-200 px-5 py-4">
+            <DialogHeader className="px-5 py-4">
               <DialogTitle className="font-bold text-slate-900">ยกเลิกรายการรอจ่าย</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 px-5 py-4 text-sm">
@@ -2403,7 +2403,7 @@ function PaymentHistoryDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto bg-slate-50 p-0" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+        <DialogHeader className="flex-row items-center justify-between gap-3 bg-white px-5 py-4">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-slate-900">{detail?.heading ?? 'รายละเอียดการจ่ายเงิน'}</DialogTitle>
             <div className="mt-1 truncate font-mono text-xs text-slate-500">{detail?.docNo ?? row?.docNo ?? '-'}</div>
