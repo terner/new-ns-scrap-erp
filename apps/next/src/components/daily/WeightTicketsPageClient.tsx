@@ -1102,7 +1102,7 @@ function ProductImagePicker({
 
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel() }}>
         <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-xl border border-slate-200 shadow-2xl flex flex-col max-h-[90vh]">
-          <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
+          <DialogHeader className="px-5 pt-4 pb-4 rounded-t-xl flex flex-row items-center justify-between bg-slate-900 border-none">
             <div className="flex items-center gap-2">
               <span className="text-lg">📦</span>
               <DialogTitle className="text-base font-bold text-white">เพิ่มสินค้า</DialogTitle>
@@ -1206,7 +1206,7 @@ function ProductImagePicker({
               onClick={handleConfirmSelection}
               className={cn(
                 "h-10 px-5 font-semibold text-white transition",
-                tempSelectedId ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-300 cursor-not-allowed"
+                tempSelectedId ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300 cursor-not-allowed"
               )}
             >
               + เพิ่ม
