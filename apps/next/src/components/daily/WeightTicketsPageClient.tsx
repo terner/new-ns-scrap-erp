@@ -878,7 +878,7 @@ export function WeightTicketsPageClient({
                 บันทึก {savedTicket.documentNo} แล้ว
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-x-10 gap-y-4 text-sm justify-items-center sm:flex sm:flex-wrap sm:items-center sm:gap-x-8">
+              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm sm:justify-start sm:gap-x-8">
                 <MetricInline label="รายการ" value={`${form.lines.length} รายการ`} />
                 <MetricInline label="น้ำหนักรวม" value={`${formatWeight(totals.grossWeight)} กก.`} />
                 <MetricInline label="หัก" value={`${formatWeight(totals.deductionWeight)} กก.`} />
