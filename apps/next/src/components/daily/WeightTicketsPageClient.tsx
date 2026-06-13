@@ -867,14 +867,14 @@ export function WeightTicketsPageClient({
           : "fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-sm lg:left-64"
       )}>
         <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 w-full sm:w-auto flex justify-center sm:block">
             {savedTicket ? (
               <div className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
                 <CheckCircle2 className="size-4" />
                 บันทึก {savedTicket.documentNo} แล้ว
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-sm sm:flex sm:flex-wrap sm:items-center sm:gap-x-5">
+              <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-sm justify-items-center sm:flex sm:flex-wrap sm:items-center sm:gap-x-5">
                 <MetricInline label="รายการ" value={`${form.lines.length} รายการ`} />
                 <MetricInline label="น้ำหนักรวม" value={`${formatWeight(totals.grossWeight)} กก.`} />
                 <MetricInline label="หัก" value={`${formatWeight(totals.deductionWeight)} กก.`} />
@@ -887,12 +887,8 @@ export function WeightTicketsPageClient({
               {!onClose && <ArrowLeft className="mr-1 h-4 w-4" />}
               {onClose ? 'ปิด' : 'กลับไปหน้ารายการ'}
             </Button>
-            <Button className={ticketTheme.button} disabled={isLoadingTicket || isSaving} type="button" onClick={saveTicket}>
-              {isSaving
-                ? 'กำลังบันทึก...'
-                : editingTicketId
-                  ? `บันทึกการแก้ไข${form.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}`
-                  : `บันทึก${form.type === 'WTI' ? 'ใบรับของ' : 'ใบส่งของ'}`}
+            <Button className="bg-blue-600 font-normal hover:bg-blue-700 text-white" disabled={isLoadingTicket || isSaving} type="button" onClick={saveTicket}>
+              {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
             </Button>
           </div>
         </div>
