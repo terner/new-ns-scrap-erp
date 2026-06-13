@@ -2188,14 +2188,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   return (
     <section className="space-y-4">
       {mode === 'stock-issue' ? (
-        <>
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <TransactionKpi label="⏰ Pending / รายการ" tone="amber" value={`${totalRows.toLocaleString('th-TH')} ใบ`} />
             <TransactionKpi label="น้ำหนักรวมในหน้า" tone="blue" value={`${formatMoney(stockIssueQty)} กก.`} />
             <TransactionKpi label="ต้นทุน (WAC)" tone="red" value={formatMoney(stockIssueCost)} />
             <TransactionKpi label="ยอดขายคาด" tone="emerald" value={formatMoney(stockIssueEst || total)} />
           </div>
-        </>
+        </div>
       ) : null}
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -4102,14 +4102,42 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
 }
 
 function TransactionKpi({ label, tone, value }: { label: string; tone: 'amber' | 'blue' | 'emerald' | 'red' | 'slate'; value: string }) {
-  const className = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-700',
-    blue: 'border-blue-200 bg-blue-50 text-blue-700',
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    red: 'border-red-200 bg-red-50 text-red-700',
-    slate: 'border-slate-200 bg-white text-slate-700',
-  }[tone]
-  return <div className={`rounded-md border p-3 shadow-sm ${className}`}><div className="text-xs opacity-75">{label}</div><div className="mt-1 break-words text-xl font-bold">{value}</div></div>
+  let emoji = '📄'
+  const text = label.toLowerCase()
+  if (text.includes('pending') || text.includes('ใบ') || text.includes('จำนวน') || text.includes('รายการ')) {
+    emoji = '📋'
+  } else if (text.includes('น้ำหนัก')) {
+    emoji = '📦'
+  } else if (text.includes('ต้นทุน') || text.includes('wac')) {
+    emoji = '💰'
+  } else if (text.includes('ยอดขาย') || text.includes('ยอดคาด') || text.includes('ยอดรวม')) {
+    emoji = '📈'
+  } else if (text.includes('สถานะ')) {
+    emoji = '⚙️'
+  }
+
+  const config = {
+    amber: { iconBg: 'bg-amber-100 text-amber-700', color: 'text-amber-700' },
+    blue: { iconBg: 'bg-blue-100 text-blue-700', color: 'text-blue-700' },
+    emerald: { iconBg: 'bg-emerald-100 text-emerald-700', color: 'text-emerald-700' },
+    red: { iconBg: 'bg-red-100 text-red-700', color: 'text-red-600' },
+    slate: { iconBg: 'bg-slate-100 text-slate-700', color: 'text-slate-900' },
+  }[tone] || { iconBg: 'bg-slate-100 text-slate-700', color: 'text-slate-900' }
+
+  // Clean label from prefix emojis to prevent duplicate symbols on circular icons
+  const cleanLabel = label.replace(/[⏰⚖💰📈⊘✓]/g, '').trim()
+
+  return (
+    <div className="bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-3">
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${config.iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
+        {emoji}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold text-slate-500 truncate">{cleanLabel}</div>
+        <div className={`text-sm font-bold ${config.color} mt-0.5 tabular-nums`}>{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function statusBadgeClass(status: string) {
