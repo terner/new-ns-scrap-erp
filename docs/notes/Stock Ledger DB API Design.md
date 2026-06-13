@@ -11,7 +11,7 @@ tags:
   - ledger
 status: draft
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-13
 ---
 
 # Stock Ledger DB API Design
@@ -69,6 +69,29 @@ available = onHandFromStockLedger - activeStockHolds
 ```
 
 ทุก write path ที่สร้าง hold หรือ stock-out จาก stock ปกติต้อง validate ด้วย branch + warehouse + product เดียวกัน เพื่อป้องกัน over selling
+
+## Stock Balance Read Model
+
+`/api/stock/balance` ต้องอ่าน `stock_ledger` เป็น bucket aggregate ใน DB ไม่โหลด movement rows ทั้งหมดมากลุ่มใน Node
+
+Bucket key:
+
+```text
+product_id + branch_id + warehouse_id + output_category + lot_no + not_available_for_sale
+```
+
+Read policy:
+
+- on-hand/value มาจาก `stock_ledger` aggregate ต่อ bucket
+- active hold overlay มาจาก `stock_holds.status = active` aggregate ต่อ bucket เดียวกัน
+- ready qty = positive on-hand - active hold เฉพาะ bucket ที่ขายได้
+- detail drilldown จำกัด latest movement/active hold rows ต่อ bucket
+
+Supporting indexes:
+
+- `idx_stock_ledger_balance_bucket`
+- `idx_stock_ledger_bucket_detail`
+- `idx_stock_holds_active_bucket_detail`
 
 ## WTO Hold Contract
 
