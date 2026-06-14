@@ -10,6 +10,9 @@ type SupplierTrackingRow = {
   avgBuy: number
   billCount: number
   code: string
+  deliveryCompletionPct: number
+  deductionPct: number
+  gradeAdjustmentCount: number
   id: string
   paidAmount: number
   paidPct: number
@@ -18,6 +21,7 @@ type SupplierTrackingRow = {
   purchaseAmount: number
   qty: number
   supplierName: string
+  wtiCount: number
 }
 
 type SupplierTrackingPayload = {
@@ -32,9 +36,19 @@ type SupplierTrackingPayload = {
 
 type SupplierTrackingDetail = {
   bills: Array<{ amount: number; avgBuy: number; date: string; docNo: string; href: string; paidAmount: number; payable: number; qty: number; status: string }>
+  gradeAdjustments: Array<{ date: string; docNo: string; qtyDiff: number; reason: string; status: string; valueDiff: number }>
   payments: Array<{ amount: number; date: string; docNo: string; method: string; netAmount: number; status: string }>
   products: Array<{ amount: number; avgBuy: number; billCount: number; productName: string; qty: number }>
+  qualitySignals: {
+    deliveryCompletionPct: number
+    deductionPct: number
+    gradeAdjustmentCount: number
+    paymentReliabilityPct: number
+    returnSignalStatus: string
+    wtiCount: number
+  }
   supplier: { code: string; id: string; name: string }
+  weightTickets: Array<{ billedWeight: number; date: string; deductWeight: number; docNo: string; grossWeight: number; netWeight: number; remainingWeight: number; status: string }>
 }
 
 const monthLabels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
@@ -78,7 +92,22 @@ export function SupplierTrackingPageClient() {
 
   const openDetail = useCallback(async (row: SupplierTrackingRow) => {
     setIsDetailLoading(true)
-    setDetail({ bills: [], payments: [], products: [], supplier: { code: row.code, id: row.id, name: row.supplierName } })
+    setDetail({
+      bills: [],
+      gradeAdjustments: [],
+      payments: [],
+      products: [],
+      qualitySignals: {
+        deliveryCompletionPct: row.deliveryCompletionPct,
+        deductionPct: row.deductionPct,
+        gradeAdjustmentCount: row.gradeAdjustmentCount,
+        paymentReliabilityPct: row.paidPct,
+        returnSignalStatus: 'ยังไม่มี purchase return source table ใน schema ปัจจุบัน',
+        wtiCount: row.wtiCount,
+      },
+      supplier: { code: row.code, id: row.id, name: row.supplierName },
+      weightTickets: [],
+    })
     try {
       const params = new URLSearchParams(queryString)
       params.set('detailId', row.id)
@@ -212,6 +241,20 @@ export function SupplierTrackingPageClient() {
                       <span className="text-red-700 font-bold tabular-nums">{formatMoney(row.payable)} ({row.paidPct.toFixed(0)}% จ่าย)</span>
                     </div>
                   </div>
+                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+                    <div>
+                      <span className="font-semibold text-slate-400 block">WTI: </span>
+                      <span className="text-slate-800">{row.wtiCount} ใบ</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-400 block">ส่งครบ: </span>
+                      <span className="text-emerald-700 font-semibold">{row.deliveryCompletionPct.toFixed(1)}%</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-400 block">หัก: </span>
+                      <span className="text-amber-700 font-semibold">{row.deductionPct.toFixed(1)}%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -224,7 +267,7 @@ export function SupplierTrackingPageClient() {
           </div>
 
           <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow mb-4">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="w-full min-w-[1180px] text-sm">
               <thead className="bg-slate-100">
                 <tr>
                   <th className="p-2 text-left">Code</th>
@@ -236,11 +279,15 @@ export function SupplierTrackingPageClient() {
                   <th className="p-2 text-right">จ่ายแล้ว</th>
                   <th className="p-2 text-right">ค้างจ่าย</th>
                   <th className="p-2 text-right">% จ่าย</th>
+                  <th className="p-2 text-right">WTI</th>
+                  <th className="p-2 text-right">ส่งครบ</th>
+                  <th className="p-2 text-right">หัก%</th>
+                  <th className="p-2 text-right">Grade</th>
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
-                {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่มีข้อมูล Supplier Tracking</td></tr> : null}
+                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
+                {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={13}>ไม่มีข้อมูล Supplier Tracking</td></tr> : null}
                 {!isLoading && rows.map((row) => (
                   <tr key={row.id} className="cursor-pointer border-t hover:bg-blue-50/40" onClick={() => void openDetail(row)}>
                     <td className="p-2 font-mono text-xs text-slate-500">{row.code || '-'}</td>
@@ -252,6 +299,10 @@ export function SupplierTrackingPageClient() {
                     <td className="p-2 text-right">{formatMoney(row.paidAmount)}</td>
                     <td className="p-2 text-right text-red-700">{formatMoney(row.payable)}</td>
                     <td className="p-2 text-right">{row.paidPct.toFixed(1)}%</td>
+                    <td className="p-2 text-right">{row.wtiCount}</td>
+                    <td className="p-2 text-right font-semibold text-emerald-700">{row.deliveryCompletionPct.toFixed(1)}%</td>
+                    <td className="p-2 text-right text-amber-700">{row.deductionPct.toFixed(1)}%</td>
+                    <td className="p-2 text-right">{row.gradeAdjustmentCount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -326,12 +377,22 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden !p-0" fallbackTitle="Supplier Tracking Detail">
         <DialogHeader>
           <DialogTitle>{detail?.supplier.name ?? 'รายละเอียด Supplier'}</DialogTitle>
-          <DialogDescription>{detail?.supplier.code ?? ''} · Purchase Bills / Payments / Product mix</DialogDescription>
+          <DialogDescription>{detail?.supplier.code ?? ''} · Purchase Bills / Payments / WTI / Grade Adjust / Product mix</DialogDescription>
         </DialogHeader>
         <div className="max-h-[72vh] space-y-4 overflow-y-auto p-4">
           {isLoading ? <div className="rounded-md bg-slate-50 p-6 text-center text-sm text-slate-500">กำลังโหลดรายละเอียด</div> : null}
           {!isLoading && detail ? (
             <>
+              <DetailSection title="Reliability / Quality Signals">
+                <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <SignalMetric label="ส่งครบจาก WTI" value={`${detail.qualitySignals.deliveryCompletionPct.toFixed(1)}%`} />
+                  <SignalMetric label="หักน้ำหนัก" value={`${detail.qualitySignals.deductionPct.toFixed(1)}%`} />
+                  <SignalMetric label="จ่ายดี" value={`${detail.qualitySignals.paymentReliabilityPct.toFixed(1)}%`} />
+                  <SignalMetric label="WTI" value={`${detail.qualitySignals.wtiCount} ใบ`} />
+                  <SignalMetric label="Grade Adjust" value={`${detail.qualitySignals.gradeAdjustmentCount} รายการ`} />
+                  <SignalMetric label="Return" value={detail.qualitySignals.returnSignalStatus} />
+                </div>
+              </DetailSection>
               <DetailSection title="Purchase Bill">
                 <SimpleTable
                   headers={['วันที่', 'เอกสาร', 'น้ำหนัก', 'ยอดซื้อ', 'ราคาเฉลี่ย', 'จ่ายแล้ว', 'ค้างจ่าย', 'สถานะ']}
@@ -342,6 +403,18 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
                 <SimpleTable
                   headers={['วันที่', 'เอกสาร', 'วิธีจ่าย', 'ยอดจ่าย', 'สุทธิ', 'สถานะ']}
                   rows={detail.payments.map((row) => [formatDateDisplay(row.date), row.docNo, row.method, formatMoney(row.amount), formatMoney(row.netAmount), row.status])}
+                />
+              </DetailSection>
+              <DetailSection title="WTI / Delivery">
+                <SimpleTable
+                  headers={['วันที่', 'WTI', 'น้ำหนักสุทธิ', 'ชั่งบิลแล้ว', 'คงเหลือ', 'หักน้ำหนัก', 'สถานะ']}
+                  rows={detail.weightTickets.map((row) => [formatDateDisplay(row.date), row.docNo, formatMoney(row.netWeight), formatMoney(row.billedWeight), formatMoney(row.remainingWeight), formatMoney(row.deductWeight), row.status])}
+                />
+              </DetailSection>
+              <DetailSection title="Grade Adjust">
+                <SimpleTable
+                  headers={['วันที่', 'เอกสาร', 'Qty Diff', 'Value Diff', 'เหตุผล', 'สถานะ']}
+                  rows={detail.gradeAdjustments.map((row) => [formatDateDisplay(row.date), row.docNo, formatMoney(row.qtyDiff), formatMoney(row.valueDiff), row.reason, row.status])}
                 />
               </DetailSection>
               <DetailSection title="Product Mix">
@@ -383,6 +456,10 @@ function SummaryCard({ color, label, value }: { color: 'blue' | 'indigo' | 'red'
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-md bg-slate-50 p-2"><div className="text-slate-500">{label}</div><div className="font-mono font-bold text-slate-900">{value}</div></div>
+}
+
+function SignalMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-md bg-slate-50 p-3"><div className="text-xs font-semibold text-slate-500">{label}</div><div className="mt-1 text-sm font-bold text-slate-900">{value}</div></div>
 }
 
 function Tab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {

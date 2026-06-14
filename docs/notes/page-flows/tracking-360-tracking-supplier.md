@@ -5,7 +5,7 @@ tags:
   - menu
   - tracking
 status: accepted-baseline
-updated: 2026-06-13
+updated: 2026-06-14
 route: /tracking/supplier
 ---
 
@@ -49,8 +49,8 @@ Latest user screenshot changes the target from purchase/payable summary into a s
 - Required data groups: Purchase Bill, WT/WTI, Grade Adjust, Payment, Return
 - Decision questions: supplier ไหนต้นทุนดี, ส่งครบไหม, quality ดีไหม, จ่ายดีไหม
 - Business importance: ธุรกิจ scrap ต้องเห็น supplier quality เพราะ supplier แต่ละรายไม่เท่ากัน
-- Local vs legacy finding: legacy row click opens supplier detail with PB list, payment list, product breakdown, and monthly breakdown. Current Next now has server-backed `supplierId`/`q` filters and row-click detail for PB/payment/product mix via `detailId`; monthly detail and quality/reliability signals are still pending.
-- Target UI direction: each supplier row/card should open a detail view/modal with PB/PMT/source links, WTI/grade-adjust/return signals when source ownership is finalized, product mix, monthly purchase/payment trend, and reliability/quality signals.
+- Local vs legacy finding: legacy row click opens supplier detail with PB list, payment list, product breakdown, and monthly breakdown. Current Next now has server-backed `supplierId`/`q` filters and row-click detail for PB/payment/product mix via `detailId`; WTI delivery, deduction, Grade Adjust, and payment reliability signals are wired from current source facts.
+- Target UI direction: each supplier row/card opens a detail modal with PB/PMT, WTI delivery facts, Grade Adjust signals, product mix, and reliability/quality signals. Return remains pending until a purchase return source table/owner is confirmed.
 
 ## Page Responsibilities
 
@@ -92,6 +92,8 @@ Source tables:
 - `suppliers` active only
 - `purchase_bills` excluding `PURCHASE_BILL_CANCELLED_STATUSES`
 - `payments` excluding `status = cancelled`
+- `weight_tickets` WTI excluding cancelled tickets
+- `grade_adjustments` excluding reversed/cancelled adjustments
 
 Response:
 
@@ -110,6 +112,7 @@ Row fields:
 - `billCount`, `paymentCount`
 - `qty`, `purchaseAmount`, `avgBuy`
 - `paidAmount`, `payable`, `paidPct`
+- `wtiCount`, `deliveryCompletionPct`, `deductionPct`, `gradeAdjustmentCount`
 
 Target detail payload fields:
 
@@ -117,7 +120,9 @@ Target detail payload fields:
 - `payments`: PMT/PMA doc no/date/account/amount/status/source link
 - `products`: product code/name/qty/purchase amount/avg buy/bill count
 - `monthly`: bill count/qty/purchase amount/paid/payable by month
-- `signals`: cost rank, delivery completeness from WTI/WT source when available, grade adjustment/quality signal, return frequency, payment reliability
+- `qualitySignals`: WTI delivery completeness, WTI deduction rate, Grade Adjust count, payment reliability, Return source status
+- `weightTickets`: WTI doc/date/net/billed/remaining/deduction/status rows
+- `gradeAdjustments`: adjustment doc/date/qty diff/value diff/reason/status rows
 
 ## Calculation Rules
 
@@ -128,6 +133,9 @@ Target detail payload fields:
 - Paid amount sums `payments.amount` by supplier/date period.
 - Paid% = `paidAmount / (paidAmount + payable) * 100` when denominator > 0.
 - Product mix groups purchase items by product name/code and counts distinct PB doc numbers and suppliers.
+- WTI delivery completeness = billed WTI summary weight / net WTI summary weight.
+- Deduction% = WTI deduct weight / WTI gross weight.
+- Grade Adjust signal counts adjustments whose product/source/target product appears in the supplier's WTI product summaries for the selected period.
 - Sort default is purchase amount descending.
 
 ## Lifecycle / Read Flow
@@ -158,7 +166,8 @@ Target detail payload fields:
 - Supplier/search server-side filter is now implemented for aggregate rows, product mix, monthly, summary, and export.
 - API now returns supplier detail rows for PB/payment drilldown through `detailId`.
 - Product mix follows the active supplier/filter and is also available inside supplier detail.
-- WTI/WT delivery completeness, Grade Adjust quality, Return frequency, and reliability signals are not wired into the API yet.
+- WTI delivery completeness, WTI deduction rate, Grade Adjust count, and payment reliability are wired into the API/UI.
+- Return frequency is not wired because the current schema has no confirmed purchase return source table.
 - AP aging/payment-cycle locks remain outside this page.
 
 ## Implementation Tasks
@@ -170,7 +179,8 @@ Target detail payload fields:
 - [x] Return PB source rows with doc no, date, qty, purchase amount, avg buy, paid, payable, status, and source link.
 - [x] Return PMT/Payment rows with doc no, date, method, amount, status, and source facts.
 - [x] Return product mix scoped by selected supplier when supplier filter/detail is active.
-- [ ] Add quality/reliability signal fields from confirmed source facts: WTI/WT delivery completeness, Grade Adjust, Return, and payment reliability.
+- [x] Add quality/reliability signal fields from confirmed source facts: WTI delivery completeness, WTI deduction, Grade Adjust count, and payment reliability.
+- [ ] Add Return frequency once source ownership/schema exists.
 - [ ] Keep AP aging out until [[Finance AP Page Flow]] due-date rules are reconciled.
 
 ### UI
@@ -179,7 +189,8 @@ Target detail payload fields:
 - [x] Make supplier filter and search server-backed, not only client-side after aggregate load.
 - [x] Make desktop rows and mobile cards clickable to open supplier detail.
 - [x] Add detail modal/view sections: PB list, payment list, product mix.
-- [ ] Add detail sections for reliability signals and monthly trend.
+- [x] Add detail sections for WTI, Grade Adjust, payment reliability, and quality signals.
+- [ ] Add monthly trend.
 - [ ] Keep product breakdown visible but scoped to the active supplier/filter.
 - [ ] Keep all interactions read-only; source document links navigate to owner pages only.
 
@@ -191,5 +202,6 @@ Target detail payload fields:
 - [x] Add supplier/search filter if UI needs server-side filter
 - [x] Add supplier detail/read endpoint or drilldown payload
 - [x] Add source references to PB/PMT documents
-- [ ] Add WTI/WT delivery completeness, Grade Adjust quality, Return frequency, and supplier reliability signals
+- [x] Add WTI delivery completeness, deduction rate, Grade Adjust quality count, and supplier payment reliability signals
+- [ ] Add Return frequency after source ownership/schema is confirmed
 - [ ] Reconcile paid/payable formulas with final payment allocation facts
