@@ -50,7 +50,7 @@ Latest user screenshot changes the target from a simple customer sales summary i
 - Decision questions: ลูกค้าคนไหนซื้อเยอะ, margin ดีไหม, จ่ายช้าไหม, มี void/cancel เอกสารผิดปกติไหมใน source flow
 - Business actions supported: เพิ่มเครดิต, ลดเครดิต, ต้นยอดขาย, blacklist
 - Local vs legacy finding: legacy row click opens customer detail with sales list, receipt list, product breakdown, and monthly breakdown. Current Next now supports row-click detail for SB/RCP/product/monthly breakdown via `detailId`; pending AR, credit utilization, and margin decision signals are wired from current source facts.
-- Target UI direction: list remains high-density, but each customer row/card opens a detail modal with SB/RCP/source links, product breakdown, monthly movement, pending AR/receivable exposure, and credit/margin decision signals. Return count/value is removed by requirement; use void/cancel documents instead.
+- Target UI direction: list remains high-density, but each customer row/card opens a detail modal with SB/RCP/source links, product breakdown, channel breakdown, monthly movement, pending AR/receivable exposure, and credit/margin decision signals. Return count/value is removed by requirement; use void/cancel documents instead.
 
 ## Page Responsibilities
 
@@ -113,6 +113,7 @@ Target detail payload fields:
 - `sales`: SB doc no/date/channel/qty/revenue/COGS/GP/received/receivable/source link
 - `receipts`: RCP doc no/date/account/amount/source link
 - `products`: product code/name/qty/revenue/COGS/GP/GP%
+- `channels`: channel name, bill count, qty, revenue, COGS, GP, GP%
 - `monthly`: bill count/qty/revenue/GP/received/receivable by month
 - `signals`: margin quality, pending AR, credit-limit utilization
 
@@ -157,7 +158,7 @@ Target detail payload fields:
 ## Current Gap
 
 - API now returns drilldown SB/RCP source rows per customer through `detailId`.
-- API now returns product breakdown per customer; channel breakdown is still pending.
+- API now returns product and channel breakdown per customer.
 - API/UI now return monthly movement per customer for selected year.
 - API/UI now expose pending AR amount/count, credit utilization, low-margin bill count, and negative-margin bill count as decision signals.
 - Return signal/count is removed by requirement; customer corrections use Sales Bill void/cancel instead of a separate Customer Return source.
@@ -172,6 +173,7 @@ Target detail payload fields:
 - [x] Return SB source rows with doc no, date, qty, revenue, COGS, GP, received, receivable, and source link.
 - [x] Return RCP source rows with doc no, date, method, amount, and status.
 - [x] Return product breakdown per customer for selected period: product name, qty, revenue, COGS, GP, GP%.
+- [x] Return channel breakdown per customer for selected period: channel name, bill count, qty, revenue, COGS, GP, GP%.
 - [x] Return monthly movement per customer for selected year: bill count, qty, revenue, GP, received, receivable.
 - [x] Add structured decision signals: low margin, negative margin, pending AR, and credit utilization.
 - [x] Remove return frequency from Customer Tracking; use void/cancel Sales documents.
@@ -185,6 +187,7 @@ Target detail payload fields:
 - [x] Add detail modal/view sections: SB list, RCP list, product breakdown.
 - [x] Add dense mobile cards and keyboard-openable mobile card controls for the same customer detail.
 - [x] Add monthly movement and decision signals.
+- [x] Add channel breakdown section in customer detail.
 - [ ] Add source document links as read-only navigation; no mutation actions.
 - [ ] Preserve table density with `text-sm`, `p-2`, `bg-slate-100` header, and no nested cards.
 
@@ -196,7 +199,7 @@ Target detail payload fields:
 - [x] Add customer detail/read endpoint or drilldown payload
 - [x] Add source references to SB/RCP/customer documents
 - [x] Add product breakdown after source contract is finalized
-- [ ] Add channel breakdown after source contract is finalized
+- [x] Add channel breakdown after source contract is finalized
 - [x] Add customer behavior signals for margin, pending AR, and credit utilization
 - [x] Remove customer return frequency; correction flow is void/cancel document
 - [ ] Add AR aging only when due-date rules are reconciled

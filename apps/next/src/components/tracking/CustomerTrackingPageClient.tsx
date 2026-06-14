@@ -36,7 +36,8 @@ type CustomerTrackingPayload = {
 }
 
 type CustomerTrackingDetail = {
-  bills: Array<{ cogs: number; date: string; docNo: string; gp: number; href: string; qty: number; receivable: number; received: number; revenue: number; status: string }>
+  bills: Array<{ channelName: string; cogs: number; date: string; docNo: string; gp: number; href: string; qty: number; receivable: number; received: number; revenue: number; status: string }>
+  channels: Array<{ billCount: number; channelName: string; cogs: number; gp: number; gpPct: number; qty: number; revenue: number }>
   customer: { code: string; id: string; name: string }
   monthly: Array<{ billCount: number; gp: number; month: string; qty: number; receivable: number; receiptCount: number; receivedAmount: number; revenue: number }>
   products: Array<{ avgSell: number; cogs: number; gp: number; gpPct: number; productName: string; qty: number; revenue: number }>
@@ -95,6 +96,7 @@ export function CustomerTrackingPageClient() {
     setIsDetailLoading(true)
     setDetail({
       bills: [],
+      channels: [],
       customer: { code: row.code, id: row.id, name: row.customerName },
       monthly: [],
       products: [],
@@ -304,10 +306,11 @@ function CustomerDetailDialog({ detail, isLoading, onOpenChange }: { detail: Cus
               </DetailSection>
               <DetailSection title="Sales Bill">
                 <SimpleTable
-                  headers={['วันที่', 'เอกสาร', 'น้ำหนัก', 'ยอดขาย', 'COGS', 'GP', 'รับเงิน', 'ลูกหนี้', 'สถานะ']}
+                  headers={['วันที่', 'เอกสาร', 'ช่องทาง', 'น้ำหนัก', 'ยอดขาย', 'COGS', 'GP', 'รับเงิน', 'ลูกหนี้', 'สถานะ']}
                   rows={detail.bills.map((row) => [
                     formatDateDisplay(row.date),
                     row.docNo,
+                    row.channelName,
                     formatMoney(row.qty),
                     formatMoney(row.revenue),
                     formatMoney(row.cogs),
@@ -316,6 +319,12 @@ function CustomerDetailDialog({ detail, isLoading, onOpenChange }: { detail: Cus
                     formatMoney(row.receivable),
                     row.status,
                   ])}
+                />
+              </DetailSection>
+              <DetailSection title="Channel Breakdown">
+                <SimpleTable
+                  headers={['ช่องทาง', 'บิล', 'น้ำหนัก', 'ยอดขาย', 'COGS', 'GP', 'GP%']}
+                  rows={detail.channels.map((row) => [row.channelName, String(row.billCount), formatMoney(row.qty), formatMoney(row.revenue), formatMoney(row.cogs), formatMoney(row.gp), `${row.gpPct.toFixed(2)}%`])}
                 />
               </DetailSection>
               <DetailSection title="Receipt">
@@ -349,13 +358,14 @@ function DetailSection({ children, title }: { children: ReactNode; title: string
 }
 
 function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  const isNumericCell = (value: string) => /^-?[\d,]+(\.\d+)?%?$/.test(value.trim())
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-sm">
         <thead className="bg-slate-100"><tr>{headers.map((header) => <th key={header} className="p-2 text-left">{header}</th>)}</tr></thead>
         <tbody>
           {rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
-          {rows.map((row, index) => <tr key={index} className="border-t">{row.map((cell, cellIndex) => <td key={`${index}-${headers[cellIndex]}`} className={cellIndex === 0 || cellIndex === 1 || cellIndex === headers.length - 1 ? 'p-2' : 'p-2 text-right'}>{cell}</td>)}</tr>)}
+          {rows.map((row, index) => <tr key={index} className="border-t">{row.map((cell, cellIndex) => <td key={`${index}-${headers[cellIndex]}`} className={cellIndex === headers.length - 1 || !isNumericCell(cell) ? 'p-2' : 'p-2 text-right'}>{cell}</td>)}</tr>)}
         </tbody>
       </table>
     </div>

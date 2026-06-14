@@ -108,6 +108,7 @@ export async function GET(request: Request) {
         where: { active: { not: false }, ...(customer ? { id: customer.id } : {}) },
       }),
       prisma.sales_bills.findMany({
+        include: { sales_channels: { select: { code: true, name: true } } },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
         where: { NOT: { status: 'cancelled' }, ...(customer ? { customer_id: customer.id } : {}) },
@@ -196,9 +197,22 @@ export async function GET(request: Request) {
       const detailReceipts = receipts.filter((receipt) => receipt.customer_id === detailCustomer.id && inYearMonth(receipt.date, year, month))
       const detailYearBills = bills.filter((bill) => bill.customer_id === detailCustomer.id && inYearMonth(bill.date, year, null))
       const detailYearReceipts = receipts.filter((receipt) => receipt.customer_id === detailCustomer.id && inYearMonth(receipt.date, year, null))
+      const channelMap = new Map<string, { billCount: number; channelName: string; cogs: number; gp: number; qty: number; revenue: number }>()
       const productMap = new Map<string, { cogs: number; gp: number; productName: string; qty: number; revenue: number }>()
 
       detailBills.forEach((bill) => {
+        const billItem = itemTotals(bill.items)
+        const billRevenue = billItem.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+        const billCogs = toNumber(bill.cogs_amount ?? bill.total_cost)
+        const billGp = toNumber(bill.gross_profit) || billRevenue - billCogs
+        const channelName = bill.sales_channels?.name ?? 'ไม่ระบุช่องทาง'
+        const channel = channelMap.get(channelName) ?? { billCount: 0, channelName, cogs: 0, gp: 0, qty: 0, revenue: 0 }
+        channel.billCount += 1
+        channel.cogs += billCogs
+        channel.gp += billGp
+        channel.qty += billItem.qty
+        channel.revenue += billRevenue
+        channelMap.set(channelName, channel)
         if (!Array.isArray(bill.items)) return
         bill.items
           .filter((item): item is SalesItem => typeof item === 'object' && item !== null)
@@ -243,6 +257,7 @@ export async function GET(request: Request) {
           const gp = toNumber(bill.gross_profit) || revenue - cogs
           return {
             cogs,
+            channelName: bill.sales_channels?.name ?? '-',
             date: toDateOnly(bill.date),
             docNo: bill.doc_no,
             gp,
@@ -254,6 +269,10 @@ export async function GET(request: Request) {
             status: bill.status ?? '-',
           }
         }),
+        channels: Array.from(channelMap.values()).map((row) => ({
+          ...row,
+          gpPct: row.revenue > 0 ? (row.gp / row.revenue) * 100 : 0,
+        })).sort((left, right) => right.revenue - left.revenue),
         customer: { code: detailCustomer.code, id: detailCustomer.code, name: detailCustomer.name },
         monthly: Array.from({ length: 12 }, (_, index) => {
           const monthKey = String(index + 1).padStart(2, '0')
