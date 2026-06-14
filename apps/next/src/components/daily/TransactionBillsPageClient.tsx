@@ -2884,27 +2884,15 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       </div>
 
       {/* Floating Action Button for Mobile */}
-      {mode !== 'stock-issue' ? (
-        <div className="fixed bottom-6 right-6 md:hidden z-10">
-          <button
-            className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
-            onClick={mode === 'purchase' ? openPurchaseForm : openSalesForm}
-            type="button"
-          >
-            <Plus className="size-8" />
-          </button>
-        </div>
-      ) : (
-        <div className="fixed bottom-6 right-6 md:hidden z-10">
-          <button
-            className="flex size-14 items-center justify-center rounded-full bg-amber-600 text-white shadow-lg hover:bg-amber-700 active:scale-95 transition-transform"
-            onClick={openStockIssueForm}
-            type="button"
-          >
-            <Plus className="size-8" />
-          </button>
-        </div>
-      )}
+      <div className="fixed bottom-6 right-6 md:hidden z-10">
+        <button
+          className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
+          onClick={mode === 'stock-issue' ? openStockIssueForm : mode === 'purchase' ? openPurchaseForm : openSalesForm}
+          type="button"
+        >
+          <Plus className="size-8" />
+        </button>
+      </div>
 
       {showForm && mode === 'purchase' ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
