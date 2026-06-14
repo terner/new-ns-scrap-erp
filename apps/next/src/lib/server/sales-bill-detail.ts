@@ -207,7 +207,7 @@ function buildDurableItems(input: {
       return 'Spot Sale'
     })
     const salesSourceLabels = Array.from(new Set(poSourceLabels.length ? poSourceLabels : ['Spot Sale']))
-    const stockSourceLabel = firstSourceAllocation
+    const stockSourceLabel = firstSourceAllocation && firstSourceAllocation.source_type !== 'WTO'
       ? `${firstSourceAllocation.source_type} ${firstSourceAllocation.source_doc_no}`
       : ''
     const tradingSource = tradingSourceInfo(input.bill.transaction_mode, line.line_no, input.tradingFactByLineNo)

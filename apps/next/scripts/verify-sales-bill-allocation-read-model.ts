@@ -185,7 +185,7 @@ async function main() {
     assertEqual('detail item count from facts', detail.items.length, 1)
     assertEqual('detail product from line fact', detail.items[0]?.productCode, product.code)
     assertEqual('detail delivery source from source facts', detail.items[0]?.deliveryTicketDocNo, ticket.doc_no)
-    assertEqual('detail source label from source/po facts', detail.items[0]?.sourceLabel, `WTO ${ticket.doc_no} / PO Sell ${poSell.doc_no}`)
+    assertEqual('detail source label from po facts', detail.items[0]?.sourceLabel, `PO Sell ${poSell.doc_no}`)
     assertEqual('detail source type from facts', detail.items[0]?.sourceType, 'WTO stock-out source / PO Sell')
     assertEqual('detail delivery docs from source fact', detail.deliveryDocNos.join(','), ticket.doc_no)
     assertEqual('detail vehicle from source fact relation', detail.items[0]?.deliveryVehicleNo, ticket.vehicle_no)
@@ -214,7 +214,7 @@ async function main() {
     const cancelledDetail = await getSalesBillDetail(bill.doc_no)
     if (!cancelledDetail) throw new Error('cancelled detail not found')
     assertEqual('cancelled detail still reads cancelled line facts', cancelledDetail.items[0]?.productCode, product.code)
-    assertEqual('cancelled source label still from cancelled facts', cancelledDetail.items[0]?.sourceLabel, `WTO ${ticket.doc_no} / PO Sell ${poSell.doc_no}`)
+    assertEqual('cancelled source label still from cancelled po facts', cancelledDetail.items[0]?.sourceLabel, `PO Sell ${poSell.doc_no}`)
     assertions += 2
   } finally {
     await cleanup(prisma)

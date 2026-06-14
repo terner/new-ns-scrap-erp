@@ -615,7 +615,8 @@ Reporting rule:
   - [x] convert `PSALE -> Sales Bill` links the source pending-sale lines and creates AR only; it does not write duplicate SB stock-out ledger rows
   - [x] preserve `PSALE` ledger audit during conversion instead of deleting/replacing it with `SB`
   - [x] optimize API/DB lookups with `20260612123936_optimize_pending_sale_api_indexes.sql` and narrow list/reversal query payloads
-  - [ ] logged-in browser QA for create/cancel/convert and SB-from-PSALE cancel
+  - [x] add isolated and rollback automated contract verification for SB-from-PSALE cancel: no duplicate `SB/SB-CANCEL` stock ledger, original `PSALE` reverses through `PSALE-CANCEL`, WTO hold reopens, and Sales Bill allocation facts cancel
+  - [ ] logged-in browser QA for create/cancel/convert and SB-from-PSALE cancel click-path
 - [ ] define COGS/FIFO rule
 - [ ] define receipt relation
 
