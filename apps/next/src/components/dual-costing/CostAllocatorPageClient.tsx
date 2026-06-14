@@ -11,6 +11,7 @@ import {
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
+  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type ProductOption = {
@@ -40,10 +41,22 @@ type CandidateRow = {
   availableQty: number
   costPoolId: string
   counterparty: string
+  date?: string
   qtyToUse: number
   sourceNo: string
   sourceType: string
   totalCostUse: number
+  unitCost: number
+}
+
+type PoolRow = {
+  availableQty: number
+  availableValue: number
+  costPoolId: string
+  counterparty: string
+  date: string
+  sourceNo: string
+  sourceType: string
   unitCost: number
 }
 
@@ -54,7 +67,7 @@ type Payload = {
     products: ProductOption[]
     sourceTypes: string[]
   }
-  pool: Array<{ availableQty: number; availableValue: number }>
+  pool: PoolRow[]
   poSells: PoSellOption[]
   selectedPoSell: PoSellOption | null
   summary: {
@@ -115,6 +128,7 @@ export function CostAllocatorPageClient() {
   const hasCandidates = (data?.candidates.length ?? 0) > 0
   const sourceTypeButtons = data?.filters.sourceTypes ?? ['po-sell', 'spot-sell']
   const sourceTypeLabel = sourceType === 'po-sell' ? 'PO Sell' : 'Spot Sell / บิลขายไม่มี PO'
+  const allocationModes = data?.filters.modes?.length ? data.filters.modes : ['FIFO', 'LIFO', 'Cheap', 'Expensive']
 
   function resetSale() {
     setSelectedPoSellId('')
@@ -128,6 +142,7 @@ export function CostAllocatorPageClient() {
       </DualCostingHint>
 
       <DualCostingErrorBox error={error} />
+      <DualCostingWorkflowStrip active="allocator" />
 
       <DualCostingPanel title="⓪ เลือกประเภทปลายทางที่จะ Match ต้นทุน">
         <div className="flex flex-wrap gap-2">
@@ -197,13 +212,59 @@ export function CostAllocatorPageClient() {
             <div>
               <label className="mb-1 block text-xs text-slate-500">Allocation Mode</label>
               <Select value={allocationMode} onChange={(event) => setAllocationMode(event.target.value)}>
-                <option value="FIFO">FIFO - ต้นทุนเก่าก่อน</option>
-                <option value="LIFO">LIFO - ต้นทุนใหม่ก่อน</option>
-                <option value="Cheap">Cheap First - ต้นทุนถูกก่อน</option>
-                <option value="Expensive">Expensive First - ต้นทุนแพงก่อน</option>
-                <option value="Manual">Manual - เลือกเอง</option>
+                {allocationModes.map((mode) => <option key={mode} value={mode}>{allocationModeLabel(mode)}</option>)}
               </Select>
             </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto rounded-md border border-slate-200">
+            <Table>
+              <TableHeader>
+                <tr>
+                  <TableHead>เอกสารขาย</TableHead>
+                  <TableHead>วันที่</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>สินค้า</TableHead>
+                  <TableHead className="text-right">ขาย</TableHead>
+                  <TableHead className="text-right">Matched</TableHead>
+                  <TableHead className="text-right">ค้าง Match</TableHead>
+                  <TableHead className="text-right">ราคา/หน่วย</TableHead>
+                  <TableHead className="text-center">เลือก</TableHead>
+                </tr>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? <TableRow><TableCell className="py-6 text-center text-slate-500" colSpan={9}>กำลังโหลด target candidates</TableCell></TableRow> : null}
+                {!isLoading && (data?.poSells.length ?? 0) === 0 ? <TableRow><TableCell className="py-6 text-center text-slate-400" colSpan={9}>ไม่มี {sourceTypeLabel} ของสินค้านี้ที่ยังไม่ match</TableCell></TableRow> : null}
+                {(data?.poSells ?? []).map((target) => {
+                  const active = selectedPoSellId === target.id
+                  return (
+                    <TableRow key={target.id} className={active ? 'bg-purple-50 hover:bg-purple-50' : 'hover:bg-slate-50'}>
+                      <TableCell className="font-mono text-xs">{target.docNo}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">{target.date}</TableCell>
+                      <TableCell>{target.customerName}</TableCell>
+                      <TableCell className="text-xs">{target.productName}</TableCell>
+                      <TableCell className="text-right">{formatMoney(target.qty)}</TableCell>
+                      <TableCell className="text-right text-emerald-700">{formatMoney(target.matchedQty)}</TableCell>
+                      <TableCell className="text-right font-bold text-amber-700">{formatMoney(target.remainingQty)}</TableCell>
+                      <TableCell className="text-right">{formatMoney(target.unitPrice)}</TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          size="xs"
+                          type="button"
+                          variant={active ? 'default' : 'secondary'}
+                          onClick={() => {
+                            setSelectedPoSellId(target.id)
+                            setShowPreview(false)
+                          }}
+                        >
+                          {active ? 'เลือกแล้ว' : 'เลือก'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           </div>
 
           {hasPoSell ? (
@@ -224,8 +285,42 @@ export function CostAllocatorPageClient() {
         </DualCostingPanel>
       ) : null}
 
+      {hasSelection ? (
+        <DualCostingPanel title="③ Cost Pool Lots ของสินค้าที่เลือก">
+          <Table className="[&_tbody_tr]:border-slate-100">
+            <TableHeader>
+              <tr>
+                <TableHead>Source</TableHead>
+                <TableHead>เลขที่</TableHead>
+                <TableHead>วันที่</TableHead>
+                <TableHead>Counterparty</TableHead>
+                <TableHead className="text-right">Available</TableHead>
+                <TableHead className="text-right">฿/หน่วย</TableHead>
+                <TableHead className="text-right">Available Value</TableHead>
+              </tr>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? <TableRow><TableCell className="py-6 text-center text-slate-500" colSpan={7}>กำลังโหลด Cost Pool</TableCell></TableRow> : null}
+              {!isLoading && (data?.pool.length ?? 0) === 0 ? <TableRow><TableCell className="py-6 text-center text-amber-700" colSpan={7}>ยังไม่มี Cost Pool lot สำหรับสินค้านี้</TableCell></TableRow> : null}
+              {(data?.pool ?? []).slice(0, 12).map((row) => (
+                <TableRow key={row.costPoolId} className="hover:bg-slate-50">
+                  <TableCell><span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{row.sourceType}</span></TableCell>
+                  <TableCell className="font-mono text-xs">{row.sourceNo}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs">{row.date}</TableCell>
+                  <TableCell className="text-xs">{row.counterparty}</TableCell>
+                  <TableCell className="text-right font-bold text-emerald-700">{formatMoney(row.availableQty)}</TableCell>
+                  <TableCell className="text-right">{formatMoney(row.unitCost)}</TableCell>
+                  <TableCell className="text-right text-emerald-700">{formatMoney(row.availableValue)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {(data?.pool.length ?? 0) > 12 ? <div className="mt-2 text-xs text-slate-500">แสดง 12 lot แรกตาม sort ปัจจุบันจากทั้งหมด {data?.pool.length ?? 0} lot</div> : null}
+        </DualCostingPanel>
+      ) : null}
+
       {showPreview && hasCandidates ? (
-        <DualCostingPanel title="③ Preview การ Match">
+        <DualCostingPanel title="④ Preview การ Match">
           <Table className="[&_tbody_tr]:border-slate-100">
             <TableHeader>
               <tr>
@@ -266,4 +361,11 @@ export function CostAllocatorPageClient() {
       ) : null}
     </DualCostingPageSection>
   )
+}
+
+function allocationModeLabel(mode: string) {
+  if (mode === 'LIFO') return 'LIFO - ต้นทุนใหม่ก่อน'
+  if (mode === 'Cheap') return 'Cheap First - ต้นทุนถูกก่อน'
+  if (mode === 'Expensive') return 'Expensive First - ต้นทุนแพงก่อน'
+  return 'FIFO - ต้นทุนเก่าก่อน'
 }

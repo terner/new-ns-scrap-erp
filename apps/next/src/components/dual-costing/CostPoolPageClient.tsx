@@ -15,6 +15,7 @@ import {
   DualCostingHint,
   DualCostingPageSection,
   DualCostingStatCard,
+  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type CostPoolRow = {
@@ -117,10 +118,11 @@ export function CostPoolPageClient() {
   return (
     <DualCostingPageSection>
       <DualCostingHint tone="amber">
-        <strong>Cost Pool</strong> คือต้นทุนคงเหลือที่รอ match กับ PO Sell ไม่ใช่ stock จริง และยังต้องแยกจาก WAC ที่ใช้ลง P/L ตามหลักบัญชี
+        <strong>Cost Pool</strong> คือต้นทุนคงเหลือที่รอ match กับดีลขายทองแดง/ทองเหลือง ไม่ใช่ stock จริง และยังต้องแยกจาก WAC ที่ใช้ลง P/L ตามหลักบัญชี
       </DualCostingHint>
 
       <DualCostingErrorBox error={error} />
+      <DualCostingWorkflowStrip active="pool" />
 
       <div className="grid gap-3 md:grid-cols-3">
         {costTypeCards.map((card) => {

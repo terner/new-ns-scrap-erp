@@ -17,6 +17,7 @@ import {
   DualCostingPageSection,
   DualCostingPanel,
   DualCostingStatCard,
+  DualCostingWorkflowStrip,
 } from './DualCostingPageShell'
 
 type Mode = 'ledger' | 'report' | 'waiting'
@@ -125,9 +126,10 @@ function WaitingAllocationsView() {
   return (
     <DualCostingPageSection>
       <DualCostingHint tone="amber">
-        Waiting Allocation Queue ใช้ติดตามยอดขายที่ยังไม่ได้ allocate ต้นทุนจาก Cost Pool เพื่อการบริหารเท่านั้น และยังไม่ใช่ตัวเลขปิดงบ
+        Waiting Allocation Queue ใช้ติดตามบิลขายไม่มี PO ของทองแดง/ทองเหลืองที่ยังไม่ได้ allocate ต้นทุนจาก Cost Pool เพื่อการบริหารเท่านั้น และยังไม่ใช่ตัวเลขปิดงบ
       </DualCostingHint>
       <DualCostingErrorBox error={error} />
+      <DualCostingWorkflowStrip active="waiting" />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <DualCostingStatCard label="รวมรายการรอ" tone="amber" value={String(data?.summary.count ?? 0)} />
         <DualCostingStatCard label="ยังไม่เริ่ม allocate" tone="red" value={String(data?.summary.fullyPending ?? 0)} />
@@ -250,6 +252,7 @@ function AllocationLedgerView() {
         Cost Allocation Ledger เป็น audit trail ของการ allocate ต้นทุนจริงต่อดีล ใช้ตรวจสอบย้อนกลับได้ แต่ reverse/write flow ยังปิดไว้
       </DualCostingHint>
       <DualCostingErrorBox error={error} />
+      <DualCostingWorkflowStrip active="ledger" />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <DualCostingStatCard label="รวม Allocations" value={String(data?.summary.active ?? 0)}><span className="text-xs text-slate-400">PO {data?.summary.poCount ?? 0} · Spot {data?.summary.spotCount ?? 0}</span></DualCostingStatCard>
         <DualCostingStatCard label="น้ำหนัก allocate" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
