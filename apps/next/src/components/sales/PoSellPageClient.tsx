@@ -325,7 +325,7 @@ export function PoSellPageClient() {
               type="button"
               onClick={columnResize.resetColumnWidths}
             >
-              Set col to default
+              คืนค่าเดิมตาราง
             </button>
           ) : null}
           <select

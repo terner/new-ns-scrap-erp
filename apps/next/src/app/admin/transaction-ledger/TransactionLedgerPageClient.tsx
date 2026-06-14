@@ -331,7 +331,7 @@ export function TransactionLedgerPageClient() {
             {refTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <button className="rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 h-9 flex items-center shrink-0" disabled={ledger.length === 0 || isExporting} type="button" onClick={() => void exportExcel()}>{isExporting ? 'กำลัง Export...' : '📊 Excel'}</button>
-          <button className="rounded-md bg-white px-3 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60 h-9 flex items-center shrink-0" disabled={ledger.length === 0} type="button" onClick={exportCsv}>CSV</button>
+          <button className="rounded-md bg-white px-3 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60 h-9 flex items-center shrink-0" disabled={ledger.length === 0} type="button" onClick={exportCsv}>ส่งออก CSV</button>
         </div>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600 pt-2 border-t border-slate-100">
           <span className="rounded-md bg-emerald-50 px-2 py-1">📥 เงินเข้ารวม <b className="text-emerald-700">{formatMoney(summary.totalIn)}</b></span>

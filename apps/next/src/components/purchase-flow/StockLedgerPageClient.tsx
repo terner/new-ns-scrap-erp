@@ -407,7 +407,7 @@ export function StockLedgerPageClient() {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <span>พบทั้งหมด <span className="font-semibold text-slate-900">{data?.total ?? 0}</span> รายการ</span>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <button className="hidden md:inline-flex h-9 rounded-md border px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>Set col to default</button> : null}
+          {columnResize.hasCustomWidths ? <button className="hidden md:inline-flex h-9 rounded-md border px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button> : null}
           <select aria-label="จำนวนรายการต่อหน้า" className="h-9 rounded-md border px-2 text-sm bg-white text-slate-800" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
             {stockLedgerPageSizes.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
           </select>

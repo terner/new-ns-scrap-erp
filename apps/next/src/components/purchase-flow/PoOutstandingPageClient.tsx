@@ -80,7 +80,7 @@ export function PoOutstandingPageClient() {
         <button className={`rounded-md px-5 py-2 text-sm font-medium ${tab === 'buy' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('buy'); setPartnerFilter(''); setProductFilter('') }}>PO ซื้อ คงเหลือ ({data?.summary.buyCount ?? 0})</button>
         <button className={`rounded-md px-5 py-2 text-sm font-medium ${tab === 'sell' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`} type="button" onClick={() => { setTab('sell'); setPartnerFilter(''); setProductFilter('') }}>PO ขาย คงเหลือ ({data?.summary.sellCount ?? 0})</button>
         <span className="flex-1" />
-        <button className="hidden md:inline-flex rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCsv}>Export CSV</button>
+        <button className="hidden md:inline-flex rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCsv}>ส่งออก CSV</button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

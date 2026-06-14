@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Edit3, Plus, Send, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
@@ -334,7 +335,7 @@ export function StockTransferPageClient() {
           <span className="ml-2 text-slate-500">· มูลค่ารวม <span className="font-semibold text-emerald-700">{formatMoney(data.summary.totalValue)}</span> บาท</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -700,9 +701,45 @@ function SearchableProductField(props: {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
 
+  const inputRef = useRef<HTMLInputElement>(null)
+  const portalHostRef = useRef<HTMLElement | null>(null)
+  const [panelRect, setPanelRect] = useState<{ left: number; top: number; width: number } | null>(null)
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null)
+
   useEffect(() => {
     setQuery(selectedLabel)
   }, [selectedLabel])
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input || typeof document === 'undefined') return
+    const resolvedPortalHost = document.body
+    portalHostRef.current = resolvedPortalHost
+    setPortalHost(resolvedPortalHost)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    const updatePanelRect = () => {
+      const input = inputRef.current
+      if (!input) return
+      const inputRect = input.getBoundingClientRect()
+      setPanelRect({
+        left: inputRect.left,
+        top: inputRect.bottom + 4,
+        width: inputRect.width,
+      })
+    }
+
+    updatePanelRect()
+    window.addEventListener('resize', updatePanelRect)
+    window.addEventListener('scroll', updatePanelRect, true)
+    return () => {
+      window.removeEventListener('resize', updatePanelRect)
+      window.removeEventListener('scroll', updatePanelRect, true)
+    }
+  }, [open])
 
   const normalizedQuery = query.trim().toLowerCase()
   const filteredOptions = props.options
@@ -726,6 +763,7 @@ function SearchableProductField(props: {
     <FormField error={props.error} errorKey={props.errorKey} label="สินค้า *">
       <div className="relative">
         <Input
+          ref={inputRef}
           aria-expanded={open}
           autoComplete="off"
           className={`h-9 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : ''}`}
@@ -761,25 +799,35 @@ function SearchableProductField(props: {
             if (event.key === 'Escape') setOpen(false)
           }}
         />
-        {open ? (
-          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
-            {filteredOptions.length > 0 ? filteredOptions.map((option, index) => (
-              <button
-                key={option.id}
-                className={`block w-full px-3 py-2 text-left text-xs focus:outline-none ${index === activeIndex ? 'bg-slate-100' : 'hover:bg-slate-50 focus:bg-slate-50'}`}
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => selectOption(option)}
+        {open && panelRect && portalHost
+          ? createPortal(
+              <div
+                className="fixed z-[80] max-h-52 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg"
+                style={{
+                  left: panelRect.left,
+                  top: panelRect.top,
+                  width: panelRect.width,
+                }}
               >
-                <span className="font-mono text-slate-700">{option.code ?? option.id}</span>
-                <span className="ml-2 text-slate-600">{option.name}</span>
-              </button>
-            )) : (
-              <div className="px-3 py-2 text-xs text-slate-400">ไม่พบสินค้า</div>
-            )}
-          </div>
-        ) : null}
+                {filteredOptions.length > 0 ? filteredOptions.map((option, index) => (
+                  <button
+                    key={option.id}
+                    className={`block w-full px-3 py-2 text-left text-xs focus:outline-none ${index === activeIndex ? 'bg-slate-100' : 'hover:bg-slate-50 focus:bg-slate-50'}`}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => selectOption(option)}
+                  >
+                    <span className="font-mono text-slate-700">{option.code ?? option.id}</span>
+                    <span className="ml-2 text-slate-600">{option.name}</span>
+                  </button>
+                )) : (
+                  <div className="px-3 py-2 text-xs text-slate-400">ไม่พบสินค้า</div>
+                )}
+              </div>,
+              portalHost,
+            )
+          : null}
       </div>
     </FormField>
   )

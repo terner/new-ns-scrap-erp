@@ -70,8 +70,8 @@ export function BankReconciliationPageClient() {
         </select>
         <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" value={fromDate} onChange={setFromDate} />
         <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" value={toDate} onChange={setToDate} />
-        <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white opacity-60" disabled type="button">Import CSV</button>
-        <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm text-white opacity-60" disabled type="button">Auto Match</button>
+        <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white opacity-60" disabled type="button">นำเข้า CSV</button>
+        <button className="rounded-md bg-emerald-600 px-3 py-2 text-sm text-white opacity-60" disabled type="button">จับคู่อัตโนมัติ</button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

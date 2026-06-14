@@ -741,7 +741,7 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
           type="button"
           onClick={() => onStatusConvertReverse?.(refNo)}
         >
-          Reverse
+          ย้อนกลับ
         </button>
       )
     }
@@ -758,16 +758,16 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
             type="button"
             onClick={() => onConvertDetail?.(refNo)}
           >
-            Detail
+            รายละเอียด
           </button>
-          <button className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 opacity-60" disabled title="Cost allocation ถูกทำตอน Post แล้ว" type="button">Confirm Cost</button>
+          <button className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 opacity-60" disabled title="Cost allocation ถูกทำตอน Post แล้ว" type="button">ยืนยันต้นทุน</button>
           <button
             className="rounded-md bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
             disabled={status === 'reversed' || !onConvertReverse}
             type="button"
             onClick={() => onConvertReverse?.(refNo)}
           >
-            Reverse
+            ย้อนกลับ
           </button>
         </div>
       )
@@ -837,7 +837,7 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
             <div className="mt-1 text-xs text-slate-500">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800" disabled={isLoading} type="button" onClick={onExport}>CSV</button>
+            <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
             <button className="text-2xl text-slate-400 hover:text-slate-700" type="button" onClick={onClose}>&times;</button>
           </div>
         </div>

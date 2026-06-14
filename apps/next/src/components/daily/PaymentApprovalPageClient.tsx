@@ -742,7 +742,7 @@ export function PaymentApprovalPageClient() {
               🖨 พิมพ์ใบอนุมัติที่เลือก ({selectedRowIds.size})
             </Button>
           )}
-          {activeColumnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={activeColumnResize.resetColumnWidths}>Set col to default</Button> : null}
+          {activeColumnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={activeColumnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <Select aria-label="จำนวนรายการต่อหน้า" className="h-9 w-auto px-2 py-1" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
             {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
           </Select>

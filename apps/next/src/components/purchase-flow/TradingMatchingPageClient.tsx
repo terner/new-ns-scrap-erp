@@ -227,7 +227,7 @@ export function TradingMatchingPageClient() {
                       <td className="p-2 text-right text-emerald-700">{formatMoney(row.matchedSalesAmount)}</td>
                       <td className={`p-2 text-right font-bold ${row.grossProfit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>{formatMoney(row.grossProfit)}</td>
                       <td className="p-2 text-right">{row.grossProfitPct.toFixed(2)}%</td>
-                      <td className="whitespace-nowrap p-2 text-center"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => setSelectedDeal(row)}>Detail</button></td>
+                      <td className="whitespace-nowrap p-2 text-center"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => setSelectedDeal(row)}>รายละเอียด</button></td>
                     </tr>
                   ))}
                 </tbody>

@@ -2352,7 +2352,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         </div>
         {mode === 'stock-issue' ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">สถานะ:</span>
+            <span className="w-14 shrink-0 text-xs text-slate-500">สถานะ:</span>
             <Segment value="" current={filterMode} label="ทั้งหมด" onClick={setFilterMode} />
             <Segment value="pending" current={filterMode} label="⏰ Pending" onClick={setFilterMode} />
             <Segment value="converted" current={filterMode} label="✓ เปิดบิลแล้ว" onClick={setFilterMode} />
@@ -2361,7 +2361,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         ) : null}
         {mode === 'purchase' || mode === 'sales' ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">ประเภท:</span>
+            <span className="w-14 shrink-0 text-xs text-slate-500">ประเภท:</span>
             <Segment value="" current={filterMode} label="ทุกประเภท" onClick={setFilterMode} />
             <Segment value="STOCK" current={filterMode} label="📦 STOCK" onClick={setFilterMode} />
             <Segment value="TRADING" current={filterMode} label="🔄 TRADING" onClick={setFilterMode} />
@@ -2369,7 +2369,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         ) : null}
         {mode === 'purchase' || mode === 'sales' ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">สถานะ:</span>
+            <span className="w-14 shrink-0 text-xs text-slate-500">สถานะ:</span>
             {statusOptions.map((option) => (
               <SegmentMulti key={option.label} current={statusFilter} label={option.label} onClick={setStatusFilter} values={option.values} />
             ))}
@@ -3339,7 +3339,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       {showStockIssueForm && mode === 'stock-issue' ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
           <div className="mx-auto my-4 flex max-h-[94vh] max-w-4xl flex-col rounded-md bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-md border-b border-black bg-slate-900 px-6 py-4 text-white">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-md bg-slate-900 px-6 py-4 text-white">
               <div>
                 <h3 className="text-xl font-bold">{editingStockIssueDocNo ? `แก้ไขเบิกออกรอบิล ${editingStockIssueDocNo}` : 'เบิกออกรอบิล'}</h3>
                 <p className="mt-1 text-xs opacity-80">เลือกใบส่งของ WTO เพื่อบันทึก PSALE และตัด stock ทันที</p>
@@ -3422,7 +3422,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <textarea className="w-full rounded-md border px-3 py-2" rows={2} value={stockIssueForm.note} onChange={(event) => setStockIssueForm((current) => ({ ...current, note: event.target.value }))} />
               </Field>
             </div>
-            <div className="sticky bottom-0 flex justify-end gap-3 border-t bg-white px-6 py-4">
+            <div className="sticky bottom-0 flex justify-end gap-3 bg-white px-6 py-4">
               <Button disabled={isSaving} type="button" variant="secondary" onClick={() => { setEditingStockIssueDocNo(null); setShowStockIssueForm(false) }}>ยกเลิก</Button>
               <Button className="bg-slate-900 hover:bg-slate-800 text-white" disabled={isSaving || !selectedStockIssueDelivery} type="button" onClick={() => void saveStockIssue()}>{isSaving ? 'กำลังบันทึก...' : editingStockIssueDocNo ? 'บันทึกการแก้ไข' : 'บันทึก + ตัด Stock'}</Button>
             </div>
@@ -4474,7 +4474,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function Segment({ current, label, onClick, value }: { current: string; label: string; onClick: (value: string) => void; value: string }) {
   const active = current === value
-  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`} type="button" onClick={() => onClick(value)}>{label}</button>
+  return <button className={`inline-flex h-7 items-center justify-center rounded-md border px-3 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`} type="button" onClick={() => onClick(value)}>{label}</button>
 }
 
 function SegmentMulti({
@@ -4493,7 +4493,7 @@ function SegmentMulti({
     : values.every((value) => current.includes(value))
   return (
     <button
-      className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+      className={`inline-flex h-7 items-center justify-center rounded-md border px-3 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
       type="button"
       onClick={() => {
         if (values.length === 0) {

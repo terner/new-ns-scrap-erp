@@ -1639,7 +1639,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <div>พบทั้งหมด {filteredSummary.count} รายการ</div>
             <div className="flex flex-wrap items-center gap-2">
-              {columnResize.hasCustomWidths ? <Button className="h-9" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+              {columnResize.hasCustomWidths ? <Button className="h-9" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
               <select className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
                 {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
               </select>

@@ -510,7 +510,7 @@ export function WeightTicketListPageClient() {
       <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
         <div>{summaryText}</div>
         <div className="flex items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="xs" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+          {columnResize.hasCustomWidths ? <Button size="xs" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
           <span>หน้า {safePage} / {totalPages}</span>
           <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>

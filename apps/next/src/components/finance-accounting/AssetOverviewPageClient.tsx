@@ -74,7 +74,7 @@ export function AssetOverviewPageClient() {
             <option value="ALL">ทุกสาขา</option>
             {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
-          <button className="rounded-md bg-[#1f2c4a] px-3 py-2 text-sm text-white opacity-60" disabled type="button">Export</button>
+          <button className="rounded-md bg-[#1f2c4a] px-3 py-2 text-sm text-white opacity-60" disabled type="button">ส่งออก</button>
         </div>
       </div>
 
