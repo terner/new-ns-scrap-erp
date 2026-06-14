@@ -12,6 +12,7 @@ import { prisma } from '@/lib/server/prisma'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
 import { activeSalesReceiptCountByBillId, salesBillCancelState } from '@/lib/server/sales-bill-cancel-policy'
 import { appendSalesBillStatusLog, SALES_BILL_STATUS_ACTION } from '@/lib/server/sales-bill-history'
+import { salesBillLineFactsForBills, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
 import { appendStockIssueStatusLog, STOCK_ISSUE_STATUS_ACTION } from '@/lib/server/stock-issue-history'
 import { consumeActiveWtoStockHolds, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
@@ -1054,32 +1055,43 @@ async function salesOptionsPayload() {
   }
 }
 
-function buildWorkbook(rows: ReturnType<typeof billJson>[]) {
+function buildLineWorkbook(rows: SalesBillLineFactRow[]) {
   const dataRows = rows.map((row) => ({
     'เลขที่': row.docNo,
-    'เลขที่อ้างอิง': row.refNo,
-    'วันที่': row.date,
+    'วันที่': row.dateText,
     'ลูกค้า': row.customerName,
-    'สาขา/คลัง': row.warehouseName,
+    'สาขา': row.branchName,
+    'คลัง': row.warehouseName,
     'ประเภท': row.transactionMode,
-    'สถานะ': row.status,
-    'จำนวนรายการ': row.itemCount,
-    'ยอดรวม': row.totalAmount,
-    'รับแล้ว': row.receivedAmount,
-    'ค้างรับ': row.receivableBalance,
-    'Gross Profit': row.grossProfit,
-    'อัพเดตโดย': row.updatedBy || row.createdBy,
-    'อัพเดตเมื่อ': row.updatedAt || row.createdAt,
+    'สถานะบิล': row.status,
+    'บรรทัด': row.lineNo,
+    'สถานะบรรทัด': row.lineStatus,
+    'รหัสสินค้า': row.productCode,
+    'สินค้า': row.productName,
+    'หน่วย': row.unit,
+    'Gross': row.grossWeight,
+    'Net/Qty': row.qty,
+    'ราคา/หน่วย': row.unitPrice,
+    'ส่วนลด': row.discountAmount,
+    'ยอดขาย': row.lineAmount,
+    'Matched COGS': row.matchedCogs,
+    'GP': row.gp,
+    'Source Type': row.sourceType,
+    'Source Doc': row.sourceDocNo,
+    'PO Sell': row.poSellDocNo,
+    'Allocation': row.allocationType,
   }))
   const workbook = XLSX.utils.book_new()
   const sheet = XLSX.utils.json_to_sheet(dataRows)
   sheet['!cols'] = [
-    { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 28 }, { wch: 22 },
-    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
-    { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
+    { wch: 16 }, { wch: 12 }, { wch: 28 }, { wch: 18 }, { wch: 18 },
+    { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 14 }, { wch: 14 },
+    { wch: 28 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+    { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 },
+    { wch: 18 }, { wch: 18 }, { wch: 14 },
   ]
-  applyWorksheetTableLayout(sheet, 14, dataRows.length + 1)
-  XLSX.utils.book_append_sheet(workbook, sheet, 'บิลขาย')
+  applyWorksheetTableLayout(sheet, 23, dataRows.length + 1)
+  XLSX.utils.book_append_sheet(workbook, sheet, 'บิลขายรายบรรทัด')
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer
 }
 
@@ -1116,7 +1128,7 @@ export async function GET(request: Request) {
     const jsonRows = rows.map((row) => billJson(row, activeReceiptCountByBillId.get(row.id) ?? 0, lineCountByBillId.get(row.id)))
 
     if (url.searchParams.get('format') === 'xlsx') {
-      const body = buildWorkbook(jsonRows)
+      const body = buildLineWorkbook(await salesBillLineFactsForBills(billIds, { lineStatuses: ['active', 'cancelled'], tradingStatuses: ['active', 'cancelled'] }))
       const filename = `sales_bills_${new Date().toISOString().slice(0, 10)}.xlsx`
 
       return new NextResponse(new Uint8Array(body), {

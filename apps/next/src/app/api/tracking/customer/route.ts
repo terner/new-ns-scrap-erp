@@ -6,60 +6,10 @@ import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requ
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
+import { salesBillLineFactsByBillId, salesBillLineFactTotals } from '@/lib/server/sales-bill-line-facts'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 
 export const runtime = 'nodejs'
-
-type SalesItem = {
-  amount?: number | string
-  cogs?: number | string
-  code?: string
-  displayName?: string
-  grossProfit?: number | string
-  netAmount?: number | string
-  netWeight?: number | string
-  productCode?: string
-  productName?: string
-  profit?: number | string
-  qty?: number | string
-  total?: number | string
-  totalCost?: number | string
-  total_cost?: number | string
-  unitCost?: number | string
-  weight?: number | string
-}
-
-function jsonNumber(value: unknown) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
-  if (typeof value === 'string') {
-    const parsed = Number(value.replace(/,/g, ''))
-    return Number.isFinite(parsed) ? parsed : 0
-  }
-  return 0
-}
-
-function itemTotals(items: unknown): { amount: number; qty: number } {
-  if (!Array.isArray(items)) return { amount: 0, qty: 0 }
-  let amount = 0
-  let qty = 0
-  items
-    .filter((item): item is SalesItem => typeof item === 'object' && item !== null)
-    .forEach((item) => {
-      amount += jsonNumber(item.netAmount ?? item.amount ?? item.total)
-      qty += jsonNumber(item.netWeight ?? item.weight ?? item.qty)
-    })
-  return { amount, qty }
-}
-
-function itemCost(item: SalesItem) {
-  const cost = jsonNumber(item.totalCost ?? item.total_cost ?? item.cogs)
-  if (cost) return cost
-  return jsonNumber(item.netWeight ?? item.weight ?? item.qty) * jsonNumber(item.unitCost)
-}
-
-function itemProductName(item: SalesItem) {
-  return item.productName ?? item.displayName ?? item.productCode ?? item.code ?? 'ไม่ระบุสินค้า'
-}
 
 function inYearMonth(date: Date, year: string | null, month: string | null) {
   const value = toDateOnly(date)
@@ -119,6 +69,8 @@ export async function GET(request: Request) {
         where: { NOT: { status: 'cancelled' }, ...(customer ? { customer_id: customer.id } : {}) },
       }),
     ])
+    const linesByBillId = await salesBillLineFactsByBillId(bills.map((bill) => bill.id))
+    const billLineTotals = (billId: bigint) => salesBillLineFactTotals(linesByBillId.get(billId))
 
     const receivedByBill = new Map<bigint, number>()
     receipts.forEach((receipt) => {
@@ -131,8 +83,8 @@ export async function GET(request: Request) {
       const customerBills = bills.filter((bill) => bill.customer_id === customer.id && inYearMonth(bill.date, year, month))
       const customerReceipts = receipts.filter((receipt) => receipt.customer_id === customer.id && inYearMonth(receipt.date, year, month))
       const totals = customerBills.reduce((sum, bill) => {
-        const item = itemTotals(bill.items)
-        const revenue = item.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+        const lineTotals = billLineTotals(bill.id)
+        const revenue = lineTotals.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
         const received = receivedByBill.get(bill.id) ?? toNumber(bill.received_amount)
         const cogs = toNumber(bill.cogs_amount ?? bill.total_cost)
         const gp = toNumber(bill.gross_profit) || revenue - cogs
@@ -144,7 +96,7 @@ export async function GET(request: Request) {
           lowMarginBillCount: sum.lowMarginBillCount + (revenue > 0 && gp / revenue < 0.05 ? 1 : 0),
           negativeMarginBillCount: sum.negativeMarginBillCount + (gp < 0 ? 1 : 0),
           pendingArBillCount: sum.pendingArBillCount + (receivable > 0 ? 1 : 0),
-          qty: sum.qty + item.qty,
+          qty: sum.qty + lineTotals.qty,
           receivable: sum.receivable + receivable,
           revenue: sum.revenue + revenue,
         }
@@ -181,12 +133,12 @@ export async function GET(request: Request) {
       const monthKey = String(index + 1).padStart(2, '0')
       const monthBills = bills.filter((bill) => inYearMonth(bill.date, year, monthKey))
       return monthBills.reduce<{ gp: number; month: string; qty: number; revenue: number }>((sum, bill) => {
-        const item = itemTotals(bill.items)
-        const revenue = item.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+        const lineTotals = billLineTotals(bill.id)
+        const revenue = lineTotals.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
         return {
           gp: sum.gp + (toNumber(bill.gross_profit) || revenue - toNumber(bill.cogs_amount ?? bill.total_cost)),
           month: monthKey,
-          qty: sum.qty + item.qty,
+          qty: sum.qty + lineTotals.qty,
           revenue: sum.revenue + revenue,
         }
       }, { gp: 0, month: monthKey, qty: 0, revenue: 0 })
@@ -201,7 +153,8 @@ export async function GET(request: Request) {
       const productMap = new Map<string, { cogs: number; gp: number; productName: string; qty: number; revenue: number }>()
 
       detailBills.forEach((bill) => {
-        const billItem = itemTotals(bill.items)
+        const lines = linesByBillId.get(bill.id) ?? []
+        const billItem = salesBillLineFactTotals(lines)
         const billRevenue = billItem.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
         const billCogs = toNumber(bill.cogs_amount ?? bill.total_cost)
         const billGp = toNumber(bill.gross_profit) || billRevenue - billCogs
@@ -213,26 +166,19 @@ export async function GET(request: Request) {
         channel.qty += billItem.qty
         channel.revenue += billRevenue
         channelMap.set(channelName, channel)
-        if (!Array.isArray(bill.items)) return
-        bill.items
-          .filter((item): item is SalesItem => typeof item === 'object' && item !== null)
-          .forEach((item) => {
-            const productName = itemProductName(item)
-            const revenue = jsonNumber(item.netAmount ?? item.amount ?? item.total)
-            const qty = jsonNumber(item.netWeight ?? item.weight ?? item.qty)
-            const cogs = itemCost(item)
-            const gp = jsonNumber(item.profit ?? item.grossProfit) || revenue - cogs
-            const current = productMap.get(productName) ?? { cogs: 0, gp: 0, productName, qty: 0, revenue: 0 }
-            current.cogs += cogs
-            current.gp += gp
-            current.qty += qty
-            current.revenue += revenue
-            productMap.set(productName, current)
-          })
+        lines.forEach((line) => {
+          const productName = line.productName
+          const current = productMap.get(productName) ?? { cogs: 0, gp: 0, productName, qty: 0, revenue: 0 }
+          current.cogs += line.cogs
+          current.gp += line.gp
+          current.qty += line.qty
+          current.revenue += line.lineAmount
+          productMap.set(productName, current)
+        })
       })
       const detailTotals = detailBills.reduce((sum, bill) => {
-        const item = itemTotals(bill.items)
-        const revenue = item.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+        const lineTotals = billLineTotals(bill.id)
+        const revenue = lineTotals.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
         const received = receivedByBill.get(bill.id) ?? toNumber(bill.received_amount)
         const receivable = Math.max(0, toNumber(bill.receivable_balance) || toNumber(bill.total_amount) - received)
         const cogs = toNumber(bill.cogs_amount ?? bill.total_cost)
@@ -250,8 +196,8 @@ export async function GET(request: Request) {
 
       return {
         bills: detailBills.slice(0, 50).map((bill) => {
-          const item = itemTotals(bill.items)
-          const revenue = item.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+          const lineTotals = billLineTotals(bill.id)
+          const revenue = lineTotals.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
           const received = receivedByBill.get(bill.id) ?? toNumber(bill.received_amount)
           const cogs = toNumber(bill.cogs_amount ?? bill.total_cost)
           const gp = toNumber(bill.gross_profit) || revenue - cogs
@@ -262,7 +208,7 @@ export async function GET(request: Request) {
             docNo: bill.doc_no,
             gp,
             href: `/sales/bills/${encodeURIComponent(bill.doc_no)}`,
-            qty: item.qty,
+            qty: lineTotals.qty,
             receivable: Math.max(0, toNumber(bill.receivable_balance) || toNumber(bill.total_amount) - received),
             received,
             revenue,
@@ -289,15 +235,15 @@ export async function GET(request: Request) {
             receivedAmount: number
             revenue: number
           }>((sum, bill) => {
-            const item = itemTotals(bill.items)
-            const revenue = item.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+            const lineTotals = billLineTotals(bill.id)
+            const revenue = lineTotals.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
             const received = receivedByBill.get(bill.id) ?? toNumber(bill.received_amount)
             const cogs = toNumber(bill.cogs_amount ?? bill.total_cost)
             return {
               billCount: sum.billCount + 1,
               gp: sum.gp + (toNumber(bill.gross_profit) || revenue - cogs),
               month: monthKey,
-              qty: sum.qty + item.qty,
+              qty: sum.qty + lineTotals.qty,
               receivable: sum.receivable + Math.max(0, toNumber(bill.receivable_balance) || toNumber(bill.total_amount) - received),
               receiptCount: monthReceipts.length,
               receivedAmount,
