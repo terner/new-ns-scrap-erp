@@ -11,7 +11,7 @@ tags:
   - page-flow
 status: draft
 created: 2026-06-10
-updated: 2026-06-12
+updated: 2026-06-14
 ---
 
 # Sales Bills Page Flow / Flow หน้า `/sales/bills`
@@ -38,14 +38,71 @@ updated: 2026-06-12
 
 ## Current Runtime Assessment
 
-ตรวจจาก current code ณ 2026-06-12:
+ตรวจจาก current code ณ 2026-06-14:
 
 - `GET /api/sales/bills` โหลด list/source options และส่ง `WTO` source เฉพาะสถานะ `delivered` สำหรับบิลขาย STOCK ใหม่
 - `POST /api/sales/bills` create path ทำงานครบสำหรับ `STOCK` baseline: สร้าง `SB`, consume active `WTO` hold, เขียน `stock_ledger.ref_type = SB`, append `weight_ticket_usage_logs`, update `WTO` เป็น `billed`, และ update `PO Sell` remaining/status
 - `GET /api/sales/bills/[id]` เป็น detail/read model เท่านั้น
 - `PATCH /api/sales/bills/[id]` action `cancel` เพิ่มแล้วสำหรับ `STOCK` SB ที่ยังไม่มี active receipt: block active `RCP`, reopen consumed `WTO` hold, เขียน `stock_ledger.ref_type = SB-CANCEL`, append `released_from_sales_bill`, คืน `WTO` เป็น `delivered`, reverse `PO Sell` usage, mark `SB` เป็น `cancelled`, และ append `sales_bill_status_logs`
-- UI ปุ่มยกเลิกของบิลขายยัง disabled จนกว่าจะทำ browser QA และ receipt-lock UX
-- current allocation ยังพึ่ง sales-bill item JSON + weight-ticket usage logs เป็นหลัก ยังไม่มี dedicated current allocation tables สำหรับ `WTO -> SB`, `SB -> PO Sell`, `SB -> Spot Sale`, และ `Customer advance -> SB`
+- UI ปุ่มยกเลิกของบิลขายเปิดใช้แล้วสำหรับ row ที่ server ส่ง `canCancel = true`; browser QA ผ่านสำหรับ WTO-backed Stock SB cancel และ PO Sell outstanding reversal
+- `TRADING` SB มี row-level Trading Cost Source, `trading_allocation_facts`, allocation-only correction API/UI, และ browser QA ผ่านแล้วสำหรับ multi-line source correction โดยไม่เขียน stock ledger
+- new SB create/cancel write-path now records dedicated allocation facts for `WTO/PSALE -> SB`, `SB -> PO Sell/Spot Sale`, and `Customer advance -> SB`; Stock SB detail/print/export still read mostly from `sales_bills.items` snapshots until reconciliation/backfill policy is defined
+
+## Target Durable Allocation Contract
+
+เป้าหมายก่อนเปิด full edit/correction ของ `STOCK` SB คือแยก fact ที่อ่านซ้ำได้จาก `sales_bills.items` JSON ออกมาเป็น table ชัดเจน โดยไม่ทำ runtime fallback จาก JSON ถ้า fact ขาด ต้อง reject write หรือแสดง reconciliation gap ให้แก้ data/write path. Migration/write-path สำหรับบิลใหม่มีแล้ว; read-model normalization/backfill สำหรับบิลเก่ายังเป็นงานถัดไป
+
+### Owner Boundary
+
+| Area | Owner table | Rule |
+|---|---|---|
+| SB header / AR | `sales_bills` | เก็บ doc no, customer, branch, totals, receipt balance, status |
+| SB line snapshot | `sales_bill_lines` target | 1 row ต่อ business line; เก็บ product, gross/deduct/net/billed qty, unit price, discount, VAT basis, line total |
+| Physical stock-out | `stock_ledger` + `stock_holds` | เขียนเฉพาะเมื่อ SB เป็น movement owner; `PSALE` source ห้ามเขียน SB stock-out ซ้ำ |
+| WTO source usage | `sales_bill_source_allocations` target + `weight_ticket_usage_logs` audit | ระบุว่า SB line ใช้ WTO summary/line ไหน จำนวนเท่าไร และ reversal status |
+| PSALE source usage | `sales_bill_source_allocations` target + `stock_issue_status_logs` audit | ระบุว่า SB ใช้ PSALE ไหน; cancel SB ต้อง reverse owner เดิมด้วย `PSALE-CANCEL` |
+| PO Sell commitment | `sales_bill_po_sell_allocations` target | ระบุ SB line -> PO Sell line หรือ `SPOT_SALE`; ใช้คืน remaining ตอน cancel |
+| Customer advance | `sales_bill_customer_advance_allocations` target | ระบุ SB -> customer advance fact; ใช้ release/recalculate ตอน cancel/correction |
+| Trading cost | `trading_allocation_facts` | มีแล้วสำหรับ Trading PB/manual Cost Source; ใช้แทน Stock allocation tables |
+
+### Target Tables
+
+| Table | Key columns | Required rule |
+|---|---|---|
+| `sales_bill_lines` | `sales_bill_id`, `line_no`, `product_id`, `qty`, `gross_weight`, `deduct_weight`, `net_weight`, `unit_price`, `discount_amount`, `line_amount`, `vat_amount`, `status` | เป็น source หลักของ detail/print/export; `sales_bills.items` คงได้เฉพาะ compatibility snapshot ระหว่าง migration |
+| `sales_bill_source_allocations` | `sales_bill_id`, `sales_line_no`, `source_type`, `source_doc_no`, `source_line_no`, `product_id`, `allocated_qty`, `movement_owner`, `stock_ledger_ref_type`, `status` | `source_type` = `WTO`, `PSALE`, `DIRECT_STOCK`; `movement_owner` = `SALES_BILL` หรือ `PSALE`; cancel ต้อง mark `cancelled/reversed` ไม่ลบ |
+| `sales_bill_po_sell_allocations` | `sales_bill_id`, `sales_line_no`, `po_sell_id`, `po_sell_line_no`, `allocation_type`, `product_id`, `allocated_qty`, `unit_price`, `allocated_amount`, `status` | `allocation_type` = `PO_SELL` หรือ `SPOT_SALE`; `PO_SELL` ต้อง validate customer/branch/product/remaining ใน transaction |
+| `sales_bill_customer_advance_allocations` | `sales_bill_id`, `customer_advance_doc_no`, `customer_id`, `allocated_amount`, `outstanding_before`, `outstanding_after`, `status` | ต้อง block over-allocation จาก active allocation facts และ release แบบ append/update status ใน transaction เดียวกับ SB cancel/correction |
+
+Index minimum:
+
+- `sales_bill_lines(sales_bill_id, line_no)` unique
+- `sales_bill_source_allocations(sales_bill_id, sales_line_no, status)`
+- `sales_bill_source_allocations(source_type, source_doc_no, status)`
+- `sales_bill_po_sell_allocations(po_sell_id, status)`
+- `sales_bill_po_sell_allocations(sales_bill_id, sales_line_no, status)`
+- `sales_bill_customer_advance_allocations(customer_advance_doc_no, status)`
+- `sales_bill_customer_advance_allocations(sales_bill_id, customer_advance_doc_no) where status = active` unique
+
+### API Rules
+
+`POST /api/sales/bills`:
+
+- Validate source facts first: WTO/PSALE/direct stock/Trading mode cannot be mixed silently.
+- Create header, line facts, source allocations, PO Sell/Spot allocations, customer advance allocations, stock ledger/hold changes, and status logs in one transaction.
+- For `STOCK`, reject if source allocation does not cover every stock line exactly.
+- For `TRADING`, continue using `trading_allocation_facts`; do not write stock allocation or stock ledger.
+
+`GET /api/sales/bills` and `GET /api/sales/bills/{docNo}`:
+
+- Detail, print, export, dashboard, and tracking must read normalized line/allocation facts once implemented.
+- If a legacy SB has no normalized facts, show a migration/reconciliation signal; do not invent source labels, COGS, PO Sell usage, or customer advance from stale JSON.
+
+`PATCH /api/sales/bills/{docNo}`:
+
+- `action = cancel`: mark active allocations cancelled/reversed, append stock/PSALE reversal where the movement owner requires it, restore PO Sell/customer advance remaining, append status logs.
+- `action = correct_*`: allowed only after the relevant allocation facts exist; correction reverses old active facts and appends corrected facts.
+- Full in-place edit remains disabled until the durable tables above exist and browser QA covers create -> cancel -> correction -> receipt-lock.
 
 ## Canonical Create SB Flow
 
@@ -256,27 +313,27 @@ Design/API รายละเอียดอยู่ที่ [[Stock Ledger DB
 - [x] แสดง VAT/totals ตาม visual baseline ของ `PB`; ใน create form ใช้ checkbox `มี VAT` เป็น control เดียว ไม่แสดง selector `ไม่คิด VAT / VAT แยก / รวม VAT` ซ้ำ และวางช่องมัดจำก่อน `ส่วนลดท้ายบิล`
 - [x] เพิ่ม selector `รับเงินล่วงหน้า/มัดจำ Customer`
 - [x] คำนวณ `ยอดลูกหนี้สุทธิ = ยอดสุทธิ - มัดจำ Customer`
-- [ ] ย้าย Customer advance จาก interim snapshot marker ไป dedicated allocation fact table เมื่อ schema พร้อม
-- [ ] เพิ่ม release/recalculate Customer advance allocation เมื่อแก้/ยกเลิก `SB`
+- [x] ย้าย Customer advance availability/create path ไป dedicated `sales_bill_customer_advance_allocations` fact table; legacy snapshot markers ถูก backfill ด้วย migration
+- [x] เพิ่ม release/cancel Customer advance allocation เมื่อยกเลิก `SB`; full edit/recalculate ยังปิดไว้ตาม policy
 
 #### Batch SB-4: Write Model And Allocation Facts
 
 - [x] Runtime create `SB` บันทึก line snapshot จาก `WTO` และ line-level `poSellId`
 - [x] Runtime create ตัดยอด `PO Sell` ตาม line source และถือ line ที่ไม่เลือก PO เป็น `Spot Sale`
 - [x] Runtime create `SB Stock` consume active stock hold จาก `WTO` แล้วเพิ่ม stock-out ledger โดยอ้าง `WTO` และ intended warehouse; `WTO` ไม่ตัด stock เอง
-- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `WTO -> SB`
-- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `SB -> PO Sell`
-- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `SB -> Spot Sale`
-- [ ] ออกแบบ/เพิ่ม current allocation table สำหรับ `Customer advance -> SB`
-- [ ] เพิ่ม transaction-safe release/rebuild allocations ตอน edit/cancel `SB` รวมถึง reverse/reopen stock hold และ reverse stock ledger
-- [ ] เพิ่ม server-side validation ให้ยึด allocation facts/current tables แทนการอ่านเฉพาะ json snapshot
+- [x] ออกแบบ/เพิ่ม current allocation table สำหรับ `WTO/PSALE -> SB` และเขียน facts ตอน create/cancel สำหรับบิลใหม่
+- [x] ออกแบบ/เพิ่ม current allocation table สำหรับ `SB -> PO Sell`
+- [x] ออกแบบ/เพิ่ม current allocation table สำหรับ `SB -> Spot Sale`
+- [x] ออกแบบ/เพิ่ม current allocation table สำหรับ `Customer advance -> SB`
+- [x] เพิ่ม transaction-safe cancellation ของ active line/source/PO/customer-advance allocation facts; full edit/rebuild ยัง disabled
+- [ ] เพิ่ม server-side read/validation pass ให้ detail/print/export ยึด allocation facts/current tables แทนการอ่าน json snapshot
 
 #### Batch SB-5: Status And Timeline Logs
 
 - [x] ต่อ `weight_ticket_usage_logs` สำหรับ `WTO -> SB` allocate ตอน create
 - [ ] ต่อ `weight_ticket_usage_logs` สำหรับ `WTO -> SB` release/reverse ตอน edit/cancel
-- [ ] เพิ่ม `sales_bill_status_logs` สำหรับ create/edit/cancel/status transition
-- [ ] เพิ่ม `sales_bill_allocation_logs` สำหรับ `SB -> PO Sell`, `Spot Sale`, และ Customer advance
+- [x] เพิ่ม `sales_bill_status_logs` สำหรับ create/cancel และ Trading allocation correction; full edit/status transition อื่นยัง deferred
+- [ ] เพิ่ม dedicated timeline logs สำหรับ `SB -> PO Sell`, `Spot Sale`, และ Customer advance นอกเหนือจาก current allocation facts
 - [ ] เพิ่ม status/allocation logs ฝั่ง `PO Sell` เมื่อถูกตัดหรือ release จาก `SB`
 - [ ] ให้ detail/timeline ของ `WTO`, `PO Sell`, และ `SB` อ่านจาก dedicated logs ไม่ใช้ audit log รวมเป็น source of truth
 

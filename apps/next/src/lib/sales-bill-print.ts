@@ -61,6 +61,7 @@ function itemRows(bill: SalesBillDetail) {
       <td>
         <div class="item-name">${escapeHtml(item.productName)}</div>
         <div class="muted">${escapeHtml([item.productCode || item.productId || null, item.sourceLabel || item.sourceType].filter(Boolean).join(' · '))}</div>
+        ${item.matchedCogs > 0 ? `<div class="muted">Matched COGS ${money(item.matchedCogs)}</div>` : ''}
         ${item.note ? `<div class="muted">${escapeHtml(item.note)}</div>` : ''}
       </td>
       <td class="num">${money(item.grossWeight)}</td>

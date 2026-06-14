@@ -533,7 +533,7 @@ Reporting rule:
 ### 6.2 Sales Prep
 
 - [ ] map `sales_bills.items jsonb`
-- [ ] design `sales_bill_lines`
+- [x] design `sales_bill_lines`
 - [x] Document canonical `/sales/bills` create flow before coding: `PO Sell -> WTO -> SB`, select WTO first, show WTO product lines, allocate to PO Sell, split excess as Spot Sale, remove free-text reference/truck fields, reuse PB VAT/totals design, and add Customer advance/deposit section (`docs/notes/Sales Bills Page Flow.md`)
 - [x] `/sales/bills` create-form PB parity slice
   - [x] Customer search dropdown
@@ -553,7 +553,7 @@ Reporting rule:
   - [x] Customer advance/deposit selector and interim snapshot allocation marker
   - [x] per-document SB print with branch-specific Company Profile, A4 portrait, multi-page header/footer, Customer/document panels, VAT/totals, deposit, and receivable balance
   - [x] SB print item table no longer repeats WTO document number or vehicle registration
-- [ ] Design and implement durable `WTO -> Sales Bill` allocation tables/rules, including `sales bill -> WTO`, `sales bill -> PO Sell`, `sales bill -> Spot Sale`, and Customer advance allocation/release
+- [x] Design and implement durable `WTO/PSALE -> Sales Bill` allocation tables/write rules for new create/cancel, including `sales bill -> source`, `sales bill -> PO Sell`, `sales bill -> Spot Sale`, and Customer advance allocation/release
   - [x] Batch WTO-A schema/API foundation
     - [x] add `weight_ticket_lines.warehouse_id` for WTO intended stock location
     - [x] add durable `stock_holds` table with `active/consumed/released/cancelled` status
@@ -569,12 +569,12 @@ Reporting rule:
     - [x] add `SB Stock` create flow consume-hold + stock-out ledger write by referencing WTO intended warehouse; WTI/WTO must not write stock ledger rows
     - [x] show stock balance as `คงเหลือจริง / จองไว้ / พร้อมส่ง` in `/stock/balance`
     - [x] show hold/consume context in SB create from WTO at baseline level
-    - [ ] transaction-safe release/rebuild on edit/cancel `SB`
-  - [ ] current allocation table for `WTO -> SB`
-  - [ ] current allocation table for `SB -> PO Sell`
-  - [ ] current allocation table for `SB -> Spot Sale`
-  - [ ] current allocation table for `Customer advance -> SB`
-  - [ ] server-side validation reads allocation facts/current tables, not only json snapshots
+    - [x] transaction-safe release/cancel on `SB`; full edit/rebuild remains disabled until read-model normalization is complete
+  - [x] current allocation table for `WTO/PSALE -> SB`
+  - [x] current allocation table for `SB -> PO Sell`
+  - [x] current allocation table for `SB -> Spot Sale`
+  - [x] current allocation table for `Customer advance -> SB`
+  - [ ] server-side detail/print/export reads allocation facts/current tables, not only json snapshots
 - [ ] Runtime status/usage cleanup after status decision
   - [x] WTI/WTO list filters use canonical target status only
   - [x] WTI has no target partial-billed status in new writes
@@ -584,8 +584,8 @@ Reporting rule:
 - [ ] Add sales-bill timeline/log coverage
   - [x] `weight_ticket_usage_logs` for `WTO -> SB` allocate on create
   - [ ] `weight_ticket_usage_logs` for `WTO -> SB` release/reverse on edit/cancel
-  - [ ] `sales_bill_status_logs`
-  - [ ] `sales_bill_allocation_logs`
+  - [x] `sales_bill_status_logs` for create/cancel and Trading allocation correction
+  - [ ] dedicated allocation timeline logs beyond current allocation facts
   - [ ] `PO Sell` allocation logs for billed/released quantity from `SB`
   - [ ] detail/timeline reads dedicated logs for `WTO`, `PO Sell`, and `SB`
 - [ ] Harden SB detail/print after allocation facts exist
@@ -602,8 +602,10 @@ Reporting rule:
   - [x] Add UI action for Trading SB allocation-only correction; full Sales Bill edit remains disabled until sales-side allocation tables are complete
   - [x] Add rollback-based automated verification for Trading SB allocation correction success, capacity guard, product mismatch guard, corrected COGS/GP, and no stock ledger side effect
   - [x] Add dashboard UI to create/list manual non-PB Trading Cost Source
-  - [ ] Logged-in browser QA Trading SB allocation correction: open `แก้ต้นทุน`, change multiple line sources, save, verify revised Matched COGS/GP, then reverse/cancel behavior
-- [ ] Define sales bill allocation tables/rules for `sales bill -> purchase bill`, `sales bill -> Trading spot`, and `sales bill -> PO Sell`; stock sales must use the separate Stock/WTO/PSALE flow
+  - [x] Logged-in browser QA Trading SB allocation correction: open `แก้ต้นทุน`, change multiple line sources, save, verify revised Matched COGS/GP, and confirm no stock ledger side effect
+- [x] Define sales bill allocation tables/rules for `sales bill -> WTO/PSALE/direct stock`, `sales bill -> PO Sell/Spot Sale`, and `Customer advance -> sales bill`; Trading cost continues through `trading_allocation_facts`
+- [x] Implement the durable Sales Bill allocation tables/write path after the design above: `sales_bill_lines`, `sales_bill_source_allocations`, `sales_bill_po_sell_allocations`, and `sales_bill_customer_advance_allocations`
+- [ ] Switch Stock SB detail/print/export read models from `sales_bills.items` snapshots to durable Sales Bill allocation facts after reconciliation/backfill policy is defined
 - [x] Implement `/sales/stock-issue` pending sale write flow from `docs/notes/Pending Sale Page Flow.md`
   - [x] create pending sale validates active WTO hold availability and writes `PSALE` stock-out ledger because goods physically leave before billing
   - [x] direct edit is intentionally disabled; pending PSALE corrections use cancel-and-recreate

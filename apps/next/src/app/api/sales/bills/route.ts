@@ -11,6 +11,7 @@ import { requireBusinessCode } from '@/lib/business-code'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
 import { activeSalesReceiptCountByBillId, salesBillCancelState } from '@/lib/server/sales-bill-cancel-policy'
+import { appendSalesBillStatusLog, SALES_BILL_STATUS_ACTION } from '@/lib/server/sales-bill-history'
 import { appendStockIssueStatusLog, STOCK_ISSUE_STATUS_ACTION } from '@/lib/server/stock-issue-history'
 import { consumeActiveWtoStockHolds, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
@@ -177,16 +178,6 @@ function calculateSalesTotals(values: SalesBillFormValues, vatRatePercent: numbe
   return { subtotal, totalAmount, vatAmount }
 }
 
-function customerAdvanceIdFromBillItems(items: Prisma.JsonValue | null | undefined) {
-  if (!Array.isArray(items)) return null
-  for (const item of items) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
-    const record = item as Record<string, unknown>
-    if (typeof record.customerAdvanceId === 'string' && record.customerAdvanceId) return record.customerAdvanceId
-  }
-  return null
-}
-
 function salesItems(
   values: SalesBillFormValues,
   parsedProductIds: bigint[],
@@ -232,6 +223,164 @@ function salesItems(
 }
 
 type SalesItemSnapshot = ReturnType<typeof salesItems>[number]
+
+function salesBillLineRows(input: {
+  actor: string
+  billId: bigint
+  createdAt: Date
+  items: SalesItemSnapshot[]
+  parsedProductIds: bigint[]
+  totals: ReturnType<typeof calculateSalesTotals>
+}) {
+  const taxableBasis = input.items.reduce((sum, item) => sum + Math.max(0, item.amount), 0)
+  return input.items.map((item, index) => ({
+    created_at: input.createdAt,
+    created_by: input.actor,
+    deduct_weight: item.deductWeight,
+    discount_amount: item.discount,
+    gross_weight: item.grossWeight,
+    line_amount: item.amount,
+    line_no: index + 1,
+    meta: {
+      deliveryLineId: item.deliveryLineId ?? null,
+      deliverySummaryId: item.deliverySummaryId ?? null,
+      tradingCostSourceId: item.tradingCostSourceId ?? null,
+    },
+    net_weight: item.netWeight,
+    notes: item.note || null,
+    product_code_snapshot: item.productCode,
+    product_id: input.parsedProductIds[index] ?? null,
+    product_name_snapshot: item.productName,
+    qty: item.qty,
+    sales_bill_id: input.billId,
+    status: 'active',
+    unit_price: item.unitPrice,
+    unit_snapshot: item.unit,
+    updated_at: input.createdAt,
+    updated_by: input.actor,
+    vat_amount: taxableBasis > 0 ? input.totals.vatAmount * (Math.max(0, item.amount) / taxableBasis) : 0,
+  }))
+}
+
+function poSellAllocationRows(input: {
+  actor: string
+  billId: bigint
+  createdAt: Date
+  headerPoSellDocNo?: string
+  items: SalesItemSnapshot[]
+  lineIdByLineNo: Map<number, bigint>
+  parsedProductIds: bigint[]
+  poSellByDocNo: Map<string, PoSellForAllocation>
+}) {
+  return input.items.map((item, index) => {
+    const lineNo = index + 1
+    const poSellDocNo = item.poSellId || input.headerPoSellDocNo || ''
+    const poSell = poSellDocNo ? input.poSellByDocNo.get(poSellDocNo) : null
+    const allocationType = poSell ? 'PO_SELL' : 'SPOT_SALE'
+    return {
+      allocated_amount: item.amount,
+      allocated_qty: item.qty,
+      allocation_type: allocationType,
+      created_at: input.createdAt,
+      created_by: input.actor,
+      meta: {
+        source: 'sales_bill_create',
+      },
+      po_sell_doc_no: poSell?.doc_no ?? null,
+      po_sell_id: poSell?.id ?? null,
+      po_sell_line_no: null,
+      product_code_snapshot: item.productCode,
+      product_id: input.parsedProductIds[index] ?? null,
+      product_name_snapshot: item.productName,
+      sales_bill_id: input.billId,
+      sales_bill_line_id: input.lineIdByLineNo.get(lineNo) ?? null,
+      sales_line_no: lineNo,
+      status: 'active',
+      unit_price: item.unitPrice,
+      updated_at: input.createdAt,
+      updated_by: input.actor,
+    }
+  })
+}
+
+function sourceAllocationRows(input: {
+  actor: string
+  billId: bigint
+  createdAt: Date
+  items: SalesItemSnapshot[]
+  lineIdByLineNo: Map<number, bigint>
+  parsedProductIds: bigint[]
+  sourceStockIssue: { doc_no: string; id: bigint } | null
+  stockDeliveryTicket: DeliveryTicketOptionRow | null
+}) {
+  if (input.sourceStockIssue) {
+    return input.items.map((item, index) => {
+      const lineNo = index + 1
+      return {
+        allocated_deduct_weight: item.deductWeight,
+        allocated_gross_weight: item.grossWeight,
+        allocated_net_weight: item.qty,
+        allocated_qty: item.qty,
+        created_at: input.createdAt,
+        created_by: input.actor,
+        meta: { source: 'sales_bill_create_from_psale' },
+        movement_owner: 'PSALE',
+        product_code_snapshot: item.productCode,
+        product_id: input.parsedProductIds[index] ?? null,
+        product_name_snapshot: item.productName,
+        sales_bill_id: input.billId,
+        sales_bill_line_id: input.lineIdByLineNo.get(lineNo) ?? null,
+        sales_line_no: lineNo,
+        source_doc_no: input.sourceStockIssue!.doc_no,
+        source_id: input.sourceStockIssue!.id,
+        source_line_no: null,
+        source_type: 'PSALE',
+        status: 'active',
+        stock_issue_id: input.sourceStockIssue!.id,
+        stock_ledger_ref_type: 'PSALE',
+        updated_at: input.createdAt,
+        updated_by: input.actor,
+        weight_ticket_id: null,
+      }
+    })
+  }
+
+  if (!input.stockDeliveryTicket) return []
+
+  return input.items.map((item, index) => {
+    const lineNo = index + 1
+    return {
+      allocated_deduct_weight: item.deductWeight,
+      allocated_gross_weight: item.grossWeight,
+      allocated_net_weight: item.qty,
+      allocated_qty: item.qty,
+      created_at: input.createdAt,
+      created_by: input.actor,
+      meta: {
+        deliveryLineId: item.deliveryLineId ?? null,
+        deliverySummaryId: item.deliverySummaryId ?? null,
+        source: 'sales_bill_create_from_wto',
+      },
+      movement_owner: 'SALES_BILL',
+      product_code_snapshot: item.productCode,
+      product_id: input.parsedProductIds[index] ?? null,
+      product_name_snapshot: item.productName,
+      sales_bill_id: input.billId,
+      sales_bill_line_id: input.lineIdByLineNo.get(lineNo) ?? null,
+      sales_line_no: lineNo,
+      source_doc_no: item.deliveryTicketDocNo || input.stockDeliveryTicket!.doc_no,
+      source_id: input.stockDeliveryTicket!.id,
+      source_line_no: lineNo,
+      source_type: 'WTO',
+      status: 'active',
+      stock_issue_id: null,
+      stock_ledger_ref_type: 'SB',
+      updated_at: input.createdAt,
+      updated_by: input.actor,
+      weight_ticket_id: input.stockDeliveryTicket!.id,
+    }
+  })
+}
 
 function parseTradingCostSourceId(sourceId: string) {
   const parts = sourceId.split(':')
@@ -595,7 +744,7 @@ async function validateStockDeliverySelection(
 }
 
 async function salesOptionsPayload() {
-  const [branches, customers, products, salesChannels, warehouses, vatRatePercent, deliveryTickets, poSellRows, tradingPurchaseBills, tradingManualCostSources, tradingAllocationFacts, customerAdvanceRows, salesBillsWithAdvance] = await Promise.all([
+  const [branches, customers, products, salesChannels, warehouses, vatRatePercent, deliveryTickets, poSellRows, tradingPurchaseBills, tradingManualCostSources, tradingAllocationFacts, customerAdvanceRows, customerAdvanceAllocations] = await Promise.all([
     prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.customers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
@@ -707,14 +856,13 @@ async function salesOptionsPayload() {
         ref_type: 'CADV',
       },
     }),
-    prisma.sales_bills.findMany({
+    prisma.sales_bill_customer_advance_allocations.findMany({
       select: {
-        items: true,
-        paid_amount: true,
-        status: true,
+        allocated_amount: true,
+        customer_advance_doc_no: true,
       },
       where: {
-        status: { notIn: ['cancelled', 'Cancelled', 'void', 'voided'] },
+        status: 'active',
       },
     }),
   ])
@@ -740,10 +888,11 @@ async function salesOptionsPayload() {
     matchedTradingCostBySource.set(sourceKey, current)
   })
   const customerAdvanceUsedById = new Map<string, number>()
-  salesBillsWithAdvance.forEach((bill) => {
-    const advanceId = customerAdvanceIdFromBillItems(bill.items)
-    if (!advanceId) return
-    customerAdvanceUsedById.set(advanceId, (customerAdvanceUsedById.get(advanceId) ?? 0) + toNumber(bill.paid_amount))
+  customerAdvanceAllocations.forEach((allocation) => {
+    customerAdvanceUsedById.set(
+      allocation.customer_advance_doc_no,
+      (customerAdvanceUsedById.get(allocation.customer_advance_doc_no) ?? 0) + toNumber(allocation.allocated_amount),
+    )
   })
 
   return {
@@ -1060,15 +1209,13 @@ export async function POST(request: Request) {
     if (selectedCustomerAdvance && selectedCustomerAdvance.ref_type !== 'CADV') return NextResponse.json({ code: 'BAD_REQUEST', error: 'เอกสารรับเงินล่วงหน้าไม่ถูกต้อง' }, { status: 400 })
     if (selectedCustomerAdvance && String(selectedCustomerAdvance.ref_id ?? '').trim() !== customer.code) return NextResponse.json({ code: 'BAD_REQUEST', error: 'เอกสารรับเงินล่วงหน้าต้องเป็นลูกค้าเดียวกับบิลขาย' }, { status: 400 })
     const customerAdvanceUsedAmount = selectedCustomerAdvance
-      ? (await prisma.sales_bills.findMany({
-          select: {
-            items: true,
-            paid_amount: true,
-          },
+      ? toNumber((await prisma.sales_bill_customer_advance_allocations.aggregate({
+          _sum: { allocated_amount: true },
           where: {
-            status: { notIn: ['cancelled', 'Cancelled', 'void', 'voided'] },
+            customer_advance_doc_no: selectedCustomerAdvance.doc_no,
+            status: 'active',
           },
-        })).reduce((sum, bill) => customerAdvanceIdFromBillItems(bill.items) === selectedCustomerAdvance.doc_no ? sum + toNumber(bill.paid_amount) : sum, 0)
+        }))._sum.allocated_amount)
       : 0
     const customerAdvanceAvailable = selectedCustomerAdvance
       ? Math.max(0, toNumber(selectedCustomerAdvance.amount_in) - customerAdvanceUsedAmount)
@@ -1409,6 +1556,88 @@ export async function POST(request: Request) {
         select: { doc_no: true, id: true },
       })
 
+      await tx.sales_bill_lines.createMany({
+        data: salesBillLineRows({
+          actor,
+          billId: createdBill.id,
+          createdAt,
+          items,
+          parsedProductIds: parsedProductIds as bigint[],
+          totals,
+        }),
+      })
+      const createdLines = await tx.sales_bill_lines.findMany({
+        select: { id: true, line_no: true },
+        where: { sales_bill_id: createdBill.id },
+      })
+      const lineIdByLineNo = new Map(createdLines.map((line) => [line.line_no, line.id] as const))
+
+      if (values.transactionMode === 'STOCK') {
+        const sourceRows = sourceAllocationRows({
+          actor,
+          billId: createdBill.id,
+          createdAt,
+          items,
+          lineIdByLineNo,
+          parsedProductIds: parsedProductIds as bigint[],
+          sourceStockIssue: sourceStockIssue ? { doc_no: sourceStockIssue.doc_no, id: sourceStockIssue.id } : null,
+          stockDeliveryTicket,
+        })
+        if (sourceRows.length) {
+          await tx.sales_bill_source_allocations.createMany({ data: sourceRows })
+        }
+      }
+
+      const poSellRows = poSellAllocationRows({
+        actor,
+        billId: createdBill.id,
+        createdAt,
+        headerPoSellDocNo: values.poSellId?.trim() || undefined,
+        items,
+        lineIdByLineNo,
+        parsedProductIds: parsedProductIds as bigint[],
+        poSellByDocNo,
+      })
+      if (poSellRows.length) {
+        await tx.sales_bill_po_sell_allocations.createMany({ data: poSellRows })
+      }
+
+      if (selectedCustomerAdvance && customerAdvanceApplied > 0) {
+        await tx.sales_bill_customer_advance_allocations.create({
+          data: {
+            allocated_amount: customerAdvanceApplied,
+            created_at: createdAt,
+            created_by: actor,
+            customer_advance_doc_no: selectedCustomerAdvance.doc_no,
+            customer_code_snapshot: customer.code,
+            customer_id: customer.id,
+            customer_name_snapshot: customer.name,
+            meta: { source: 'sales_bill_create' },
+            outstanding_after: Math.max(0, customerAdvanceAvailable - customerAdvanceApplied),
+            outstanding_before: customerAdvanceAvailable,
+            sales_bill_id: createdBill.id,
+            status: 'active',
+            updated_at: createdAt,
+            updated_by: actor,
+          },
+        })
+      }
+
+      await appendSalesBillStatusLog(tx, {
+        action: SALES_BILL_STATUS_ACTION.CREATED,
+        actor,
+        createdAt,
+        fromStatus: null,
+        meta: {
+          lineFactCount: items.length,
+          reason: 'sales_bill_create',
+          transactionMode: values.transactionMode,
+        },
+        note: values.note || null,
+        salesBillId: createdBill.id,
+        toStatus: 'unreceived',
+      })
+
       for (const [poSellDocNo, allocation] of poSellAllocations.entries()) {
         const poSell = poSellByDocNo.get(poSellDocNo)
         if (!poSell || 'error' in allocation) continue
@@ -1739,6 +1968,70 @@ export async function PATCH(request: Request) {
           sales_bill_id: bill.id,
           status: 'active',
         },
+      })
+
+      await Promise.all([
+        tx.sales_bill_lines.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${reason}`,
+            status: 'cancelled',
+            updated_at: createdAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+        tx.sales_bill_source_allocations.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${reason}`,
+            status: 'cancelled',
+            updated_at: createdAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+        tx.sales_bill_po_sell_allocations.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${reason}`,
+            status: 'cancelled',
+            updated_at: createdAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+        tx.sales_bill_customer_advance_allocations.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${reason}`,
+            status: 'cancelled',
+            updated_at: createdAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+      ])
+
+      await appendSalesBillStatusLog(tx, {
+        action: SALES_BILL_STATUS_ACTION.CANCELLED,
+        actor,
+        createdAt,
+        fromStatus: bill.status ?? null,
+        meta: {
+          reason: 'sales_bill_cancel',
+        },
+        note: reason,
+        salesBillId: bill.id,
+        toStatus: 'cancelled',
       })
 
       if (isStockBill) {

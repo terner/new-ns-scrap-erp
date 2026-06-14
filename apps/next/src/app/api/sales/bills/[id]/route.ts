@@ -355,6 +355,57 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         },
       })
 
+      await Promise.all([
+        tx.sales_bill_lines.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${values.note}`,
+            status: 'cancelled',
+            updated_at: cancelledAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+        tx.sales_bill_source_allocations.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${values.note}`,
+            status: 'cancelled',
+            updated_at: cancelledAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+        tx.sales_bill_po_sell_allocations.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${values.note}`,
+            status: 'cancelled',
+            updated_at: cancelledAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+        tx.sales_bill_customer_advance_allocations.updateMany({
+          data: {
+            notes: `Cancelled from Sales Bill ${bill.doc_no}: ${values.note}`,
+            status: 'cancelled',
+            updated_at: cancelledAt,
+            updated_by: actor,
+          },
+          where: {
+            sales_bill_id: bill.id,
+            status: 'active',
+          },
+        }),
+      ])
+
       const updated = await tx.sales_bills.update({
         data: {
           cancel_note: values.note,
