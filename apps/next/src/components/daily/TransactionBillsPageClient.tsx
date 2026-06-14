@@ -3210,7 +3210,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       {showStockIssueForm && mode === 'stock-issue' ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
           <div className="mx-auto my-4 flex max-h-[94vh] max-w-4xl flex-col rounded-md bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-md-t-md border-b bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-4 text-white">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-md border-b border-black bg-slate-900 px-6 py-4 text-white">
               <div>
                 <h3 className="text-xl font-bold">{editingStockIssueDocNo ? `แก้ไขเบิกออกรอบิล ${editingStockIssueDocNo}` : 'เบิกออกรอบิล'}</h3>
                 <p className="mt-1 text-xs opacity-80">เลือกใบส่งของ WTO เพื่อบันทึก PSALE และตัด stock ทันที</p>
@@ -3295,7 +3295,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             </div>
             <div className="sticky bottom-0 flex justify-end gap-3 border-t bg-white px-6 py-4">
               <Button disabled={isSaving} type="button" variant="secondary" onClick={() => { setEditingStockIssueDocNo(null); setShowStockIssueForm(false) }}>ยกเลิก</Button>
-              <Button className="bg-amber-600 hover:bg-amber-700" disabled={isSaving || !selectedStockIssueDelivery} type="button" onClick={() => void saveStockIssue()}>{isSaving ? 'กำลังบันทึก...' : editingStockIssueDocNo ? 'บันทึกการแก้ไข' : 'บันทึก + ตัด Stock'}</Button>
+              <Button className="bg-slate-900 hover:bg-slate-800 text-white" disabled={isSaving || !selectedStockIssueDelivery} type="button" onClick={() => void saveStockIssue()}>{isSaving ? 'กำลังบันทึก...' : editingStockIssueDocNo ? 'บันทึกการแก้ไข' : 'บันทึก + ตัด Stock'}</Button>
             </div>
           </div>
         </div>
