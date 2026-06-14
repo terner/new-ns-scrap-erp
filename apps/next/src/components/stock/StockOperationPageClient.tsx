@@ -807,6 +807,7 @@ function OperationTable({
                   </button>
                 </div>
               </div>
+            )
           }
 
           if (mode === 'status-convert') {
