@@ -521,7 +521,8 @@ export function StockTransferPageClient() {
                   <Button size="sm" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, { productId: '', qty: 0 }] }))}>+ เพิ่มรายการ</Button>
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
-                <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                {/* Desktop View (Table) */}
+                <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200 bg-white">
                   <table className="w-full min-w-[920px] text-sm">
                     <thead className="border-b border-slate-300/80 bg-slate-200/80">
                       <tr>
@@ -581,6 +582,92 @@ export function StockTransferPageClient() {
                       </tr>
                     </tfoot>
                   </table>
+                </div>
+
+                {/* Mobile View (Stacked Cards) */}
+                <div className="md:hidden space-y-3">
+                  {form.items.map((item, index) => {
+                    const source = sourceStockByProductId.get(item.productId)
+                    const lineValue = item.qty * (source?.sourceUnitCost ?? 0)
+                    return (
+                      <div key={index} className="rounded-lg border border-slate-200 p-4 space-y-3 relative bg-slate-50/50">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                          <span className="font-semibold text-slate-700 text-xs">รายการที่ {index + 1}</span>
+                          <Button
+                            disabled={form.items.length <= 1}
+                            size="xs"
+                            type="button"
+                            variant="outline"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 h-7 px-2.5"
+                            onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}
+                          >
+                            ลบ
+                          </Button>
+                        </div>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">สินค้า *</label>
+                            <SearchableProductField
+                              error={fieldErrors[`items.${index}.productId`]}
+                              errorKey={`items.${index}.productId`}
+                              options={productOptions}
+                              value={item.productId}
+                              onChange={(value) => updateItem(index, 'productId', value)}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">คงเหลือต้นทาง</span>
+                              <span className="text-xs font-medium text-slate-700 tabular-nums block bg-white border border-slate-200 rounded px-2.5 py-1.5 h-8 truncate">
+                                {source ? `${formatMoney(source.readyQty)} กก.` : '-'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">มูลค่า / กก.</span>
+                              <span className="text-xs font-medium text-slate-700 tabular-nums block bg-white border border-slate-200 rounded px-2.5 py-1.5 h-8 truncate">
+                                {source ? `${formatMoney(source.sourceUnitCost)} บ.` : '-'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">น้ำหนัก *</span>
+                              <InputField
+                                error={fieldErrors[`items.${index}.qty`]}
+                                errorKey={`items.${index}.qty`}
+                                inputClassName={`text-right tabular-nums h-8 text-xs ${numberInputClass}`}
+                                label="น้ำหนัก *"
+                                type="number"
+                                value={item.qty ? String(item.qty) : ''}
+                                onChange={(value) => updateItem(index, 'qty', Number(value || 0))}
+                                hideLabel={true}
+                              />
+                            </div>
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">มูลค่ารวม</span>
+                              <span className="text-xs font-bold text-emerald-700 tabular-nums block bg-white border border-slate-200 rounded px-2.5 py-1.5 h-8 truncate">
+                                {formatMoney(lineValue)} บ.
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Mobile Footer (Totals) */}
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs space-y-1.5 font-semibold">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-sans">น้ำหนักรวม:</span>
+                      <span className="text-blue-700 tabular-nums">{formatMoney(formTotalQty)} กก.</span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-200/60 pt-1.5">
+                      <span className="text-slate-500 font-sans">มูลค่ารวม:</span>
+                      <span className="text-emerald-700 tabular-nums">{formatMoney(formTotalValue)} บาท</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
