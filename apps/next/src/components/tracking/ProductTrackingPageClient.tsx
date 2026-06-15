@@ -95,10 +95,10 @@ type ProductTrackingPayload = {
 }
 
 type ProductTrackingDetail = {
-  allocationLines: Array<{ allocationNo: string; date: string; matchedCogs: number; method: string; qty: number; salesDocNo: string; sourceDocNo: string; sourceType: string; status: string }>
+  allocationLines: Array<{ allocationNo: string; date: string; matchedCogs: number; method: string; qty: number; salesDocHref: string | null; salesDocNo: string; sourceDocHref: string | null; sourceDocNo: string; sourceType: string; status: string }>
   monthly: Array<{ buyAmount: number; buyQty: number; gp: number; month: string; productionInputQty: number; productionLossQty: number; productionOutputQty: number; productionYieldPct: number; revenue: number; sellQty: number }>
-  product: { code: string; id: string; metalGroup: string | null; name: string; unit: string }
-  productionLines: Array<{ date: string; docNo: string; inputQty: number; lossQty: number; outputQty: number; status: string; yieldPct: number }>
+  product: { code: string; id: string; metalGroup: string | null; name: string; stockBalanceHref: string; unit: string }
+  productionLines: Array<{ date: string; docNo: string; href: string; inputQty: number; lossQty: number; outputQty: number; status: string; yieldPct: number }>
   productionSignals: { allocationCogs: number; allocationCount: number; allocationQty: number; inputQty: number; lossPct: number; lossQty: number; outputQty: number; productionOrderCount: number; yieldPct: number }
   purchaseLines: Array<{ amount: number; avgBuy: number; date: string; docNo: string; href: string; party: string; qty: number; status: string }>
   salesLines: Array<{ avgSell: number; cogs: number; date: string; docNo: string; gp: number; href: string; party: string; qty: number; revenue: number; status: string }>
@@ -109,20 +109,38 @@ type DetailCell = string | { href: string; label: string }
 const monthLabels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 
-export function ProductTrackingPageClient() {
+type ProductTrackingPageClientProps = {
+  initialCustomerId?: string
+  initialMetalGroup?: string
+  initialMonth?: string
+  initialProductId?: string
+  initialSearch?: string
+  initialSupplierId?: string
+  initialYear?: string
+}
+
+export function ProductTrackingPageClient({
+  initialCustomerId = '',
+  initialMetalGroup = '',
+  initialMonth = '',
+  initialProductId = '',
+  initialSearch = '',
+  initialSupplierId = '',
+  initialYear,
+}: ProductTrackingPageClientProps) {
   const [data, setData] = useState<ProductTrackingPayload | null>(null)
   const [detail, setDetail] = useState<ProductTrackingDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [customerId, setCustomerId] = useState('')
+  const [customerId, setCustomerId] = useState(initialCustomerId)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [metalGroup, setMetalGroup] = useState('')
-  const [month, setMonth] = useState('')
-  const [productId, setProductId] = useState('')
-  const [search, setSearch] = useState('')
-  const [supplierId, setSupplierId] = useState('')
+  const [metalGroup, setMetalGroup] = useState(initialMetalGroup)
+  const [month, setMonth] = useState(initialMonth)
+  const [productId, setProductId] = useState(initialProductId)
+  const [search, setSearch] = useState(initialSearch)
+  const [supplierId, setSupplierId] = useState(initialSupplierId)
   const [view, setView] = useState<'list' | 'top10' | 'yearCompare'>('list')
-  const [year, setYear] = useState(String(new Date().getFullYear()))
+  const [year, setYear] = useState(initialYear ?? String(new Date().getFullYear()))
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({ year })
@@ -157,7 +175,7 @@ export function ProductTrackingPageClient() {
     setDetail({
       allocationLines: [],
       monthly: [],
-      product: { code, id: code, metalGroup: row.metalGroup ?? null, name: row.name ?? row.productName ?? '-', unit: row.unit ?? 'kg' },
+      product: { code, id: code, metalGroup: row.metalGroup ?? null, name: row.name ?? row.productName ?? '-', stockBalanceHref: `/stock/balance?productId=${encodeURIComponent(code)}`, unit: row.unit ?? 'kg' },
       productionLines: [],
       productionSignals: {
         allocationCogs: row.allocationCogs ?? 0,
@@ -370,6 +388,13 @@ function ProductDetailDialog({ detail, isLoading, onOpenChange }: { detail: Prod
                   <SignalMetric label="Allocated COGS" value={formatMoney(detail.productionSignals.allocationCogs)} />
                 </div>
               </DetailSection>
+              <DetailSection title="Stock Support">
+                <div className="p-3">
+                  <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700" href={detail.product.stockBalanceHref}>
+                    เปิด Stock Balance
+                  </a>
+                </div>
+              </DetailSection>
               <DetailSection title="Purchase Lines">
                 <SimpleTable
                   headers={['วันที่', 'เอกสาร', 'Supplier', 'น้ำหนัก', 'ยอดซื้อ', 'ซื้อเฉลี่ย', 'สถานะ']}
@@ -391,13 +416,22 @@ function ProductDetailDialog({ detail, isLoading, onOpenChange }: { detail: Prod
               <DetailSection title="Production Lines">
                 <SimpleTable
                   headers={['วันที่', 'ใบสั่งผลิต', 'Input', 'Output', 'Loss', 'Yield', 'สถานะ']}
-                  rows={detail.productionLines.map((row) => [formatDateDisplay(row.date), row.docNo, formatMoney(row.inputQty), formatMoney(row.outputQty), formatMoney(row.lossQty), `${row.yieldPct.toFixed(1)}%`, row.status])}
+                  rows={detail.productionLines.map((row) => [formatDateDisplay(row.date), { href: row.href, label: row.docNo }, formatMoney(row.inputQty), formatMoney(row.outputQty), formatMoney(row.lossQty), `${row.yieldPct.toFixed(1)}%`, row.status])}
                 />
               </DetailSection>
               <DetailSection title="Allocation / Cost Source">
                 <SimpleTable
                   headers={['วันที่', 'Allocation', 'Source', 'Sales', 'Qty', 'Matched COGS', 'Method', 'สถานะ']}
-                  rows={detail.allocationLines.map((row) => [formatDateDisplay(row.date), row.allocationNo, row.sourceDocNo, row.salesDocNo, formatMoney(row.qty), formatMoney(row.matchedCogs), row.method, row.status])}
+                  rows={detail.allocationLines.map((row) => [
+                    formatDateDisplay(row.date),
+                    row.allocationNo,
+                    row.sourceDocHref ? { href: row.sourceDocHref, label: row.sourceDocNo } : row.sourceDocNo,
+                    row.salesDocHref ? { href: row.salesDocHref, label: row.salesDocNo } : row.salesDocNo,
+                    formatMoney(row.qty),
+                    formatMoney(row.matchedCogs),
+                    row.method,
+                    row.status,
+                  ])}
                 />
               </DetailSection>
             </>

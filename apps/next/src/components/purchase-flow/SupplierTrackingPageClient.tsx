@@ -7,6 +7,7 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
 type SupplierTrackingRow = {
+  agingBuckets: Array<{ amount: number; bucket: string; count: number }>
   avgBuy: number
   billCount: number
   code: string
@@ -14,6 +15,9 @@ type SupplierTrackingRow = {
   deductionPct: number
   gradeAdjustmentCount: number
   id: string
+  oldestApAgeDays: number
+  overdueApAmount: number
+  overdueApBillCount: number
   paidAmount: number
   paidPct: number
   payable: number
@@ -35,21 +39,25 @@ type SupplierTrackingPayload = {
 }
 
 type SupplierTrackingDetail = {
-  bills: Array<{ amount: number; avgBuy: number; date: string; docNo: string; href: string; paidAmount: number; payable: number; qty: number; status: string }>
-  gradeAdjustments: Array<{ date: string; docNo: string; qtyDiff: number; reason: string; status: string; valueDiff: number }>
+  bills: Array<{ ageBucket: string; ageDays: number; amount: number; avgBuy: number; date: string; docNo: string; dueDate: string; href: string; paidAmount: number; payable: number; qty: number; referenceDateType: string; status: string }>
+  gradeAdjustments: Array<{ date: string; docNo: string; href: string; qtyDiff: number; reason: string; status: string; valueDiff: number }>
   monthly: Array<{ billCount: number; month: string; paidAmount: number; payable: number; paymentCount: number; purchaseAmount: number; qty: number }>
-  payments: Array<{ amount: number; date: string; docNo: string; method: string; netAmount: number; status: string }>
+  payments: Array<{ amount: number; date: string; docNo: string; href: string; method: string; netAmount: number; status: string }>
   products: Array<{ amount: number; avgBuy: number; billCount: number; productName: string; qty: number }>
   qualitySignals: {
+    agingBuckets: Array<{ amount: number; bucket: string; count: number }>
     deliveryCompletionPct: number
     deductionPct: number
     gradeAdjustmentCount: number
+    oldestApAgeDays: number
+    overdueApAmount: number
+    overdueApBillCount: number
     paymentReliabilityPct: number
     returnSignalStatus: string
     wtiCount: number
   }
   supplier: { code: string; id: string; name: string }
-  weightTickets: Array<{ billedWeight: number; date: string; deductWeight: number; docNo: string; grossWeight: number; netWeight: number; remainingWeight: number; status: string }>
+  weightTickets: Array<{ billedWeight: number; date: string; deductWeight: number; docNo: string; grossWeight: number; href: string; netWeight: number; remainingWeight: number; status: string }>
 }
 
 type DetailCell = string | { href: string; label: string }
@@ -102,9 +110,13 @@ export function SupplierTrackingPageClient() {
       payments: [],
       products: [],
       qualitySignals: {
+        agingBuckets: row.agingBuckets,
         deliveryCompletionPct: row.deliveryCompletionPct,
         deductionPct: row.deductionPct,
         gradeAdjustmentCount: row.gradeAdjustmentCount,
+        oldestApAgeDays: row.oldestApAgeDays,
+        overdueApAmount: row.overdueApAmount,
+        overdueApBillCount: row.overdueApBillCount,
         paymentReliabilityPct: row.paidPct,
         returnSignalStatus: 'ยังไม่มี purchase return source table ใน schema ปัจจุบัน',
         wtiCount: row.wtiCount,
@@ -127,13 +139,11 @@ export function SupplierTrackingPageClient() {
 
   const rows = data?.rows ?? []
 
-  const topFive = rows.slice(0, 5)
   const topPurchase = [...rows].sort((left, right) => right.purchaseAmount - left.purchaseAmount).slice(0, 10)
   const topQty = [...rows].sort((left, right) => right.qty - left.qty).slice(0, 10)
   const cheapest = [...rows].filter((row) => row.avgBuy > 0).sort((left, right) => left.avgBuy - right.avgBuy).slice(0, 10)
   const expensive = [...rows].filter((row) => row.avgBuy > 0).sort((left, right) => right.avgBuy - left.avgBuy).slice(0, 10)
   const topPayable = [...rows].sort((left, right) => right.payable - left.payable).slice(0, 10)
-  const maxMonthAmount = Math.max(1, ...(data?.monthly ?? []).map((item) => item.amount))
   const exportHref = `/api/tracking/supplier?${queryString}&format=xlsx`
   const paidAmount = rows.reduce((sum, row) => sum + row.paidAmount, 0)
   const payable = rows.reduce((sum, row) => sum + row.payable, 0)
@@ -142,10 +152,12 @@ export function SupplierTrackingPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <SummaryCard color="blue" label="💰 ยอดซื้อรวม" value={formatMoney(rows.reduce((sum, row) => sum + row.purchaseAmount, 0))} />
-        <SummaryCard color="indigo" label="⚖️ น้ำหนักรวม" value={`${formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))} กก.`} />
-        <SummaryCard color="red" label="🏦 เจ้าหนี้ค้าง" value={formatMoney(payable)} />
+      <div className="grid grid-cols-2 gap-2.5 text-sm sm:gap-4 lg:grid-cols-5">
+        <SummaryCard icon="🏭" label="Supplier" tone="blue" value={`${data?.summary.suppliers ?? rows.length}`} />
+        <SummaryCard icon="⚖️" label="น้ำหนัก" tone="indigo" value={`${formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))} กก.`} />
+        <SummaryCard icon="💰" label="ยอดซื้อ" tone="blue" value={formatMoney(rows.reduce((sum, row) => sum + row.purchaseAmount, 0))} />
+        <SummaryCard icon="✅" label="จ่ายแล้ว" tone="emerald" value={formatMoney(paidAmount)} />
+        <SummaryCard className="col-span-2 lg:col-span-1" icon="🏦" label="เจ้าหนี้ค้าง" tone="red" value={formatMoney(payable)} />
       </div>
 
       <div className="rounded-md bg-white p-3 shadow">
@@ -161,28 +173,6 @@ export function SupplierTrackingPageClient() {
           </select>
           <input className="h-9 rounded-md border px-3 text-sm" placeholder="ค้นหา Supplier" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <a className="inline-flex h-9 items-center justify-center rounded-md bg-blue-700 px-4 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-md bg-white p-4 shadow lg:col-span-2">
-          <div className="mb-3 text-sm font-semibold text-slate-700">ยอดซื้อรายเดือน {data?.year ?? year}</div>
-          <div className="grid grid-cols-12 items-end gap-2">
-            {(data?.monthly ?? []).map((item, index) => (
-              <div key={item.month} className="flex min-h-40 flex-col items-center justify-end gap-1">
-                <div className="w-full rounded-md-t bg-blue-500" style={{ height: `${Math.max(4, (item.amount / maxMonthAmount) * 128)}px` }} />
-                <div className="text-[10px] text-slate-500">{monthLabels[index]}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-md bg-white p-4 shadow">
-          <div className="mb-3 text-sm font-bold text-slate-700">🏆 Top 5 Supplier</div>
-          <BarList rows={topFive.map((row) => ({ label: row.supplierName, value: row.purchaseAmount }))} />
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <MiniMetric label="จ่ายแล้ว" value={formatMoney(paidAmount)} />
-            <MiniMetric label="ค้างจ่าย" value={formatMoney(payable)} />
-          </div>
         </div>
       </div>
 
@@ -258,6 +248,10 @@ export function SupplierTrackingPageClient() {
                       <span className="font-semibold text-slate-400 block">หัก: </span>
                       <span className="text-amber-700 font-semibold">{row.deductionPct.toFixed(1)}%</span>
                     </div>
+                    <div>
+                      <span className="font-semibold text-slate-400 block">เกินกำหนด: </span>
+                      <span className="text-red-700 font-semibold">{formatMoney(row.overdueApAmount)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -282,6 +276,8 @@ export function SupplierTrackingPageClient() {
                   <th className="p-2 text-right">ราคาเฉลี่ย</th>
                   <th className="p-2 text-right">จ่ายแล้ว</th>
                   <th className="p-2 text-right">ค้างจ่าย</th>
+                  <th className="p-2 text-right">เกินกำหนด</th>
+                  <th className="p-2 text-right">เก่าสุด</th>
                   <th className="p-2 text-right">% จ่าย</th>
                   <th className="p-2 text-right">WTI</th>
                   <th className="p-2 text-right">ส่งครบ</th>
@@ -290,8 +286,8 @@ export function SupplierTrackingPageClient() {
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
-                {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={13}>ไม่มีข้อมูล Supplier Tracking</td></tr> : null}
+                {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={15}>กำลังโหลดข้อมูล</td></tr> : null}
+                {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={15}>ไม่มีข้อมูล Supplier Tracking</td></tr> : null}
                 {!isLoading && rows.map((row) => (
                   <tr key={row.id} className="cursor-pointer border-t hover:bg-blue-50/40" onClick={() => void openDetail(row)}>
                     <td className="p-2 font-mono text-xs text-slate-500">{row.code || '-'}</td>
@@ -302,6 +298,8 @@ export function SupplierTrackingPageClient() {
                     <td className="p-2 text-right">{formatMoney(row.avgBuy)}</td>
                     <td className="p-2 text-right">{formatMoney(row.paidAmount)}</td>
                     <td className="p-2 text-right text-red-700">{formatMoney(row.payable)}</td>
+                    <td className="p-2 text-right text-red-700">{formatMoney(row.overdueApAmount)}</td>
+                    <td className={`p-2 text-right ${row.oldestApAgeDays > 30 ? 'font-semibold text-red-700' : ''}`}>{row.oldestApAgeDays}</td>
                     <td className="p-2 text-right">{row.paidPct.toFixed(1)}%</td>
                     <td className="p-2 text-right">{row.wtiCount}</td>
                     <td className="p-2 text-right font-semibold text-emerald-700">{row.deliveryCompletionPct.toFixed(1)}%</td>
@@ -392,21 +390,30 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
                   <SignalMetric label="ส่งครบจาก WTI" value={`${detail.qualitySignals.deliveryCompletionPct.toFixed(1)}%`} />
                   <SignalMetric label="หักน้ำหนัก" value={`${detail.qualitySignals.deductionPct.toFixed(1)}%`} />
                   <SignalMetric label="จ่ายดี" value={`${detail.qualitySignals.paymentReliabilityPct.toFixed(1)}%`} />
+                  <SignalMetric label="AP เกินกำหนด" value={formatMoney(detail.qualitySignals.overdueApAmount)} />
+                  <SignalMetric label="บิลเกินกำหนด" value={`${detail.qualitySignals.overdueApBillCount} บิล`} />
+                  <SignalMetric label="เก่าสุด" value={`${detail.qualitySignals.oldestApAgeDays} วัน`} />
                   <SignalMetric label="WTI" value={`${detail.qualitySignals.wtiCount} ใบ`} />
                   <SignalMetric label="Grade Adjust" value={`${detail.qualitySignals.gradeAdjustmentCount} รายการ`} />
                   <SignalMetric label="Return" value={detail.qualitySignals.returnSignalStatus} />
                 </div>
               </DetailSection>
+              <DetailSection title="AP Aging Buckets">
+                <SimpleTable
+                  headers={['Bucket', 'บิล', 'ยอดค้าง']}
+                  rows={detail.qualitySignals.agingBuckets.map((row) => [row.bucket, String(row.count), formatMoney(row.amount)])}
+                />
+              </DetailSection>
               <DetailSection title="Purchase Bill">
                 <SimpleTable
-                  headers={['วันที่', 'เอกสาร', 'น้ำหนัก', 'ยอดซื้อ', 'ราคาเฉลี่ย', 'จ่ายแล้ว', 'ค้างจ่าย', 'สถานะ']}
-                  rows={detail.bills.map((row) => [formatDateDisplay(row.date), { href: row.href, label: row.docNo }, formatMoney(row.qty), formatMoney(row.amount), formatMoney(row.avgBuy), formatMoney(row.paidAmount), formatMoney(row.payable), row.status])}
+                  headers={['วันที่', 'เอกสาร', 'Due', 'Bucket', 'อายุ', 'น้ำหนัก', 'ยอดซื้อ', 'ราคาเฉลี่ย', 'จ่ายแล้ว', 'ค้างจ่าย', 'สถานะ']}
+                  rows={detail.bills.map((row) => [formatDateDisplay(row.date), { href: row.href, label: row.docNo }, formatDateDisplay(row.dueDate), row.ageBucket, `${row.ageDays} วัน`, formatMoney(row.qty), formatMoney(row.amount), formatMoney(row.avgBuy), formatMoney(row.paidAmount), formatMoney(row.payable), row.status])}
                 />
               </DetailSection>
               <DetailSection title="Payment">
                 <SimpleTable
                   headers={['วันที่', 'เอกสาร', 'วิธีจ่าย', 'ยอดจ่าย', 'สุทธิ', 'สถานะ']}
-                  rows={detail.payments.map((row) => [formatDateDisplay(row.date), row.docNo, row.method, formatMoney(row.amount), formatMoney(row.netAmount), row.status])}
+                  rows={detail.payments.map((row) => [formatDateDisplay(row.date), { href: row.href, label: row.docNo }, row.method, formatMoney(row.amount), formatMoney(row.netAmount), row.status])}
                 />
               </DetailSection>
               <DetailSection title="Monthly Purchase / Payment Trend">
@@ -418,13 +425,13 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
               <DetailSection title="WTI / Delivery">
                 <SimpleTable
                   headers={['วันที่', 'WTI', 'น้ำหนักสุทธิ', 'ชั่งบิลแล้ว', 'คงเหลือ', 'หักน้ำหนัก', 'สถานะ']}
-                  rows={detail.weightTickets.map((row) => [formatDateDisplay(row.date), row.docNo, formatMoney(row.netWeight), formatMoney(row.billedWeight), formatMoney(row.remainingWeight), formatMoney(row.deductWeight), row.status])}
+                  rows={detail.weightTickets.map((row) => [formatDateDisplay(row.date), { href: row.href, label: row.docNo }, formatMoney(row.netWeight), formatMoney(row.billedWeight), formatMoney(row.remainingWeight), formatMoney(row.deductWeight), row.status])}
                 />
               </DetailSection>
               <DetailSection title="Grade Adjust">
                 <SimpleTable
                   headers={['วันที่', 'เอกสาร', 'Qty Diff', 'Value Diff', 'เหตุผล', 'สถานะ']}
-                  rows={detail.gradeAdjustments.map((row) => [formatDateDisplay(row.date), row.docNo, formatMoney(row.qtyDiff), formatMoney(row.valueDiff), row.reason, row.status])}
+                  rows={detail.gradeAdjustments.map((row) => [formatDateDisplay(row.date), { href: row.href, label: row.docNo }, formatMoney(row.qtyDiff), formatMoney(row.valueDiff), row.reason, row.status])}
                 />
               </DetailSection>
               <DetailSection title="Product Mix">
@@ -467,13 +474,22 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: DetailCell[][
   )
 }
 
-function SummaryCard({ color, label, value }: { color: 'blue' | 'indigo' | 'red'; label: string; value: string }) {
-  const gradient = color === 'red' ? 'from-red-500 to-rose-600' : color === 'indigo' ? 'from-indigo-500 to-violet-600' : 'from-blue-500 to-indigo-600'
-  return <div className={`rounded-md bg-gradient-to-br ${gradient} p-5 text-white shadow-xl`}><div className="text-xs opacity-80">{label}</div><div className="mt-1 font-mono text-3xl font-bold">{value}</div></div>
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md bg-slate-50 p-2"><div className="text-slate-500">{label}</div><div className="font-mono font-bold text-slate-900">{value}</div></div>
+function SummaryCard({ className = '', icon, label, tone, value }: { className?: string; icon: string; label: string; tone: 'blue' | 'emerald' | 'indigo' | 'red'; value: string }) {
+  const colors = {
+    blue: 'bg-blue-100 text-blue-700',
+    emerald: 'bg-emerald-100 text-emerald-700',
+    indigo: 'bg-indigo-100 text-indigo-700',
+    red: 'bg-red-100 text-red-700',
+  }[tone]
+  return (
+    <div className={`flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5 ${className}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl sm:h-12 sm:w-12 ${colors}`}>{icon}</div>
+      <div className="min-w-0">
+        <div className={`text-xs ${colors.split(' ')[1]}`}>{label}</div>
+        <div className="truncate font-mono font-bold text-slate-900">{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function SignalMetric({ label, value }: { label: string; value: string }) {
@@ -482,11 +498,6 @@ function SignalMetric({ label, value }: { label: string; value: string }) {
 
 function Tab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <button className={active ? 'rounded-md bg-blue-700 px-4 py-2 text-sm font-bold text-white' : 'rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600'} type="button" onClick={onClick}>{label}</button>
-}
-
-function BarList({ rows }: { rows: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...rows.map((row) => row.value))
-  return <div className="space-y-2">{rows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีข้อมูล</div> : rows.map((row, index) => <div key={row.label}><div className="mb-1 flex justify-between text-xs"><span>{index + 1}. {row.label}</span><b>{formatMoney(row.value)}</b></div><div className="h-2 rounded-md bg-slate-100"><div className="h-2 rounded-md bg-blue-500" style={{ width: `${Math.min(100, row.value / max * 100)}%` }} /></div></div>)}</div>
 }
 
 function TopPanel({ rows, title }: { rows: { label: string; value: number }[]; title: string }) {

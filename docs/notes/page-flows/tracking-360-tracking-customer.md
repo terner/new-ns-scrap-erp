@@ -5,7 +5,7 @@ tags:
   - menu
   - tracking
 status: accepted-baseline
-updated: 2026-06-14
+updated: 2026-06-15
 route: /tracking/customer
 ---
 
@@ -49,8 +49,8 @@ Latest user screenshot changes the target from a simple customer sales summary i
 - Required data groups: Sales Bill, Receipt, Margin, Pending AR. Customer return is intentionally not tracked as a separate source; corrections use Sales Bill void/cancel.
 - Decision questions: ลูกค้าคนไหนซื้อเยอะ, margin ดีไหม, จ่ายช้าไหม, มี void/cancel เอกสารผิดปกติไหมใน source flow
 - Business actions supported: เพิ่มเครดิต, ลดเครดิต, ต้นยอดขาย, blacklist
-- Local vs legacy finding: legacy row click opens customer detail with sales list, receipt list, product breakdown, and monthly breakdown. Current Next now supports row-click detail for SB/RCP/product/monthly breakdown via `detailId`; pending AR, credit utilization, and margin decision signals are wired from current source facts.
-- Target UI direction: list remains high-density, but each customer row/card opens a detail modal with SB/RCP movement, SB source links, product breakdown, channel breakdown, monthly movement, pending AR/receivable exposure, and credit/margin decision signals. Return count/value is removed by requirement; use void/cancel documents instead.
+- Local vs legacy finding: legacy row click opens customer detail with sales list, receipt list, product breakdown, and monthly breakdown. Current Next now supports row-click detail for SB/RCP/product/monthly breakdown via `detailId`; pending AR, AR aging, credit utilization, and margin decision signals are wired from current source facts.
+- Target UI direction: list remains high-density, but each customer row/card opens a detail modal with SB/RCP movement, SB source links, product breakdown, channel breakdown, monthly movement, pending AR/AR aging/receivable exposure, and credit/margin decision signals. Return count/value is removed by requirement; use void/cancel documents instead.
 
 ## Page Responsibilities
 
@@ -91,6 +91,12 @@ Source tables:
 - `sales_bills` excluding `status = cancelled`
 - `receipts` excluding `status = cancelled`
 
+Branch scope:
+
+- For branch-scoped users, Sales Bill and Receipt facts are limited to documents whose `branch_id` is null legacy/global or included in the user's allowed branch set.
+- `filters.customers`, rows, summary, monthly, detail, and export are derived from the scoped source facts. Active customer master rows without visible scoped facts must not appear as selectable filter options.
+- Requesting `customerId/detailId` for a customer with no visible scoped source facts returns no row/detail instead of leaking cross-branch data.
+
 Response:
 
 | Field | Meaning |
@@ -111,11 +117,11 @@ Row fields:
 Target detail payload fields:
 
 - `sales`: SB doc no/date/channel/qty/revenue/COGS/GP/received/receivable/source link
-- `receipts`: RCP doc no/date/account/amount/status; source link waits for receipt owner route contract
+- `receipts`: RCP doc no/date/account/amount/status/source link to `/sales/receipts?tab=history&q=<RCP>`
 - `products`: product code/name/qty/revenue/COGS/GP/GP%
 - `channels`: channel name, bill count, qty, revenue, COGS, GP, GP%
 - `monthly`: bill count/qty/revenue/GP/received/receivable by month
-- `signals`: margin quality, pending AR, credit-limit utilization
+- `signals`: margin quality, pending AR, AR aging buckets, overdue AR, oldest AR age, credit-limit utilization
 
 ## Calculation Rules
 
@@ -126,6 +132,9 @@ Target detail payload fields:
 - Receipt amount counted toward received = `amount + withholding_tax + discount`.
 - Receivable per bill = `max(0, total_amount - receivedByBill)`.
 - Pending AR bill count = sales bills whose receivable balance is greater than zero.
+- AR aging uses [[Document Aging Policy]] financial due aging buckets: `Current`, `1-30`, `31-60`, `61-90`, `>90`.
+- AR aging reference date uses `sales_bills.due_date` first; if missing, use `sales_bills.date + sales_bills.credit_term`; if missing, use `sales_bills.date + customers.credit_term`; if still missing, use sales bill document date.
+- AR aging amount uses active receivable per bill only when receivable is greater than zero.
 - Credit utilization% = pending AR amount / customer credit limit when credit limit is configured.
 - Low-margin bill count uses GP% below 5%; negative-margin bill count uses GP below zero.
 - Customer return frequency is not calculated; cancelled/voided Sales Bill and Receipt rows are excluded from active totals and remain auditable in their owner flow.
@@ -148,7 +157,7 @@ Target detail payload fields:
 - Cancelled SB/RCP must be excluded.
 - Receipt amount must not double count bill received amount and aggregate receipt list separately without stating purpose.
 - Customer code is required for outward id; missing business code should fail loudly through `requireBusinessCode`.
-- Aging/credit exposure must not be inferred from this page until due-date policy is added.
+- AR aging must keep due date/reference date/as-of date separate and follow [[Document Aging Policy]].
 
 ## Side Effects
 
@@ -161,8 +170,11 @@ Target detail payload fields:
 - API now returns product and channel breakdown per customer.
 - API/UI now return monthly movement per customer for selected year.
 - API/UI now expose pending AR amount/count, credit utilization, low-margin bill count, and negative-margin bill count as decision signals.
+- API/UI now expose read-only AR aging buckets, overdue AR amount/count, and oldest AR age from current Sales Bill/customer credit-term facts.
 - Return signal/count is removed by requirement; customer corrections use Sales Bill void/cancel instead of a separate Customer Return source.
-- AR aging buckets and due-date logic remain owned by [[Finance AR Page Flow]].
+- Authenticated browser QA now covers desktop row detail, dense mobile card detail, SB source navigation, RCP source navigation, RCP/detail/product/monthly breakdown rendering, XLSX export, and no page-level mobile horizontal overflow.
+- UI now follows the `docs/design.md` list-page order more closely: compact KPI cards first, then filter shell, then tabs/data area. The old pre-filter hero/chart blocks are removed from the default top flow.
+- Finance AR remains the owner flow for settlement/payment-cycle mutation; Tracking Customer only consumes the read-only due-aging signal.
 - Customer advance allocation is out of scope here and should come from Sales/Payment flow facts.
 
 ## Implementation Tasks
@@ -176,22 +188,24 @@ Target detail payload fields:
 - [x] Return channel breakdown per customer for selected period: channel name, bill count, qty, revenue, COGS, GP, GP%.
 - [x] Return monthly movement per customer for selected year: bill count, qty, revenue, GP, received, receivable.
 - [x] Add structured decision signals: low margin, negative margin, pending AR, and credit utilization.
+- [x] Add read-only AR aging buckets, overdue AR amount/count, and oldest AR age from [[Document Aging Policy]].
 - [x] Remove return frequency from Customer Tracking; use void/cancel Sales documents.
-- [ ] Keep `year/month/customerId/q` filter and `format=xlsx` export aligned with the JSON result.
+- [x] Keep `year/month/customerId/q` filter and `format=xlsx` export aligned with the JSON result.
 - [x] Render SB source links in the detail table; `/sales/bills/[id]` is available as a read-only owner page.
-- [ ] Add RCP source links after `/sales/receipts` detail/deep-link contract is confirmed.
+- [x] Add RCP source links after `/sales/receipts` detail/deep-link contract is confirmed.
 
 ### UI
 
-- [ ] Keep `docs/design.md` ordering: KPI cards, filter shell, tabs, pagination/summary if row count grows, data area.
-- [ ] Use compact filter shell with year, month, customer, search, and XLSX export button.
+- [x] Keep `docs/design.md` ordering: KPI cards, filter shell, tabs, pagination/summary if row count grows, data area.
+- [x] Use compact filter shell with year, month, customer, search, and XLSX export button.
 - [x] Make desktop rows and dense mobile cards clickable to open customer detail.
 - [x] Add detail modal/view sections: SB list, RCP list, product breakdown.
 - [x] Add dense mobile cards and keyboard-openable mobile card controls for the same customer detail.
 - [x] Add monthly movement and decision signals.
+- [x] Add AR aging bucket section and overdue/oldest-age columns in row/detail views.
 - [x] Add channel breakdown section in customer detail.
-- [ ] Add source document links as read-only navigation; no mutation actions.
-- [ ] Preserve table density with `text-sm`, `p-2`, `bg-slate-100` header, and no nested cards.
+- [x] Add source document links as read-only navigation for SB and RCP owner routes; no mutation actions.
+- [x] Preserve table density with `text-sm`, `p-2`, `bg-slate-100` header, and no nested cards.
 
 ## Implementation Checklist
 
@@ -204,4 +218,4 @@ Target detail payload fields:
 - [x] Add channel breakdown after source contract is finalized
 - [x] Add customer behavior signals for margin, pending AR, and credit utilization
 - [x] Remove customer return frequency; correction flow is void/cancel document
-- [ ] Add AR aging only when due-date rules are reconciled
+- [x] Add AR aging from reconciled due-date rules in [[Document Aging Policy]]

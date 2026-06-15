@@ -5,7 +5,7 @@ tags:
   - menu
   - tracking
 status: accepted-baseline
-updated: 2026-06-14
+updated: 2026-06-15
 route: /tracking/supplier
 ---
 
@@ -49,8 +49,8 @@ Latest user screenshot changes the target from purchase/payable summary into a s
 - Required data groups: Purchase Bill, WT/WTI, Grade Adjust, Payment, Return
 - Decision questions: supplier ไหนต้นทุนดี, ส่งครบไหม, quality ดีไหม, จ่ายดีไหม
 - Business importance: ธุรกิจ scrap ต้องเห็น supplier quality เพราะ supplier แต่ละรายไม่เท่ากัน
-- Local vs legacy finding: legacy row click opens supplier detail with PB list, payment list, product breakdown, and monthly breakdown. Current Next now has server-backed `supplierId`/`q` filters and row-click detail for PB/payment/product/monthly mix via `detailId`; WTI delivery, deduction, Grade Adjust, and payment reliability signals are wired from current source facts.
-- Target UI direction: each supplier row/card opens a detail modal with PB source links, PMT movement, WTI delivery facts, Grade Adjust signals, product mix, monthly trend, and reliability/quality signals. Return is held until a purchase return source table/owner is confirmed.
+- Local vs legacy finding: legacy row click opens supplier detail with PB list, payment list, product breakdown, and monthly breakdown. Current Next now has server-backed `supplierId`/`q` filters and row-click detail for PB/payment/product/monthly mix via `detailId`; WTI delivery, deduction, Grade Adjust, AP aging, and payment reliability signals are wired from current source facts.
+- Target UI direction: each supplier row/card opens a detail modal with PB source links, PMT movement, WTI delivery facts, Grade Adjust signals, AP aging, product mix, monthly trend, and reliability/quality signals. Return is held until a purchase return source table/owner is confirmed.
 
 ## Page Responsibilities
 
@@ -95,6 +95,12 @@ Source tables:
 - `weight_tickets` WTI excluding cancelled tickets
 - `grade_adjustments` excluding reversed/cancelled adjustments
 
+Branch scope:
+
+- For branch-scoped users, Purchase Bill, Payment, WTI, and Grade Adjust facts are limited to documents with allowed branch evidence. PB/PMT/Grade Adjust allow null legacy/global branch ids; WTI requires allowed `branch_id`.
+- `filters.suppliers`, rows, byProduct, monthly, summary, detail, and export are derived from the scoped source facts. Active supplier master rows without visible scoped facts must not appear as selectable filter options.
+- Requesting `supplierId/detailId` for a supplier with no visible scoped source facts returns no row/detail instead of leaking cross-branch data.
+
 Response:
 
 | Field | Meaning |
@@ -117,12 +123,12 @@ Row fields:
 Target detail payload fields:
 
 - `bills`: PB doc no/date/product qty/amount/avg buy/paid/payable/status/source link
-- `payments`: PMT/PMA doc no/date/account/amount/status; source link waits for payment owner route contract
+- `payments`: PMT/PMA doc no/date/account/amount/status/source link to `/purchase/payments?tab=history&q=<PMT>`
 - `products`: product code/name/qty/purchase amount/avg buy/bill count
 - `monthly`: bill count/payment count/qty/purchase amount/paid/payable by month
-- `qualitySignals`: WTI delivery completeness, WTI deduction rate, Grade Adjust count, payment reliability, Return source status
-- `weightTickets`: WTI doc/date/net/billed/remaining/deduction/status rows
-- `gradeAdjustments`: adjustment doc/date/qty diff/value diff/reason/status rows
+- `qualitySignals`: WTI delivery completeness, WTI deduction rate, Grade Adjust count, AP aging buckets, overdue AP, oldest AP age, payment reliability, Return source status
+- `weightTickets`: WTI doc/date/net/billed/remaining/deduction/status/source link rows
+- `gradeAdjustments`: adjustment doc/date/qty diff/value diff/reason/status/source link rows; owner link targets `/stock/convert?q=<GA>` until a separate Grade Adjust detail route exists.
 
 ## Calculation Rules
 
@@ -130,7 +136,10 @@ Target detail payload fields:
 - Item amount uses `netAmount`, `amount`, `totalAmount`, `total`; fallback `subtotal`, then `total_amount`.
 - Item qty uses `netWeight` or `qty`.
 - Payable uses `purchase_bills.payable_balance`.
-- Paid amount sums `payments.amount` by supplier/date period.
+- AP aging uses [[Document Aging Policy]] financial due aging buckets: `Current`, `1-30`, `31-60`, `61-90`, `>90`.
+- Current purchase bill schema has no confirmed supplier due-date or supplier credit-term field, so Tracking Supplier uses Purchase Bill document date as the AP aging reference date and labels that source as `documentDate`.
+- AP aging amount uses active payable per bill only when payable is greater than zero.
+- Paid amount sums settlement value from non-cancelled `payments` by supplier/date period: `amount + withholding_tax + discount`.
 - Paid% = `paidAmount / (paidAmount + payable) * 100` when denominator > 0.
 - Product mix groups purchase items by product name/code and counts distinct PB doc numbers and suppliers.
 - WTI delivery completeness = billed WTI summary weight / net WTI summary weight.
@@ -153,7 +162,7 @@ Target detail payload fields:
 - Cancelled PB/PMT must be excluded.
 - Supplier business code is required for outward id through `requireBusinessCode`.
 - Payment amount must be counted from payment facts, not inferred only from PB paid snapshots.
-- AP aging remains owned by [[Finance AP Page Flow]]; this page currently shows payable exposure only.
+- AP aging is read-only in this page; Finance AP remains the owner flow for settlement/payment-cycle mutation and future due-date/credit-term source upgrades.
 - If supplier filtering/search is added, JSON response and export must share the same filter.
 
 ## Side Effects
@@ -168,8 +177,12 @@ Target detail payload fields:
 - Product mix follows the active supplier/filter and is also available inside supplier detail.
 - Supplier detail monthly purchase/payment trend is available for the selected year.
 - WTI delivery completeness, WTI deduction rate, Grade Adjust count, and payment reliability are wired into the API/UI.
+- API/UI now expose read-only AP aging buckets, overdue AP amount/count, and oldest AP age from current Purchase Bill payable facts.
+- API now reconciles Supplier Tracking paid/reliability/monthly paid formulas with the current payment settlement rule: non-cancelled PMT `amount + withholding_tax + discount`.
 - Return frequency is intentionally held because the current schema has no confirmed purchase return source table/owner contract.
-- AP aging/payment-cycle locks remain outside this page.
+- Authenticated browser QA now covers desktop row detail, dense mobile card detail, PB/PMT/WTI/Grade Adjust source navigation, WTI/payment/Grade Adjust signals, scoped product mix, held Supplier Return messaging, XLSX export, and no page-level mobile horizontal overflow.
+- UI now follows the `docs/design.md` list-page order more closely: compact KPI cards first, then filter shell, then tabs/data area. The old pre-filter monthly/top blocks are removed from the default top flow.
+- Payment-cycle locks remain outside this page. AP aging is report-only here and currently uses PB document date until PB due-date/supplier credit-term schema is confirmed.
 
 ## Implementation Tasks
 
@@ -183,19 +196,20 @@ Target detail payload fields:
 - [x] Add monthly purchase/payment trend scoped to supplier detail.
 - [x] Add quality/reliability signal fields from confirmed source facts: WTI delivery completeness, WTI deduction, Grade Adjust count, and payment reliability.
 - [ ] HOLD: Add Return frequency once source ownership/schema exists.
-- [ ] Keep AP aging out until [[Finance AP Page Flow]] due-date rules are reconciled.
+- [x] Add read-only AP aging buckets, overdue AP amount/count, and oldest AP age using PB document date until due-date/credit-term source fields exist.
 
 ### UI
 
-- [ ] Use `docs/design.md` list pattern: KPI cards, compact filter shell, tabs, desktop table, dense mobile cards.
+- [x] Use `docs/design.md` list pattern: KPI cards, compact filter shell, tabs, desktop table, dense mobile cards.
 - [x] Make supplier filter and search server-backed, not only client-side after aggregate load.
 - [x] Make desktop rows and mobile cards clickable to open supplier detail.
 - [x] Add detail modal/view sections: PB list, payment list, product mix.
 - [x] Add detail sections for WTI, Grade Adjust, payment reliability, and quality signals.
+- [x] Add AP aging bucket section and overdue/oldest-age columns in row/detail views.
 - [x] Add monthly trend.
-- [ ] Keep product breakdown visible but scoped to the active supplier/filter.
+- [x] Keep product breakdown visible but scoped to the active supplier/filter.
 - [x] Keep PB source document links read-only and navigate to the purchase bill owner page.
-- [ ] Add PMT/WTI/Grade Adjust source links after owner route contracts are confirmed.
+- [x] Add PMT/WTI/Grade Adjust source links after owner route contracts are confirmed; Grade Adjust currently deep-links to the owner list filter, not a separate detail route.
 
 ## Implementation Checklist
 
@@ -206,5 +220,6 @@ Target detail payload fields:
 - [x] Add supplier detail/read endpoint or drilldown payload
 - [x] Add source references to PB/PMT documents
 - [x] Add WTI delivery completeness, deduction rate, Grade Adjust quality count, and supplier payment reliability signals
+- [x] Add read-only AP aging buckets from current PB payable facts
 - [ ] Add Return frequency after source ownership/schema is confirmed
-- [ ] Reconcile paid/payable formulas with final payment allocation facts
+- [x] Reconcile paid/payable formulas with current payment settlement facts

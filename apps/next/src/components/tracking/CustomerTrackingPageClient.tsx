@@ -7,6 +7,7 @@ import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
 type CustomerTrackingRow = {
+  agingBuckets: Array<{ amount: number; bucket: string; count: number }>
   avgSell: number
   billCount: number
   code: string
@@ -19,6 +20,9 @@ type CustomerTrackingRow = {
   id: string
   lowMarginBillCount: number
   negativeMarginBillCount: number
+  oldestArAgeDays: number
+  overdueArAmount: number
+  overdueArBillCount: number
   pendingArBillCount: number
   profitPerKg: number
   qty: number
@@ -36,18 +40,22 @@ type CustomerTrackingPayload = {
 }
 
 type CustomerTrackingDetail = {
-  bills: Array<{ channelName: string; cogs: number; date: string; docNo: string; gp: number; href: string; qty: number; receivable: number; received: number; revenue: number; status: string }>
+  bills: Array<{ ageBucket: string; ageDays: number; channelName: string; cogs: number; date: string; docNo: string; dueDate: string; gp: number; href: string; qty: number; receivable: number; received: number; referenceDateType: string; revenue: number; status: string }>
   channels: Array<{ billCount: number; channelName: string; cogs: number; gp: number; gpPct: number; qty: number; revenue: number }>
   customer: { code: string; id: string; name: string }
   monthly: Array<{ billCount: number; gp: number; month: string; qty: number; receivable: number; receiptCount: number; receivedAmount: number; revenue: number }>
   products: Array<{ avgSell: number; cogs: number; gp: number; gpPct: number; productName: string; qty: number; revenue: number }>
-  receipts: Array<{ amount: number; date: string; docNo: string; method: string; netAmount: number; status: string }>
+  receipts: Array<{ amount: number; date: string; docNo: string; href: string; method: string; netAmount: number; status: string }>
   signals: {
+    agingBuckets: Array<{ amount: number; bucket: string; count: number }>
     creditLimit: number
     creditUtilizationPct: number
     gpPct: number
     lowMarginBillCount: number
     negativeMarginBillCount: number
+    oldestArAgeDays: number
+    overdueArAmount: number
+    overdueArBillCount: number
     pendingArAmount: number
     pendingArBillCount: number
   }
@@ -104,11 +112,15 @@ export function CustomerTrackingPageClient() {
       products: [],
       receipts: [],
       signals: {
+        agingBuckets: row.agingBuckets,
         creditLimit: row.creditLimit,
         creditUtilizationPct: row.creditUtilizationPct,
         gpPct: row.gpPct,
         lowMarginBillCount: row.lowMarginBillCount,
         negativeMarginBillCount: row.negativeMarginBillCount,
+        oldestArAgeDays: row.oldestArAgeDays,
+        overdueArAmount: row.overdueArAmount,
+        overdueArBillCount: row.overdueArBillCount,
         pendingArAmount: row.receivable,
         pendingArBillCount: row.pendingArBillCount,
       },
@@ -127,33 +139,22 @@ export function CustomerTrackingPageClient() {
   }, [queryString])
 
   const rows = data?.rows ?? []
-  const topFive = rows.slice(0, 5)
   const topRevenue = [...rows].sort((left, right) => right.revenue - left.revenue).slice(0, 10)
   const topGp = [...rows].sort((left, right) => right.gp - left.gp).slice(0, 10)
   const topGpPct = [...rows].filter((row) => row.revenue > 0).sort((left, right) => right.gpPct - left.gpPct).slice(0, 10)
   const topReceivable = [...rows].sort((left, right) => right.receivable - left.receivable).slice(0, 10)
-  const maxMonthRevenue = Math.max(1, ...(data?.monthly ?? []).map((item) => item.revenue))
   const exportHref = `/api/tracking/customer?${queryString}&format=xlsx`
 
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-md bg-gradient-to-br from-emerald-500 to-teal-700 p-5 text-white shadow-xl lg:col-span-2">
-          <div className="text-xs opacity-80">💰 ยอดขายรวม</div>
-          <div className="font-mono text-4xl font-bold">{formatMoney(data?.summary.revenue ?? 0)}</div>
-          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MiniStat label="ลูกค้า" value={`${data?.summary.customers ?? 0}`} />
-            <MiniStat label="น้ำหนัก" value={`${formatMoney(data?.summary.qty ?? 0)} กก.`} />
-            <MiniStat label="GP" value={formatMoney(data?.summary.gp ?? 0)} />
-            <MiniStat label="ลูกหนี้" value={formatMoney(data?.summary.receivable ?? 0)} />
-          </div>
-        </div>
-        <div className="rounded-md bg-white p-4 shadow-lg">
-          <div className="mb-3 text-sm font-bold text-slate-700">🏆 Top 5 Customer</div>
-          <BarList color="emerald" rows={topFive.map((row) => ({ label: row.customerName, value: row.revenue }))} />
-        </div>
+      <div className="grid grid-cols-2 gap-2.5 text-sm sm:gap-4 lg:grid-cols-5">
+        <SummaryCard icon="👥" label="ลูกค้า" tone="emerald" value={`${data?.summary.customers ?? 0}`} />
+        <SummaryCard icon="⚖️" label="น้ำหนัก" tone="blue" value={`${formatMoney(data?.summary.qty ?? 0)} กก.`} />
+        <SummaryCard icon="💰" label="ยอดขาย" tone="emerald" value={formatMoney(data?.summary.revenue ?? 0)} />
+        <SummaryCard icon="📈" label="GP" tone="violet" value={formatMoney(data?.summary.gp ?? 0)} />
+        <SummaryCard className="col-span-2 lg:col-span-1" icon="🧾" label="ลูกหนี้" tone="amber" value={formatMoney(data?.summary.receivable ?? 0)} />
       </div>
 
       <div className="rounded-md bg-white p-3 shadow">
@@ -169,24 +170,6 @@ export function CustomerTrackingPageClient() {
           </select>
           <input className="h-9 rounded-md border px-3 text-sm" placeholder="ค้นหา Customer" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <a className="inline-flex h-9 items-center justify-center rounded-md bg-emerald-600 px-4 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-md bg-white p-4 shadow">
-          <div className="mb-3 text-sm font-semibold text-slate-700">ยอดขายรายเดือน {data?.year ?? year}</div>
-          <div className="grid grid-cols-12 items-end gap-2">
-            {(data?.monthly ?? []).map((item, index) => (
-              <div key={item.month} className="flex min-h-40 flex-col items-center justify-end gap-1">
-                <div className="w-full rounded-md-t bg-emerald-500" style={{ height: `${Math.max(4, (item.revenue / maxMonthRevenue) * 128)}px` }} />
-                <div className="text-[10px] text-slate-500">{monthLabels[index]}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-md bg-white p-4 shadow">
-          <div className="mb-3 text-sm font-semibold text-slate-700">สัดส่วน Top 5</div>
-          <BarList color="teal" rows={topFive.map((row) => ({ label: row.customerName, value: row.revenue }))} />
         </div>
       </div>
 
@@ -225,8 +208,9 @@ export function CustomerTrackingPageClient() {
                 <MiniLine label="GP" tone={row.gp >= 0 ? 'emerald' : 'red'} value={formatMoney(row.gp)} />
                 <MiniLine label="น้ำหนัก" value={`${formatMoney(row.qty)} กก.`} />
                 <MiniLine label="ลูกหนี้" tone="amber" value={formatMoney(row.receivable)} />
+                <MiniLine label="เกินกำหนด" tone={row.overdueArAmount > 0 ? 'red' : 'slate'} value={formatMoney(row.overdueArAmount)} />
                 <MiniLine label="บิลค้าง AR" tone="amber" value={`${row.pendingArBillCount}`} />
-                <MiniLine label="ใช้เครดิต" tone={row.creditUtilizationPct >= 100 ? 'red' : 'slate'} value={`${row.creditUtilizationPct.toFixed(1)}%`} />
+                <MiniLine label="เก่าสุด" tone={row.oldestArAgeDays > 30 ? 'red' : 'slate'} value={`${row.oldestArAgeDays} วัน`} />
               </div>
             </div>
           ))}
@@ -247,13 +231,15 @@ export function CustomerTrackingPageClient() {
                 <th className="p-2 text-right">฿/กก.</th>
                 <th className="p-2 text-right">รับเงิน</th>
                 <th className="p-2 text-right">ลูกหนี้</th>
+                <th className="p-2 text-right">เกินกำหนด</th>
+                <th className="p-2 text-right">เก่าสุด</th>
                 <th className="p-2 text-right">บิลค้าง AR</th>
                 <th className="p-2 text-right">ใช้เครดิต</th>
               </tr>
             </thead>
             <tbody>
-              {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={14}>กำลังโหลดข้อมูล</td></tr> : null}
-              {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={14}>ไม่มีข้อมูล Customer Tracking</td></tr> : null}
+              {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={16}>กำลังโหลดข้อมูล</td></tr> : null}
+              {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={16}>ไม่มีข้อมูล Customer Tracking</td></tr> : null}
               {!isLoading && rows.map((row) => (
                 <tr key={row.id} className="cursor-pointer border-t hover:bg-emerald-50/40" onClick={() => void openDetail(row)}>
                   <td className="p-2 font-mono text-xs text-slate-500">{row.code || '-'}</td>
@@ -268,6 +254,8 @@ export function CustomerTrackingPageClient() {
                   <td className="p-2 text-right">{formatMoney(row.profitPerKg)}</td>
                   <td className="p-2 text-right">{formatMoney(row.receivedAmount)}</td>
                   <td className="p-2 text-right text-amber-700">{formatMoney(row.receivable)}</td>
+                  <td className="p-2 text-right text-red-700">{formatMoney(row.overdueArAmount)}</td>
+                  <td className={`p-2 text-right ${row.oldestArAgeDays > 30 ? 'font-semibold text-red-700' : ''}`}>{row.oldestArAgeDays}</td>
                   <td className="p-2 text-right">{row.pendingArBillCount}</td>
                   <td className={`p-2 text-right ${row.creditUtilizationPct >= 100 ? 'font-semibold text-red-700' : ''}`}>{row.creditUtilizationPct.toFixed(1)}%</td>
                 </tr>
@@ -299,6 +287,9 @@ function CustomerDetailDialog({ detail, isLoading, onOpenChange }: { detail: Cus
                 <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-4">
                   <SignalMetric label="Pending AR" value={formatMoney(detail.signals.pendingArAmount)} />
                   <SignalMetric label="บิลค้าง AR" value={`${detail.signals.pendingArBillCount} บิล`} />
+                  <SignalMetric label="AR เกินกำหนด" value={formatMoney(detail.signals.overdueArAmount)} />
+                  <SignalMetric label="บิลเกินกำหนด" value={`${detail.signals.overdueArBillCount} บิล`} />
+                  <SignalMetric label="เก่าสุด" value={`${detail.signals.oldestArAgeDays} วัน`} />
                   <SignalMetric label="ใช้เครดิต" value={`${detail.signals.creditUtilizationPct.toFixed(1)}%`} />
                   <SignalMetric label="GP%" value={`${detail.signals.gpPct.toFixed(2)}%`} />
                   <SignalMetric label="บิล Margin ต่ำ" value={`${detail.signals.lowMarginBillCount} บิล`} />
@@ -306,12 +297,21 @@ function CustomerDetailDialog({ detail, isLoading, onOpenChange }: { detail: Cus
                   <SignalMetric label="Credit Limit" value={formatMoney(detail.signals.creditLimit)} />
                 </div>
               </DetailSection>
+              <DetailSection title="AR Aging Buckets">
+                <SimpleTable
+                  headers={['Bucket', 'บิล', 'ยอดค้าง']}
+                  rows={detail.signals.agingBuckets.map((row) => [row.bucket, String(row.count), formatMoney(row.amount)])}
+                />
+              </DetailSection>
               <DetailSection title="Sales Bill">
                 <SimpleTable
-                  headers={['วันที่', 'เอกสาร', 'ช่องทาง', 'น้ำหนัก', 'ยอดขาย', 'COGS', 'GP', 'รับเงิน', 'ลูกหนี้', 'สถานะ']}
+                  headers={['วันที่', 'เอกสาร', 'Due', 'Bucket', 'อายุ', 'ช่องทาง', 'น้ำหนัก', 'ยอดขาย', 'COGS', 'GP', 'รับเงิน', 'ลูกหนี้', 'สถานะ']}
                   rows={detail.bills.map((row) => [
                     formatDateDisplay(row.date),
                     { href: row.href, label: row.docNo },
+                    formatDateDisplay(row.dueDate),
+                    row.ageBucket,
+                    `${row.ageDays} วัน`,
                     row.channelName,
                     formatMoney(row.qty),
                     formatMoney(row.revenue),
@@ -332,7 +332,7 @@ function CustomerDetailDialog({ detail, isLoading, onOpenChange }: { detail: Cus
               <DetailSection title="Receipt">
                 <SimpleTable
                   headers={['วันที่', 'เอกสาร', 'วิธีรับเงิน', 'ยอดรับ', 'สุทธิ', 'สถานะ']}
-                  rows={detail.receipts.map((row) => [formatDateDisplay(row.date), row.docNo, row.method, formatMoney(row.amount), formatMoney(row.netAmount), row.status])}
+                  rows={detail.receipts.map((row) => [formatDateDisplay(row.date), { href: row.href, label: row.docNo }, row.method, formatMoney(row.amount), formatMoney(row.netAmount), row.status])}
                 />
               </DetailSection>
               <DetailSection title="Monthly Movement">
@@ -383,13 +383,27 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: DetailCell[][
   )
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md bg-white/15 p-3"><div className="text-xs opacity-80">{label}</div><div className="font-mono text-lg font-bold">{value}</div></div>
-}
-
 function MiniLine({ label, tone = 'slate', value }: { label: string; tone?: 'amber' | 'emerald' | 'red' | 'slate'; value: string }) {
   const text = tone === 'amber' ? 'text-amber-700' : tone === 'emerald' ? 'text-emerald-700' : tone === 'red' ? 'text-red-700' : 'text-slate-800'
   return <div><div className="text-slate-500">{label}</div><div className={`font-mono font-bold ${text}`}>{value}</div></div>
+}
+
+function SummaryCard({ className = '', icon, label, tone, value }: { className?: string; icon: string; label: string; tone: 'amber' | 'blue' | 'emerald' | 'violet'; value: string }) {
+  const colors = {
+    amber: 'bg-amber-100 text-amber-700',
+    blue: 'bg-blue-100 text-blue-700',
+    emerald: 'bg-emerald-100 text-emerald-700',
+    violet: 'bg-violet-100 text-violet-700',
+  }[tone]
+  return (
+    <div className={`flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5 ${className}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl sm:h-12 sm:w-12 ${colors}`}>{icon}</div>
+      <div className="min-w-0">
+        <div className={`text-xs ${colors.split(' ')[1]}`}>{label}</div>
+        <div className="truncate font-mono font-bold text-slate-900">{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function SignalMetric({ label, value }: { label: string; value: string }) {
@@ -398,12 +412,6 @@ function SignalMetric({ label, value }: { label: string; value: string }) {
 
 function Tab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <button className={active ? 'rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white' : 'rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600'} type="button" onClick={onClick}>{label}</button>
-}
-
-function BarList({ color, rows }: { color: 'emerald' | 'teal'; rows: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...rows.map((row) => row.value))
-  const bar = color === 'emerald' ? 'bg-emerald-500' : 'bg-teal-500'
-  return <div className="space-y-2">{rows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีข้อมูล</div> : rows.map((row, index) => <div key={row.label}><div className="mb-1 flex justify-between text-xs"><span>{index + 1}. {row.label}</span><b>{formatMoney(row.value)}</b></div><div className="h-2 rounded-md bg-slate-100"><div className={`h-2 rounded-md ${bar}`} style={{ width: `${Math.min(100, row.value / max * 100)}%` }} /></div></div>)}</div>
 }
 
 function TopPanel({ color, rows, suffix = '', title }: { color: 'amber' | 'blue' | 'emerald' | 'teal'; rows: { label: string; value: number }[]; suffix?: string; title: string }) {

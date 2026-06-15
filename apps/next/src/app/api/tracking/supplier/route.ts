@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
+import type { Prisma } from '../../../../../generated/prisma/client'
 import { requireBusinessCode } from '@/lib/business-code'
 import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { getAllowedBranchIds } from '@/lib/server/branch-scope'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
+import { addToFinancialAgingBucketTotals, computeFinancialDueAging, emptyFinancialAgingBucketTotals, financialAgingBuckets } from '@/lib/server/document-aging'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
@@ -49,6 +52,12 @@ function itemProductName(item: PurchaseItem) {
   return item.productName ?? item.productCode ?? 'ไม่ระบุสินค้า'
 }
 
+type NumericLike = Parameters<typeof toNumber>[0]
+
+function paymentSettlementAmount(payment: { amount: NumericLike; discount?: NumericLike; withholding_tax?: NumericLike }) {
+  return toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
+}
+
 function inYearMonth(date: Date, year: string | null, month: string | null) {
   const value = toDateOnly(date)
   if (year && value.slice(0, 4) !== year) return false
@@ -63,6 +72,41 @@ function yearMonthDateWhere(year: string, month: string | null) {
     ? new Date(Date.UTC(Number(year), Number(normalizedMonth), 0, 23, 59, 59, 999))
     : new Date(`${year}-12-31T23:59:59.999Z`)
   return { gte: from, lte: to }
+}
+
+function branchScopedPurchaseBillWhere(allowedBranchIds: bigint[] | null): Prisma.purchase_billsWhereInput {
+  if (allowedBranchIds === null) return {}
+  return {
+    OR: [
+      { branch_id: null },
+      { branch_id: { in: allowedBranchIds } },
+    ],
+  }
+}
+
+function branchScopedPaymentWhere(allowedBranchIds: bigint[] | null): Prisma.paymentsWhereInput {
+  if (allowedBranchIds === null) return {}
+  return {
+    OR: [
+      { branch_id: null },
+      { branch_id: { in: allowedBranchIds } },
+    ],
+  }
+}
+
+function branchScopedWeightTicketWhere(allowedBranchIds: bigint[] | null): Prisma.weight_ticketsWhereInput {
+  if (allowedBranchIds === null) return {}
+  return { branch_id: { in: allowedBranchIds } }
+}
+
+function branchScopedGradeAdjustmentWhere(allowedBranchIds: bigint[] | null): Prisma.grade_adjustmentsWhereInput {
+  if (allowedBranchIds === null) return {}
+  return {
+    OR: [
+      { branch_id: null },
+      { branch_id: { in: allowedBranchIds } },
+    ],
+  }
 }
 
 function buildWorkbook(rows: Array<Record<string, string | number>>, sheetName: string) {
@@ -88,6 +132,7 @@ export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'reports.reports.view')
+    const allowedBranchIds = await getAllowedBranchIds(context)
 
     const url = new URL(request.url)
     const year = url.searchParams.get('year') || String(new Date().getFullYear())
@@ -97,6 +142,7 @@ export async function GET(request: Request) {
     const search = url.searchParams.get('q')?.trim().toLowerCase()
     const supplier = supplierId ? await findActiveSupplierReferenceByCodeOrId(supplierId) : null
     const detailSupplier = detailId ? await findActiveSupplierReferenceByCodeOrId(detailId) : null
+    const asOfDate = new Date()
 
     const [suppliers, bills, payments, weightTickets, gradeAdjustments] = await Promise.all([
       prisma.suppliers.findMany({ orderBy: [{ name: 'asc' }], where: { active: { not: false } } }),
@@ -104,18 +150,19 @@ export async function GET(request: Request) {
         include: { purchase_bill_items: { orderBy: { line_no: 'asc' }, where: { item_status: 'active' } } },
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
-        where: { status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] }, ...(supplier ? { supplier_id: supplier.id } : {}) },
+        where: { ...branchScopedPurchaseBillWhere(allowedBranchIds), status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] }, ...(supplier ? { supplier_id: supplier.id } : {}) },
       }),
       prisma.payments.findMany({
         orderBy: [{ date: 'desc' }],
         take: 10000,
-        where: { NOT: { status: 'cancelled' }, ...(supplier ? { supplier_id: supplier.id } : {}) },
+        where: { ...branchScopedPaymentWhere(allowedBranchIds), NOT: { status: 'cancelled' }, ...(supplier ? { supplier_id: supplier.id } : {}) },
       }),
       prisma.weight_tickets.findMany({
         include: { weight_ticket_lines: true, weight_ticket_product_summaries: true },
         orderBy: [{ document_date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
         where: {
+          ...branchScopedWeightTicketWhere(allowedBranchIds),
           cancelled_at: null,
           doc_type: 'WTI',
           document_date: yearMonthDateWhere(year, month),
@@ -125,11 +172,13 @@ export async function GET(request: Request) {
       prisma.grade_adjustments.findMany({
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 5000,
-        where: { date: yearMonthDateWhere(year, month), reversed_at: null, status: { not: 'cancelled' } },
+        where: { ...branchScopedGradeAdjustmentWhere(allowedBranchIds), date: yearMonthDateWhere(year, month), reversed_at: null, status: { not: 'cancelled' } },
       }),
     ])
+    const visibleSupplierIds = new Set([...bills, ...payments, ...weightTickets].map((row) => row.supplier_id).filter((id): id is bigint => id != null))
+    const visibleSuppliers = suppliers.filter((supplier) => visibleSupplierIds.has(supplier.id))
 
-    const supplierRows = suppliers.map((supplier) => {
+    const supplierRows = visibleSuppliers.map((supplier) => {
       const supplierBills = bills.filter((bill) => bill.supplier_id === supplier.id && inYearMonth(bill.date, year, month))
       const supplierPayments = payments.filter((payment) => payment.supplier_id === supplier.id && inYearMonth(payment.date, year, month))
       const supplierTickets = weightTickets.filter((ticket) => ticket.supplier_id === supplier.id && inYearMonth(ticket.document_date, year, month))
@@ -145,18 +194,26 @@ export async function GET(request: Request) {
       }, { billedWeight: 0, deductWeight: 0, grossWeight: 0, netWeight: 0 })
       const supplierProductIds = new Set(supplierTickets.flatMap((ticket) => ticket.weight_ticket_product_summaries.map((summary) => String(summary.product_id))))
       const gradeAdjustmentCount = gradeAdjustments.filter((row) => [row.product_id, row.source_product_id, row.target_product_id].some((id) => id != null && supplierProductIds.has(String(id)))).length
-      const purchase = supplierBills.reduce<{ amount: number; payable: number; qty: number }>((sum, bill) => {
+      const purchase = supplierBills.reduce<{ agingBuckets: ReturnType<typeof emptyFinancialAgingBucketTotals>; amount: number; oldestApAgeDays: number; overdueApAmount: number; overdueApBillCount: number; payable: number; qty: number }>((sum, bill) => {
         const item = itemTotals(purchaseBillItemRows(bill))
         const amount = item.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+        const payable = toNumber(bill.payable_balance)
+        const aging = computeFinancialDueAging({ asOfDate, documentDate: bill.date })
+        if (payable > 0) addToFinancialAgingBucketTotals(sum.agingBuckets, aging.ageBucket, payable)
         return {
+          agingBuckets: sum.agingBuckets,
           amount: sum.amount + amount,
-          payable: sum.payable + toNumber(bill.payable_balance),
+          oldestApAgeDays: payable > 0 ? Math.max(sum.oldestApAgeDays, aging.ageDays) : sum.oldestApAgeDays,
+          overdueApAmount: sum.overdueApAmount + (payable > 0 && aging.ageDays > 0 ? payable : 0),
+          overdueApBillCount: sum.overdueApBillCount + (payable > 0 && aging.ageDays > 0 ? 1 : 0),
+          payable: sum.payable + payable,
           qty: sum.qty + item.qty,
         }
-      }, { amount: 0, payable: 0, qty: 0 })
-      const paidAmount = supplierPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)
+      }, { agingBuckets: emptyFinancialAgingBucketTotals(), amount: 0, oldestApAgeDays: 0, overdueApAmount: 0, overdueApBillCount: 0, payable: 0, qty: 0 })
+      const paidAmount = supplierPayments.reduce((sum, payment) => sum + paymentSettlementAmount(payment), 0)
 
       return {
+        agingBuckets: financialAgingBuckets.map((bucket) => ({ amount: purchase.agingBuckets[bucket].amount, bucket, count: purchase.agingBuckets[bucket].count })),
         avgBuy: purchase.qty > 0 ? purchase.amount / purchase.qty : 0,
         billCount: supplierBills.length,
         code: requireBusinessCode(supplier.code, `ผู้ขาย ${supplier.id}`),
@@ -164,6 +221,9 @@ export async function GET(request: Request) {
         deductionPct: ticketTotals.grossWeight > 0 ? (ticketTotals.deductWeight / ticketTotals.grossWeight) * 100 : 0,
         gradeAdjustmentCount,
         id: requireBusinessCode(supplier.code, `ผู้ขาย ${supplier.id}`),
+        oldestApAgeDays: purchase.oldestApAgeDays,
+        overdueApAmount: purchase.overdueApAmount,
+        overdueApBillCount: purchase.overdueApBillCount,
         paidAmount,
         paidPct: paidAmount + purchase.payable > 0 ? (paidAmount / (paidAmount + purchase.payable)) * 100 : 0,
         payable: purchase.payable,
@@ -217,7 +277,7 @@ export async function GET(request: Request) {
       }, { amount: 0, month: monthKey, qty: 0 })
     })
 
-    const detail = detailSupplier ? (() => {
+    const detail = detailSupplier && visibleSupplierIds.has(detailSupplier.id) ? (() => {
       const detailBills = bills.filter((bill) => bill.supplier_id === detailSupplier.id && inYearMonth(bill.date, year, month))
       const detailPayments = payments.filter((payment) => payment.supplier_id === detailSupplier.id && inYearMonth(payment.date, year, month))
       const detailTickets = weightTickets.filter((ticket) => ticket.supplier_id === detailSupplier.id && inYearMonth(ticket.document_date, year, month))
@@ -248,15 +308,20 @@ export async function GET(request: Request) {
         bills: detailBills.slice(0, 50).map((bill) => {
           const item = itemTotals(purchaseBillItemRows(bill))
           const amount = item.amount || toNumber(bill.subtotal) || toNumber(bill.total_amount)
+          const aging = computeFinancialDueAging({ asOfDate, documentDate: bill.date })
           return {
+            ageBucket: aging.ageBucket,
+            ageDays: aging.ageDays,
             amount,
             avgBuy: item.qty > 0 ? amount / item.qty : 0,
             date: toDateOnly(bill.date),
             docNo: bill.doc_no,
+            dueDate: aging.referenceDate,
             href: `/purchase/bills/${encodeURIComponent(bill.doc_no)}`,
             paidAmount: toNumber(bill.paid_amount),
             payable: toNumber(bill.payable_balance),
             qty: item.qty,
+            referenceDateType: aging.referenceDateType,
             status: bill.status ?? '-',
           }
         }),
@@ -264,6 +329,7 @@ export async function GET(request: Request) {
           amount: toNumber(payment.amount),
           date: toDateOnly(payment.date),
           docNo: payment.doc_no,
+          href: `/purchase/payments?tab=history&q=${encodeURIComponent(payment.doc_no)}`,
           method: payment.method ?? '-',
           netAmount: toNumber(payment.net_amount),
           status: payment.status ?? '-',
@@ -272,7 +338,7 @@ export async function GET(request: Request) {
           const monthKey = String(index + 1).padStart(2, '0')
           const monthBills = detailYearBills.filter((bill) => inYearMonth(bill.date, year, monthKey))
           const monthPayments = detailYearPayments.filter((payment) => inYearMonth(payment.date, year, monthKey))
-          const paidAmount = monthPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)
+          const paidAmount = monthPayments.reduce((sum, payment) => sum + paymentSettlementAmount(payment), 0)
           return monthBills.reduce<{
             billCount: number
             month: string
@@ -304,11 +370,38 @@ export async function GET(request: Request) {
           })
         }),
         qualitySignals: {
+          agingBuckets: (() => {
+            const bucketTotals = emptyFinancialAgingBucketTotals()
+            detailBills.forEach((bill) => {
+              const payable = toNumber(bill.payable_balance)
+              if (payable <= 0) return
+              const aging = computeFinancialDueAging({ asOfDate, documentDate: bill.date })
+              addToFinancialAgingBucketTotals(bucketTotals, aging.ageBucket, payable)
+            })
+            return financialAgingBuckets.map((bucket) => ({ amount: bucketTotals[bucket].amount, bucket, count: bucketTotals[bucket].count }))
+          })(),
           deliveryCompletionPct: detailTicketTotals.netWeight > 0 ? (detailTicketTotals.billedWeight / detailTicketTotals.netWeight) * 100 : 0,
           deductionPct: detailTicketTotals.grossWeight > 0 ? (detailTicketTotals.deductWeight / detailTicketTotals.grossWeight) * 100 : 0,
           gradeAdjustmentCount: detailGradeAdjustments.length,
-          paymentReliabilityPct: detailBills.reduce((sum, bill) => sum + toNumber(bill.payable_balance), 0) + detailPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0) > 0
-            ? detailPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0) / (detailPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0) + detailBills.reduce((sum, bill) => sum + toNumber(bill.payable_balance), 0)) * 100
+          oldestApAgeDays: detailBills.reduce((oldest, bill) => {
+            const payable = toNumber(bill.payable_balance)
+            if (payable <= 0) return oldest
+            return Math.max(oldest, computeFinancialDueAging({ asOfDate, documentDate: bill.date }).ageDays)
+          }, 0),
+          overdueApAmount: detailBills.reduce((sum, bill) => {
+            const payable = toNumber(bill.payable_balance)
+            if (payable <= 0) return sum
+            const aging = computeFinancialDueAging({ asOfDate, documentDate: bill.date })
+            return sum + (aging.ageDays > 0 ? payable : 0)
+          }, 0),
+          overdueApBillCount: detailBills.reduce((sum, bill) => {
+            const payable = toNumber(bill.payable_balance)
+            if (payable <= 0) return sum
+            const aging = computeFinancialDueAging({ asOfDate, documentDate: bill.date })
+            return sum + (aging.ageDays > 0 ? 1 : 0)
+          }, 0),
+          paymentReliabilityPct: detailBills.reduce((sum, bill) => sum + toNumber(bill.payable_balance), 0) + detailPayments.reduce((sum, payment) => sum + paymentSettlementAmount(payment), 0) > 0
+            ? detailPayments.reduce((sum, payment) => sum + paymentSettlementAmount(payment), 0) / (detailPayments.reduce((sum, payment) => sum + paymentSettlementAmount(payment), 0) + detailBills.reduce((sum, bill) => sum + toNumber(bill.payable_balance), 0)) * 100
             : 0,
           returnSignalStatus: 'ยังไม่มี purchase return source table ใน schema ปัจจุบัน',
           wtiCount: detailTickets.length,
@@ -316,6 +409,7 @@ export async function GET(request: Request) {
         gradeAdjustments: detailGradeAdjustments.map((row) => ({
           date: toDateOnly(row.date),
           docNo: row.doc_no,
+          href: `/stock/convert?q=${encodeURIComponent(row.doc_no)}`,
           qtyDiff: toNumber(row.qty_diff),
           reason: row.reason ?? row.notes ?? '-',
           status: row.status,
@@ -335,6 +429,7 @@ export async function GET(request: Request) {
           deductWeight: toNumber(ticket.deduct_weight),
           docNo: ticket.doc_no,
           grossWeight: toNumber(ticket.gross_weight),
+          href: `/daily/weight-ticket-list/${encodeURIComponent(ticket.doc_no)}`,
           netWeight: ticket.weight_ticket_product_summaries.reduce((sum, summary) => sum + toNumber(summary.net_weight), 0) || toNumber(ticket.net_weight),
           remainingWeight: ticket.weight_ticket_product_summaries.reduce((sum, summary) => sum + toNumber(summary.remaining_weight), 0),
           status: ticket.status,
@@ -350,6 +445,9 @@ export async function GET(request: Request) {
         DeliveryCompletionPct: row.deliveryCompletionPct,
         DeductionPct: row.deductionPct,
         GradeAdjustments: row.gradeAdjustmentCount,
+        OldestApAgeDays: row.oldestApAgeDays,
+        OverdueApAmount: row.overdueApAmount,
+        OverdueApBills: row.overdueApBillCount,
         Paid: row.paidAmount,
         PaidPct: row.paidPct,
         Payable: row.payable,
@@ -364,7 +462,7 @@ export async function GET(request: Request) {
       byProduct,
       detail,
       filters: {
-        suppliers: suppliers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ผู้ขาย ${row.id}`), name: row.name })),
+        suppliers: visibleSuppliers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ผู้ขาย ${row.id}`), name: row.name })),
       },
       monthly,
       rows: supplierRows,

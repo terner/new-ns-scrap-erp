@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
+import type { Prisma } from '../../../../../generated/prisma/client'
 import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { getAllowedBranchIds } from '@/lib/server/branch-scope'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
@@ -183,10 +185,48 @@ function createAgg(product: ProductRef | undefined, fallbackName: string, matchK
   }
 }
 
+function isAllowedBranch(allowedBranchIds: bigint[] | null, branchId: bigint) {
+  return allowedBranchIds === null || allowedBranchIds.some((allowedBranchId) => allowedBranchId === branchId)
+}
+
+function branchScopedPurchaseBillWhere(allowedBranchIds: bigint[] | null, requestedBranchId?: bigint): Prisma.purchase_billsWhereInput {
+  if (requestedBranchId != null) return isAllowedBranch(allowedBranchIds, requestedBranchId) ? { branch_id: requestedBranchId } : { branch_id: { in: [] } }
+  if (allowedBranchIds === null) return {}
+  return {
+    OR: [
+      { branch_id: null },
+      { branch_id: { in: allowedBranchIds } },
+    ],
+  }
+}
+
+function branchScopedSalesBillWhere(allowedBranchIds: bigint[] | null, requestedBranchId?: bigint): Prisma.sales_billsWhereInput {
+  if (requestedBranchId != null) return isAllowedBranch(allowedBranchIds, requestedBranchId) ? { branch_id: requestedBranchId } : { branch_id: { in: [] } }
+  if (allowedBranchIds === null) return {}
+  return {
+    OR: [
+      { branch_id: null },
+      { branch_id: { in: allowedBranchIds } },
+    ],
+  }
+}
+
+function branchScopedProductionOrderWhere(allowedBranchIds: bigint[] | null, requestedBranchId?: bigint): Prisma.production_ordersWhereInput {
+  if (requestedBranchId != null) return isAllowedBranch(allowedBranchIds, requestedBranchId) ? { branch_id: requestedBranchId } : { branch_id: { in: [] } }
+  if (allowedBranchIds === null) return {}
+  return {
+    OR: [
+      { branch_id: null },
+      { branch_id: { in: allowedBranchIds } },
+    ],
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'reports.reports.view')
+    const allowedBranchIds = await getAllowedBranchIds(context)
 
     const url = new URL(request.url)
     const year = url.searchParams.get('year') || String(new Date().getFullYear())
@@ -199,6 +239,9 @@ export async function GET(request: Request) {
     const customerId = url.searchParams.get('customerId')
     const search = url.searchParams.get('q')?.trim().toLowerCase()
     const branch = branchId ? await findActiveBranchReferenceByCodeOrId(branchId) : null
+    const purchaseBranchWhere = branchScopedPurchaseBillWhere(allowedBranchIds, branch?.id)
+    const salesBranchWhere = branchScopedSalesBillWhere(allowedBranchIds, branch?.id)
+    const productionBranchWhere = branchScopedProductionOrderWhere(allowedBranchIds, branch?.id)
     const supplier = supplierId ? await findActiveSupplierReferenceByCodeOrId(supplierId) : null
     const customer = customerId ? await findActiveCustomerReferenceByCodeOrId(customerId) : null
     const normalizedProductId = productId ? await prisma.products.findFirst({
@@ -236,8 +279,8 @@ export async function GET(request: Request) {
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
         where: {
+          ...purchaseBranchWhere,
           status: { notIn: [...PURCHASE_BILL_CANCELLED_STATUSES] },
-          ...(branch?.id != null ? { branch_id: branch.id } : {}),
           ...(supplier ? { supplier_id: supplier.id } : {}),
         },
       }),
@@ -246,8 +289,8 @@ export async function GET(request: Request) {
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
         where: {
+          ...salesBranchWhere,
           NOT: { status: 'cancelled' },
-          ...(branch?.id != null ? { branch_id: branch.id } : {}),
           ...(customer ? { customer_id: customer.id } : {}),
         },
       }),
@@ -261,8 +304,8 @@ export async function GET(request: Request) {
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         take: 10000,
         where: {
+          ...productionBranchWhere,
           status: { not: 'Cancelled' },
-          ...(branch?.id != null ? { branch_id: branch.id } : {}),
         },
       }),
       prisma.trading_allocation_facts.findMany({
@@ -275,6 +318,19 @@ export async function GET(request: Request) {
         },
       }),
     ])
+    const visiblePurchaseBillIds = new Set(purchaseBills.map((bill) => bill.id.toString()))
+    const visibleSalesBillIds = new Set(salesBills.map((bill) => bill.id.toString()))
+    const visibleAllocationFacts = allowedBranchIds === null && branch?.id == null
+      ? allocationFacts
+      : allocationFacts.filter((fact) => {
+        if (fact.purchase_bill_id != null && visiblePurchaseBillIds.has(fact.purchase_bill_id.toString())) return true
+        if (fact.sales_bill_id != null && visibleSalesBillIds.has(fact.sales_bill_id.toString())) return true
+        return false
+      })
+    const visibleSupplierIds = new Set(purchaseBills.map((bill) => bill.supplier_id).filter((id): id is bigint => id != null))
+    const visibleCustomerIds = new Set(salesBills.map((bill) => bill.customer_id).filter((id): id is bigint => id != null))
+    const visibleSuppliers = suppliers.filter((supplier) => visibleSupplierIds.has(supplier.id))
+    const visibleCustomers = customers.filter((customer) => visibleCustomerIds.has(customer.id))
     const salesLines = await salesBillLineFactsForBills(salesBills.map((bill) => bill.id))
 
     const productsByKey = new Map<string, ProductRef>()
@@ -344,7 +400,7 @@ export async function GET(request: Request) {
         })
       })
 
-    allocationFacts
+    visibleAllocationFacts
       .filter((fact) => inYearMonth(fact.date, year, month))
       .forEach((fact) => {
         const product = fact.product_id != null ? productsByKey.get(String(fact.product_id)) : undefined
@@ -492,23 +548,39 @@ export async function GET(request: Request) {
           const inputQty = order.production_inputs.filter((input) => input.product_id === detailProduct.id).reduce((sum, input) => sum + toNumber(input.qty), 0)
           const outputQty = order.production_outputs.filter((output) => output.product_id === detailProduct.id && !isLossOutput(output)).reduce((sum, output) => sum + toNumber(output.qty), 0)
           const lossQty = order.production_outputs.filter((output) => output.product_id === detailProduct.id && isLossOutput(output)).reduce((sum, output) => sum + toNumber(output.qty), 0)
-          return { date: toDateOnly(order.date), docNo: order.doc_no, inputQty, lossQty, outputQty, status: order.status ?? '-', yieldPct: inputQty > 0 ? (outputQty / inputQty) * 100 : 0 }
+          return {
+            date: toDateOnly(order.date),
+            docNo: order.doc_no,
+            href: `/production/orders?q=${encodeURIComponent(order.doc_no)}`,
+            inputQty,
+            lossQty,
+            outputQty,
+            status: order.status ?? '-',
+            yieldPct: inputQty > 0 ? (outputQty / inputQty) * 100 : 0,
+          }
         })
         .filter((order) => order.inputQty > 0 || order.outputQty > 0 || order.lossQty > 0)
         .slice(0, 80)
-      const allocationLines = allocationFacts
+      const allocationLines = visibleAllocationFacts
         .filter((fact) => fact.product_id === detailProduct.id && inYearMonth(fact.date, year, month))
-        .map((fact) => ({
-          allocationNo: fact.allocation_no,
-          date: toDateOnly(fact.date),
-          matchedCogs: toNumber(fact.matched_cogs),
-          method: fact.allocation_method,
-          qty: toNumber(fact.qty),
-          salesDocNo: fact.sales_doc_no ?? '-',
-          sourceDocNo: fact.source_doc_no ?? '-',
-          sourceType: fact.source_type,
-          status: fact.status,
-        }))
+        .map((fact) => {
+          const salesDocNo = fact.sales_doc_no ?? '-'
+          const sourceDocNo = fact.source_doc_no ?? '-'
+          const isPurchaseSource = ['TRADING_PURCHASE_BILL', 'PURCHASE_BILL', 'PB'].includes(fact.source_type ?? '')
+          return {
+            allocationNo: fact.allocation_no,
+            date: toDateOnly(fact.date),
+            matchedCogs: toNumber(fact.matched_cogs),
+            method: fact.allocation_method,
+            qty: toNumber(fact.qty),
+            salesDocHref: fact.sales_doc_no ? `/sales/bills/${encodeURIComponent(fact.sales_doc_no)}` : null,
+            salesDocNo,
+            sourceDocHref: fact.source_doc_no && isPurchaseSource ? `/purchase/bills/${encodeURIComponent(fact.source_doc_no)}` : null,
+            sourceDocNo,
+            sourceType: fact.source_type,
+            status: fact.status,
+          }
+        })
         .slice(0, 80)
       const detailMonthly = Array.from({ length: 12 }, (_, index) => {
         const monthKey = String(index + 1).padStart(2, '0')
@@ -558,6 +630,7 @@ export async function GET(request: Request) {
           id: requireBusinessCode(detailProduct.code, `สินค้า ${detailProduct.id}`),
           metalGroup: detailProduct.metal_group,
           name: detailProduct.name,
+          stockBalanceHref: `/stock/balance?productId=${encodeURIComponent(requireBusinessCode(detailProduct.code, `สินค้า ${detailProduct.id}`))}`,
           unit: detailProduct.unit ?? 'kg',
         },
         productionLines: detailProductionOrders,
@@ -599,8 +672,8 @@ export async function GET(request: Request) {
       filters: {
         metalGroups: Array.from(new Set(products.map((product) => product.metal_group).filter(Boolean))).sort(),
         products: products.map((product) => ({ active: product.active, code: product.code, id: requireBusinessCode(product.code, `สินค้า ${product.id}`), metalGroup: product.metal_group, name: product.name })),
-        suppliers: suppliers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ผู้ขาย ${row.id}`), name: row.name })),
-        customers: customers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ลูกค้า ${row.id}`), name: row.name })),
+        suppliers: visibleSuppliers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ผู้ขาย ${row.id}`), name: row.name })),
+        customers: visibleCustomers.map((row) => ({ active: row.active, code: row.code, id: requireBusinessCode(row.code, `ลูกค้า ${row.id}`), name: row.name })),
       },
       monthly,
       rows,
