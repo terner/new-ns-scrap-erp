@@ -112,3 +112,33 @@
   - รัน `type-check` และ `lint` (eslint) บน `@ns-scrap-erp/next` ผ่านสำเร็จ 100% ปราศจาก Error ในตัว Component
 - **ภาพหลักฐานการปรับปรุงหน้าจอประวัติเปลี่ยน Supplier:** [kpi_cards_neutral_gray](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/kpi_cards_status_1781496817967.png) (แสดงผลการ์ด Coins ส่วนต่าง 0.00 เป็นสีเทาอ่อนพาสเทลตามแนวทาง Peach UI ที่ผ่านการอนุมัติ)
 
+### 13. ซ่อนช่องกรอก "เลขที่เอกสาร" (Auto-generated) ในแบบฟอร์มคลังสินค้า (Stock Operations UI)
+- **การดำเนินการ:** แก้ไขคอมโพเนนต์ร่วม `<BaseDateDoc />` ใน [StockOperationPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/stock/StockOperationPageClient.tsx) เพื่อซ่อนกล่องกรอกข้อมูล "เลขที่เอกสาร" (Document Number) เนื่องจากระบบฝั่งเซิร์ฟเวอร์จะสร้างให้อัตโนมัติ (Auto-generated) ในตอนบันทึกส่งฟอร์มใหม่อยู่แล้ว
+- **ผลลัพธ์:** ผู้ใช้งานจะไม่เห็นช่อง "เลขที่เอกสาร" ในหน้าต่าง Modal "ปรับเกรดสินค้า" (Grade Adjustment) และ "ปรับสต๊อกสินค้า" (Stock Adjustment) อีกต่อไป ป้องกันการสับสนของข้อมูลและลดการกรอกฟิลด์ที่ไม่จำเป็น
+- **สถานะ:** เสร็จสมบูรณ์
+- **ภาพหลักฐานการทดสอบหน้าจอ:** [grade_adjustment_no_doc_no](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/grade_adjustment_no_doc_no_1781497331376.png) (แสดงผลกล่อง Modal ปรับเกรดสินค้าที่ซ่อนช่องเลขที่เอกสารไปแล้ว เลย์เอาต์สมมาตรและสะอาดตา)### 14. แก้ไขปัญหาเลือกสินค้าไม่ได้ใน SearchCombobox และปรับฟิลด์ Shift ในหน้าใบสั่งผลิต
+- **การดำเนินการ:**
+  - **แก้ไข SearchCombobox:** แก้ไขปัญหาใหญ่ที่ Radix UI Dialog focus trap บล็อกการคลิกปุ่ม Portal ที่อยู่ภายนอก Dialog DOM tree โดยปรับปรุงให้ `SearchCombobox` ทำการตรวจหาและตั้ง `scopedPortalHost` เป็น Dialog Content element (`[role="dialog"]`) เพื่อเรนเดอร์ dropdown panel ภายใต้ Dialog DOM tree ทันที ทำให้อีเวนต์ pointerdown/click ของเมาส์ผ่านทะลุเข้าไปทำงานและแก้ไขได้ 100%
+  - **Click Outside & Capturing Phase:** เปลี่ยนระบบปิด dropdown จากเดิมที่ใช้ input `onBlur` (มีปัญหา race condition กับ timeout) มาใช้ Click Outside handler บน `document` ร่วมกับ `onMouseDownCapture` และ `onTouchStartCapture` บนตัวเลือกเพื่อหยุดการบล็อกของ Radix UI
+  - **ปรับฟิลด์ Shift:** เปลี่ยนช่องกะการทำงาน (Shift) ใน [ProductionOrdersPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/production/ProductionOrdersPageClient.tsx) จาก `<input>` เป็น `<select>` มีตัวเลือก "เช้า" และ "บ่าย" ตามสไตล์ AcexPOS
+  - **ข้อตกลงและกฎเหล็กการทดสอบ:** บันทึกข้อกำหนดความปลอดภัยของข้อมูลหลัก "ห้ามเพิ่มข้อมูลสินค้าหรือข้อมูลหลักเองในการทดสอบเด็ดขาด ให้ใช้เฉพาะสินค้าเดิมที่มีอยู่จริงของโรงงานเท่านั้น" ลงในเอกสารแนวทาง [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md) และเอกสารติดตามงานเรียบร้อยเพื่อความโปร่งใสและถูกต้องของข้อมูล
+- **ผลลัพธ์การตรวจสอบ (E2E Test):**
+  - รัน `type-check` และ `lint` บนเครื่องโลคอลผ่านสำเร็จ 100%
+  - จำลองความจริงผ่าน Browser subagent คลิกเลือกสินค้าตัวแรก **"SKU001 - กระทะดำ, ผัด"** โดยไม่มีการพิมพ์ค้นหา และกดบันทึกสำเร็จ จนเกิดรายการใบสั่งผลิตใหม่รหัส **`PO2606-0003`**
+  - ภาพถ่ายโมดอลหลังกดเลือก: [dialog_after_click_product](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/dialog_after_click_product_1781499177516.png)
+  - ภาพตารางหลักหลังสร้างใบสั่งผลิตสำเร็จ: [production_orders_with_new_order](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/production_orders_with_new_order_1781499258928.png)
+
+### 15. จัด responsive หน้ารายการใบสั่งผลิตและรายละเอียด (Production Orders Responsive - Final)
+- **การดำเนินการ:** ปรับปรุง Responsive ในหน้าใบสั่งผลิต [ProductionOrdersPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/production/ProductionOrdersPageClient.tsx):
+  - **Mobile Toolbar:** เพิ่มปุ่ม "+ สร้าง" สี Slate-900 ขนาดเล็กกระชับ (h-9) ลงใน Toolbar สำหรับจอมือถือถัดจากปุ่มตัวกรอง เพื่ออำนวยความสะดวกในการกดสร้างใบสั่งผลิตบนอุปกรณ์ขนาดเล็ก
+  - **Modal Footer:** ตกแต่งปุ่มปิดและปุ่มบันทึกใน footer ของใบสั่งผลิต:
+    - ปุ่มยกเลิก/ปิด: เปลี่ยนจากปุ่มปกติมีกรอบเป็น Text-only button ไร้กรอบ (`bg-transparent text-slate-500 hover:text-slate-700 border-0 outline-none transition-colors`) ชิดขวา
+    - ปุ่มบันทึก/ตกลง: ใช้เฉดสีกรมท่าเข้มพรีเมียม (`bg-[#0F172A] hover:bg-[#1E293B] font-semibold text-white transition-colors`) ตามมาตรฐาน Peach UI
+  - **Product Stock Preview:** ปรับตารางสต๊อกสินค้าที่จะผลิตให้รองรับ Responsive:
+    - แสดงผลในรูปแบบ Desktop table ตามปกติบนจอใหญ่ (`hidden md:block`)
+    - ยุบเป็นกล่องการ์ดแนวตั้งกระชับ (Mobile Dense Card List) บนจอมือถือ (`block md:hidden`) เพื่อหลีกเลี่ยง Horizontal Scrollbar
+  - **Metric Cards ใน Modal รายละเอียด:** ปรับปรุงดีไซน์ Metric Cards 6 กล่องด้านบนของ Modal ให้สอดคล้องกันโดยใช้กรอบบางมน `bg-white shadow-sm border border-slate-200 rounded-xl`
+- **ผลการคอมไพล์และการตรวจสอบ (Technical Validation):**
+  - รัน `type-check` และ `lint` บนเครื่องโลคอลผ่านสำเร็จ 100%
+  - ทดสอบความถูกต้องบนเบราว์เซอร์ผ่าน Browser Subagent ใน viewport 375px ยืนยันว่าไม่มีส่วนประกอบใดหลุดล้น มีการจัดวางที่สวยงามและใช้งานได้ง่าย
+

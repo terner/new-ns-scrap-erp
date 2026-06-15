@@ -1237,7 +1237,7 @@ function Metric({
   )
 }
 
-function Field(props: { label: string; onChange: (value: string) => void; type?: string; value: string }) {
+function Field(props: { disabled?: boolean; label: string; onChange: (value: string) => void; type?: string; value: string }) {
   return (
     <label className="block text-xs font-semibold text-slate-600">
       {props.label}
@@ -1245,7 +1245,8 @@ function Field(props: { label: string; onChange: (value: string) => void; type?:
         <DatePickerInput className="mt-1.5 w-full font-normal" value={props.value} onChange={props.onChange} />
       ) : (
         <input
-          className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-slate-900"
+          className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-slate-900 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+          disabled={props.disabled}
           inputMode={props.type === 'number' ? 'decimal' : undefined}
           min={props.type === 'number' ? 0 : undefined}
           step={props.type === 'number' ? 'any' : undefined}
@@ -1256,6 +1257,12 @@ function Field(props: { label: string; onChange: (value: string) => void; type?:
       )}
     </label>
   )
+}
+
+function BaseDateDoc<T extends { date: string; docNo?: string | null }>({ setValues, values }: { setValues: (values: T) => void; values: T }) {
+  return <>
+    <Field label="วันที่" type="date" value={values.date} onChange={(date) => setValues({ ...values, date })} />
+  </>
 }
 
 function Select(props: { disabled?: boolean; label: string; onChange: (value: string) => void; options: StockOption[]; placeholder?: string; value: string }) {
@@ -1652,13 +1659,6 @@ function AdjustForm(props: { cancelHref: string; isSaving: boolean; onSubmit: (v
       </div>
     </div>
   </FormShell>
-}
-
-function BaseDateDoc<T extends { date: string; docNo?: string | null }>({ setValues, values }: { setValues: (values: T) => void; values: T }) {
-  return <>
-    <Field label="วันที่" type="date" value={values.date} onChange={(date) => setValues({ ...values, date })} />
-    <Field label="เลขที่เอกสาร" value={values.docNo ?? ''} onChange={(docNo) => setValues({ ...values, docNo })} />
-  </>
 }
 
 function ReadOnlyBox({ label, value, valueClassName = 'text-slate-800' }: { label: string; value: string; valueClassName?: string }) {
