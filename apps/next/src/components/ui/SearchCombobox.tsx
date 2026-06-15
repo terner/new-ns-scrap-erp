@@ -279,10 +279,6 @@ export function SearchCombobox({
                     event.stopPropagation()
                     selectOption(option)
                   }}
-                  onTouchStartCapture={(event) => {
-                    event.stopPropagation()
-                    selectOption(option)
-                  }}
                   onClick={(event) => {
                     event.preventDefault()
                   }}

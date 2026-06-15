@@ -174,3 +174,21 @@
   - แท็บ Output ที่แสดงคลังรับสำหรับระบุข้อมูล: [details_output_tab](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/details_output_tab_1781504883438.png)
   - วิดีโอบันทึกการทดสอบ E2E: ![verify_prod_wh_visibility](/C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/verify_prod_wh_visibility_1781504831149.webp)
 
+### 18. ปรับปรุงฟิลด์ฟอร์มเบิก/รับผลผลิต และขยายขอบเขตแสดงสต๊อกปัจจุบันในหน้าฝ่ายผลิต (Production Form & Stock Preview Polish)
+- **การดำเนินการ:**
+  - **Autofill ประเภทเครื่องจักร:** เพิ่มฟิลด์ประเภทเครื่องจักร (Read-only) โดยจะดึงค่าอัตโนมัติเมื่อผู้ใช้เลือกเครื่องจักร (ดึงค่า `type` ผ่าน options API ของ `production_machines`) พร้อมแมปประเภทการผลิต (`Processing`/`Baling`/`Sorting`) เบื้องหลังอัตโนมัติ
+  - **นำฟิลด์ที่ไม่จำเป็นออก:**
+    - **แท็บ Input:** ซ่อนฟิลด์ "สถานะสต๊อก" และ "Lot No." และตั้งค่าส่ง default `stockStatus: 'RM'` เบื้องหลัง พร้อมจัด Grid 3 คอลัมน์ใหม่ (ขยายช่องสินค้าเป็น `md:col-span-2` ให้สวยงามสมดุล)
+    - **แท็บ Output:** ซ่อนฟิลด์ "ประเภท" และ "Lot No." และตั้งค่าส่ง default `categoryCode: 'FG'` เบื้องหลัง พร้อมจัด Grid 3 คอลัมน์ใหม่ (ขยายช่องสินค้าเป็น `md:col-span-2` และหมายเหตุเป็น `md:col-span-2`)
+  - **ขยายการแสดงผล Stock ปัจจุบัน (กรอบแดง):** แก้ไขฟังก์ชัน `productionProductStock` ใน backend ให้ดึงข้อมูลสต๊อกของสินค้านั้นจาก**ทุกคลังสินค้าที่เป็นคลัง Active** ในสาขาที่เลือก และแสดงข้อมูลแยกแถวให้เห็นทั้งประเภท **FG** และ **RM** ทั้งหมด (จากเดิมที่แสดงคลังที่เลือกคลังเดียว) และอัปเดต UI ให้แสดงคลังตรงตามแถว (`row.warehouseCode`)
+- **ผลลัพธ์การตรวจสอบ (UAT & Compilation):**
+  - รันคำสั่งตรวจสอบ Type-check และ ESLint บน Next.js Workspace ผ่านสำเร็จ 100% ไม่มีข้อผิดพลาด
+  - ตรวจสอบ E2E UAT บนเบราว์เซอร์จริงผ่าน subagent:
+    - การเลือกเครื่องจักรจะดึงประเภทเครื่องจักรขึ้นแสดงอัตโนมัติถูกต้อง (เช่น เลือกเครื่องตัดอลูมิเนียม ขึ้นประเภทเครื่องตัด)
+    - แท็บ Input และ Output มีฟอร์ม 3 คอลัมน์สวยงาม ไม่มีฟิลด์ที่ถูกซ่อน และบันทึกข้อมูลเบิก/รับได้จริง
+    - กล่องแสดงผล Stock ปัจจุบัน ดึงข้อมูลสต๊อก SKU001 ทั้งจากคลัง `FG-SK` และ `RM-SK` มาแสดงคู่กันพร้อมกันอย่างถูกต้อง
+  - ภาพหลักฐาน UAT การเชื่อมโยงประเภทเครื่องจักร: [machine_type_autofill](file:///C:/Users/pc/.gemini/antigravity-ide/brain/027f3d4f-1a1a-4f60-881c-53257b3b2958/machine_type_autofill_1781511145459.png)
+  - ภาพหลักฐาน UAT แท็บ Input: [input_tab_clean](file:///C:/Users/pc/.gemini/antigravity-ide/brain/027f3d4f-1a1a-4f60-881c-53257b3b2958/input_tab_verification_1781511347988.png)
+  - ภาพหลักฐาน UAT แท็บ Output: [output_tab_clean](file:///C:/Users/pc/.gemini/antigravity-ide/brain/027f3d4f-1a1a-4f60-881c-53257b3b2958/output_tab_verification_1781511355423.png)
+  - ภาพหลักฐาน UAT Stock Preview แยกคลัง/ประเภท: [stock_preview_all_warehouses](file:///C:/Users/pc/.gemini/antigravity-ide/brain/027f3d4f-1a1a-4f60-881c-53257b3b2958/sku001_stock_preview_1781511807699.png)
+

@@ -121,6 +121,39 @@
    - เพื่อให้สอดคล้องกับข้อกำหนดการห้ามสร้างข้อมูลสินค้าขึ้นมาเองในการทดสอบ แนะนำให้ทำการดึงชุดข้อมูลสินค้าหลัก (Master Product List) ล่าสุดจากโรงงานจริง มาตั้งค่าเป็นฐานข้อมูลจำลอง (Dev Database Seeding) โดยตรง
    - เหตุผล: เพื่อช่วยให้การพัฒนาและทดสอบระบบทั้งหมดดำเนินไปภายใต้รายการข้อมูลสินค้าที่มีอยู่จริงของโรงงานเท่านั้น ลดโอกาสการปะปนของข้อมูลขยะและช่วยทดสอบความถูกต้องของระบบคำนวณบัญชีคลังสินค้าได้อย่างแม่นยำที่สุด
 
+---
+
+## 🧪 ผลการทดสอบ UAT และข้อสังเกตโมดูลการผลิต (UAT Audit Results & Bug Observations - 2026-06-15)
+
+จากการรัน UAT และตรวจสอบการเคลื่อนไหวของคลังสินค้าและบัญชีคลังฝ่ายผลิต ผ่านเบราว์เซอร์และสคริปต์ มีข้อสังเกตและพฤติกรรมของระบบที่ต้องบันทึกดังนี้:
+
+### 1. พฤติกรรมการคำนวณและอัปเดตสถานะ (Correct Behaviors)
+- **Real-time Metrics:** บนหน้ารายละเอียดใบสั่งผลิต ยอดวัตถุดิบนำเข้า (`inputQty`), ผลผลิตรวม (`outputQty`), ยอดสูญเสีย (`lossQty`), WIP คงเหลือ และ Yield % คำนวณแบบสะสมจากรายการเคลื่อนไหวได้ถูกต้องตามจริง
+- **Status Transition:** เอกสารมีวงจรสถานะที่สมบูรณ์ `Open -> In Production -> Partially Completed -> Completed` (หากยอด WIP balance = 0 และระบุจบงาน) หรือเปลี่ยนเป็น `Cancelled` ได้สำเร็จ
+- **Lock Rules:** เมื่อใบสั่งผลิตอยู่ในสถานะ `Completed` หรือ `Cancelled` ระบบจะบล็อกการบันทึก Input/Output เพิ่มเติม และปุ่มย้อนกลับรายการ (Reverse) จะถูก Disable เสมอ ซึ่งตรงตาม Business Rules
+
+### 2. บั๊กที่ตรวจพบในหน้าจอการผลิต (Bug Observations)
+- **บั๊ก Case-sensitivity ของสถานะการเคลื่อนไหว (`active` vs `Active`):**
+  - **ไฟล์ที่พบปัญหา:** [ProductionOrdersPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/production/ProductionOrdersPageClient.tsx)
+  - **รายละเอียด:** โค้ดส่วน UI ตรวจสอบสถานะเพื่อประเมินปุ่มย้อนกลับรายการโดยเช็คกับเงื่อนไข `row.status !== 'Active'` (ตัวพิมพ์ใหญ่) และ Badge ตรวจสอบ `row.status === 'Active'` แต่ทว่าข้อมูล JSON จริงจาก API/Database ส่งค่าสถานะมาเป็น `"active"` (ตัวพิมพ์เล็ก)
+  - **ผลกระทบ:** 
+    1. ปุ่ม **Reverse** สำหรับเบิกวัตถุดิบ (Input) และรับผลผลิต (Output) ถูก Disable เสมอ ทำให้ผู้ใช้ทั่วไปไม่สามารถกด Reverse รายการได้แม้สถานะใบสั่งผลิตจะเอื้ออำนวย
+    2. สี Badge สถานะแสดงผลเป็นสีแดง (เสมือนว่ารายการผิดปกติ) แทนที่จะเป็นสีเขียว
+  - **แนวทางแก้ไข:** เปลี่ยนการตรวจสอบเงื่อนไขใน [ProductionOrdersPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/production/ProductionOrdersPageClient.tsx) ให้เทียบค่ากับ `'active'` (หรือให้ Tolerate ทั้งสองกรณีด้วยการใช้ `.toLowerCase()`) เพื่อให้สอดคล้องกับ API payload จริง
+
+- **การแต่งปุ่มยกเลิกใน Modal หมวดหมู่ผลผลิตไม่ตรงตามสไตล์ (Styling Issue):**
+  - **ไฟล์ที่พบปัญหา:** [MasterDataPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/master-data/shared/MasterDataPageClient.tsx) (ผ่าน config ใน [productionOutputCategoriesPageConfig](file:///c:/new-ns-scrap-erp/apps/next/src/lib/master-data-page-configs.ts) บนหน้า `/production/output-categories`)
+  - **รายละเอียด:** เมื่อคลิกแก้ไขหมวดหมู่ผลผลิต ปุ่ม "ยกเลิก" ใน Modal Dialog ยังคงแสดงผลแบบมีเส้นขอบและพื้นหลังสีขาว (`border border-slate-300 bg-white`) ซึ่งไม่ตรงตามมาตรฐานการฟื้นฟู AcexPOS Style ใน Peach UI ที่ต้องการให้ปุ่มยกเลิกเป็นแบบข้อความเรียบง่ายไร้กรอบ (Text-only)
+  - **แนวทางแก้ไข:** ปรับปรุงคลาสปุ่มยกเลิกของฟอร์ม Modal ใน [MasterDataPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/master-data/shared/MasterDataPageClient.tsx) หรือแยกการส่ง Class styling ผ่าน config ให้เหมาะสมเพื่อรองรับดีไซน์แบบไร้กรอบตัวพิมพ์ข้อความธรรมดา
+
+- **การปรับปรุง Layout ตัวเลือกวันที่และปุ่มส่งออกบนมือถือ (Mobile Toolbar Fit - แก้ไขแล้ว):**
+  - **ไฟล์ที่แก้ไข:** [ProductionReportPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/production/ProductionReportPageClient.tsx)
+  - **รายละเอียด:** ปุ่มตัวกรองวันและปุ่ม Export CSV เดิมแสดงผลเบียดเสียดกันหรือเลยขอบกรอบการ์ดออกมาเมื่อเปิดบนอุปกรณ์หน้าจอขนาดเล็ก
+  - **แนวทางแก้ไข:** แยกการจัดวางเป็น 2 แถวบนมือถือ โดยแถวแรกเป็น DatePicker 2 ช่องคู่กับปุ่มล้างวันที่ (ใช้ `flex-1` เพื่อหด/ขยายขนาด DatePicker ตามพื้นที่หน้าจอโดยอัตโนมัติ ช่วยป้องกันไม่ให้ปุ่มล้างล้นกรอบการ์ด) ส่วนแถวที่สองจัดปุ่มส่งออก CSV ให้ขยายความกว้างเต็มพื้นที่ (`w-full`) เพื่อให้กดง่ายและได้สัดส่วนสวยงาม ส่วนบนจอเดสก์ท็อปจะแสดงเรียงในแถวเดียวตามปกติ
+
+
+
+
 
 
 

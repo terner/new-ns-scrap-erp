@@ -195,11 +195,19 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
     return (
       <section className="space-y-4">
         {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-        <div className="flex flex-wrap gap-2">
-          <DatePickerInput className="w-[130px]" value={dateFrom} onChange={setDateFrom} />
-          <DatePickerInput className="w-[130px]" value={dateTo} onChange={setDateTo} />
-          <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
-          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white" type="button" onClick={exportCostCsv}>Export CSV</button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <DatePickerInput className="flex-1 sm:flex-none sm:w-[130px]" value={dateFrom} onChange={setDateFrom} />
+            <span className="text-slate-400 text-xs shrink-0">-</span>
+            <DatePickerInput className="flex-1 sm:flex-none sm:w-[130px]" value={dateTo} onChange={setDateTo} />
+            <button className="rounded-md border border-slate-200 px-2.5 py-2 text-xs sm:text-sm hover:bg-slate-50 focus:outline-none shrink-0" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>
+              <span className="hidden xs:inline">ล้างวันที่</span>
+              <span className="xs:hidden">ล้าง</span>
+            </button>
+          </div>
+          <button className="rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs sm:text-sm font-semibold text-white focus:outline-none sm:ml-auto w-full sm:w-auto text-center shrink-0" type="button" onClick={exportCostCsv}>
+            Export CSV
+          </button>
         </div>
         <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 lg:grid-cols-7 text-sm">
           <CostCard label="RM Cost" tone="red" value={costTotals.rm} emoji="📦" iconBg="bg-red-100 text-red-700" />
@@ -467,12 +475,22 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <DatePickerInput className="w-[130px]" value={dateFrom} onChange={setDateFrom} />
-          <DatePickerInput className="w-[130px]" value={dateTo} onChange={setDateTo} />
-          <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 focus:outline-none" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>ล้างวันที่</button>
-          {config.exportable ? <button className="ml-auto rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white focus:outline-none" type="button" onClick={exportCsv}>ส่งออก CSV</button> : null}
+      <div className="rounded-xl border border-slate-200/60 bg-white p-3 sm:p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <DatePickerInput className="flex-1 sm:flex-none sm:w-[130px]" value={dateFrom} onChange={setDateFrom} />
+            <span className="text-slate-400 text-xs shrink-0">-</span>
+            <DatePickerInput className="flex-1 sm:flex-none sm:w-[130px]" value={dateTo} onChange={setDateTo} />
+            <button className="rounded-md border border-slate-200 px-2.5 py-2 text-xs sm:text-sm hover:bg-slate-50 focus:outline-none shrink-0" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>
+              <span className="hidden xs:inline">ล้างวันที่</span>
+              <span className="xs:hidden">ล้าง</span>
+            </button>
+          </div>
+          {config.exportable ? (
+            <button className="rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs sm:text-sm font-semibold text-white focus:outline-none sm:ml-auto w-full sm:w-auto text-center shrink-0" type="button" onClick={exportCsv}>
+              ส่งออก CSV
+            </button>
+          ) : null}
         </div>
       </div>
       {mode === 'yieldLoss' ? (

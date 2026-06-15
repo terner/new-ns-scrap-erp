@@ -789,12 +789,12 @@ export async function productionOrderOptions() {
     prisma.branches.findMany({ orderBy: [{ code: 'asc' }], select: { active: true, code: true, id: true, name: true }, where: { active: true } }),
     prisma.warehouses.findMany({ orderBy: [{ code: 'asc' }], select: { active: true, branch_id: true, branches: { select: { code: true } }, code: true, id: true, name: true, type: true }, where: { active: true } }),
     prisma.products.findMany({ orderBy: [{ code: 'asc' }], select: { active: true, code: true, id: true, name: true }, where: { active: true } }),
-    prisma.production_machines.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true }, where: { active: true } }),
+    prisma.production_machines.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true, type: true }, where: { active: true } }),
     prisma.production_lines.findMany({ orderBy: [{ name: 'asc' }], select: { active: true, id: true, name: true }, where: { active: true } }),
   ])
   return {
     branches: branches.map((row) => ({ code: requireBusinessCode(row.code, `สาขา ${row.id}`), id: requireBusinessCode(row.code, `สาขา ${row.id}`), name: row.name })),
-    machines: machines.map((row) => ({ code: row.name, id: row.name, name: row.name })),
+    machines: machines.map((row) => ({ code: row.name, id: row.name, name: row.name, type: row.type })),
     productionLines: lines.map((row) => ({ code: row.name, id: row.name, name: row.name })),
     products: products.map((row) => ({ code: requireBusinessCode(row.code, `สินค้า ${row.id}`), id: requireBusinessCode(row.code, `สินค้า ${row.id}`), name: row.name })),
     productionTypes: ['Sorting', 'Baling', 'Melting', 'Processing'],
@@ -804,16 +804,49 @@ export async function productionOrderOptions() {
 
 export async function productionProductStock(input: { branchCode: string; productCode: string; warehouseCode: string }) {
   const branch = await findActiveBranchByCode(prisma, input.branchCode.trim().toUpperCase())
-  const [product, warehouse] = await Promise.all([
-    findActiveProductByCode(prisma, input.productCode.trim().toUpperCase()),
-    findActiveWarehouseByCode(prisma, input.warehouseCode.trim().toUpperCase(), branch.id),
-  ])
-  const statuses = await Promise.all((['RM', 'FG'] as const).map(async (status) => ({ status, ...(await stockSnapshot(prisma, { branchId: branch.id, productId: product.id, status, warehouseId: warehouse.id })) })))
+  const product = await findActiveProductByCode(prisma, input.productCode.trim().toUpperCase())
+
+  const warehouses = await prisma.warehouses.findMany({
+    select: { id: true, code: true, name: true, type: true },
+    where: { branch_id: branch.id, active: true },
+    orderBy: { code: 'asc' },
+  })
+
+  const rows: Array<{
+    avgCost: number
+    qty: number
+    status: string
+    value: number
+    warehouseCode: string
+    warehouseName: string
+  }> = []
+
+  for (const warehouse of warehouses) {
+    for (const status of ['RM', 'FG'] as const) {
+      const snap = await stockSnapshot(prisma, {
+        branchId: branch.id,
+        productId: product.id,
+        status,
+        warehouseId: warehouse.id,
+      })
+      if (Math.abs(snap.qty) > 0.000001) {
+        rows.push({
+          avgCost: snap.unitCost,
+          qty: snap.qty,
+          status,
+          value: snap.value,
+          warehouseCode: warehouse.code,
+          warehouseName: warehouse.name,
+        })
+      }
+    }
+  }
+
   return {
     branchCode: branch.code,
     productCode: product.code,
     productName: product.name,
-    rows: statuses.filter((row) => Math.abs(row.qty) > 0.000001).map((row) => ({ avgCost: row.unitCost, qty: row.qty, status: row.status, value: row.value })),
-    warehouseCode: warehouse.code,
+    rows,
+    warehouseCode: input.warehouseCode,
   }
 }

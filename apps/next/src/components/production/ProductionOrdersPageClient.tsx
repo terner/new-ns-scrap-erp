@@ -57,10 +57,11 @@ type ProductionOrdersPayload = {
   summary: { inputCost: number; outputValue: number; qtyPlanned: number; total: number; totalPages: number; variance: number }
 }
 type Option = { code: string; id: string; name: string }
+type MachineOption = Option & { type?: string | null }
 type WarehouseOption = Option & { branchCode: string | null; type: string | null }
 type ProductionOrderOptions = {
   branches: Option[]
-  machines: Option[]
+  machines: MachineOption[]
   productionLines: Option[]
   productionTypes: string[]
   products: Option[]
@@ -71,7 +72,7 @@ type ProductStockPayload = {
   branchCode: string
   productCode: string
   productName: string
-  rows: Array<{ avgCost: number; qty: number; status: string; value: number }>
+  rows: Array<{ avgCost: number; qty: number; status: string; value: number; warehouseCode?: string; warehouseName?: string }>
   warehouseCode: string
 }
 
@@ -414,11 +415,12 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     machineCode: '',
     notes: '',
     productionLineCode: '',
-    productionType: '',
+    productionType: 'Processing',
     shift: 'เช้า',
     sourceWarehouseCode: '',
     targetProductCode: '',
     wipWarehouseCode: '',
+    machineType: '',
   })
   const [inputForm, setInputForm] = useState({ date: todayDateInput(), lotNo: '', netQty: '', notes: '', productCode: '', sourceWarehouseCode: '', stockStatus: 'RM' })
   const [outputForm, setOutputForm] = useState({ categoryCode: 'FG', completeOrder: false, date: todayDateInput(), destinationWarehouseCode: '', lossQty: '', lotNo: '', netQty: '', notes: '', productCode: row?.productCode ?? '' })
@@ -566,13 +568,18 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     const defaultFgWarehouse = warehouses.find((w) => w.type?.toUpperCase() === 'FG')
       || warehouses.find((w) => w.type?.toUpperCase() !== 'WIP')
       || warehouses[0]
+    const defaultSourceWarehouse = warehouses.find((w) => w.type?.toUpperCase() === 'RM')
+      || warehouses.find((w) => w.type?.toUpperCase() !== 'WIP' && w.type?.toUpperCase() !== 'FG')
+      || warehouses[0]
+    const defaultWipWarehouse = warehouses.find((w) => w.type?.toUpperCase() === 'WIP')
+      || warehouses[0]
 
     setCreateForm((form) => ({
       ...form,
       branchCode,
       destinationWarehouseCode: defaultFgWarehouse?.code ?? '',
-      sourceWarehouseCode: '',
-      wipWarehouseCode: '',
+      sourceWarehouseCode: defaultSourceWarehouse?.code ?? '',
+      wipWarehouseCode: defaultWipWarehouse?.code ?? '',
     }))
     setCreateErrors((current) => {
       const next = { ...current }
@@ -580,6 +587,31 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
       delete next.destinationWarehouseCode
       delete next.sourceWarehouseCode
       delete next.wipWarehouseCode
+      return next
+    })
+  }
+
+  function updateCreateMachine(machineCode: string) {
+    const machine = options.machines.find((m) => m.code === machineCode)
+    const machineType = machine?.type ?? ''
+
+    const mappedProdType = {
+      'เครื่องตัด': 'Processing',
+      'เครื่องบด': 'Processing',
+      'เครื่องอัด': 'Baling',
+      'เครื่องอัดขวด': 'Baling',
+      'สายพาน': 'Sorting',
+    }[machineType] || 'Processing'
+
+    setCreateForm((form) => ({
+      ...form,
+      machineCode,
+      machineType,
+      productionType: mappedProdType,
+    }))
+    setCreateErrors((current) => {
+      const next = { ...current }
+      delete next.machineCode
       return next
     })
   }
@@ -617,14 +649,14 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     const netQty = Number(netQtyText)
     const productCode = getComboboxCode(formElement, 'production-input-product', inputForm.productCode)
     const sourceWarehouseCode = readFormValue(formElement, 'production-input-source-warehouse') || inputForm.sourceWarehouseCode
-    const stockStatus = readFormValue(formElement, 'production-input-stock-status') || inputForm.stockStatus
-    if (!productCode || !sourceWarehouseCode || !stockStatus || !Number.isFinite(netQty) || netQty <= 0) {
-      setError('กรุณาเลือกสินค้า คลังต้นทาง สถานะสต๊อก และระบุ Net (กก.) มากกว่า 0')
+    const stockStatus = 'RM'
+    if (!productCode || !sourceWarehouseCode || !Number.isFinite(netQty) || netQty <= 0) {
+      setError('กรุณาเลือกสินค้า คลังต้นทาง และระบุ Net (กก.) มากกว่า 0')
       return
     }
     await runAction(async () => {
       await dailyFetchJson(`/api/production/orders/${encodeURIComponent(row.docNo)}/inputs`, {
-        body: JSON.stringify({ date: inputForm.date, lines: [{ lotNo: inputForm.lotNo || undefined, netQty, productCode, sourceWarehouseCode, stockStatus }], notes: inputForm.notes || undefined }),
+        body: JSON.stringify({ date: inputForm.date, lines: [{ netQty, productCode, sourceWarehouseCode, stockStatus }], notes: inputForm.notes || undefined }),
         method: 'POST',
       })
       await onRefreshRow(row.docNo)
@@ -640,10 +672,10 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     const netQty = Number(netQtyText)
     const lossQty = lossQtyText ? Number(lossQtyText) : 0
     const productCode = getComboboxCode(formElement, 'production-output-product', outputForm.productCode)
-    const categoryCode = readFormValue(formElement, 'production-output-category') || outputForm.categoryCode
+    const categoryCode = 'FG'
     const destinationWarehouseCode = readFormValue(formElement, 'production-output-destination-warehouse') || outputForm.destinationWarehouseCode
-    if (netQtyText && (!productCode || !categoryCode || !destinationWarehouseCode || !Number.isFinite(netQty) || netQty <= 0)) {
-      setError('กรุณาเลือกสินค้า ประเภท คลังรับ และระบุ Net (กก.) มากกว่า 0')
+    if (netQtyText && (!productCode || !destinationWarehouseCode || !Number.isFinite(netQty) || netQty <= 0)) {
+      setError('กรุณาเลือกสินค้า คลังรับ และระบุ Net (กก.) มากกว่า 0')
       return
     }
     if (!Number.isFinite(lossQty) || lossQty < 0) {
@@ -655,7 +687,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
       return
     }
     await runAction(async () => {
-      const lines = netQtyText ? [{ categoryCode, destinationWarehouseCode, lotNo: outputForm.lotNo || undefined, netQty, productCode }] : []
+      const lines = netQtyText ? [{ categoryCode, destinationWarehouseCode, lotNo: undefined, netQty, productCode }] : []
       await dailyFetchJson(`/api/production/orders/${encodeURIComponent(row.docNo)}/outputs`, {
         body: JSON.stringify({ completeOrder: outputForm.completeOrder, date: outputForm.date, lines, lossQty, notes: outputForm.notes || undefined }),
         method: 'POST',
@@ -710,19 +742,19 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(false) }}>
       <DialogContent className="max-w-5xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 max-h-[90vh] animate-fade-in" hideClose>
         <div className="bg-slate-900 px-5 py-4 shrink-0 border-b border-slate-800">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <DialogTitle className="font-mono text-lg font-bold text-slate-100">{isCreate ? 'ใบสั่งผลิตใหม่' : row?.docNo ?? ''}</DialogTitle>
               <StatusBadge status={isCreate ? 'Open' : row?.status ?? '-'} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {!isCreate && row ? (
                 <div className="flex flex-wrap gap-2">
                   <button className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white disabled:bg-slate-800 hover:bg-teal-700" disabled={isSaving || rowWipQty > 0 || row.status === 'Completed' || row.status === 'Cancelled'} type="button" onClick={() => void patchOrder('complete')}>จบงาน</button>
                   <button className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:bg-slate-800 hover:bg-red-700" disabled={isSaving || row.inputCount > 0 || row.outputCount > 0 || row.status === 'Cancelled'} type="button" onClick={() => void patchOrder('cancel')}>ยกเลิก</button>
                 </div>
               ) : null}
-              <button className="text-2xl text-slate-400 hover:text-slate-200 ml-2" type="button" onClick={() => onClose(false)}>&times;</button>
+              <button className="text-2xl text-slate-400 hover:text-slate-200 ml-1" type="button" onClick={() => onClose(false)}>&times;</button>
             </div>
           </div>
           {!isCreate && row ? (
@@ -767,7 +799,6 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                 <div className="grid gap-3 text-sm md:grid-cols-3">
                   <FormField error={createErrors.date} label="วันที่ *"><DatePickerInput value={createForm.date} onChange={(date) => updateCreateForm('date', date)} /></FormField>
                   <SelectField error={createErrors.branchCode} label="สาขา *" placeholder="เลือกสาขา" value={createForm.branchCode} options={options.branches} onChange={updateCreateBranch} />
-                  <SelectField error={createErrors.productionType} label="ประเภทการผลิต *" placeholder="เลือกประเภทการผลิต" value={createForm.productionType} options={options.productionTypes.map((value) => ({ code: value, id: value, name: value }))} onChange={(productionType) => updateCreateForm('productionType', productionType)} />
                   <SearchCombobox
                     error={createErrors.targetProductCode}
                     errorKey="targetProductCode"
@@ -778,9 +809,8 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                     value={createForm.targetProductCode}
                     onChange={(targetProductCode) => updateCreateForm('targetProductCode', targetProductCode)}
                   />
-                  <SelectField error={createErrors.sourceWarehouseCode} label="คลังต้นทาง *" placeholder="เลือกคลังต้นทาง" value={createForm.sourceWarehouseCode} options={branchWarehouses} onChange={(sourceWarehouseCode) => updateCreateForm('sourceWarehouseCode', sourceWarehouseCode)} />
-                  <SelectField disabled={isWipWarehouseLocked} error={createErrors.wipWarehouseCode} helperText={isWipWarehouseLocked ? 'ล็อกจากคลัง WIP ของสาขา' : undefined} label="คลัง WIP *" placeholder={createForm.branchCode ? 'เลือกคลัง WIP' : 'เลือกสาขาก่อน'} value={createForm.wipWarehouseCode} options={branchWipWarehouses} onChange={(wipWarehouseCode) => updateCreateForm('wipWarehouseCode', wipWarehouseCode)} />
-                  <SelectField label="เครื่องจักร" allowBlank value={createForm.machineCode} options={options.machines} onChange={(machineCode) => updateCreateForm('machineCode', machineCode)} />
+                  <SelectField label="เครื่องจักร" allowBlank value={createForm.machineCode} options={options.machines} onChange={updateCreateMachine} />
+                  <ReadField label="ประเภทเครื่องจักร" value={createForm.machineType || '-'} />
                   <SelectField label="ไลน์ผลิต" allowBlank value={createForm.productionLineCode} options={options.productionLines} onChange={(productionLineCode) => updateCreateForm('productionLineCode', productionLineCode)} />
                   <FormField label="Shift">
                     <select
@@ -792,7 +822,11 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                       <option value="บ่าย">บ่าย</option>
                     </select>
                   </FormField>
-                  <FormField label="หมายเหตุ"><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={createForm.notes} onChange={(event) => updateCreateForm('notes', event.target.value)} /></FormField>
+                  <div className="md:col-span-2">
+                    <FormField label="หมายเหตุ">
+                      <input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={createForm.notes} onChange={(event) => updateCreateForm('notes', event.target.value)} />
+                    </FormField>
+                  </div>
                   <div className="md:col-span-3">
                     <ProductStockPreview
                       destinationWarehouseName={selectedDestinationWarehouse?.name ?? ''}
@@ -827,13 +861,13 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
               title="วัตถุดิบที่เบิก"
               onReverse={(docNo) => void reverseMovement('inputs', docNo)}
               form={(
-                <div className="grid gap-3 text-sm md:grid-cols-4">
+                <div className="grid gap-3 text-sm md:grid-cols-3">
                   <FormField label="วันที่"><DatePickerInput value={inputForm.date} onChange={(date) => setInputForm((form) => ({ ...form, date }))} /></FormField>
-                  <SearchCombobox inputId="production-input-product" label="สินค้า" options={productSearchOptions} placeholder="พิมพ์รหัส/ชื่อสินค้า..." value={inputForm.productCode} onChange={(productCode) => setInputForm((form) => ({ ...form, productCode }))} />
+                  <div className="md:col-span-2">
+                    <SearchCombobox inputId="production-input-product" label="สินค้า" options={productSearchOptions} placeholder="พิมพ์รหัส/ชื่อสินค้า..." value={inputForm.productCode} onChange={(productCode) => setInputForm((form) => ({ ...form, productCode }))} />
+                  </div>
                   <SelectField selectId="production-input-source-warehouse" label="คลังต้นทาง" value={inputForm.sourceWarehouseCode} options={options.warehouses} onChange={(sourceWarehouseCode) => setInputForm((form) => ({ ...form, sourceWarehouseCode }))} />
-                  <SelectField selectId="production-input-stock-status" label="สถานะสต๊อก" value={inputForm.stockStatus} options={[{ code: 'RM', id: 'RM', name: 'RM' }, { code: 'FG', id: 'FG', name: 'FG' }]} onChange={(stockStatus) => setInputForm((form) => ({ ...form, stockStatus }))} />
                   <FormField label="Net (กก.)"><input key={`input-net-${row?.inputCount ?? 0}`} ref={inputNetQtyRef} id="production-input-net-qty" className="w-full rounded-md border px-3 py-2 text-right border-slate-300 bg-white" defaultValue={inputForm.netQty} inputMode="decimal" /></FormField>
-                  <FormField label="Lot No."><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={inputForm.lotNo} onChange={(event) => setInputForm((form) => ({ ...form, lotNo: event.target.value }))} /></FormField>
                   <FormField label="หมายเหตุ"><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={inputForm.notes} onChange={(event) => setInputForm((form) => ({ ...form, notes: event.target.value }))} /></FormField>
                 </div>
               )}
@@ -850,16 +884,18 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
               title="ผลผลิต"
               onReverse={(docNo) => void reverseMovement('outputs', docNo)}
               form={(
-                <div className="grid gap-3 text-sm md:grid-cols-4">
+                <div className="grid gap-3 text-sm md:grid-cols-3">
                   <FormField label="วันที่"><DatePickerInput value={outputForm.date} onChange={(date) => setOutputForm((form) => ({ ...form, date }))} /></FormField>
-                  <SearchCombobox inputId="production-output-product" label="สินค้า/Grade" options={productSearchOptions} placeholder="พิมพ์รหัส/ชื่อสินค้า..." value={outputForm.productCode} onChange={(productCode) => setOutputForm((form) => ({ ...form, productCode }))} />
-                  <SelectField selectId="production-output-category" label="ประเภท" value={outputForm.categoryCode} options={[{ code: 'FG', id: 'FG', name: 'FG' }, { code: 'RM', id: 'RM', name: 'RM' }]} onChange={(categoryCode) => setOutputForm((form) => ({ ...form, categoryCode }))} />
+                  <div className="md:col-span-2">
+                    <SearchCombobox inputId="production-output-product" label="สินค้า/Grade" options={productSearchOptions} placeholder="พิมพ์รหัส/ชื่อสินค้า..." value={outputForm.productCode} onChange={(productCode) => setOutputForm((form) => ({ ...form, productCode }))} />
+                  </div>
                   <SelectField selectId="production-output-destination-warehouse" label="คลังรับ" value={outputForm.destinationWarehouseCode} options={options.warehouses} onChange={(destinationWarehouseCode) => setOutputForm((form) => ({ ...form, destinationWarehouseCode }))} />
                   <FormField label="Net (กก.)"><input key={`output-net-${row?.outputCount ?? 0}`} ref={outputNetQtyRef} id="production-output-net-qty" className="w-full rounded-md border px-3 py-2 text-right border-slate-300 bg-white" defaultValue={outputForm.netQty} inputMode="decimal" /></FormField>
                   <FormField label="Loss kg"><input key={`output-loss-${row?.outputCount ?? 0}`} ref={outputLossQtyRef} id="production-output-loss-qty" className="w-full rounded-md border px-3 py-2 text-right border-slate-300 bg-white" defaultValue={outputForm.lossQty} inputMode="decimal" /></FormField>
-                  <FormField label="Lot No."><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={outputForm.lotNo} onChange={(event) => setOutputForm((form) => ({ ...form, lotNo: event.target.value }))} /></FormField>
                   <label className="flex items-center gap-2 rounded-md border px-3 py-2 border-slate-300 bg-white h-9 mt-6 select-none cursor-pointer"><input checked={outputForm.completeOrder} type="checkbox" onChange={(event) => setOutputForm((form) => ({ ...form, completeOrder: event.target.checked }))} />จบงานหลังรับ</label>
-                  <FormField label="หมายเหตุ"><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={outputForm.notes} onChange={(event) => setOutputForm((form) => ({ ...form, notes: event.target.value }))} /></FormField>
+                  <div className="md:col-span-2">
+                    <FormField label="หมายเหตุ"><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={outputForm.notes} onChange={(event) => setOutputForm((form) => ({ ...form, notes: event.target.value }))} /></FormField>
+                  </div>
                 </div>
               )}
               onSubmit={(formElement) => void submitOutput(formElement)}
@@ -1094,7 +1130,7 @@ function ProductStockPreview({
           <tbody className="divide-y divide-indigo-50/50">
             {stock.rows.map((row, index) => (
               <tr key={index} className="hover:bg-indigo-50/10">
-                <td className="p-2 font-medium text-slate-700">{stock.branchCode} / {destinationWarehouseName}</td>
+                <td className="p-2 font-medium text-slate-700">{stock.branchCode} / {row.warehouseCode || destinationWarehouseName}</td>
                 <td className="p-2 text-center"><span className="rounded bg-slate-100 px-1 py-0.5 text-[10px] font-bold text-slate-600">{row.status}</span></td>
                 <td className="p-2 text-right font-bold text-slate-900 tabular-nums">{formatMoney(row.qty)}</td>
                 <td className="p-2 text-right text-slate-500 tabular-nums">{formatMoney(row.avgCost)}</td>
@@ -1117,7 +1153,7 @@ function ProductStockPreview({
         {stock.rows.map((row, index) => (
           <div key={index} className="p-3 space-y-2 text-xs">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-slate-700">{stock.branchCode} / {destinationWarehouseName}</span>
+              <span className="font-semibold text-slate-700">{stock.branchCode} / {row.warehouseCode || destinationWarehouseName}</span>
               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">{row.status}</span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center py-1.5 bg-indigo-50/30 rounded-md">
