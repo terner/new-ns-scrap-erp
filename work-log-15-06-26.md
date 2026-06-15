@@ -142,3 +142,18 @@
   - รัน `type-check` และ `lint` บนเครื่องโลคอลผ่านสำเร็จ 100%
   - ทดสอบความถูกต้องบนเบราว์เซอร์ผ่าน Browser Subagent ใน viewport 375px ยืนยันว่าไม่มีส่วนประกอบใดหลุดล้น มีการจัดวางที่สวยงามและใช้งานได้ง่าย
 
+### 16. ปรับปรุงระบบจัดการคลังรับผลผลิตฝ่ายผลิต (Production Destination Warehouse Redesign)
+- **การดำเนินการ:**
+  - ซ่อนช่องเลือก **"คลังรับผลผลิต *"** (destinationWarehouseCode) ออกจากฟอร์มสร้างใบสั่งผลิตใหม่ เพื่อลดความซ้ำซ้อนตามที่ลูกค้าแจ้งในห้องสนทนา Line
+  - ซ่อนฟิลด์แสดง **"คลังรับผลผลิต"** ออกจากหน้าจอแสดงรายละเอียดใบสั่งผลิต (Header Tab)
+  - เพิ่มระบบคำนวณและ Auto-set คลังสินค้าประเภท `FG` ของสาขาที่เลือกเป็นคลังรับผลผลิตเริ่มต้นในเบื้องหลัง เพื่อรองรับ Backend validation ที่เป็น required field ของฐานข้อมูลและ API
+  - คงฟิลด์ **"คลังรับ"** ในแท็บ **Output** ของรายละเอียดใบสั่งผลิตไว้เพื่อให้ผู้ใช้เลือกคลังรับสินค้าจริงได้ตอนบันทึกรับผลผลิต
+- **ผลลัพธ์การตรวจสอบ (E2E Test & Validation):**
+  - รัน `npm run type-check` และ `npm run lint` ของ Next.js Workspace ผ่านสำเร็จ 100% ไม่มีข้อผิดพลาด
+  - ดำเนินการทดสอบผ่าน Browser subagent โดยจำลองการสร้างใบสั่งผลิต PO ตัวใหม่ (ได้เลขที่เอกสาร **PO2606-0005**) ยืนยันว่าไม่มีช่องคลังรับผลผลิตให้กรอกบน UI แต่สามารถบันทึกสำเร็จลงฐานข้อมูล และแสดงข้อมูลในตารางได้อย่างถูกต้อง
+  - ยืนยันว่าเมื่อเปิดดูรายละเอียดใบสั่งผลิต ในแท็บ Header ไม่มีฟิลด์คลังรับแสดง แต่ในแท็บ Output มีฟิลด์ "คลังรับ" ให้ระบุตามความต้องการของลูกค้า
+- **ภาพหลักฐานการทดสอบในระบบ (Artifact Screenshots & Videos):**
+  - ฟอร์มสร้างใบสั่งผลิตที่ซ่อนคลังรับผลผลิต: [create_dialog_no_dest_wh](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/create_dialog_no_dest_wh_1781503719316.png)
+  - รายการตารางแสดงเอกสาร PO2606-0005 ที่ถูกสร้างสำเร็จ: [order_created_in_table](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/order_created_in_table_1781503761738.png)
+  - แท็บ Output ที่มีช่องคลังรับสำหรับบันทึกผลผลิต: [output_tab_dest_warehouse_visible](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/output_tab_dest_warehouse_visible_1781503832898.png)
+  - วิดีโอบันทึกการทดสอบ E2E: ![verify_prod_warehouse_removal](/C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/verify_prod_warehouse_removal_1781503698390.webp)

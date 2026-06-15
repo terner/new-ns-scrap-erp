@@ -562,10 +562,15 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
   }
 
   function updateCreateBranch(branchCode: string) {
+    const warehouses = options.warehouses.filter((w) => w.branchCode === branchCode)
+    const defaultFgWarehouse = warehouses.find((w) => w.type?.toUpperCase() === 'FG')
+      || warehouses.find((w) => w.type?.toUpperCase() !== 'WIP')
+      || warehouses[0]
+
     setCreateForm((form) => ({
       ...form,
       branchCode,
-      destinationWarehouseCode: '',
+      destinationWarehouseCode: defaultFgWarehouse?.code ?? '',
       sourceWarehouseCode: '',
       wipWarehouseCode: '',
     }))
@@ -775,7 +780,6 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                   />
                   <SelectField error={createErrors.sourceWarehouseCode} label="คลังต้นทาง *" placeholder="เลือกคลังต้นทาง" value={createForm.sourceWarehouseCode} options={branchWarehouses} onChange={(sourceWarehouseCode) => updateCreateForm('sourceWarehouseCode', sourceWarehouseCode)} />
                   <SelectField disabled={isWipWarehouseLocked} error={createErrors.wipWarehouseCode} helperText={isWipWarehouseLocked ? 'ล็อกจากคลัง WIP ของสาขา' : undefined} label="คลัง WIP *" placeholder={createForm.branchCode ? 'เลือกคลัง WIP' : 'เลือกสาขาก่อน'} value={createForm.wipWarehouseCode} options={branchWipWarehouses} onChange={(wipWarehouseCode) => updateCreateForm('wipWarehouseCode', wipWarehouseCode)} />
-                  <SelectField error={createErrors.destinationWarehouseCode} label="คลังรับผลผลิต *" placeholder="เลือกคลังรับผลผลิต" value={createForm.destinationWarehouseCode} options={branchWarehouses} onChange={(destinationWarehouseCode) => updateCreateForm('destinationWarehouseCode', destinationWarehouseCode)} />
                   <SelectField label="เครื่องจักร" allowBlank value={createForm.machineCode} options={options.machines} onChange={(machineCode) => updateCreateForm('machineCode', machineCode)} />
                   <SelectField label="ไลน์ผลิต" allowBlank value={createForm.productionLineCode} options={options.productionLines} onChange={(productionLineCode) => updateCreateForm('productionLineCode', productionLineCode)} />
                   <FormField label="Shift">
@@ -806,7 +810,6 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                   <ReadField label="สถานะ" value={row?.status ?? '-'} />
                   <ReadField label="สินค้าเป้าหมาย" value={row?.productName ?? '-'} />
                   <ReadField label="สาขา" value={row?.branchName ?? '-'} />
-                  <ReadField label="คลังรับผลผลิต" value={row?.warehouseName ?? '-'} />
                   <ReadField label="WIP" value={formatMoney(rowWipQty)} />
                   <ReadField label="หมายเหตุ" value={row?.notes || '-'} />
                 </div>
