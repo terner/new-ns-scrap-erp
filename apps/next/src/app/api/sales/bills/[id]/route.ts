@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { salesBillCancelSchema } from '@/lib/sales'
 import { apiErrorResponse } from '@/lib/server/api-error'
-import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { AuthContextError, authContextErrorResponse, getBranchCodeIntersection, getCurrentAuthContext, requirePermission, type AppAuthContext } from '@/lib/server/auth-context'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { appendSalesBillStatusLog, SALES_BILL_STATUS_ACTION } from '@/lib/server/sales-bill-history'
@@ -10,6 +10,7 @@ import { activeSalesReceiptCount, isSalesBillActiveForCancel } from '@/lib/serve
 import { reversePoSellUsage } from '@/lib/server/sales-bill-po-sell-reversal'
 import { appendStockIssueStatusLog, STOCK_ISSUE_STATUS_ACTION } from '@/lib/server/stock-issue-history'
 import { reopenConsumedWtoStockHoldsForSalesBill, reversePendingSaleStockIssue, WtoStockHoldError } from '@/lib/server/stock-holds'
+import { assertTaxFilingPeriodUnlocked } from '@/lib/server/tax-filing-source-lock'
 import {
   correctTradingAllocationsSchema as tradingCorrectionSchema,
   correctTradingSalesBillAllocations as runTradingSalesBillAllocationCorrection,
@@ -19,13 +20,30 @@ import { appendWeightTicketUsageLogs, WEIGHT_TICKET_USAGE_ACTION } from '@/lib/s
 
 export const runtime = 'nodejs'
 
+async function salesBranchScope(context: AppAuthContext, requestedBranchCode?: string | null) {
+  const allowedCodes = getBranchCodeIntersection(context, requestedBranchCode)
+  if (allowedCodes === null) return { ids: null }
+  if (allowedCodes.length === 0) return { ids: [] as bigint[] }
+  const branches = await prisma.branches.findMany({
+    select: { id: true },
+    where: { code: { in: allowedCodes } },
+  })
+  return { ids: branches.map((branch) => branch.id) }
+}
+
+function scopedSalesBillWhere(allowedBranchIds: bigint[] | null) {
+  return allowedBranchIds === null ? {} : { branch_id: { in: allowedBranchIds } }
+}
+
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await getCurrentAuthContext()
     requirePermission(auth, 'finance.cash.view')
 
     const { id } = await context.params
-    const detail = await getSalesBillDetail(decodeURIComponent(id))
+    const detail = await getSalesBillDetail(decodeURIComponent(id), {
+      allowedBranchCodes: getBranchCodeIntersection(auth),
+    })
     if (!detail) {
       return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบบิลขายที่ต้องการ' }, { status: 404 })
     }
@@ -50,6 +68,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const actor = currentActor(auth)
       const correctedAt = new Date()
       const billRef = decodeURIComponent(id)
+      const branchScope = await salesBranchScope(auth)
+      const scopedBill = await prisma.sales_bills.findFirst({
+        select: { id: true },
+        where: { doc_no: billRef, ...scopedSalesBillWhere(branchScope.ids) },
+      })
+      if (!scopedBill) {
+        return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบบิลขายที่ต้องการ' }, { status: 404 })
+      }
       const result = await prisma.$transaction((tx) => runTradingSalesBillAllocationCorrection(tx, {
         actor,
         allocations: values.allocations,
@@ -68,6 +94,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const actor = currentActor(auth)
     const cancelledAt = new Date()
     const billRef = decodeURIComponent(id)
+    const branchScope = await salesBranchScope(auth)
 
     const result = await prisma.$transaction(async (tx) => {
       const bill = await tx.sales_bills.findFirst({
@@ -79,78 +106,93 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           items: true,
           status: true,
           transaction_mode: true,
+          vat_amount: true,
         },
-        where: { doc_no: billRef },
+        where: { doc_no: billRef, ...scopedSalesBillWhere(branchScope.ids) },
       })
       if (!bill) throw new Error('ไม่พบบิลขายที่ต้องการยกเลิก')
       if (!isSalesBillActiveForCancel(bill.status)) throw new Error('บิลขายนี้ถูกยกเลิกแล้ว')
+      if (toNumber(bill.vat_amount) > 0) {
+        await assertTaxFilingPeriodUnlocked(tx, {
+          date: bill.date,
+          sourceLabel: `บิลขาย ${bill.doc_no}`,
+          taxTypes: ['VAT'],
+        })
+      }
 
       const activeReceiptCount = await activeSalesReceiptCount(tx, bill.id)
       if (activeReceiptCount > 0) {
         throw new Error('ยกเลิกบิลขายไม่ได้ เพราะมีรายการรับเงินแล้ว')
       }
 
-      if ((bill.transaction_mode ?? 'STOCK') === 'STOCK') {
-        const convertedStockIssue = await tx.stock_issues.findFirst({
-          select: { doc_no: true, id: true, status: true },
-          where: {
-            converted_to_bill_id: bill.id,
-            status: 'converted',
-          },
-        })
+      const convertedStockIssue = await tx.stock_issues.findFirst({
+        select: { doc_no: true, id: true, status: true },
+        where: {
+          converted_to_bill_id: bill.id,
+          status: 'converted',
+        },
+      })
 
-        if (convertedStockIssue) {
-          const holds = await reversePendingSaleStockIssue(tx, {
-            actor,
-            cancelDate: normalizeDate(cancelledAt.toISOString().slice(0, 10)),
-            note: values.note,
-            stockIssueDocNo: convertedStockIssue.doc_no,
-          })
-          const ticketIds = [...new Set(holds.map((hold) => hold.weight_ticket_id))]
-          await Promise.all(ticketIds.map(async (ticketId) => {
-            const ticket = await tx.weight_tickets.findUnique({ select: { status: true }, where: { id: ticketId } })
-            if (!ticket) return
-            await tx.weight_tickets.update({
-              data: {
-                status: 'delivered',
-                updated_at: cancelledAt,
-                updated_by: actor,
-              },
-              where: { id: ticketId },
-            })
-            await appendWeightTicketStatusLog(tx, {
-              action: WEIGHT_TICKET_STATUS_ACTION.USAGE_STATUS_CHANGED,
-              actor,
-              createdAt: cancelledAt,
-              fromStatus: ticket.status,
-              meta: { reason: 'sales_bill_cancel_from_pending_sale', salesBillDocNo: bill.doc_no, stockIssueDocNo: convertedStockIssue.doc_no },
-              note: values.note,
-              toStatus: 'delivered',
-              weightTicketId: ticketId,
-            })
-          }))
-          await tx.stock_issues.update({
+      if (convertedStockIssue) {
+        const holds = await reversePendingSaleStockIssue(tx, {
+          actor,
+          cancelDate: normalizeDate(cancelledAt.toISOString().slice(0, 10)),
+          note: values.note,
+          stockIssueDocNo: convertedStockIssue.doc_no,
+        })
+        const ticketIds = [...new Set(holds.map((hold) => hold.weight_ticket_id))]
+        await Promise.all(ticketIds.map(async (ticketId) => {
+          const ticket = await tx.weight_tickets.findUnique({ select: { status: true }, where: { id: ticketId } })
+          if (!ticket) return
+          await tx.weight_tickets.update({
             data: {
-              notes: values.note,
-              status: 'cancelled',
+              status: 'delivered',
+              updated_at: cancelledAt,
+              updated_by: actor,
             },
-            where: { id: convertedStockIssue.id },
+            where: { id: ticketId },
           })
-          await appendStockIssueStatusLog(tx, {
-            action: STOCK_ISSUE_STATUS_ACTION.CANCELLED,
+          await appendWeightTicketStatusLog(tx, {
+            action: WEIGHT_TICKET_STATUS_ACTION.USAGE_STATUS_CHANGED,
             actor,
             createdAt: cancelledAt,
-            fromStatus: convertedStockIssue.status,
-            meta: {
-              reason: 'sales_bill_cancel_from_pending_sale',
-              reverseRefType: 'PSALE-CANCEL',
-              salesBillDocNo: bill.doc_no,
-            },
+            fromStatus: ticket.status,
+            meta: { reason: 'sales_bill_cancel_from_pending_sale', salesBillDocNo: bill.doc_no, stockIssueDocNo: convertedStockIssue.doc_no },
             note: values.note,
-            stockIssueId: convertedStockIssue.id,
-            toStatus: 'cancelled',
+            toStatus: 'delivered',
+            weightTicketId: ticketId,
           })
-        } else {
+        }))
+        await tx.stock_issues.update({
+          data: {
+            notes: values.note,
+            status: 'cancelled',
+          },
+          where: { id: convertedStockIssue.id },
+        })
+        await appendStockIssueStatusLog(tx, {
+          action: STOCK_ISSUE_STATUS_ACTION.CANCELLED,
+          actor,
+          createdAt: cancelledAt,
+          fromStatus: convertedStockIssue.status,
+          meta: {
+            reason: 'sales_bill_cancel_from_pending_sale',
+            reverseRefType: 'PSALE-CANCEL',
+            salesBillDocNo: bill.doc_no,
+          },
+          note: values.note,
+          stockIssueId: convertedStockIssue.id,
+          toStatus: 'cancelled',
+        })
+      } else {
+        const usageLogs = await tx.weight_ticket_usage_logs.findMany({
+          where: {
+            action: WEIGHT_TICKET_USAGE_ACTION.ALLOCATED_TO_SALES_BILL,
+            target_doc_no: bill.doc_no,
+            target_type: 'SALES_BILL',
+          },
+        })
+        if (usageLogs.length > 0) {
           await reopenConsumedWtoStockHoldsForSalesBill(tx, {
             actor,
             cancelDate: normalizeDate(cancelledAt.toISOString().slice(0, 10)),
@@ -158,13 +200,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
             salesBillDocNo: bill.doc_no,
           })
 
-          const usageLogs = await tx.weight_ticket_usage_logs.findMany({
-            where: {
-              action: WEIGHT_TICKET_USAGE_ACTION.ALLOCATED_TO_SALES_BILL,
-              target_doc_no: bill.doc_no,
-              target_type: 'SALES_BILL',
-            },
-          })
           await appendWeightTicketUsageLogs(tx, usageLogs.map((log) => ({
             action: WEIGHT_TICKET_USAGE_ACTION.RELEASED_FROM_SALES_BILL,
             actor,

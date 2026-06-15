@@ -77,6 +77,7 @@ type WtoHoldAllocation = WtoStockBucket & {
 }
 
 export type ConsumedWtoStockHoldLine = {
+  holdKey: string
   lotNo: string | null
   notAvailableForSale: boolean
   outputCategory: string | null
@@ -303,37 +304,44 @@ async function loadSaleableBuckets(tx: TxClient, input: {
     }),
   ])
 
-  const onHoldByBucket = new Map(
-    holdSums.map((row) => [
-      bucketKey({
-        lotNo: row.lot_no,
-        notAvailableForSale: row.not_available_for_sale,
-        outputCategory: row.output_category,
-        productId: row.product_id,
-        warehouseId: row.warehouse_id,
-      }),
-      toNumber(row._sum.qty),
-    ]),
-  )
-
-  return ledgerSums
-    .map((row) => {
-      const key = bucketKey({
-        lotNo: row.lot_no,
-        notAvailableForSale: row.not_available_for_sale,
-        outputCategory: row.output_category,
-        productId: row.product_id,
-        warehouseId: row.warehouse_id,
-      })
-      return {
-        availableQty: toNumber(row._sum.qty_in) - toNumber(row._sum.qty_out) - (onHoldByBucket.get(key) ?? 0),
-        lotNo: row.lot_no,
-        notAvailableForSale: row.not_available_for_sale === true,
-        outputCategory: row.output_category,
-        productId: row.product_id as bigint,
-        warehouseId: row.warehouse_id as bigint,
-      }
+  const onHoldByBucket = new Map<string, number>()
+  holdSums.forEach((row) => {
+    const key = bucketKey({
+      lotNo: row.lot_no,
+      notAvailableForSale: row.not_available_for_sale,
+      outputCategory: row.output_category,
+      productId: row.product_id,
+      warehouseId: row.warehouse_id,
     })
+    onHoldByBucket.set(key, (onHoldByBucket.get(key) ?? 0) + toNumber(row._sum.qty))
+  })
+
+  const onHandBuckets = new Map<string, WtoStockBucket>()
+  ledgerSums.forEach((row) => {
+    const key = bucketKey({
+      lotNo: row.lot_no,
+      notAvailableForSale: row.not_available_for_sale,
+      outputCategory: row.output_category,
+      productId: row.product_id,
+      warehouseId: row.warehouse_id,
+    })
+    const current = onHandBuckets.get(key) ?? {
+      availableQty: 0,
+      lotNo: row.lot_no,
+      notAvailableForSale: row.not_available_for_sale === true,
+      outputCategory: row.output_category,
+      productId: row.product_id as bigint,
+      warehouseId: row.warehouse_id as bigint,
+    }
+    current.availableQty += toNumber(row._sum.qty_in) - toNumber(row._sum.qty_out)
+    onHandBuckets.set(key, current)
+  })
+
+  return [...onHandBuckets.entries()]
+    .map(([key, row]) => ({
+      ...row,
+      availableQty: row.availableQty - (onHoldByBucket.get(key) ?? 0),
+    }))
     .filter((row) => row.productId != null && row.warehouseId != null && row.availableQty > 0.000001)
     .sort((left, right) => (
       (left.outputCategory ?? '').localeCompare(right.outputCategory ?? '')
@@ -552,7 +560,7 @@ export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
       }), qty > 0 ? value / qty : 0] as const
     }),
   )
-  const ledgerRows = holds.map((hold) => {
+  const consumedLines: ConsumedWtoStockHoldLine[] = holds.map((hold) => {
     const unitCost = unitCostByKey.get(bucketKey({
       lotNo: hold.lot_no,
       notAvailableForSale: hold.not_available_for_sale,
@@ -562,29 +570,44 @@ export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
     })) ?? 0
     const qty = toNumber(hold.qty)
     return {
+      holdKey: hold.hold_key,
+      lotNo: hold.lot_no,
+      notAvailableForSale: hold.not_available_for_sale,
+      outputCategory: hold.output_category,
+      productId: hold.product_id,
+      qty,
+      sourceDocNo: hold.source_doc_no,
+      sourceLineNo: hold.source_line_no,
+      unitCost,
+      valueOut: qty * unitCost,
+      warehouseId: hold.warehouse_id,
+      weightTicketLineId: hold.weight_ticket_line_id,
+    }
+  })
+  await tx.stock_ledger.createMany({
+    data: consumedLines.map((line) => ({
       branch_id: input.branchId,
       created_by: input.actor,
       date: input.billDate,
-      lot_no: hold.lot_no,
+      lot_no: line.lotNo,
       movement_type: 'ขายออก',
-      note: `WTO ${hold.source_doc_no}${hold.source_line_no ? ` / รายการ ${hold.source_line_no}` : ''}`,
-      notes: `ตัด stock จาก hold ${hold.hold_key}`,
-      not_available_for_sale: hold.not_available_for_sale,
-      output_category: hold.output_category,
-      product_id: hold.product_id,
+      note: `WTO ${line.sourceDocNo}${line.sourceLineNo ? ` / รายการ ${line.sourceLineNo}` : ''}`,
+      notes: `ตัด stock จาก hold ${line.holdKey}`,
+      not_available_for_sale: line.notAvailableForSale,
+      output_category: line.outputCategory,
+      product_id: line.productId,
       qty_in: 0,
-      qty_out: qty,
+      qty_out: line.qty,
       ref_id: input.salesBillDocNo,
       ref_no: input.salesBillDocNo,
       ref_type: 'SB',
       sales_channel_id: input.salesChannelId ?? null,
-      unit_cost: unitCost,
+      unit_cost: line.unitCost,
       value_in: 0,
-      value_out: qty * unitCost,
-      warehouse_id: hold.warehouse_id,
-    }
+      value_out: line.valueOut,
+      warehouse_id: line.warehouseId,
+    })),
   })
-  await tx.stock_ledger.createMany({ data: ledgerRows })
   const now = new Date()
   const consumed = await tx.stock_holds.updateMany({
     data: {
@@ -604,6 +627,8 @@ export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
   if (consumed.count !== holds.length) {
     throw new WtoStockHoldError('stock hold ของใบส่งของนี้ถูกใช้งานไปแล้ว กรุณาโหลดข้อมูลใหม่')
   }
+
+  return consumedLines
 }
 
 export async function consumeActiveWtoStockHoldsForPendingSale(tx: TxClient, input: {
@@ -658,6 +683,7 @@ export async function consumeActiveWtoStockHoldsForPendingSale(tx: TxClient, inp
     })) ?? 0
     const qty = toNumber(hold.qty)
     return {
+      holdKey: hold.hold_key,
       lotNo: hold.lot_no,
       notAvailableForSale: hold.not_available_for_sale,
       outputCategory: hold.output_category,

@@ -51,7 +51,32 @@ export type SalesBillDetail = {
   salesName: string
   status: string
   statusLabel: string
+  sourceUsageFacts: Array<{
+    amount: number
+    createdAt: string
+    docNo: string
+    id: string
+    lineNo: number | null
+    productName: string
+    qty: number
+    status: string
+    title: string
+    type: string
+    unit: string
+  }>
   subtotal: number
+  timeline: Array<{
+    action: string
+    actor: string
+    createdAt: string
+    details: string[]
+    id: string
+    status: string
+    statusLabel: string
+    title: string
+    tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'slate'
+    transitionText: string
+  }>
   totalAmount: number
   transactionMode: string
   vatAmount: number
@@ -101,6 +126,59 @@ function salesBillStatusLabel(status: string | null | undefined) {
     default:
       return status ?? '-'
   }
+}
+
+function salesBillHistoryActionLabel(action: string | null | undefined) {
+  switch (String(action ?? '').toLowerCase()) {
+    case 'created':
+      return 'สร้างบิลขาย'
+    case 'customer_receipt_allocated':
+      return 'รับเงิน'
+    case 'customer_receipt_cancelled':
+      return 'ยกเลิกรับเงิน'
+    case 'allocation_corrected':
+      return 'แก้ Trading allocation'
+    case 'cancelled':
+      return 'ยกเลิกบิล'
+    case 'status_synced':
+      return 'ปรับสถานะ'
+    default:
+      return 'อัปเดตสถานะบิล'
+  }
+}
+
+function salesBillHistoryTone(action: string | null | undefined): SalesBillDetail['timeline'][number]['tone'] {
+  switch (String(action ?? '').toLowerCase()) {
+    case 'created':
+      return 'blue'
+    case 'customer_receipt_allocated':
+      return 'emerald'
+    case 'allocation_corrected':
+    case 'status_synced':
+      return 'amber'
+    case 'customer_receipt_cancelled':
+    case 'cancelled':
+      return 'rose'
+    default:
+      return 'slate'
+  }
+}
+
+function money(value: number | null | undefined) {
+  return (value ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+}
+
+function historyMetaValue(meta: unknown, key: string) {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
+  return (meta as Record<string, unknown>)[key]
+}
+
+function sourceUsageStatusLabel(status: string) {
+  const normalized = status.toLowerCase()
+  if (normalized === 'active') return 'active'
+  if (normalized === 'cancelled') return 'cancelled'
+  if (normalized === 'reversed') return 'reversed'
+  return status || '-'
 }
 
 function customerAddress(customer: SalesBillDetailRow['customers']) {
@@ -298,7 +376,11 @@ function buildSnapshotItems(input: {
   })
 }
 
-export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail | null> {
+export async function getSalesBillDetail(
+  docNo: string,
+  options: { allowedBranchCodes?: string[] | null } = {},
+): Promise<SalesBillDetail | null> {
+  if (options.allowedBranchCodes?.length === 0) return null
   const bill: SalesBillDetailRow | null = await prisma.sales_bills.findFirst({
     include: {
       branches: true,
@@ -307,6 +389,7 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
       warehouses: true,
     },
     where: {
+      ...(options.allowedBranchCodes ? { branches: { is: { code: { in: options.allowedBranchCodes } } } } : {}),
       doc_no: docNo,
     },
   })
@@ -315,7 +398,7 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
 
   const factStatuses = ['active', 'cancelled']
   const snapshots = itemSnapshots(bill.items)
-  const [lineFacts, salesperson, customerAdvanceAllocations, tradingAllocationFacts] = await Promise.all([
+  const [lineFacts, salesperson, customerAdvanceAllocations, tradingAllocationFacts, statusLogs, weightTicketUsageLogs] = await Promise.all([
     prisma.sales_bill_lines.findMany({
       include: {
         sales_bill_po_sell_allocations: {
@@ -349,7 +432,11 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
     prisma.sales_bill_customer_advance_allocations.findMany({
       orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
       select: {
+        allocated_amount: true,
+        created_at: true,
         customer_advance_doc_no: true,
+        id: true,
+        status: true,
       },
       where: {
         sales_bill_id: bill.id,
@@ -369,6 +456,19 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
           },
         })
       : Promise.resolve([]),
+    prisma.sales_bill_status_logs.findMany({
+      orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+      where: {
+        sales_bill_id: bill.id,
+      },
+    }),
+    prisma.weight_ticket_usage_logs.findMany({
+      orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+      where: {
+        target_doc_no: bill.doc_no,
+        target_type: 'SALES_BILL',
+      },
+    }),
   ])
 
   const hasDurableLineFacts = lineFacts.length > 0
@@ -416,6 +516,94 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
   const items = hasDurableLineFacts
     ? buildDurableItems({ bill, lineFacts, poSellDocNoSet, tradingFactByLineNo, vehicleByDeliveryDocNo })
     : buildSnapshotItems({ bill, snapshots, tradingFactByLineNo, vehicleByDeliveryDocNo })
+  const timeline = statusLogs.map((log) => {
+    const customerReceiptDocNo = historyMetaValue(log.meta, 'customerReceiptDocNo')
+    const allocationLineNo = historyMetaValue(log.meta, 'allocationLineNo')
+    const reason = historyMetaValue(log.meta, 'reason')
+    const transitionText = log.from_status && log.from_status !== log.to_status
+      ? `${salesBillStatusLabel(log.from_status)} -> ${salesBillStatusLabel(log.to_status)}`
+      : salesBillStatusLabel(log.to_status)
+    const details = [
+      `สถานะ ${transitionText}`,
+      `ยอดบิล ${money(toNumber(log.total_amount_snapshot))}`,
+      `รับแล้ว ${money(toNumber(log.received_amount_snapshot))}`,
+      `ค้างรับ ${money(toNumber(log.receivable_balance_snapshot))}`,
+      `ผู้ทำ ${log.created_by ?? '-'}`,
+    ]
+    if (typeof customerReceiptDocNo === 'string' && customerReceiptDocNo) details.push(`ใบรับเงิน ${customerReceiptDocNo}`)
+    if (typeof allocationLineNo === 'number') details.push(`Receipt allocation line ${allocationLineNo}`)
+    if (typeof reason === 'string' && reason) details.push(`เหตุผล ${reason}`)
+    if (log.note) details.push(`หมายเหตุ ${log.note}`)
+    return {
+      action: log.action,
+      actor: log.created_by ?? '-',
+      createdAt: log.created_at.toISOString(),
+      details,
+      id: log.event_key ?? `sales-bill-status:${String(log.id)}`,
+      status: log.to_status ?? '',
+      statusLabel: salesBillStatusLabel(log.to_status),
+      title: salesBillHistoryActionLabel(log.action),
+      tone: salesBillHistoryTone(log.action),
+      transitionText,
+    }
+  }).reverse()
+  const sourceUsageFacts: SalesBillDetail['sourceUsageFacts'] = [
+    ...weightTicketUsageLogs.map((log) => ({
+      amount: 0,
+      createdAt: log.created_at.toISOString(),
+      docNo: log.weight_ticket_doc_no,
+      id: log.event_key ?? `wto-usage:${String(log.id)}`,
+      lineNo: log.target_line_no,
+      productName: log.product_name_snapshot ?? '-',
+      qty: toNumber(log.allocated_net_weight) || toNumber(log.allocated_qty),
+      status: log.action === 'released_from_sales_bill' ? 'cancelled' : 'active',
+      title: log.action === 'released_from_sales_bill' ? 'คืน WTO จากบิลขาย' : 'ใช้ WTO ในบิลขาย',
+      type: 'WTO usage log',
+      unit: 'กก.',
+    })),
+    ...lineFacts.flatMap((line) => line.sales_bill_po_sell_allocations.map((allocation) => ({
+      amount: toNumber(allocation.allocated_amount),
+      createdAt: allocation.created_at.toISOString(),
+      docNo: allocation.po_sell_doc_no ?? allocation.po_sells?.doc_no ?? 'Spot Sale',
+      id: `po-allocation:${String(allocation.id)}`,
+      lineNo: allocation.sales_line_no,
+      productName: allocation.product_name_snapshot,
+      qty: toNumber(allocation.allocated_qty),
+      status: sourceUsageStatusLabel(allocation.status),
+      title: allocation.allocation_type === 'PO_SELL' ? 'ตัด PO Sell' : 'Spot Sale',
+      type: 'Sales allocation fact',
+      unit: line.unit_snapshot || 'กก.',
+    }))),
+    ...tradingAllocationFacts.map((fact) => ({
+      amount: toNumber(fact.matched_cogs),
+      createdAt: fact.created_at.toISOString(),
+      docNo: fact.source_doc_no ?? fact.trading_cost_sources?.source_no ?? fact.purchase_bills?.doc_no ?? '-',
+      id: `trading-allocation:${String(fact.id)}`,
+      lineNo: fact.sales_line_no,
+      productName: fact.product_name_snapshot ?? '-',
+      qty: toNumber(fact.qty),
+      status: sourceUsageStatusLabel(fact.status),
+      title: fact.source_type === 'TRADING_COST_SOURCE' ? 'ใช้ Trading Cost Source' : 'ใช้ Trading PB',
+      type: 'Trading allocation fact',
+      unit: 'กก.',
+    })),
+    ...customerAdvanceAllocations.map((allocation) => ({
+      amount: toNumber(allocation.allocated_amount),
+      createdAt: allocation.created_at.toISOString(),
+      docNo: allocation.customer_advance_doc_no,
+      id: `customer-advance:${String(allocation.id)}`,
+      lineNo: null,
+      productName: '-',
+      qty: 0,
+      status: sourceUsageStatusLabel(allocation.status),
+      title: 'ใช้เงินล่วงหน้า Customer',
+      type: 'Customer advance allocation fact',
+      unit: '',
+    })),
+  ].sort((left, right) => {
+    const dateCompare = Date.parse(right.createdAt) - Date.parse(left.createdAt)
+    return dateCompare || left.id.localeCompare(right.id)
+  })
   const readModelWarning = hasDurableLineFacts
     ? ''
     : snapshots.length > 0
@@ -448,7 +636,9 @@ export async function getSalesBillDetail(docNo: string): Promise<SalesBillDetail
     salesName: salesperson?.name ?? bill.salesman ?? '-',
     status: bill.status ?? '',
     statusLabel: salesBillStatusLabel(bill.status),
+    sourceUsageFacts,
     subtotal: toNumber(bill.subtotal),
+    timeline,
     totalAmount: toNumber(bill.total_amount),
     transactionMode: bill.transaction_mode ?? 'STOCK',
     vatAmount: toNumber(bill.vat_amount),

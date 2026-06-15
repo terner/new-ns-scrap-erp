@@ -3,7 +3,7 @@ import { z } from 'zod'
 import * as XLSX from 'xlsx'
 import { salesBillFormSchema, type SalesBillFormValues } from '@/lib/sales'
 import { apiErrorResponse } from '@/lib/server/api-error'
-import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { AuthContextError, authContextErrorResponse, getBranchCodeIntersection, getCurrentAuthContext, requirePermission, type AppAuthContext } from '@/lib/server/auth-context'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { currentActor, nextDailyDocNo, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
@@ -16,6 +16,7 @@ import { salesBillLineFactsForBills, type SalesBillLineFactRow } from '@/lib/ser
 import { appendStockIssueStatusLog, STOCK_ISSUE_STATUS_ACTION } from '@/lib/server/stock-issue-history'
 import { consumeActiveWtoStockHolds, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
+import { assertTaxFilingPeriodUnlocked } from '@/lib/server/tax-filing-source-lock'
 import { findActiveWarehouseReferenceByCodeOrId } from '@/lib/server/warehouse-reference'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import { appendWeightTicketUsageLogs, WEIGHT_TICKET_USAGE_ACTION } from '@/lib/server/weight-ticket-usage-history'
@@ -130,8 +131,27 @@ async function salesBillLineCountByBillId(billIds: bigint[]) {
   return new Map(rows.map((row) => [row.sales_bill_id, row._count.id] as const))
 }
 
-function billWhere(query: BillQuery): Prisma.sales_billsWhereInput {
+async function salesBranchScope(context: AppAuthContext, requestedBranchCode?: string | null) {
+  const allowedCodes = getBranchCodeIntersection(context, requestedBranchCode)
+  if (allowedCodes === null) return { codes: null, ids: null }
+  if (allowedCodes.length === 0) return { codes: [], ids: [] as bigint[] }
+  const branches = await prisma.branches.findMany({
+    select: { code: true, id: true },
+    where: { code: { in: allowedCodes } },
+  })
+  return {
+    codes: allowedCodes,
+    ids: branches.map((branch) => branch.id),
+  }
+}
+
+function scopedBranchWhere(allowedBranchIds: bigint[] | null): Prisma.sales_billsWhereInput {
+  return allowedBranchIds === null ? {} : { branch_id: { in: allowedBranchIds } }
+}
+
+function billWhere(query: BillQuery, allowedBranchIds: bigint[] | null = null): Prisma.sales_billsWhereInput {
   const where: Prisma.sales_billsWhereInput = {}
+  Object.assign(where, scopedBranchWhere(allowedBranchIds))
 
   if (query.dateFrom || query.dateTo) {
     where.date = {
@@ -237,6 +257,10 @@ function salesItems(
 }
 
 type SalesItemSnapshot = ReturnType<typeof salesItems>[number]
+
+function isDeliveryBackedSalesItem(item: Pick<SalesItemSnapshot, 'deliveryTicketId'>) {
+  return Boolean(item.deliveryTicketId)
+}
 
 function salesBillLineRows(input: {
   actor: string
@@ -361,9 +385,10 @@ function sourceAllocationRows(input: {
 
   if (!input.stockDeliveryTicket) return []
 
-  return input.items.map((item, index) => {
+  return input.items.flatMap((item, index) => {
+    if (!isDeliveryBackedSalesItem(item)) return []
     const lineNo = index + 1
-    return {
+    return [{
       allocated_deduct_weight: item.deductWeight,
       allocated_gross_weight: item.grossWeight,
       allocated_net_weight: item.qty,
@@ -392,7 +417,7 @@ function sourceAllocationRows(input: {
       updated_at: input.createdAt,
       updated_by: input.actor,
       weight_ticket_id: input.stockDeliveryTicket!.id,
-    }
+    }]
   })
 }
 
@@ -706,6 +731,10 @@ async function validateStockDeliverySelection(
   if (!deliveryDocNo) {
     return { error: 'เลือกใบส่งของ WTO' as const }
   }
+  const deliveryItems = values.items.filter((item) => item.deliveryTicketId)
+  if (deliveryItems.length === 0) {
+    return { error: 'เลือกหรือเพิ่มรายการจากใบส่งของ WTO ก่อนบันทึก' as const }
+  }
 
   const { ticket, usedQtyBySummaryId } = await loadDeliveryAvailability(deliveryDocNo)
   if (!ticket || ticket.doc_type !== 'WTO' || ticket.cancelled_at) {
@@ -721,7 +750,7 @@ async function validateStockDeliverySelection(
   const { deliverySummarySourceMap, lineToSummaryRef } = deliveryReferenceMaps(ticket, productCodeById)
   const requestedQtyBySummaryId = new Map<string, number>()
 
-  for (const item of values.items) {
+  for (const item of deliveryItems) {
     const resolvedSummaryRef = item.deliverySummaryId ?? (item.deliveryLineId ? lineToSummaryRef.get(item.deliveryLineId) ?? null : null)
     if (item.deliveryTicketId !== ticket.doc_no || !resolvedSummaryRef) {
       return { error: 'รายการ Stock ต้องอ้างอิงรายการจากใบส่งของเดียวกัน' as const }
@@ -757,9 +786,17 @@ async function validateStockDeliverySelection(
   return { deliverySummarySourceMap, ticket }
 }
 
-async function salesOptionsPayload() {
+async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchScope>>) {
+  const allowedBranchCodes = scope.codes
+  const allowedBranchIds = scope.ids
   const [branches, customers, products, salesChannels, warehouses, vatRatePercent, deliveryTickets, poSellRows, tradingPurchaseBills, tradingManualCostSources, tradingAllocationFacts, customerAdvanceRows, customerAdvanceAllocations] = await Promise.all([
-    prisma.branches.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    prisma.branches.findMany({
+      orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }],
+      select: { active: true, code: true, id: true, name: true },
+      where: {
+        ...(allowedBranchCodes ? { code: { in: allowedBranchCodes } } : {}),
+      },
+    }),
     prisma.customers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
     prisma.sales_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
@@ -772,6 +809,9 @@ async function salesOptionsPayload() {
         code: true,
         id: true,
         name: true,
+      },
+      where: {
+        ...(allowedBranchIds ? { branch_id: { in: allowedBranchIds } } : {}),
       },
     }),
     activeVatRatePercent(new Date()),
@@ -790,6 +830,7 @@ async function salesOptionsPayload() {
       orderBy: [{ document_date: 'desc' }, { doc_no: 'desc' }],
       take: 300,
       where: {
+        ...(allowedBranchIds ? { branch_id: { in: allowedBranchIds } } : {}),
         cancelled_at: null,
         doc_type: 'WTO',
         status: 'delivered',
@@ -813,6 +854,7 @@ async function salesOptionsPayload() {
       },
       take: 500,
       where: {
+        ...(allowedBranchIds ? { branch_id: { in: allowedBranchIds } } : {}),
         status: { notIn: ['cancelled', 'canceled', 'closed', 'completed', 'fully matched', 'received', 'void', 'Cancelled', 'Canceled', 'Closed', 'Completed'] },
       },
     }),
@@ -828,12 +870,14 @@ async function salesOptionsPayload() {
             product_name: true,
             qty: true,
           },
+          where: { item_status: 'active' },
         },
-        suppliers: { select: { name: true } },
+        suppliers: { select: { branch_id: true, name: true } },
       },
       orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
       take: 500,
       where: {
+        ...(allowedBranchIds ? { branch_id: { in: allowedBranchIds } } : {}),
         status: { notIn: ['cancelled', 'Cancelled', 'void', 'voided', 'reversed'] },
         transaction_mode: 'TRADING',
       },
@@ -846,6 +890,7 @@ async function salesOptionsPayload() {
       orderBy: [{ date: 'desc' }, { source_no: 'desc' }],
       take: 500,
       where: {
+        ...(allowedBranchIds ? { suppliers: { is: { branch_id: { in: allowedBranchIds } } } } : {}),
         status: 'active',
       },
     }),
@@ -1102,7 +1147,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const includePaging = url.searchParams.get('format') !== 'xlsx'
     const query = parseBillQuery(url, includePaging)
-    const where = billWhere(query)
+    const branchScope = await salesBranchScope(context)
+    const where = billWhere(query, branchScope.ids)
 
     const [rows, totalRows, totals] = await Promise.all([
       prisma.sales_bills.findMany({
@@ -1143,7 +1189,7 @@ export async function GET(request: Request) {
       rows: jsonRows,
       totalAmount: toNumber(totals._sum.total_amount),
       totalRows,
-      ...await salesOptionsPayload(),
+      ...await salesOptionsPayload(branchScope),
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
@@ -1162,6 +1208,13 @@ export async function POST(request: Request) {
     const billDate = createdAt.toISOString().slice(0, 10)
     const vatRatePercent = await activeVatRatePercent(normalizeDate(billDate))
     const totals = calculateSalesTotals(values, vatRatePercent)
+    if (totals.vatAmount > 0) {
+      await assertTaxFilingPeriodUnlocked(prisma, {
+        date: normalizeDate(billDate),
+        sourceLabel: 'บิลขาย',
+        taxTypes: ['VAT'],
+      })
+    }
     const requestedProductCodes = values.items.map((item) => item.productId?.trim() ?? '')
     const invalidProductIndex = requestedProductCodes.findIndex((productCode) => !productCode)
     if (invalidProductIndex >= 0) {
@@ -1181,12 +1234,16 @@ export async function POST(request: Request) {
 
     if (!customer) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ลูกค้าไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (!branch) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    const requestedBranchScope = await salesBranchScope(context, branch.code)
+    if (requestedBranchScope.ids !== null && requestedBranchScope.ids.length === 0) {
+      return NextResponse.json({ code: 'FORBIDDEN', error: 'ไม่มีสิทธิ์สร้างบิลขายในสาขานี้' }, { status: 403 })
+    }
     if (!channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางขายไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (
       values.transactionMode === 'TRADING'
-      && (values.deliveryTicketId || values.pendingStockIssueId || values.fromPsaleNo || values.fromPsaleId || values.warehouseId)
+      && (values.pendingStockIssueId || values.fromPsaleNo || values.fromPsaleId || values.warehouseId)
     ) {
-      return NextResponse.json({ code: 'BAD_REQUEST', error: 'บิลขาย Trading ห้ามอ้างอิงใบส่งของ คลัง หรือใบเบิก Stock' }, { status: 400 })
+      return NextResponse.json({ code: 'BAD_REQUEST', error: 'บิลขาย Trading ห้ามอ้างอิงคลังหรือใบเบิก Stock; ถ้ามี stock line ให้เลือก WTO เท่านั้น' }, { status: 400 })
     }
     if (values.warehouseId && !warehouse) return NextResponse.json({ code: 'BAD_REQUEST', error: 'คลังไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
     if (branch?.code && warehouse?.branchCode && warehouse.branchCode !== branch.code) return NextResponse.json({ code: 'BAD_REQUEST', error: 'สาขาและคลังไม่ตรงกัน' }, { status: 400 })
@@ -1275,6 +1332,7 @@ export async function POST(request: Request) {
             id: true,
             items: true,
             status: true,
+            total_cost: true,
           },
           where: { doc_no: values.pendingStockIssueId },
         })
@@ -1313,10 +1371,10 @@ export async function POST(request: Request) {
         }
       }
     }
-    let stockIssue: { doc_no: string; id: bigint; status: string | null } | null = null
+    let stockIssue: { doc_no: string; id: bigint; status: string | null; total_cost: Prisma.Decimal | null } | null = null
     if (fromPsaleNo) {
       stockIssue = await prisma.stock_issues.findFirst({
-        select: { doc_no: true, id: true, status: true },
+        select: { doc_no: true, id: true, status: true, total_cost: true },
         where: { doc_no: fromPsaleNo },
       })
       if (!stockIssue) {
@@ -1327,7 +1385,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (values.transactionMode === 'STOCK' && !pendingStockIssue && !stockIssue) {
+    if ((values.transactionMode === 'STOCK' && !pendingStockIssue && !stockIssue) || (values.transactionMode === 'TRADING' && Boolean(values.deliveryTicketId))) {
       const deliveryValidation = await validateStockDeliverySelection(values, branch?.id ?? null, customer.id, productByCode, productCodeById)
       if ('error' in deliveryValidation) {
         return NextResponse.json({ code: 'BAD_REQUEST', error: deliveryValidation.error }, { status: 400 })
@@ -1354,12 +1412,13 @@ export async function POST(request: Request) {
     const tradingCostSourceByLineIndex = new Map<number, TradingCostSourceLine>()
     const tradingMatchedCogsByLineIndex = new Map<number, number>()
     if (values.transactionMode === 'TRADING') {
-      const tradingSourceIds = values.items.map((item) => item.tradingCostSourceId?.trim() ?? '')
-      const invalidSourceIndex = tradingSourceIds.findIndex((sourceId) => !sourceId || !parseTradingCostSourceId(sourceId))
+      const tradingSourceIds = values.items.map((item) => item.deliveryTicketId ? '' : item.tradingCostSourceId?.trim() ?? '')
+      const invalidSourceIndex = values.items.findIndex((item, index) => !item.deliveryTicketId && (!tradingSourceIds[index] || !parseTradingCostSourceId(tradingSourceIds[index])))
       if (invalidSourceIndex >= 0) {
         return NextResponse.json({ code: 'BAD_REQUEST', error: `เลือก Trading Cost Source ให้รายการที่ ${invalidSourceIndex + 1}` }, { status: 400 })
       }
-      const parsedSources = tradingSourceIds.map((sourceId) => parseTradingCostSourceId(sourceId)!)
+      const parsedSourcesByIndex = tradingSourceIds.map((sourceId) => sourceId ? parseTradingCostSourceId(sourceId) : null)
+      const parsedSources = parsedSourcesByIndex.filter((source): source is NonNullable<typeof source> => source != null)
       const sourceDocNos = [...new Set(parsedSources.filter((source) => source.sourceType === 'PB').map((source) => source.docNo))]
       const manualSourceNos = [...new Set(parsedSources.filter((source) => source.sourceType === 'MANUAL').map((source) => source.docNo))]
       const sourceBills = await prisma.purchase_bills.findMany({
@@ -1374,10 +1433,12 @@ export async function POST(request: Request) {
               product_name: true,
               qty: true,
             },
+            where: { item_status: 'active' },
           },
           suppliers: { select: { name: true } },
         },
         where: {
+          branch_id: branch.id,
           doc_no: { in: sourceDocNos },
           status: { notIn: ['cancelled', 'Cancelled', 'void', 'voided', 'reversed'] },
           transaction_mode: 'TRADING',
@@ -1386,11 +1447,12 @@ export async function POST(request: Request) {
       const manualSources = await prisma.trading_cost_sources.findMany({
         include: {
           products: { select: { code: true, name: true } },
-          suppliers: { select: { name: true } },
+          suppliers: { select: { branch_id: true, name: true } },
         },
         where: {
           source_no: { in: manualSourceNos },
           status: 'active',
+          suppliers: { is: { branch_id: branch.id } },
         },
       })
       const sourceBillByDocNo = new Map(sourceBills.map((bill) => [bill.doc_no, bill] as const))
@@ -1435,7 +1497,8 @@ export async function POST(request: Request) {
       })
       const requestedQtyBySource = new Map<string, number>()
       const requestedCostBySource = new Map<string, number>()
-      for (const [index, source] of parsedSources.entries()) {
+      for (const [index, source] of parsedSourcesByIndex.entries()) {
+        if (!source) continue
         if (source.sourceType === 'MANUAL') {
           const manualSource = manualSourceByNo.get(source.docNo)
           if (!manualSource) {
@@ -1540,7 +1603,9 @@ export async function POST(request: Request) {
     }
     const totalCost = values.transactionMode === 'TRADING'
       ? Array.from(tradingMatchedCogsByLineIndex.values()).reduce((sum, amount) => sum + amount, 0)
-      : 0
+      : sourceStockIssue
+        ? toNumber(sourceStockIssue.total_cost)
+        : 0
     const selectedHeaderPoSell = poSells.length === 1 ? poSells[0] : null
 
     const created = await prisma.$transaction(async (tx) => {
@@ -1555,6 +1620,7 @@ export async function POST(request: Request) {
           discount: values.discountTotal,
           discount_total: values.discountTotal,
           doc_no: docNo,
+          cogs_amount: totalCost,
           gross_profit: totals.totalAmount - totalCost,
           has_vat: values.hasVat,
           items: items as Prisma.InputJsonValue,
@@ -1601,7 +1667,7 @@ export async function POST(request: Request) {
       })
       const lineIdByLineNo = new Map(createdLines.map((line) => [line.line_no, line.id] as const))
 
-      if (values.transactionMode === 'STOCK') {
+      if (values.transactionMode === 'STOCK' || stockDeliveryTicket) {
         const sourceRows = sourceAllocationRows({
           actor,
           billId: createdBill.id,
@@ -1686,6 +1752,7 @@ export async function POST(request: Request) {
 
       if (values.transactionMode === 'TRADING') {
         const allocationRows = items.map((item, index) => {
+          if (isDeliveryBackedSalesItem(item)) return null
           const source = tradingCostSourceByLineIndex.get(index)
           if (!source) return null
           return {
@@ -1744,8 +1811,8 @@ export async function POST(request: Request) {
         })
       }
 
-      if (values.transactionMode === 'STOCK' && stockDeliveryTicket && !sourceStockIssue) {
-        await consumeActiveWtoStockHolds(tx, {
+      if (stockDeliveryTicket && !sourceStockIssue) {
+        const consumedStockLines = await consumeActiveWtoStockHolds(tx, {
           actor,
           billDate: normalizeDate(billDate),
           branchId: branch.id,
@@ -1753,8 +1820,21 @@ export async function POST(request: Request) {
           salesChannelId: channel.id,
           weightTicketId: stockDeliveryTicket.id,
         })
+        const stockCogs = consumedStockLines.reduce((sum, line) => sum + line.valueOut, 0)
+        const combinedCogs = totalCost + stockCogs
+        await tx.sales_bills.update({
+          data: {
+            cogs_amount: combinedCogs,
+            gross_profit: totals.totalAmount - combinedCogs,
+            total_cost: combinedCogs,
+            updated_at: createdAt,
+            updated_by: actor,
+          },
+          where: { id: createdBill.id },
+        })
 
         const usageEntries = items.flatMap((item, index) => {
+          if (!isDeliveryBackedSalesItem(item)) return []
           const summary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
           if (!summary) return []
           return [{
@@ -1780,6 +1860,7 @@ export async function POST(request: Request) {
 
         const summaryUsage = new Map<bigint, number>()
         items.forEach((item) => {
+          if (!isDeliveryBackedSalesItem(item)) return
           const summary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
           if (!summary) return
           summaryUsage.set(summary.id, (summaryUsage.get(summary.id) ?? 0) + item.qty)
@@ -1903,15 +1984,23 @@ export async function PATCH(request: Request) {
     const raw = await request.json()
     const { id, action, reason } = cancelSalesBillSchema.parse(raw)
     const actor = currentActor(context)
+    const branchScope = await salesBranchScope(context)
 
     const bill = await prisma.sales_bills.findFirst({
-      where: { doc_no: id }
+      where: { doc_no: id, ...scopedBranchWhere(branchScope.ids) }
     })
     if (!bill) {
       return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบบิลขาย' }, { status: 404 })
     }
     if (bill.status === 'cancelled') {
       return NextResponse.json({ code: 'BAD_REQUEST', error: 'บิลนี้ถูกยกเลิกแล้ว' }, { status: 400 })
+    }
+    if (toNumber(bill.vat_amount) > 0) {
+      await assertTaxFilingPeriodUnlocked(prisma, {
+        date: bill.date,
+        sourceLabel: `บิลขาย ${bill.doc_no}`,
+        taxTypes: ['VAT'],
+      })
     }
 
     const activeReceiptsCount = await prisma.receipts.count({
