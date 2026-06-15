@@ -444,7 +444,7 @@ export async function buildStockReconciliationReport() {
           sum(coalesce(sl.qty_in, 0) - coalesce(sl.qty_out, 0)) as net_qty,
           sum(abs(coalesce(sl.value_in, 0)) + abs(coalesce(sl.value_out, 0))) as ledger_value
         from public.stock_ledger sl
-        where sl.ref_type = 'ADJ'
+        where sl.ref_type in ('ADJ', 'ADJ-REV')
         group by coalesce(sl.ref_no, sl.ref_id)
       )
       select 'stock_adjustment_missing_ledger'::text as issue, 'ADJ'::text as ref_type, sa.doc_no, sa.status, coalesce(sa.diff_qty, 0) as expected, coalesce(adj_ledger.net_qty, 0) as net_qty
@@ -463,10 +463,19 @@ export async function buildStockReconciliationReport() {
 
       union all
 
-      select 'stock_adjustment_accounting_value_not_zero'::text as issue, 'ADJ'::text as ref_type, sa.doc_no, sa.status, 0::numeric as expected, coalesce(adj_ledger.ledger_value, 0) as net_qty
+      select 'stock_adjustment_note_only_value_not_zero'::text as issue, 'ADJ'::text as ref_type, sa.doc_no, sa.status, 0::numeric as expected, coalesce(adj_ledger.ledger_value, 0) as net_qty
       from public.stock_adjustments sa
       join adj_ledger on adj_ledger.doc_no = sa.doc_no
-      where abs(coalesce(adj_ledger.ledger_value, 0)) > 0.000001
+      where coalesce(sa.accounting_impact_policy, 'NOTE_ONLY') = 'NOTE_ONLY'
+        and abs(coalesce(adj_ledger.ledger_value, 0)) > 0.000001
+
+      union all
+
+      select 'stock_adjustment_correction_value_mismatch'::text as issue, 'ADJ'::text as ref_type, sa.doc_no, sa.status, abs(coalesce(sa.value_note, 0)) as expected, coalesce(adj_ledger.ledger_value, 0) as net_qty
+      from public.stock_adjustments sa
+      join adj_ledger on adj_ledger.doc_no = sa.doc_no
+      where coalesce(sa.accounting_impact_policy, '') = 'STOCK_CORRECTION'
+        and abs(abs(coalesce(sa.value_note, 0)) - coalesce(adj_ledger.ledger_value, 0)) > 0.000001
       order by ref_type, doc_no
       limit 500
     `,

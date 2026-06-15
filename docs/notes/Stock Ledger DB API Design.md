@@ -277,6 +277,8 @@ Automation:
 
 - `npm run verify:stock-ledger --workspace @ns-scrap-erp/next` runs the server reconciliation helper plus additional invariant checks for PSALE reversal parity, SB-from-PSALE duplicate stock ledger rows, consumed holds after PSALE reversal, production reconciliation issues, PI/PO2 reversal parity, and duplicate production reversal doc numbers reused across different source documents.
 - The command requires the active dev-target `DATABASE_URL`; it must fail on source/ledger mismatch instead of skipping rows or inventing defaults.
+- `npm run verify:psale-sales-bill-lifecycle --workspace @ns-scrap-erp/next` runs a transaction-rollback lifecycle fixture for PSALE create -> convert to Stock SB -> cancel SB from PSALE.
+- `npm run verify:sales-bill-psale-cancel --workspace @ns-scrap-erp/next` runs an isolated fixture contract for the converted PSALE -> Stock SB -> cancel path. It verifies that the Sales Bill does not write duplicate `SB/SB-CANCEL` ledger rows, cancellation reverses the original `PSALE` rows with `PSALE-CANCEL`, the WTO hold is active again, and Sales Bill line/source allocation facts are cancelled.
 - `npm run qa:stock-ledger-write-paths --workspace @ns-scrap-erp/next` executes real dev-target write-path QA for PSALE create/cancel and production PI/PO2 create/reverse. The script resolves QA source data from current stock/master data and fails if a required branch/product/warehouse reference is missing.
 
 Production reversal doc-number policy:
@@ -296,6 +298,8 @@ Production reversal doc-number policy:
 | stock reconciliation helper/API | `apps/next/src/lib/server/stock-reconciliation.ts`, `apps/next/src/app/api/stock/reconciliation/route.ts` |
 | stock reconciliation UI | `apps/next/src/app/stock/reconciliation/page.tsx`, `apps/next/src/components/stock/StockReconciliationPageClient.tsx` |
 | stock reconciliation automation | `apps/next/scripts/verify-stock-ledger-contract.ts` |
+| PSALE -> SB lifecycle rollback automation | `apps/next/scripts/verify-psale-sales-bill-lifecycle.ts` |
+| SB-from-PSALE cancel contract automation | `apps/next/scripts/verify-sales-bill-psale-cancel-contract.ts` |
 | stock write-path QA automation | `apps/next/scripts/qa-stock-ledger-write-paths.ts` |
 | production movement/reversal service | `apps/next/src/lib/server/production-orders.ts` |
 | production reconciliation helper/API | `apps/next/src/lib/server/production-reconciliation.ts`, `apps/next/src/app/api/production/reconciliation/route.ts` |

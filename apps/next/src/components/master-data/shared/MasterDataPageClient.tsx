@@ -580,7 +580,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
             <div className="flex flex-wrap items-center gap-2">
               {columnResize.hasCustomWidths ? (
                 <Button className="hidden md:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
-                  Set col to default
+                  คืนค่าเดิมตาราง
                 </Button>
               ) : null}
               <select

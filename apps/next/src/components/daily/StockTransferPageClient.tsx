@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Edit3, Plus, Send, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney, stockTransferFormSchema, todayDateInput, type StockTransferFormValues } from '@/lib/daily'
@@ -85,6 +87,7 @@ export function StockTransferPageClient() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<StockTransferFormValues>(emptyForm)
   const [formOpen, setFormOpen] = useState(false)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [page, setPage] = useState(1)
@@ -158,6 +161,7 @@ export function StockTransferPageClient() {
 
   const totalPages = Math.max(1, Math.ceil(data.totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
+  const hasFilters = Boolean(docNo.trim() || dateFrom || dateTo || totalQtyFrom.trim() || totalQtyTo.trim())
 
   function clearFilters() {
     setDocNo('')
@@ -295,37 +299,145 @@ export function StockTransferPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="rounded-md bg-white p-3 shadow">
-        <div className="grid gap-2 md:grid-cols-[minmax(180px,1fr)_150px_150px_130px_130px_auto_auto]">
+      {/* Desktop Toolbar (Hidden on Mobile) */}
+      <div className="hidden md:block rounded-md bg-white p-3 shadow">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
-            className="h-9"
-            placeholder="เลขที่เอกสาร"
+            className="h-9 min-w-[260px] flex-1"
+            placeholder="ค้นหาเลขที่เอกสาร..."
             type="search"
             value={docNo}
             onChange={(event) => setDocNo(event.target.value)}
           />
-          <DatePickerInput className="w-full" value={dateFrom} onChange={setDateFrom} />
-          <DatePickerInput className="w-full" value={dateTo} onChange={setDateTo} />
+          <label className="text-xs text-slate-500">วันที่:</label>
+          <DatePickerInput className="w-[130px] h-9" value={dateFrom} onChange={setDateFrom} />
+          <span className="text-slate-400">→</span>
+          <DatePickerInput className="w-[130px] h-9" value={dateTo} onChange={setDateTo} />
+          <label className="text-xs text-slate-500">น้ำหนัก:</label>
           <Input
-            className={`h-9 text-right tabular-nums ${numberInputClass}`}
+            className={`h-9 w-[100px] text-right tabular-nums ${numberInputClass}`}
             inputMode="decimal"
             placeholder="นน. จาก"
             value={totalQtyFrom}
             onChange={(event) => setTotalQtyFrom(event.target.value)}
           />
+          <span className="text-slate-400">→</span>
           <Input
-            className={`h-9 text-right tabular-nums ${numberInputClass}`}
+            className={`h-9 w-[100px] text-right tabular-nums ${numberInputClass}`}
             inputMode="decimal"
             placeholder="นน. ถึง"
             value={totalQtyTo}
             onChange={(event) => setTotalQtyTo(event.target.value)}
           />
-          {(docNo || dateFrom || dateTo || totalQtyFrom || totalQtyTo) ? (
-            <Button size="sm" type="button" variant="secondary" onClick={clearFilters}>ล้าง</Button>
-          ) : <span />}
-          <Button size="sm" type="button" onClick={openCreateForm}><Plus className="mr-1 h-4 w-4" />โอนใหม่</Button>
+          {hasFilters ? (
+            <Button size="sm" type="button" variant="secondary" className="h-9" onClick={clearFilters}>✕ ล้าง</Button>
+          ) : null}
+          <Button size="sm" type="button" className="h-9 ml-auto bg-slate-900 text-white hover:bg-slate-800" onClick={openCreateForm}>
+            <Plus className="mr-1 h-4 w-4" />โอนใหม่
+          </Button>
         </div>
       </div>
+
+      {/* Mobile Toolbar (Hidden on Desktop) */}
+      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+        <div className="flex gap-2 items-center">
+          <Input
+            className="min-w-[200px] flex-1 h-9"
+            placeholder="ค้นหาเลขที่เอกสาร..."
+            type="search"
+            value={docNo}
+            onChange={(event) => setDocNo(event.target.value)}
+          />
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            onClick={() => setShowMobileFilters(true)}
+          >
+            ตัวกรอง {hasFilters ? '(มี)' : ''}
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom Sheet Filter for Mobile */}
+      {showMobileFilters ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h4 className="font-bold text-slate-800">ตัวกรองรายการโอนสินค้า</h4>
+              <button
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
+                onClick={() => setShowMobileFilters(false)}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
+                <div className="flex items-center gap-2">
+                  <DatePickerInput className="flex-1" value={dateFrom} onChange={setDateFrom} />
+                  <span className="text-slate-400">→</span>
+                  <DatePickerInput className="flex-1" value={dateTo} onChange={setDateTo} />
+                </div>
+              </div>
+
+              <div>
+                <span className="mb-1 block text-xs font-semibold text-slate-600">ช่วงน้ำหนัก (กก.)</span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    className={`h-9 flex-1 text-right tabular-nums ${numberInputClass}`}
+                    inputMode="decimal"
+                    placeholder="นน. จาก"
+                    value={totalQtyFrom}
+                    onChange={(event) => setTotalQtyFrom(event.target.value)}
+                  />
+                  <span className="text-slate-400">→</span>
+                  <Input
+                    className={`h-9 flex-1 text-right tabular-nums ${numberInputClass}`}
+                    inputMode="decimal"
+                    placeholder="นน. ถึง"
+                    value={totalQtyTo}
+                    onChange={(event) => setTotalQtyTo(event.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  clearFilters()
+                  setShowMobileFilters(false)
+                }}
+              >
+                ล้างตัวกรอง
+              </Button>
+              <Button
+                type="button"
+                className="h-11 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                ใช้ตัวกรอง
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* FAB for mobile creation */}
+      <button
+        aria-label="โอนใหม่"
+        className="h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg fixed bottom-6 right-6 z-40 md:hidden flex items-center justify-center hover:bg-blue-700"
+        type="button"
+        onClick={openCreateForm}
+      >
+        <Plus className="h-6 w-6" />
+      </button>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>
@@ -334,7 +446,7 @@ export function StockTransferPageClient() {
           <span className="ml-2 text-slate-500">· มูลค่ารวม <span className="font-semibold text-emerald-700">{formatMoney(data.summary.totalValue)}</span> บาท</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -354,7 +466,7 @@ export function StockTransferPageClient() {
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
-          <form noValidate className="w-full max-w-5xl overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
+          <form noValidate data-combobox-portal-root="true" className="w-full max-w-5xl overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
             <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0">
               <div>
                 <h3 className="font-bold text-slate-100 text-lg">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
@@ -409,7 +521,8 @@ export function StockTransferPageClient() {
                   <Button size="sm" type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, { productId: '', qty: 0 }] }))}>+ เพิ่มรายการ</Button>
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
-                <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                {/* Desktop View (Table) */}
+                <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200 bg-white">
                   <table className="w-full min-w-[920px] text-sm">
                     <thead className="border-b border-slate-300/80 bg-slate-200/80">
                       <tr>
@@ -436,8 +549,8 @@ export function StockTransferPageClient() {
                                 onChange={(value) => updateItem(index, 'productId', value)}
                               />
                             </td>
-                            <td className="p-2 pt-8 text-right tabular-nums text-slate-700">{source ? `${formatMoney(source.readyQty)} กก.` : '-'}</td>
-                            <td className="p-2 pt-8 text-right tabular-nums text-slate-700">{source ? formatMoney(source.sourceUnitCost) : '-'}</td>
+                            <td className="p-2 pt-4 text-right tabular-nums text-slate-700">{source ? `${formatMoney(source.readyQty)} กก.` : '-'}</td>
+                            <td className="p-2 pt-4 text-right tabular-nums text-slate-700">{source ? formatMoney(source.sourceUnitCost) : '-'}</td>
                             <td className="p-2">
                               <InputField
                                 error={fieldErrors[`items.${index}.qty`]}
@@ -447,11 +560,12 @@ export function StockTransferPageClient() {
                                 type="number"
                                 value={item.qty ? String(item.qty) : ''}
                                 onChange={(value) => updateItem(index, 'qty', Number(value || 0))}
+                                hideLabel={true}
                               />
                             </td>
-                            <td className="p-2 pt-8 text-right tabular-nums font-medium text-emerald-700">{formatMoney(lineValue)}</td>
+                            <td className="p-2 pt-4 text-right tabular-nums font-medium text-emerald-700">{formatMoney(lineValue)}</td>
                             <td className="p-2 text-right">
-                              <Button className="mt-6" disabled={form.items.length <= 1} size="xs" type="button" variant="outline" onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}>
+                              <Button className="mt-2" disabled={form.items.length <= 1} size="xs" type="button" variant="outline" onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}>
                                 ลบ
                               </Button>
                             </td>
@@ -468,6 +582,92 @@ export function StockTransferPageClient() {
                       </tr>
                     </tfoot>
                   </table>
+                </div>
+
+                {/* Mobile View (Stacked Cards) */}
+                <div className="md:hidden space-y-3">
+                  {form.items.map((item, index) => {
+                    const source = sourceStockByProductId.get(item.productId)
+                    const lineValue = item.qty * (source?.sourceUnitCost ?? 0)
+                    return (
+                      <div key={index} className="rounded-lg border border-slate-200 p-4 space-y-3 relative bg-slate-50/50">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                          <span className="font-semibold text-slate-700 text-xs">รายการที่ {index + 1}</span>
+                          <Button
+                            disabled={form.items.length <= 1}
+                            size="xs"
+                            type="button"
+                            variant="outline"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 h-7 px-2.5"
+                            onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_entry, entryIndex) => entryIndex !== index) }))}
+                          >
+                            ลบ
+                          </Button>
+                        </div>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">สินค้า *</label>
+                            <SearchableProductField
+                              error={fieldErrors[`items.${index}.productId`]}
+                              errorKey={`items.${index}.productId`}
+                              options={productOptions}
+                              value={item.productId}
+                              onChange={(value) => updateItem(index, 'productId', value)}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">คงเหลือต้นทาง</span>
+                              <span className="text-xs font-medium text-slate-700 tabular-nums block bg-white border border-slate-200 rounded px-2.5 py-1.5 h-8 truncate">
+                                {source ? `${formatMoney(source.readyQty)} กก.` : '-'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">มูลค่า / กก.</span>
+                              <span className="text-xs font-medium text-slate-700 tabular-nums block bg-white border border-slate-200 rounded px-2.5 py-1.5 h-8 truncate">
+                                {source ? `${formatMoney(source.sourceUnitCost)} บ.` : '-'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">น้ำหนัก *</span>
+                              <InputField
+                                error={fieldErrors[`items.${index}.qty`]}
+                                errorKey={`items.${index}.qty`}
+                                inputClassName={`text-right tabular-nums h-8 text-xs ${numberInputClass}`}
+                                label="น้ำหนัก *"
+                                type="number"
+                                value={item.qty ? String(item.qty) : ''}
+                                onChange={(value) => updateItem(index, 'qty', Number(value || 0))}
+                                hideLabel={true}
+                              />
+                            </div>
+                            <div>
+                              <span className="block text-xs font-semibold text-slate-500 mb-1">มูลค่ารวม</span>
+                              <span className="text-xs font-bold text-emerald-700 tabular-nums block bg-white border border-slate-200 rounded px-2.5 py-1.5 h-8 truncate">
+                                {formatMoney(lineValue)} บ.
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Mobile Footer (Totals) */}
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs space-y-1.5 font-semibold">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-sans">น้ำหนักรวม:</span>
+                      <span className="text-blue-700 tabular-nums">{formatMoney(formTotalQty)} กก.</span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-200/60 pt-1.5">
+                      <span className="text-slate-500 font-sans">มูลค่ารวม:</span>
+                      <span className="text-emerald-700 tabular-nums">{formatMoney(formTotalValue)} บาท</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -628,10 +828,10 @@ function IconButton(props: { children: React.ReactNode; disabled?: boolean; labe
   )
 }
 
-function FormField(props: { children: React.ReactNode; className?: string; error?: string; errorKey?: string; label: string }) {
+function FormField(props: { children: React.ReactNode; className?: string; error?: string; errorKey?: string; label: string; hideLabel?: boolean }) {
   return (
     <label className={props.className}>
-      <span className="mb-1 block text-xs font-medium text-slate-600">{props.label}</span>
+      {!props.hideLabel ? <span className="mb-1 block text-xs font-medium text-slate-600">{props.label}</span> : null}
       {props.errorKey ? <div data-error-key={props.errorKey}>{props.children}</div> : props.children}
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
@@ -646,9 +846,10 @@ function InputField(props: {
   onChange: (value: string) => void
   type?: string
   value: string
+  hideLabel?: boolean
 }) {
   return (
-    <FormField error={props.error} errorKey={props.errorKey} label={props.label}>
+    <FormField error={props.error} errorKey={props.errorKey} label={props.label} hideLabel={props.hideLabel}>
       <Input
         data-error-key={props.errorKey}
         className={`h-9 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : ''} ${props.inputClassName ?? ''}`.trim()}
@@ -694,94 +895,26 @@ function SearchableProductField(props: {
   options: Option[]
   value: string
 }) {
-  const selectedOption = props.options.find((option) => option.id === props.value)
-  const selectedLabel = selectedOption ? optionLabel(selectedOption) : ''
-  const [query, setQuery] = useState(selectedLabel)
-  const [open, setOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
-
-  useEffect(() => {
-    setQuery(selectedLabel)
-  }, [selectedLabel])
-
-  const normalizedQuery = query.trim().toLowerCase()
-  const filteredOptions = props.options
-    .filter((option) => {
-      if (!normalizedQuery) return true
-      return optionLabel(option).toLowerCase().includes(normalizedQuery)
-    })
-    .slice(0, 30)
-
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [query])
-
-  function selectOption(option: Option) {
-    props.onChange(option.id)
-    setQuery(optionLabel(option))
-    setOpen(false)
-  }
+  const mappedOptions = useMemo(() => {
+    return props.options.map((option) => ({
+      id: option.id,
+      label: option.code ? `${option.code} - ${option.name}` : option.name,
+      searchText: option.code ? `${option.code} ${option.name}` : option.name,
+    }))
+  }, [props.options])
 
   return (
-    <FormField error={props.error} errorKey={props.errorKey} label="สินค้า *">
-      <div className="relative">
-        <Input
-          aria-expanded={open}
-          autoComplete="off"
-          className={`h-9 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : ''}`}
-          data-error-key={props.errorKey}
-          placeholder="พิมพ์รหัส/ชื่อสินค้า..."
-          role="combobox"
-          value={query}
-          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-          onChange={(event) => {
-            const nextQuery = event.target.value
-            setQuery(nextQuery)
-            setOpen(true)
-            if (props.value && nextQuery !== selectedLabel) props.onChange('')
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown') {
-              event.preventDefault()
-              setOpen(true)
-              setActiveIndex((current) => filteredOptions.length > 0 ? Math.min(filteredOptions.length - 1, current + 1) : 0)
-              return
-            }
-            if (event.key === 'ArrowUp') {
-              event.preventDefault()
-              setOpen(true)
-              setActiveIndex((current) => Math.max(0, current - 1))
-              return
-            }
-            if (event.key === 'Enter' && open && filteredOptions[activeIndex]) {
-              event.preventDefault()
-              selectOption(filteredOptions[activeIndex])
-            }
-            if (event.key === 'Escape') setOpen(false)
-          }}
-        />
-        {open ? (
-          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
-            {filteredOptions.length > 0 ? filteredOptions.map((option, index) => (
-              <button
-                key={option.id}
-                className={`block w-full px-3 py-2 text-left text-xs focus:outline-none ${index === activeIndex ? 'bg-slate-100' : 'hover:bg-slate-50 focus:bg-slate-50'}`}
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => selectOption(option)}
-              >
-                <span className="font-mono text-slate-700">{option.code ?? option.id}</span>
-                <span className="ml-2 text-slate-600">{option.name}</span>
-              </button>
-            )) : (
-              <div className="px-3 py-2 text-xs text-slate-400">ไม่พบสินค้า</div>
-            )}
-          </div>
-        ) : null}
-      </div>
-    </FormField>
+    <SearchCombobox
+      error={props.error}
+      errorKey={props.errorKey}
+      inputId={`product-select-${props.errorKey}`}
+      label="สินค้า *"
+      hideLabel={true}
+      options={mappedOptions}
+      placeholder="พิมพ์รหัส/ชื่อสินค้า..."
+      value={props.value}
+      onChange={props.onChange}
+    />
   )
 }
 

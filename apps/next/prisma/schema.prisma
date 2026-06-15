@@ -523,6 +523,7 @@ model accounts {
   id                                            BigInt                      @id @default(autoincrement())
   branches                                      branches?                   @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   bank_statement                                bank_statement[]
+  customer_receipts                             customer_receipts[]
   expenses                                      expenses[]
   loan_payments                                 loan_payments[]
   payment_account_splits                        payment_account_splits[]
@@ -530,7 +531,6 @@ model accounts {
   payments                                      payments[]
   petty_advance_returns                         petty_advance_returns[]
   petty_advances                                petty_advances[]
-  customer_receipts                             customer_receipts[]
   receipts                                      receipts[]
   supplier_advance_payments                     supplier_advance_payments[]
   transfers_transfers_from_account_idToaccounts transfers[]                 @relation("transfers_from_account_idToaccounts")
@@ -594,7 +594,6 @@ model audit_logs {
 
 model bank_statement {
   date                   DateTime                 @db.Date
-  doc_no                 String                   @unique
   ref_type               String?
   ref_id                 String?
   ref_no                 String?
@@ -613,12 +612,12 @@ model bank_statement {
   version                Int?                     @default(1)
   id                     BigInt                   @id @default(autoincrement())
   account_id             BigInt?
+  doc_no                 String                   @unique(map: "uq_bank_statement_doc_no")
   accounts               accounts?                @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer_receipts      customer_receipts?
   payment_account_splits payment_account_splits[]
-  customer_receipts      customer_receipts[]
 
   @@index([account_id], map: "idx_bank_account")
-  @@index([doc_no], map: "idx_bank_statement_doc_no")
   @@index([date(sort: Desc)], map: "idx_bank_date")
   @@index([ref_type, ref_id], map: "idx_bank_statement_source", where: raw("((ref_type IS NOT NULL) AND (ref_id IS NOT NULL))"))
   @@schema("public")
@@ -628,8 +627,7 @@ model company_profiles {
   name        String
   name_en     String?
   tax_id      String?
-  branch_code String?  @default("00000")
-  branch_id   BigInt?
+  branch_code String?   @default("00000")
   address     String
   phone       String
   fax         String?
@@ -638,10 +636,11 @@ model company_profiles {
   bank_info   String?
   footer_note String?
   logo_url    String?
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
   updated_by  String?
-  id          BigInt   @id @default(autoincrement())
+  id          BigInt    @id @default(autoincrement())
+  branch_id   BigInt?   @unique(map: "company_profiles_branch_id_unique", where: raw("(branch_id IS NOT NULL)"))
   branches    branches? @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([branch_id], map: "idx_company_profiles_branch_id")
@@ -677,7 +676,6 @@ model account_subtypes {
 }
 
 model bill_swap_history {
-  event_key          String    @unique @default(dbgenerated("('BSH-'::text || gen_random_uuid()::text)"))
   bill_id            BigInt
   swap_date          DateTime? @default(now()) @db.Timestamptz(6)
   before_supplier_id BigInt?
@@ -690,6 +688,7 @@ model bill_swap_history {
   reason             String?
   changed_by         String?
   id                 BigInt    @id @default(autoincrement())
+  event_key          String    @unique @default(dbgenerated("('BSH-'::text || (gen_random_uuid())::text)"))
 
   @@schema("public")
 }
@@ -706,9 +705,10 @@ model branches {
   accounts                  accounts[]
   app_user_branch_access    app_user_branch_access[]
   assets                    assets[]
-  company_profiles          company_profiles[]
+  company_profiles          company_profiles?
   customer_receipts         customer_receipts[]
   expenses                  expenses[]
+  grade_adjustments         grade_adjustments[]
   payments                  payments[]
   production_lines          production_lines[]
   production_machines       production_machines[]
@@ -716,6 +716,7 @@ model branches {
   purchase_bills            purchase_bills[]
   receipts                  receipts[]
   sales_bills               sales_bills[]
+  stock_cost_pool_entries   stock_cost_pool_entries[]
   stock_holds               stock_holds[]
   stock_issues              stock_issues[]
   stock_ledger              stock_ledger[]
@@ -742,22 +743,22 @@ model currencies {
 }
 
 model director_employees {
-  code              String   @unique(map: "directors_code_key")
+  code              String           @unique(map: "directors_code_key")
   name              String
   type              String?
   phone             String?
   bank_account      String?
-  active            Boolean  @default(true)
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+  active            Boolean          @default(true)
+  created_at        DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime         @default(now()) @db.Timestamptz(6)
   bank_name         String?
   account_no        String?
+  id                BigInt           @id(map: "directors_pkey") @default(autoincrement())
   name_title        String?
   first_name        String?
   last_name         String?
   bank_account_name String?
   bank_branch       String?
-  id                BigInt   @id(map: "directors_pkey") @default(autoincrement())
   petty_advances    petty_advances[]
 
   @@index([active])
@@ -766,20 +767,20 @@ model director_employees {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model customers {
-  code                     String           @unique
+  code                     String                     @unique(map: "uq_customers_code")
   name                     String
   tax_id                   String?
   phone                    String?
   email                    String?
   address                  String?
-  credit_term              Int?             @default(0)
-  active                   Boolean?         @default(true)
-  created_at               DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime?        @default(now()) @db.Timestamptz(6)
+  credit_term              Int?                       @default(0)
+  active                   Boolean?                   @default(true)
+  created_at               DateTime?                  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?                  @default(now()) @db.Timestamptz(6)
   updated_by               String?
-  version                  Int?             @default(1)
+  version                  Int?                       @default(1)
   type                     String?
-  credit_limit             Decimal?         @db.Decimal
+  credit_limit             Decimal?                   @db.Decimal
   address_no               String?
   address_moo              String?
   address_village          String?
@@ -788,8 +789,8 @@ model customers {
   address_district         String?
   address_province         String?
   address_postal_code      String?
-  address_country          String?          @default("ไทย")
-  market_scope             String           @default("ในประเทศ")
+  address_country          String?                    @default("ไทย")
+  market_scope             String                     @default("ในประเทศ")
   name_title               String?
   first_name               String?
   last_name                String?
@@ -799,13 +800,15 @@ model customers {
   address_city             String?
   address_state_region     String?
   address_postal_code_intl String?
-  id                       BigInt           @id @default(autoincrement())
+  id                       BigInt                     @id @default(autoincrement())
   sales_id                 BigInt?
-  po_sells                 po_sells[]
   customer_receipts        customer_receipts[]
+  po_sells                 po_sells[]
   receipts                 receipts[]
+  sales_bill_customer_advance_allocations sales_bill_customer_advance_allocations[]
   sales_bills              sales_bills[]
   stock_issues             stock_issues[]
+  trading_allocation_facts trading_allocation_facts[]
   trading_deals            trading_deals[]
   weight_tickets           weight_tickets[]
 
@@ -957,72 +960,85 @@ model fx_gain_loss {
 }
 
 model grade_adjustments {
-  doc_no              String
-  date                DateTime    @db.Date
-  qty_diff            Decimal     @db.Decimal
-  value_diff          Decimal     @db.Decimal
-  reason              String?
-  approved_by         String?
-  notes               String?
-  created_at          DateTime?   @default(now()) @db.Timestamptz(6)
-  updated_at          DateTime?   @db.Timestamptz(6)
-  updated_by          String?
-  version             Int?        @default(1)
-  warehouse_id        BigInt?
-  id                  BigInt      @id @default(autoincrement())
-  product_id          BigInt?
-  status              String      @default("posted")
-  cost_status         String      @default("allocated")
-  source_type         String      @default("Manual")
-  allocation_method   String?
-  branch_id           BigInt?
-  source_product_id   BigInt?
-  target_product_id   BigInt?
-  source_qty          Decimal?    @db.Decimal
-  target_qty          Decimal?    @db.Decimal
-  source_lot_no       String?
-  target_lot_no       String?
-  reversed_at         DateTime?   @db.Timestamptz(6)
-  reversed_by         String?
-  target_cost_policy  String      @default("SOURCE_MATCHED")
-  source_unit_cost    Decimal?    @db.Decimal
-  target_unit_cost    Decimal?    @db.Decimal
-  cost_variance       Decimal     @default(0) @db.Decimal
-  cost_override_reason String?
-  products            products?   @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  warehouses          warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  doc_no                                                 String
+  date                                                   DateTime                      @db.Date
+  qty_diff                                               Decimal                       @db.Decimal
+  value_diff                                             Decimal                       @db.Decimal
+  reason                                                 String?
+  approved_by                                            String?
+  notes                                                  String?
+  created_at                                             DateTime?                     @default(now()) @db.Timestamptz(6)
+  updated_at                                             DateTime?                     @db.Timestamptz(6)
+  updated_by                                             String?
+  version                                                Int?                          @default(1)
+  warehouse_id                                           BigInt?
+  id                                                     BigInt                        @id @default(autoincrement())
+  product_id                                             BigInt?
+  status                                                 String                        @default("posted")
+  cost_status                                            String                        @default("allocated")
+  source_type                                            String                        @default("Manual")
+  allocation_method                                      String?
+  branch_id                                              BigInt?
+  source_product_id                                      BigInt?
+  target_product_id                                      BigInt?
+  source_qty                                             Decimal?                      @db.Decimal
+  target_qty                                             Decimal?                      @db.Decimal
+  source_lot_no                                          String?
+  target_lot_no                                          String?
+  reversed_at                                            DateTime?                     @db.Timestamptz(6)
+  reversed_by                                            String?
+  target_cost_policy                                     String                        @default("SOURCE_MATCHED")
+  source_unit_cost                                       Decimal?                      @db.Decimal
+  target_unit_cost                                       Decimal?                      @db.Decimal
+  cost_variance                                          Decimal                       @default(0) @db.Decimal
+  cost_override_reason                                   String?
+  branches                                               branches?                     @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products                                               products?                     @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products_grade_adjustments_source_product_idToproducts products?                     @relation("grade_adjustments_source_product_idToproducts", fields: [source_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products_grade_adjustments_target_product_idToproducts products?                     @relation("grade_adjustments_target_product_idToproducts", fields: [target_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses                                             warehouses?                   @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stock_cost_pool_allocations                            stock_cost_pool_allocations[]
+  stock_cost_pool_entries                                stock_cost_pool_entries[]
 
   @@index([cost_status, date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_grade_adjustments_cost_status_date")
   @@index([status, date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_grade_adjustments_status_date")
   @@schema("public")
 }
 
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model stock_cost_pool_entries {
-  id                    BigInt    @id @default(autoincrement())
-  pool_key              String    @unique @default(dbgenerated("('SCP-'::text || gen_random_uuid()::text)"))
-  source_type           String
-  source_ref_type       String
-  source_ref_id         String?
-  source_ref_no         String?
-  source_line_id        String?
-  source_ledger_id      BigInt?
-  regrade_adjustment_id BigInt?
-  date                  DateTime  @db.Date
-  branch_id             BigInt?
-  warehouse_id          BigInt?
-  product_id            BigInt
-  lot_no                String?
-  original_qty          Decimal   @db.Decimal
-  allocated_qty         Decimal   @default(0) @db.Decimal
-  released_qty          Decimal   @default(0) @db.Decimal
-  unit_cost             Decimal   @db.Decimal
-  original_value        Decimal   @db.Decimal
-  status                String    @default("Available")
-  notes                 String?
-  created_at            DateTime? @default(now()) @db.Timestamptz(6)
-  created_by            String?
-  updated_at            DateTime? @db.Timestamptz(6)
-  updated_by            String?
+  id                                                                                                    BigInt                        @id @default(autoincrement())
+  pool_key                                                                                              String                        @unique @default(dbgenerated("('SCP-'::text || (gen_random_uuid())::text)"))
+  source_type                                                                                           String
+  source_ref_type                                                                                       String
+  source_ref_id                                                                                         String?
+  source_ref_no                                                                                         String?
+  source_line_id                                                                                        String?
+  source_ledger_id                                                                                      BigInt?
+  regrade_adjustment_id                                                                                 BigInt?
+  date                                                                                                  DateTime                      @db.Date
+  branch_id                                                                                             BigInt?
+  warehouse_id                                                                                          BigInt?
+  product_id                                                                                            BigInt
+  lot_no                                                                                                String?
+  original_qty                                                                                          Decimal                       @db.Decimal
+  allocated_qty                                                                                         Decimal                       @default(0) @db.Decimal
+  released_qty                                                                                          Decimal                       @default(0) @db.Decimal
+  unit_cost                                                                                             Decimal                       @db.Decimal
+  original_value                                                                                        Decimal                       @db.Decimal
+  status                                                                                                String                        @default("Available")
+  notes                                                                                                 String?
+  created_at                                                                                            DateTime?                     @default(now()) @db.Timestamptz(6)
+  created_by                                                                                            String?
+  updated_at                                                                                            DateTime?                     @db.Timestamptz(6)
+  updated_by                                                                                            String?
+  stock_cost_pool_allocations_stock_cost_pool_allocations_source_pool_entry_idTostock_cost_pool_entries stock_cost_pool_allocations[] @relation("stock_cost_pool_allocations_source_pool_entry_idTostock_cost_pool_entries")
+  stock_cost_pool_allocations_stock_cost_pool_allocations_target_pool_entry_idTostock_cost_pool_entries stock_cost_pool_allocations[] @relation("stock_cost_pool_allocations_target_pool_entry_idTostock_cost_pool_entries")
+  branches                                                                                              branches?                     @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products                                                                                              products                      @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  grade_adjustments                                                                                     grade_adjustments?            @relation(fields: [regrade_adjustment_id], references: [id], onUpdate: NoAction)
+  stock_ledger                                                                                          stock_ledger?                 @relation(fields: [source_ledger_id], references: [id], onUpdate: NoAction)
+  warehouses                                                                                            warehouses?                   @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([product_id, branch_id, warehouse_id, status, date, id], map: "idx_stock_cost_pool_entries_available", where: raw("(status = ANY (ARRAY['Available'::text, 'Partially Used'::text]))"))
   @@index([regrade_adjustment_id], map: "idx_stock_cost_pool_entries_regrade", where: raw("(regrade_adjustment_id IS NOT NULL)"))
@@ -1031,23 +1047,26 @@ model stock_cost_pool_entries {
 }
 
 model stock_cost_pool_allocations {
-  id                   BigInt    @id @default(autoincrement())
-  allocation_key       String    @unique @default(dbgenerated("('SCA-'::text || gen_random_uuid()::text)"))
-  allocation_type      String
-  status               String    @default("active")
-  grade_adjustment_id  BigInt
-  source_pool_entry_id BigInt
-  target_pool_entry_id BigInt?
-  line_no              Int       @default(1)
-  allocation_method    String
-  qty                  Decimal   @db.Decimal
-  unit_cost            Decimal   @db.Decimal
-  total_cost           Decimal   @db.Decimal
-  created_at           DateTime? @default(now()) @db.Timestamptz(6)
-  created_by           String?
-  reversed_at          DateTime? @db.Timestamptz(6)
-  reversed_by          String?
-  notes                String?
+  id                                                                                                BigInt                   @id @default(autoincrement())
+  allocation_key                                                                                    String                   @unique @default(dbgenerated("('SCA-'::text || (gen_random_uuid())::text)"))
+  allocation_type                                                                                   String
+  status                                                                                            String                   @default("active")
+  grade_adjustment_id                                                                               BigInt
+  source_pool_entry_id                                                                              BigInt
+  target_pool_entry_id                                                                              BigInt?
+  line_no                                                                                           Int                      @default(1)
+  allocation_method                                                                                 String
+  qty                                                                                               Decimal                  @db.Decimal
+  unit_cost                                                                                         Decimal                  @db.Decimal
+  total_cost                                                                                        Decimal                  @db.Decimal
+  created_at                                                                                        DateTime?                @default(now()) @db.Timestamptz(6)
+  created_by                                                                                        String?
+  reversed_at                                                                                       DateTime?                @db.Timestamptz(6)
+  reversed_by                                                                                       String?
+  notes                                                                                             String?
+  grade_adjustments                                                                                 grade_adjustments        @relation(fields: [grade_adjustment_id], references: [id], onUpdate: NoAction)
+  stock_cost_pool_entries_stock_cost_pool_allocations_source_pool_entry_idTostock_cost_pool_entries stock_cost_pool_entries  @relation("stock_cost_pool_allocations_source_pool_entry_idTostock_cost_pool_entries", fields: [source_pool_entry_id], references: [id], onUpdate: NoAction)
+  stock_cost_pool_entries_stock_cost_pool_allocations_target_pool_entry_idTostock_cost_pool_entries stock_cost_pool_entries? @relation("stock_cost_pool_allocations_target_pool_entry_idTostock_cost_pool_entries", fields: [target_pool_entry_id], references: [id], onUpdate: NoAction)
 
   @@index([grade_adjustment_id, status], map: "idx_stock_cost_pool_allocations_adjustment")
   @@index([source_pool_entry_id, status], map: "idx_stock_cost_pool_allocations_source")
@@ -1183,8 +1202,8 @@ model overseas_recipients {
   swift      String?
   currency   String?  @default("USD")
   active     Boolean? @default(true)
-  code       String   @unique
   id         BigInt   @id @default(autoincrement())
+  code       String   @unique
 
   @@schema("public")
 }
@@ -1220,13 +1239,15 @@ model production_machine_types {
 }
 
 model payment_methods {
-  name       String
-  active     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  updated_at DateTime @default(now()) @db.Timestamptz(6)
-  type       String   @default("bank")
-  code       String   @unique
-  id         BigInt   @id @default(autoincrement())
+  name              String
+  active            Boolean             @default(true)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  type              String              @default("bank")
+  code              String              @unique
+  id                BigInt              @id @default(autoincrement())
+  bank_name         String?
+  account_no        String?
   customer_receipts customer_receipts[]
 
   @@index([type])
@@ -1337,6 +1358,7 @@ model payments {
   @@index([bill_id], map: "idx_pmt_bill")
   @@index([date(sort: Desc)], map: "idx_pmt_date")
   @@index([supplier_id], map: "idx_pmt_supplier")
+  @@index([bill_id, created_at, doc_no, amount, withholding_tax, discount, status], map: "idx_payments_active_bill_created", where: raw("(status <> 'cancelled'::text)"))
   @@schema("public")
 }
 
@@ -1373,11 +1395,12 @@ model payment_approvals {
   @@index([status], map: "idx_payment_approvals_status")
   @@index([approved_at(sort: Desc)], map: "idx_payment_approvals_approved_at")
   @@index([doc_no], map: "idx_payment_approvals_doc_no")
+  @@index([source_id, status, doc_no], map: "idx_payment_approvals_purchase_bill_locked", where: raw("((source_type = 'purchase_bill'::text) AND (status = ANY (ARRAY['approved'::text, 'paid'::text])))"))
   @@schema("public")
 }
 
 model payment_approval_status_logs {
-  event_key                String            @unique(map: "idx_payment_approval_status_logs_event_key") @default(dbgenerated("('PMALOG-'::text || gen_random_uuid()::text)"))
+  event_key                String            @unique(map: "idx_payment_approval_status_logs_event_key") @default(dbgenerated("('PMALOG-'::text || (gen_random_uuid())::text)"))
   action                   String
   payment_approval_doc_no  String
   source_type              String
@@ -1394,8 +1417,8 @@ model payment_approval_status_logs {
   id                       BigInt            @id @default(autoincrement())
   payment_approval_id      BigInt
   payment_id               BigInt?
-  payment_approvals        payment_approvals @relation(fields: [payment_approval_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  payments                 payments?         @relation(fields: [payment_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  payment_approvals        payment_approvals @relation(fields: [payment_approval_id], references: [id], onUpdate: NoAction)
+  payments                 payments?         @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
 
   @@index([action], map: "idx_payment_approval_status_logs_action")
   @@index([payment_approval_doc_no], map: "idx_payment_approval_status_logs_approval_doc_no")
@@ -1405,7 +1428,7 @@ model payment_approval_status_logs {
 }
 
 model payment_status_logs {
-  event_key              String     @unique(map: "idx_payment_status_logs_event_key") @default(dbgenerated("('PMTLOG-'::text || gen_random_uuid()::text)"))
+  event_key              String     @unique(map: "idx_payment_status_logs_event_key") @default(dbgenerated("('PMTLOG-'::text || (gen_random_uuid())::text)"))
   action                 String
   payment_doc_no         String
   payment_voucher_id     String?
@@ -1423,9 +1446,9 @@ model payment_status_logs {
   payment_id             BigInt?
   supplier_id            BigInt?
   account_id             BigInt?
-  accounts               accounts?  @relation(fields: [account_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  payments               payments?  @relation(fields: [payment_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  suppliers              suppliers? @relation(fields: [supplier_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  accounts               accounts?  @relation(fields: [account_id], references: [id], onUpdate: NoAction)
+  payments               payments?  @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
+  suppliers              suppliers? @relation(fields: [supplier_id], references: [id], onUpdate: NoAction)
 
   @@index([action], map: "idx_payment_status_logs_action")
   @@index([payment_doc_no, created_at(sort: Desc)], map: "idx_payment_status_logs_doc_created")
@@ -1450,8 +1473,8 @@ model payment_allocations {
   id                      BigInt            @id @default(autoincrement())
   payment_id              BigInt?
   payment_approval_id     BigInt
-  payment_approvals       payment_approvals @relation(fields: [payment_approval_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  payments                payments?         @relation(fields: [payment_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  payment_approvals       payment_approvals @relation(fields: [payment_approval_id], references: [id], onUpdate: NoAction)
+  payments                payments?         @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
 
   @@index([payment_approval_id], map: "idx_payment_allocations_approval")
   @@index([payment_id], map: "idx_payment_allocations_payment", where: raw("(payment_id IS NOT NULL)"))
@@ -1477,9 +1500,9 @@ model payment_account_splits {
   payment_id            BigInt?
   account_id            BigInt?
   bank_statement_id     BigInt?
-  accounts              accounts?       @relation(fields: [account_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  bank_statement        bank_statement? @relation(fields: [bank_statement_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  payments              payments?       @relation(fields: [payment_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  accounts              accounts?       @relation(fields: [account_id], references: [id], onUpdate: NoAction)
+  bank_statement        bank_statement? @relation(fields: [bank_statement_id], references: [id], onUpdate: NoAction)
+  payments              payments?       @relation(fields: [payment_id], references: [id], onUpdate: NoAction)
 
   @@index([account_id], map: "idx_payment_account_splits_account", where: raw("(account_id IS NOT NULL)"))
   @@index([payment_id], map: "idx_payment_account_splits_payment", where: raw("(payment_id IS NOT NULL)"))
@@ -1489,7 +1512,6 @@ model payment_account_splits {
 }
 
 model petty_advance_returns {
-  doc_no         String         @unique(map: "uq_petty_advance_returns_doc_no")
   date           DateTime       @db.Date
   amount         Decimal        @default(0) @db.Decimal
   notes          String?
@@ -1501,6 +1523,7 @@ model petty_advance_returns {
   id             BigInt         @id @default(autoincrement())
   account_id     BigInt?
   advance_id     BigInt
+  doc_no         String         @unique(map: "uq_petty_advance_returns_doc_no")
   accounts       accounts?      @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   petty_advances petty_advances @relation(fields: [advance_id], references: [id], onUpdate: NoAction)
 
@@ -1516,11 +1539,6 @@ model petty_advances {
   date                        DateTime                @db.Date
   type                        String                  @default("DIRECTOR_LOAN")
   recipient_name              String
-  recipient_person_code       String?
-  recipient_bank_name         String?
-  recipient_bank_account_name String?
-  recipient_account_no        String?
-  recipient_bank_branch       String?
   amount                      Decimal                 @default(0) @db.Decimal
   status                      String                  @default("active")
   notes                       String?
@@ -1533,6 +1551,11 @@ model petty_advances {
   version                     Int                     @default(1)
   id                          BigInt                  @id @default(autoincrement())
   account_id                  BigInt?
+  recipient_person_code       String?
+  recipient_bank_name         String?
+  recipient_bank_account_name String?
+  recipient_account_no        String?
+  recipient_bank_branch       String?
   petty_advance_returns       petty_advance_returns[]
   accounts                    accounts?               @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   recipient_person            director_employees?     @relation(fields: [recipient_person_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
@@ -1549,12 +1572,7 @@ model po_buys {
   doc_no                       String
   date                         DateTime                       @db.Date
   expected_delivery            DateTime?                      @db.Date
-  subtotal                     Decimal?                       @default(0) @db.Decimal
   total_amount                 Decimal?                       @default(0) @db.Decimal
-  has_vat                      Boolean?                       @default(false)
-  vat_type                     String?                        @default("NONE")
-  vat_rate_percent             Decimal                        @default(7.00) @db.Decimal(5, 2)
-  vat_amount                   Decimal?                       @default(0) @db.Decimal
   cut_amount                   Decimal?                       @default(0) @db.Decimal
   remaining_amount             Decimal?                       @default(0) @db.Decimal
   status                       String?                        @default("Open")
@@ -1590,6 +1608,11 @@ model po_buys {
   id                           BigInt                         @id @default(autoincrement())
   channel_id                   BigInt?
   product_id                   BigInt?
+  subtotal                     Decimal?                       @default(0) @db.Decimal
+  has_vat                      Boolean?                       @default(false)
+  vat_type                     String?                        @default("NONE")
+  vat_rate_percent             Decimal                        @default(7.00) @db.Decimal(5, 2)
+  vat_amount                   Decimal?                       @default(0) @db.Decimal
   po_buy_allocation_logs       po_buy_allocation_logs[]
   po_buy_status_logs           po_buy_status_logs[]
   suppliers                    suppliers?                     @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1600,11 +1623,12 @@ model po_buys {
   @@index([date(sort: Desc), doc_no(sort: Desc)], map: "idx_po_buys_date_doc_no")
   @@index([doc_no], map: "idx_po_buys_doc_no")
   @@index([status, date(sort: Desc), doc_no(sort: Desc)], map: "idx_po_buys_status_date_doc_no", where: raw("(status IS NOT NULL)"))
+  @@index([doc_no], map: "idx_po_buys_doc_no_pattern")
   @@schema("public")
 }
 
 model po_buy_allocation_logs {
-  event_key             String               @unique @default(dbgenerated("('POALLOC-'::text || gen_random_uuid()::text)"))
+  event_key             String               @unique(map: "idx_po_buy_allocation_logs_event_key") @default(dbgenerated("('POALLOC-'::text || (gen_random_uuid())::text)"))
   action                String
   po_buy_doc_no         String
   purchase_bill_doc_no  String?
@@ -1625,10 +1649,10 @@ model po_buy_allocation_logs {
   purchase_bill_id      BigInt?
   purchase_bill_item_id BigInt?
   product_id            BigInt?
-  po_buys               po_buys              @relation(fields: [po_buy_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  purchase_bills        purchase_bills?      @relation(fields: [purchase_bill_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  purchase_bill_items   purchase_bill_items? @relation(fields: [purchase_bill_item_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  products              products?            @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  po_buys               po_buys              @relation(fields: [po_buy_id], references: [id], onUpdate: NoAction)
+  products              products?            @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  purchase_bills        purchase_bills?      @relation(fields: [purchase_bill_id], references: [id], onUpdate: NoAction)
+  purchase_bill_items   purchase_bill_items? @relation(fields: [purchase_bill_item_id], references: [id], onUpdate: NoAction)
 
   @@index([po_buy_id, created_at(sort: Desc)], map: "idx_po_buy_allocation_logs_po_created")
   @@index([product_id], map: "idx_po_buy_allocation_logs_product")
@@ -1637,17 +1661,17 @@ model po_buy_allocation_logs {
 }
 
 model po_buy_status_logs {
-  event_key     String   @unique
-  action        String
-  from_status   String?
   to_status     String
-  po_buy_doc_no String
   note          String?
   meta          Json?
   created_at    DateTime @default(now()) @db.Timestamptz(6)
   created_by    String?
   id            BigInt   @id @default(autoincrement())
   po_buy_id     BigInt
+  event_key     String   @unique
+  action        String
+  from_status   String?
+  po_buy_doc_no String
   po_buys       po_buys  @relation(fields: [po_buy_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([po_buy_id, created_at(sort: Desc)], map: "idx_po_buy_status_logs_po_created")
@@ -1682,91 +1706,99 @@ model po_sells {
   id                BigInt     @id @default(autoincrement())
   channel_id        BigInt?
   product_id        BigInt?
+  subtotal          Decimal?   @default(0) @db.Decimal
+  has_vat           Boolean?   @default(false)
+  vat_type          String?    @default("NONE")
+  vat_rate_percent  Decimal    @default(7.00) @db.Decimal(5, 2)
+  vat_amount        Decimal?   @default(0) @db.Decimal
   customers         customers? @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales_bill_po_sell_allocations sales_bill_po_sell_allocations[]
 
   @@index([doc_no], map: "idx_po_sells_doc_no")
   @@schema("public")
 }
 
 model production_inputs {
-  date              DateTime           @db.Date
-  qty               Decimal            @db.Decimal
-  unit_cost         Decimal?           @default(0) @db.Decimal
-  total_cost        Decimal?           @default(0) @db.Decimal
-  source            String?
-  notes             String?
-  created_at        DateTime?          @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime?          @db.Timestamptz(6)
-  updated_by        String?
-  version           Int?               @default(1)
-  doc_no            String
-  status            String             @default("active")
-  lot_no            String?
-  wac_unit_cost     Decimal?           @db.Decimal
-  reversed_at       DateTime?          @db.Timestamptz(6)
-  reversed_by       String?
-  reverse_reason    String?
-  reversal_doc_no   String?
-  id                BigInt             @id @default(autoincrement())
-  order_id          BigInt?
-  product_id        BigInt?
-  source_warehouse_id BigInt?
-  wip_warehouse_id BigInt?
-  production_orders production_orders? @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  products          products?          @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  date                                                         DateTime           @db.Date
+  qty                                                          Decimal            @db.Decimal
+  unit_cost                                                    Decimal?           @default(0) @db.Decimal
+  total_cost                                                   Decimal?           @default(0) @db.Decimal
+  source                                                       String?
+  notes                                                        String?
+  created_at                                                   DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at                                                   DateTime?          @db.Timestamptz(6)
+  updated_by                                                   String?
+  version                                                      Int?               @default(1)
+  id                                                           BigInt             @id @default(autoincrement())
+  order_id                                                     BigInt?
+  product_id                                                   BigInt?
+  doc_no                                                       String
+  status                                                       String             @default("active")
+  source_warehouse_id                                          BigInt?
+  wip_warehouse_id                                             BigInt?
+  lot_no                                                       String?
+  wac_unit_cost                                                Decimal?           @db.Decimal
+  reversed_at                                                  DateTime?          @db.Timestamptz(6)
+  reversed_by                                                  String?
+  reverse_reason                                               String?
+  reversal_doc_no                                              String?
+  production_orders                                            production_orders? @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products                                                     products?          @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses_production_inputs_source_warehouse_idTowarehouses warehouses?        @relation("production_inputs_source_warehouse_idTowarehouses", fields: [source_warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses_production_inputs_wip_warehouse_idTowarehouses    warehouses?        @relation("production_inputs_wip_warehouse_idTowarehouses", fields: [wip_warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([order_id], map: "idx_pi_order")
   @@index([order_id, status], map: "idx_production_inputs_order_status")
   @@index([doc_no], map: "idx_production_inputs_doc_no")
-  @@index([reversal_doc_no], map: "idx_production_inputs_reversal_doc_no")
+  @@index([reversal_doc_no], map: "idx_production_inputs_reversal_doc_no", where: raw("(reversal_doc_no IS NOT NULL)"))
   @@index([status], map: "idx_production_inputs_status")
   @@index([source_warehouse_id, wip_warehouse_id], map: "idx_production_inputs_source_wip_warehouse")
   @@schema("public")
 }
 
 model production_orders {
-  doc_no                 String
-  date                   DateTime             @db.Date
-  qty_planned            Decimal?             @default(0) @db.Decimal
-  status                 String?              @default("Open")
-  total_input_cost       Decimal?             @default(0) @db.Decimal
-  total_output_value     Decimal?             @default(0) @db.Decimal
-  variance               Decimal?             @default(0) @db.Decimal
-  closed_at              DateTime?            @db.Timestamptz(6)
-  closed_by              String?
-  notes                  String?
-  created_at             DateTime?            @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime?            @db.Timestamptz(6)
-  updated_by             String?
-  version                Int?                 @default(1)
-  production_type        String?
-  target_lot_no          String?
-  shift                  String?
-  supervisor_name        String?
-  operator_name          String?
-  planned_input_qty      Decimal?             @default(0) @db.Decimal
-  planned_output_qty     Decimal?             @default(0) @db.Decimal
-  cost_allocation_method String?
-  normal_loss_percent    Decimal?             @default(0) @db.Decimal
-  branch_id              BigInt?
-  warehouse_id           BigInt?
-  warehouse_from_id      BigInt?
-  warehouse_wip_id       BigInt?
-  warehouse_to_id        BigInt?
-  warehouse_return_id    BigInt?
-  id                     BigInt               @id @default(autoincrement())
-  machine_id             BigInt?
-  product_id             BigInt?
-  production_line_id     BigInt?
-  process_costs          process_costs[]
-  production_inputs      production_inputs[]
+  doc_no                       String
+  date                         DateTime                       @db.Date
+  qty_planned                  Decimal?                       @default(0) @db.Decimal
+  status                       String?                        @default("Open")
+  total_input_cost             Decimal?                       @default(0) @db.Decimal
+  total_output_value           Decimal?                       @default(0) @db.Decimal
+  variance                     Decimal?                       @default(0) @db.Decimal
+  closed_at                    DateTime?                      @db.Timestamptz(6)
+  closed_by                    String?
+  notes                        String?
+  created_at                   DateTime?                      @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime?                      @db.Timestamptz(6)
+  updated_by                   String?
+  version                      Int?                           @default(1)
+  production_type              String?
+  target_lot_no                String?
+  shift                        String?
+  supervisor_name              String?
+  operator_name                String?
+  planned_input_qty            Decimal?                       @default(0) @db.Decimal
+  planned_output_qty           Decimal?                       @default(0) @db.Decimal
+  cost_allocation_method       String?
+  normal_loss_percent          Decimal?                       @default(0) @db.Decimal
+  branch_id                    BigInt?
+  warehouse_id                 BigInt?
+  warehouse_from_id            BigInt?
+  warehouse_wip_id             BigInt?
+  warehouse_to_id              BigInt?
+  warehouse_return_id          BigInt?
+  id                           BigInt                         @id @default(autoincrement())
+  machine_id                   BigInt?
+  product_id                   BigInt?
+  production_line_id           BigInt?
+  process_costs                process_costs[]
+  production_inputs            production_inputs[]
   production_order_status_logs production_order_status_logs[]
-  branches               branches?            @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  production_machines    production_machines? @relation(fields: [machine_id], references: [id])
-  products               products?            @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  production_lines       production_lines?    @relation(fields: [production_line_id], references: [id])
-  warehouses             warehouses?          @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  production_outputs     production_outputs[]
+  branches                     branches?                      @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  production_machines          production_machines?           @relation(fields: [machine_id], references: [id])
+  products                     products?                      @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  production_lines             production_lines?              @relation(fields: [production_line_id], references: [id])
+  warehouses                   warehouses?                    @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  production_outputs           production_outputs[]
 
   @@index([machine_id])
   @@index([production_line_id])
@@ -1779,7 +1811,7 @@ model production_orders {
 }
 
 model production_order_status_logs {
-  event_key         String            @unique(map: "idx_production_order_status_logs_event_key") @default(dbgenerated("('POSTATUS-'::text || gen_random_uuid()::text)"))
+  event_key         String            @unique(map: "idx_production_order_status_logs_event_key") @default(dbgenerated("('POSTATUS-'::text || (gen_random_uuid())::text)"))
   action            String
   order_doc_no      String
   from_status       String?
@@ -1790,7 +1822,7 @@ model production_order_status_logs {
   created_by        String?
   id                BigInt            @id @default(autoincrement())
   order_id          BigInt
-  production_orders production_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  production_orders production_orders @relation(fields: [order_id], references: [id], onUpdate: NoAction)
 
   @@index([order_id, created_at(sort: Desc)], map: "idx_production_order_status_logs_order_created")
   @@index([order_doc_no], map: "idx_production_order_status_logs_doc_no")
@@ -1833,20 +1865,21 @@ model production_outputs {
   updated_by                   String?
   version                      Int?                          @default(1)
   output_status                String?
+  id                           BigInt                        @id @default(autoincrement())
+  order_id                     BigInt?
+  output_category              BigInt?
+  product_id                   BigInt?
   doc_no                       String
   status                       String                        @default("active")
   category_code                String?
+  destination_warehouse_id     BigInt?
   lot_no                       String?
   source_wip_qty               Decimal?                      @db.Decimal
   reversed_at                  DateTime?                     @db.Timestamptz(6)
   reversed_by                  String?
   reverse_reason               String?
   reversal_doc_no              String?
-  id                           BigInt                        @id @default(autoincrement())
-  order_id                     BigInt?
-  output_category              BigInt?
-  product_id                   BigInt?
-  destination_warehouse_id     BigInt?
+  warehouses                   warehouses?                   @relation(fields: [destination_warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   production_orders            production_orders?            @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   production_output_categories production_output_categories? @relation(fields: [output_category], references: [id], onDelete: Restrict)
   products                     products?                     @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1855,7 +1888,7 @@ model production_outputs {
   @@index([order_id, status], map: "idx_production_outputs_order_status")
   @@index([doc_no], map: "idx_production_outputs_doc_no")
   @@index([output_category])
-  @@index([reversal_doc_no], map: "idx_production_outputs_reversal_doc_no")
+  @@index([reversal_doc_no], map: "idx_production_outputs_reversal_doc_no", where: raw("(reversal_doc_no IS NOT NULL)"))
   @@index([status], map: "idx_production_outputs_status")
   @@index([category_code], map: "idx_production_outputs_category_code")
   @@index([destination_warehouse_id], map: "idx_production_outputs_destination_warehouse")
@@ -1881,38 +1914,46 @@ model production_output_categories {
 }
 
 model products {
-  code                            String                            @unique
-  name                            String
-  unit                            String?                           @default("kg")
-  metal_group                     String?
-  std_price                       Decimal?                          @default(0) @db.Decimal
-  std_cost                        Decimal?                          @default(0) @db.Decimal
-  active                          Boolean?                          @default(true)
-  created_at                      DateTime?                         @default(now()) @db.Timestamptz(6)
-  updated_at                      DateTime?                         @db.Timestamptz(6)
-  updated_by                      String?
-  version                         Int?                              @default(1)
-  type                            String?
-  grade                           String?
-  image_names                     String[]                          @default([])
-  image_storage_key               String?
-  image_thumbnail_storage_key     String?
-  id                              BigInt                            @id @default(autoincrement())
-  grade_adjustments               grade_adjustments[]
-  po_buy_allocation_logs          po_buy_allocation_logs[]
-  production_inputs               production_inputs[]
-  production_orders               production_orders[]
-  production_outputs              production_outputs[]
-  purchase_bill_items             purchase_bill_items[]
-  stock_holds                     stock_holds[]
-  stock_ledger                    stock_ledger[]
-  stock_transfer_items            stock_transfer_items[]
-  trading_deals                   trading_deals[]
-  weight_ticket_usage_logs        weight_ticket_usage_logs[]
-  weight_ticket_lines             weight_ticket_lines[]
-  weight_ticket_product_summaries weight_ticket_product_summaries[]
+  code                                                            String                            @unique(map: "uq_products_code")
+  name                                                            String
+  unit                                                            String?                           @default("kg")
+  metal_group                                                     String?
+  std_price                                                       Decimal?                          @default(0) @db.Decimal
+  std_cost                                                        Decimal?                          @default(0) @db.Decimal
+  active                                                          Boolean?                          @default(true)
+  created_at                                                      DateTime?                         @default(now()) @db.Timestamptz(6)
+  updated_at                                                      DateTime?                         @db.Timestamptz(6)
+  updated_by                                                      String?
+  version                                                         Int?                              @default(1)
+  type                                                            String?
+  grade                                                           String?
+  id                                                              BigInt                            @id @default(autoincrement())
+  image_names                                                     String[]                          @default([])
+  image_storage_key                                               String?
+  image_thumbnail_storage_key                                     String?
+  grade_adjustments                                               grade_adjustments[]
+  grade_adjustments_grade_adjustments_source_product_idToproducts grade_adjustments[]               @relation("grade_adjustments_source_product_idToproducts")
+  grade_adjustments_grade_adjustments_target_product_idToproducts grade_adjustments[]               @relation("grade_adjustments_target_product_idToproducts")
+  po_buy_allocation_logs                                          po_buy_allocation_logs[]
+  production_inputs                                               production_inputs[]
+  production_orders                                               production_orders[]
+  production_outputs                                              production_outputs[]
+  purchase_bill_items                                             purchase_bill_items[]
+  sales_bill_lines                                                sales_bill_lines[]
+  sales_bill_po_sell_allocations                                  sales_bill_po_sell_allocations[]
+  sales_bill_source_allocations                                   sales_bill_source_allocations[]
+  stock_cost_pool_entries                                         stock_cost_pool_entries[]
+  stock_holds                                                     stock_holds[]
+  stock_ledger                                                    stock_ledger[]
+  stock_transfer_items                                            stock_transfer_items[]
+  trading_allocation_facts                                        trading_allocation_facts[]
+  trading_cost_sources                                            trading_cost_sources[]
+  trading_deals                                                   trading_deals[]
+  weight_ticket_lines                                             weight_ticket_lines[]
+  weight_ticket_product_summaries                                 weight_ticket_product_summaries[]
+  weight_ticket_usage_logs                                        weight_ticket_usage_logs[]
 
-  @@index([active(sort: Desc), code, name], map: "idx_products_active_code_name")
+  @@index([active(sort: Desc), code, name, id, unit], map: "idx_products_active_code_name")
   @@index([metal_group], map: "idx_products_metal_group")
   @@schema("public")
 }
@@ -1984,29 +2025,30 @@ model purchase_bills {
   cancel_note                       String?
   cancelled_at                      DateTime?                           @db.Timestamptz(6)
   cancelled_by                      String?
-  supplier_name_snapshot            String?
-  supplier_tax_id_snapshot          String?
-  supplier_address_snapshot         String?
-  supplier_phone_snapshot           String?
-  supplier_sales_rep_snapshot       String?
   supplier_id                       BigInt?
   branch_id                         BigInt?
   warehouse_id                      BigInt?
   sales_id                          BigInt?
   id                                BigInt                              @id @default(autoincrement())
   po_buy_id                         BigInt?
+  supplier_name_snapshot            String?
+  supplier_tax_id_snapshot          String?
+  supplier_address_snapshot         String?
+  supplier_phone_snapshot           String?
+  supplier_sales_rep_snapshot       String?
   po_buy_allocation_logs            po_buy_allocation_logs[]
   purchase_bill_items               purchase_bill_items[]
-  purchase_bill_status_logs         purchase_bill_status_logs[]
   purchase_bill_po_allocations      purchase_bill_po_allocations[]
   purchase_bill_receipt_allocations purchase_bill_receipt_allocations[]
-  supplier_advance_allocation_logs  supplier_advance_allocation_logs[]
-  weight_ticket_usage_logs          weight_ticket_usage_logs[]
+  purchase_bill_status_logs         purchase_bill_status_logs[]
   branches                          branches?                           @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   suppliers                         suppliers?                          @relation(fields: [supplier_id], references: [id], onDelete: NoAction)
   warehouses                        warehouses?                         @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  supplier_advance_allocation_logs  supplier_advance_allocation_logs[]
   supplier_advance_allocations      supplier_advance_allocations[]
+  trading_allocation_facts          trading_allocation_facts[]
   trading_deals                     trading_deals[]
+  weight_ticket_usage_logs          weight_ticket_usage_logs[]
 
   @@index([branch_id], map: "idx_pb_branch")
   @@index([date(sort: Desc)], map: "idx_pb_created_at")
@@ -2019,11 +2061,13 @@ model purchase_bills {
   @@index([status, date(sort: Desc), doc_no(sort: Desc)], map: "idx_purchase_bills_status_created_doc_no", where: raw("(status IS NOT NULL)"))
   @@index([supplier_id], map: "idx_pb_supplier")
   @@index([doc_no], map: "idx_purchase_bills_doc_no")
+  @@index([date(sort: Desc), doc_no(sort: Desc)], map: "idx_purchase_bills_active_created_doc_no", where: raw("(status <> ALL (ARRAY['cancelled'::text, 'cancelled_supplier_swap'::text]))"))
+  @@index([doc_no], map: "idx_purchase_bills_doc_no_pattern")
   @@schema("public")
 }
 
 model purchase_bill_status_logs {
-  event_key            String         @unique
+  event_key            String         @unique(map: "idx_purchase_bill_status_logs_event_key")
   action               String
   from_status          String?
   to_status            String
@@ -2042,8 +2086,6 @@ model purchase_bill_status_logs {
 
 model purchase_bill_items {
   line_no                           Int
-  item_status                       String                             @default("active")
-  item_version                      Int                                @default(1)
   product_code                      String?
   product_name                      String?
   display_name                      String?
@@ -2058,24 +2100,27 @@ model purchase_bill_items {
   amount                            Decimal                            @default(0) @db.Decimal
   note                              String?
   source_snapshot                   Json?
-  superseded_at                     DateTime?                          @db.Timestamptz(6)
-  superseded_by                     String?
-  superseded_reason                 String?
   created_at                        DateTime                           @default(now()) @db.Timestamptz(6)
   updated_at                        DateTime                           @default(now()) @db.Timestamptz(6)
   id                                BigInt                             @id @default(autoincrement())
   po_buy_id                         BigInt?
   product_id                        BigInt?
   purchase_bill_id                  BigInt
-  po_buys                           po_buys?                           @relation(fields: [po_buy_id], references: [id], onUpdate: NoAction)
+  item_status                       String                             @default("active")
+  item_version                      Int                                @default(1)
+  superseded_at                     DateTime?                          @db.Timestamptz(6)
+  superseded_by                     String?
+  superseded_reason                 String?
   po_buy_allocation_logs            po_buy_allocation_logs[]
+  po_buys                           po_buys?                           @relation(fields: [po_buy_id], references: [id], onUpdate: NoAction)
   products                          products?                          @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   purchase_bills                    purchase_bills                     @relation(fields: [purchase_bill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   purchase_bill_po_allocations      purchase_bill_po_allocations?
   purchase_bill_receipt_allocations purchase_bill_receipt_allocations?
   weight_ticket_usage_logs          weight_ticket_usage_logs[]
 
-  @@index([purchase_bill_id, line_no], map: "idx_purchase_bill_items_active_bill")
+  @@unique([purchase_bill_id, line_no], map: "uq_purchase_bill_items_active_bill_line", where: raw("(item_status = 'active'::text)"))
+  @@index([purchase_bill_id, line_no], map: "idx_purchase_bill_items_active_bill", where: raw("(item_status = 'active'::text)"))
   @@index([purchase_bill_id, item_status, item_version(sort: Desc), line_no], map: "idx_purchase_bill_items_bill_status_version")
   @@index([po_buy_id], map: "idx_purchase_bill_items_po_buy")
   @@index([product_id], map: "idx_purchase_bill_items_product")
@@ -2087,25 +2132,25 @@ model purchase_bill_receipt_allocations {
   allocated_qty                    Decimal                         @default(0) @db.Decimal
   allocated_gross_weight           Decimal                         @default(0) @db.Decimal
   allocated_deduct_weight          Decimal                         @default(0) @db.Decimal
-  allocation_status                String                          @default("active")
   created_at                       DateTime                        @default(now()) @db.Timestamptz(6)
   created_by                       String?
-  released_at                      DateTime?                       @db.Timestamptz(6)
-  released_by                      String?
-  release_reason                   String?
   id                               BigInt                          @id @default(autoincrement())
   purchase_bill_id                 BigInt
   purchase_bill_item_id            BigInt                          @unique
   weight_ticket_id                 BigInt
   weight_ticket_product_summary_id BigInt
+  allocation_status                String                          @default("active")
+  released_at                      DateTime?                       @db.Timestamptz(6)
+  released_by                      String?
+  release_reason                   String?
   weight_ticket_product_summaries  weight_ticket_product_summaries @relation(fields: [weight_ticket_product_summary_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "purchase_bill_receipt_allocat_weight_ticket_product_summar_fkey")
   purchase_bills                   purchase_bills                  @relation(fields: [purchase_bill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   purchase_bill_items              purchase_bill_items             @relation(fields: [purchase_bill_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   weight_tickets                   weight_tickets                  @relation(fields: [weight_ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([purchase_bill_id], map: "idx_purchase_bill_receipt_allocations_bill")
-  @@index([purchase_bill_id, purchase_bill_item_id], map: "idx_purchase_bill_receipt_allocations_active_bill")
-  @@index([weight_ticket_id, weight_ticket_product_summary_id, purchase_bill_id], map: "idx_purchase_bill_receipt_allocations_active_ticket")
+  @@index([purchase_bill_id, purchase_bill_item_id], map: "idx_purchase_bill_receipt_allocations_active_bill", where: raw("(allocation_status = 'active'::text)"))
+  @@index([weight_ticket_id, weight_ticket_product_summary_id, purchase_bill_id], map: "idx_purchase_bill_receipt_allocations_active_ticket", where: raw("(allocation_status = 'active'::text)"))
   @@index([weight_ticket_id, weight_ticket_product_summary_id, purchase_bill_id], map: "idx_purchase_bill_receipt_allocations_active_ticket_summary", where: raw("(allocation_status = 'active'::text)"))
   @@index([weight_ticket_id], map: "idx_purchase_bill_receipt_allocations_ticket")
   @@index([weight_ticket_product_summary_id], map: "idx_purchase_bill_receipt_allocations_summary")
@@ -2116,23 +2161,23 @@ model purchase_bill_po_allocations {
   allocated_qty         Decimal             @default(0) @db.Decimal
   allocated_amount      Decimal             @default(0) @db.Decimal
   unit_price_snapshot   Decimal             @default(0) @db.Decimal
-  allocation_status     String              @default("active")
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
   created_by            String?
-  released_at           DateTime?           @db.Timestamptz(6)
-  released_by           String?
-  release_reason        String?
   id                    BigInt              @id @default(autoincrement())
   po_buy_id             BigInt
   purchase_bill_id      BigInt
   purchase_bill_item_id BigInt              @unique
+  allocation_status     String              @default("active")
+  released_at           DateTime?           @db.Timestamptz(6)
+  released_by           String?
+  release_reason        String?
   po_buys               po_buys             @relation(fields: [po_buy_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   purchase_bills        purchase_bills      @relation(fields: [purchase_bill_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   purchase_bill_items   purchase_bill_items @relation(fields: [purchase_bill_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([po_buy_id], map: "idx_purchase_bill_po_allocations_po")
-  @@index([po_buy_id, purchase_bill_id, purchase_bill_item_id], map: "idx_purchase_bill_po_allocations_active_po")
-  @@index([purchase_bill_id, purchase_bill_item_id], map: "idx_purchase_bill_po_allocations_active_bill")
+  @@index([po_buy_id, purchase_bill_id, purchase_bill_item_id], map: "idx_purchase_bill_po_allocations_active_po", where: raw("(allocation_status = 'active'::text)"))
+  @@index([purchase_bill_id, purchase_bill_item_id], map: "idx_purchase_bill_po_allocations_active_bill", where: raw("(allocation_status = 'active'::text)"))
   @@index([purchase_bill_id, purchase_bill_item_id], map: "idx_purchase_bill_po_allocations_active_bill_item", where: raw("(allocation_status = 'active'::text)"))
   @@index([purchase_bill_id], map: "idx_purchase_bill_po_allocations_bill")
   @@schema("public")
@@ -2148,43 +2193,44 @@ model purchase_channels {
 }
 
 model receipt_vouchers {
-  doc_no               String?   @unique
-  date                 DateTime? @db.Date
-  purchase_bill_doc_no String?
-  seller_name          String?
-  seller_tax_id        String?
-  seller_address       String?
-  seller_phone         String?
-  license_plate        String?
-  sales_person         String?
-  items                Json?
-  total_qty            Decimal?  @default(0) @db.Decimal
-  total_amount         Decimal?  @default(0) @db.Decimal
-  amount_in_words      String?
-  note                 String?
-  payer_signer_name    String?
-  receiver_signer_name String?
-  payment_method       String?
-  created_by           String?
-  created_at           DateTime? @default(now()) @db.Timestamptz(6)
-  updated_by           String?
-  updated_at           DateTime? @db.Timestamptz(6)
-  id                   BigInt    @id @default(autoincrement())
-  purchase_bill_id     BigInt?
-  status               String    @default("active")
-  cancel_note          String?
-  cancelled_at         DateTime? @db.Timestamptz(6)
-  cancelled_by         String?
+  doc_no                      String?                       @unique
+  date                        DateTime?                     @db.Date
+  purchase_bill_doc_no        String?
+  seller_name                 String?
+  seller_tax_id               String?
+  seller_address              String?
+  seller_phone                String?
+  license_plate               String?
+  sales_person                String?
+  items                       Json?
+  total_qty                   Decimal?                      @default(0) @db.Decimal
+  total_amount                Decimal?                      @default(0) @db.Decimal
+  amount_in_words             String?
+  note                        String?
+  payer_signer_name           String?
+  receiver_signer_name        String?
+  payment_method              String?
+  created_by                  String?
+  created_at                  DateTime?                     @default(now()) @db.Timestamptz(6)
+  updated_by                  String?
+  updated_at                  DateTime?                     @db.Timestamptz(6)
+  id                          BigInt                        @id @default(autoincrement())
+  purchase_bill_id            BigInt?
+  status                      String                        @default("active")
+  cancel_note                 String?
+  cancelled_at                DateTime?                     @db.Timestamptz(6)
+  cancelled_by                String?
   receipt_voucher_status_logs receipt_voucher_status_logs[]
 
   @@index([cancelled_at], map: "idx_receipt_vouchers_cancelled_at", where: raw("(cancelled_at IS NOT NULL)"))
   @@index([date(sort: Desc), doc_no(sort: Desc)], map: "idx_receipt_vouchers_date_doc_no")
   @@index([status], map: "idx_receipt_vouchers_status")
+  @@index([doc_no], map: "idx_receipt_vouchers_doc_no_pattern", where: raw("(doc_no IS NOT NULL)"))
   @@schema("public")
 }
 
 model receipt_voucher_status_logs {
-  event_key              String           @unique @default(dbgenerated("('RVLOG-'::text || gen_random_uuid()::text)"))
+  event_key              String           @unique @default(dbgenerated("('RVLOG-'::text || (gen_random_uuid())::text)"))
   receipt_voucher_id     BigInt
   receipt_voucher_doc_no String
   action                 String
@@ -2196,7 +2242,7 @@ model receipt_voucher_status_logs {
   created_at             DateTime         @default(now()) @db.Timestamptz(6)
   created_by             String?
   id                     BigInt           @id @default(autoincrement())
-  receipt_vouchers       receipt_vouchers @relation(fields: [receipt_voucher_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  receipt_vouchers       receipt_vouchers @relation(fields: [receipt_voucher_id], references: [id], onUpdate: NoAction)
 
   @@index([receipt_voucher_id, created_at(sort: Desc)], map: "idx_receipt_voucher_status_logs_voucher_created")
   @@index([receipt_voucher_id, created_at, id], map: "idx_receipt_voucher_status_logs_voucher_created_asc")
@@ -2206,35 +2252,35 @@ model receipt_voucher_status_logs {
 }
 
 model receipts {
-  doc_no          String
-  date            DateTime   @db.Date
-  amount          Decimal    @db.Decimal
-  withholding_tax Decimal?   @default(0) @db.Decimal
-  fee             Decimal?   @default(0) @db.Decimal
-  net_amount      Decimal?   @default(0) @db.Decimal
-  vat_type        String?
-  lines           Json?
-  notes           String?
-  status          String?    @default("active")
-  created_by      String?
-  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
-  voucher_id      String?
-  bank_fee        Decimal?   @default(0) @db.Decimal
-  discount        Decimal?   @default(0) @db.Decimal
-  method          String?
-  updated_at      DateTime?  @db.Timestamptz(6)
-  updated_by      String?
-  version         Int?       @default(1)
-  idempotency_key String?
-  customer_id     BigInt?
-  branch_id       BigInt?
-  id              BigInt     @id @default(autoincrement())
-  account_id      BigInt?
-  bill_id         BigInt?
-  accounts        accounts?  @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  branches        branches?  @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  customers       customers? @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  doc_no                       String
+  date                         DateTime                      @db.Date
+  amount                       Decimal                       @db.Decimal
+  withholding_tax              Decimal?                      @default(0) @db.Decimal
+  fee                          Decimal?                      @default(0) @db.Decimal
+  net_amount                   Decimal?                      @default(0) @db.Decimal
+  vat_type                     String?
+  lines                        Json?
+  notes                        String?
+  status                       String?                       @default("active")
+  created_by                   String?
+  created_at                   DateTime?                     @default(now()) @db.Timestamptz(6)
+  voucher_id                   String?
+  bank_fee                     Decimal?                      @default(0) @db.Decimal
+  discount                     Decimal?                      @default(0) @db.Decimal
+  method                       String?
+  updated_at                   DateTime?                     @db.Timestamptz(6)
+  updated_by                   String?
+  version                      Int?                          @default(1)
+  idempotency_key              String?
+  customer_id                  BigInt?
+  branch_id                    BigInt?
+  id                           BigInt                        @id @default(autoincrement())
+  account_id                   BigInt?
+  bill_id                      BigInt?
   customer_receipt_allocations customer_receipt_allocations?
+  accounts                     accounts?                     @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches                     branches?                     @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customers                    customers?                    @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([bill_id], map: "idx_rcp_bill")
   @@index([date(sort: Desc)], map: "idx_rcp_date")
@@ -2245,7 +2291,8 @@ model receipts {
 }
 
 model customer_receipts {
-  doc_no                       String                         @unique(map: "customer_receipts_doc_no_key")
+  id                           BigInt                         @id @default(autoincrement())
+  doc_no                       String                         @unique
   date                         DateTime                       @db.Date
   gross_amount                 Decimal                        @default(0) @db.Decimal
   discount_total               Decimal                        @default(0) @db.Decimal
@@ -2269,19 +2316,18 @@ model customer_receipts {
   updated_at                   DateTime                       @default(now()) @db.Timestamptz(6)
   updated_by                   String?
   version                      Int                            @default(1)
-  id                           BigInt                         @id @default(autoincrement())
   customer_id                  BigInt
   account_id                   BigInt
   branch_id                    BigInt?
   payment_method_id            BigInt
   bank_statement_id            BigInt?                        @unique
-  accounts                     accounts                       @relation(fields: [account_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  bank_statement               bank_statement?                @relation(fields: [bank_statement_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  branches                     branches?                      @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  customers                    customers                      @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  payment_methods              payment_methods                @relation(fields: [payment_method_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   customer_receipt_allocations customer_receipt_allocations[]
   customer_receipt_status_logs customer_receipt_status_logs[]
+  accounts                     accounts                       @relation(fields: [account_id], references: [id], onUpdate: NoAction)
+  bank_statement               bank_statement?                @relation(fields: [bank_statement_id], references: [id], onUpdate: NoAction)
+  branches                     branches?                      @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customers                    customers                      @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  payment_methods              payment_methods                @relation(fields: [payment_method_id], references: [id], onUpdate: NoAction)
 
   @@index([date(sort: Desc)], map: "idx_customer_receipts_date")
   @@index([customer_id, date(sort: Desc)], map: "idx_customer_receipts_customer_date")
@@ -2294,6 +2340,10 @@ model customer_receipts {
 }
 
 model customer_receipt_allocations {
+  id                         BigInt            @id @default(autoincrement())
+  receipt_id                 BigInt
+  sales_bill_id              BigInt
+  receipt_line_id            BigInt?           @unique
   line_no                    Int
   sales_bill_doc_no_snapshot String
   customer_code_snapshot     String
@@ -2309,13 +2359,9 @@ model customer_receipt_allocations {
   updated_at                 DateTime          @default(now()) @db.Timestamptz(6)
   updated_by                 String?
   version                    Int               @default(1)
-  id                         BigInt            @id @default(autoincrement())
-  receipt_id                 BigInt
-  sales_bill_id              BigInt
-  receipt_line_id            BigInt?           @unique
-  customer_receipts          customer_receipts @relation(fields: [receipt_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  receipts                   receipts?         @relation(fields: [receipt_line_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  sales_bills                sales_bills       @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customer_receipts          customer_receipts @relation(fields: [receipt_id], references: [id], onUpdate: NoAction)
+  receipts                   receipts?         @relation(fields: [receipt_line_id], references: [id], onUpdate: NoAction)
+  sales_bills                sales_bills       @relation(fields: [sales_bill_id], references: [id], onUpdate: NoAction)
 
   @@unique([receipt_id, line_no], map: "customer_receipt_allocations_line_unique")
   @@index([receipt_id, line_no], map: "idx_customer_receipt_allocations_receipt")
@@ -2327,7 +2373,9 @@ model customer_receipt_allocations {
 }
 
 model customer_receipt_status_logs {
-  event_key             String            @unique @default(dbgenerated("('RCPLOG-'::text || gen_random_uuid()::text)"))
+  id                    BigInt            @id @default(autoincrement())
+  event_key             String            @unique @default(dbgenerated("('RCPLOG-'::text || (gen_random_uuid())::text)"))
+  receipt_id            BigInt
   receipt_doc_no        String
   action                String
   from_status           String?
@@ -2338,9 +2386,7 @@ model customer_receipt_status_logs {
   meta                  Json?
   created_at            DateTime          @default(now()) @db.Timestamptz(6)
   created_by            String?
-  id                    BigInt            @id @default(autoincrement())
-  receipt_id            BigInt
-  customer_receipts     customer_receipts @relation(fields: [receipt_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customer_receipts     customer_receipts @relation(fields: [receipt_id], references: [id], onUpdate: NoAction)
 
   @@index([receipt_id, created_at(sort: Desc)], map: "idx_customer_receipt_status_logs_receipt_created")
   @@index([receipt_doc_no], map: "idx_customer_receipt_status_logs_doc_no")
@@ -2378,70 +2424,75 @@ model roles_config {
 }
 
 model sales_bills {
-  doc_no                    String          @unique(map: "uq_sales_bills_doc_no")
-  date                      DateTime        @db.Date
-  ref_no                    String?
-  transaction_mode          String?         @default("STOCK")
-  vat_type                  String?         @default("EXCLUDE")
-  credit_term               Int?            @default(0)
-  subtotal                  Decimal?        @default(0) @db.Decimal
-  discount                  Decimal?        @default(0) @db.Decimal
-  vat_amount                Decimal?        @default(0) @db.Decimal
-  total_amount              Decimal         @db.Decimal
-  received_amount           Decimal?        @default(0) @db.Decimal
-  receivable_balance        Decimal?        @default(0) @db.Decimal
-  cogs_amount               Decimal?        @default(0) @db.Decimal
-  gross_profit              Decimal?        @default(0) @db.Decimal
-  status                    String?         @default("open")
-  items                     Json?
-  notes                     String?
-  created_by                String?
-  created_at                DateTime?       @default(now()) @db.Timestamptz(6)
-  updated_at                DateTime?       @default(now()) @db.Timestamptz(6)
-  license_plate             String?
-  contact_phone             String?
-  contact_name              String?
-  trading_from_purchase_ids Json?
-  sales_source              String?
-  vat_invoice_issued        Boolean?        @default(false)
-  vat_invoice_no            String?
-  vat_invoice_date          DateTime?       @db.Date
-  discount_total            Decimal?        @default(0) @db.Decimal
-  has_vat                   Boolean?        @default(false)
-  salesman                  String?
-  note                      String?
-  from_p_sale_no            String?
-  has_wht                   Boolean?        @default(false)
-  wht_amount                Decimal?        @default(0) @db.Decimal
-  paid_amount               Decimal?        @default(0) @db.Decimal
-  total_cost                Decimal?        @db.Decimal
-  updated_by                String?
-  total_commission          Decimal?        @default(0) @db.Decimal
-  commission_pct            Decimal?        @default(0) @db.Decimal
-  version                   Int?            @default(1)
-  due_date                  DateTime?       @db.Date
-  bill_date                 DateTime?       @db.Date
-  payment_type              String?
-  is_opening                Boolean?        @default(false)
-  cancel_note               String?
-  cancelled_at              DateTime?       @db.Timestamptz(6)
-  cancelled_by              String?
-  customer_id               BigInt?
-  branch_id                 BigInt?
-  warehouse_id              BigInt?
-  sales_id                  BigInt?
-  id                        BigInt          @id @default(autoincrement())
-  channel_id                BigInt?
-  from_p_sale_id            BigInt?
-  po_sell_id                BigInt?
-  trading_from_purchase_id  BigInt?
-  branches                  branches?       @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  sales_channels            sales_channels? @relation(fields: [channel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  customers                 customers?      @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  warehouses                warehouses?     @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  doc_no                       String                         @unique(map: "uq_sales_bills_doc_no")
+  date                         DateTime                       @db.Date
+  ref_no                       String?
+  transaction_mode             String?                        @default("STOCK")
+  vat_type                     String?                        @default("EXCLUDE")
+  credit_term                  Int?                           @default(0)
+  subtotal                     Decimal?                       @default(0) @db.Decimal
+  discount                     Decimal?                       @default(0) @db.Decimal
+  vat_amount                   Decimal?                       @default(0) @db.Decimal
+  total_amount                 Decimal                        @db.Decimal
+  received_amount              Decimal?                       @default(0) @db.Decimal
+  receivable_balance           Decimal?                       @default(0) @db.Decimal
+  cogs_amount                  Decimal?                       @default(0) @db.Decimal
+  gross_profit                 Decimal?                       @default(0) @db.Decimal
+  status                       String?                        @default("open")
+  items                        Json?
+  notes                        String?
+  created_by                   String?
+  created_at                   DateTime?                      @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime?                      @default(now()) @db.Timestamptz(6)
+  license_plate                String?
+  contact_phone                String?
+  contact_name                 String?
+  trading_from_purchase_ids    Json?
+  sales_source                 String?
+  vat_invoice_issued           Boolean?                       @default(false)
+  vat_invoice_no               String?
+  vat_invoice_date             DateTime?                      @db.Date
+  discount_total               Decimal?                       @default(0) @db.Decimal
+  has_vat                      Boolean?                       @default(false)
+  salesman                     String?
+  note                         String?
+  from_p_sale_no               String?
+  has_wht                      Boolean?                       @default(false)
+  wht_amount                   Decimal?                       @default(0) @db.Decimal
+  paid_amount                  Decimal?                       @default(0) @db.Decimal
+  total_cost                   Decimal?                       @db.Decimal
+  updated_by                   String?
+  total_commission             Decimal?                       @default(0) @db.Decimal
+  commission_pct               Decimal?                       @default(0) @db.Decimal
+  version                      Int?                           @default(1)
+  due_date                     DateTime?                      @db.Date
+  bill_date                    DateTime?                      @db.Date
+  payment_type                 String?
+  is_opening                   Boolean?                       @default(false)
+  customer_id                  BigInt?
+  branch_id                    BigInt?
+  warehouse_id                 BigInt?
+  sales_id                     BigInt?
+  id                           BigInt                         @id @default(autoincrement())
+  channel_id                   BigInt?
+  from_p_sale_id               BigInt?
+  po_sell_id                   BigInt?
+  trading_from_purchase_id     BigInt?
+  cancel_note                  String?
+  cancelled_at                 DateTime?                      @db.Timestamptz(6)
+  cancelled_by                 String?
   customer_receipt_allocations customer_receipt_allocations[]
-  sales_bill_status_logs    sales_bill_status_logs[]
-  trading_deals             trading_deals[]
+  sales_bill_customer_advance_allocations sales_bill_customer_advance_allocations[]
+  sales_bill_lines             sales_bill_lines[]
+  sales_bill_po_sell_allocations sales_bill_po_sell_allocations[]
+  sales_bill_source_allocations sales_bill_source_allocations[]
+  sales_bill_status_logs       sales_bill_status_logs[]
+  branches                     branches?                      @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales_channels               sales_channels?                @relation(fields: [channel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customers                    customers?                     @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses                   warehouses?                    @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trading_allocation_facts     trading_allocation_facts[]
+  trading_deals                trading_deals[]
 
   @@index([doc_no], map: "idx_sales_bills_doc_no")
   @@index([branch_id], map: "idx_sb_branch")
@@ -2454,7 +2505,7 @@ model sales_bills {
 }
 
 model sales_bill_status_logs {
-  event_key                   String      @unique
+  event_key                   String      @unique(map: "idx_sales_bill_status_logs_event_key") @default(dbgenerated("('SBSTATUS-'::text || (gen_random_uuid())::text)"))
   action                      String
   sales_bill_doc_no           String
   total_amount_snapshot       Decimal     @default(0) @db.Decimal
@@ -2468,11 +2519,152 @@ model sales_bill_status_logs {
   created_by                  String?
   id                          BigInt      @id @default(autoincrement())
   sales_bill_id               BigInt
-  sales_bills                 sales_bills @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bills                 sales_bills @relation(fields: [sales_bill_id], references: [id], onUpdate: NoAction)
 
   @@index([sales_bill_id, created_at(sort: Desc)], map: "idx_sales_bill_status_logs_bill_created")
   @@index([sales_bill_doc_no], map: "idx_sales_bill_status_logs_doc_no")
   @@index([action], map: "idx_sales_bill_status_logs_action")
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model sales_bill_lines {
+  id                                BigInt                            @id @default(autoincrement())
+  sales_bill_id                     BigInt
+  line_no                           Int
+  product_id                        BigInt?
+  product_code_snapshot             String
+  product_name_snapshot             String
+  unit_snapshot                     String?
+  gross_weight                      Decimal                           @default(0) @db.Decimal
+  deduct_weight                     Decimal                           @default(0) @db.Decimal
+  net_weight                        Decimal                           @default(0) @db.Decimal
+  qty                               Decimal                           @default(0) @db.Decimal
+  unit_price                        Decimal                           @default(0) @db.Decimal
+  discount_amount                   Decimal                           @default(0) @db.Decimal
+  line_amount                       Decimal                           @default(0) @db.Decimal
+  vat_amount                        Decimal                           @default(0) @db.Decimal
+  status                            String                            @default("active")
+  notes                             String?
+  meta                              Json?
+  created_at                        DateTime                          @default(now()) @db.Timestamptz(6)
+  created_by                        String?
+  updated_at                        DateTime                          @default(now()) @db.Timestamptz(6)
+  updated_by                        String?
+  version                           Int                               @default(1)
+  products                          products?                         @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bills                       sales_bills                       @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bill_po_sell_allocations    sales_bill_po_sell_allocations[]
+  sales_bill_source_allocations     sales_bill_source_allocations[]
+
+  @@unique([sales_bill_id, line_no], map: "uq_sales_bill_lines_bill_line")
+  @@index([sales_bill_id, status], map: "idx_sales_bill_lines_bill_status")
+  @@index([product_id, status], map: "idx_sales_bill_lines_product_status", where: raw("(product_id IS NOT NULL)"))
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model sales_bill_source_allocations {
+  id                       BigInt            @id @default(autoincrement())
+  sales_bill_id            BigInt
+  sales_bill_line_id       BigInt?
+  sales_line_no            Int
+  source_type              String
+  source_doc_no            String
+  source_line_no           Int?
+  source_id                BigInt?
+  weight_ticket_id         BigInt?
+  stock_issue_id           BigInt?
+  product_id               BigInt?
+  product_code_snapshot    String
+  product_name_snapshot    String
+  allocated_qty            Decimal           @default(0) @db.Decimal
+  allocated_gross_weight   Decimal           @default(0) @db.Decimal
+  allocated_deduct_weight  Decimal           @default(0) @db.Decimal
+  allocated_net_weight     Decimal           @default(0) @db.Decimal
+  movement_owner           String
+  stock_ledger_ref_type    String?
+  status                   String            @default("active")
+  notes                    String?
+  meta                     Json?
+  created_at               DateTime          @default(now()) @db.Timestamptz(6)
+  created_by               String?
+  updated_at               DateTime          @default(now()) @db.Timestamptz(6)
+  updated_by               String?
+  version                  Int               @default(1)
+  products                 products?         @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bill_lines         sales_bill_lines? @relation(fields: [sales_bill_line_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bills              sales_bills       @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  stock_issues             stock_issues?     @relation(fields: [stock_issue_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  weight_tickets           weight_tickets?   @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([sales_bill_id, sales_line_no, status], map: "idx_sales_bill_source_allocations_bill_line_status")
+  @@index([source_type, source_doc_no, status], map: "idx_sales_bill_source_allocations_source_status")
+  @@index([weight_ticket_id, status], map: "idx_sales_bill_source_allocations_wto", where: raw("(weight_ticket_id IS NOT NULL)"))
+  @@index([stock_issue_id, status], map: "idx_sales_bill_source_allocations_psale", where: raw("(stock_issue_id IS NOT NULL)"))
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model sales_bill_po_sell_allocations {
+  id                    BigInt            @id @default(autoincrement())
+  sales_bill_id         BigInt
+  sales_bill_line_id    BigInt?
+  sales_line_no         Int
+  allocation_type       String
+  po_sell_id            BigInt?
+  po_sell_doc_no        String?
+  po_sell_line_no       Int?
+  product_id            BigInt?
+  product_code_snapshot String
+  product_name_snapshot String
+  allocated_qty         Decimal           @default(0) @db.Decimal
+  unit_price            Decimal           @default(0) @db.Decimal
+  allocated_amount      Decimal           @default(0) @db.Decimal
+  status                String            @default("active")
+  notes                 String?
+  meta                  Json?
+  created_at            DateTime          @default(now()) @db.Timestamptz(6)
+  created_by            String?
+  updated_at            DateTime          @default(now()) @db.Timestamptz(6)
+  updated_by            String?
+  version               Int               @default(1)
+  po_sells              po_sells?         @relation(fields: [po_sell_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  products              products?         @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bill_lines      sales_bill_lines? @relation(fields: [sales_bill_line_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bills           sales_bills       @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([sales_bill_id, sales_line_no, status], map: "idx_sales_bill_po_sell_allocations_bill_line_status")
+  @@index([po_sell_id, status], map: "idx_sales_bill_po_sell_allocations_po_status", where: raw("(po_sell_id IS NOT NULL)"))
+  @@index([allocation_type, status], map: "idx_sales_bill_po_sell_allocations_type_status")
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model sales_bill_customer_advance_allocations {
+  id                       BigInt      @id @default(autoincrement())
+  sales_bill_id            BigInt
+  customer_advance_doc_no  String
+  customer_id              BigInt?
+  customer_code_snapshot   String
+  customer_name_snapshot   String
+  allocated_amount         Decimal     @default(0) @db.Decimal
+  outstanding_before       Decimal     @default(0) @db.Decimal
+  outstanding_after        Decimal     @default(0) @db.Decimal
+  status                   String      @default("active")
+  notes                    String?
+  meta                     Json?
+  created_at               DateTime    @default(now()) @db.Timestamptz(6)
+  created_by               String?
+  updated_at               DateTime    @default(now()) @db.Timestamptz(6)
+  updated_by               String?
+  version                  Int         @default(1)
+  customers                customers?  @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sales_bills              sales_bills @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([sales_bill_id, status], map: "idx_sales_bill_customer_advance_allocations_bill_status")
+  @@index([customer_advance_doc_no, status], map: "idx_sales_bill_customer_advance_allocations_advance_status")
+  @@index([customer_id, status], map: "idx_sales_bill_customer_advance_allocations_customer_status", where: raw("(customer_id IS NOT NULL)"))
   @@schema("public")
 }
 
@@ -2487,7 +2679,7 @@ model sales_channels {
 }
 
 model salespersons {
-  code       String    @unique
+  code       String    @unique(map: "uq_salespersons_code")
   name       String
   phone      String?
   email      String?
@@ -2528,11 +2720,12 @@ model weight_tickets {
   customer_id                       BigInt?
   id                                BigInt                              @id @default(autoincrement())
   purchase_bill_receipt_allocations purchase_bill_receipt_allocations[]
+  sales_bill_source_allocations     sales_bill_source_allocations[]
   stock_holds                       stock_holds[]
-  weight_ticket_status_logs         weight_ticket_status_logs[]
-  weight_ticket_usage_logs          weight_ticket_usage_logs[]
   weight_ticket_lines               weight_ticket_lines[]
   weight_ticket_product_summaries   weight_ticket_product_summaries[]
+  weight_ticket_status_logs         weight_ticket_status_logs[]
+  weight_ticket_usage_logs          weight_ticket_usage_logs[]
   branches                          branches                            @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   customers                         customers?                          @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   suppliers                         suppliers?                          @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -2565,13 +2758,13 @@ model weight_ticket_lines {
   id                                  BigInt                               @id @default(autoincrement())
   impurity_id                         BigInt?
   product_id                          BigInt
-  warehouse_id                        BigInt?
   weight_ticket_id                    BigInt
+  warehouse_id                        BigInt?
+  stock_holds                         stock_holds[]
   impurities                          impurities?                          @relation(fields: [impurity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   products                            products                             @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   warehouses                          warehouses?                          @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   weight_tickets                      weight_tickets                       @relation(fields: [weight_ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  stock_holds                         stock_holds[]
   weight_ticket_product_summary_lines weight_ticket_product_summary_lines?
 
   @@unique([weight_ticket_id, line_no], map: "uq_weight_ticket_lines_ticket_line")
@@ -2597,10 +2790,10 @@ model weight_ticket_product_summaries {
   product_id                          BigInt
   weight_ticket_id                    BigInt
   purchase_bill_receipt_allocations   purchase_bill_receipt_allocations[]
-  weight_ticket_usage_logs            weight_ticket_usage_logs[]
   products                            products                              @relation(fields: [product_id], references: [id], onUpdate: NoAction)
   weight_tickets                      weight_tickets                        @relation(fields: [weight_ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   weight_ticket_product_summary_lines weight_ticket_product_summary_lines[]
+  weight_ticket_usage_logs            weight_ticket_usage_logs[]
 
   @@unique([weight_ticket_id, product_id], map: "uq_weight_ticket_product_summaries_ticket_product")
   @@index([product_id], map: "idx_weight_ticket_product_summaries_product")
@@ -2609,7 +2802,7 @@ model weight_ticket_product_summaries {
 }
 
 model weight_ticket_status_logs {
-  event_key              String         @unique(map: "idx_weight_ticket_status_logs_event_key") @default(dbgenerated("('WTSTATUS-'::text || gen_random_uuid()::text)"))
+  event_key              String         @unique(map: "idx_weight_ticket_status_logs_event_key") @default(dbgenerated("('WTSTATUS-'::text || (gen_random_uuid())::text)"))
   action                 String
   weight_ticket_doc_no   String
   doc_type               String
@@ -2624,7 +2817,7 @@ model weight_ticket_status_logs {
   created_by             String?
   id                     BigInt         @id @default(autoincrement())
   weight_ticket_id       BigInt
-  weight_tickets         weight_tickets @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  weight_tickets         weight_tickets @relation(fields: [weight_ticket_id], references: [id], onUpdate: NoAction)
 
   @@index([weight_ticket_id, created_at(sort: Desc)], map: "idx_weight_ticket_status_logs_ticket_created")
   @@index([weight_ticket_doc_no], map: "idx_weight_ticket_status_logs_doc_no")
@@ -2632,7 +2825,7 @@ model weight_ticket_status_logs {
 }
 
 model weight_ticket_usage_logs {
-  event_key                        String                           @unique @default(dbgenerated("('WTUSE-'::text || gen_random_uuid()::text)"))
+  event_key                        String                           @unique(map: "idx_weight_ticket_usage_logs_event_key") @default(dbgenerated("('WTUSE-'::text || (gen_random_uuid())::text)"))
   action                           String
   weight_ticket_doc_no             String
   doc_type                         String                           @default("WTI")
@@ -2658,11 +2851,11 @@ model weight_ticket_usage_logs {
   product_id                       BigInt?
   purchase_bill_id                 BigInt?
   purchase_bill_item_id            BigInt?
-  products                         products?                        @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  purchase_bills                   purchase_bills?                  @relation(fields: [purchase_bill_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  purchase_bill_items              purchase_bill_items?             @relation(fields: [purchase_bill_item_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  weight_tickets                   weight_tickets                   @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  weight_ticket_product_summaries  weight_ticket_product_summaries? @relation(fields: [weight_ticket_product_summary_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  products                         products?                        @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  purchase_bills                   purchase_bills?                  @relation(fields: [purchase_bill_id], references: [id], onUpdate: NoAction)
+  purchase_bill_items              purchase_bill_items?             @relation(fields: [purchase_bill_item_id], references: [id], onUpdate: NoAction)
+  weight_tickets                   weight_tickets                   @relation(fields: [weight_ticket_id], references: [id], onUpdate: NoAction)
+  weight_ticket_product_summaries  weight_ticket_product_summaries? @relation(fields: [weight_ticket_product_summary_id], references: [id], onUpdate: NoAction)
 
   @@index([weight_ticket_id, created_at(sort: Desc)], map: "idx_weight_ticket_usage_logs_ticket_created")
   @@index([weight_ticket_product_summary_id], map: "idx_weight_ticket_usage_logs_summary")
@@ -2687,40 +2880,45 @@ model weight_ticket_product_summary_lines {
 }
 
 model stock_adjustments {
-  doc_no          String?
-  date            DateTime? @db.Date
-  lot_no          String?
-  system_qty      Decimal?  @default(0) @db.Decimal
-  counted_qty     Decimal?  @default(0) @db.Decimal
-  diff_qty        Decimal?  @default(0) @db.Decimal
-  adjust_type     String?
-  output_category String?
-  on_hold_qty     Decimal?  @default(0) @db.Decimal
-  ready_qty_snapshot Decimal? @default(0) @db.Decimal
-  accounting_impact_policy String? @default("NOTE_ONLY")
-  reason          String?
-  remark          String?
-  unit_cost_used  Decimal?  @default(0) @db.Decimal
-  value_note      Decimal?  @default(0) @db.Decimal
-  status          String?   @default("posted")
-  created_by      String?
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  reversed_at     DateTime? @db.Timestamptz(6)
-  reversed_by     String?
-  updated_at      DateTime? @db.Timestamptz(6)
-  updated_by      String?
-  version         Int?      @default(1)
-  branch_id       BigInt?
-  warehouse_id    BigInt?
-  id              BigInt    @id @default(autoincrement())
-  product_id      BigInt?
-  stock_ledger_id BigInt?
+  doc_no                   String?   @unique(map: "uq_stock_adjustments_doc_no", where: raw("(doc_no IS NOT NULL)"))
+  date                     DateTime? @db.Date
+  lot_no                   String?
+  system_qty               Decimal?  @default(0) @db.Decimal
+  counted_qty              Decimal?  @default(0) @db.Decimal
+  diff_qty                 Decimal?  @default(0) @db.Decimal
+  adjust_type              String?
+  reason                   String?
+  remark                   String?
+  unit_cost_used           Decimal?  @default(0) @db.Decimal
+  value_note               Decimal?  @default(0) @db.Decimal
+  status                   String?   @default("posted")
+  created_by               String?
+  created_at               DateTime? @default(now()) @db.Timestamptz(6)
+  reversed_at              DateTime? @db.Timestamptz(6)
+  reversed_by              String?
+  updated_at               DateTime? @db.Timestamptz(6)
+  updated_by               String?
+  version                  Int?      @default(1)
+  branch_id                BigInt?
+  warehouse_id             BigInt?
+  id                       BigInt    @id @default(autoincrement())
+  product_id               BigInt?
+  stock_ledger_id          BigInt?
+  output_category          String?
+  on_hold_qty              Decimal?  @default(0) @db.Decimal
+  ready_qty_snapshot       Decimal?  @default(0) @db.Decimal
+  accounting_impact_policy String?   @default("NOTE_ONLY")
 
   @@index([branch_id], map: "idx_stock_adjustments_branch")
+  @@index([branch_id, date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_adjustments_branch_date_created", where: raw("(branch_id IS NOT NULL)"))
   @@index([date(sort: Desc)], map: "idx_stock_adjustments_date")
+  @@index([date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_adjustments_list_date_created")
+  @@index([adjust_type, date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_adjustments_type_date_created", where: raw("(adjust_type IS NOT NULL)"))
   @@index([product_id], map: "idx_stock_adjustments_product")
+  @@index([product_id, date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_adjustments_product_date_created", where: raw("(product_id IS NOT NULL)"))
   @@index([output_category], map: "idx_stock_adjustments_output_category")
   @@index([status], map: "idx_stock_adjustments_status")
+  @@index([doc_no], map: "idx_stock_adjustments_doc_no_pattern", where: raw("(doc_no IS NOT NULL)"))
   @@schema("public")
 }
 
@@ -2739,9 +2937,10 @@ model stock_issues {
   warehouse_id            BigInt?
   id                      BigInt                    @id @default(autoincrement())
   converted_to_bill_id    BigInt?
+  sales_bill_source_allocations sales_bill_source_allocations[]
+  stock_issue_status_logs stock_issue_status_logs[]
   branches                branches?                 @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   customers               customers?                @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  stock_issue_status_logs stock_issue_status_logs[]
   warehouses              warehouses?               @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([converted_to_bill_id, status], map: "idx_stock_issues_converted_bill", where: raw("(converted_to_bill_id IS NOT NULL)"))
@@ -2752,20 +2951,20 @@ model stock_issues {
 }
 
 model stock_issue_status_logs {
+  id                        BigInt       @id @default(autoincrement())
   event_key                 String       @unique
-  action                    String
+  stock_issue_id            BigInt
   stock_issue_doc_no        String
-  total_cost_snapshot       Decimal      @default(0) @db.Decimal
-  total_est_amount_snapshot Decimal      @default(0) @db.Decimal
+  action                    String
   from_status               String?
   to_status                 String
+  total_cost_snapshot       Decimal      @default(0) @db.Decimal
+  total_est_amount_snapshot Decimal      @default(0) @db.Decimal
   note                      String?
   meta                      Json?
   created_at                DateTime     @default(now()) @db.Timestamptz(6)
   created_by                String?
-  id                        BigInt       @id @default(autoincrement())
-  stock_issue_id            BigInt
-  stock_issues              stock_issues @relation(fields: [stock_issue_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  stock_issues              stock_issues @relation(fields: [stock_issue_id], references: [id], onUpdate: NoAction)
 
   @@index([stock_issue_id, created_at(sort: Desc)], map: "idx_stock_issue_status_logs_issue_created")
   @@index([stock_issue_doc_no], map: "idx_stock_issue_status_logs_doc_no")
@@ -2775,42 +2974,42 @@ model stock_issue_status_logs {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model stock_holds {
-  hold_key              String                @unique @default(dbgenerated("('STH-'::text || gen_random_uuid()::text)"))
-  source_type           String                @default("WTO")
-  source_doc_no         String
-  source_line_no        Int?
-  qty                   Decimal               @default(0) @db.Decimal
-  output_category       String?
-  lot_no                String?
+  hold_key               String               @unique @default(dbgenerated("('STH-'::text || (gen_random_uuid())::text)"))
+  source_type            String               @default("WTO")
+  source_doc_no          String
+  source_line_no         Int?
+  qty                    Decimal              @default(0) @db.Decimal
+  status                 String               @default("active")
+  held_at                DateTime             @default(now()) @db.Timestamptz(6)
+  released_at            DateTime?            @db.Timestamptz(6)
+  consumed_at            DateTime?            @db.Timestamptz(6)
+  cancelled_at           DateTime?            @db.Timestamptz(6)
+  released_by            String?
+  consumed_by            String?
+  cancelled_by           String?
+  release_reason         String?
+  consumed_by_ref_type   String?
+  consumed_by_ref_no     String?
+  note                   String?
+  meta                   Json?
+  created_at             DateTime             @default(now()) @db.Timestamptz(6)
+  created_by             String?
+  updated_at             DateTime?            @db.Timestamptz(6)
+  updated_by             String?
+  id                     BigInt               @id @default(autoincrement())
+  weight_ticket_id       BigInt
+  weight_ticket_line_id  BigInt?
+  product_id             BigInt
+  branch_id              BigInt
+  warehouse_id           BigInt
+  output_category        String?
+  lot_no                 String?
   not_available_for_sale Boolean              @default(false)
-  status                String                @default("active")
-  held_at               DateTime              @default(now()) @db.Timestamptz(6)
-  released_at           DateTime?             @db.Timestamptz(6)
-  consumed_at           DateTime?             @db.Timestamptz(6)
-  cancelled_at          DateTime?             @db.Timestamptz(6)
-  released_by           String?
-  consumed_by           String?
-  cancelled_by          String?
-  release_reason        String?
-  consumed_by_ref_type  String?
-  consumed_by_ref_no    String?
-  note                  String?
-  meta                  Json?
-  created_at            DateTime              @default(now()) @db.Timestamptz(6)
-  created_by            String?
-  updated_at            DateTime?             @db.Timestamptz(6)
-  updated_by            String?
-  id                    BigInt                @id @default(autoincrement())
-  weight_ticket_id      BigInt
-  weight_ticket_line_id BigInt?
-  product_id            BigInt
-  branch_id             BigInt
-  warehouse_id          BigInt
-  branches              branches              @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  products              products              @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  warehouses            warehouses            @relation(fields: [warehouse_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  weight_ticket_lines   weight_ticket_lines?   @relation(fields: [weight_ticket_line_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  weight_tickets        weight_tickets         @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  branches               branches             @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  products               products             @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  warehouses             warehouses           @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+  weight_tickets         weight_tickets       @relation(fields: [weight_ticket_id], references: [id], onUpdate: NoAction)
+  weight_ticket_lines    weight_ticket_lines? @relation(fields: [weight_ticket_line_id], references: [id], onUpdate: NoAction)
 
   @@index([branch_id, product_id, warehouse_id, output_category], map: "idx_stock_holds_active_lookup")
   @@index([product_id, branch_id, warehouse_id, output_category, lot_no, not_available_for_sale, held_at(sort: Desc), id(sort: Desc)], map: "idx_stock_holds_active_bucket_detail", where: raw("(status = 'active'::text)"))
@@ -2822,18 +3021,18 @@ model stock_holds {
 }
 
 model stock_transfer_items {
-  qty                    Decimal         @db.Decimal
-  source_unit_cost       Decimal         @default(0) @db.Decimal
-  line_value             Decimal         @default(0) @db.Decimal
-  created_at             DateTime        @default(now()) @db.Timestamptz(6)
-  created_by             String?
-  updated_at             DateTime?       @db.Timestamptz(6)
-  updated_by             String?
-  id                     BigInt          @id @default(autoincrement())
-  transfer_id            BigInt
-  product_id             BigInt
-  products               products        @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  stock_transfers        stock_transfers @relation(fields: [transfer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id               BigInt          @id @default(autoincrement())
+  transfer_id      BigInt
+  product_id       BigInt
+  qty              Decimal         @db.Decimal
+  source_unit_cost Decimal         @default(0) @db.Decimal
+  line_value       Decimal         @default(0) @db.Decimal
+  created_at       DateTime        @default(now()) @db.Timestamptz(6)
+  created_by       String?
+  updated_at       DateTime?       @db.Timestamptz(6)
+  updated_by       String?
+  products         products        @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  stock_transfers  stock_transfers @relation(fields: [transfer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([product_id], map: "idx_stock_transfer_items_product")
   @@index([transfer_id, product_id], map: "idx_stock_transfer_items_transfer_product")
@@ -2841,54 +3040,54 @@ model stock_transfer_items {
 }
 
 model stock_transfers {
-  doc_no                 String                 @unique
-  date                   DateTime               @db.Date
-  status                 String                 @default("draft")
-  notes                  String?
-  total_qty              Decimal                @default(0) @db.Decimal
-  total_value            Decimal                @default(0) @db.Decimal
-  posted_at              DateTime?              @db.Timestamptz(6)
-  posted_by              String?
-  cancelled_at           DateTime?              @db.Timestamptz(6)
-  cancelled_by           String?
-  cancel_reason          String?
-  created_at             DateTime               @default(now()) @db.Timestamptz(6)
-  created_by             String?
-  updated_at             DateTime?              @db.Timestamptz(6)
-  updated_by             String?
-  version                Int                    @default(1)
-  id                     BigInt                 @id @default(autoincrement())
-  from_branch_id         BigInt
-  from_warehouse_id      BigInt
-  to_branch_id           BigInt
-  to_warehouse_id        BigInt
-  branches_from          branches               @relation("stock_transfers_from_branch_idTobranches", fields: [from_branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  branches_to            branches               @relation("stock_transfers_to_branch_idTobranches", fields: [to_branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  stock_transfer_items   stock_transfer_items[]
-  warehouses_from        warehouses             @relation("stock_transfers_from_warehouse_idTowarehouses", fields: [from_warehouse_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  warehouses_to          warehouses             @relation("stock_transfers_to_warehouse_idTowarehouses", fields: [to_warehouse_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  id                   BigInt                 @id @default(autoincrement())
+  doc_no               String                 @unique
+  date                 DateTime               @db.Date
+  from_branch_id       BigInt
+  from_warehouse_id    BigInt
+  to_branch_id         BigInt
+  to_warehouse_id      BigInt
+  status               String                 @default("draft")
+  notes                String?
+  total_qty            Decimal                @default(0) @db.Decimal
+  total_value          Decimal                @default(0) @db.Decimal
+  posted_at            DateTime?              @db.Timestamptz(6)
+  posted_by            String?
+  cancelled_at         DateTime?              @db.Timestamptz(6)
+  cancelled_by         String?
+  cancel_reason        String?
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  created_by           String?
+  updated_at           DateTime?              @db.Timestamptz(6)
+  updated_by           String?
+  version              Int                    @default(1)
+  stock_transfer_items stock_transfer_items[]
+  branches_from        branches               @relation("stock_transfers_from_branch_idTobranches", fields: [from_branch_id], references: [id], onUpdate: NoAction)
+  warehouses_from      warehouses             @relation("stock_transfers_from_warehouse_idTowarehouses", fields: [from_warehouse_id], references: [id], onUpdate: NoAction)
+  branches_to          branches               @relation("stock_transfers_to_branch_idTobranches", fields: [to_branch_id], references: [id], onUpdate: NoAction)
+  warehouses_to        warehouses             @relation("stock_transfers_to_warehouse_idTowarehouses", fields: [to_warehouse_id], references: [id], onUpdate: NoAction)
 
   @@index([date(sort: Desc), doc_no(sort: Desc)], map: "idx_stock_transfers_date_doc")
   @@index([doc_no], map: "idx_stock_transfers_doc_no")
   @@index([status, date(sort: Desc), doc_no(sort: Desc)], map: "idx_stock_transfers_status_date_doc")
   @@index([total_qty], map: "idx_stock_transfers_total_qty")
+  @@index([doc_no], map: "idx_stock_transfers_doc_no_pattern")
   @@schema("public")
 }
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model stock_ledger {
-  ledger_key              String      @unique @default(dbgenerated("('SLG-'::text || gen_random_uuid()::text)"))
-  date                    DateTime    @db.Date
+  date                    DateTime                  @db.Date
   movement_type           String
   ref_id                  String?
   ref_no                  String?
-  qty_in                  Decimal?    @default(0) @db.Decimal
-  qty_out                 Decimal?    @default(0) @db.Decimal
-  value_in                Decimal?    @default(0) @db.Decimal
-  value_out               Decimal?    @default(0) @db.Decimal
-  unit_cost               Decimal?    @default(0) @db.Decimal
+  qty_in                  Decimal?                  @default(0) @db.Decimal
+  qty_out                 Decimal?                  @default(0) @db.Decimal
+  value_in                Decimal?                  @default(0) @db.Decimal
+  value_out               Decimal?                  @default(0) @db.Decimal
+  unit_cost               Decimal?                  @default(0) @db.Decimal
   notes                   String?
-  created_at              DateTime?   @default(now()) @db.Timestamptz(6)
+  created_at              DateTime?                 @default(now()) @db.Timestamptz(6)
   lot_no                  String?
   created_by              String?
   not_available_for_sale  Boolean?
@@ -2898,22 +3097,24 @@ model stock_ledger {
   return_reason           String?
   source_input_id         String?
   note                    String?
-  paid                    Boolean?    @default(false)
-  updated_at              DateTime?   @db.Timestamptz(6)
+  paid                    Boolean?                  @default(false)
+  updated_at              DateTime?                 @db.Timestamptz(6)
   updated_by              String?
-  version                 Int?        @default(1)
-  is_opening              Boolean?    @default(false)
+  version                 Int?                      @default(1)
+  is_opening              Boolean?                  @default(false)
   warehouse_id            BigInt?
   branch_id               BigInt?
-  id                      BigInt      @id @default(autoincrement())
+  id                      BigInt                    @id @default(autoincrement())
   output_product_id       BigInt?
   product_id              BigInt?
   purchase_channel_id     BigInt?
   sales_channel_id        BigInt?
   source_input_product_id BigInt?
-  branches                branches?   @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  products                products?   @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  warehouses              warehouses? @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ledger_key              String                    @unique @default(dbgenerated("('SLG-'::text || (gen_random_uuid())::text)"))
+  stock_cost_pool_entries stock_cost_pool_entries[]
+  branches                branches?                 @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products                products?                 @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses              warehouses?               @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([date(sort: Desc)], map: "idx_stock_date")
   @@index([ref_type, ref_no, product_id], map: "idx_stock_ledger_ref_lookup", where: raw("(ref_type = ANY (ARRAY['PB'::text, 'PB-CANCEL'::text, 'PB-EDIT-REV'::text, 'SB'::text, 'SB-CANCEL'::text, 'PSALE'::text, 'PSALE-CANCEL'::text]))"))
@@ -2929,6 +3130,7 @@ model stock_ledger {
   @@index([date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_ledger_sc_list", where: raw("((ref_type = 'SC'::text) AND (qty_out > (0)::numeric))"))
   @@index([output_category, note, branch_id, warehouse_id, product_id, date(sort: Desc)], map: "idx_stock_ledger_sc_filter", where: raw("((ref_type = 'SC'::text) AND (qty_out > (0)::numeric))"))
   @@index([output_category, note, date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_ledger_sc_transition_list", where: raw("((ref_type = 'SC'::text) AND (qty_out > (0)::numeric))"))
+  @@index([ref_type, ref_no, created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_ledger_adj_ref_lookup", where: raw("(ref_type = ANY (ARRAY['ADJ'::text, 'ADJ-REV'::text]))"))
   @@index([branch_id, warehouse_id, product_id, date], map: "idx_stock_ledger_stock_dimension")
   @@index([product_id, branch_id, warehouse_id, output_category, lot_no, not_available_for_sale, date], map: "idx_stock_ledger_balance_bucket")
   @@index([product_id, branch_id, warehouse_id, output_category, lot_no, not_available_for_sale, date(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "idx_stock_ledger_bucket_detail")
@@ -2939,7 +3141,6 @@ model stock_ledger {
 }
 
 model supplier_advance_allocations {
-  allocation_key                   String                             @unique @default(dbgenerated("('SAA-'::text || gen_random_uuid()::text)"))
   allocated_amount                 Decimal                            @db.Decimal
   status                           String                             @default("active")
   allocated_at                     DateTime                           @default(now()) @db.Timestamptz(6)
@@ -2953,6 +3154,7 @@ model supplier_advance_allocations {
   id                               BigInt                             @id @default(autoincrement())
   advance_payment_id               BigInt
   purchase_bill_id                 BigInt
+  allocation_key                   String                             @unique @default(dbgenerated("('SAA-'::text || (gen_random_uuid())::text)"))
   supplier_advance_allocation_logs supplier_advance_allocation_logs[]
   supplier_advance_payments        supplier_advance_payments          @relation(fields: [advance_payment_id], references: [id], onUpdate: NoAction)
   purchase_bills                   purchase_bills                     @relation(fields: [purchase_bill_id], references: [id], onUpdate: NoAction)
@@ -2964,7 +3166,7 @@ model supplier_advance_allocations {
 }
 
 model supplier_advance_allocation_logs {
-  event_key                    String                        @unique @default(dbgenerated("('ADVALLOC-'::text || gen_random_uuid()::text)"))
+  event_key                    String                        @unique(map: "idx_supplier_advance_allocation_logs_event_key") @default(dbgenerated("('ADVALLOC-'::text || (gen_random_uuid())::text)"))
   action                       String
   advance_doc_no               String
   purchase_bill_doc_no         String?
@@ -2980,9 +3182,9 @@ model supplier_advance_allocation_logs {
   advance_payment_id           BigInt
   purchase_bill_id             BigInt?
   allocation_id                BigInt?
-  supplier_advance_payments    supplier_advance_payments     @relation(fields: [advance_payment_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  purchase_bills               purchase_bills?               @relation(fields: [purchase_bill_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  supplier_advance_allocations supplier_advance_allocations? @relation(fields: [allocation_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  supplier_advance_payments    supplier_advance_payments     @relation(fields: [advance_payment_id], references: [id], onUpdate: NoAction)
+  supplier_advance_allocations supplier_advance_allocations? @relation(fields: [allocation_id], references: [id], onUpdate: NoAction)
+  purchase_bills               purchase_bills?               @relation(fields: [purchase_bill_id], references: [id], onUpdate: NoAction)
 
   @@index([advance_payment_id, created_at(sort: Desc)], map: "idx_supplier_advance_allocation_logs_advance_created")
   @@index([allocation_id], map: "idx_supplier_advance_allocation_logs_allocation")
@@ -3029,10 +3231,10 @@ model supplier_advance_payments {
   funding_account_id               BigInt?
   supplier_advance_allocation_logs supplier_advance_allocation_logs[]
   supplier_advance_allocations     supplier_advance_allocations[]
-  supplier_advance_status_logs     supplier_advance_status_logs[]
   branches                         branches                           @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   accounts                         accounts?                          @relation(fields: [funding_account_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   suppliers                        suppliers                          @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  supplier_advance_status_logs     supplier_advance_status_logs[]
 
   @@index([funding_account_id], map: "idx_supplier_advance_payments_account")
   @@index([branch_id], map: "idx_supplier_advance_payments_branch")
@@ -3045,7 +3247,7 @@ model supplier_advance_payments {
 }
 
 model supplier_advance_status_logs {
-  event_key                 String                    @unique @default(dbgenerated("('ADVLOG-'::text || gen_random_uuid()::text)"))
+  event_key                 String                    @unique(map: "idx_supplier_advance_status_logs_event_key") @default(dbgenerated("('ADVLOG-'::text || (gen_random_uuid())::text)"))
   action                    String
   advance_doc_no            String
   amount_snapshot           Decimal                   @default(0) @db.Decimal
@@ -3059,7 +3261,7 @@ model supplier_advance_status_logs {
   created_by                String?
   id                        BigInt                    @id @default(autoincrement())
   advance_payment_id        BigInt
-  supplier_advance_payments supplier_advance_payments @relation(fields: [advance_payment_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  supplier_advance_payments supplier_advance_payments @relation(fields: [advance_payment_id], references: [id], onUpdate: NoAction)
 
   @@index([action], map: "idx_supplier_advance_status_logs_action")
   @@index([advance_payment_id, created_at(sort: Desc)], map: "idx_supplier_advance_status_logs_advance_created")
@@ -3067,7 +3269,7 @@ model supplier_advance_status_logs {
 }
 
 model suppliers {
-  code                      String                      @unique
+  code                      String                      @unique(map: "uq_suppliers_code")
   name                      String
   tax_id                    String?
   phone                     String?
@@ -3109,6 +3311,8 @@ model suppliers {
   supplier_advance_payments supplier_advance_payments[]
   supplier_bank_accounts    supplier_bank_accounts[]
   branches                  branches?                   @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trading_allocation_facts  trading_allocation_facts[]
+  trading_cost_sources      trading_cost_sources[]
   trading_deals             trading_deals[]
   weight_tickets            weight_tickets[]
 
@@ -3118,11 +3322,12 @@ model suppliers {
   @@index([market_scope], map: "idx_suppliers_market_scope")
   @@index([type], map: "idx_suppliers_type")
   @@index([country_code], map: "idx_suppliers_country_code")
+  @@index([code, name], map: "idx_suppliers_active_code_name", where: raw("(active IS TRUE)"))
+  @@index([active(sort: Desc), name, code, id], map: "idx_suppliers_active_name_cover")
   @@schema("public")
 }
 
 model supplier_bank_accounts {
-  code           String      @unique(map: "uq_supplier_bank_accounts_code")
   payment_method String?     @default("เงินโอน")
   account_no     String?
   account_name   String?
@@ -3131,10 +3336,11 @@ model supplier_bank_accounts {
   created_at     DateTime?   @default(now()) @db.Timestamptz(6)
   updated_at     DateTime?   @default(now()) @db.Timestamptz(6)
   branch_code    String?
-  bank_name_id   BigInt?
   supplier_id    BigInt
   id             BigInt      @id @default(autoincrement())
-  bank_names     bank_names? @relation(fields: [bank_name_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bank_name_id   BigInt?
+  code           String      @unique(map: "uq_supplier_bank_accounts_code")
+  bank_names     bank_names? @relation(fields: [bank_name_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_supplier_bank_accounts_bank_name")
   suppliers      suppliers   @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
 
   @@unique([supplier_id, account_no], map: "uq_supplier_bank_accounts_supplier_account")
@@ -3194,37 +3400,38 @@ model thai_subdistricts {
 }
 
 model trading_deals {
-  deal_no                 String
-  date                    DateTime        @db.Date
-  purchase_bill_no        String?
-  sales_bill_no           String?
-  matched_qty             Decimal?        @default(0) @db.Decimal
-  matched_purchase_amount Decimal?        @default(0) @db.Decimal
-  matched_sales_amount    Decimal?        @default(0) @db.Decimal
-  ex_vat                  Boolean?        @default(true)
-  status                  String?         @default("Partially Matched")
-  notes                   String?
-  created_by              String?
-  cancelled_at            DateTime?       @db.Timestamptz(6)
-  created_at              DateTime?       @default(now()) @db.Timestamptz(6)
-  note                    String?
-  updated_at              DateTime?       @db.Timestamptz(6)
-  updated_by              String?
-  version                 Int?            @default(1)
-  cancelled_by            String?
-  cancelled_reason        String?
-  auto_created            Boolean?        @default(false)
-  supplier_id             BigInt?
-  customer_id             BigInt?
-  id                      BigInt          @id @default(autoincrement())
-  product_id              BigInt?
-  purchase_bill_id        BigInt?
-  sales_bill_id           BigInt?
-  customers               customers?      @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  products                products?       @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  purchase_bills          purchase_bills? @relation(fields: [purchase_bill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  sales_bills             sales_bills?    @relation(fields: [sales_bill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  suppliers               suppliers?      @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deal_no                  String
+  date                     DateTime                   @db.Date
+  purchase_bill_no         String?
+  sales_bill_no            String?
+  matched_qty              Decimal?                   @default(0) @db.Decimal
+  matched_purchase_amount  Decimal?                   @default(0) @db.Decimal
+  matched_sales_amount     Decimal?                   @default(0) @db.Decimal
+  ex_vat                   Boolean?                   @default(true)
+  status                   String?                    @default("Partially Matched")
+  notes                    String?
+  created_by               String?
+  cancelled_at             DateTime?                  @db.Timestamptz(6)
+  created_at               DateTime?                  @default(now()) @db.Timestamptz(6)
+  note                     String?
+  updated_at               DateTime?                  @db.Timestamptz(6)
+  updated_by               String?
+  version                  Int?                       @default(1)
+  cancelled_by             String?
+  cancelled_reason         String?
+  auto_created             Boolean?                   @default(false)
+  supplier_id              BigInt?
+  customer_id              BigInt?
+  id                       BigInt                     @id @default(autoincrement())
+  product_id               BigInt?
+  purchase_bill_id         BigInt?
+  sales_bill_id            BigInt?
+  trading_allocation_facts trading_allocation_facts[]
+  customers                customers?                 @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products                 products?                  @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  purchase_bills           purchase_bills?            @relation(fields: [purchase_bill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales_bills              sales_bills?               @relation(fields: [sales_bill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  suppliers                suppliers?                 @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([purchase_bill_id], map: "idx_deal_pb")
   @@index([sales_bill_id], map: "idx_deal_sb")
@@ -3292,24 +3499,28 @@ model public_users {
 }
 
 model warehouses {
-  code              String              @unique
-  name              String
-  active            Boolean?            @default(true)
-  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
-  type              String?
-  id                BigInt              @id @default(autoincrement())
-  branch_id         BigInt?
-  grade_adjustments grade_adjustments[]
-  production_orders production_orders[]
-  purchase_bills    purchase_bills[]
-  sales_bills       sales_bills[]
-  stock_issues      stock_issues[]
-  stock_holds       stock_holds[]
-  stock_ledger      stock_ledger[]
-  stock_transfers_from stock_transfers[] @relation("stock_transfers_from_warehouse_idTowarehouses")
-  stock_transfers_to   stock_transfers[] @relation("stock_transfers_to_warehouse_idTowarehouses")
-  weight_ticket_lines weight_ticket_lines[]
-  branches          branches?           @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  code                                                                String                    @unique
+  name                                                                String
+  active                                                              Boolean?                  @default(true)
+  created_at                                                          DateTime?                 @default(now()) @db.Timestamptz(6)
+  type                                                                String?
+  id                                                                  BigInt                    @id @default(autoincrement())
+  branch_id                                                           BigInt?
+  grade_adjustments                                                   grade_adjustments[]
+  production_inputs_production_inputs_source_warehouse_idTowarehouses production_inputs[]       @relation("production_inputs_source_warehouse_idTowarehouses")
+  production_inputs_production_inputs_wip_warehouse_idTowarehouses    production_inputs[]       @relation("production_inputs_wip_warehouse_idTowarehouses")
+  production_orders                                                   production_orders[]
+  production_outputs                                                  production_outputs[]
+  purchase_bills                                                      purchase_bills[]
+  sales_bills                                                         sales_bills[]
+  stock_cost_pool_entries                                             stock_cost_pool_entries[]
+  stock_holds                                                         stock_holds[]
+  stock_issues                                                        stock_issues[]
+  stock_ledger                                                        stock_ledger[]
+  stock_transfers_from                                                stock_transfers[]         @relation("stock_transfers_from_warehouse_idTowarehouses")
+  stock_transfers_to                                                  stock_transfers[]         @relation("stock_transfers_to_warehouse_idTowarehouses")
+  branches                                                            branches?                 @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  weight_ticket_lines                                                 weight_ticket_lines[]
 
   @@schema("public")
 }
@@ -3541,6 +3752,89 @@ model app_auth_events {
   @@index([created_at(sort: Desc)], map: "idx_app_auth_events_created_at")
   @@index([event_type], map: "idx_app_auth_events_event_type")
   @@index([target_app_user_id], map: "idx_app_auth_events_target_app_user_id")
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model trading_allocation_facts {
+  id                     BigInt                @id @default(autoincrement())
+  allocation_no          String                @unique(map: "uq_trading_allocation_facts_allocation_no")
+  date                   DateTime              @db.Date
+  trading_deal_id        BigInt?
+  purchase_bill_id       BigInt?
+  sales_bill_id          BigInt?
+  supplier_id            BigInt?
+  customer_id            BigInt?
+  product_id             BigInt?
+  source_type            String                @default("TRADING_PURCHASE_BILL")
+  source_doc_no          String?
+  source_line_no         Int?
+  sales_doc_no           String?
+  sales_line_no          Int?
+  product_code_snapshot  String?
+  product_name_snapshot  String?
+  supplier_name_snapshot String?
+  customer_name_snapshot String?
+  qty                    Decimal               @default(0) @db.Decimal
+  sales_amount           Decimal               @default(0) @db.Decimal
+  matched_cogs           Decimal               @default(0) @db.Decimal
+  allocation_method      String                @default("RECORDED_LINE")
+  status                 String                @default("active")
+  notes                  String?
+  created_at             DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime              @default(now()) @db.Timestamptz(6)
+  created_by             String?
+  updated_by             String?
+  trading_cost_source_id BigInt?
+  customers              customers?            @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  products               products?             @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  purchase_bills         purchase_bills?       @relation(fields: [purchase_bill_id], references: [id], onUpdate: NoAction)
+  sales_bills            sales_bills?          @relation(fields: [sales_bill_id], references: [id], onUpdate: NoAction)
+  suppliers              suppliers?            @relation(fields: [supplier_id], references: [id], onUpdate: NoAction)
+  trading_cost_sources   trading_cost_sources? @relation(fields: [trading_cost_source_id], references: [id], onUpdate: NoAction)
+  trading_deals          trading_deals?        @relation(fields: [trading_deal_id], references: [id], onUpdate: NoAction)
+
+  @@index([trading_cost_source_id, product_id], map: "idx_trading_allocation_facts_cost_source")
+  @@index([customer_id, date(sort: Desc), id(sort: Desc)], map: "idx_trading_allocation_facts_customer_date", where: raw("((status = 'active'::text) AND (customer_id IS NOT NULL))"))
+  @@index([date(sort: Desc), id(sort: Desc)], map: "idx_trading_allocation_facts_date", where: raw("(status = 'active'::text)"))
+  @@index([product_id, date(sort: Desc), id(sort: Desc)], map: "idx_trading_allocation_facts_product_date", where: raw("((status = 'active'::text) AND (product_id IS NOT NULL))"))
+  @@index([purchase_bill_id, product_id], map: "idx_trading_allocation_facts_purchase", where: raw("(status = 'active'::text)"))
+  @@index([sales_bill_id, sales_line_no, product_id], map: "idx_trading_allocation_facts_sales", where: raw("(status = 'active'::text)"))
+  @@index([sales_doc_no], map: "idx_trading_allocation_facts_sales_doc", where: raw("(sales_doc_no IS NOT NULL)"))
+  @@index([source_doc_no], map: "idx_trading_allocation_facts_source_doc", where: raw("(source_doc_no IS NOT NULL)"))
+  @@index([supplier_id, date(sort: Desc), id(sort: Desc)], map: "idx_trading_allocation_facts_supplier_date", where: raw("((status = 'active'::text) AND (supplier_id IS NOT NULL))"))
+  @@schema("public")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model trading_cost_sources {
+  id                       BigInt                     @id @default(autoincrement())
+  source_no                String                     @unique(map: "uq_trading_cost_sources_source_no")
+  source_type              String                     @default("SPOT_MANUAL")
+  date                     DateTime                   @db.Date
+  supplier_id              BigInt?
+  product_id               BigInt?
+  product_code_snapshot    String?
+  product_name_snapshot    String?
+  supplier_name_snapshot   String?
+  qty                      Decimal                    @default(0) @db.Decimal
+  unit_cost                Decimal                    @default(0) @db.Decimal
+  total_amount             Decimal                    @default(0) @db.Decimal
+  status                   String                     @default("active")
+  notes                    String?
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  created_by               String?
+  updated_by               String?
+  trading_allocation_facts trading_allocation_facts[]
+  products                 products?                  @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  suppliers                suppliers?                 @relation(fields: [supplier_id], references: [id], onUpdate: NoAction)
+
+  @@index([date(sort: Desc), id(sort: Desc)], map: "idx_trading_cost_sources_date")
+  @@index([product_id, status, date(sort: Desc)], map: "idx_trading_cost_sources_product_status")
+  @@index([supplier_id, status, date(sort: Desc)], map: "idx_trading_cost_sources_supplier_status")
   @@schema("public")
 }
 

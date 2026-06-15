@@ -815,7 +815,7 @@ export function AdvancePaymentsPageClient() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <span>พบทั้งหมด {data?.pagination.totalRows ?? 0} รายการ</span>
             <div className="flex flex-wrap items-center gap-2">
-              {columnResize.hasCustomWidths ? <Button className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+              {columnResize.hasCustomWidths ? <Button className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
               <Select aria-label="จำนวนรายการต่อหน้า" className="h-9 w-auto min-w-[96px] px-2" value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
                 {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
               </Select>

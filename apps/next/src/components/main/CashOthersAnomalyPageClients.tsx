@@ -59,7 +59,7 @@ export function CashOthersSummaryPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow"><label className="text-xs font-bold text-slate-500">As of</label><DatePickerInput className="w-[140px]" value={asOf} onChange={setAsOf} /><span className="flex-1" /><button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500" disabled type="button">Export disabled</button></div>
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow"><label className="text-xs font-bold text-slate-500">As of</label><DatePickerInput className="w-[140px]" value={asOf} onChange={setAsOf} /><span className="flex-1" /><button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500" disabled type="button">ส่งออก (ปิดการใช้งาน)</button></div>
       <div className="grid grid-cols-1 gap-4 rounded-md bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-center text-white shadow-lg md:grid-cols-4">
         <Grand label="Total Asset" value={summary.totalAsset} />
         <Grand label="Total Debt" value={summary.totalDebt} />

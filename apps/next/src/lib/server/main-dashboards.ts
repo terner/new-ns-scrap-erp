@@ -7,6 +7,7 @@ import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-ref
 import { loadProductionMetrics, summarizeProductionMetrics } from '@/lib/server/production-reports'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemQty, purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
+import { salesBillLineFactsByBillId, salesBillLineFactTotals, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
 
 export type MainDashboardFilter = {
   branchId?: string
@@ -107,6 +108,24 @@ function billHasProductOrGroup(items: unknown, productById: Map<string, { metal_
   })
 }
 
+function salesBillHasProductOrGroup(lines: SalesBillLineFactRow[] | undefined, productById: Map<string, { code: string | null; metal_group: string | null }>, productId?: string, group?: string) {
+  if (!productId && !group) return true
+  return (lines ?? []).some((line) => {
+    const product = line.productId == null ? undefined : productById.get(String(line.productId))
+    if (productId && line.productCode !== productId && String(line.productId ?? '') !== productId) return false
+    if (group && (product?.metal_group ?? 'อื่นๆ') !== group) return false
+    return true
+  })
+}
+
+function salesLineRows(lines: SalesBillLineFactRow[] | undefined) {
+  return (lines ?? []).map((line) => ({
+    amount: line.lineAmount,
+    productId: line.productId == null ? '' : String(line.productId),
+    qty: line.qty,
+  }))
+}
+
 async function cashBalances(asOf: Date) {
   const [accounts, bankRows] = await Promise.all([
     prisma.accounts.findMany({ where: { active: true } }),
@@ -175,8 +194,9 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
   ])
 
   const productById = new Map(products.map((row) => [String(row.id), row]))
+  const activeSalesLineFactsByBillId = await salesBillLineFactsByBillId(sales.filter((row) => activeStatus(row.status)).map((row) => row.id))
   const activePurchases = purchases.filter((row) => activeStatus(row.status) && billHasProductOrGroup(purchaseBillItemRows(row), productById, filter.productId, filter.group))
-  const activeSales = sales.filter((row) => activeStatus(row.status) && billHasProductOrGroup(row.items, productById, filter.productId, filter.group))
+  const activeSales = sales.filter((row) => activeStatus(row.status) && salesBillHasProductOrGroup(activeSalesLineFactsByBillId.get(row.id), productById, filter.productId, filter.group))
   const todayPurchases = activePurchases.filter((row) => row.date >= todayStart && row.date <= todayEnd)
   const todaySales = activeSales.filter((row) => row.date >= todayStart && row.date <= todayEnd)
   const todayExpenses = expenses.filter((row) => row.date >= todayStart && row.date <= todayEnd && activeStatus(row.status))
@@ -248,7 +268,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     }
   }
   for (const bill of todaySales) {
-    for (const item of itemRows(bill.items)) {
+    for (const item of salesLineRows(activeSalesLineFactsByBillId.get(bill.id))) {
       const product = productById.get(item.productId)
       const group = ensureGroup(product?.metal_group ?? 'อื่นๆ')
       const row = ensureProduct(group, item.productId || 'unknown')
@@ -273,7 +293,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     const current = topCustomers.get(key) ?? { amount: 0, bills: 0, gp: 0, id: key === '__unknown_customer__' ? '' : key, name: bill.customers?.name ?? '-', qty: 0 }
     current.amount += toNumber(bill.total_amount)
     current.gp += toNumber(bill.gross_profit)
-    current.qty += itemsQty(bill.items)
+    current.qty += salesBillLineFactTotals(activeSalesLineFactsByBillId.get(bill.id)).qty
     current.bills += 1
     topCustomers.set(key, current)
   }
@@ -286,7 +306,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
     current.qty += item.qty
     productIn.set(item.productId, current)
   }
-  for (const bill of activeSales) for (const item of itemRows(bill.items)) {
+  for (const bill of activeSales) for (const item of salesLineRows(activeSalesLineFactsByBillId.get(bill.id))) {
     const product = productById.get(item.productId)
     const current = productOut.get(item.productId) ?? { amount: 0, code: product?.code ?? '', group: product?.metal_group ?? 'อื่นๆ', id: product?.code ?? '', name: product?.name ?? '-', qty: 0 }
     current.amount += item.amount
@@ -464,7 +484,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
       sections: {
         cash: { ...cash, netCash: cash.cash + cash.bank + cash.fcd + finance.summary.ar - finance.summary.ap - cash.odUsed },
         purchase: { amount: purchaseAmount, count: activePurchases.length, qty: activePurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0), today: todayPurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
-        sales: { amount: salesAmount, count: activeSales.length, gp: grossProfit, qty: activeSales.reduce((sum, row) => sum + itemsQty(row.items), 0), today: todaySales.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
+        sales: { amount: salesAmount, count: activeSales.length, gp: grossProfit, qty: activeSales.reduce((sum, row) => sum + salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0), today: todaySales.reduce((sum, row) => sum + toNumber(row.total_amount), 0) },
         stock: { qty: stockQty, value: stockValue },
       },
       stockByBranch: Array.from(stockByBranchMap.values()).filter((row) => row.qty !== 0 || row.value !== 0).sort((a, b) => b.value - a.value),
@@ -492,7 +512,7 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
           purchaseQty: activePurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0),
           salesAmount,
           salesCount: activeSales.length,
-          salesQty: activeSales.reduce((sum, row) => sum + itemsQty(row.items), 0),
+          salesQty: activeSales.reduce((sum, row) => sum + salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0),
         },
         topCustomers: Array.from(topCustomers.values()).map((row) => ({ ...row, gpPct: row.amount > 0 ? row.gp / row.amount * 100 : 0 })).sort((a, b) => b.amount - a.amount).slice(0, 10),
         topProductsIn: Array.from(productIn.values()).sort((a, b) => b.amount - a.amount).slice(0, 5),
@@ -517,13 +537,13 @@ export async function buildMainDashboards(filter: MainDashboardFilter) {
         sellQty: row.sellQty,
       })).sort((a, b) => (b.buyAmt + b.sellAmt) - (a.buyAmt + a.sellAmt)),
       purchaseBills: todayPurchases.slice(0, 12).map((row) => ({ amount: toNumber(row.total_amount), docNo: row.doc_no, name: row.suppliers?.name ?? '-', qty: purchaseBillItemQty(row) })),
-      salesBills: todaySales.slice(0, 12).map((row) => ({ amount: toNumber(row.total_amount), docNo: row.doc_no, name: row.customers?.name ?? '-', qty: itemsQty(row.items) })),
+      salesBills: todaySales.slice(0, 12).map((row) => ({ amount: toNumber(row.total_amount), docNo: row.doc_no, name: row.customers?.name ?? '-', qty: salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty })),
       summary: {
         expenseAmount: todayExpenses.reduce((sum, row) => sum + toNumber(row.amount), 0),
         purchaseAmount: todayPurchases.reduce((sum, row) => sum + toNumber(row.total_amount), 0),
         purchaseQty: todayPurchases.reduce((sum, row) => sum + purchaseBillItemQty(row), 0),
         salesAmount: todaySales.reduce((sum, row) => sum + toNumber(row.total_amount), 0),
-        salesQty: todaySales.reduce((sum, row) => sum + itemsQty(row.items), 0),
+        salesQty: todaySales.reduce((sum, row) => sum + salesBillLineFactTotals(activeSalesLineFactsByBillId.get(row.id)).qty, 0),
       },
     },
     ownerDaily: {

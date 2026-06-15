@@ -61,6 +61,7 @@ function itemRows(bill: SalesBillDetail) {
       <td>
         <div class="item-name">${escapeHtml(item.productName)}</div>
         <div class="muted">${escapeHtml([item.productCode || item.productId || null, item.sourceLabel || item.sourceType].filter(Boolean).join(' · '))}</div>
+        ${item.matchedCogs > 0 ? `<div class="muted">Matched COGS ${money(item.matchedCogs)}</div>` : ''}
         ${item.note ? `<div class="muted">${escapeHtml(item.note)}</div>` : ''}
       </td>
       <td class="num">${money(item.grossWeight)}</td>
@@ -147,6 +148,7 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
       .total-row:last-child { border-bottom: 0; }
       .total-row.final { background: #0f766e; color: white; font-size: 13px; font-weight: 900; }
       .total-row.advance { color: #b45309; }
+      .read-warning { margin-top: 10px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; color: #92400e; padding: 7px 9px; font-weight: 700; break-inside: avoid; page-break-inside: avoid; }
       .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 20px; break-inside: avoid; }
       .sig { text-align: center; color: #475569; }
       .sig-line { border-top: 1px solid #94a3b8; padding-top: 5px; margin-top: 28px; font-weight: 800; color: #1e293b; }
@@ -234,6 +236,8 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
           </div>
         </div>
       </section>
+
+      ${bill.readModelWarning ? `<div class="read-warning">${escapeHtml(bill.readModelWarning)}</div>` : ''}
 
       <table class="items">
         <thead>

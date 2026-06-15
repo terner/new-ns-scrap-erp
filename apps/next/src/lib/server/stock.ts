@@ -471,14 +471,14 @@ export async function stockBalanceDetail(input: {
   }
 }
 
-export async function averageCostForStock(input: { branchId?: bigint | null; lotNo?: string | null; productId: string | bigint; status?: string | null; warehouseId?: bigint | null }) {
+export async function averageCostForStock(input: { asOf?: string | null; branchId?: bigint | null; lotNo?: string | null; productId: string | bigint; status?: string | null; warehouseId?: bigint | null }) {
   const snapshot = await stockBalanceSnapshot(input)
   const totalQty = snapshot.rows.reduce((sum, row) => sum + row.qty, 0)
   const totalValue = snapshot.rows.reduce((sum, row) => sum + row.value, 0)
   return totalQty > 0 ? totalValue / totalQty : 0
 }
 
-export async function quantityForStock(input: { branchId?: bigint | null; lotNo?: string | null; productId: string | bigint; quantityType?: 'onHand' | 'ready'; status?: string | null; warehouseId?: bigint | null }) {
+export async function quantityForStock(input: { asOf?: string | null; branchId?: bigint | null; lotNo?: string | null; productId: string | bigint; quantityType?: 'onHand' | 'ready'; status?: string | null; warehouseId?: bigint | null }) {
   const snapshot = await stockBalanceSnapshot(input)
   const field = input.quantityType === 'ready' ? 'readyQty' : 'qty'
   return snapshot.rows.reduce((sum, row) => sum + row[field], 0)

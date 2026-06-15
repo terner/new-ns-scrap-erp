@@ -275,8 +275,12 @@ export function StockBalancePageClient() {
       </div>
 
       {/* Status Cards */}
-      <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-        {byStatus.map((item) => <StatusCard key={item.status} item={item} />)}
+      <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+        {byStatus.map((item, index) => (
+          <div key={item.status} className={index === 2 ? 'col-span-2 md:col-span-1' : ''}>
+            <StatusCard item={item} />
+          </div>
+        ))}
       </div>
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
@@ -315,7 +319,7 @@ export function StockBalancePageClient() {
           ) : null}
           
           <button className="h-9 rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={() => void loadData()}>
-            Refresh
+            โหลดใหม่
           </button>
           
           <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 h-9 flex items-center" type="button" onClick={exportXlsx}>
@@ -368,7 +372,7 @@ export function StockBalancePageClient() {
             onChange={(event) => setQ(event.target.value)} 
           />
           <button className="h-9 rounded-md bg-slate-100 px-2.5 text-xs text-slate-700" type="button" onClick={() => void loadData()}>
-            Refresh
+            โหลดใหม่
           </button>
           <button
             type="button"
@@ -629,7 +633,7 @@ function Info({
         : 'text-slate-900 font-medium'
   const fontClass = mono ? 'font-mono' : ''
   return (
-    <div className="flex border-b py-1.5">
+    <div className="flex border-b border-slate-100 py-1.5">
       <span className="w-36 text-slate-500 shrink-0">{label}</span>
       <span className={`${valueColor} ${fontClass} break-all`}>{value}</span>
     </div>
@@ -726,7 +730,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
         <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">พร้อมส่ง</div><div className="text-2xl font-bold text-emerald-600">{formatMoney(info.ready)} <span className="text-sm font-normal">กก.</span></div></div>
       </div>
       <div className="mt-3 rounded-md bg-white shadow">
-        <div className="flex items-center justify-between border-b bg-slate-50 p-3">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-3">
           <h4 className="font-bold text-slate-700">📜 รายการสต๊อกของสินค้านี้ ({rows.length} รายการ)</h4>
           <span className="text-xs text-slate-500">กด Detail เพื่อดู row ปัจจุบัน</span>
         </div>
@@ -737,7 +741,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.key} className="border-t hover:bg-blue-50/30">
+                <tr key={row.key} className="border-t border-slate-100 hover:bg-blue-50/30">
                   <td className="p-2">{row.lastDate}</td>
                   <td className="p-2"><StockStatusCell row={row} /></td>
                   <td className="p-2 text-slate-500">{row.branchName} / {row.warehouseName}</td>
@@ -770,8 +774,8 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
       <div className="rounded-md bg-white p-4 shadow">
         <h3 className="mb-2 font-bold text-slate-800">🥧 สัดส่วน Stock RM/WIP/FG (มูลค่า)</h3>
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-[180px] w-[180px] items-center justify-center rounded-md-full" style={{ background: totalValue > 0 ? `conic-gradient(#3b82f6 0deg ${rmDeg}deg, #f59e0b ${rmDeg}deg ${rmDeg + wipDeg}deg, #10b981 ${rmDeg + wipDeg}deg 360deg)` : '#e5e7eb' }}>
-            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-md-full bg-white text-center">
+          <div className="flex h-[180px] w-[180px] items-center justify-center rounded-full" style={{ background: totalValue > 0 ? `conic-gradient(#3b82f6 0deg ${rmDeg}deg, #f59e0b ${rmDeg}deg ${rmDeg + wipDeg}deg, #10b981 ${rmDeg + wipDeg}deg 360deg)` : '#e5e7eb' }}>
+            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white text-center">
               <span className="text-xs text-slate-500">รวม</span>
               <span className="text-xs font-bold text-slate-900">{formatMoney(totalValue)}</span>
             </div>
@@ -780,7 +784,7 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
             <LegendRow color="bg-blue-500" label="📦 RM" value={rm} />
             <LegendRow color="bg-amber-500" label="⚙️ WIP" value={wip} />
             <LegendRow color="bg-emerald-500" label="✅ FG" value={fg} />
-            <div className="flex justify-between border-t pt-2 font-bold"><span>รวม</span><span>{formatMoney(totalValue)}</span></div>
+            <div className="flex justify-between border-t border-slate-200 pt-2 font-bold"><span>รวม</span><span>{formatMoney(totalValue)}</span></div>
           </div>
         </div>
       </div>
@@ -794,7 +798,7 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
             return (
               <div key={row.group}>
                 <div className="mb-0.5 flex justify-between text-sm"><span className="font-medium">{row.group} <span className="text-xs text-slate-400">({formatMoney(row.rmQty + row.wipQty + row.fgQty)} กก.)</span></span><span className="font-mono font-bold">{formatMoney(value)}</span></div>
-                <div className="h-2 w-full rounded-md-full bg-slate-100"><div className={`h-2 rounded-md-full bg-gradient-to-r ${colors[index % colors.length]}`} style={{ width: `${Math.max(2, value / maxGroup * 100)}%` }} /></div>
+                <div className="h-2 w-full rounded-full bg-slate-100"><div className={`h-2 rounded-full bg-gradient-to-r ${colors[index % colors.length]}`} style={{ width: `${Math.max(2, value / maxGroup * 100)}%` }} /></div>
               </div>
             )
           })}
@@ -811,33 +815,110 @@ function LegendRow({ color, label, value }: { color: string; label: string; valu
 function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: { byStatus: StatusSummary[]; isLoading: boolean; matrixRows: MatrixRow[]; totalQty: number; totalValue: number }) {
   const valueFor = (status: string) => byStatus.find((item) => item.status === status) ?? { count: 0, qty: 0, status, value: 0 }
   return (
-    <div className="overflow-x-auto rounded-md bg-white shadow">
-      <table className="w-full min-w-[980px] text-sm">
-        <thead className="bg-slate-100"><tr><th className="p-2 text-left">หมวดสินค้า</th><th className="bg-blue-50 p-2 text-right">📦 RM (กก.)</th><th className="bg-blue-50 p-2 text-right">RM มูลค่า</th><th className="bg-amber-50 p-2 text-right">⚙️ WIP (กก.)</th><th className="bg-amber-50 p-2 text-right">WIP มูลค่า</th><th className="bg-emerald-50 p-2 text-right">✅ FG (กก.)</th><th className="bg-emerald-50 p-2 text-right">FG มูลค่า</th><th className="p-2 text-right">รวม กก.</th><th className="p-2 text-right">รวมมูลค่า</th></tr></thead>
-        <tbody>
-          {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
-          {!isLoading && matrixRows.map((row) => (
-            <tr key={row.group} className="border-t hover:bg-slate-50">
-              <td className="p-2 font-bold">{row.group}</td>
-              <td className="p-2 text-right text-blue-700">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
-              <td className="p-2 text-right text-blue-700">{row.rmVal ? formatMoney(row.rmVal) : '-'}</td>
-              <td className="p-2 text-right text-amber-700">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
-              <td className="p-2 text-right text-amber-700">{row.wipVal ? formatMoney(row.wipVal) : '-'}</td>
-              <td className="p-2 text-right text-emerald-700">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
-              <td className="p-2 text-right text-emerald-700">{row.fgVal ? formatMoney(row.fgVal) : '-'}</td>
-              <td className="p-2 text-right font-bold">{formatMoney(row.rmQty + row.wipQty + row.fgQty)}</td>
-              <td className="p-2 text-right font-bold text-emerald-700">{formatMoney(row.rmVal + row.wipVal + row.fgVal)}</td>
-            </tr>
-          ))}
-          {!isLoading && matrixRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่มีสต๊อก</td></tr> : null}
-        </tbody>
-        {matrixRows.length ? (
-          <tfoot className="bg-slate-100 font-bold">
-            <tr><td className="p-2">รวมทั้งหมด ({matrixRows.length} หมวด)</td><td className="p-2 text-right text-blue-700">{formatMoney(valueFor('RM').qty)}</td><td className="p-2 text-right text-blue-700">{formatMoney(valueFor('RM').value)}</td><td className="p-2 text-right text-amber-700">{formatMoney(valueFor('WIP').qty)}</td><td className="p-2 text-right text-amber-700">{formatMoney(valueFor('WIP').value)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(valueFor('FG').qty)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(valueFor('FG').value)}</td><td className="p-2 text-right">{formatMoney(totalQty)}</td><td className="p-2 text-right text-base text-emerald-700">{formatMoney(totalValue)}</td></tr>
-          </tfoot>
+    <>
+      {/* Desktop View (Table) */}
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+        <table className="w-full min-w-[980px] text-sm">
+          <thead className="bg-slate-100"><tr><th className="p-2 text-left">หมวดสินค้า</th><th className="bg-blue-50 p-2 text-right">📦 RM (กก.)</th><th className="bg-blue-50 p-2 text-right">RM มูลค่า</th><th className="bg-amber-50 p-2 text-right">⚙️ WIP (กก.)</th><th className="bg-amber-50 p-2 text-right">WIP มูลค่า</th><th className="bg-emerald-50 p-2 text-right">✅ FG (กก.)</th><th className="bg-emerald-50 p-2 text-right">FG มูลค่า</th><th className="p-2 text-right">รวม กก.</th><th className="p-2 text-right">รวมมูลค่า</th></tr></thead>
+          <tbody>
+            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && matrixRows.map((row) => (
+              <tr key={row.group} className="border-t border-slate-100 hover:bg-slate-50">
+                <td className="p-2 font-bold">{row.group}</td>
+                <td className="p-2 text-right text-blue-700">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
+                <td className="p-2 text-right text-blue-700">{row.rmVal ? formatMoney(row.rmVal) : '-'}</td>
+                <td className="p-2 text-right text-amber-700">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
+                <td className="p-2 text-right text-amber-700">{row.wipVal ? formatMoney(row.wipVal) : '-'}</td>
+                <td className="p-2 text-right text-emerald-700">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
+                <td className="p-2 text-right text-emerald-700">{row.fgVal ? formatMoney(row.fgVal) : '-'}</td>
+                <td className="p-2 text-right font-bold">{formatMoney(row.rmQty + row.wipQty + row.fgQty)}</td>
+                <td className="p-2 text-right font-bold text-emerald-700">{formatMoney(row.rmVal + row.wipVal + row.fgVal)}</td>
+              </tr>
+            ))}
+            {!isLoading && matrixRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่มีสต๊อก</td></tr> : null}
+          </tbody>
+          {matrixRows.length ? (
+            <tfoot className="bg-slate-100 font-bold">
+              <tr><td className="p-2">รวมทั้งหมด ({matrixRows.length} หมวด)</td><td className="p-2 text-right text-blue-700">{formatMoney(valueFor('RM').qty)}</td><td className="p-2 text-right text-blue-700">{formatMoney(valueFor('RM').value)}</td><td className="p-2 text-right text-amber-700">{formatMoney(valueFor('WIP').qty)}</td><td className="p-2 text-right text-amber-700">{formatMoney(valueFor('WIP').value)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(valueFor('FG').qty)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(valueFor('FG').value)}</td><td className="p-2 text-right">{formatMoney(totalQty)}</td><td className="p-2 text-right text-base text-emerald-700">{formatMoney(totalValue)}</td></tr>
+            </tfoot>
+          ) : null}
+        </table>
+      </div>
+
+      {/* Mobile View (Card List) */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow">กำลังโหลดข้อมูล</div>
         ) : null}
-      </table>
-    </div>
+        {!isLoading && matrixRows.map((row) => {
+          const totalRowQty = row.rmQty + row.wipQty + row.fgQty
+          const totalRowVal = row.rmVal + row.wipVal + row.fgVal
+          return (
+            <div key={row.group} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+              <div className="border-b border-slate-100 pb-2">
+                <span className="font-bold text-slate-800 text-sm">{row.group}</span>
+              </div>
+              <div className="space-y-2 text-xs text-slate-600">
+                <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded">
+                  <span className="font-medium text-blue-800">📦 RM (วัตถุดิบ)</span>
+                  <span className="font-semibold text-right text-blue-700 tabular-nums">
+                    {row.rmQty ? `${formatMoney(row.rmQty)} กก.` : '-'} {row.rmVal ? `(${formatMoney(row.rmVal)} บ.)` : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center bg-amber-50/50 p-2 rounded">
+                  <span className="font-medium text-amber-800">⚙️ WIP (ระหว่างผลิต)</span>
+                  <span className="font-semibold text-right text-amber-700 tabular-nums">
+                    {row.wipQty ? `${formatMoney(row.wipQty)} กก.` : '-'} {row.wipVal ? `(${formatMoney(row.wipVal)} บ.)` : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center bg-emerald-50/50 p-2 rounded">
+                  <span className="font-medium text-emerald-800">✅ FG (สินค้าสำเร็จรูป)</span>
+                  <span className="font-semibold text-right text-emerald-700 tabular-nums">
+                    {row.fgQty ? `${formatMoney(row.fgQty)} กก.` : '-'} {row.fgVal ? `(${formatMoney(row.fgVal)} บ.)` : ''}
+                  </span>
+                </div>
+              </div>
+              <div className="border-t border-slate-100 pt-2 flex justify-between items-center text-xs font-bold text-slate-800">
+                <span>รวมทั้งสิ้น</span>
+                <span className="tabular-nums">
+                  {formatMoney(totalRowQty)} กก. | <span className="text-emerald-700">{formatMoney(totalRowVal)} บาท</span>
+                </span>
+              </div>
+            </div>
+          )
+        })}
+        {!isLoading && matrixRows.length === 0 ? (
+          <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow">ไม่มีสต๊อก</div>
+        ) : null}
+
+        {/* Mobile Footer Summary */}
+        {!isLoading && matrixRows.length ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-900 text-white p-4 shadow space-y-2">
+            <div className="border-b border-slate-800 pb-2 text-xs font-bold text-slate-400">
+              รวมทั้งหมด ({matrixRows.length} หมวด)
+            </div>
+            <div className="text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-400">RM:</span>
+                <span className="font-semibold text-blue-300 tabular-nums">{formatMoney(valueFor('RM').qty)} กก. ({formatMoney(valueFor('RM').value)} บ.)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">WIP:</span>
+                <span className="font-semibold text-amber-300 tabular-nums">{formatMoney(valueFor('WIP').qty)} กก. ({formatMoney(valueFor('WIP').value)} บ.)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">FG:</span>
+                <span className="font-semibold text-emerald-300 tabular-nums">{formatMoney(valueFor('FG').qty)} กก. ({formatMoney(valueFor('FG').value)} บ.)</span>
+              </div>
+            </div>
+            <div className="border-t border-slate-800 pt-2 flex justify-between text-sm font-bold">
+              <span>รวมสะสมสุทธิ</span>
+              <span className="tabular-nums text-emerald-400">{formatMoney(totalQty)} กก. | {formatMoney(totalValue)} บาท</span>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </>
   )
 }
 
@@ -849,7 +930,7 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
         <tbody>
           {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
           {!isLoading && rows.map((row) => (
-            <tr key={row.key} className={`border-t ${row.qty < 0 ? 'bg-red-50/60' : 'hover:bg-slate-50'}`}>
+            <tr key={row.key} className={`border-t border-slate-100 ${row.qty < 0 ? 'bg-red-50/60' : 'hover:bg-slate-50'}`}>
               <td className="p-2"><span className="font-mono text-xs text-slate-500">{row.productCode}</span> {row.productName}<div className="text-xs text-slate-400">Lot: {row.lotNo || '-'}</div></td>
               <td className="p-2">{row.productMetalGroup || 'อื่นๆ'}</td>
               <td className="p-2 text-center"><StockStatusCell row={row} /></td>

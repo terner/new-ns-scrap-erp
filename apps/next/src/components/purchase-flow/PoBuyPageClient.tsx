@@ -853,7 +853,7 @@ export function PoBuyPageClient() {
               variant="outline"
               onClick={columnResize.resetColumnWidths}
             >
-              Set col to default
+              คืนค่าเดิมตาราง
             </UiButton>
           ) : null}
           <UiSelect

@@ -9,6 +9,7 @@ import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-ref
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import { purchaseBillItemRows } from '@/lib/server/purchase-bill-items'
+import { salesBillLineFactsForBills, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
 
@@ -108,12 +109,6 @@ function itemAmount(item: JsonItem) {
   return itemQty(item) * jsonNumber(item.price)
 }
 
-function itemCost(item: JsonItem) {
-  const cost = jsonNumber(item.totalCost ?? item.total_cost ?? item.cogs)
-  if (cost) return cost
-  return itemQty(item) * jsonNumber(item.unitCost)
-}
-
 function productLookupKeys(product: ProductRef) {
   return [String(product.id), product.code, product.name].map((value) => value.trim().toLowerCase()).filter(Boolean)
 }
@@ -133,6 +128,14 @@ function itemLookupKeys(item: JsonItem) {
 
 function itemFallbackName(item: JsonItem) {
   return item.productName ?? item.displayName ?? item.name ?? item.productCode ?? item.code ?? 'ไม่ระบุสินค้า'
+}
+
+function lineLookupKeys(line: SalesBillLineFactRow) {
+  return [
+    line.productId,
+    line.productCode,
+    line.productName,
+  ].map((value) => String(value ?? '').trim().toLowerCase()).filter(Boolean)
 }
 
 function buildWorkbook(rows: Array<Record<string, string | number>>) {
@@ -272,6 +275,7 @@ export async function GET(request: Request) {
         },
       }),
     ])
+    const salesLines = await salesBillLineFactsForBills(salesBills.map((bill) => bill.id))
 
     const productsByKey = new Map<string, ProductRef>()
     products.forEach((product) => productLookupKeys(product).forEach((key) => productsByKey.set(key, product)))
@@ -282,6 +286,13 @@ export async function GET(request: Request) {
       if ((productId || metalGroup) && !product) return null
       const key = product ? String(product.id) : `name:${itemFallbackName(item)}`
       if (!rowsByKey.has(key)) rowsByKey.set(key, createAgg(product, itemFallbackName(item), key))
+      return rowsByKey.get(key) ?? null
+    }
+    const ensureRowForLine = (line: SalesBillLineFactRow) => {
+      const product = lineLookupKeys(line).map((key) => productsByKey.get(key)).find(Boolean)
+      if ((productId || metalGroup) && !product) return null
+      const key = product ? String(product.id) : `line:${line.productName}`
+      if (!rowsByKey.has(key)) rowsByKey.set(key, createAgg(product, line.productName, key))
       return rowsByKey.get(key) ?? null
     }
 
@@ -297,25 +308,16 @@ export async function GET(request: Request) {
           })
       })
 
-    salesBills
-      .filter((bill) => inYearMonth(bill.date, year, month))
-      .forEach((bill) => {
-        if (!Array.isArray(bill.items)) return
-        const salesItems = bill.items as unknown[]
-        salesItems
-          .filter(isJsonItem)
-          .forEach((item) => {
-            const row = ensureRow(item)
-            if (!row) return
-            const revenue = itemAmount(item)
-            const cogs = itemCost(item)
-            const gp = jsonNumber(item.profit ?? item.grossProfit) || revenue - cogs
-            row.sellQty += itemQty(item)
-            row.revenue += revenue
-            row.cogs += cogs
-            row.gp += gp
-            row.sellBills.add(bill.doc_no)
-          })
+    salesLines
+      .filter((line) => inYearMonth(line.date, year, month))
+      .forEach((line) => {
+        const row = ensureRowForLine(line)
+        if (!row) return
+        row.sellQty += line.qty
+        row.revenue += line.lineAmount
+        row.cogs += line.cogs
+        row.gp += line.gp
+        row.sellBills.add(line.docNo)
       })
 
     productionOrders
@@ -407,19 +409,13 @@ export async function GET(request: Request) {
         })
         return sum
       }, { amount: 0, qty: 0 })
-      const sell = salesBills.filter((bill) => inYearMonth(bill.date, year, monthKey)).reduce((sum, bill) => {
-        if (!Array.isArray(bill.items)) return sum
-        const salesItems = bill.items as unknown[]
-        salesItems.filter(isJsonItem).forEach((item) => {
-          const row = ensureRow(item)
-          if (row && rows.some((product) => product.matchKey === row.matchKey)) {
-            const revenue = itemAmount(item)
-            const cogs = itemCost(item)
-            sum.gp += jsonNumber(item.profit ?? item.grossProfit) || revenue - cogs
-            sum.qty += itemQty(item)
-            sum.revenue += revenue
-          }
-        })
+      const sell = salesLines.filter((line) => inYearMonth(line.date, year, monthKey)).reduce((sum, line) => {
+        const row = ensureRowForLine(line)
+        if (row && rows.some((product) => product.matchKey === row.matchKey)) {
+          sum.gp += line.gp
+          sum.qty += line.qty
+          sum.revenue += line.lineAmount
+        }
         return sum
       }, { gp: 0, qty: 0, revenue: 0 })
       const production = productionOrders.filter((order) => inYearMonth(order.date, year, monthKey)).reduce((sum, order) => {
@@ -455,6 +451,7 @@ export async function GET(request: Request) {
     const detail = detailProduct ? (() => {
       const detailKeys = new Set(productLookupKeys(detailProduct))
       const matchesDetailProduct = (item: JsonItem) => itemLookupKeys(item).some((key) => detailKeys.has(key))
+      const matchesDetailLine = (line: SalesBillLineFactRow) => lineLookupKeys(line).some((key) => detailKeys.has(key))
       const purchaseLines = purchaseBills
         .filter((bill) => inYearMonth(bill.date, year, month))
         .flatMap((bill) => purchaseBillItemRows(bill)
@@ -474,32 +471,20 @@ export async function GET(request: Request) {
             }
           }))
         .slice(0, 80)
-      const salesLines = salesBills
-        .filter((bill) => inYearMonth(bill.date, year, month))
-        .flatMap((bill) => {
-          if (!Array.isArray(bill.items)) return []
-          return bill.items
-            .filter(isJsonItem)
-            .filter(matchesDetailProduct)
-            .map((item) => {
-              const qty = itemQty(item)
-              const revenue = itemAmount(item)
-              const cogs = itemCost(item)
-              const gp = jsonNumber(item.profit ?? item.grossProfit) || revenue - cogs
-              return {
-                avgSell: qty > 0 ? revenue / qty : 0,
-                cogs,
-                date: toDateOnly(bill.date),
-                docNo: bill.doc_no,
-                gp,
-                href: `/sales/bills/${encodeURIComponent(bill.doc_no)}`,
-                party: bill.customers?.name ?? '-',
-                qty,
-                revenue,
-                status: bill.status ?? '-',
-              }
-            })
-        })
+      const detailSalesLines = salesLines
+        .filter((line) => inYearMonth(line.date, year, month) && matchesDetailLine(line))
+        .map((line) => ({
+          avgSell: line.qty > 0 ? line.lineAmount / line.qty : 0,
+          cogs: line.cogs,
+          date: line.dateText,
+          docNo: line.docNo,
+          gp: line.gp,
+          href: `/sales/bills/${encodeURIComponent(line.docNo)}`,
+          party: line.customerName,
+          qty: line.qty,
+          revenue: line.lineAmount,
+          status: line.status,
+        }))
         .slice(0, 80)
       const detailProductionOrders = productionOrders
         .filter((order) => inYearMonth(order.date, year, month))
@@ -534,15 +519,10 @@ export async function GET(request: Request) {
           })
           return sum
         }, { amount: 0, qty: 0 })
-        const sell = salesBills.filter((bill) => inYearMonth(bill.date, year, monthKey)).reduce((sum, bill) => {
-          if (!Array.isArray(bill.items)) return sum
-          bill.items.filter(isJsonItem).filter(matchesDetailProduct).forEach((item) => {
-            const revenue = itemAmount(item)
-            const cogs = itemCost(item)
-            sum.gp += jsonNumber(item.profit ?? item.grossProfit) || revenue - cogs
-            sum.qty += itemQty(item)
-            sum.revenue += revenue
-          })
+        const sell = salesLines.filter((line) => inYearMonth(line.date, year, monthKey) && matchesDetailLine(line)).reduce((sum, line) => {
+          sum.gp += line.gp
+          sum.qty += line.qty
+          sum.revenue += line.lineAmount
           return sum
         }, { gp: 0, qty: 0, revenue: 0 })
         const production = productionOrders.filter((order) => inYearMonth(order.date, year, monthKey)).reduce((sum, order) => {
@@ -593,7 +573,7 @@ export async function GET(request: Request) {
           yieldPct: productionTotals.inputQty > 0 ? (productionTotals.outputQty / productionTotals.inputQty) * 100 : 0,
         },
         purchaseLines,
-        salesLines,
+        salesLines: detailSalesLines,
       }
     })() : null
 

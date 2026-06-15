@@ -1501,7 +1501,7 @@ export function MoneyMovementPageClient({
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <div>พบทั้งหมด <span className="font-semibold text-slate-900">{supplierBillTotalRows}</span> รายการ</div>
             <div className="flex flex-wrap items-center gap-2">
-              {paymentQueueColumnResize.hasCustomWidths ? <UiButton className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={paymentQueueColumnResize.resetColumnWidths}>Set col to default</UiButton> : null}
+              {paymentQueueColumnResize.hasCustomWidths ? <UiButton className="h-9 font-normal" size="sm" type="button" variant="outline" onClick={paymentQueueColumnResize.resetColumnWidths}>คืนค่าเดิมตาราง</UiButton> : null}
               <UiSelect
                 aria-label="จำนวนรายการต่อหน้า"
                 className="h-9 w-auto min-w-[96px] px-2"
@@ -2077,7 +2077,7 @@ export function MoneyMovementPageClient({
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
               <div>พบทั้งหมด <span className="font-semibold text-slate-900">{historyTotalRows}</span> รายการ</div>
               <div className="flex flex-wrap items-center gap-2">
-                {historyColumnResize.hasCustomWidths ? <UiButton className="font-normal" size="sm" type="button" variant="outline" onClick={historyColumnResize.resetColumnWidths}>Set col to default</UiButton> : null}
+                {historyColumnResize.hasCustomWidths ? <UiButton className="font-normal" size="sm" type="button" variant="outline" onClick={historyColumnResize.resetColumnWidths}>คืนค่าเดิมตาราง</UiButton> : null}
                 <UiSelect
                   aria-label="จำนวนรายการต่อหน้าประวัติ"
                   className="h-9 w-auto min-w-[96px] px-2"

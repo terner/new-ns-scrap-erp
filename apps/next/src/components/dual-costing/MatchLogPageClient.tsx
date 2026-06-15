@@ -156,7 +156,7 @@ export function MatchLogPageClient() {
           </Select>
           {hasActiveFilters ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
           <Button asChild size="sm" variant="export">
-            <a href={exportHref}>Export XLSX</a>
+            <a href={exportHref}>ส่งออก XLSX</a>
           </Button>
         </div>
       </DualCostingFilterCard>
@@ -201,7 +201,7 @@ export function MatchLogPageClient() {
               <TableCell className="text-center text-xs">{row.allocationMode}</TableCell>
               <TableCell className="text-center"><span className={`rounded-md px-2 py-0.5 text-[10px] ${row.status === 'reversed' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{statusLabel(row.status)}</span></TableCell>
               <TableCell className="text-right">
-                {row.status !== 'reversed' ? <button className="text-xs text-red-600 opacity-60" disabled title="Reverse ยังเป็น read-only shell" type="button">Reverse</button> : null}
+                {row.status !== 'reversed' ? <button className="text-xs text-red-600 opacity-60" disabled title="Reverse ยังเป็น read-only shell" type="button">ย้อนกลับ</button> : null}
               </TableCell>
             </TableRow>
           ))}

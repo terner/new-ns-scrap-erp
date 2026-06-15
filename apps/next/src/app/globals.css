@@ -155,6 +155,12 @@ textarea {
   border-color: var(--color-slate-300);
 }
 
+/* Table baseline: cell borders should default to theme line color, not text color (black). */
+th,
+td {
+  border-color: var(--color-scrap-line);
+}
+
 input.border:not([class*="bg-"]),
 select.border:not([class*="bg-"]),
 textarea.border:not([class*="bg-"]) {

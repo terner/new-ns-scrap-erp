@@ -177,7 +177,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden md:inline-flex" onClick={resetColumnWidths}>Set col to default</Button> : null}
+          {hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden md:inline-flex" onClick={resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <Select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto px-2 py-1"

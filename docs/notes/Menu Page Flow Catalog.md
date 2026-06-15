@@ -112,14 +112,14 @@ Source:
 | `/stock/ledger` | Stock Ledger | [[Stock Ledger Page Flow]], [[Stock Ledger and Stock Balance]] | accepted code baseline | target ledger shows physical stock movements only; hold is not ledger | finish source links and no-hold-row rule |
 | `/stock/status-convert` | ปรับสถานะสินค้า (RM/FG) | [[Stock Status Convert Page Flow]] | accepted code baseline | target `SC`: RM<->FG status bucket conversion with paired stock ledger, ready-stock validation, source WAC carry-forward, and Production reporting source label | finish hold-aware validation and reversal policy |
 | `/stock/convert` | Grade Adjustment / ปรับเกรด | [[Stock Convert Page Flow]] | accepted code baseline | legacy `gradeAdjustment`: convert product/grade using source WAC | finish cost allocation and reversal |
-| `/stock/adjust` | นับสต๊อก / Stock Count Adjust | [[Stock Adjust Page Flow]] | accepted code baseline | legacy `stockAdjust`: count adjustment with reason and note-only/P&L policy | finalize approval/reconciliation boundary |
+| `/stock/adjust` | นับสต๊อก / Stock Count Adjust | [[Stock Adjust Page Flow]] | accepted code baseline | target `stockAdjust`: cycle count/stock correction with fixed reasons, 7-day correction, unit price/kg, signed value, and WAC/margin impact policy | implement correction/value policy and approval boundary |
 
 ## Trading & PO Reports
 
 | Route | Page | Detailed doc | Current Next | Flow baseline | Gap |
 |---|---|---|---|---|---|
-| `/trading/dashboard` | Trading Dashboard | [[Trading Flow]], [[page-flows/trading-po-reports-trading-dashboard|Trading Dashboard Page Flow]] | accepted code baseline | legacy `tradingDashboard`: monitor Trading PB/SB/deals, ex-VAT GP, unmatched, AR/AP; Trading does not affect stock on hand/WAC | add source document links and aging buckets |
-| `/trading/matching` | Trading Matching | [[Trading Flow]], [[page-flows/trading-po-reports-trading-matching|Trading Matching Page Flow]] | accepted code baseline | legacy `tradingMatching`: match Trading PB to Trading SB, calculate GP before VAT, reverse by marking Cancelled | finish durable match write/reverse API and audited duplicate cleanup |
+| `/trading/dashboard` | Trading Dashboard | [[Trading Flow]], [[page-flows/trading-po-reports-trading-dashboard|Trading Dashboard Page Flow]] | accepted code baseline | target update: trader/operator monitor for Trading margin, allocation, pending buy/sell, exposure, stock/cost-source readiness; not an accounting AR/AP dashboard | replace legacy accounting/trend/donut emphasis with Trading by Product/Purchase/Sales tabs, explicit filters, source links, aging buckets, and allocation-backed Matched COGS |
+| `/trading/matching` | Trading Matching | [[Trading Flow]], [[page-flows/trading-po-reports-trading-matching|Trading Matching Page Flow]] | accepted code baseline | updated requirement: Sales Bill-led allocation read surface with Cost, Sales Amount, Expected GP, GP%, and buy-side remaining cost | add source bill drilldown and normalized allocation ledger/source model |
 | `/po-reports/outstanding` | PO ซื้อ/ขาย คงเหลือ | [[Trading Flow]], [[page-flows/trading-po-reports-po-reports-outstanding|PO Outstanding Page Flow]], [[Purchase Flow]], [[PO Sell Flow]] | accepted code baseline | legacy `poOutstanding`: outstanding PO Buy and PO Sell commitments with remaining qty/value and delivery aging | add server-side filters/export, source usage links, and close-short ownership |
 
 ## Reports

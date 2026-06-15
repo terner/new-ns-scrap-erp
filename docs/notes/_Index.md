@@ -38,7 +38,7 @@ created: 2026-05-16
 - [[Stock Transfer Page Flow]] - contract หน้า `/stock/transfer`: paired `ST` out/in ledger movement, no-revenue transfer, source/destination validation, source available/cost preview, doc/date/weight filters, total value และ draft-only edit/cancel policy
 - [[Stock Status Convert Page Flow]] - contract หน้า `/stock/status-convert`: paired `SC` RM/FG status out/in movement, ready-stock validation, RM<->FG validation, source WAC carry-forward และ reverse/reconciliation gap
 - [[Stock Convert Page Flow]] - contract หน้า `/stock/convert`: grade/product conversion `GA`, source-target cost/yield policy และ deferred confirm/reverse flow
-- [[Stock Adjust Page Flow]] - contract หน้า `/stock/adjust`: stock count adjustment `ADJ`, note-only accounting policy, reason/audit และ reverse gap
+- [[Stock Adjust Page Flow]] - contract หน้า `/stock/adjust`: stock count/cycle count correction `ADJ`, fixed reason options, แก้ไขได้ภายใน 7 วัน, ราคาต่อกก., มูลค่ารวม signed และ WAC/margin impact gap
 - [[Dual Costing Flow]] - ภาพรวมหมวด Dual Costing ทั้ง 8 เมนู active: scope เฉพาะทองแดง/ทองเหลือง, Cost Pool -> Allocator -> Match Log/Ledger -> Report, และเส้นแบ่ง Deal Cost management view ออกจาก WAC/P&L
 - [[Cost Pool]] - กติกาแยกของ Cost Pool/Dual Costing: eligibility เฉพาะทองแดง/ทองเหลือง, source types, availability, short-close/reversal, API contract และ implementation gap
 - [[Purchase Flow Status Matrix]] - matrix สถานะเอกสารราย use case และราย step สำหรับ PO/WTI/ADV/PB/PMA/PMT ใช้เป็น acceptance criteria ข้าม Purchase Flow กับ Payment Flow
@@ -52,7 +52,7 @@ created: 2026-05-16
 - [[Customer Advance Page Flow]] - contract หน้า `/finance/customer-advance`: current read baseline จาก `CADV` bank statement, remaining/used rule และ target allocation tables
 - [[Main Dashboard Reports Flow]] - ภาพรวมหมวด Main / Dashboard & Reports และ `/reports`: current APIs, source tables/helpers, query params, response sections, management-read boundary, และ gap เรื่องสูตร/drilldown/export
 - [[Finance Accounting Flow]] - ภาพรวมหมวด Finance / Accounting ทั้ง 19 เมนู: current APIs, query params, source builders/tables, write-disabled design states, management-report boundary, และ gap เรื่อง GL/statutory close/tax/asset/loan write flows
-- [[Trading Flow]] - ภาพรวมหมวด `Trading / PO Reports`: Trading Dashboard, Trading Matching, PO Outstanding, ex-VAT GP, PB/SB Trading matching, PO commitment report, และ side-effect boundary ว่า Trading ไม่เขียน stock ledger/WAC
+- [[Trading Flow]] - ภาพรวมหมวด `Trading / PO Reports`: Trading Dashboard แบบ trader/operator monitor, Trading Matching, PO Outstanding, ex-VAT GP, Sales Bill-led Trading allocation, Matched COGS, buy-side remaining cost, PO commitment report, และ side-effect boundary ว่า Trading ไม่เขียน stock ledger/WAC
 - [[Tracking 360 Flow]] - ภาพรวมหมวด `Tracking 360`: Customer, Supplier, Product tracking จาก SB/RCP, PB/PMT และ stock ledger พร้อม read-only/export boundary และ gap เรื่อง drilldown/source timeline
 - [[Purchase Flow Test Matrix]] - execution checklist ของ Purchase Flow สำหรับ UAT/smoke/regression ตั้งแต่ PO, WTI, Purchase Bill, Approval, Payment ไปจนถึง stock/reversal
 - [[WTI Product Summary Design]] - design decision สำหรับการแยก `WTI` เป็น raw lot layer + per-product summary layer เพื่อให้ `บิลรับซื้อ` ใช้ยอดรวมต่อสินค้าได้โดยไม่เสีย trace ของ lot ชั่ง
@@ -64,7 +64,7 @@ created: 2026-05-16
 - [[Page Flow Proof Tracker]] - tracker ว่าไม่เหลือหน้า missing page-flow แล้ว; P0/P1/P2/P3 ทำ current-code proof baseline แล้ว เหลือ runtime hardening หลักใน P0 transaction/stock/payment gaps
 - [[PO Buy Page Flow]] - contract หน้า `/purchase/po-buy`: `POB` เป็น commitment เท่านั้น ไม่สร้าง stock/AP เอง, มี close-short, allocation boundary ไป PB, print, aging และ runtime checklist
 - [[Printable Documents]] - source of truth ของเอกสารที่ต้องพิมพ์/Save as PDF: POB, PB, SB, WTI/WTO, PMA, PMT, RV, RCP และสถานะที่พิมพ์ได้ใน payment history
-- [[Sales Flow]] - flow ขายแบบละเอียด: PO Sell, Pending Sale/PSALE, ใบส่งของ/WTO, บิลขาย Trading จากหลายบิลซื้อพร้อม stock line, Sales Bill, Receipt, เลขเอกสาร, สถานะ, stock/AR effect
+- [[Sales Flow]] - flow ขายแบบละเอียด: PO Sell, Pending Sale/PSALE, ใบส่งของ/WTO, บิลขาย Trading จากหลายบิลซื้อหรือรายการ Trading ที่ไม่ตัด stock, Sales Bill, Receipt, เลขเอกสาร, สถานะ, stock/AR effect
 - [[Pending Sale Page Flow]] - contract หน้า `/sales/stock-issue`: เบิกสินค้าออกจริงก่อนเปิดบิล, `PSALE` stock-out, convert เป็น `SB` โดยไม่ตัด stock ซ้ำ, และ gap ที่ Next ยังมีแค่ read/list baseline
 - [[Sales Bills Page Flow]] - contract หน้า `/sales/bills`: สร้าง SB จาก WTO, allocate เข้า PO Sell รายบรรทัด, แยกยอดเกินเป็น Spot Sale, VAT/totals แบบ PB, และหักมัดจำ Customer
 - [[Production Flow]] - canonical flow หมวด `การผลิต`: production order, input, output, process cost, WIP, yield/loss, ref type `PI/PO2`, และสถานะ implementation read baseline

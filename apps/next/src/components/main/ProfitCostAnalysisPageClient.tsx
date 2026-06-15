@@ -144,7 +144,7 @@ export function ProfitCostAnalysisPageClient() {
           </div>
         </div>
         <div className="mt-4 flex justify-end border-t pt-3">
-          <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white opacity-70" disabled type="button">Export CSV</button>
+          <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white opacity-70" disabled type="button">ส่งออก CSV</button>
         </div>
       </div>
 

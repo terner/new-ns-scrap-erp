@@ -549,7 +549,7 @@ export function DailyPettyAdvancePageClient() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{filteredRows.length}</span> รายการ</div>
-        {columnResize.hasCustomWidths ? <button className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>Set col to default</button> : null}
+        {columnResize.hasCustomWidths ? <button className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button> : null}
       </div>
 
       {detailRow ? <DetailModal row={detailRow} onClose={() => setDetailRow(null)} onReturn={openReturnForm} /> : null}

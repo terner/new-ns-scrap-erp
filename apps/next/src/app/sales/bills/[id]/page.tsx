@@ -103,6 +103,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
                       <td className="px-3 py-2 align-top">
                         <div className="text-slate-900">{item.sourceLabel || '-'}</div>
                         <div className="text-xs text-slate-500">{item.sourceType || '-'}</div>
+                        {item.matchedCogs > 0 ? <div className="mt-1 text-xs text-red-600">Matched COGS {formatMoney(item.matchedCogs)}</div> : null}
                       </td>
                       <td className="px-3 py-2 align-top">
                         <div>{item.deliveryTicketDocNo || '-'}</div>

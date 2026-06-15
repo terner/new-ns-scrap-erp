@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-13
 route: /stock/adjust
 ---
 
@@ -25,7 +25,7 @@ route: /stock/adjust
 
 ## Flow Baseline
 
-ADJ ปรับยอดจากการนับจริง พร้อม reason/audit
+ADJ ปรับยอดจากการนับจริง พร้อม reason/audit และ stock correction value ตาม requirement ล่าสุด
 
 ## Page Responsibilities
 
@@ -33,12 +33,15 @@ ADJ ปรับยอดจากการนับจริง พร้อม
 - สร้าง adjustment in/out เฉพาะส่วนต่าง
 - เก็บ reason, note, actor, date และ source evidence
 - ใช้ reconcile stock balance กับ physical count
+- ใช้สำหรับ stock หาย, stock เกิน, audit และ cycle count
+- แสดง/บันทึกราคาต่อกก. และมูลค่ารวม signed ที่อาจกระทบ WAC/margin
 
 ## Non-Responsibilities
 
 - ไม่ใช้แทน PB/SB/ST/GA สำหรับ transaction ปกติ
 - ไม่ลบ ledger เก่า
-- ไม่แก้ต้นทุนย้อนหลังโดยไม่มี accounting policy
+- ไม่แก้ต้นทุนย้อนหลังหรือ WAC/margin impact โดยไม่มี price/correction policy ที่ trace ได้
+- ไม่สร้าง master เหตุผลแยก; เหตุผลใช้ fixed options ในหน้า
 
 ## Lifecycle / Operation Flow
 
@@ -46,9 +49,10 @@ ADJ ปรับยอดจากการนับจริง พร้อม
 |---|---|---|
 | 1 | เปิดหน้า | GET adjust list/options |
 | 2 | เลือก stock bucket | product+branch+warehouse+lot/status |
-| 3 | กรอก counted qty | ระบบคำนวณ difference |
-| 4 | บันทึก | POST ADJ ledger diff |
-| 5 | reverse/approve | target ต้องมี approval/reversal boundary |
+| 3 | กรอก counted qty | ระบบคำนวณ difference, unit price/kg และมูลค่ารวม |
+| 4 | บันทึก | POST ADJ ledger diff + stock correction value |
+| 5 | แก้ไขภายใน 7 วัน | target correction/reversal trail พร้อม updated_by/updated_at |
+| 6 | reverse/approve หลัง 7 วัน | target ต้องมี approval/reversal boundary |
 
 ## API / Data Contract
 
@@ -67,14 +71,17 @@ ADJ ปรับยอดจากการนับจริง พร้อม
 ## Validation / Status Rules
 
 - counted qty ต้อง >= 0
-- reason required
+- reason required และต้องเลือกจาก fixed options: Missing, Lost/Damaged, Found Excess, Lost, Damaged, Wrong Branch, Other
 - ถ้ามี active hold ต้อง policy ว่านับ on_hand หรือ available
 - adjustment date/cutoff ต้องชัด
+- แก้ไขรายการนับ stock ได้ไม่เกิน 7 วัน; หลังจากนั้นต้องมี approval/reconciliation policy
+- `LOSS` value ต้องติดลบ, `GAIN` value ต้องเป็นบวก และ wording คือ `มูลค่ารวม (บาท)` ไม่ใช่ `มูลค่า Note`
 
 ## Side Effects
 
 - เขียน stock ledger ref_type ADJ เฉพาะส่วนต่าง
 - balance เปลี่ยนตาม diff
+- target correction value อาจกระทบ WAC และ margin ตาม price policy
 
 ## Current Code Baseline
 
@@ -86,13 +93,14 @@ ADJ ปรับยอดจากการนับจริง พร้อม
 ## Current Gap
 
 - approval/reconciliation boundary ทำแล้วในระดับ runtime policy: direct post ถูก block ถ้า counted qty ต่ำกว่า active hold และต้องปลด hold/ทำ approval policy แยกก่อน
-- accounting impact เป็น `NOTE_ONLY`: ADJ ledger value ต้องเป็นศูนย์ และ reconciliation ตรวจ policy นี้แล้ว
-- remaining: dedicated approval/reversal document ยังเป็น future policy แยกจาก quick count adjust
+- current runtime สำหรับ row ใหม่ใช้ `STOCK_CORRECTION`: ADJ ledger เขียน qty และ value ตามส่วนต่าง, `value_note` เป็น signed total value, และ server reject non-zero correction ถ้าไม่พบราคาต่อกก.
+- UI/API เพิ่ม server snapshot preview, fixed reason options, unit price/kg, signed `มูลค่ารวม`, `updated_by/updated_at`, และ edit/correction ภายใน 7 วัน
+- remaining: approval flow หลัง 7 วันและ CSV/export ยังเป็น future policy/delivery แยกจาก quick count adjust
 
 ## Implementation Checklist
 
 - [x] Verify current Next page/component against this page-flow
 - [x] Verify API route handlers match Current API and status rules above
-- [ ] Verify legacy behavior for any gap before implementing runtime change
+- [x] Verify legacy/updated requirement before runtime change
 - [ ] Add/adjust tests or browser QA checklist before changing runtime
-- [ ] Update this file and canonical reference if contract changes
+- [x] Update this file and canonical reference if contract changes

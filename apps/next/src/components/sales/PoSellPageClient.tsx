@@ -88,6 +88,7 @@ const blankPoSellItem = (): PoSellFormValues['items'][number] => ({
   price: 0,
   productId: '',
   qty: 0,
+  tradingCostSourceId: null,
 })
 
 const initialPoSellForm = (): PoSellFormValues => ({
@@ -324,7 +325,7 @@ export function PoSellPageClient() {
               type="button"
               onClick={columnResize.resetColumnWidths}
             >
-              Set col to default
+              คืนค่าเดิมตาราง
             </button>
           ) : null}
           <select
@@ -785,4 +786,3 @@ function DetailItem({ className = '', label, value }: { className?: string; labe
     </div>
   )
 }
-

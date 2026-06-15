@@ -101,6 +101,18 @@ export const stockConvertFormSchema = z.object({
 
 export type StockConvertFormValues = z.infer<typeof stockConvertFormSchema>
 
+export const stockAdjustReasonOptions = [
+  'หาของไม่เจอ (Missing)',
+  'นับจริง 0 แต่ระบบมี (Lost/Damaged)',
+  'นับได้เกินระบบ (Found Excess)',
+  'สูญหาย (Lost)',
+  'เสียหาย (Damaged)',
+  'ผิดสาขา/คลัง (Wrong Branch)',
+  'อื่นๆ (Other)',
+] as const
+
+export const stockAdjustReasonSchema = z.enum(stockAdjustReasonOptions)
+
 export const stockAdjustFormSchema = z.object({
   branchId: z.string().trim().min(1, 'เลือกสาขา'),
   countedQty: nonNegativeQty('นับจริง'),
@@ -108,14 +120,25 @@ export const stockAdjustFormSchema = z.object({
   docNo: optionalDocNo,
   lotNo: optionalGeneralText('Lot', 80),
   productId: z.string().trim().min(1, 'เลือกสินค้า'),
-  reason: z.string().trim().min(3, 'กรอกเหตุผลอย่างน้อย 3 ตัวอักษร').max(240, 'เหตุผลยาวเกินไป').regex(generalTextPattern, 'เหตุผลมีรูปแบบไม่ถูกต้อง'),
+  reason: stockAdjustReasonSchema,
   remark: optionalGeneralText('หมายเหตุ', 500),
   status: stockStatusSchema,
   systemQty: nonNegativeQty('ยอดในระบบ'),
+  totalValue: z.number().optional(),
+  unitPricePerKg: z.number().nonnegative().optional(),
   warehouseId: z.string().trim().min(1, 'เลือกคลัง'),
 })
 
 export type StockAdjustFormValues = z.infer<typeof stockAdjustFormSchema>
+
+export const stockAdjustCorrectionSchema = z.object({
+  countedQty: nonNegativeQty('นับจริง'),
+  docNo: z.string().trim().min(1, 'ระบุเลขที่เอกสาร'),
+  reason: stockAdjustReasonSchema,
+  remark: optionalGeneralText('หมายเหตุ', 500),
+})
+
+export type StockAdjustCorrectionValues = z.infer<typeof stockAdjustCorrectionSchema>
 
 export type StockOption = {
   active: boolean | null

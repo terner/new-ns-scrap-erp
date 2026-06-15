@@ -407,7 +407,7 @@ export function StockLedgerPageClient() {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <span>พบทั้งหมด <span className="font-semibold text-slate-900">{data?.total ?? 0}</span> รายการ</span>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <button className="hidden md:inline-flex h-9 rounded-md border px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>Set col to default</button> : null}
+          {columnResize.hasCustomWidths ? <button className="hidden md:inline-flex h-9 rounded-md border px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button> : null}
           <select aria-label="จำนวนรายการต่อหน้า" className="h-9 rounded-md border px-2 text-sm bg-white text-slate-800" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
             {stockLedgerPageSizes.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
           </select>
@@ -714,7 +714,7 @@ function StockLedgerDetailModal({ onClose, row }: { onClose: () => void; row: St
 function DetailPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100">{title}</div>
+      <div className="mb-3 text-xs sm:text-sm font-bold text-slate-600 pb-1 border-b border-slate-100">{title}</div>
       <div className="space-y-2">{children}</div>
     </div>
   )
@@ -729,8 +729,8 @@ function DetailRow({ className = '', label, mono = false, tone = 'normal', value
   }[tone]
   return (
     <div className={`flex flex-col py-0.5 ${className}`}>
-      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
-      <div className={`mt-0.5 text-xs sm:text-sm font-semibold ${mono ? 'font-mono' : ''} ${toneClass}`}>{value}</div>
+      <div className="text-xs text-slate-500 font-medium">{label}</div>
+      <div className={`mt-0.5 text-sm font-semibold ${mono ? 'font-mono' : ''} ${toneClass}`}>{value}</div>
     </div>
   )
 }

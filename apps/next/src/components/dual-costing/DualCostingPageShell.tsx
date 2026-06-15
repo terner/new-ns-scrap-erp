@@ -72,6 +72,26 @@ export function DualCostingErrorBox({ error }: { error: string | null }) {
   return error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null
 }
 
+export function DualCostingWorkflowStrip({ active }: { active: 'allocator' | 'ledger' | 'pool' | 'waiting' }) {
+  const steps = [
+    { key: 'pool', label: 'Cost Pool' },
+    { key: 'waiting', label: 'Waiting Allocation' },
+    { key: 'allocator', label: 'Cost Allocator' },
+    { key: 'ledger', label: 'Allocation Ledger' },
+  ] as const
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      {steps.map((step, index) => (
+        <div key={step.key} className="flex items-center gap-2">
+          <span className={cn('rounded-md border px-2.5 py-1 font-medium', active === step.key ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-600')}>{step.label}</span>
+          {index < steps.length - 1 ? <span className="text-slate-400">→</span> : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function DualCostingHint({
   children,
   tone = 'slate',
