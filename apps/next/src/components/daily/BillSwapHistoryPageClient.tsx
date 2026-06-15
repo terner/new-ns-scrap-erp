@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowUpDown, ClipboardList, Coins, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Input } from '@/components/ui/Input'
@@ -57,6 +58,31 @@ const billSwapColumns: Array<ResizableColumnDefinition<BillSwapColumnKey>> = [
   { defaultWidth: 90, key: 'diff', minWidth: 80 },
   { defaultWidth: 220, key: 'reason', minWidth: 160 },
 ]
+
+function getDiffTextColors(diff: number) {
+  if (diff === 0) {
+    return {
+      text: 'text-slate-700',
+      iconBg: 'bg-slate-100',
+      iconColor: 'text-slate-600',
+      valueColor: 'text-slate-900',
+    }
+  }
+  if (diff < 0) {
+    return {
+      text: 'text-emerald-700',
+      iconBg: 'bg-emerald-50',
+      iconColor: 'text-emerald-600',
+      valueColor: 'text-emerald-700',
+    }
+  }
+  return {
+    text: 'text-red-600',
+    iconBg: 'bg-rose-50',
+    iconColor: 'text-rose-600',
+    valueColor: 'text-rose-600',
+  }
+}
 
 export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history' }: { tableKey?: string }) {
   const [dateFrom, setDateFrom] = useState('')
@@ -118,6 +144,8 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
     weight: filteredRows.reduce((sum, row) => sum + row.weight, 0),
   }), [filteredRows])
 
+  const diffColors = useMemo(() => getDiffTextColors(totals.diff), [totals.diff])
+
   const totalRows = filteredRows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -150,11 +178,36 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <Kpi label="จำนวนรายการเปลี่ยน" value={totals.rows.toLocaleString('th-TH')} tone="white" />
-        <Kpi label="น้ำหนักรวม (กก.)" value={formatMoney(totals.weight)} tone="blue" />
-        <Kpi label="ยอดเก่า / ยอดใหม่" value={`${formatMoney(totals.before)} / ${formatMoney(totals.after)}`} tone="slate" />
-        <Kpi label="ส่วนต่างรวม (ก่อน VAT)" value={formatMoney(totals.diff)} tone={totals.diff >= 0 ? 'emerald' : 'red'} />
+      <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
+        <Kpi
+          icon={<ClipboardList className="size-5" />}
+          label="จำนวนรายการเปลี่ยน"
+          value={totals.rows.toLocaleString('th-TH')}
+          iconBgColor="bg-slate-100"
+          iconColor="text-slate-600"
+        />
+        <Kpi
+          icon={<Scale className="size-5" />}
+          label="น้ำหนักรวม (กก.)"
+          value={formatMoney(totals.weight)}
+          iconBgColor="bg-blue-50"
+          iconColor="text-blue-600"
+        />
+        <Kpi
+          icon={<ArrowUpDown className="size-5" />}
+          label="ยอดเก่า / ยอดใหม่"
+          value={`${formatMoney(totals.before)} / ${formatMoney(totals.after)}`}
+          iconBgColor="bg-amber-50"
+          iconColor="text-amber-600"
+        />
+        <Kpi
+          icon={<Coins className="size-5" />}
+          label="ส่วนต่างรวม (ก่อน VAT)"
+          value={formatMoney(totals.diff)}
+          iconBgColor={diffColors.iconBg}
+          iconColor={diffColors.iconColor}
+          valueColor={diffColors.valueColor}
+        />
       </div>
 
       <div className="rounded-md bg-white p-3 shadow">
@@ -228,7 +281,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
                 </div>
                 <div>
                   <span className="font-semibold text-slate-500 block">ส่วนต่าง (ก่อน VAT): </span>
-                  <span className={`font-bold tabular-nums ${row.diffExVat >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  <span className={`font-bold tabular-nums ${getDiffTextColors(row.diffExVat).text}`}>
                     {formatMoney(row.diffExVat)} บาท
                   </span>
                 </div>
@@ -259,7 +312,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
         ) : null}
       </div>
 
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden md:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-xs" style={{ minWidth: tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {billSwapColumns.map((column, index) => {
@@ -290,18 +343,18 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && pagedRows.map((row) => (
               <tr key={row.id} className="hover:bg-slate-50">
-                <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.swapDate}</td>
-                <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.billDocNo || row.billId}</td>
-                <td className="p-2 text-xs font-semibold text-rose-600">{row.beforeSupplierName}</td>
-                <td className="p-2 text-xs font-semibold text-emerald-700">{row.afterSupplierName}</td>
-                <td className="p-2 text-xs font-semibold text-slate-700">{row.productName}</td>
+                <td className="p-2 text-xs font-semibold text-slate-700 whitespace-nowrap">{row.swapDate}</td>
+                <td className="p-2 text-xs font-semibold text-slate-700 truncate" title={row.billDocNo || row.billId}>{row.billDocNo || row.billId}</td>
+                <td className="p-2 text-xs font-semibold text-rose-600 truncate" title={row.beforeSupplierName}>{row.beforeSupplierName}</td>
+                <td className="p-2 text-xs font-semibold text-emerald-700 truncate" title={row.afterSupplierName}>{row.afterSupplierName}</td>
+                <td className="p-2 text-xs font-semibold text-slate-700 truncate" title={row.productName}>{row.productName}</td>
                 <td className="p-2 pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.weight)}</td>
                 <td className="p-2 pr-4 text-right text-xs font-semibold text-rose-600 tabular-nums">{formatMoney(row.beforePrice)}</td>
                 <td className="p-2 pr-4 text-right text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(row.afterPrice)}</td>
                 <td className="p-2 pr-4 text-right text-xs font-semibold text-rose-600 tabular-nums">{formatMoney(row.beforeAmount)}</td>
                 <td className="p-2 pr-4 text-right text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(row.afterAmount)}</td>
-                <td className={`p-2 pr-4 text-right text-xs font-semibold tabular-nums ${row.diffExVat >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(row.diffExVat)}</td>
-                <td className="max-w-60 truncate p-2 text-xs font-semibold text-slate-700">{row.reason || '-'}</td>
+                <td className={`p-2 pr-4 text-right text-xs font-semibold tabular-nums ${getDiffTextColors(row.diffExVat).text}`}>{formatMoney(row.diffExVat)}</td>
+                <td className="p-2 text-xs font-semibold text-slate-700 truncate" title={row.reason || ''}>{row.reason || '-'}</td>
               </tr>
             ))}
             {!isLoading && totalRows === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>ยังไม่มีประวัติการเปลี่ยน Supplier</td></tr> : null}
@@ -314,7 +367,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
                 <td className="p-2" colSpan={2} />
                 <td className="p-2 pr-4 text-right text-rose-600 tabular-nums">{formatMoney(totals.before)}</td>
                 <td className="p-2 pr-4 text-right text-emerald-700 tabular-nums">{formatMoney(totals.after)}</td>
-                <td className={`p-2 pr-4 text-right tabular-nums ${totals.diff >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(totals.diff)}</td>
+                <td className={`p-2 pr-4 text-right tabular-nums ${diffColors.text}`}>{formatMoney(totals.diff)}</td>
                 <td />
               </tr>
             </tfoot>
@@ -325,15 +378,29 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
   )
 }
 
-function Kpi({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' | 'red' | 'slate' | 'white'; value: string }) {
-  const tones = {
-    blue: 'bg-blue-50 text-blue-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    red: 'bg-red-50 text-red-700',
-    slate: 'bg-slate-50 text-slate-800',
-    white: 'bg-white text-slate-900',
-  }
-  return <div className={`rounded-md p-3 shadow ${tones[tone]}`}><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
+interface KpiProps {
+  icon: React.ReactNode
+  label: string
+  value: string
+  iconBgColor: string
+  iconColor: string
+  valueColor?: string
+}
+
+function Kpi({ icon, label, value, iconBgColor, iconColor, valueColor = 'text-slate-900' }: KpiProps) {
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className={`flex size-12 shrink-0 items-center justify-center rounded-full ${iconBgColor} ${iconColor}`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold text-slate-500">{label}</div>
+        <div className={`mt-1 text-lg font-bold ${valueColor} tabular-nums leading-tight truncate`} title={value}>
+          {value}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function billSwapSortValue(row: ReturnType<typeof enrichBillSwapRow>, sort: BillSwapSortKey) {

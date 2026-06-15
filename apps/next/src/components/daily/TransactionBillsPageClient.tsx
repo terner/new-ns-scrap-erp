@@ -2743,18 +2743,20 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             {isLoading ? <TableRow><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>กำลังโหลดข้อมูล</td></TableRow> : null}
             {!isLoading && pageRows.map((row) => (
               <TableRow key={row.id} className={`hover:bg-slate-50 ${(mode === 'purchase' || mode === 'sales') && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
-                <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.docNo}</td>
+                <td className="p-2 text-xs font-semibold text-slate-700 truncate" title={row.docNo}>{row.docNo}</td>
                 {mode === 'purchase' && !isStockIssueRow(row) ? (
                   <td className="p-2 text-xs font-semibold text-slate-700">
                     <CollapsedList items={row.receiptDocNos} splitItems={true} />
                   </td>
                 ) : null}
-                {mode === 'sales' && !isStockIssueRow(row) ? <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.refNo || '-'}</td> : null}
-                <td className="p-2 text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</td>
-                <td className="p-2 text-xs font-semibold text-slate-700">{'supplierName' in row ? row.supplierName : row.customerName}</td>
-                {mode !== 'purchase' ? <td className="p-2 text-xs font-semibold text-slate-700">{formatBranchWarehouse(row)}</td> : null}
-                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{row.transactionMode ?? '-'}</span></td> : null}
-                <td className="p-2 text-center">
+                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-xs font-semibold text-slate-700 truncate" title={row.refNo || ''}>{row.refNo || '-'}</td> : null}
+                <td className="p-2 text-xs font-semibold text-slate-700 whitespace-nowrap">{formatDateDisplay(row.date)}</td>
+                <td className="p-2 text-xs font-semibold text-slate-700 truncate" title={'supplierName' in row ? row.supplierName : row.customerName}>
+                  {'supplierName' in row ? row.supplierName : row.customerName}
+                </td>
+                {mode !== 'purchase' ? <td className="p-2 text-xs font-semibold text-slate-700 truncate" title={formatBranchWarehouse(row)}>{formatBranchWarehouse(row)}</td> : null}
+                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-center whitespace-nowrap"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.transactionMode === 'TRADING' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>{row.transactionMode ?? '-'}</span></td> : null}
+                <td className="p-2 text-center whitespace-nowrap">
                   <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${mode === 'purchase' && !isStockIssueRow(row) ? workflowStatusBadgeClass(row.paymentWorkflowStatus ?? 'pending_approval') : statusBadgeClass(row.status)}`}>
                     <span className="size-1.5 rounded-full bg-current" />
                     {mode === 'purchase' && !isStockIssueRow(row) ? workflowStatusText(row.paymentWorkflowStatus ?? 'pending_approval') : statusText(row.status)}
@@ -2765,11 +2767,23 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.totalQty ?? 0)} /> : null}
                 {mode === 'stock-issue' && isStockIssueRow(row) ? <TableNumberCell tone="amber" value={formatMoney(row.totalCost)} /> : null}
                 <TableNumberCell strong value={formatMoney(isStockIssueRow(row) ? row.totalEstAmount : row.totalAmount ?? 0)} />
-                {mode === 'sales' && !isStockIssueRow(row) ? <td className={`p-2 pr-4 text-right font-semibold tabular-nums ${(row.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}><div>{formatMoney(row.grossProfit ?? 0)}</div><div className="text-xs text-slate-500">{formatMoney((row.totalAmount ?? 0) > 0 ? (row.grossProfit ?? 0) / (row.totalAmount ?? 1) * 100 : 0)}%</div></td> : null}
+                {mode === 'sales' && !isStockIssueRow(row) ? (
+                  <td className={`p-2 pr-4 text-right font-semibold tabular-nums space-y-0.5 ${(row.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    <div className="leading-tight">{formatMoney(row.grossProfit ?? 0)}</div>
+                    <div className="text-[10px] font-normal text-slate-400 leading-none">
+                      {formatMoney((row.totalAmount ?? 0) > 0 ? (row.grossProfit ?? 0) / (row.totalAmount ?? 1) * 100 : 0)}%
+                    </div>
+                  </td>
+                ) : null}
                 {mode === 'sales' && !isStockIssueRow(row) ? <TableNumberCell value={formatMoney(row.receivedAmount ?? 0)} /> : null}
                 {mode !== 'stock-issue' && !isStockIssueRow(row) ? <TableNumberCell tone="amber" value={formatMoney(mode === 'purchase' ? row.payableBalance ?? 0 : row.receivableBalance ?? 0)} /> : null}
-                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-center"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.vatInvoiceIssued ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
-                {mode !== 'stock-issue' && !isStockIssueRow(row) ? <td className="p-2 text-xs font-semibold text-slate-700"><div>{row.updatedBy || row.createdBy || '-'}</div><div className="text-[10px] font-normal text-slate-400">{formatDateTime(row.updatedAt || row.createdAt)}</div></td> : null}
+                {mode === 'sales' && !isStockIssueRow(row) ? <td className="p-2 text-center whitespace-nowrap"><span className={`rounded-md-full px-2 py-0.5 text-xs font-semibold ${row.vatInvoiceIssued ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ออก'}</span>{row.vatInvoiceNo ? <div className="mt-1 text-[10px] text-slate-500">{row.vatInvoiceNo}</div> : null}</td> : null}
+                {mode !== 'stock-issue' && !isStockIssueRow(row) ? (
+                  <td className="p-2 text-xs font-semibold text-slate-700">
+                    <div className="truncate" title={row.updatedBy || row.createdBy || '-'}>{row.updatedBy || row.createdBy || '-'}</div>
+                    <div className="text-[10px] font-normal text-slate-400 mt-0.5">{formatDateTime(row.updatedAt || row.createdAt)}</div>
+                  </td>
+                ) : null}
                 {mode === 'purchase' && !isStockIssueRow(row) ? (
                   <td className="p-2 text-right">
                     <div className="flex justify-end gap-2">
@@ -2897,12 +2911,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       {showForm && mode === 'purchase' ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
           <div className="mx-auto my-4 flex max-h-[94vh] max-w-5xl flex-col rounded-md bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-md-t-md border-b bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-md bg-slate-900 px-6 py-5 text-white">
               <div>
                 <h3 className="text-xl font-bold">📥 {editingBillId ? 'แก้ไขบิลรับซื้อ' : 'สร้างบิลรับซื้อใหม่'}</h3>
-                <p className="mt-1 text-xs opacity-80">{editingBillId ? 'แก้ไขได้เฉพาะบิลที่ยังไม่อนุมัติโอนเงินและยังไม่มีการชำระเงิน' : 'บันทึก header และรายการสินค้าในบิลรับซื้อ'}</p>
+                <p className="mt-1 text-xs text-slate-400">{editingBillId ? 'แก้ไขได้เฉพาะบิลที่ยังไม่อนุมัติโอนเงินและยังไม่มีการชำระเงิน' : 'บันทึก header และรายการสินค้าในบิลรับซื้อ'}</p>
               </div>
-              <button className="text-3xl leading-none text-white/80 hover:text-white" type="button" onClick={() => { setSupplierSwapMode(false); setSupplierSwapSupplierId(''); setLockedReceiptSnapshot(null); setShowForm(false) }}>&times;</button>
+              <button className="text-3xl leading-none text-white/80 hover:text-white focus:outline-none" type="button" onClick={() => { setSupplierSwapMode(false); setSupplierSwapSupplierId(''); setLockedReceiptSnapshot(null); setShowForm(false) }}>&times;</button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6 text-sm">
               <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -3033,7 +3047,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           ))}
                         </div>
                       ) : null}
-                      <div className="overflow-x-auto rounded-md border">
+                      <div className="overflow-x-auto rounded-md border border-slate-200/60">
                       <table className="w-full min-w-[920px] text-sm">
                         <thead className="bg-slate-100">
                           <tr>
@@ -3163,12 +3177,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                     </div>
                   )
                 ) : (
-                  <div className="overflow-x-auto rounded-md border">
+                  <div className="overflow-x-auto rounded-md border border-slate-200/60">
                     <table className="w-full min-w-[780px] text-sm">
                       <tbody>
                         {form.items.map((item, index) => (
                           <Fragment key={index}>
-                            <tr className="border-t align-top hover:bg-blue-50/30">
+                            <tr className="border-t border-slate-100 align-top hover:bg-blue-50/30">
                               <td className="p-2" colSpan={4}>
                                 <ProductSearchCombobox error={fieldErrors[`items.${index}.productId`]} errorKey={`items.${index}.productId`} inputId={`purchase-bill-product-search-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateItem(index, 'productId', value)} />
                                 <input className="mt-1.5 w-full rounded-md border bg-yellow-50 px-2 py-1 text-xs" placeholder="ชื่อสำหรับโชว์ในบิล (ว่าง = ใช้ชื่อ Master)" value={item.displayName ?? ''} onChange={(event) => updateItem(index, 'displayName', event.target.value || null)} />
@@ -3228,7 +3242,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           </Fragment>
                         ))}
                       </tbody>
-                      <tfoot className="border-t bg-emerald-50 font-bold">
+                      <tfoot className="border-t border-slate-200 bg-emerald-50 font-bold">
                         <tr>
                           <td className="p-2 text-right tabular-nums"><span className="mr-2 text-slate-700">รวม</span>{formatMoney(form.items.reduce((sum, item) => sum + item.grossWeight, 0))}</td>
                           <td className="p-2 text-right tabular-nums text-amber-700">{formatMoney(form.items.reduce((sum, item) => sum + item.deductWeight, 0))}</td>
@@ -3317,9 +3331,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 }} /></Field>
               </div>
             </div>
-            <div className="flex justify-end gap-2 rounded-md-b-md border-t bg-white p-4">
-              <button className="rounded-md border px-4 py-2 text-sm hover:bg-slate-50" type="button" onClick={() => { setSupplierSwapMode(false); setSupplierSwapSupplierId(''); setLockedReceiptSnapshot(null); setShowForm(false) }}>ยกเลิก</button>
-              <button className="rounded-md bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving || !stockReceiptSelected} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : supplierSwapMode ? 'บันทึกและสร้าง PB ใหม่' : editingBillId ? 'บันทึกการแก้ไข' : 'บันทึกบิลรับซื้อ'}</button>
+            <div className="flex justify-end gap-3.5 rounded-b-md border-t border-slate-100 bg-white px-6 py-4">
+              <button className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors focus:outline-none" type="button" onClick={() => { setSupplierSwapMode(false); setSupplierSwapSupplierId(''); setLockedReceiptSnapshot(null); setShowForm(false) }}>ยกเลิก</button>
+              <button className="h-10 px-6 rounded-md bg-[#0F172A] hover:bg-[#1E293B] text-sm font-semibold text-white shadow-sm disabled:opacity-60 transition-colors focus:outline-none" disabled={isSaving || !stockReceiptSelected} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : supplierSwapMode ? 'บันทึกและสร้าง PB ใหม่' : editingBillId ? 'บันทึกการแก้ไข' : 'บันทึกบิลรับซื้อ'}</button>
             </div>
           </div>
         </div>
@@ -3368,7 +3382,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 font-bold text-slate-700">รายการสินค้า</h4>
                 {selectedStockIssueDelivery ? (
-                  <div className="overflow-x-auto rounded-md border">
+                  <div className="overflow-x-auto rounded-md border border-slate-200/60">
                     <table className="min-w-full text-xs">
                       <thead className="bg-slate-50 text-slate-500">
                         <tr>
@@ -3378,7 +3392,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           <th className="p-2 text-right">ยอดคาด</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y">
+                      <tbody className="divide-y divide-slate-100">
                         {selectedStockIssueDelivery.productSummaries.map((summary) => {
                           const price = stockIssueForm.prices[summary.productId] ?? 0
                           return (
@@ -3407,10 +3421,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               </div>
 
               <Field label="หมายเหตุ">
-                <textarea className="w-full rounded-md border px-3 py-2" rows={2} value={stockIssueForm.note} onChange={(event) => setStockIssueForm((current) => ({ ...current, note: event.target.value }))} />
+                <textarea className="w-full rounded-md border border-slate-200 px-3 py-2" rows={2} value={stockIssueForm.note} onChange={(event) => setStockIssueForm((current) => ({ ...current, note: event.target.value }))} />
               </Field>
             </div>
-            <div className="sticky bottom-0 flex justify-end gap-3 bg-white px-6 py-4">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-100 bg-white px-6 py-4">
               <Button disabled={isSaving} type="button" variant="secondary" onClick={() => { setEditingStockIssueDocNo(null); setShowStockIssueForm(false) }}>ยกเลิก</Button>
               <Button className="bg-slate-900 hover:bg-slate-800 text-white" disabled={isSaving || !selectedStockIssueDelivery} type="button" onClick={() => void saveStockIssue()}>{isSaving ? 'กำลังบันทึก...' : editingStockIssueDocNo ? 'บันทึกการแก้ไข' : 'บันทึก + ตัด Stock'}</Button>
             </div>
@@ -3420,12 +3434,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       {showSalesForm && (mode === 'sales' || mode === 'stock-issue') ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
           <div className="relative mx-auto my-4 flex max-h-[94vh] max-w-5xl flex-col rounded-md bg-white shadow-2xl" data-combobox-portal-root="true">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-md-t-md border-b bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-4 text-white">
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-md bg-slate-900 px-6 py-5 text-white">
               <div>
                 <h3 className="text-xl font-bold">สร้างบิลขายใหม่</h3>
-                <p className="mt-1 text-xs opacity-80">บันทึกบิลขายแบบ Stock / Trading พร้อม VAT และข้อมูลรับเงิน</p>
+                <p className="mt-1 text-xs text-slate-400">บันทึกบิลขายแบบ Stock / Trading พร้อม VAT และข้อมูลรับเงิน</p>
               </div>
-              <button className="text-3xl leading-none text-white/80 hover:text-white" type="button" onClick={() => setShowSalesForm(false)}>&times;</button>
+              <button className="text-3xl leading-none text-white/80 hover:text-white focus:outline-none" type="button" onClick={() => setShowSalesForm(false)}>&times;</button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6 text-sm">
               <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -3630,7 +3644,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                     </div>
                   )
                 ) : (
-                  <div className="overflow-x-auto rounded-md border">
+                  <div className="overflow-x-auto rounded-md border border-slate-200/60">
                     <table className="w-full min-w-[1160px] text-sm">
                       <tbody>
                         {salesForm.items.map((item, index) => {
@@ -3651,7 +3665,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           const rowCostSourceCapacity = item.tradingCostSourceId ? tradingCostSourceAvailableForRow(item.tradingCostSourceId, index) : null
                           const costSourceVariance = rowCostSourceCapacity != null ? poQtyVariance(rowCostSourceCapacity, item.qty) : null
                           return (
-                            <tr key={index} className="border-t align-top hover:bg-blue-50/30">
+                            <tr key={index} className="border-t border-slate-100 align-top hover:bg-blue-50/30">
                               <td className="p-2" colSpan={2}>
                                 <ProductSearchCombobox error={salesFieldErrors[`items.${index}.productId`]} errorKey={`items.${index}.productId`} inputId={`sales-bill-product-${index}`} options={activeProducts} value={item.productId} onChange={(value) => updateSalesItem(index, 'productId', value)} />
                               </td>
@@ -3727,7 +3741,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           )
                         })}
                       </tbody>
-                      <tfoot className="border-t bg-emerald-50 font-bold">
+                      <tfoot className="border-t border-slate-200 bg-emerald-50 font-bold">
                         <tr>
                           <td className="p-2 text-right tabular-nums text-emerald-700" colSpan={5}><span className="mr-2 text-slate-700">น้ำหนักรวม</span>{formatMoney(salesForm.items.reduce((sum, item) => sum + item.qty, 0))}</td>
                           <td></td>
@@ -3810,9 +3824,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <Field error={salesFieldErrors.note} label="หมายเหตุ"><textarea data-error-key="note" className={`w-full rounded-md border px-3 py-2 ${salesFieldErrors.note ? 'border-red-400 bg-red-50' : ''}`} rows={2} value={salesForm.note ?? ''} onChange={(event) => updateSalesForm('note', event.target.value || null)} /></Field>
               </div>
             </div>
-            <div className="flex justify-end gap-2 rounded-md-b-md border-t bg-white p-4">
-              <button className="rounded-md border px-4 py-2 text-sm hover:bg-slate-50" disabled={isSaving} type="button" onClick={() => setShowSalesForm(false)}>ยกเลิก</button>
-              <button className="rounded-md bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void saveSalesBill()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกบิลขาย'}</button>
+            <div className="flex justify-end gap-3.5 rounded-b-md border-t border-slate-100 bg-white px-6 py-4">
+              <button className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors focus:outline-none" disabled={isSaving} type="button" onClick={() => setShowSalesForm(false)}>ยกเลิก</button>
+              <button className="h-10 px-6 rounded-md bg-[#0F172A] hover:bg-[#1E293B] text-sm font-semibold text-white shadow-sm disabled:opacity-60 transition-colors focus:outline-none" disabled={isSaving} type="button" onClick={() => void saveSalesBill()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกบิลขาย'}</button>
             </div>
           </div>
         </div>

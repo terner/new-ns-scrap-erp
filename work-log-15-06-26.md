@@ -1,0 +1,144 @@
+# NS Scrap ERP Work Log (2026-06-15)
+
+## 📅 ข้อมูลทั่วไป
+- **วันที่:** 15 มิถุนายน 2569 (2026-06-15)
+- **แอปพลิเคชันหลัก:** `apps/next/` (Next.js Target)
+- **ฐานข้อมูลพัฒนา (Dev Target):** Supabase `fhglqymcdmrgbsbadnwr`
+
+---
+
+## 🛠️ รายการสิ่งต่าง ๆ ที่ดำเนินการแล้ววันนี้
+
+### 1. รันเซิร์ฟเวอร์พัฒนา (Next.js Dev Server)
+- **การดำเนินการ:** เริ่มต้นรันคำสั่ง `npm run dev` ในโหมดเบื้องหลัง (Background Task ID: `task-17`)
+- **สถานะ:** ทำงานสำเร็จเรียบร้อย (Ready)
+- **พอร์ตที่ใช้งาน:**
+  - Local: [http://localhost:3000](http://localhost:3000)
+  - Network: [http://0.0.0.0:3000](http://0.0.0.0:3000)
+
+### 2. สร้างไฟล์ติดตามงานประจำวัน (Daily Task Checklist)
+- **การดำเนินการ:** สร้างไฟล์ `task15-06-26.md` ใน root ของโปรเจกต์ เพื่อเตรียมรองรับรายการงานและขั้นตอนถัดไปที่ผู้ใช้จะสั่งการ
+- **ลิงก์ไฟล์:** [task15-06-26.md](file:///c:/new-ns-scrap-erp/task15-06-26.md)
+
+### 3. บันทึกประวัติการทำงาน (Work Log)
+- **การดำเนินการ:** สร้างไฟล์นี้ขึ้นมาเพื่อบันทึกงานที่ดำเนินการเสร็จสิ้นในแต่ละช่วงของวัน
+- **ลิงก์ไฟล์:** [work-log-15-06-26.md](file:///c:/new-ns-scrap-erp/work-log-15-06-26.md)
+
+### 4. ติดตั้งและตั้งค่า Headroom
+- **การดำเนินการ:** 
+  - ติดตั้ง `headroom-ai[mcp]` และ `httpx[http2]` ในระบบ
+  - ลงทะเบียนเซิร์ฟเวอร์ MCP สำหรับ Codex (`headroom mcp install`) เพื่อช่วยบีบอัด Context
+  - รัน Headroom proxy ในโหมดเบื้องหลัง (Background Task ID: `task-79`) บนพอร์ต `http://127.0.0.1:8787` เพื่อเร่งประสิทธิภาพการบีบอัด Token และลดค่าใช้จ่าย/ประหยัด Context window ของ LLM
+
+### 5. สร้างเอกสารคู่มือ Peach UI (AcexPOS Style)
+- **การดำเนินการ:** สร้างคู่มืออ้างอิงและเกณฑ์มาตรฐานสำหรับการออกแบบหน้าจอระบบ (UI Rehabilitation Guidelines) ในไฟล์ `Peach.md` เพื่อสรุปการเปลี่ยนแปลงที่อัปเดตไปในบรันช์ `peach` และใช้อ้างอิงการจัดวางปุ่ม ตาราง การ์ด และ Modal
+- **ลิงก์ไฟล์:** [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md)
+
+### 6. เพิ่มกฎควบคุมการทำงานและข้อตกลงการพัฒนาทั้งหมดใน Peach.md
+- **การดำเนินการ:** บันทึกข้อกำหนดทั้งหมด ได้แก่ **Strict Scope Control**, กฎการใช้งาน Git, **Design Consistency**, **Inquiry vs Action**, **Ask When Unsure**, **Create Task Checklist**, **Brief Final Reports**, **Validation & Verification**, **Preserve Unrelated Code**, **Fail-Fast Policy**, **Visual Verification**, **Mobile Responsiveness**, **Commit Summary Policy**, **Visual Image Feedback & Audit Policy**, **No Horizontal Scroll Tables on Mobile** และ **Thorough Interactive Browser Testing** ลงในไฟล์ [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md) เพื่อใช้เป็นกฎหลักในการควบคุมการปฏิบัติงานของเอเจนต์ในเครื่องพัฒนาอย่างเป็นระบบ
+- **ลิงก์ไฟล์:** [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md)
+
+### 7. ปรับแต่ง UI ใบรับซื้อและบิลขายสไตล์ AcexPOS
+- **การดำเนินการ:** ปรับเปลี่ยนหน้าตาของ Modal "สร้างบิลรับซื้อใหม่" และ "สร้างบิลขายใหม่" ใน [TransactionBillsPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/daily/TransactionBillsPageClient.tsx):
+  - เปลี่ยนสีบาร์หัวข้อ (Header) เป็นสี Slate-900 เข้ม ไร้กรอบล่าง (`bg-slate-900 px-6 py-5 text-white`)
+  - เปลี่ยนรูปแบบปุ่ม "ยกเลิก" เป็นแบบข้อความเรียบง่ายไร้กรอบ (Text-only Button) ชิดขวา
+  - เปลี่ยนปุ่ม "บันทึก" เป็นสีเข้ม Slate (`bg-[#0F172A] hover:bg-[#1E293B]`) มนสวยงาม พร้อมเพิ่มเอฟเฟกต์สีเวลายกเลิกการโฟกัส (`focus:outline-none`)
+- **สถานะ:** เสร็จสมบูรณ์
+- **ผลลัพธ์การตรวจสอบ (Validation & Verification):**
+  - รันคำสั่ง `npm run lint` และ `npm run type-check` ผ่านเรียบร้อย (0 errors)
+  - ปรับปรุงคู่มือการทดสอบใน `Peach.md` เพื่อป้องกันการตกหล่น โดยกำหนดให้ทดสอบครบทุกโหมดแบบจบกระบวนการจริง (End-to-End)
+  - ทดสอบสร้างบิลรับซื้อแบบ TRADING แบบ End-to-End สำเร็จ ได้เลขที่เอกสาร **PB012606-0004** ยอดสุทธิ 22,500.00 บาท และสามารถกด "แก้ไข" ปรับราคาทองแดงเส้นใหญ่จาก 50 บาท เป็น 60 บาท และบันทึกแก้ไขคำนวณใหม่ได้ยอดสุทธิ 23,400.00 บาท เข้าฐานข้อมูลอย่างสมบูรณ์แบบ
+  - ภาพบันทึกการกรอกบิล TRADING: [trading_bill_form_filled](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/trading_bill_form_filled_1781494364529.png)
+  - ภาพบันทึกการกรอกบิล TRADING: [trading_bill_form_filled](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/trading_bill_form_filled_1781494364529.png)
+  - ภาพตารางรายการหลังบันทึกและแก้ไขสำเร็จ: [purchase_bill_list_updated](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/purchase_bill_list_updated_1781494414031.png)
+
+### 8. การทดสอบปุ่มในกรอบแดงและ Responsive 375px อย่างละเอียด (Thorough Interactive Browser Testing)
+- **การดำเนินการ:** ดำเนินการทดสอบโดยการกดปุ่มทุกปุ่มบนหน้าจอ "บิลรับซื้อ" (Purchase Bills) ตามกรอบแดงที่ผู้ใช้กำหนด ทั้งในโหมดเดสก์ท็อปและโหมดโทรศัพท์มือถือ 375px ผ่าน Browser Subagent
+- **รายละเอียดการตรวจสอบ:**
+  - **Header Tabs (แท็บ):** ทดลองสลับแท็บ "ประวัติเปลี่ยนตัว Supplier" และ "เลขที่ซื้อ" ทำงานได้ราบรื่น ดึงข้อมูลตรงและไม่มีการค้าง
+  - **Type Filters (ตัวกรองประเภท):** ทดลองกด "STOCK", "TRADING" และ "ทุกประเภท" ตารางข้อมูลกรองแบ่งประเภททันทีและแสดงรายการตรงตาม Database constraint
+  - **Status Filters (ตัวกรองสถานะ):** ไล่กดทดสอบครบทั้ง 7 ปุ่ม ("ทุกสถานะ", "ยังไม่อนุมัติ", "รอจ่าย", "ชำระบางส่วน", "เสร็จสิ้น", "ยกเลิก", "ยกเลิก/เปลี่ยน Supplier") ตารางกรองและเปลี่ยนสถานะแบบ Real-time
+  - **Table Rows / Detail Checking (ตารางและรายละเอียด):** คลิกแถวรายการบิลแรกในตารางเพื่อเรียกเปิด Detail Dialog modal ข้อมูลแสดงแยกส่วนหัวกับส่วนตารางสินค้าชัดเจนสวยงาม ไม่มี Focus Outline ขีดดำเข้ม และขนาดตัวหนังสืออ่านง่ายเหมาะสม
+  - **Mobile Responsive (375x812):** ทดสอบสลับสัดส่วนหน้าจอ:
+    - แท็บปรับขนาดให้พอดี
+    - ตัวกรองหดรวมเป็นปุ่ม "ตัวกรอง" เมื่อกดจะเลื่อนลิ้นชัก (Filter Drawer) ขึ้นมาจากด้านล่าง มีการทำงานครบถ้วน กดปุ่ม STOCK / TRADING คัดกรองและปิดหน้าต่างได้ถูกต้อง
+    - ตารางแปลงสภาพเป็นการ์ดแนวตั้ง (Mobile Card List Layout) สัมผัสง่าย และเมื่อคลิกการ์ดจะเปิดแสดงรายละเอียดบิลสวยงามไม่มีการตกขอบหรือแถบเลื่อนแนวนอน (Horizontal scroll)
+- **ภาพหลักฐานการทดสอบในระบบ (Artifact Screenshots):**
+  - แท็บประวัติเปลี่ยนตัวคู่ค้า (Desktop): [desktop_tab_history](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_tab_history_1781495504765.png)
+  - แท็บบิลรับซื้อหลัก (Desktop): [desktop_tab_bills](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_tab_bills_1781495513611.png)
+  - ตัวกรองประเภท STOCK (Desktop): [desktop_filter_stock](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_filter_stock_1781495520622.png)
+  - ตัวกรองประเภท TRADING (Desktop): [desktop_filter_trading](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_filter_trading_1781495528480.png)
+  - ตัวกรองทุกประเภท (Desktop): [desktop_filter_type_all](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_filter_type_all_1781495539604.png)
+  - ตัวกรองสถานะยังไม่อนุมัติ (Desktop): [desktop_status_pending](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_status_pending_1781495547255.png)
+  - ตัวกรองสถานะรอจ่าย (Desktop): [desktop_status_awaiting](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_status_awaiting_1781495558096.png)
+  - ตัวกรองสถานะชำระบางส่วน (Desktop): [desktop_status_partial](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_status_partial_1781495566263.png)
+  - ตัวกรองสถานะเสร็จสิ้น (Desktop): [desktop_status_completed](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_status_completed_1781495573383.png)
+  - ตัวกรองสถานะยกเลิก (Desktop): [desktop_status_cancelled](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_status_cancelled_1781495581940.png)
+  - ตัวกรองสถานะยกเลิก/เปลี่ยน Supplier (Desktop): [desktop_status_cancelled_supplier](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_status_cancelled_supplier_1781495589426.png)
+  - ตัวกรองทุกสถานะ (Desktop): [desktop_status_all](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_status_all_1781495596411.png)
+  - หน้าต่างตรวจสอบรายละเอียดบิล (Desktop Modal): [desktop_bill_detail](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/desktop_bill_detail_1781495606722.png)
+  - แท็บประวัติเปลี่ยนตัวคู่ค้า (Mobile): [mobile_tab_history](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/mobile_tab_history_1781495624826.png)
+  - แท็บบิลรับซื้อหลัก (Mobile): [mobile_tab_bills](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/mobile_tab_bills_1781495631085.png)
+  - ลิ้นชักตัวกรองสไลด์เปิด (Mobile Filter Drawer): [mobile_filter_drawer_open](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/mobile_filter_drawer_open_1781495639948.png)
+  - ผลลัพธ์กรอง STOCK (Mobile): [mobile_filter_stock_applied](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/mobile_filter_stock_applied_1781495647475.png)
+  - ผลลัพธ์กรอง TRADING (Mobile): [mobile_filter_trading_applied](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/mobile_filter_trading_applied_1781495661662.png)
+  - รายละเอียดบิลบนมือถือ (Mobile Detail Dialog): [mobile_bill_detail](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/mobile_bill_detail_1781495681604.png)
+
+### 9. อัปเดตนโยบายการตรวจหาจุดบกพร่องทางสายตา (Visual Self-Audit & "Eh" Policy)
+- **การดำเนินการ:** บันทึกข้อตกลงการพัฒนาลงในไกด์ไลน์ [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md) ว่าด้วยเรื่องพฤติกรรมการวิเคราะห์และตรวจเช็คจุดบกพร่องทางสายตาด้วยตนเองก่อนเสนอปรับปรุง (Proactive Visual Self-Audit & "Eh" Policy) โดยกำหนดให้เอเจนต์สังเกตและเสนอแนะแนวทางแก้ไขให้ผู้ใช้ตัดสินใจเลือกทุกครั้งที่เจอปัญหาทางกายภาพของหน้าจอ เช่น ข้อความเบียดทับ หรือตารางไม่ยืดหยุ่น เพื่อความเรียบร้อยและรักษาคุณภาพ UI
+
+### 10. ปรับนโยบายการทดสอบตัวกรองเพื่อประหยัดเวลา (Filter Sample Testing Optimization)
+- **การดำเนินการ:** ปรับลดข้อกำหนดการตรวจสอบฟังก์ชันคัดกรองตัวกรอง (Filters) บนหน้าจอ ในคู่มือ [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md) โดยกำหนดให้ทำเพียงการสุ่มตรวจสอบบางเงื่อนไขที่เป็นตัวแทน (Sample testing เช่น กรอง STOCK 1 ครั้ง และ กรองสถานะ 1 ครั้ง) เพื่อยืนยันว่าการทำงานเชื่อมโยงถูกต้องก็พอ ไม่จำเป็นต้องไล่กดสลับสปินเนอร์เพื่อตรวจจนครบทุกตัวปุ่ม เพื่อลดเวลาในการรอคอยและประหยัดการทำงานของเซสชันประมวลผลตามคำสั่งล่าสุดของผู้ใช้
+
+### 11. แก้ไขปัญหา UI ตารางล้นและข้อความซ้อนทับกันในหน้าบิลขาย/ซื้อ (Table Text Overlapping Fix)
+- **การดำเนินการ:** แก้ไขโค้ดใน [TransactionBillsPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/daily/TransactionBillsPageClient.tsx) เพื่อแก้ไขปัญหาทางกายภาพของการแสดงผลตารางข้อมูล (Desktop Mode) สำหรับหน้าบิลขายและบิลซื้อ:
+  - **คอลัมน์ "เลขที่" และ "ลูกค้า":** ใส่ CSS class `truncate` และเพิ่ม tooltip อัตโนมัติด้วยคุณลักษณะ `title={...}` ป้องกันการล้นช่องและทับซ้อนกับคอลัมน์อื่นอย่างสมบูรณ์แบบ
+  - **คอลัมน์ "GP / Margin":** ปรับเปลี่ยน Spacing และ Typography ให้สวยงามเป็นระเบียบตามสไตล์ AcexPOS Dashboard โดยให้ตัวเลขหลักและเปอร์เซ็นต์ย่อยจัดวางบรรทัดที่เหมาะสม (`space-y-0.5` และ `leading-tight`) ลดขนาดฟอนต์ของเปอร์เซ็นต์เป็น `text-[10px]` และเปลี่ยนสีให้จางลงเป็นสี `text-slate-400`
+  - **คอลัมน์ "อัพเดตล่าสุด":** จำกัดความกว้างของตัวอีเมล/ชื่อผู้แก้ไขด้วย `truncate` และจัดเรียงคู่กับวันเวลาให้อ่านง่าย
+- **ผลการคอมไพล์และการตรวจสอบ (Technical Validation):**
+  - รัน `type-check` ผ่านสำเร็จ 100% ไม่มีข้อผิดพลาด
+  - รัน `lint` (eslint) ผ่านสำเร็จ 100% ไม่มีข้อผิดพลาดในไฟล์ที่ทำการแก้ไข
+- **ภาพหลักฐานการทดสอบตารางบิลขายหลังอัปเดต:** [sales_bills_fixed_table](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/sales_bills_fixed_table_1781496032333.png)
+
+### 12. ปรับปรุงสไตล์และแก้ไขปัญหากล่องสถิติและตารางข้อมูลหน้าประวัติเปลี่ยน Supplier (Supplier Swap History UI Polish - Final)
+- **การดำเนินการ:** ปรับปรุงโครงสร้างของส่วนประกอบหน้าจอ "ประวัติเปลี่ยน Supplier ในบิล" ใน [BillSwapHistoryPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/daily/BillSwapHistoryPageClient.tsx):
+  - **KPI Cards ด้านบน:** ยกเลิกการใช้แบบ Left-border indicator cards (ขอบซ้ายหนา) ตามฟีดแบ็กของผู้ใช้ และเปลี่ยนมาใช้ดีไซน์หลักตามมาตรฐาน **Peach UI / AcexPOS** (การ์ดขาวมนบาง `bg-white shadow-sm border border-slate-200 rounded-xl` มีไอคอนวงกลมสีพาสเทลอ่อนอยู่ด้านซ้าย และข้อความชื่อกับค่าตัวเลขสถิติเด่นชัดอยู่ทางขวา)
+  - **ตรรกะสีค่าศูนย์ (Zero Neutral Slate Gray):** เพิ่มการทำงานใน `getDiffTextColors(diff)` ให้รองรับเมื่อส่วนต่างเท่ากับ `0.00` ให้เปลี่ยนสีวงกลมพาสเทลไอคอนเป็นสีเทา (`bg-slate-100 text-slate-600`) และตัวเลขผลลัพธ์เป็นสีเทาเข้ม (`text-slate-900`) ไม่ปล่อยเป็นสีเขียวหรือแดง เพื่อความถูกต้องตามหลักการเงินการบัญชี
+  - **ตาราง Desktop:** ห่อหุ้มตารางด้วยคอนเทนเนอร์ที่มีขอบมนบางนุ่มตา (`rounded-md border border-slate-100 bg-white shadow-sm`)
+  - **คอลัมน์ เลขที่บิล, Supplier เดิม, Supplier ใหม่, สินค้า และเหตุผล:** ใส่ CSS `truncate` และเพิ่ม HTML title tooltip เพื่อย่นคำที่ยาวผิดปกติ ป้องกันตารางล้นและอักษรซ้อนทับกัน
+- **การปรับปรุงเอกสารแนวทางดีไซน์:**
+  - บันทึกความชอบของผู้ใช้และข้อห้ามเกี่ยวกับ Left-border cards รวมถึงกติกาตรรกะสีตัวเลขผลลัพธ์ที่เป็นศูนย์ลงในคู่มือ [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md) เรียบร้อยเพื่อเป็นแนวทางอ้างอิงให้เอเจนต์ในรอบถัดๆ ไป
+- **ผลการคอมไพล์และการตรวจสอบ (Technical Validation):**
+  - รัน `type-check` และ `lint` (eslint) บน `@ns-scrap-erp/next` ผ่านสำเร็จ 100% ปราศจาก Error ในตัว Component
+- **ภาพหลักฐานการปรับปรุงหน้าจอประวัติเปลี่ยน Supplier:** [kpi_cards_neutral_gray](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/kpi_cards_status_1781496817967.png) (แสดงผลการ์ด Coins ส่วนต่าง 0.00 เป็นสีเทาอ่อนพาสเทลตามแนวทาง Peach UI ที่ผ่านการอนุมัติ)
+
+### 13. ซ่อนช่องกรอก "เลขที่เอกสาร" (Auto-generated) ในแบบฟอร์มคลังสินค้า (Stock Operations UI)
+- **การดำเนินการ:** แก้ไขคอมโพเนนต์ร่วม `<BaseDateDoc />` ใน [StockOperationPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/stock/StockOperationPageClient.tsx) เพื่อซ่อนกล่องกรอกข้อมูล "เลขที่เอกสาร" (Document Number) เนื่องจากระบบฝั่งเซิร์ฟเวอร์จะสร้างให้อัตโนมัติ (Auto-generated) ในตอนบันทึกส่งฟอร์มใหม่อยู่แล้ว
+- **ผลลัพธ์:** ผู้ใช้งานจะไม่เห็นช่อง "เลขที่เอกสาร" ในหน้าต่าง Modal "ปรับเกรดสินค้า" (Grade Adjustment) และ "ปรับสต๊อกสินค้า" (Stock Adjustment) อีกต่อไป ป้องกันการสับสนของข้อมูลและลดการกรอกฟิลด์ที่ไม่จำเป็น
+- **สถานะ:** เสร็จสมบูรณ์
+- **ภาพหลักฐานการทดสอบหน้าจอ:** [grade_adjustment_no_doc_no](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/grade_adjustment_no_doc_no_1781497331376.png) (แสดงผลกล่อง Modal ปรับเกรดสินค้าที่ซ่อนช่องเลขที่เอกสารไปแล้ว เลย์เอาต์สมมาตรและสะอาดตา)### 14. แก้ไขปัญหาเลือกสินค้าไม่ได้ใน SearchCombobox และปรับฟิลด์ Shift ในหน้าใบสั่งผลิต
+- **การดำเนินการ:**
+  - **แก้ไข SearchCombobox:** แก้ไขปัญหาใหญ่ที่ Radix UI Dialog focus trap บล็อกการคลิกปุ่ม Portal ที่อยู่ภายนอก Dialog DOM tree โดยปรับปรุงให้ `SearchCombobox` ทำการตรวจหาและตั้ง `scopedPortalHost` เป็น Dialog Content element (`[role="dialog"]`) เพื่อเรนเดอร์ dropdown panel ภายใต้ Dialog DOM tree ทันที ทำให้อีเวนต์ pointerdown/click ของเมาส์ผ่านทะลุเข้าไปทำงานและแก้ไขได้ 100%
+  - **Click Outside & Capturing Phase:** เปลี่ยนระบบปิด dropdown จากเดิมที่ใช้ input `onBlur` (มีปัญหา race condition กับ timeout) มาใช้ Click Outside handler บน `document` ร่วมกับ `onMouseDownCapture` และ `onTouchStartCapture` บนตัวเลือกเพื่อหยุดการบล็อกของ Radix UI
+  - **ปรับฟิลด์ Shift:** เปลี่ยนช่องกะการทำงาน (Shift) ใน [ProductionOrdersPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/production/ProductionOrdersPageClient.tsx) จาก `<input>` เป็น `<select>` มีตัวเลือก "เช้า" และ "บ่าย" ตามสไตล์ AcexPOS
+  - **ข้อตกลงและกฎเหล็กการทดสอบ:** บันทึกข้อกำหนดความปลอดภัยของข้อมูลหลัก "ห้ามเพิ่มข้อมูลสินค้าหรือข้อมูลหลักเองในการทดสอบเด็ดขาด ให้ใช้เฉพาะสินค้าเดิมที่มีอยู่จริงของโรงงานเท่านั้น" ลงในเอกสารแนวทาง [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md) และเอกสารติดตามงานเรียบร้อยเพื่อความโปร่งใสและถูกต้องของข้อมูล
+- **ผลลัพธ์การตรวจสอบ (E2E Test):**
+  - รัน `type-check` และ `lint` บนเครื่องโลคอลผ่านสำเร็จ 100%
+  - จำลองความจริงผ่าน Browser subagent คลิกเลือกสินค้าตัวแรก **"SKU001 - กระทะดำ, ผัด"** โดยไม่มีการพิมพ์ค้นหา และกดบันทึกสำเร็จ จนเกิดรายการใบสั่งผลิตใหม่รหัส **`PO2606-0003`**
+  - ภาพถ่ายโมดอลหลังกดเลือก: [dialog_after_click_product](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/dialog_after_click_product_1781499177516.png)
+  - ภาพตารางหลักหลังสร้างใบสั่งผลิตสำเร็จ: [production_orders_with_new_order](file:///C:/Users/pc/.gemini/antigravity-ide/brain/73b25086-46c1-43bb-8b9d-0229deaeb181/production_orders_with_new_order_1781499258928.png)
+
+### 15. จัด responsive หน้ารายการใบสั่งผลิตและรายละเอียด (Production Orders Responsive - Final)
+- **การดำเนินการ:** ปรับปรุง Responsive ในหน้าใบสั่งผลิต [ProductionOrdersPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/production/ProductionOrdersPageClient.tsx):
+  - **Mobile Toolbar:** เพิ่มปุ่ม "+ สร้าง" สี Slate-900 ขนาดเล็กกระชับ (h-9) ลงใน Toolbar สำหรับจอมือถือถัดจากปุ่มตัวกรอง เพื่ออำนวยความสะดวกในการกดสร้างใบสั่งผลิตบนอุปกรณ์ขนาดเล็ก
+  - **Modal Footer:** ตกแต่งปุ่มปิดและปุ่มบันทึกใน footer ของใบสั่งผลิต:
+    - ปุ่มยกเลิก/ปิด: เปลี่ยนจากปุ่มปกติมีกรอบเป็น Text-only button ไร้กรอบ (`bg-transparent text-slate-500 hover:text-slate-700 border-0 outline-none transition-colors`) ชิดขวา
+    - ปุ่มบันทึก/ตกลง: ใช้เฉดสีกรมท่าเข้มพรีเมียม (`bg-[#0F172A] hover:bg-[#1E293B] font-semibold text-white transition-colors`) ตามมาตรฐาน Peach UI
+  - **Product Stock Preview:** ปรับตารางสต๊อกสินค้าที่จะผลิตให้รองรับ Responsive:
+    - แสดงผลในรูปแบบ Desktop table ตามปกติบนจอใหญ่ (`hidden md:block`)
+    - ยุบเป็นกล่องการ์ดแนวตั้งกระชับ (Mobile Dense Card List) บนจอมือถือ (`block md:hidden`) เพื่อหลีกเลี่ยง Horizontal Scrollbar
+  - **Metric Cards ใน Modal รายละเอียด:** ปรับปรุงดีไซน์ Metric Cards 6 กล่องด้านบนของ Modal ให้สอดคล้องกันโดยใช้กรอบบางมน `bg-white shadow-sm border border-slate-200 rounded-xl`
+- **ผลการคอมไพล์และการตรวจสอบ (Technical Validation):**
+  - รัน `type-check` และ `lint` บนเครื่องโลคอลผ่านสำเร็จ 100%
+  - ทดสอบความถูกต้องบนเบราว์เซอร์ผ่าน Browser Subagent ใน viewport 375px ยืนยันว่าไม่มีส่วนประกอบใดหลุดล้น มีการจัดวางที่สวยงามและใช้งานได้ง่าย
+

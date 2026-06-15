@@ -6,6 +6,7 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
+import { Plus } from 'lucide-react'
 
 type Category = { availableForSale: boolean; code: string; name: string; stockEffect: string }
 type ProductionMovementRow = {
@@ -344,6 +345,18 @@ export function ProductionOrdersPageClient() {
           <span className="px-1 text-sm font-medium">หน้า {data?.page ?? page} / {totalPages}</span>
           <button className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-50 bg-white text-slate-700 hover:bg-slate-50 text-sm" disabled={page >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
         </div>
+      </div>
+
+      {/* Floating Action Button (FAB) for Mobile */}
+      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+        <button
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
+          onClick={() => setModalMode('create')}
+          type="button"
+          aria-label="เพิ่มใบสั่งผลิต"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
       </div>
 
       {modalMode ? <ProductionOrderModal mode={modalMode} row={selectedRow} onClose={closeModal} onRefreshRow={refreshSelectedOrder} /> : null}
@@ -765,7 +778,16 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                   <SelectField error={createErrors.destinationWarehouseCode} label="คลังรับผลผลิต *" placeholder="เลือกคลังรับผลผลิต" value={createForm.destinationWarehouseCode} options={branchWarehouses} onChange={(destinationWarehouseCode) => updateCreateForm('destinationWarehouseCode', destinationWarehouseCode)} />
                   <SelectField label="เครื่องจักร" allowBlank value={createForm.machineCode} options={options.machines} onChange={(machineCode) => updateCreateForm('machineCode', machineCode)} />
                   <SelectField label="ไลน์ผลิต" allowBlank value={createForm.productionLineCode} options={options.productionLines} onChange={(productionLineCode) => updateCreateForm('productionLineCode', productionLineCode)} />
-                  <FormField label="Shift"><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={createForm.shift} onChange={(event) => updateCreateForm('shift', event.target.value)} /></FormField>
+                  <FormField label="Shift">
+                    <select
+                      className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white h-9 text-sm outline-none font-sans text-slate-800"
+                      value={createForm.shift}
+                      onChange={(event) => updateCreateForm('shift', event.target.value)}
+                    >
+                      <option value="เช้า">เช้า</option>
+                      <option value="บ่าย">บ่าย</option>
+                    </select>
+                  </FormField>
                   <FormField label="หมายเหตุ"><input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={createForm.notes} onChange={(event) => updateCreateForm('notes', event.target.value)} /></FormField>
                   <div className="md:col-span-3">
                     <ProductStockPreview
@@ -841,9 +863,24 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
           ) : null}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50" type="button" onClick={() => onClose(false)}>ปิด</button>
-          {isCreate ? <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50" disabled={isSaving} type="button" onClick={() => void submitCreate()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button> : null}
+        <div className="flex flex-wrap justify-end items-center gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
+          <button 
+            className="rounded-md px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 bg-transparent border-0 outline-none transition-colors" 
+            type="button" 
+            onClick={() => onClose(false)}
+          >
+            {isCreate ? 'ยกเลิก' : 'ปิด'}
+          </button>
+          {isCreate ? (
+            <button 
+              className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50" 
+              disabled={isSaving} 
+              type="button" 
+              onClick={() => void submitCreate()}
+            >
+              {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+            </button>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
@@ -900,7 +937,7 @@ function MovementPanel({
       ) : null}
 
       <div className="overflow-x-auto rounded-md border border-slate-200">
-        <table className="w-full text-xs">
+        <table className="hidden md:table w-full text-xs">
           <thead className="bg-slate-100">
             <tr>
               <th className="p-2 text-left">วันที่</th>
@@ -956,6 +993,59 @@ function MovementPanel({
             ) : null}
           </tbody>
         </table>
+
+        <div className="block md:hidden divide-y divide-slate-100 bg-white">
+          {rows.map((row, index) => (
+            <div key={index} className={`p-4 space-y-2 text-xs ${row.status === 'Reversed' ? 'bg-slate-50/50 text-slate-400 line-through' : ''}`}>
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <span className="font-semibold text-slate-900 text-sm leading-tight block">{index + 1}. {row.productName}</span>
+                  <span className="text-[10px] text-slate-400 font-mono block">{row.productCode}</span>
+                </div>
+                <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${row.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  {row.status}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 py-1.5 border-t border-b border-slate-100/50 text-slate-600">
+                <div><span className="text-slate-400 font-medium">วันที่:</span> {formatDateDisplay(row.date)}</div>
+                <div><span className="text-slate-400 font-medium">เลขที่:</span> <span className="font-mono">{row.docNo}</span></div>
+                <div><span className="text-slate-400 font-medium">คลัง:</span> {row.warehouseName} {row.stockStatus ? `[${row.stockStatus}]` : ''}</div>
+                <div><span className="text-slate-400 font-medium">Lot No.:</span> <span className="font-mono">{row.lotNo || '-'}</span></div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2 text-center py-2 bg-slate-50 rounded-md">
+                <div>
+                  <span className="text-[9px] text-slate-400 block">น้ำหนัก (กก.)</span>
+                  <span className="font-bold text-slate-700 tabular-nums">{formatMoney(row.qty)}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-400 block">ราคา/กก.</span>
+                  <span className="font-medium text-slate-500 tabular-nums">{formatMoney(row.unitCost)}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-400 block">รวมมูลค่า</span>
+                  <span className="font-bold text-blue-700 tabular-nums">{formatMoney(row.totalCost)}</span>
+                </div>
+              </div>
+              
+              {canWrite && row.status === 'Active' && (
+                <div className="flex justify-end pt-1">
+                  <button
+                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                    type="button"
+                    onClick={() => onReverse(row.docNo)}
+                  >
+                    Reverse
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          {rows.length === 0 ? (
+            <div className="p-6 text-center text-slate-400">ยังไม่มีรายการเคลื่อนไหว</div>
+          ) : null}
+        </div>
       </div>
     </div>
   )
@@ -984,7 +1074,9 @@ function ProductStockPreview({
       <h5 className="font-bold text-indigo-800 text-xs flex items-center gap-1.5">
         📦 ข้อมูล Stock ปัจจุบันของสินค้าที่จะผลิต: <span className="font-normal text-slate-600">{stock.productName} ({stock.productCode})</span>
       </h5>
-      <div className="overflow-x-auto rounded-md bg-white border border-indigo-100">
+      
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white border border-indigo-100">
         <table className="w-full text-xs">
           <thead className="bg-indigo-50 text-indigo-700">
             <tr>
@@ -1014,6 +1106,37 @@ function ProductStockPreview({
             ) : null}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden divide-y divide-indigo-100/60 bg-white rounded-md border border-indigo-100 overflow-hidden shadow-sm">
+        {stock.rows.map((row, index) => (
+          <div key={index} className="p-3 space-y-2 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-slate-700">{stock.branchCode} / {destinationWarehouseName}</span>
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">{row.status}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center py-1.5 bg-indigo-50/30 rounded-md">
+              <div>
+                <span className="text-[9px] text-slate-400 block">คงเหลือ (กก.)</span>
+                <span className="font-bold text-slate-900 tabular-nums">{formatMoney(row.qty)}</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-slate-400 block">เฉลี่ย/กก.</span>
+                <span className="font-medium text-slate-500 tabular-nums">{formatMoney(row.avgCost)}</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-slate-400 block">รวมมูลค่า</span>
+                <span className="font-bold text-indigo-700 tabular-nums">{formatMoney(row.value)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+        {stock.rows.length === 0 ? (
+          <div className="p-4 text-center text-slate-400 font-semibold text-xs">
+            ไม่มีของในคลังนี้ (เป็นศูนย์)
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -1063,7 +1186,7 @@ function MiniMetric({ label, tone, value }: { label: string; tone: 'amber' | 'em
 
 function Metric({ label, value, tone = 'normal' }: { label: string; tone?: 'normal' | 'danger'; value: string }) {
   return (
-    <div className="rounded-md bg-white p-3 shadow border border-slate-200/50">
+    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-3">
       <div className="text-xs text-slate-500 font-semibold">{label}</div>
       <div className={`mt-1 text-lg font-bold ${tone === 'danger' ? 'text-red-700' : 'text-slate-900'}`}>{value}</div>
     </div>

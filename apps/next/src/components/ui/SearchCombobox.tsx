@@ -47,6 +47,7 @@ export function SearchCombobox({
   const hasInlineRequired = label.trim().endsWith('*')
   const labelText = hasInlineRequired ? label.trim().slice(0, -1).trimEnd() : label
   const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
   const portalHostRef = useRef<HTMLElement | null>(null)
   const selectedOption = useMemo(() => options.find((option) => option.id === value) ?? null, [options, value])
@@ -66,7 +67,7 @@ export function SearchCombobox({
   useEffect(() => {
     const input = inputRef.current
     if (!input || typeof document === 'undefined') return
-    const scopedPortalHost = input.closest('[data-combobox-portal-root="true"]')
+    const scopedPortalHost = input.closest('[role="dialog"]') || input.closest('[data-combobox-portal-root="true"]')
     const resolvedPortalHost = scopedPortalHost instanceof HTMLElement ? scopedPortalHost : document.body
     portalHostRef.current = resolvedPortalHost
     setPortalHost(resolvedPortalHost)
@@ -105,6 +106,36 @@ export function SearchCombobox({
       window.removeEventListener('scroll', updatePanelRect, true)
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as HTMLElement
+      if (containerRef.current?.contains(target)) return
+      
+      const optionsPanel = document.getElementById(`${inputId}-options`)
+      if (optionsPanel?.contains(target)) return
+
+      const exactMatch = options.find((option) => option.label.toLowerCase() === query.trim().toLowerCase())
+      if (exactMatch) {
+        onChange(exactMatch.id)
+        setQuery(exactMatch.label)
+      } else if (selectedOption) {
+        setQuery(selectedOption.label)
+      } else {
+        setQuery('')
+      }
+      setOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('touchstart', handleOutsideClick)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('touchstart', handleOutsideClick)
+    }
+  }, [open, options, query, selectedOption, onChange, inputId])
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -145,7 +176,7 @@ export function SearchCombobox({
   }
 
   return (
-    <div className="relative" data-error-key={errorKey}>
+    <div ref={containerRef} className="relative" data-error-key={errorKey}>
       {!hideLabel ? <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor={inputId}>{labelText}{hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}</label> : null}
       <Input
         ref={inputRef}
@@ -172,19 +203,6 @@ export function SearchCombobox({
           if (!isSelectedValueQuery) return
           if (!shouldAutoSelectText()) return
           requestAnimationFrame(() => inputRef.current?.select())
-        }}
-        onBlur={() => {
-          if (disabled) return
-          window.setTimeout(() => {
-            const exactMatch = options.find((option) => option.label.toLowerCase() === query.trim().toLowerCase())
-            if (exactMatch) {
-              onChange(exactMatch.id)
-              setQuery(exactMatch.label)
-            } else if (selectedOption) {
-              setQuery(selectedOption.label)
-            }
-            setOpen(false)
-          }, 120)
         }}
         onChange={(event) => {
           if (disabled) return
@@ -257,9 +275,16 @@ export function SearchCombobox({
                   role="option"
                   type="button"
                   onMouseEnter={() => setHighlightedIndex(index)}
-                  onMouseDown={(event) => {
-                    event.preventDefault()
+                  onMouseDownCapture={(event) => {
+                    event.stopPropagation()
                     selectOption(option)
+                  }}
+                  onTouchStartCapture={(event) => {
+                    event.stopPropagation()
+                    selectOption(option)
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault()
                   }}
                 >
                   <span className="block font-medium">{option.label}</span>
