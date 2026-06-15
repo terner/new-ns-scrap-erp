@@ -3,8 +3,10 @@ title: จำหน่ายทรัพย์สิน Page Flow
 tags:
   - page-flow
   - menu
+  - finance-accounting
+  - fixed-assets
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-16
 route: /finance-accounting/asset-disposal
 ---
 
@@ -17,84 +19,81 @@ route: /finance-accounting/asset-disposal
 | Menu section | Finance Accounting |
 | Route | `/finance-accounting/asset-disposal` |
 | Page | จำหน่ายทรัพย์สิน |
-| Current Next | accepted code baseline |
+| Current Next | asset disposal/reverse baseline |
 
 ## Canonical References
 
-[[Finance Accounting Flow]], [[Menu Page Flow Catalog]]
+[[Finance Accounting Flow]], [[Fixed Assets Page Flow]], [[ค่าเสื่อมราคา Page Flow]]
 
 ## Flow Baseline
 
-finance/accounting read model: จำหน่ายทรัพย์สิน
+จำหน่ายทรัพย์สินเป็นขั้นตอนปิด lifecycle ของ asset. ระบบเลือก asset ที่ยังไม่ถูกจำหน่าย, ดึง NBV ล่าสุดจาก `assets + active depreciations`, บันทึก disposal, คำนวณ gain/loss, และเปลี่ยนสถานะ asset.
 
 ## Page Responsibilities
 
-- ใช้เป็น accounting/finance report read model จาก operational facts
-- แสดง report-specific cutoff/as-of/currency/period
-- drilldown ไป source finance/stock/payment/sales/purchase data
-- แสดง read model/report ตาม filter ของหน้า
-- รองรับ search/filter/date range/sort/export ตาม design baseline
-- drilldown ไป source document หรือ source report ที่เกี่ยวข้อง
-- แสดง created/document/due/as-of date แยกกันตาม Document Aging Policy
+- แสดง asset ที่ยังจำหน่ายได้ พร้อม NBV ล่าสุด
+- สร้าง disposal ประเภท `Sale`, `Scrap`, `Write Off`, `Lost`, `Other`
+- บันทึกราคาขาย, customer optional, receipt ref optional, reason, notes
+- คำนวณ `gainLoss = sellingPrice - NBV`
+- เปลี่ยนสถานะ asset เป็น `Sold`, `Disposed`, หรือ `Lost`
+- Reverse disposal ด้วยเหตุผลและคืนสถานะ asset เป็น `Active`
 
 ## Non-Responsibilities
 
-- ไม่สร้างหรือแก้ business transaction
-- ไม่เขียน stock_ledger หรือ bank_statement
-- ไม่เปลี่ยนสถานะเอกสารต้นทาง
-- ไม่เป็น source of truth แทนเอกสาร/fact table ต้นทาง
+- ไม่สร้าง customer receipt หรือ bank statement จากราคาขาย
+- ไม่ post GL disposal journal ใน dev-scope batch นี้
+- ไม่ลบ disposal row ตอน reverse
 
-## Lifecycle / Read Flow
+## Calculation
 
-| Step | User action | System result |
-|---|---|---|
-| 1 | เปิดหน้า | โหลด read model จาก Current API |
-| 2 | กรองข้อมูล | apply filter/date/search/sort ฝั่ง API หรือ client ตาม contract |
-| 3 | ตรวจรายละเอียด | drilldown ไป source document/report ที่เกี่ยวข้อง |
-| 4 | Export/print | ส่งออกข้อมูลตาม filter ปัจจุบันโดยไม่แก้ source |
+```text
+Accumulated Depreciation = sum(active depreciation rows)
+NBV = max(Salvage Value, Net Asset Cost - Accumulated Depreciation)
+Gain/Loss = Selling Price - NBV
+```
+
+Status mapping:
+
+- `Sale` -> asset status `Sold`
+- `Lost` -> asset status `Lost`
+- `Scrap`, `Write Off`, `Other` -> asset status `Disposed`
 
 ## API / Data Contract
 
-### Current API
-
 - `GET /api/finance-accounting/asset-disposal`
+- `POST /api/finance-accounting/asset-disposal`
+- `PATCH /api/finance-accounting/asset-disposal` with `action=reverse`
 
-### Data Contract
+Source tables:
 
-- API ต้องระบุ source facts ที่ใช้ประกอบตัวเลขของหน้า
-- list/report/export ต้องใช้ filter definition เดียวกัน
-- source links ต้องใช้ outward document/code ใน UI และ resolve internal id ฝั่ง server
-- ถ้าใช้ legacy-derived calculation ต้องบันทึก formula ก่อนแก้ runtime
+- `assets`
+- `depreciations`
+- `asset_disposals`
+- `customers`
 
 ## Validation / Status Rules
 
-- report ต้องระบุ actual vs forecast/accrual assumption
-- ห้ามรวมสกุลเงินหรือหน่วยโดยไม่มี conversion policy
-- ตัวเลขต้อง reconcile กับ source facts ที่ระบุ
-- filter/export ต้องใช้ condition ชุดเดียวกับตาราง
-- ต้องแยกหน่วย/สกุลเงิน/branch/date cutoff เมื่อเกี่ยวข้อง
-- cancelled/reversed source ต้องแสดงหรือ exclude ตาม report definition ชัดเจน
+- ต้องเลือก asset ที่ยังไม่เป็น `Sold`, `Disposed`, `Lost`, `Inactive`
+- selling price ต้องไม่ติดลบ
+- reverse ต้องมี reason
+- disposal row ใช้ status `approved` หรือ `reversed`
 
 ## Side Effects
 
-- read-only ไม่มี transaction side effect
-- export/print/report generation ไม่ mutate source data
+- Create writes `asset_disposals`
+- Create updates `assets.asset_status`
+- Reverse updates `asset_disposals.status/reversal metadata` and returns asset status to `Active`
+- ไม่มี GL/bank/stock side effect ใน batch นี้
 
-## Current Code Baseline
+## Legacy Comparison
 
-- Current `apps/next` page/API code is accepted as the P2 proof baseline as of 2026-06-11.
-- This page is a read-model/report surface; current APIs are `GET`-oriented and protected by report/finance permissions.
-- No transaction, stock ledger, bank statement, AP/AR settlement, or source document status side effect is expected from this page.
-- Future changes should reconcile formula/source/cutoff details here before changing runtime behavior.
-
-## Current Gap
-
-P2 proof completed against current Next page/API code. Remaining work is formula/source/cutoff refinement only when the target report definition changes or a page-specific discrepancy is found.
+- Legacy `view-assetDisposal` สร้าง disposal, คำนวณ NBV/gain-loss, และ update asset status
+- Target Next เพิ่ม persistent `asset_disposals` table และ reverse action เพื่อไม่ลบหรือแก้ history แบบไร้ร่องรอย
 
 ## Implementation Checklist
 
-- [x] Verify current API response shape and source tables
-- [ ] Verify legacy formula if current implementation is incomplete
-- [ ] Define drilldown route/source document links
-- [ ] Confirm export/print and date cutoff behavior
-- [ ] Update this file when report formula changes
+- [x] Verify legacy disposal behavior
+- [x] Add `asset_disposals` table
+- [x] Enable create disposal UI/API
+- [x] Enable reverse UI/API
+- [ ] Add receipt/bank/GL posting only after approved finance posting contract

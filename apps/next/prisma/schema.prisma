@@ -571,6 +571,7 @@ model assets {
   branches             branches?       @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   suppliers            suppliers?      @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   depreciations        depreciations[]
+  asset_disposals      asset_disposals[]
 
   @@schema("public")
 }
@@ -803,6 +804,7 @@ model customers {
   id                       BigInt                     @id @default(autoincrement())
   sales_id                 BigInt?
   customer_receipts        customer_receipts[]
+  asset_disposals          asset_disposals[]
   po_sells                 po_sells[]
   receipts                 receipts[]
   sales_bill_customer_advance_allocations sales_bill_customer_advance_allocations[]
@@ -846,15 +848,62 @@ model deletion_tombstones {
 }
 
 model depreciations {
-  date        DateTime  @db.Date
-  amount      Decimal   @db.Decimal
-  accumulated Decimal?  @default(0) @db.Decimal
-  nbv         Decimal?  @default(0) @db.Decimal
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
-  id          BigInt    @id @default(autoincrement())
-  asset_id    BigInt?
-  assets      assets?   @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  date            DateTime  @db.Date
+  amount          Decimal   @db.Decimal
+  accumulated     Decimal?  @default(0) @db.Decimal
+  nbv             Decimal?  @default(0) @db.Decimal
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  id              BigInt    @id @default(autoincrement())
+  asset_id        BigInt?
+  period_year     Int?
+  period_month    Int?
+  status          String    @default("posted")
+  posted_at       DateTime  @default(now()) @db.Timestamptz(6)
+  posted_by       String?
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_by      String?
+  reversed_at     DateTime? @db.Timestamptz(6)
+  reversed_by     String?
+  reversal_reason String?
+  assets          assets?   @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@index([asset_id, period_year, period_month, status], map: "idx_depreciations_asset_period_status")
+  @@index([status, date(sort: Desc), id(sort: Desc)], map: "idx_depreciations_status_date")
+  @@schema("public")
+}
+
+model asset_disposals {
+  id                     BigInt             @id @default(autoincrement())
+  disposal_no            String             @unique(map: "uq_asset_disposals_disposal_no")
+  asset_id               BigInt
+  disposal_date          DateTime           @db.Date
+  disposal_type          String
+  selling_price          Decimal            @default(0) @db.Decimal
+  book_value_at_disposal Decimal            @default(0) @db.Decimal
+  gain_loss              Decimal            @default(0) @db.Decimal
+  customer_id            BigInt?
+  customer_receipt_id    BigInt?
+  receipt_ref_no         String?
+  reason                 String?
+  notes                  String?
+  status                 String             @default("draft")
+  approved_at            DateTime?          @db.Timestamptz(6)
+  approved_by            String?
+  created_at             DateTime           @default(now()) @db.Timestamptz(6)
+  created_by             String?
+  updated_at             DateTime           @default(now()) @db.Timestamptz(6)
+  updated_by             String?
+  reversed_at            DateTime?          @db.Timestamptz(6)
+  reversed_by            String?
+  reversal_reason        String?
+  assets                 assets             @relation(fields: [asset_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customers              customers?         @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  customer_receipts      customer_receipts? @relation(fields: [customer_receipt_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([asset_id, disposal_date(sort: Desc), id(sort: Desc)], map: "idx_asset_disposals_asset_date")
+  @@index([status, disposal_date(sort: Desc), id(sort: Desc)], map: "idx_asset_disposals_status_date")
+  @@index([customer_id, disposal_date(sort: Desc), id(sort: Desc)], map: "idx_asset_disposals_customer_date", where: raw("(customer_id IS NOT NULL)"))
+  @@index([customer_receipt_id], map: "idx_asset_disposals_receipt", where: raw("(customer_receipt_id IS NOT NULL)"))
   @@schema("public")
 }
 
@@ -2323,6 +2372,7 @@ model customer_receipts {
   bank_statement_id            BigInt?                        @unique
   customer_receipt_allocations customer_receipt_allocations[]
   customer_receipt_status_logs customer_receipt_status_logs[]
+  asset_disposals              asset_disposals[]
   accounts                     accounts                       @relation(fields: [account_id], references: [id], onUpdate: NoAction)
   bank_statement               bank_statement?                @relation(fields: [bank_statement_id], references: [id], onUpdate: NoAction)
   branches                     branches?                      @relation(fields: [branch_id], references: [id], onDelete: Restrict, onUpdate: NoAction)

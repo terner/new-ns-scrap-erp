@@ -3,8 +3,10 @@ title: Fixed Assets Page Flow
 tags:
   - page-flow
   - menu
+  - finance-accounting
+  - fixed-assets
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-16
 route: /finance-accounting/asset-register
 ---
 
@@ -16,8 +18,8 @@ route: /finance-accounting/asset-register
 |---|---|
 | Menu section | Finance Accounting |
 | Route | `/finance-accounting/asset-register` |
-| Page | Fixed Assets |
-| Current Next | accepted code baseline |
+| Page | Fixed Assets / ทรัพย์สิน |
+| Current Next | asset lifecycle write baseline |
 
 ## Canonical References
 
@@ -25,76 +27,75 @@ route: /finance-accounting/asset-register
 
 ## Flow Baseline
 
-finance/accounting read model: Fixed Assets
+ทะเบียนทรัพย์สินเป็นจุดเริ่มของ asset lifecycle. ผู้ใช้สร้าง master ของทรัพย์สินก่อน แล้วข้อมูล `cost / salvage / useful life / depreciation method / status` จะถูกใช้ต่อโดยหน้า `ค่าเสื่อมราคา` และ `จำหน่ายทรัพย์สิน`.
 
 ## Page Responsibilities
 
-- ใช้เป็น accounting/finance report read model จาก operational facts
-- แสดง report-specific cutoff/as-of/currency/period
-- drilldown ไป source finance/stock/payment/sales/purchase data
-- แสดง read model/report ตาม filter ของหน้า
-- รองรับ search/filter/date range/sort/export ตาม design baseline
-- drilldown ไป source document หรือ source report ที่เกี่ยวข้อง
-- แสดง created/document/due/as-of date แยกกันตาม Document Aging Policy
+- สร้าง/แก้ไขทะเบียนทรัพย์สิน เช่น code, name, category, branch, supplier, purchase date, cost, VAT, net asset cost, salvage value, useful life, depreciation method, location, responsible person, serial/vehicle fields, notes
+- นำเข้า CSV/TSV ผ่าน preview ก่อน commit
+- ส่งออก CSV และดาวน์โหลด template
+- คำนวณ NBV, accumulated depreciation, monthly depreciation จาก `assets` + active `depreciations`
+- ปิดใช้งานทรัพย์สินแบบ non-destructive ด้วย status `Inactive` แทน legacy hard delete
+- ส่งต่อข้อมูลทรัพย์สิน Active ไปให้ depreciation/disposal flows
 
 ## Non-Responsibilities
 
-- ไม่สร้างหรือแก้ business transaction
-- ไม่เขียน stock_ledger หรือ bank_statement
-- ไม่เปลี่ยนสถานะเอกสารต้นทาง
-- ไม่เป็น source of truth แทนเอกสาร/fact table ต้นทาง
+- ไม่ hard-delete asset และไม่ cascade delete depreciation แบบ legacy
+- ไม่เขียน `stock_ledger` หรือ `bank_statement`
+- ไม่ post GL acquisition journal ใน dev-scope batch นี้
+- ไม่สร้าง AP/payment จากการซื้อทรัพย์สิน
 
-## Lifecycle / Read Flow
+## Lifecycle / Flow
 
 | Step | User action | System result |
 |---|---|---|
-| 1 | เปิดหน้า | โหลด read model จาก Current API |
-| 2 | กรองข้อมูล | apply filter/date/search/sort ฝั่ง API หรือ client ตาม contract |
-| 3 | ตรวจรายละเอียด | drilldown ไป source document/report ที่เกี่ยวข้อง |
-| 4 | Export/print | ส่งออกข้อมูลตาม filter ปัจจุบันโดยไม่แก้ source |
+| 1 | เปิดหน้า | โหลด asset rows, filters, branch/supplier/options, summary NBV |
+| 2 | กด `+ เพิ่มทรัพย์สิน` | เปิด form asset master |
+| 3 | บันทึก | validate code/name/cost/VAT/net cost/salvage/useful life และ create/update `assets` |
+| 4 | Import | parse CSV/TSV ฝั่ง client, preview duplicate/error ฝั่ง API, แล้ว commit เมื่อไม่มี error |
+| 5 | แก้ไข | โหลด row snapshot เข้าฟอร์ม แล้ว update asset master |
+| 6 | ปิดใช้งาน | เปลี่ยน `asset_status = Inactive` โดยไม่ลบ history |
 
 ## API / Data Contract
 
-### Current API
-
 - `GET /api/finance-accounting/asset-register`
+- `GET /api/finance-accounting/asset-register?template=csv`
+- `GET /api/finance-accounting/asset-register?format=csv`
+- `POST /api/finance-accounting/asset-register`
+- `POST action=previewImport|commitImport`
+- `PATCH action=deactivate`
 
-### Data Contract
+Source tables:
 
-- API ต้องระบุ source facts ที่ใช้ประกอบตัวเลขของหน้า
-- list/report/export ต้องใช้ filter definition เดียวกัน
-- source links ต้องใช้ outward document/code ใน UI และ resolve internal id ฝั่ง server
-- ถ้าใช้ legacy-derived calculation ต้องบันทึก formula ก่อนแก้ runtime
+- `assets`
+- `depreciations`
+- `branches`
+- `suppliers`
 
 ## Validation / Status Rules
 
-- report ต้องระบุ actual vs forecast/accrual assumption
-- ห้ามรวมสกุลเงินหรือหน่วยโดยไม่มี conversion policy
-- ตัวเลขต้อง reconcile กับ source facts ที่ระบุ
-- filter/export ต้องใช้ condition ชุดเดียวกับตาราง
-- ต้องแยกหน่วย/สกุลเงิน/branch/date cutoff เมื่อเกี่ยวข้อง
-- cancelled/reversed source ต้องแสดงหรือ exclude ตาม report definition ชัดเจน
+- `code`, `name`, `originalCost`, `netAssetCost` จำเป็น
+- `vatAmount` ต้องไม่เกิน `originalCost`
+- `salvageValue` ต้องไม่เกิน `netAssetCost`
+- `Straight Line` ต้องมี `usefulLifeMonths > 0`
+- `code` ต้อง unique ทั้งสร้าง/แก้/import
+- status ที่ใช้ใน lifecycle หลัก: `Active`, `Inactive`, `Fully Depreciated`, `Sold`, `Disposed`, `Lost`
 
 ## Side Effects
 
-- read-only ไม่มี transaction side effect
-- export/print/report generation ไม่ mutate source data
+- Create/update/import mutate `assets`
+- Deactivate mutate เฉพาะ `assets.asset_status`
+- ไม่มี GL/bank/stock side effect ใน batch นี้
 
-## Current Code Baseline
+## Legacy Comparison
 
-- Current `apps/next` page/API code is accepted as the P2 proof baseline as of 2026-06-11.
-- This page is a read-model/report surface; current APIs are `GET`-oriented and protected by report/finance permissions.
-- No transaction, stock ledger, bank statement, AP/AR settlement, or source document status side effect is expected from this page.
-- Future changes should reconcile formula/source/cutoff details here before changing runtime behavior.
-
-## Current Gap
-
-P2 proof completed against current Next page/API code. Remaining work is formula/source/cutoff refinement only when the target report definition changes or a page-specific discrepancy is found.
+- Legacy `view-assetRegister` รองรับ add/edit/delete/import/export และ hard-delete จะลบ depreciation ที่เกี่ยวข้อง
+- Target Next clone เปิด add/edit/import/export/deactivate แล้ว แต่เปลี่ยน delete เป็น deactivate เพื่อรักษา audit/history
 
 ## Implementation Checklist
 
-- [x] Verify current API response shape and source tables
-- [ ] Verify legacy formula if current implementation is incomplete
-- [ ] Define drilldown route/source document links
-- [ ] Confirm export/print and date cutoff behavior
-- [ ] Update this file when report formula changes
+- [x] Verify legacy asset register actions and fields
+- [x] Enable create/edit/import/export/deactivate UI
+- [x] Add server validation and duplicate-code protection
+- [x] Keep destructive delete excluded
+- [ ] Add acquisition GL posting only after FA5 posting/period contract is approved

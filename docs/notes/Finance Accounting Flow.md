@@ -6,18 +6,18 @@ tags:
   - read-model
   - flow
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-16
 ---
 
 # Finance Accounting Flow
 
-เอกสารนี้เป็น source หลักของหมวด `Finance / Accounting` ใน active Next app. สถานะปัจจุบันของหมวดนี้เป็น management/read baseline เป็นหลัก: อ่านข้อมูลจาก operational tables, asset/loan/equity/opening/historical tables และ helper report แล้วแสดงผลให้ผู้บริหาร/การเงินตรวจสอบ แต่ยังไม่ใช่ GL/statutory accounting close system
+เอกสารนี้เป็น source หลักของหมวด `Finance / Accounting` ใน active Next app. สถานะปัจจุบันของหมวดนี้เป็น management/report baseline พร้อม controlled write flow สำหรับ asset lifecycle เบื้องต้น ได้แก่ ทะเบียนทรัพย์สิน, ค่าเสื่อมราคา, และจำหน่ายทรัพย์สิน. หมวดนี้ยังไม่ใช่ GL/statutory accounting close system
 
 ## Shared Boundary
 
-- permission กลางของ API ชุดนี้คือ `finance.financials.view`
-- ทุกหน้าปัจจุบันเป็น `GET` read surface
-- write action จำนวนมากถูกปิดผ่าน `designState` เช่น asset disposal, depreciation run/reverse, loan import/payment, opening balance apply, historical data save
+- permission กลางของ API อ่านคือ `finance.financials.view`
+- write action ที่เปิดแล้วใช้ `finance.financials.manage` และต้องมี validation/reversal policy เฉพาะหน้า
+- Asset Register, Depreciation, และ Asset Disposal เปิด write flow เฉพาะ asset lifecycle; GL journal, statutory posting, bank/receipt posting, และ period close ยัง deferred
 - ห้ามให้ report page เขียน `bank_statement`, `stock_ledger`, PB/SB status, AP/AR allocation, GL posting หรือ asset/loan/equity state จนกว่าจะมี write-flow + audit + reversal design แยก
 
 ## Current API Map
@@ -34,9 +34,9 @@ updated: 2026-06-11
 | `/finance-accounting/pl-statement` | `GET /api/finance-accounting/pl-statement` | `from`, `to`, `branchId`, `transactionMode` | `buildPlStatement()` | read-only management P&L |
 | `/finance-accounting/balance-sheet` | `GET /api/finance-accounting/balance-sheet` | `asOf`, `branchId` | `buildBalanceSheet()` | read-only management balance sheet |
 | `/finance-accounting/cash-flow-statement` | `GET /api/finance-accounting/cash-flow-statement` | `from`, `to`, `branchId` | `buildCashFlowStatement()` | read-only management cash flow |
-| `/finance-accounting/asset-register` | `GET /api/finance-accounting/asset-register` | none | `assets`, `depreciations`, `branches`, `suppliers` | read-only register |
-| `/finance-accounting/depreciation` | `GET /api/finance-accounting/depreciation` | none | `assets`, `depreciations` | run/reverse disabled |
-| `/finance-accounting/asset-disposal` | `GET /api/finance-accounting/asset-disposal` | none | active `assets` + depreciation-derived NBV | disposal write disabled |
+| `/finance-accounting/asset-register` | `GET/POST/PATCH /api/finance-accounting/asset-register` | `q`, `category`, `status`, `format`, `template` | `assets`, `depreciations`, `branches`, `suppliers` | create/edit/import/export/deactivate enabled; GL acquisition posting deferred |
+| `/finance-accounting/depreciation` | `GET/POST/PATCH /api/finance-accounting/depreciation` | `month`, `year`, `periodMonth`, `periodYear` | `assets`, `depreciations` | preview/commit/reverse enabled; GL depreciation posting deferred |
+| `/finance-accounting/asset-disposal` | `GET/POST/PATCH /api/finance-accounting/asset-disposal` | none | `assets`, `depreciations`, `asset_disposals`, `customers` | create approved disposal and reverse enabled; receipt/bank/GL posting deferred |
 | `/finance-accounting/loan-contracts` | `GET /api/finance-accounting/loan-contracts` | none | `loans`, `loan_schedules`, `loan_payments` | save/import/payment disabled |
 | `/finance-accounting/loan-dashboard` | `GET /api/finance-accounting/loan-dashboard` | none | `loans`, `loan_schedules`, `loan_payments` | read-only |
 | `/finance-accounting/asset-overview` | `GET /api/finance-accounting/asset-overview` | `asOf`, `branchId` | `buildCashOthersSummary()` + `buildFinancialDashboard()` | read-only |
@@ -51,7 +51,7 @@ updated: 2026-06-11
 | Management financial statements | P&L, Balance Sheet, Cash Flow Statement, Financial Dashboard. These are report-derived statements from operational tables, not locked statutory statements yet. |
 | Cash/working capital planning | Cash Flow Analysis, CF Forecast Calendar, Working Capital, Stock Finance, Profit Leak. These explain cash pressure, inventory/AR/AP days, stock finance risk and margin leakage. |
 | Tax baseline | Tax / VAT / WHT reads transaction tax fields and tax calendar assumptions. It is not a filing ledger and has no filing lock/status today. |
-| Asset baseline | Asset Register, Depreciation, Asset Disposal, Asset Overview read asset/depreciation facts and NBV. Write/reverse/disposal behavior is intentionally disabled. |
+| Asset baseline | Asset Register creates/maintains asset master, Depreciation posts/reverses monthly depreciation rows, Asset Disposal closes/reverses asset lifecycle using latest NBV, and Asset Overview remains read-only. |
 | Loan/equity/opening/historical | Loan Contracts/Dashboard, Equity, Opening Balance, Historical Data read setup/support tables. Write paths need approval/audit/cutover design before enabling. |
 
 ## Validation Rules
@@ -68,6 +68,6 @@ updated: 2026-06-11
 - no normalized GL journal/posting layer yet
 - no statutory close/period lock
 - tax filing status and PP30/PND workflow are not implemented
-- asset acquisition/disposal/depreciation posting and reversal remain design-only
+- asset acquisition/disposal/depreciation GL posting remains deferred in this dev-scope batch; source lifecycle rows and reversals are enabled
 - loan payment posting to bank statement/interest/principal split remains design-only
 - opening balance and historical-data writes are disabled until cutover approval policy is defined

@@ -3,8 +3,10 @@ title: ค่าเสื่อมราคา Page Flow
 tags:
   - page-flow
   - menu
+  - finance-accounting
+  - fixed-assets
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-16
 route: /finance-accounting/depreciation
 ---
 
@@ -17,84 +19,81 @@ route: /finance-accounting/depreciation
 | Menu section | Finance Accounting |
 | Route | `/finance-accounting/depreciation` |
 | Page | ค่าเสื่อมราคา |
-| Current Next | accepted code baseline |
+| Current Next | depreciation run/reverse baseline |
 
 ## Canonical References
 
-[[Finance Accounting Flow]], [[Menu Page Flow Catalog]]
+[[Finance Accounting Flow]], [[Fixed Assets Page Flow]], [[จำหน่ายทรัพย์สิน Page Flow]]
 
 ## Flow Baseline
 
-finance/accounting read model: ค่าเสื่อมราคา
+ค่าเสื่อมราคาใช้ asset master จาก `Fixed Assets` เป็น source แล้วสร้างรายการค่าเสื่อมรายเดือนใน `depreciations`. ผลลัพธ์จะลด NBV ของ asset และถูกใช้ต่อใน Balance Sheet / Asset Disposal.
 
 ## Page Responsibilities
 
-- ใช้เป็น accounting/finance report read model จาก operational facts
-- แสดง report-specific cutoff/as-of/currency/period
-- drilldown ไป source finance/stock/payment/sales/purchase data
-- แสดง read model/report ตาม filter ของหน้า
-- รองรับ search/filter/date range/sort/export ตาม design baseline
-- drilldown ไป source document หรือ source report ที่เกี่ยวข้อง
-- แสดง created/document/due/as-of date แยกกันตาม Document Aging Policy
+- เลือกงวดเดือน/ปี
+- preview asset ที่ eligible ก่อน commit
+- commit ค่าเสื่อมแบบ idempotent ต่อ asset/period โดยไม่ run ซ้ำถ้ามี posted depreciation ที่ยังไม่ reversed
+- reverse depreciation row ด้วยเหตุผล โดยเปลี่ยน status เป็น `reversed`
+- อัปเดต asset เป็น `Fully Depreciated` เมื่อ NBV ลงถึง salvage value
 
 ## Non-Responsibilities
 
-- ไม่สร้างหรือแก้ business transaction
-- ไม่เขียน stock_ledger หรือ bank_statement
-- ไม่เปลี่ยนสถานะเอกสารต้นทาง
-- ไม่เป็น source of truth แทนเอกสาร/fact table ต้นทาง
+- ไม่เขียน `stock_ledger` หรือ `bank_statement`
+- ไม่ post GL depreciation journal ใน dev-scope batch นี้
+- ไม่ลบ depreciation row ตอน reverse
 
-## Lifecycle / Read Flow
+## Calculation
 
-| Step | User action | System result |
-|---|---|---|
-| 1 | เปิดหน้า | โหลด read model จาก Current API |
-| 2 | กรองข้อมูล | apply filter/date/search/sort ฝั่ง API หรือ client ตาม contract |
-| 3 | ตรวจรายละเอียด | drilldown ไป source document/report ที่เกี่ยวข้อง |
-| 4 | Export/print | ส่งออกข้อมูลตาม filter ปัจจุบันโดยไม่แก้ source |
+```text
+Depreciable Amount = Net Asset Cost - Salvage Value
+Monthly Depreciation = Depreciable Amount / Useful Life Months
+Accumulated Depreciation = sum(active depreciation rows)
+NBV = max(Salvage Value, Net Asset Cost - Accumulated Depreciation)
+```
+
+Eligibility:
+
+- asset status ต้องไม่เป็น `Inactive`, `Sold`, `Disposed`, `Lost`, `Fully Depreciated`
+- depreciation method ต้องไม่เป็น `No Depreciation` หรือ `Manual`
+- useful life ต้องมากกว่า 0
+- งวดเดียวกันต้องยังไม่มี active depreciation row สำหรับ asset นั้น
 
 ## API / Data Contract
 
-### Current API
+- `GET /api/finance-accounting/depreciation?month=MM&year=YYYY`
+- `POST /api/finance-accounting/depreciation` with `action=preview`
+- `POST /api/finance-accounting/depreciation` with `action=commit`
+- `PATCH /api/finance-accounting/depreciation` with `action=reverse`
 
-- `GET /api/finance-accounting/depreciation`
+Source tables:
 
-### Data Contract
-
-- API ต้องระบุ source facts ที่ใช้ประกอบตัวเลขของหน้า
-- list/report/export ต้องใช้ filter definition เดียวกัน
-- source links ต้องใช้ outward document/code ใน UI และ resolve internal id ฝั่ง server
-- ถ้าใช้ legacy-derived calculation ต้องบันทึก formula ก่อนแก้ runtime
+- `assets`
+- `depreciations`
 
 ## Validation / Status Rules
 
-- report ต้องระบุ actual vs forecast/accrual assumption
-- ห้ามรวมสกุลเงินหรือหน่วยโดยไม่มี conversion policy
-- ตัวเลขต้อง reconcile กับ source facts ที่ระบุ
-- filter/export ต้องใช้ condition ชุดเดียวกับตาราง
-- ต้องแยกหน่วย/สกุลเงิน/branch/date cutoff เมื่อเกี่ยวข้อง
-- cancelled/reversed source ต้องแสดงหรือ exclude ตาม report definition ชัดเจน
+- `periodMonth` ต้องอยู่ระหว่าง 1-12
+- `periodYear` ต้องอยู่ในช่วง target system ที่รองรับ
+- commit ต้อง recompute preview ฝั่ง server ก่อนเขียน
+- reverse ต้องมี reason และเปลี่ยน `depreciations.status = reversed`
 
 ## Side Effects
 
-- read-only ไม่มี transaction side effect
-- export/print/report generation ไม่ mutate source data
+- Commit creates `depreciations` rows with `period_year`, `period_month`, `status = posted`
+- Commit may update `assets.asset_status = Fully Depreciated`
+- Reverse updates depreciation status/reversal metadata only
+- ไม่มี GL/bank/stock side effect ใน batch นี้
 
-## Current Code Baseline
+## Legacy Comparison
 
-- Current `apps/next` page/API code is accepted as the P2 proof baseline as of 2026-06-11.
-- This page is a read-model/report surface; current APIs are `GET`-oriented and protected by report/finance permissions.
-- No transaction, stock ledger, bank statement, AP/AR settlement, or source document status side effect is expected from this page.
-- Future changes should reconcile formula/source/cutoff details here before changing runtime behavior.
-
-## Current Gap
-
-P2 proof completed against current Next page/API code. Remaining work is formula/source/cutoff refinement only when the target report definition changes or a page-specific discrepancy is found.
+- Legacy `view-depreciation` รองรับ run one/run all, duplicate-period prevention, fully-depreciated status, และ reverse run
+- Target Next รองรับ preview/commit/reverse และเก็บ reversal metadata แทนการลบแถว
 
 ## Implementation Checklist
 
-- [x] Verify current API response shape and source tables
-- [ ] Verify legacy formula if current implementation is incomplete
-- [ ] Define drilldown route/source document links
-- [ ] Confirm export/print and date cutoff behavior
-- [ ] Update this file when report formula changes
+- [x] Verify legacy depreciation run/reverse behavior
+- [x] Add depreciation status/reversal schema
+- [x] Enable preview/commit/reverse API
+- [x] Enable page UI for run and reverse
+- [ ] Add GL depreciation posting only after FA5 posting/period contract is approved
