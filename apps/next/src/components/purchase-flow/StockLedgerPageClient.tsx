@@ -21,15 +21,15 @@ const stockLedgerPageSizes = [25, 50, 80, 100]
 const stockLedgerColumns: Array<ResizableColumnDefinition<StockLedgerColumnKey>> = [
   { defaultWidth: 92, key: 'date', minWidth: 82 },
   { defaultWidth: 132, key: 'refNo', minWidth: 110 },
-  { defaultWidth: 320, key: 'counterpartyName', minWidth: 150 },
+  { defaultWidth: 240, key: 'counterpartyName', minWidth: 150 },
   { defaultWidth: 132, key: 'movementType', minWidth: 110 },
-  { defaultWidth: 280, key: 'productName', minWidth: 160 },
-  { defaultWidth: 92, key: 'qtyIn', minWidth: 80 },
-  { defaultWidth: 92, key: 'qtyOut', minWidth: 80 },
-  { defaultWidth: 112, key: 'runningBalanceByProduct', minWidth: 96 },
-  { defaultWidth: 104, key: 'unitCost', minWidth: 90 },
-  { defaultWidth: 112, key: 'valueIn', minWidth: 96 },
-  { defaultWidth: 112, key: 'valueOut', minWidth: 96 },
+  { defaultWidth: 240, key: 'productName', minWidth: 160 },
+  { defaultWidth: 100, key: 'qtyIn', minWidth: 85 },
+  { defaultWidth: 100, key: 'qtyOut', minWidth: 85 },
+  { defaultWidth: 120, key: 'runningBalanceByProduct', minWidth: 100 },
+  { defaultWidth: 120, key: 'unitCost', minWidth: 100 },
+  { defaultWidth: 130, key: 'valueIn', minWidth: 110 },
+  { defaultWidth: 130, key: 'valueOut', minWidth: 110 },
 ]
 
 type StockLedgerColumnKey = StockLedgerSortKey
@@ -101,7 +101,7 @@ export function StockLedgerPageClient() {
   const [sortKey, setSortKey] = useState<StockLedgerSortKey>('date')
   const [toDate, setToDate] = useState('')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
-  const columnResize = useResizableColumns('stock.ledger', stockLedgerColumns)
+  const columnResize = useResizableColumns('stock.ledger.v2', stockLedgerColumns)
 
   const loadData = useCallback(async () => {
     const requestId = latestLoadRequestRef.current + 1
