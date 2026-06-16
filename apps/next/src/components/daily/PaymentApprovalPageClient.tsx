@@ -567,10 +567,10 @@ export function PaymentApprovalPageClient() {
       <div className="space-y-4 rounded-md border border-slate-200 bg-slate-50 p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-sm font-semibold text-slate-900">{row.sourceType === 'petty_advance_return' ? 'ยืนยันบัญชีรับคืน' : 'แบ่งรายการอนุมัติจ่าย'}</div>
-            <div className="text-xs text-slate-500">{row.sourceType === 'petty_advance_return' ? 'รายการคืนเงินใช้บัญชีรับคืนที่ระบุจากหน้าเงินสำรองจ่าย' : '1 source document สามารถแตก approval items หลายรายการได้'}</div>
+            <div className="text-sm font-semibold text-slate-900">{row.sourceType === 'petty_advance_return' ? 'แบ่งบัญชีรับคืน' : 'แบ่งรายการอนุมัติจ่าย'}</div>
+            <div className="text-xs text-slate-500">{row.sourceType === 'petty_advance_return' ? 'รายการคืนเงินสามารถแยกรับคืนได้หลายบัญชี ยอดรวมต้องเท่ากับยอดคืน' : '1 source document สามารถแตก approval items หลายรายการได้'}</div>
           </div>
-          {row.sourceType === 'petty_advance_return' ? null : <Button size="sm" type="button" onClick={addSplit}>+ เพิ่มรายการย่อย</Button>}
+          <Button size="sm" type="button" onClick={addSplit}>+ เพิ่มรายการย่อย</Button>
         </div>
 
         <div className="space-y-2">
