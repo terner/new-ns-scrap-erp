@@ -3,8 +3,8 @@ title: Production Dashboard Page Flow
 tags:
   - page-flow
   - menu
-status: accepted-baseline
-updated: 2026-06-13
+status: hidden-baseline
+updated: 2026-06-16
 route: /production/dashboard
 ---
 
@@ -17,7 +17,7 @@ route: /production/dashboard
 | Menu section | Production |
 | Route | `/production/dashboard` |
 | Page | Production Dashboard |
-| Current Next | accepted code baseline |
+| Current Next | hidden baseline / no active menu |
 
 ## Canonical References
 
@@ -26,6 +26,8 @@ route: /production/dashboard
 ## Flow Baseline
 
 dashboard KPI จาก production orders/input/output/WIP/yield/cost
+
+Current runtime note: this route/API remains in code as a hidden baseline, but it is intentionally removed from the active Production navigation and Reports catalog per user direction. Do not re-add it to active menus unless explicitly requested.
 
 ## Requirement Snapshot 2026-06-13
 

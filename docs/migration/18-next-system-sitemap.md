@@ -105,7 +105,6 @@ UI note: list/search/filter real WTI/WTO documents, row click opens detail, and 
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
 | `/production/orders` | ใบสั่งผลิต | read baseline / write pending | `GET /api/production/orders` | `production_orders`, target `production_inputs`, `production_outputs`, `stock_ledger` | `production.operations.view` |
-| `/production/dashboard` | Production Dashboard | read baseline | `GET /api/production/dashboard` | production aggregate tables | `production.operations.view` |
 | `/production/report` | รายงานการผลิต / Yield | read baseline | `GET /api/production/report` | production aggregate tables | `production.operations.view` |
 | `/production/production-cost-report` | Production Cost Report | read baseline | `GET /api/production/production-cost-report` | `process_costs`, production tables | `production.operations.view` |
 | `/production/yield-loss-report` | Yield/Loss + Abnormal | read baseline | `GET /api/production/yield-loss-report` | production aggregate tables | `production.operations.view` |

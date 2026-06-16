@@ -50,7 +50,6 @@ updated: 2026-06-11
   - `/finance/cash-position`
   - `/finance/customer-advance`
   - `/production/orders`
-  - `/production/dashboard`
   - `/production/report`
 - Batch 3 deepened report/read-model pages across main dashboards, tracking, trading/PO reports, dual costing, general reports, and finance-accounting pages with Current API/read-model contracts.
 - Batch 4 deepened all active master-data and admin/system pages, and separated platform/support behavior into [[System Supporting Flows]].
@@ -98,7 +97,6 @@ updated: 2026-06-11
 | `/sales/po-sell` | PO Sell | [daily-transactions-sales-po-sell.md](daily-transactions-sales-po-sell.md) | [[PO Sell Flow]], [[Sales Flow]] |
 | `/daily/design-mockup` | Design Mockup | [daily-transactions-daily-design-mockup.md](daily-transactions-daily-design-mockup.md) | [[Architecture Map]] |
 | `/production/orders` | ใบสั่งผลิต | [production-production-orders.md](production-production-orders.md) | [[Production Flow]] |
-| `/production/dashboard` | Production Dashboard | [production-production-dashboard.md](production-production-dashboard.md) | [[Production Flow]] |
 | `/production/report` | รายงานการผลิต / Yield | [production-production-report.md](production-production-report.md) | [[Production Flow]] |
 | `/dual-costing/cost-pool` | Cost Pool | [dual-costing-dual-costing-cost-pool.md](dual-costing-dual-costing-cost-pool.md) | [[Dual Costing Flow]], [[Cost Pool]] |
 | `/dual-costing/cost-allocator` | Cost Allocator | [dual-costing-dual-costing-cost-allocator.md](dual-costing-dual-costing-cost-allocator.md) | [[Dual Costing Flow]], [[Cost Pool]], [[PO Sell Flow]] |

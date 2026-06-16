@@ -29,7 +29,6 @@
 "active","รายการประจำวัน","โอนสินค้าระหว่างสาขา","/stock/transfer","",""
 "active","รายการประจำวัน","ประวัติเปลี่ยน Supplier ในบิล","/daily/bill-swap-history","",""
 "active","การผลิต","ใบสั่งผลิต","/production/orders","",""
-"active","การผลิต","Production Dashboard","/production/dashboard","",""
 "active","การผลิต","รายงานการผลิต / Yield","/production/report","",""
 "active","การผลิต","Production Cost Report","/production/production-cost-report","",""
 "active","Dual Costing (จองดีล)","PO Buy (จองซื้อ)","/purchase/po-buy","",""
