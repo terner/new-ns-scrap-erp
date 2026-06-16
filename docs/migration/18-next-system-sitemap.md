@@ -57,7 +57,6 @@ Status terms:
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
 | `/owner-daily` | Owner Daily Control | read baseline | `GET /api/owner-daily` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `expenses`, `receipts`, `payments`, `stock_ledger`, `trading_deals`, `production_orders` | `reports.reports.view` |
-| `/anomaly-detector` | ตรวจจับความผิดปกติ | read baseline | `GET /api/anomaly-detector` | `accounts`, `bank_statement`, `stock_ledger`, `sales_bills`, `purchase_bills`, `customers`, `suppliers`, `trading_deals` | `reports.reports.view` |
 | `/daily-report` | Daily Report | read baseline | `GET /api/daily-report` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments`, `bank_statement`, `products` | `reports.reports.view` |
 | `/dashboard` | Dashboard | read baseline | `GET /api/dashboard` | `purchase_bills`, `sales_bills`, `expenses`, `accounts`, `bank_statement`, `stock_ledger`, `production_orders`, `trading_deals` | `reports.reports.view` |
 | `/profit-cost-analysis` | Profit & Cost Analysis | read baseline | `GET /api/profit-cost-analysis` | `purchase_bills`, `sales_bills`, `stock_ledger`, `products`, `suppliers`, `customers`, `branches`, `purchase_channels`, `sales_channels` | `reports.reports.view` |
@@ -82,7 +81,7 @@ Status terms:
 |---|---|---|---|---|---|
 | `/purchase/bills` | บิลรับซื้อ | partial write | `GET/POST/PATCH /api/purchase/bills` | `purchase_bills`, `suppliers`, `products`, `stock_ledger` | `finance.cash.view` |
 | `/purchase/bills/[id]` | Purchase bill detail/edit | partial write | `PATCH /api/purchase/bills` | `purchase_bills`, `stock_ledger` | `finance.cash.view` |
-| `/purchase/advance-payments` | จ่ายเงินล่วงหน้า / มัดจำ | partial write baseline | `GET/POST /api/purchase/advance-payments` | `supplier_advance_payments`, `supplier_advance_allocations`, `suppliers`, `branches`, `accounts` | `finance.cash.view` |
+| `/purchase/advance-payments` | เงินล่วงหน้า/มัดจำ | partial write baseline + customer advance tab | `GET/POST /api/purchase/advance-payments`, `GET /api/finance/customer-advance` | `supplier_advance_payments`, `supplier_advance_allocations`, `bank_statement` (`CADV`), `suppliers`, `customers`, `branches`, `accounts` | `finance.cash.view` |
 | `/sales/bills` | บิลขาย | read baseline | `GET /api/sales/bills` | `sales_bills`, `customers` | `finance.cash.view` |
 | `/sales/stock-issue` | เบิกออกรอบิล | read baseline / write pending | `GET /api/sales/stock-issue` | `stock_issues`, target `stock_ledger` for `PSALE` | `finance.cash.view` |
 | `/daily/payment-approval` | อนุมัติจ่ายเงิน | partial write | `GET/POST /api/daily/payment-approval` | `payment_approvals`, `purchase_bills`, `supplier_advance_payments`, `expenses` | `finance.cash.view` |
@@ -106,8 +105,6 @@ UI note: list/search/filter real WTI/WTO documents, row click opens detail, and 
 | Route | Label | Page status | APIs | Primary tables | Permission |
 |---|---|---|---|---|---|
 | `/production/orders` | ใบสั่งผลิต | read baseline / write pending | `GET /api/production/orders` | `production_orders`, target `production_inputs`, `production_outputs`, `stock_ledger` | `production.operations.view` |
-| `/production/output-categories` | หมวดหมู่ผลผลิต | partial write | `GET/POST /api/production/output-categories`, `PATCH /api/production/output-categories/{id}` | `production_output_categories` | `production.operations.view` |
-| `/production/dashboard` | Production Dashboard | read baseline | `GET /api/production/dashboard` | production aggregate tables | `production.operations.view` |
 | `/production/report` | รายงานการผลิต / Yield | read baseline | `GET /api/production/report` | production aggregate tables | `production.operations.view` |
 | `/production/production-cost-report` | Production Cost Report | read baseline | `GET /api/production/production-cost-report` | `process_costs`, production tables | `production.operations.view` |
 | `/production/yield-loss-report` | Yield/Loss + Abnormal | read baseline | `GET /api/production/yield-loss-report` | production aggregate tables | `production.operations.view` |
@@ -137,7 +134,7 @@ UI note: list/search/filter real WTI/WTO documents, row click opens detail, and 
 | `/finance/bank` | Cash / Bank Statement | read baseline | `GET /api/finance/bank` | `bank_statement`, `accounts` | `finance.cash.view` |
 | `/finance/cash-position` | Cash Position | read baseline | `GET /api/finance/cash-position` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills` | `finance.cash.view` |
 | `/finance/supplier-advance` | จ่ายล่วงหน้า Supplier | read baseline | `GET /api/finance/supplier-advance` | `bank_statement` (`SADV`), `suppliers`, `accounts` | `finance.cash.view` |
-| `/finance/customer-advance` | รับล่วงหน้าจาก Customer | read baseline | `GET /api/finance/customer-advance` | `bank_statement` (`CADV`), `customers`, `accounts` | `finance.cash.view` |
+| `/finance/customer-advance` | รับล่วงหน้าจาก Customer | compatibility redirect to `/purchase/advance-payments?tab=customer` | `GET /api/finance/customer-advance` | `bank_statement` (`CADV`), `customers`, `accounts` | `finance.cash.view` |
 
 ### Foreign Finance
 

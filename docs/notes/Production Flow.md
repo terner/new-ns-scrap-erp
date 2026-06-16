@@ -27,10 +27,10 @@ Routes ปัจจุบัน:
 |---|---|---|---|
 | ใบสั่งผลิต | `/production/orders` | `GET /api/production/orders` | read baseline |
 | หมวดหมู่ผลผลิต | `/production/output-categories` | `GET/POST /api/production/output-categories`, `PATCH /api/production/output-categories/[id]` | master baseline |
-| Production Dashboard | `/production/dashboard` | `GET /api/production/dashboard` | read baseline |
+| Production Dashboard | `/production/dashboard` | `GET /api/production/dashboard` | hidden baseline / no active menu |
 | รายงานการผลิต / Yield | `/production/report` | `GET /api/production/report` | read baseline |
 
-Production menu must expose only the four pages above. Legacy/supporting production report surfaces such as `/production/production-cost-report`, `/production/yield-loss-report`, `/production/machine-utilization`, `/production/reconciliation`, and retired `/production/wip-report` must not be exposed in the Production navigation. Their formulas can be used as source material or internal/supporting APIs where still needed, but they are not user-facing pages in the target Production menu.
+Production menu must not expose hidden/supporting production report surfaces. `/production/dashboard` is currently a hidden baseline, and legacy/supporting surfaces such as `/production/production-cost-report`, `/production/yield-loss-report`, `/production/machine-utilization`, `/production/reconciliation`, and retired `/production/wip-report` must not be exposed in the Production navigation. Their formulas can be used as source material or internal/supporting APIs where still needed, but they are not user-facing pages in the target Production menu.
 
 ## Business Purpose
 
@@ -157,7 +157,8 @@ Dashboard source-of-truth ต้องใช้ production facts ที่ recon
   * รองรับ Responsive: บน Mobile จะแปลงการแสดงผลตารางเป็นแบบการ์ดแนวตั้งเพื่อหลีกเลี่ยง Horizontal Scroll และหากไม่มีงาน WIP ค้าง จะขึ้นแสดงกล่องสถานะสีเขียวแจ้งว่า "ไม่มี WIP คงเหลือ - ผลิตเสร็จทุกใบ" แทนอย่างสวยงาม
 * **การซ่อนหน้าจอแดชบอร์ดการผลิต (`/production/dashboard`):**
   * ตามคำสั่งผู้ใช้ ให้ทำการซ่อนหน้าแดชบอร์ดการผลิตชั่วคราวเพื่อเก็บไว้ก่อน
-  * ดำเนินการโดยคอมเมนต์เส้นทางเข้าถึงออกจากโครงสร้างเมนูหลัก [navigation.ts](file:///c:/new-ns-scrap-erp/apps/next/src/lib/navigation.ts) และหน้ารวมรายงาน [ReportsIndexPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/app/reports/ReportsIndexPageClient.tsx) เรียบร้อยแล้ว
+  * ดำเนินการโดยถอดเส้นทางเข้าถึงออกจากโครงสร้างเมนูหลัก [navigation.ts](file:///c:/new-ns-scrap-erp/apps/next/src/lib/navigation.ts) และหน้ารวมรายงาน [ReportsIndexPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/app/reports/ReportsIndexPageClient.tsx) เรียบร้อยแล้ว
+  * Route และ API ยังเก็บไว้เป็น hidden baseline ไม่ใช่ active navigation/report surface
 
 
 Status target สำหรับ MVP:

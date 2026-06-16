@@ -115,7 +115,6 @@ const reports: ReportLink[] = [
   { category: 'main', href: '/cash-flow-calendar', label: 'Cash Flow Calendar', owner: 'Main', status: 'read/design', summary: 'ปฏิทินเงินเข้าออกและ running balance' },
   { category: 'main', href: '/business-calendar', label: 'Business Calendar', owner: 'Main', status: 'read/design', summary: 'ปฏิทินซื้อขายค่าใช้จ่ายและ GP รายวัน' },
   { category: 'main', href: '/cash-others-summary', label: 'Cash & Others Summary', owner: 'Main', status: 'read baseline', summary: 'Cash, AR, AP, stock, pending sale และ trading pending' },
-  { category: 'main', href: '/anomaly-detector', label: 'ตรวจจับความผิดปกติ', owner: 'Main', status: 'read baseline', summary: 'Read-only anomaly scan พร้อม link ไปหน้าที่เกี่ยวข้อง' },
   { category: 'finance', href: '/finance/ar', label: 'ลูกหนี้ (AR)', owner: 'Finance', status: 'read baseline', summary: 'AR aging, customer exposure และ overdue' },
   { category: 'finance', href: '/finance/ap', label: 'เจ้าหนี้ (AP)', owner: 'Finance', status: 'read baseline', summary: 'AP aging, supplier exposure และ payment queue' },
   { category: 'finance', href: '/finance/bank', label: 'Cash / Bank Statement', owner: 'Finance', status: 'read baseline', summary: 'Bank statement, duplicate checks และ export' },
