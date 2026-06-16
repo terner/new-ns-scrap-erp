@@ -247,6 +247,16 @@ export const navigationItems: NavigationItem[] = [
   { href: '/master-data/salespersons', icon: '👨‍💼', label: 'พนักงานขาย (Sales)', section: 'master-data' },
   { href: '/master-data/suppliers', icon: '🏭', label: 'ผู้ขาย', section: 'master-data' },
   {
+    href: '/master-data/asset-categories',
+    icon: '🏗️',
+    label: 'ทรัพย์สิน',
+    section: 'master-data',
+    children: [
+      { href: '/master-data/asset-categories', icon: '📂', label: 'หมวดหมู่ทรัพย์สิน', section: 'master-data' },
+      { href: '/master-data/departments', icon: '🏢', label: 'แผนก', section: 'master-data' },
+    ],
+  },
+  {
     href: '/master-data/products',
     icon: '🔩',
     label: 'สินค้า',

@@ -180,6 +180,23 @@ export function AssetRegisterPageClient() {
     }))
   }, [data?.options.suppliers])
 
+  const categoryOptions = useMemo(() => {
+    return (data?.options.categories ?? []).map((cat) => ({
+      id: cat,
+      label: cat,
+      searchText: cat,
+    }))
+  }, [data?.options.categories])
+
+  const departmentOptions = useMemo(() => {
+    return (data?.options.departments ?? []).map((dept) => ({
+      id: dept,
+      label: dept,
+      searchText: dept,
+    }))
+  }, [data?.options.departments])
+
+
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
     if (search.trim()) params.set('q', search.trim())
@@ -492,31 +509,27 @@ export function AssetRegisterPageClient() {
               />
             </Field>
             <Field label="ชื่อทรัพย์สิน"><input className={fieldClass} value={form.name} onChange={(event) => updateForm('name', event.target.value)} /></Field>
-            <Field label="หมวด">
-              <input 
-                list="asset-categories-list" 
-                className={fieldClass} 
-                value={form.category} 
-                onChange={(event) => updateForm('category', event.target.value)} 
-                placeholder="เลือกหรือพิมพ์หมวด"
+            <div className="w-full">
+              <SearchCombobox
+                inputId="form-category"
+                label="หมวด"
+                options={categoryOptions}
+                value={form.category}
+                onChange={(value) => updateForm('category', value)}
+                placeholder="เลือกหรือพิมพ์หมวด..."
               />
-              <datalist id="asset-categories-list">
-                {(data?.options.categories ?? []).map(cat => <option key={cat} value={cat} />)}
-              </datalist>
-            </Field>
+            </div>
             <Field label="สาขา"><OptionSelect blankLabel="ไม่ระบุสาขา" options={data?.options.branches ?? []} value={form.branchId} onChange={(value) => updateForm('branchId', value)} /></Field>
-            <Field label="แผนก">
-              <input 
-                list="asset-departments-list" 
-                className={fieldClass} 
-                value={form.department} 
-                onChange={(event) => updateForm('department', event.target.value)} 
-                placeholder="เลือกหรือพิมพ์แผนก"
+            <div className="w-full">
+              <SearchCombobox
+                inputId="form-department"
+                label="แผนก"
+                options={departmentOptions}
+                value={form.department}
+                onChange={(value) => updateForm('department', value)}
+                placeholder="เลือกหรือพิมพ์แผนก..."
               />
-              <datalist id="asset-departments-list">
-                {(data?.options.departments ?? []).map(dept => <option key={dept} value={dept} />)}
-              </datalist>
-            </Field>
+            </div>
             <Field label="สถานที่"><input className={fieldClass} value={form.location} onChange={(event) => updateForm('location', event.target.value)} /></Field>
             <Field label="วันที่ซื้อ"><input className={fieldClass} type="date" value={form.purchaseDate} onChange={(event) => updateForm('purchaseDate', event.target.value)} /></Field>
             <Field label="ประเภทการได้มา"><SelectControl options={data?.options.acquisitionTypes ?? []} value={form.acquisitionType} onChange={(value) => updateForm('acquisitionType', value)} /></Field>
@@ -767,8 +780,8 @@ export function DepreciationPageClient() {
                   <Td><span className="font-mono font-bold text-red-700">{row.refNo}</span></Td>
                   <Td>{row.period}</Td>
                   <Td>
-                    <div className="font-semibold text-slate-800">{row.assetCode}</div>
-                    <div className="text-[10px] text-slate-400 font-medium">{row.assetName}</div>
+                    <div className="font-semibold text-slate-800">{row.assetName}</div>
+                    <div className="text-[10px] text-slate-400 font-medium font-mono">{row.assetCode}</div>
                   </Td>
                   <Td align="right">{formatMoney(row.accumBefore)}</Td>
                   <Td align="right" className="font-medium text-amber-700">{formatMoney(row.depreciationAmount)}</Td>

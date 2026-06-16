@@ -120,7 +120,7 @@ function assetInput(body: Record<string, unknown>) {
     acquisition_type: ACQUISITION_TYPES.includes(asText(body.acquisitionType)) ? asText(body.acquisitionType) : 'Purchased',
     asset_status: STATUSES.includes(asText(body.assetStatus)) ? asText(body.assetStatus) : 'Active',
     branch_id: idValue(body.branchId),
-    category: CATEGORIES.includes(asText(body.category)) ? asText(body.category) : 'Other',
+    category: asText(body.category) || 'Other',
     chassis_no: nullableText(body.chassisNo),
     code,
     department: nullableText(body.department),
@@ -148,7 +148,7 @@ async function payload(search = new URLSearchParams()) {
   const q = (search.get('q') || '').trim().toLowerCase()
   const category = search.get('category') || 'all'
   const status = search.get('status') || 'all'
-  const [assets, branches, suppliers] = await Promise.all([
+  const [assets, branches, suppliers, dbCategories, dbDepartments] = await Promise.all([
     prisma.assets.findMany({
       include: {
         branches: { select: { code: true, id: true, name: true } },
@@ -160,6 +160,8 @@ async function payload(search = new URLSearchParams()) {
     }),
     prisma.branches.findMany({ orderBy: { code: 'asc' }, select: { code: true, id: true, name: true }, where: { active: true } }),
     prisma.suppliers.findMany({ orderBy: { code: 'asc' }, select: { code: true, id: true, name: true }, where: { active: true }, take: 5000 }),
+    prisma.asset_categories.findMany({ orderBy: { code: 'asc' }, select: { name: true }, where: { active: true } }),
+    prisma.departments.findMany({ orderBy: { code: 'asc' }, select: { name: true }, where: { active: true } }),
   ])
   let rows = assets.map(mapAsset)
   if (q) rows = rows.filter((row) => [row.code, row.name, row.location, row.branchName].join(' ').toLowerCase().includes(q))
@@ -183,7 +185,8 @@ async function payload(search = new URLSearchParams()) {
       acquisitionTypes: ACQUISITION_TYPES,
       assetStatuses: STATUSES,
       branches: branches.map((row) => ({ code: row.code, id: String(row.id), name: row.name })),
-      categories: CATEGORIES,
+      categories: dbCategories.length > 0 ? dbCategories.map((c) => c.name) : CATEGORIES,
+      departments: dbDepartments.map((d) => d.name),
       depreciationMethods: DEPRECIATION_METHODS,
       suppliers: suppliers.map((row) => ({ code: row.code, id: String(row.id), name: row.name })),
     },
@@ -222,6 +225,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json(body)
   } catch (caught) {
+    console.error('API GET Asset Register Error:', caught)
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'โหลดทะเบียนทรัพย์สินไม่ได้', 500)
   }

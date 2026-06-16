@@ -52,6 +52,7 @@ created: 2026-05-16
 - [[Customer Advance Page Flow]] - contract หน้า `/finance/customer-advance`: current read baseline จาก `CADV` bank statement, remaining/used rule และ target allocation tables
 - [[Main Dashboard Reports Flow]] - ภาพรวมหมวด Main / Dashboard & Reports และ `/reports`: current APIs, source tables/helpers, query params, response sections, management-read boundary, และ gap เรื่องสูตร/drilldown/export
 - [[Finance Accounting Flow]] - ภาพรวมหมวด Finance / Accounting ทั้ง 19 เมนู: current APIs, query params, source builders/tables, write-disabled design states, management-report boundary, และ gap เรื่อง GL/statutory close/tax/asset/loan write flows
+- [[Fixed Assets Workflow]] - กระบวนการทำงานระบบทรัพย์สินถาวรแบบละเอียด: ตั้งแต่การตั้งค่าข้อมูลหลัก (หมวดหมู่/แผนก), การขึ้นทะเบียนทรัพย์สิน, การคิดค่าเสื่อมราคา, และการจำหน่ายทรัพย์สิน พร้อมสูตรคำนวณและกฎทางธุรกิจ
 - [[Trading Flow]] - ภาพรวมหมวด `Trading / PO Reports`: Trading Dashboard แบบ trader/operator monitor, Trading Matching, PO Outstanding, ex-VAT GP, Sales Bill-led Trading allocation, Matched COGS, buy-side remaining cost, PO commitment report, และ side-effect boundary ว่า Trading ไม่เขียน stock ledger/WAC
 - [[Tracking 360 Flow]] - ภาพรวมหมวด `Tracking 360`: Customer, Supplier, Product tracking จาก SB/RCP, PB/PMT และ stock ledger พร้อม read-only/export boundary และ gap เรื่อง drilldown/source timeline
 - [[Purchase Flow Test Matrix]] - execution checklist ของ Purchase Flow สำหรับ UAT/smoke/regression ตั้งแต่ PO, WTI, Purchase Bill, Approval, Payment ไปจนถึง stock/reversal
