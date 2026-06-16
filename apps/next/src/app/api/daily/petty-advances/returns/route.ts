@@ -3,7 +3,7 @@ import { pettyAdvanceReturnFormSchema } from '@/lib/daily'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { findActiveAccountReferenceByCode } from '@/lib/server/account-reference'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { currentActor, normalizeDate, toNumber } from '@/lib/server/daily'
+import { currentActor, nextDailyDocNo, normalizeDate, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
 import type { Prisma } from '../../../../../../generated/prisma/client'
 
@@ -35,10 +35,9 @@ export async function POST(request: Request) {
         return null
       }
 
-      const existingPending = await tx.payment_approvals.findFirst({
+      const existingPending = await tx.petty_advance_returns.findFirst({
         where: {
-          source_id: advance.id.toString(),
-          source_type: 'petty_advance_return',
+          advance_id: advance.id,
           status: 'pending',
         },
       })
@@ -50,23 +49,18 @@ export async function POST(request: Request) {
         throw new Error('ยอดคืนเงินเกินยอดคงค้าง')
       }
 
-      const requestedReturn = await tx.payment_approvals.create({
+      const requestedReturn = await tx.petty_advance_returns.create({
         data: {
-          approved_amount: values.amount,
-          approved_by: actor,
-          destination_account_no_snapshot: account.accountNo ?? null,
-          destination_bank_account_id_snapshot: account.code ?? null,
-          destination_bank_name_snapshot: account.name,
-          destination_payment_method_snapshot: account.type ?? 'รับคืน',
-          note: values.notes,
-          party_id: advance.recipient_person_code ?? null,
-          party_name_snapshot: advance.recipient_name,
-          source_date_snapshot: normalizeDate(values.date),
-          source_doc_no_snapshot: advance.doc_no,
-          source_id: advance.id.toString(),
-          source_type: 'petty_advance_return',
+          account_id: account.id,
+          advance_id: advance.id,
+          amount: values.amount,
+          created_by: actor,
+          date: normalizeDate(values.date),
+          doc_no: await nextDailyDocNo('petty_advance_returns', 'PRET', values.date, tx),
+          notes: values.notes,
           status: 'pending',
           updated_at: new Date(),
+          updated_by: actor,
         },
       })
 
@@ -77,7 +71,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบรายการเงินสำรอง' }, { status: 404 })
     }
 
-    return NextResponse.json({ id: result.id.toString(), status: result.status })
+    return NextResponse.json({ docNo: result.doc_no, id: result.id.toString(), status: result.status })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'บันทึกคืนเงินสำรองจ่ายไม่ได้', 400)

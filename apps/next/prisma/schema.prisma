@@ -1587,6 +1587,12 @@ model petty_advance_returns {
   date           DateTime       @db.Date
   amount         Decimal        @default(0) @db.Decimal
   notes          String?
+  status         String         @default("approved")
+  approved_at    DateTime?      @db.Timestamptz(6)
+  approved_by    String?
+  voided_at      DateTime?      @db.Timestamptz(6)
+  voided_by      String?
+  void_reason    String?
   created_by     String?
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   updated_by     String?
@@ -1603,6 +1609,7 @@ model petty_advance_returns {
   @@index([advance_id], map: "idx_petty_advance_returns_advance")
   @@index([date(sort: Desc)], map: "idx_petty_advance_returns_date")
   @@index([doc_no], map: "idx_petty_advance_returns_doc_no")
+  @@index([status], map: "idx_petty_advance_returns_status")
   @@schema("public")
 }
 

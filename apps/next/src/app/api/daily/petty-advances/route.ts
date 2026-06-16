@@ -221,7 +221,7 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const [accounts, rows, recipientOptions, pendingReturnApprovals] = await Promise.all([
+    const [accounts, rows, recipientOptions, pendingReturns] = await Promise.all([
       listDailyAccounts(),
       prisma.petty_advances.findMany({
         include: {
@@ -229,26 +229,27 @@ export async function GET() {
           petty_advance_returns: {
             include: { accounts: true },
             orderBy: [{ date: 'desc' }],
+            where: { status: 'approved' },
           },
         },
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 5000,
       }),
       listPettyAdvanceRecipients(),
-      prisma.payment_approvals.findMany({
+      prisma.petty_advance_returns.findMany({
         select: {
-          approved_amount: true,
-          source_id: true,
+          advance_id: true,
+          amount: true,
         },
         where: {
-          source_type: 'petty_advance_return',
           status: 'pending',
         },
       }),
     ])
     const pendingReturnByAdvanceId = new Map<string, number>()
-    pendingReturnApprovals.forEach((approval) => {
-      pendingReturnByAdvanceId.set(approval.source_id, (pendingReturnByAdvanceId.get(approval.source_id) ?? 0) + toNumber(approval.approved_amount))
+    pendingReturns.forEach((entry) => {
+      const advanceId = entry.advance_id.toString()
+      pendingReturnByAdvanceId.set(advanceId, (pendingReturnByAdvanceId.get(advanceId) ?? 0) + toNumber(entry.amount))
     })
 
     return NextResponse.json({ accounts, recipientOptions, rows: rows.map((row) => advanceJson(row, pendingReturnByAdvanceId.get(row.id.toString()) ?? 0)) })
