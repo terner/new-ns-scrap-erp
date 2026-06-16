@@ -464,3 +464,35 @@ export const remittancePurposesPageConfig: MasterDataPageConfig = {
     statusColumn,
   ],
 }
+
+export const assetCategoriesPageConfig: MasterDataPageConfig = {
+  apiPath: '/api/master-data/asset-categories',
+  createLabel: 'เพิ่มหมวดหมู่ทรัพย์สิน',
+  entityName: 'หมวดหมู่ทรัพย์สิน',
+  emptyMessage: 'ไม่พบข้อมูลหมวดหมู่ทรัพย์สิน',
+  fields: [
+    { key: 'code', label: 'รหัสหมวดหมู่' },
+    { key: 'name', label: 'ชื่อหมวดหมู่', required: true },
+  ],
+  columns: [
+    { key: 'code', label: 'รหัส' },
+    { key: 'name', label: 'ชื่อหมวดหมู่' },
+    statusColumn,
+  ],
+}
+
+export const departmentsPageConfig: MasterDataPageConfig = {
+  apiPath: '/api/master-data/departments',
+  createLabel: 'เพิ่มแผนก',
+  entityName: 'แผนก',
+  emptyMessage: 'ไม่พบข้อมูลแผนก',
+  fields: [
+    { key: 'code', label: 'รหัสแผนก' },
+    { key: 'name', label: 'ชื่อแผนก', required: true },
+  ],
+  columns: [
+    { key: 'code', label: 'รหัส' },
+    { key: 'name', label: 'ชื่อแผนก' },
+    statusColumn,
+  ],
+}
