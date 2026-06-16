@@ -39,7 +39,6 @@ const MATCH_STATUS_OPTIONS = [
   { label: 'ยังไม่จับคู่', value: 'Not Matched' },
   { label: 'จับคู่บางส่วน', value: 'Partially Matched' },
   { label: 'จับคู่ครบ', value: 'Fully Matched' },
-  { label: 'จับคู่เกิน', value: 'Over Matched' },
   { label: 'ยกเลิก', value: 'Cancelled' },
 ] as const
 const CANCELLED_STATUSES = ['cancelled', 'Cancelled', 'canceled', 'Canceled', 'void', 'Void']
@@ -188,6 +187,7 @@ function matchStatus(matchedQty: number, qty: number, currentDocumentStatus: PoS
 }
 
 function matchStatusLabel(status: string) {
+  if (status === 'Over Matched') return 'จับคู่เกิน'
   return MATCH_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status
 }
 
