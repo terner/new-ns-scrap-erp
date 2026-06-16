@@ -480,7 +480,7 @@ export function ReceiptVouchersPageClient() {
         </div>
 
         {/* Desktop Toolbar (Hidden on Mobile) */}
-        <div className="hidden md:block rounded-md bg-white p-3 shadow">
+        <div className="hidden lg:block rounded-md bg-white p-3 shadow">
           <div className="flex flex-wrap items-center gap-2">
             <Input
               className="min-w-[260px] flex-1 rounded-md"
@@ -503,7 +503,7 @@ export function ReceiptVouchersPageClient() {
         </div>
 
         {/* Mobile Toolbar (Hidden on Desktop) */}
-        <div className="block md:hidden rounded-md bg-white p-3 shadow">
+        <div className="block lg:hidden rounded-md bg-white p-3 shadow">
           <div className="flex items-center gap-2">
             <Input
               className="flex-1 min-w-0 rounded-md"
@@ -525,7 +525,7 @@ export function ReceiptVouchersPageClient() {
 
         {/* Bottom Sheet Filter for Mobile */}
         {showMobileFilters ? (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
             <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                 <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
@@ -594,7 +594,7 @@ export function ReceiptVouchersPageClient() {
         </div>
 
         {/* Mobile Card List */}
-        <div className="block md:hidden space-y-3">
+        <div className="block lg:hidden space-y-3">
           {isLoading ? (
             <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
           ) : null}
@@ -633,7 +633,7 @@ export function ReceiptVouchersPageClient() {
           ) : null}
         </div>
 
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
               {receiptVoucherColumns.map((column, index) => {
@@ -724,7 +724,7 @@ export function ReceiptVouchersPageClient() {
       {printingRow ? <PrintPreview companyProfile={companyProfile} row={printingRow} onClose={() => setPrintingRow(null)} /> : null}
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-6 right-6 z-40 md:hidden print:hidden">
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden print:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
           onClick={openCreateForm}
@@ -774,7 +774,7 @@ function ReceiptVoucherFormModal({
         <div className="flex items-center justify-between border-b border-slate-200 px-4 md:px-5 py-3 shrink-0">
           <div>
             <h3 className="text-base font-bold text-slate-900">{mode === 'edit' ? 'แก้ไข' : 'สร้าง'}ใบสำคัญรับเงิน</h3>
-            <p className="hidden md:block text-xs text-slate-500">ใช้สำหรับ Supplier รับเงินสดจากบริษัท กรณีไม่มีใบเสร็จจาก Supplier</p>
+            <p className="hidden lg:block text-xs text-slate-500">ใช้สำหรับ Supplier รับเงินสดจากบริษัท กรณีไม่มีใบเสร็จจาก Supplier</p>
           </div>
           <button className="text-2xl leading-none text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>&times;</button>
         </div>
@@ -821,14 +821,14 @@ function ReceiptVoucherFormModal({
               <div className="mt-3">
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-md border border-amber-200 bg-amber-100/50 px-3 py-1.5 text-xs font-semibold text-amber-950 md:hidden focus-visible:outline-none"
+                  className="flex w-full items-center justify-between rounded-md border border-amber-200 bg-amber-100/50 px-3 py-1.5 text-xs font-semibold text-amber-950 lg:hidden focus-visible:outline-none"
                   onClick={() => setShowSellerDetails(!showSellerDetails)}
                 >
                   <span>📋 {showSellerDetails ? 'ซ่อนรายละเอียดผู้รับเงิน' : 'ดูรายละเอียดผู้รับเงิน'}</span>
                   <span className="text-[10px]">{showSellerDetails ? '▲' : '▼'}</span>
                 </button>
 
-                <div className={`${showSellerDetails ? 'grid' : 'hidden'} md:grid mt-2 md:mt-3 grid-cols-1 gap-2 rounded-md border border-amber-200 bg-white/70 p-3 text-xs text-slate-700 md:grid-cols-2`}>
+                <div className={`${showSellerDetails ? 'grid' : 'hidden'} lg:grid mt-2 md:mt-3 grid-cols-1 gap-2 rounded-md border border-amber-200 bg-white/70 p-3 text-xs text-slate-700 md:grid-cols-2`}>
                   <ReadOnlyInfo label="ผู้รับเงิน" value={form.sellerName} />
                   <ReadOnlyInfo label="เลขประจำตัวผู้เสียภาษี" value={form.sellerTaxId} />
                   <ReadOnlyInfo label="ที่อยู่" value={form.sellerAddress} wide />

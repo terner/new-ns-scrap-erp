@@ -518,7 +518,7 @@ export function AdvancePaymentsPageClient() {
           <div>
             <Button type="button" variant="outline" onClick={closeForm}><ArrowLeft className="mr-1 h-4 w-4" />กลับไปหน้ารายการ</Button>
           </div>
-          <div className="rounded-md bg-white p-4 shadow">
+          <div className="rounded-2xl bg-white p-4 shadow">
           <div className="mb-4">
             <div>
               <div className="text-sm font-semibold text-slate-900">{editingAdvanceId ? `แก้ไขรายการ ADV ${editingAdvanceNo ?? ''}` : 'สร้างรายการจ่ายเงินล่วงหน้า / มัดจำ'}</div>
@@ -531,15 +531,21 @@ export function AdvancePaymentsPageClient() {
                 description="ระบุผู้ขาย สาขา และยอดเงินที่ต้องจ่ายล่วงหน้า"
                 title="ข้อมูลการเงิน"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <SearchCombobox error={fieldErrors.supplierId} errorKey="supplierId" inputId="advance-supplier" label="ผู้ขาย *" options={supplierOptions} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
-                  <Field error={fieldErrors.branchId} label="สาขา *">
-                    <Select className={`h-9 w-full px-2 py-1.5 ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)}>
-                      <option disabled value="">เลือกสาขา</option>
-                      {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                    </Select>
-                  </Field>
-                  <MoneyInputField error={fieldErrors.amount} label="ยอดมัดจำ *" value={form.amount} onChange={(value) => updateForm('amount', value)} />
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="col-span-2 sm:col-span-1">
+                    <SearchCombobox error={fieldErrors.supplierId} errorKey="supplierId" inputId="advance-supplier" label="ผู้ขาย *" options={supplierOptions} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <Field error={fieldErrors.branchId} label="สาขา *">
+                      <Select className={`h-9 w-full px-2 py-1.5 ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => updateForm('branchId', event.target.value)}>
+                        <option disabled value="">เลือกสาขา</option>
+                        {(data?.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                      </Select>
+                    </Field>
+                  </div>
+                  <div className="col-span-2 lg:col-span-1">
+                    <MoneyInputField error={fieldErrors.amount} label="ยอดมัดจำ *" value={form.amount} onChange={(value) => updateForm('amount', value)} />
+                  </div>
                 </div>
               </FormSection>
 
@@ -547,10 +553,16 @@ export function AdvancePaymentsPageClient() {
                 description="ผูกเอกสาร ADV กับข้อมูลอ้างอิงจากรถเข้า/ใบชั่งใหญ่"
                 title="อ้างอิงใบชั่งใหญ่"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <InputField error={fieldErrors.largeScaleDocNo} label="เลขที่ใบชั่งใหญ่" value={form.largeScaleDocNo} onChange={(value) => updateForm('largeScaleDocNo', value)} />
-                  <InputField className="max-w-[220px]" error={fieldErrors.inDate} label="วันที่รถเข้า" step="60" type="datetime-local" value={form.inDate} onChange={(value) => updateForm('inDate', value)} />
-                  <InputField className="max-w-[220px]" error={fieldErrors.outDate} label="วันที่รถออก" step="60" type="datetime-local" value={form.outDate} onChange={(value) => updateForm('outDate', value)} />
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="col-span-2 sm:col-span-1">
+                    <InputField error={fieldErrors.largeScaleDocNo} label="เลขที่ใบชั่งใหญ่" value={form.largeScaleDocNo} onChange={(value) => updateForm('largeScaleDocNo', value)} />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <InputField className="max-w-[220px]" error={fieldErrors.inDate} label="วันที่รถเข้า" step="60" type="datetime-local" value={form.inDate} onChange={(value) => updateForm('inDate', value)} />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <InputField className="max-w-[220px]" error={fieldErrors.outDate} label="วันที่รถออก" step="60" type="datetime-local" value={form.outDate} onChange={(value) => updateForm('outDate', value)} />
+                  </div>
                 </div>
               </FormSection>
 
@@ -558,21 +570,31 @@ export function AdvancePaymentsPageClient() {
                 description="กรอกข้อมูลสินค้า น้ำหนัก และราคาที่ใช้คำนวณอ้างอิง"
                 title="สินค้าและน้ำหนัก"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <SearchCombobox
-                    error={fieldErrors.productName}
-                    errorKey="productName"
-                    inputId="advance-product"
-                    label="ชื่อสินค้า"
-                    options={productOptions}
-                    placeholder="พิมพ์รหัส/ชื่อสินค้า..."
-                    value={form.productId}
-                    onChange={(value) => updateForm('productId', value)}
-                  />
-                  <InputField error={fieldErrors.weightIn} label="น้ำหนักเข้า *" min="0" step="0.01" type="number" value={form.weightIn} onChange={(value) => updateForm('weightIn', value)} />
-                  <InputField error={fieldErrors.weightOut} label="น้ำหนักออก *" min="0" step="0.01" type="number" value={form.weightOut} onChange={(value) => updateForm('weightOut', value)} />
-                  <InputField readOnly className="bg-slate-50 text-slate-700" error={fieldErrors.netWeight} label="น้ำหนักสุทธิ *" min="0" step="0.01" type="number" value={derivedNetWeight} onChange={() => undefined} />
-                  <MoneyInputField error={fieldErrors.pricePerKg} label="ราคา/กก. *" value={form.pricePerKg} onChange={(value) => updateForm('pricePerKg', value)} />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="col-span-2 sm:col-span-1">
+                    <SearchCombobox
+                      error={fieldErrors.productName}
+                      errorKey="productName"
+                      inputId="advance-product"
+                      label="ชื่อสินค้า"
+                      options={productOptions}
+                      placeholder="พิมพ์รหัส/ชื่อสินค้า..."
+                      value={form.productId}
+                      onChange={(value) => updateForm('productId', value)}
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <InputField error={fieldErrors.weightIn} label="น้ำหนักเข้า *" min="0" step="0.01" type="number" value={form.weightIn} onChange={(value) => updateForm('weightIn', value)} />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <InputField error={fieldErrors.weightOut} label="น้ำหนักออก *" min="0" step="0.01" type="number" value={form.weightOut} onChange={(value) => updateForm('weightOut', value)} />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <InputField readOnly className="bg-slate-50 text-slate-700 font-mono" error={fieldErrors.netWeight} label="น้ำหนักสุทธิ *" min="0" step="0.01" type="number" value={derivedNetWeight} onChange={() => undefined} />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <MoneyInputField error={fieldErrors.pricePerKg} label="ราคา/กก. *" value={form.pricePerKg} onChange={(value) => updateForm('pricePerKg', value)} />
+                  </div>
                 </div>
               </FormSection>
 
@@ -580,9 +602,11 @@ export function AdvancePaymentsPageClient() {
                 description="รวบรวมข้อมูลตัวรถและรูปประกอบในจุดเดียว"
                 title="ข้อมูลรถ"
               >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <InputField error={fieldErrors.plateNo} label="ทะเบียนรถ" value={form.plateNo} onChange={(value) => updateForm('plateNo', value)} />
-                  <div className="md:col-span-2 xl:col-span-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="col-span-2 sm:col-span-1">
+                    <InputField error={fieldErrors.plateNo} label="ทะเบียนรถ" value={form.plateNo} onChange={(value) => updateForm('plateNo', value)} />
+                  </div>
+                  <div className="col-span-2 lg:col-span-3">
                     <Field error={fieldErrors.vehiclePhotoNames} label="รูปภาพรถ">
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <label className="block bg-white p-6 border-2 border-dashed border-slate-300 rounded-xl text-center hover:border-emerald-400 hover:bg-slate-50 cursor-pointer transition-colors">
@@ -949,23 +973,32 @@ export function AdvancePaymentsPageClient() {
         setIsDetailOpen(open)
         if (!open) setDetail(null)
       }}>
-        <DialogContent className="max-h-[90vh] max-w-5xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียด ADV" hideClose>
+        <DialogContent className="max-h-[90vh] max-w-5xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียด ADV" hideClose>
           <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
-            <DialogTitle className="text-white">{detail?.docNo ? `รายละเอียด ${detail.docNo}` : 'รายละเอียด ADV'}</DialogTitle>
-            <DialogDescription className="text-slate-300">กดที่รายการเพื่อดูข้อมูลเอกสาร การหักบิลย้อนหลัง และ timeline ของรายการ ADV</DialogDescription>
+            <div className="flex items-start justify-between gap-3 w-full">
+              <div>
+                <DialogTitle className="text-white">{detail?.docNo ? `รายละเอียด ${detail.docNo}` : 'รายละเอียด ADV'}</DialogTitle>
+                <DialogDescription className="text-slate-300">กดที่รายการเพื่อดูข้อมูลเอกสาร การหักบิลย้อนหลัง และ timeline ของรายการ ADV</DialogDescription>
+              </div>
+              <button className="rounded-xl px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white transition-colors outline-none focus:outline-none focus:ring-0 cursor-pointer" type="button" onClick={() => setIsDetailOpen(false)}>✕</button>
+            </div>
           </DialogHeader>
           {isDetailLoading ? <div className="flex-1 p-8 text-center text-sm text-slate-500 bg-white">กำลังโหลดรายละเอียด...</div> : null}
           {!isDetailLoading && detail ? (
             <div className="flex-1 overflow-y-auto space-y-4 p-4 bg-slate-50">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Metric label="ยอดมัดจำ" value={formatMoney(detail.amount)} />
                 <Metric label="ใช้หักบิลแล้ว" value={formatMoney(detail.allocatedAmount)} />
-                <Metric label="คงเหลือ" tone="amber" value={formatMoney(detail.remainingAmount)} />
-                <Metric label="สถานะ" value={detail.statusLabel} />
+                <div className="col-span-2 sm:col-span-1">
+                  <Metric label="คงเหลือ" tone="amber" value={formatMoney(detail.remainingAmount)} />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <Metric label="สถานะ" value={detail.statusLabel} />
+                </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm col-span-2 lg:col-span-1">
                   <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลเอกสาร</div>
                   <DetailGrid
                     items={[
@@ -994,7 +1027,7 @@ export function AdvancePaymentsPageClient() {
                   ) : null}
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 col-span-2 lg:col-span-1">
                   <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="mb-3 text-sm font-semibold text-slate-900">การติดตามสถานะ</div>
                     <DetailGrid

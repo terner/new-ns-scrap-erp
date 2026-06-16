@@ -100,6 +100,7 @@ function WaitingAllocationsView() {
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -130,82 +131,224 @@ function WaitingAllocationsView() {
       </DualCostingHint>
       <DualCostingErrorBox error={error} />
       <DualCostingWorkflowStrip active="waiting" />
+      
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <DualCostingStatCard label="รวมรายการรอ" tone="amber" value={String(data?.summary.count ?? 0)} />
-        <DualCostingStatCard label="ยังไม่เริ่ม allocate" tone="red" value={String(data?.summary.fullyPending ?? 0)} />
-        <DualCostingStatCard label="บางส่วน" tone="amber" value={String(data?.summary.partial ?? 0)} />
-        <DualCostingStatCard label="น้ำหนักรอ allocate" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
-        <DualCostingStatCard label="มูลค่าขายรอ Match" tone="emerald" value={formatMoney(data?.summary.totalRevenue ?? 0)} />
+        <DualCostingStatCard icon="⏳" label="รวมรายการรอ" tone="amber" value={String(data?.summary.count ?? 0)} />
+        <DualCostingStatCard icon="❌" label="ยังไม่เริ่ม allocate" tone="red" value={String(data?.summary.fullyPending ?? 0)} />
+        <DualCostingStatCard icon="🔗" label="บางส่วน" tone="amber" value={String(data?.summary.partial ?? 0)} />
+        <DualCostingStatCard icon="⚖️" label="น้ำหนักรอ allocate" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
+        <DualCostingStatCard icon="💰" label="มูลค่าขายรอ Match" tone="emerald" value={formatMoney(data?.summary.totalRevenue ?? 0)} />
       </div>
 
       <DualCostingPanel title="สรุปตามหมวด">
-        <Table>
-          <TableHeader>
-            <tr>
-              <TableHead>หมวด</TableHead>
-              <TableHead className="text-right">รายการ</TableHead>
-              <TableHead className="text-right">น้ำหนักรอ</TableHead>
-              <TableHead className="text-right">มูลค่ารอ</TableHead>
-            </tr>
-          </TableHeader>
-          <TableBody>
-            {(data?.summary.byCategory ?? []).map((row) => <TableRow key={row.name}><TableCell><span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{row.name}</span></TableCell><TableCell className="text-right">{row.count}</TableCell><TableCell className="text-right font-bold">{formatMoney(row.qty)} กก.</TableCell><TableCell className="text-right font-bold text-emerald-700">{formatMoney(row.revenue)}</TableCell></TableRow>)}
-            {!isLoading && (data?.summary.byCategory.length ?? 0) === 0 ? <TableRow><TableCell className="py-6 text-center text-slate-400" colSpan={4}>ไม่มีรายการรอ allocate ตามตัวกรอง</TableCell></TableRow> : null}
-          </TableBody>
-        </Table>
+        {/* Desktop View */}
+        <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <Table className="text-xs">
+            <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+              <tr>
+                <th className="p-3 pl-4 text-left">หมวด</th>
+                <th className="p-3 text-right">รายการ</th>
+                <th className="p-3 text-right">น้ำหนักรอ</th>
+                <th className="p-3 pr-4 text-right">มูลค่ารอ</th>
+              </tr>
+            </TableHeader>
+            <TableBody>
+              {(data?.summary.byCategory ?? []).map((row) => (
+                <TableRow key={row.name} className="border-t border-slate-100 hover:bg-slate-50/30 transition-colors">
+                  <TableCell className="p-3 pl-4"><span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{row.name}</span></TableCell>
+                  <TableCell className="p-3 text-right text-slate-700">{row.count}</TableCell>
+                  <TableCell className="p-3 text-right font-mono font-bold text-slate-800">{formatMoney(row.qty)} กก.</TableCell>
+                  <TableCell className="p-3 pr-4 text-right font-mono font-bold text-emerald-700">{formatMoney(row.revenue)}</TableCell>
+                </TableRow>
+              ))}
+              {!isLoading && (data?.summary.byCategory.length ?? 0) === 0 ? <TableRow><TableCell className="py-6 text-center text-slate-400" colSpan={4}>ไม่มีรายการรอ allocate ตามตัวกรอง</TableCell></TableRow> : null}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile View */}
+        <div className="block lg:hidden space-y-3">
+          {(data?.summary.byCategory ?? []).map((row) => (
+            <div key={row.name} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{row.name}</span>
+                <span className="text-xs text-slate-500 font-semibold">{row.count} รายการ</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 block">น้ำหนักรอ</span>
+                  <span className="font-mono font-bold text-slate-800">{formatMoney(row.qty)} กก.</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500 block">มูลค่ารอ</span>
+                  <span className="font-mono font-bold text-emerald-700">{formatMoney(row.revenue)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {!isLoading && (data?.summary.byCategory.length ?? 0) === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-400">ไม่มีรายการรอ allocate ตามตัวกรอง</div>
+          ) : null}
+        </div>
       </DualCostingPanel>
 
       <DualCostingFilterCard>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input className="min-w-[240px] flex-1 rounded-md" placeholder="ค้นหา doc no / สินค้า / ลูกค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <Select className="w-auto min-w-[160px]" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">ทุกสถานะ</option>{(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
-          <Select className="w-auto min-w-[160px]" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">ทุกหมวด</option>{(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
+        {/* Desktop View */}
+        <div className="hidden lg:block">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input className="min-w-[240px] flex-1 rounded-md border-slate-300 focus-visible:ring-emerald-100" placeholder="ค้นหา doc no / สินค้า / ลูกค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <Select className="w-auto min-w-[160px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">ทุกสถานะ</option>{(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
+            <Select className="w-auto min-w-[160px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">ทุกหมวด</option>{(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
+          </div>
+        </div>
+
+        {/* Mobile View */}
+        <div className="block lg:hidden space-y-2">
+          <div className="flex gap-2">
+            <Input className="flex-1 h-10 rounded-md border-slate-300 focus-visible:ring-emerald-100 text-sm" placeholder="ค้นหา doc no / สินค้า / ลูกค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <button
+              className={`h-10 rounded-md border px-3 text-sm font-semibold transition-colors flex items-center gap-1 shrink-0 ${
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              type="button"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+            >
+              🔍 ตัวกรอง
+            </button>
+          </div>
+
+          {showMobileFilters && (
+            <div className="grid grid-cols-1 gap-2.5 pt-2 border-t border-slate-100 animate-in slide-in-from-top-2 duration-100">
+              <label className="text-xs text-slate-500 font-semibold">
+                สถานะ
+                <Select className="mt-1 w-full h-9 border-slate-300 focus-visible:ring-emerald-100 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">ทุกสถานะ</option>{(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
+              </label>
+              <label className="text-xs text-slate-500 font-semibold">
+                หมวดสินค้า
+                <Select className="mt-1 w-full h-9 border-slate-300 focus-visible:ring-emerald-100 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
+                  <option value="all">ทุกหมวด</option>
+                  {(data?.filters.categories ?? []).map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </Select>
+              </label>
+              <div className="flex justify-end pt-1">
+                <Button
+                  className="rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors focus-visible:outline-none"
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setCategory('all')
+                    setSearch('')
+                    setStatus('all')
+                  }}
+                >
+                  ล้างตัวกรอง
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </DualCostingFilterCard>
 
-      <DualCostingCountRow countValue={data?.rows.length ?? 0} />
+      {/* Desktop View */}
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <Table className="text-xs">
+          <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+            <tr>
+              <TableHead className="p-3 pl-4">บิลขาย</TableHead>
+              <TableHead className="p-3">วันที่</TableHead>
+              <TableHead className="p-3">ลูกค้า</TableHead>
+              <TableHead className="p-3">สินค้า</TableHead>
+              <TableHead className="p-3 text-center">หมวด</TableHead>
+              <TableHead className="p-3 text-right">ขาย (กก.)</TableHead>
+              <TableHead className="p-3 text-right">Allocate แล้ว</TableHead>
+              <TableHead className="p-3 text-right">ค้าง (กก.)</TableHead>
+              <TableHead className="p-3 text-right">ราคา/กก.</TableHead>
+              <TableHead className="p-3 text-right">มูลค่ารอ</TableHead>
+              <TableHead className="p-3 text-center">สถานะ</TableHead>
+              <TableHead className="p-3 pr-4 text-center">Action</TableHead>
+            </tr>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? <TableRow><TableCell className="py-8 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+            {!isLoading && (data?.rows.length ?? 0) === 0 ? <TableRow><TableCell className="py-8 text-center text-emerald-700" colSpan={12}>ไม่มีรายการค้าง allocate ตามตัวกรอง</TableCell></TableRow> : null}
+            {(data?.rows ?? []).map((row) => {
+              const allocatorHref = `/dual-costing/cost-allocator?sourceType=spot-sell&productId=${encodeURIComponent(row.productId)}&poSellId=${encodeURIComponent(`${row.salesBillId}:${row.itemId}`)}`
+              return (
+                <TableRow key={row.id} className="border-t border-slate-100 hover:bg-amber-50/20 transition-colors">
+                  <TableCell className="p-3 pl-4 font-mono text-slate-700">{row.docNo}</TableCell>
+                  <TableCell className="p-3 whitespace-nowrap text-slate-600">{formatDateDisplay(row.date)}</TableCell>
+                  <TableCell className="p-3 text-slate-800 font-medium">{row.customerName}</TableCell>
+                  <TableCell className="p-3 text-xs text-slate-700">{row.productName}</TableCell>
+                  <TableCell className="p-3 text-center"><span className="rounded border border-amber-255 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{row.metalGroup}</span></TableCell>
+                  <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.qty)}</TableCell>
+                  <TableCell className="p-3 text-right font-mono text-emerald-700 font-semibold">{formatMoney(row.allocatedQty)}</TableCell>
+                  <TableCell className="p-3 text-right font-mono font-bold text-amber-700">{formatMoney(row.remainingQty)}</TableCell>
+                  <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.unitPrice)}</TableCell>
+                  <TableCell className="p-3 text-right font-mono text-emerald-700 font-medium">{formatMoney(row.revenuePending)}</TableCell>
+                  <TableCell className="p-3 text-center"><StatusPill status={row.allocationStatus} /></TableCell>
+                  <TableCell className="p-3 pr-4 text-center"><Button asChild size="xs" type="button" className="rounded-lg font-semibold focus-visible:ring-2 focus-visible:ring-emerald-100"><Link href={allocatorHref}>จัดสรร</Link></Button></TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
-      <Table>
-        <TableHeader>
-          <tr>
-            <TableHead>บิลขาย</TableHead>
-            <TableHead>วันที่</TableHead>
-            <TableHead>ลูกค้า</TableHead>
-            <TableHead>สินค้า</TableHead>
-            <TableHead className="text-center">หมวด</TableHead>
-            <TableHead className="text-right">ขาย (กก.)</TableHead>
-            <TableHead className="text-right">Allocate แล้ว</TableHead>
-            <TableHead className="text-right">ค้าง (กก.)</TableHead>
-            <TableHead className="text-right">ราคา/กก.</TableHead>
-            <TableHead className="text-right">มูลค่ารอ</TableHead>
-            <TableHead className="text-center">สถานะ</TableHead>
-            <TableHead className="text-center">Action</TableHead>
-          </tr>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? <TableRow><TableCell className="py-8 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
-          {!isLoading && (data?.rows.length ?? 0) === 0 ? <TableRow><TableCell className="py-8 text-center text-emerald-700" colSpan={12}>ไม่มีรายการค้าง allocate ตามตัวกรอง</TableCell></TableRow> : null}
-          {(data?.rows ?? []).map((row) => {
-            const allocatorHref = `/dual-costing/cost-allocator?sourceType=spot-sell&productId=${encodeURIComponent(row.productId)}&poSellId=${encodeURIComponent(`${row.salesBillId}:${row.itemId}`)}`
-            return (
-              <TableRow key={row.id} className="hover:bg-amber-50/30">
-                <TableCell className="font-mono">{row.docNo}</TableCell>
-                <TableCell>{formatDateDisplay(row.date)}</TableCell>
-                <TableCell>{row.customerName}</TableCell>
-                <TableCell>{row.productName}</TableCell>
-                <TableCell className="text-center"><span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{row.metalGroup}</span></TableCell>
-                <TableCell className="text-right">{formatMoney(row.qty)}</TableCell>
-                <TableCell className="text-right text-emerald-700">{formatMoney(row.allocatedQty)}</TableCell>
-                <TableCell className="text-right font-bold text-amber-700">{formatMoney(row.remainingQty)}</TableCell>
-                <TableCell className="text-right">{formatMoney(row.unitPrice)}</TableCell>
-                <TableCell className="text-right text-emerald-700">{formatMoney(row.revenuePending)}</TableCell>
-                <TableCell className="text-center"><StatusPill status={row.allocationStatus} /></TableCell>
-                <TableCell className="text-center"><Button asChild size="xs" type="button"><Link href={allocatorHref}>จัดสรร</Link></Button></TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+
+      {/* Mobile Card List */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && (data?.rows.length ?? 0) === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-emerald-700 shadow-sm">ไม่มีรายการค้าง allocate ตามตัวกรอง</div>
+        ) : null}
+        {!isLoading && (data?.rows ?? []).map((row) => {
+          const allocatorHref = `/dual-costing/cost-allocator?sourceType=spot-sell&productId=${encodeURIComponent(row.productId)}&poSellId=${encodeURIComponent(`${row.salesBillId}:${row.itemId}`)}`
+          return (
+            <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-mono text-xs font-semibold text-slate-500">{row.docNo}</div>
+                  <div className="text-xs text-slate-500">{formatDateDisplay(row.date)}</div>
+                </div>
+                <StatusPill status={row.allocationStatus} />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-slate-800">{row.customerName}</div>
+                <div className="text-xs text-slate-600 mt-1">{row.productName}</div>
+                <div className="mt-1"><span className="rounded border border-amber-250 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{row.metalGroup}</span></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                <div>
+                  <span className="text-slate-500 block">ขาย / Allocate แล้ว</span>
+                  <span className="font-mono font-medium text-slate-800">{formatMoney(row.qty)} / <span className="text-emerald-700 font-semibold">{formatMoney(row.allocatedQty)}</span> กก.</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500 block">ค้าง allocate</span>
+                  <span className="font-mono font-bold text-amber-700">{formatMoney(row.remainingQty)} กก.</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">ราคา/กก.</span>
+                  <span className="font-mono text-slate-700">{formatMoney(row.unitPrice)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500 block">มูลค่ารอ Match</span>
+                  <span className="font-mono font-semibold text-emerald-700">{formatMoney(row.revenuePending)}</span>
+                </div>
+              </div>
+              <div className="pt-1">
+                <Button asChild size="sm" type="button" className="w-full rounded-lg font-semibold focus-visible:ring-2 focus-visible:ring-emerald-100">
+                  <Link href={allocatorHref}>จัดสรร</Link>
+                </Button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </DualCostingPageSection>
   )
 }
@@ -220,6 +363,7 @@ function AllocationLedgerView() {
   const [status, setStatus] = useState('approved')
   const [targetType, setTargetType] = useState('all')
   const [toDate, setToDate] = useState('')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -253,55 +397,207 @@ function AllocationLedgerView() {
       </DualCostingHint>
       <DualCostingErrorBox error={error} />
       <DualCostingWorkflowStrip active="ledger" />
+      
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <DualCostingStatCard label="รวม Allocations" value={String(data?.summary.active ?? 0)}><span className="text-xs text-slate-400">PO {data?.summary.poCount ?? 0} · Spot {data?.summary.spotCount ?? 0}</span></DualCostingStatCard>
-        <DualCostingStatCard label="น้ำหนัก allocate" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
-        <DualCostingStatCard label="ต้นทุนรวม" tone="red" value={formatMoney(data?.summary.cost ?? 0)} />
-        <DualCostingStatCard label="กำไรรวม (Deal Cost)" tone={(data?.summary.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={formatMoney(data?.summary.gp ?? 0)} />
+        <DualCostingStatCard icon="📊" label="รวม Allocations" tone="slate" value={String(data?.summary.active ?? 0)}>
+          <span className="text-xs font-semibold text-slate-500 mt-0.5 block">PO {data?.summary.poCount ?? 0} · Spot {data?.summary.spotCount ?? 0}</span>
+        </DualCostingStatCard>
+        <DualCostingStatCard icon="⚖️" label="น้ำหนัก allocate" tone="blue" value={`${formatMoney(data?.summary.totalQty ?? 0)} กก.`} />
+        <DualCostingStatCard icon="💳" label="ต้นทุนรวม" tone="red" value={formatMoney(data?.summary.cost ?? 0)} />
+        <DualCostingStatCard icon="📈" label="กำไรรวม (Deal Cost)" tone={(data?.summary.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={formatMoney(data?.summary.gp ?? 0)} />
       </div>
 
       <DualCostingFilterCard>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input className="min-w-[240px] flex-1 rounded-md" placeholder="ค้นหา match id / doc / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <span className="text-xs text-slate-500">วันที่:</span>
-          <DatePickerInput id="allocation-ledger-from" value={fromDate} onChange={setFromDate} />
-          <span className="text-slate-400">→</span>
-          <DatePickerInput id="allocation-ledger-to" value={toDate} onChange={setToDate} />
-          <Select className="w-auto min-w-[150px]" value={targetType} onChange={(event) => setTargetType(event.target.value)}><option value="all">ทุก target</option>{(data?.filters.targetTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
-          <Select className="w-auto min-w-[150px]" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">ทุกหมวด</option>{(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
-          <Select className="w-auto min-w-[150px]" value={status} onChange={(event) => setStatus(event.target.value)}><option value="approved">Approved</option><option value="reversed">Reversed</option><option value="all">ทั้งหมด</option></Select>
-          <Button disabled size="sm" type="button" variant="export">ส่งออก CSV</Button>
+        {/* Desktop View */}
+        <div className="hidden xl:block">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input className="min-w-[200px] flex-1 rounded-md border-slate-300 focus-visible:ring-emerald-100" placeholder="ค้นหา match id / doc / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <span className="text-xs text-slate-500 font-semibold">วันที่:</span>
+            <DatePickerInput id="allocation-ledger-from" value={fromDate} onChange={setFromDate} />
+            <span className="text-slate-400">→</span>
+            <DatePickerInput id="allocation-ledger-to" value={toDate} onChange={setToDate} />
+            <Select className="w-auto min-w-[130px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={targetType} onChange={(event) => setTargetType(event.target.value)}><option value="all">ทุก target</option>{(data?.filters.targetTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
+            <Select className="w-auto min-w-[130px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">ทุกหมวด</option>{(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
+            <Select className="w-auto min-w-[130px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={status} onChange={(event) => setStatus(event.target.value)}><option value="approved">Approved</option><option value="reversed">Reversed</option><option value="all">ทั้งหมด</option></Select>
+            <Button disabled className="ml-auto rounded-lg h-9 px-3 text-xs font-semibold focus-visible:ring-slate-100" size="sm" type="button" variant="export">ส่งออก CSV</Button>
+          </div>
+        </div>
+
+        {/* Mobile / Tablet View */}
+        <div className="block xl:hidden space-y-2">
+          <div className="flex gap-2">
+            <Input className="flex-1 h-10 rounded-md border-slate-300 focus-visible:ring-emerald-100 text-sm" placeholder="ค้นหา match id / doc / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <button
+              className={`h-10 rounded-md border px-3 text-sm font-semibold transition-colors flex items-center gap-1 shrink-0 ${
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              type="button"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+            >
+              🔍 ตัวกรอง
+            </button>
+          </div>
+
+          {showMobileFilters && (
+            <div className="grid grid-cols-1 gap-2.5 pt-2 border-t border-slate-100 animate-in slide-in-from-top-2 duration-100">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-slate-500 font-semibold">
+                  จากวันที่
+                  <DatePickerInput className="mt-1 w-full" value={fromDate} onChange={setFromDate} />
+                </label>
+                <label className="text-xs text-slate-500 font-semibold">
+                  ถึงวันที่
+                  <DatePickerInput className="mt-1 w-full" value={toDate} onChange={setToDate} />
+                </label>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <label className="text-xs text-slate-500 font-semibold">
+                  Target
+                  <Select className="mt-1 w-full h-9 border-slate-300 focus-visible:ring-emerald-100 text-xs" value={targetType} onChange={(event) => setTargetType(event.target.value)}><option value="all">ทุก target</option>{(data?.filters.targetTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}</Select>
+                </label>
+                <label className="text-xs text-slate-500 font-semibold">
+                  หมวดหมู่
+                  <Select className="mt-1 w-full h-9 border-slate-300 focus-visible:ring-emerald-100 text-xs" value={category} onChange={(event) => setCategory(event.target.value)}>
+                    <option value="all">ทุกหมวด</option>
+                    {(data?.filters.categories ?? []).map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </Select>
+                </label>
+                <label className="text-xs text-slate-500 font-semibold">
+                  สถานะ
+                  <Select className="mt-1 w-full h-9 border-slate-300 focus-visible:ring-emerald-100 text-xs" value={status} onChange={(event) => setStatus(event.target.value)}>
+                    <option value="approved">Approved</option>
+                    <option value="reversed">Reversed</option>
+                    <option value="all">ทั้งหมด</option>
+                  </Select>
+                </label>
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button
+                  className="rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors focus-visible:outline-none"
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setCategory('all')
+                    setFromDate('')
+                    setSearch('')
+                    setStatus('approved')
+                    setTargetType('all')
+                    setToDate('')
+                  }}
+                >
+                  ล้างตัวกรอง
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </DualCostingFilterCard>
 
-      <DualCostingCountRow countValue={data?.rows.length ?? 0} />
+      {/* Desktop View */}
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <Table className="text-xs">
+          <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+            <tr>
+              <TableHead className="p-3 pl-4">Match ID</TableHead>
+              <TableHead className="p-3 text-center">Type</TableHead>
+              <TableHead className="p-3">Sale Doc</TableHead>
+              <TableHead className="p-3">สินค้า</TableHead>
+              <TableHead className="p-3 text-center">หมวด</TableHead>
+              <TableHead className="p-3 text-right">Sale Qty</TableHead>
+              <TableHead className="p-3 text-right">Allocated</TableHead>
+              <TableHead className="p-3">Cost Pool</TableHead>
+              <TableHead className="p-3 text-right">฿/กก.</TableHead>
+              <TableHead className="p-3 text-right">Total Cost</TableHead>
+              <TableHead className="p-3 text-right">Revenue</TableHead>
+              <TableHead className="p-3 text-right">GP</TableHead>
+              <TableHead className="p-3 text-right">GP%</TableHead>
+              <TableHead className="p-3">By</TableHead>
+              <TableHead className="p-3 pr-4 text-center">Status</TableHead>
+            </tr>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? <TableRow><TableCell className="py-8 text-center text-slate-500" colSpan={15}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+            {!isLoading && (data?.rows.length ?? 0) === 0 ? <TableRow><TableCell className="py-8 text-center text-slate-500" colSpan={15}>ไม่มี allocation log ตรงกับ filter</TableCell></TableRow> : null}
+            {(data?.rows ?? []).map((row) => (
+              <TableRow key={row.id} className={`border-t border-slate-100 hover:bg-indigo-50/30 transition-colors ${row.status === 'reversed' ? 'opacity-50' : ''}`}>
+                <TableCell className="p-3 pl-4 font-mono text-xs text-slate-700">{row.matchId}</TableCell>
+                <TableCell className="p-3 text-center"><TargetPill type={row.targetType} /></TableCell>
+                <TableCell className="p-3 font-mono text-xs text-slate-700">{row.saleDocNo}</TableCell>
+                <TableCell className="p-3 text-xs text-slate-800">{row.productName}</TableCell>
+                <TableCell className="p-3 text-center"><span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{row.productCategory}</span></TableCell>
+                <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.saleQty)}</TableCell>
+                <TableCell className="p-3 text-right font-mono font-medium text-blue-700">{formatMoney(row.allocatedQty)}</TableCell>
+                <TableCell className="p-3 font-mono text-xs text-slate-600">{row.costPoolNo}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.costPerKg)}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-red-700">{formatMoney(row.totalCost)}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-emerald-700">{formatMoney(row.allocatedRevenue)}</TableCell>
+                <TableCell className={`p-3 text-right font-mono font-bold ${row.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-655'}`}>{formatMoney(row.grossProfit)}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-xs text-slate-700">{row.gpPct.toFixed(2)}%</TableCell>
+                <TableCell className="p-3 text-xs text-slate-700">{row.allocatedBy}</TableCell>
+                <TableCell className="p-3 pr-4 text-center"><span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${row.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50' : 'bg-slate-100 text-slate-600 border border-slate-200/50'}`}>{row.status}</span></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
-      <Table>
-        <TableHeader>
-          <tr>
-            <TableHead>Match ID</TableHead>
-            <TableHead className="text-center">Type</TableHead>
-            <TableHead>Sale Doc</TableHead>
-            <TableHead>สินค้า</TableHead>
-            <TableHead className="text-center">หมวด</TableHead>
-            <TableHead className="text-right">Sale Qty</TableHead>
-            <TableHead className="text-right">Allocated</TableHead>
-            <TableHead>Cost Pool</TableHead>
-            <TableHead className="text-right">฿/กก.</TableHead>
-            <TableHead className="text-right">Total Cost</TableHead>
-            <TableHead className="text-right">Revenue</TableHead>
-            <TableHead className="text-right">GP</TableHead>
-            <TableHead className="text-right">GP%</TableHead>
-            <TableHead>By</TableHead>
-            <TableHead className="text-center">Status</TableHead>
-          </tr>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? <TableRow><TableCell className="py-8 text-center text-slate-500" colSpan={15}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
-          {!isLoading && (data?.rows.length ?? 0) === 0 ? <TableRow><TableCell className="py-8 text-center text-slate-500" colSpan={15}>ไม่มี allocation log ตรงกับ filter</TableCell></TableRow> : null}
-          {(data?.rows ?? []).map((row) => <TableRow key={row.id} className={`hover:bg-indigo-50/30 ${row.status === 'reversed' ? 'opacity-50' : ''}`}><TableCell className="font-mono text-xs">{row.matchId}</TableCell><TableCell className="text-center"><TargetPill type={row.targetType} /></TableCell><TableCell className="font-mono text-xs">{row.saleDocNo}</TableCell><TableCell className="text-xs">{row.productName}</TableCell><TableCell className="text-center"><span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px]">{row.productCategory}</span></TableCell><TableCell className="text-right">{formatMoney(row.saleQty)}</TableCell><TableCell className="text-right font-medium text-blue-700">{formatMoney(row.allocatedQty)}</TableCell><TableCell className="font-mono text-xs">{row.costPoolNo}</TableCell><TableCell className="text-right">{formatMoney(row.costPerKg)}</TableCell><TableCell className="text-right text-red-700">{formatMoney(row.totalCost)}</TableCell><TableCell className="text-right text-emerald-700">{formatMoney(row.allocatedRevenue)}</TableCell><TableCell className={`text-right font-bold ${row.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(row.grossProfit)}</TableCell><TableCell className="text-right text-xs">{row.gpPct.toFixed(2)}%</TableCell><TableCell className="text-xs">{row.allocatedBy}</TableCell><TableCell className="text-center"><span className={`rounded-md px-2 py-0.5 text-[10px] ${row.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{row.status}</span></TableCell></TableRow>)}
-        </TableBody>
-      </Table>
+
+
+      {/* Mobile Card List */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && (data?.rows.length ?? 0) === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">ไม่มี allocation log ตรงกับ filter</div>
+        ) : null}
+        {!isLoading && (data?.rows ?? []).map((row) => (
+          <div key={row.id} className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 ${row.status === 'reversed' ? 'opacity-50' : ''}`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="font-mono text-xs font-bold text-slate-800">{row.matchId}</div>
+                <div className="text-xs text-slate-500 mt-0.5">Sale Doc: <span className="font-mono">{row.saleDocNo}</span></div>
+              </div>
+              <div className="flex gap-1.5 items-center">
+                <TargetPill type={row.targetType} />
+                <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${row.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/50' : 'bg-slate-100 text-slate-600 border border-slate-200/50'}`}>{row.status}</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-600">{row.productName}</div>
+              <div className="mt-1 flex gap-1">
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{row.productCategory}</span>
+                <span className="rounded-md bg-indigo-50 text-indigo-700 px-2 py-0.5 text-xs font-mono">Pool: {row.costPoolNo}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+              <div>
+                <span className="text-slate-500 block">Sale / Allocated Qty</span>
+                <span className="font-mono text-slate-700">{formatMoney(row.saleQty)} / <span className="text-blue-700 font-semibold">{formatMoney(row.allocatedQty)}</span> กก.</span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-500 block">ต้นทุน (฿/กก.)</span>
+                <span className="font-mono text-slate-700">{formatMoney(row.totalCost)} (<span className="text-slate-600">{formatMoney(row.costPerKg)}</span>)</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Revenue</span>
+                <span className="font-mono font-semibold text-emerald-700">{formatMoney(row.allocatedRevenue)}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-500 block">GP (GP%)</span>
+                <span className={`font-mono font-bold ${row.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-655'}`}>{formatMoney(row.grossProfit)} ({row.gpPct.toFixed(2)}%)</span>
+              </div>
+            </div>
+            <div className="pt-1.5 border-t border-slate-100/50 flex justify-between text-xs text-slate-500">
+              <span>โดย {row.allocatedBy}</span>
+              <span>{row.allocatedAt ? formatDateDisplay(row.allocatedAt) : ''}</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </DualCostingPageSection>
   )
 }
@@ -337,53 +633,112 @@ function DualCostingReportView() {
         รายงานนี้ใช้ Deal Cost เพื่อให้ผู้บริหารดูกำไรต่อดีล/ลอตที่ allocate เท่านั้น ไม่ใช้ปิดงบ และ P&L ยังใช้ WAC ตามหลักบัญชี
       </DualCostingHint>
       <DualCostingErrorBox error={error} />
-      {isLoading ? <div className="rounded-md bg-white p-6 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
-      <div className="grid grid-cols-2 gap-3 rounded-md bg-gradient-to-r from-emerald-500 to-blue-500 p-4 text-white shadow md:grid-cols-4">
-        <HeroMetric label="Total Revenue (Allocated)" value={formatMoney((report?.po.revenue ?? 0) + (report?.spotAllocated.revenue ?? 0))} />
-        <HeroMetric label="Total Cost (Deal Cost)" value={formatMoney(report?.total.cost ?? 0)} />
-        <HeroMetric label="Gross Profit" value={formatMoney(report?.total.gp ?? 0)} />
-        <HeroMetric label="GP%" value={`${(report?.total.gpPct ?? 0).toFixed(2)}%`} />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <ReportCard metric={report?.po} title="ขายผ่าน PO Sell" />
-        <ReportCard metric={report?.spotAllocated} title="ขาย Spot Sell (Allocated)" />
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <DualCostingStatCard label="รายการค้าง" tone="amber" value={String(report?.waiting.count ?? 0)} />
-        <DualCostingStatCard label="น้ำหนักค้าง" tone="amber" value={`${formatMoney(report?.waiting.qty ?? 0)} กก.`} />
-        <DualCostingStatCard label="มูลค่าขายค้าง" tone="emerald" value={formatMoney(report?.waiting.revenue ?? 0)} />
-      </div>
-      <DualCostingPanel title="สรุปตามหมวดสินค้า">
-        <Table>
-          <TableHeader>
-            <tr>
-              <TableHead>หมวด</TableHead>
-              <TableHead className="text-right">Allocated Qty</TableHead>
-              <TableHead className="text-right">Revenue</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
-              <TableHead className="text-right">GP</TableHead>
-              <TableHead className="text-right">GP%</TableHead>
-              <TableHead className="text-right">Pending Qty</TableHead>
-              <TableHead className="text-right">Pending Revenue</TableHead>
-            </tr>
-          </TableHeader>
-          <TableBody>
-            {(report?.byCategory ?? []).map((row) => <TableRow key={row.category}><TableCell><span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">{row.category}</span></TableCell><TableCell className="text-right">{formatMoney(row.allocatedQty)}</TableCell><TableCell className="text-right text-blue-700">{formatMoney(row.revenue)}</TableCell><TableCell className="text-right text-red-700">{formatMoney(row.cost)}</TableCell><TableCell className={`text-right font-bold ${row.gp >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(row.gp)}</TableCell><TableCell className="text-right">{row.gpPct.toFixed(2)}%</TableCell><TableCell className="text-right text-amber-700">{formatMoney(row.pendingQty)}</TableCell><TableCell className="text-right text-amber-700">{formatMoney(row.pendingRevenue)}</TableCell></TableRow>)}
-          </TableBody>
-        </Table>
-      </DualCostingPanel>
+      {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล...</div> : null}
+      
+      {!isLoading && report ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 p-5 text-white shadow-lg border border-emerald-500/20 md:grid-cols-4">
+            <HeroMetric label="Total Revenue (Allocated)" value={formatMoney((report?.po.revenue ?? 0) + (report?.spotAllocated.revenue ?? 0))} />
+            <HeroMetric label="Total Cost (Deal Cost)" value={formatMoney(report?.total.cost ?? 0)} />
+            <HeroMetric label="Gross Profit" value={formatMoney(report?.total.gp ?? 0)} />
+            <HeroMetric label="GP%" value={`${(report?.total.gpPct ?? 0).toFixed(2)}%`} />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <ReportCard metric={report?.po} title="ขายผ่าน PO Sell" />
+            <ReportCard metric={report?.spotAllocated} title="ขาย Spot Sell (Allocated)" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <DualCostingStatCard icon="⏳" label="รายการค้าง" tone="amber" value={String(report?.waiting.count ?? 0)} />
+            <DualCostingStatCard icon="⚖️" label="น้ำหนักค้าง" tone="amber" value={`${formatMoney(report?.waiting.qty ?? 0)} กก.`} />
+            <DualCostingStatCard icon="💰" label="มูลค่าขายค้าง" tone="emerald" value={formatMoney(report?.waiting.revenue ?? 0)} />
+          </div>
+          <DualCostingPanel title="สรุปตามหมวดสินค้า">
+            {/* Desktop View */}
+            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+              <Table className="text-xs">
+                <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+                  <tr>
+                    <TableHead className="p-3 pl-4">หมวด</TableHead>
+                    <TableHead className="p-3 text-right">Allocated Qty</TableHead>
+                    <TableHead className="p-3 text-right">Revenue</TableHead>
+                    <TableHead className="p-3 text-right">Cost</TableHead>
+                    <TableHead className="p-3 text-right">GP</TableHead>
+                    <TableHead className="p-3 text-right">GP%</TableHead>
+                    <TableHead className="p-3 text-right">Pending Qty</TableHead>
+                    <TableHead className="p-3 pr-4 text-right">Pending Revenue</TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {(report?.byCategory ?? []).map((row) => (
+                    <TableRow key={row.category} className="border-t border-slate-100 hover:bg-slate-50/30 transition-colors">
+                      <TableCell className="p-3 pl-4"><span className="rounded border border-emerald-250 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">{row.category}</span></TableCell>
+                      <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.allocatedQty)}</TableCell>
+                      <TableCell className="p-3 text-right font-mono text-blue-700 font-semibold">{formatMoney(row.revenue)}</TableCell>
+                      <TableCell className="p-3 text-right font-mono text-red-600">{formatMoney(row.cost)}</TableCell>
+                      <TableCell className={`p-3 text-right font-mono font-bold ${row.gp >= 0 ? 'text-emerald-700' : 'text-red-655'}`}>{formatMoney(row.gp)}</TableCell>
+                      <TableCell className="p-3 text-right font-mono text-slate-700">{row.gpPct.toFixed(2)}%</TableCell>
+                      <TableCell className="p-3 text-right font-mono text-amber-700">{formatMoney(row.pendingQty)}</TableCell>
+                      <TableCell className="p-3 pr-4 text-right font-mono text-amber-700 font-semibold">{formatMoney(row.pendingRevenue)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile View */}
+            <div className="block lg:hidden space-y-3">
+              {(report?.byCategory ?? []).map((row) => (
+                <div key={row.category} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <span className="rounded border border-emerald-250 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">{row.category}</span>
+                    <span className="text-xs text-slate-500 font-semibold">พบ {row.rows} รายการ</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500 block">Allocated Qty</span>
+                      <span className="font-mono text-slate-700">{formatMoney(row.allocatedQty)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-500 block">Revenue</span>
+                      <span className="font-mono text-blue-700 font-semibold">{formatMoney(row.revenue)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Cost</span>
+                      <span className="font-mono text-red-600">{formatMoney(row.cost)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-500 block">GP (GP%)</span>
+                      <span className={`font-mono font-bold ${row.gp >= 0 ? 'text-emerald-700' : 'text-red-655'}`}>{formatMoney(row.gp)} ({row.gpPct.toFixed(2)}%)</span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 col-span-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-slate-500 block">Pending Qty</span>
+                        <span className="font-mono text-amber-700">{formatMoney(row.pendingQty)}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-slate-500 block">Pending Revenue</span>
+                        <span className="font-mono text-amber-700 font-semibold">{formatMoney(row.pendingRevenue)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DualCostingPanel>
+        </>
+      ) : null}
     </DualCostingPageSection>
   )
 }
 
 function StatusPill({ status }: { status: string }) {
   return status === 'pending_allocation'
-    ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">pending</span>
-    : <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">partial</span>
+    ? <span className="rounded border border-red-200/50 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">pending</span>
+    : <span className="rounded border border-amber-200/50 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">partial</span>
 }
 
 function TargetPill({ type }: { type: string }) {
-  return <span className={`rounded-md px-2 py-0.5 text-[10px] ${type === 'PO_SELL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{type === 'PO_SELL' ? 'PO' : 'Spot'}</span>
+  return <span className={`rounded border px-2 py-0.5 text-xs font-semibold ${type === 'PO_SELL' ? 'bg-blue-50 text-blue-700 border-blue-200/50' : 'bg-purple-50 text-purple-700 border-purple-200/50'}`}>{type === 'PO_SELL' ? 'PO' : 'Spot'}</span>
 }
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
@@ -394,12 +749,12 @@ function ReportCard({ metric, title }: { metric?: ReportMetric; title: string })
   return (
     <DualCostingPanel title={title}>
       <div className="grid grid-cols-2 gap-3">
-        <DualCostingStatCard label="จำนวนรายการ" value={String(metric?.count ?? 0)} />
-        <DualCostingStatCard label="น้ำหนัก" tone="blue" value={formatMoney(metric?.qty ?? 0)} />
-        <DualCostingStatCard label="Revenue" tone="emerald" value={formatMoney(metric?.revenue ?? 0)} />
-        <DualCostingStatCard label="Cost" tone="red" value={formatMoney(metric?.cost ?? 0)} />
-        <DualCostingStatCard label="GP" tone={(metric?.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={formatMoney(metric?.gp ?? 0)} />
-        <DualCostingStatCard label="GP%" value={`${(metric?.gpPct ?? 0).toFixed(2)}%`} />
+        <DualCostingStatCard icon="📊" label="จำนวนรายการ" tone="slate" value={String(metric?.count ?? 0)} />
+        <DualCostingStatCard icon="⚖️" label="น้ำหนัก" tone="blue" value={formatMoney(metric?.qty ?? 0)} />
+        <DualCostingStatCard icon="💰" label="Revenue" tone="emerald" value={formatMoney(metric?.revenue ?? 0)} />
+        <DualCostingStatCard icon="💳" label="Cost" tone="red" value={formatMoney(metric?.cost ?? 0)} />
+        <DualCostingStatCard icon="📈" label="GP" tone={(metric?.gp ?? 0) >= 0 ? 'emerald' : 'red'} value={formatMoney(metric?.gp ?? 0)} />
+        <DualCostingStatCard icon="📈" label="GP%" tone="slate" value={`${(metric?.gpPct ?? 0).toFixed(2)}%`} />
       </div>
     </DualCostingPanel>
   )

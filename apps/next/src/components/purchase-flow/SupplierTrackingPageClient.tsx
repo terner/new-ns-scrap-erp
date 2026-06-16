@@ -161,13 +161,13 @@ export function SupplierTrackingPageClient() {
       </div>
 
       <div className="rounded-md bg-white p-3 shadow">
-        <div className="grid gap-2 md:grid-cols-6">
+        <div className="grid gap-2 lg:grid-cols-6">
           <input className="h-9 rounded-md border px-3 text-sm" type="number" value={year} onChange={(event) => setYear(event.target.value)} />
           <select className="h-9 rounded-md border px-3 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
             <option value="">ทั้งปี</option>
             {months.map((value, index) => <option key={value} value={value}>{monthLabels[index]}</option>)}
           </select>
-          <select className="h-9 rounded-md border px-3 text-sm md:col-span-2" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+          <select className="h-9 rounded-md border px-3 text-sm lg:col-span-2" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
             <option value="">Supplier ทั้งหมด</option>
             {(data?.filters?.suppliers ?? []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.code ? `${supplier.code} - ${supplier.name}` : supplier.name}</option>)}
           </select>
@@ -197,7 +197,7 @@ export function SupplierTrackingPageClient() {
       {view === 'list' ? (
         <>
           {/* Mobile Card list for main tracking list */}
-          <div className="block md:hidden space-y-3 mb-4">
+          <div className="block lg:hidden space-y-3 mb-4">
             {isLoading ? (
               <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
             ) : null}
@@ -264,7 +264,7 @@ export function SupplierTrackingPageClient() {
             ) : null}
           </div>
 
-          <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow mb-4">
+          <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow mb-4">
             <table className="w-full min-w-[1180px] text-sm">
               <thead className="bg-slate-100">
                 <tr>
@@ -312,7 +312,7 @@ export function SupplierTrackingPageClient() {
           </div>
 
           {/* Mobile Card list for Product breakdown */}
-          <div className="block md:hidden space-y-3">
+          <div className="block lg:hidden space-y-3">
             <div className="border-b bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 rounded-t-md">Product breakdown จากบิลรับซื้อ (มือถือ)</div>
             {(data?.byProduct ?? []).slice(0, 20).map((row) => (
               <div key={row.productName} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
@@ -347,7 +347,7 @@ export function SupplierTrackingPageClient() {
             ) : null}
           </div>
 
-          <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+          <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
             <div className="border-b bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">Product breakdown จากบิลรับซื้อ</div>
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">Supplier</th><th className="p-2 text-right">บิล</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
@@ -386,7 +386,7 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
           {!isLoading && detail ? (
             <>
               <DetailSection title="Reliability / Quality Signals">
-                <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2 p-3 lg:grid-cols-3">
                   <SignalMetric label="ส่งครบจาก WTI" value={`${detail.qualitySignals.deliveryCompletionPct.toFixed(1)}%`} />
                   <SignalMetric label="หักน้ำหนัก" value={`${detail.qualitySignals.deductionPct.toFixed(1)}%`} />
                   <SignalMetric label="จ่ายดี" value={`${detail.qualitySignals.paymentReliabilityPct.toFixed(1)}%`} />
@@ -449,41 +449,116 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
 }
 
 function DetailSection({ children, title }: { children: ReactNode; title: string }) {
-  return <section className="rounded-md border border-slate-200 bg-white"><div className="border-b bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">{title}</div>{children}</section>
+  return (
+    <section className="rounded-xl border border-slate-200/60 bg-slate-50 overflow-hidden shadow-sm">
+      <div className="border-b border-slate-200/60 bg-slate-100/60 px-4 py-2.5 text-sm font-bold text-slate-850">{title}</div>
+      {children}
+    </section>
+  )
 }
 
 function SimpleTable({ headers, rows }: { headers: string[]; rows: DetailCell[][] }) {
+  const cellText = (cell: DetailCell) => typeof cell === 'string' ? cell : cell.label
+  const isNumericCell = (cell: DetailCell) => /^-?[\d,]+(\.\d+)?%?$/.test(cellText(cell).trim())
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-sm">
-        <thead className="bg-slate-100"><tr>{headers.map((header) => <th key={header} className="p-2 text-left">{header}</th>)}</tr></thead>
-        <tbody>
-          {rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
-          {rows.map((row, index) => (
-            <tr key={index} className="border-t">
-              {row.map((cell, cellIndex) => (
-                <td key={`${index}-${headers[cellIndex]}`} className={cellIndex === 0 || cellIndex === 1 || cellIndex === headers.length - 1 ? 'p-2' : 'p-2 text-right'}>
-                  {typeof cell === 'string' ? cell : <a className="font-mono font-semibold text-blue-700 underline-offset-2 hover:underline" href={cell.href}>{cell.label}</a>}
-                </td>
+    <>
+      {/* Desktop Table View */}
+      <div className="hidden lg:block overflow-x-auto bg-white">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200/60">
+            <tr>
+              {headers.map((header, idx) => (
+                <th key={header} className={`p-2.5 text-slate-600 font-semibold text-xs text-left ${idx === 0 ? 'pl-4' : idx === headers.length - 1 ? 'pr-4' : ''}`}>
+                  {header}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={headers.length}>ไม่มีข้อมูล</td></tr> : null}
+            {rows.map((row, index) => (
+              <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/30">
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={`${index}-${headers[cellIndex]}`}
+                    className={`
+                      p-2.5 text-slate-700
+                      ${cellIndex === 0 ? 'pl-4' : cellIndex === row.length - 1 ? 'pr-4' : ''}
+                      ${cellIndex === 0 || cellIndex === 1 || cellIndex === headers.length - 1 || !isNumericCell(cell) ? 'text-left' : 'text-right'}
+                    `}
+                  >
+                    {typeof cell === 'string' ? (
+                      cell
+                    ) : (
+                      <a className="font-mono font-semibold text-blue-600 underline-offset-2 hover:underline focus:outline-none focus-visible:outline-none focus-visible:ring-0" href={cell.href}>
+                        {cell.label}
+                      </a>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block lg:hidden space-y-3 p-3">
+        {rows.length === 0 ? <div className="text-center text-xs text-slate-400 py-4 bg-white rounded-xl border border-slate-200/60">ไม่มีข้อมูล</div> : null}
+        {rows.map((row, index) => (
+          <div key={index} className="rounded-xl border border-slate-200/60 bg-white p-3.5 shadow-sm space-y-2 text-xs">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 font-semibold">
+              <span className="text-slate-800 font-bold">
+                {typeof row[0] === 'string' ? row[0] : (
+                  <a className="font-mono text-blue-600 underline focus:outline-none focus-visible:outline-none focus-visible:ring-0" href={(row[0] as { href: string }).href}>
+                    {row[0].label}
+                  </a>
+                )}
+              </span>
+              {row.length > 1 && (
+                <span className="text-slate-600 font-bold">
+                  {cellText(row[row.length - 1])}
+                </span>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {row.slice(1, row.length - 1).map((cell, cellIndex) => {
+                const headerLabel = headers[cellIndex + 1] || ''
+                const cellValue = cellText(cell)
+                const isLink = typeof cell !== 'string'
+                return (
+                  <div key={cellIndex} className="flex justify-between items-center gap-2">
+                    <span className="text-slate-500 font-semibold">{headerLabel}</span>
+                    <span className="text-slate-800 font-medium font-mono text-right truncate max-w-[180px]">
+                      {isLink ? (
+                        <a className="text-blue-600 underline focus:outline-none focus-visible:outline-none focus-visible:ring-0" href={(cell as { href: string }).href}>
+                          {cellValue}
+                        </a>
+                      ) : (
+                        cellValue
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
 function SummaryCard({ className = '', icon, label, tone, value }: { className?: string; icon: string; label: string; tone: 'blue' | 'emerald' | 'indigo' | 'red'; value: string }) {
   const colors = {
-    blue: 'bg-blue-100 text-blue-700',
-    emerald: 'bg-emerald-100 text-emerald-700',
-    indigo: 'bg-indigo-100 text-indigo-700',
-    red: 'bg-red-100 text-red-700',
+    blue: 'bg-blue-100 text-blue-700 border-blue-200/50',
+    emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200/50',
+    indigo: 'bg-indigo-100 text-indigo-700 border-indigo-200/50',
+    red: 'bg-red-100 text-red-700 border-red-200/50',
   }[tone]
   return (
     <div className={`flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5 ${className}`}>
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl sm:h-12 sm:w-12 ${colors}`}>{icon}</div>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl sm:h-12 sm:w-12 ${colors.split(' ')[0]}`}>{icon}</div>
       <div className="min-w-0">
         <div className={`text-xs ${colors.split(' ')[1]}`}>{label}</div>
         <div className="truncate font-mono font-bold text-slate-900">{value}</div>
@@ -493,7 +568,12 @@ function SummaryCard({ className = '', icon, label, tone, value }: { className?:
 }
 
 function SignalMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md bg-slate-50 p-3"><div className="text-xs font-semibold text-slate-500">{label}</div><div className="mt-1 text-sm font-bold text-slate-900">{value}</div></div>
+  return (
+    <div className="rounded-xl border border-slate-200/60 bg-white p-3.5 shadow-sm">
+      <div className="text-xs font-semibold text-slate-500">{label}</div>
+      <div className="mt-1.5 text-sm font-bold text-slate-900 font-mono">{value}</div>
+    </div>
+  )
 }
 
 function Tab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
@@ -507,7 +587,7 @@ function TopPanel({ rows, title }: { rows: { label: string; value: number }[]; t
 function YearCompare({ monthly }: { monthly: SupplierTrackingPayload['monthly'] }) {
   return (
     <>
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full min-w-[680px] text-sm">
           <thead className="bg-slate-100"><tr><th className="p-2 text-left">เดือน</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
           <tbody>{monthly.map((row, index) => <tr key={row.month} className="border-t"><td className="p-2">{monthLabels[index]}</td><td className="p-2 text-right">{formatMoney(row.qty)}</td><td className="p-2 text-right font-semibold text-blue-700">{formatMoney(row.amount)}</td><td className="p-2 text-right">{formatMoney(row.qty > 0 ? row.amount / row.qty : 0)}</td></tr>)}</tbody>
@@ -515,7 +595,7 @@ function YearCompare({ monthly }: { monthly: SupplierTrackingPayload['monthly'] 
       </div>
 
       {/* Mobile Card list */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {monthly.map((row, index) => (
           <div key={row.month} className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2">
             <div className="flex justify-between items-center">

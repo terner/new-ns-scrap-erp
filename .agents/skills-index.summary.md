@@ -1,7 +1,7 @@
 # Skills Index Summary
 
-Generated: 2026-05-17T09:27:35.822Z
-Total skills: 8
+Generated: 2026-06-16T11:46:00.000Z
+Total skills: 13
 
 ## Categories
 
@@ -9,9 +9,10 @@ Total skills: 8
 | --- | ---: |
 | web-engineering | 2 |
 | database | 2 |
-| testing-qa | 1 |
+| testing-qa | 3 |
 | migration | 2 |
-| documentation | 1 |
+| documentation | 3 |
+| optimization | 1 |
 
 ## Skills
 
@@ -25,4 +26,9 @@ Total skills: 8
 | migration | codebase-migrate | unknown | project | override:id |
 | migration | ns-scrap-erp-migration | unknown | project | override:id |
 | documentation | ns-scrap-erp-obsidian | unknown | project | keyword-match:obsidian,adr,documentation |
+| optimization | ponytail | low | project | override:id |
+| testing-qa | ponytail-review | low | project | override:id |
+| testing-qa | ponytail-audit | low | project | override:id |
+| documentation | ponytail-debt | low | project | override:id |
+| documentation | ponytail-help | low | project | override:id |
 

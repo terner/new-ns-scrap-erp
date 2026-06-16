@@ -284,10 +284,10 @@ export function StockBalancePageClient() {
       </div>
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block mb-3 space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden lg:block mb-4 space-y-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <input 
-            className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm h-9" 
+            className="min-w-[200px] flex-1 rounded-lg border border-slate-300 px-3 py-1 bg-white text-sm outline-none focus:ring-0 focus:border-slate-400 transition-colors h-9" 
             placeholder="ค้นหารหัส/ชื่อสินค้า/Lot/สาขา/คลัง/หมวด..." 
             type="search" 
             value={q} 
@@ -297,7 +297,7 @@ export function StockBalancePageClient() {
           <div className="min-w-64">
             <SearchCombobox
               hideLabel
-              inputClassName="h-9 text-sm"
+              inputClassName="h-9 text-sm rounded-lg border-slate-300 focus:border-slate-400 focus:ring-0 outline-none"
               inputId="stock-balance-product-search"
               label="สินค้า"
               options={productOptions}
@@ -307,39 +307,39 @@ export function StockBalancePageClient() {
             />
           </div>
           {productId ? (
-            <button className="rounded-md bg-slate-100 px-2 py-1.5 text-xs hover:bg-slate-200 h-9 flex items-center" type="button" onClick={() => setProductId('')}>
+            <button className="rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 text-xs px-2.5 py-1.5 outline-none focus:ring-0 transition-colors h-9 flex items-center" type="button" onClick={() => setProductId('')}>
               ✕ ล้างสินค้า
             </button>
           ) : null}
 
           {hasFilters ? (
-            <button className="rounded-md bg-slate-100 px-3 py-2 text-xs hover:bg-slate-200 h-9" type="button" onClick={resetFilters}>
+            <button className="rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 text-xs px-2.5 py-1.5 outline-none focus:ring-0 transition-colors h-9" type="button" onClick={resetFilters}>
               ✕ ล้างทั้งหมด
             </button>
           ) : null}
           
-          <button className="h-9 rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={() => void loadData()}>
+          <button className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 outline-none focus:ring-0 transition-colors" type="button" onClick={() => void loadData()}>
             โหลดใหม่
           </button>
           
-          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 h-9 flex items-center" type="button" onClick={exportXlsx}>
+          <button className="ml-auto rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 border border-emerald-500/20 outline-none focus:ring-0 h-9 flex items-center transition-colors" type="button" onClick={exportXlsx}>
             ส่งออก Excel
           </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-          <span className="text-xs text-slate-500">รูปแบบแสดงผล:</span>
+          <span className="text-xs text-slate-500 font-medium">รูปแบบแสดงผล:</span>
           <MatchButton active={viewMode === 'summary'} label="Matrix (กลุ่ม × คลัง)" onClick={() => setViewMode('summary')} />
           <MatchButton active={viewMode === 'detail'} label="รายสินค้า" onClick={() => setViewMode('detail')} />
 
-          <span className="text-xs text-slate-500 ml-4">หมวดสินค้า:</span>
-          <select className="h-7 rounded-md border border-slate-300 px-2 py-0.5 text-xs bg-white text-slate-800" value={group} onChange={(event) => setGroup(event.target.value)}>
+          <span className="text-xs text-slate-500 ml-4 font-medium">หมวดสินค้า:</span>
+          <select className="h-9 text-sm px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-slate-800 outline-none focus:ring-0 focus:border-slate-400 transition-colors" value={group} onChange={(event) => setGroup(event.target.value)}>
             <option value="">ทุกหมวด</option>
             {groupOptions.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
 
-          <span className="text-xs text-slate-500 ml-4">คลังสินค้า:</span>
-          <select className="h-7 rounded-md border border-slate-300 px-2 py-0.5 text-xs bg-white text-slate-800" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <span className="text-xs text-slate-500 ml-4 font-medium">ประเภทคลัง:</span>
+          <select className="h-9 text-sm px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-slate-800 outline-none focus:ring-0 focus:border-slate-400 transition-colors" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">ทุกประเภท</option>
             <option value="RM">📦 RM</option>
             <option value="WIP">⚙️ WIP</option>
@@ -347,14 +347,14 @@ export function StockBalancePageClient() {
             <option value={ON_HOLD_STATUS}>On Hold</option>
           </select>
 
-          <span className="text-xs text-slate-500 ml-4">สาขา:</span>
-          <select className="h-7 rounded-md border border-slate-300 px-2 py-0.5 text-xs bg-white text-slate-800" value={branchId} onChange={(event) => { setBranchId(event.target.value); setWarehouseId('') }}>
+          <span className="text-xs text-slate-500 ml-4 font-medium">สาขา:</span>
+          <select className="h-9 text-sm px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-slate-800 outline-none focus:ring-0 focus:border-slate-400 transition-colors" value={branchId} onChange={(event) => { setBranchId(event.target.value); setWarehouseId('') }}>
             <option value="">ทุกสาขา</option>
             {data?.reference.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
 
-          <span className="text-xs text-slate-500 ml-4">คลัง:</span>
-          <select className="h-7 rounded-md border border-slate-300 px-2 py-0.5 text-xs bg-white text-slate-800" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>
+          <span className="text-xs text-slate-500 ml-4 font-medium">คลัง:</span>
+          <select className="h-9 text-sm px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-slate-800 outline-none focus:ring-0 focus:border-slate-400 transition-colors" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>
             <option value="">ทุกคลัง</option>
             {data?.reference.warehouses.filter((item) => !branchId || item.branchId === branchId).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
@@ -362,36 +362,36 @@ export function StockBalancePageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-3 space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+      <div className="mb-4 space-y-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-sm lg:hidden animate-fade-in">
         <div className="flex gap-2 items-center">
           <input 
-            className="min-w-[150px] flex-1 rounded-md border border-slate-300 px-3 h-9 text-sm" 
+            className="min-w-[150px] flex-1 rounded-lg border border-slate-300 px-3 h-9 text-sm outline-none focus:ring-0 focus:border-slate-400 bg-white transition-colors" 
             placeholder="ค้นหาด่วน..." 
             type="search" 
             value={q} 
             onChange={(event) => setQ(event.target.value)} 
           />
-          <button className="h-9 rounded-md bg-slate-100 px-2.5 text-xs text-slate-700" type="button" onClick={() => void loadData()}>
+          <button className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-755 hover:bg-slate-100 outline-none focus:ring-0 font-medium" type="button" onClick={() => void loadData()}>
             โหลดใหม่
           </button>
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 outline-none focus:ring-0"
             onClick={() => setShowMobileFilters(true)}
           >
             ตัวกรอง {hasFilters ? '(มี)' : ''}
           </button>
         </div>
         
-        <div className="flex gap-2 border-t border-slate-100 pt-2">
+        <div className="flex gap-2 border-t border-slate-100 pt-2.5">
           <button 
-            className={`flex-1 h-8 rounded-md text-xs font-semibold ${viewMode === 'summary' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'}`} 
+            className={`flex-1 h-9 rounded-lg text-xs font-semibold transition outline-none focus:ring-0 ${viewMode === 'summary' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'}`} 
             onClick={() => setViewMode('summary')}
           >
              Matrix
           </button>
           <button 
-            className={`flex-1 h-8 rounded-md text-xs font-semibold ${viewMode === 'detail' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'}`} 
+            className={`flex-1 h-9 rounded-lg text-xs font-semibold transition outline-none focus:ring-0 ${viewMode === 'detail' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'}`} 
             onClick={() => setViewMode('detail')}
           >
              รายสินค้า
@@ -401,7 +401,7 @@ export function StockBalancePageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto animate-slide-up">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองสต๊อก</h4>
@@ -509,7 +509,7 @@ export function StockBalancePageClient() {
         <DialogContent className="max-w-xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 animate-fade-in" hideClose>
           <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0 border-b border-slate-800">
             <h3 className="font-bold text-slate-100 text-[16px]">รายละเอียดสต๊อกคงเหลือ</h3>
-            <button className="text-2xl text-slate-400 hover:text-white" type="button" onClick={() => setDetailRow(null)}>&times;</button>
+            <button className="text-2xl text-slate-400 hover:text-white transition-colors outline-none focus:outline-none focus:ring-0" type="button" onClick={() => setDetailRow(null)}>&times;</button>
           </div>
           
           {detailRow ? (
@@ -589,7 +589,7 @@ export function StockBalancePageClient() {
 
           <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
             <button 
-              className="rounded-md border border-slate-300 bg-white px-5 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 animate-fade-in" 
+              className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm px-5 py-2 transition-colors outline-none focus:ring-0 animate-fade-in" 
               type="button" 
               onClick={() => setDetailRow(null)}
             >
@@ -643,13 +643,13 @@ function Info({
 function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
   const activeClass = {
     amber: 'border-amber-600 bg-amber-600 text-white',
-    dark: 'border-slate-700 bg-slate-700 text-white',
+    dark: 'border-slate-850 bg-slate-900 text-white hover:bg-slate-800',
     emerald: 'border-emerald-600 bg-emerald-600 text-white',
     red: 'border-red-600 bg-red-600 text-white',
     slate: 'border-slate-500 bg-slate-500 text-white',
   }[tone]
-  const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-100'
-  return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
+  const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
+  return <button className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition outline-none focus:ring-0 ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
 }
 
 
@@ -678,14 +678,14 @@ function Metric({
           ? 'text-red-600'
           : 'text-slate-900'
   return (
-    <div className="bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-3">
-      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
+    <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-full ${iconBg} flex items-center justify-center text-lg shrink-0`}>
         {emoji}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold text-slate-500 truncate">{label}</div>
-        <div className={`text-sm font-bold ${color} mt-0.5 tabular-nums`}>{value}</div>
-        {sub ? <div className="text-[10px] text-slate-400 mt-0.5 truncate">{sub}</div> : null}
+        <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider truncate">{label}</div>
+        <div className={`text-base font-bold ${color} mt-0.5 tabular-nums`}>{value}</div>
+        {sub ? <div className="text-[10px] text-slate-400 mt-0.5 truncate leading-tight">{sub}</div> : null}
       </div>
     </div>
   )
@@ -693,18 +693,24 @@ function Metric({
 
 function StatusCard({ item }: { item: StatusSummary }) {
   const meta = item.status === 'FG'
-    ? { border: 'border-emerald-500', icon: '✅', label: 'FG (พร้อมขาย)', text: 'text-emerald-700', bg: 'bg-emerald-50' }
+    ? { border: 'border-emerald-200', bg: 'bg-emerald-50/30', text: 'text-emerald-700', iconBg: 'bg-emerald-100/60 text-emerald-600', emoji: '✅', label: 'FG (พร้อมขาย)' }
     : item.status === 'WIP'
-      ? { border: 'border-amber-500', icon: '⚙️', label: 'WIP (กำลังผลิต)', text: 'text-amber-700', bg: 'bg-amber-50' }
-      : { border: 'border-blue-500', icon: '📦', label: 'RM (วัตถุดิบ)', text: 'text-blue-700', bg: 'bg-blue-50' }
+      ? { border: 'border-amber-200', bg: 'bg-amber-50/30', text: 'text-amber-700', iconBg: 'bg-amber-100/60 text-amber-600', emoji: '⚙️', label: 'WIP (กำลังผลิต)' }
+      : { border: 'border-blue-200', bg: 'bg-blue-50/30', text: 'text-blue-700', iconBg: 'bg-blue-100/60 text-blue-600', emoji: '📦', label: 'RM (วัตถุดิบ)' }
   return (
-    <div className={`rounded-md border-l-4 p-4 shadow ${meta.bg} ${meta.border}`}>
-      <div className={`text-xs ${meta.text}`}>{meta.icon} {meta.label} — {item.count} รายการ</div>
-      <div className={`text-xl font-bold ${meta.text}`}>{formatMoney(item.qty)} กก.</div>
-      <div className="text-sm text-slate-600">มูลค่า {formatMoney(item.value)}</div>
+    <div className={`rounded-xl border bg-white p-4 shadow-sm flex items-center gap-3.5 ${meta.border}`}>
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${meta.iconBg}`}>
+        {meta.emoji}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{meta.label} — {item.count} รายการ</div>
+        <div className={`text-lg font-bold mt-0.5 ${meta.text}`}>{formatMoney(item.qty)} กก.</div>
+        <div className="text-[10px] text-slate-400 font-medium mt-0.5">มูลค่า {formatMoney(item.value)} บาท</div>
+      </div>
     </div>
   )
 }
+
 
 function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
   averageCost: number
@@ -714,43 +720,82 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
   rows: BalanceRow[]
 }) {
   return (
-    <div className="mb-3 rounded-md border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 p-4 shadow">
+    <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/10 p-5 shadow-sm space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-xl font-bold text-indigo-700">📦 {info.product.name}</h3>
-          <p className="font-mono text-sm text-slate-600">{info.product.code ?? '-'} · {info.product.metalGroup ?? '-'} · {info.product.status ?? 'RM'}</p>
+          <h3 className="text-lg font-bold text-indigo-900">📦 {info.product.name}</h3>
+          <p className="font-mono text-xs text-slate-500 mt-0.5">{info.product.code ?? '-'} · {info.product.metalGroup ?? '-'} · {info.product.status ?? 'RM'}</p>
         </div>
-        <button className="text-sm text-slate-500 hover:text-slate-800" type="button" onClick={onClose}>✕ ปิด</button>
+        <button 
+          className="text-slate-400 hover:text-slate-650 text-xs font-semibold outline-none focus:ring-0" 
+          type="button" 
+          onClick={onClose}
+        >
+          ✕ ปิด
+        </button>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
-        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">📊 คงเหลือ</div><div className={`text-2xl font-bold ${info.qty > 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(info.qty)} <span className="text-sm font-normal">กก.</span></div></div>
-        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">💰 มูลค่ารวม (WAC)</div><div className="text-2xl font-bold text-blue-700">{formatMoney(info.value)} <span className="text-sm font-normal">บาท</span></div></div>
-        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">⚖ ราคาเฉลี่ย/กก.</div><div className="text-2xl font-bold text-amber-700">{formatMoney(averageCost)} <span className="text-sm font-normal">บ./กก.</span></div></div>
-        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">จองไว้</div><div className="text-2xl font-bold text-amber-700">{formatMoney(info.onHold)} <span className="text-sm font-normal">กก.</span></div></div>
-        <div className="rounded-md bg-white p-3 shadow"><div className="text-xs text-slate-500">พร้อมส่ง</div><div className="text-2xl font-bold text-emerald-600">{formatMoney(info.ready)} <span className="text-sm font-normal">กก.</span></div></div>
-      </div>
-      <div className="mt-3 rounded-md bg-white shadow">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-3">
-          <h4 className="font-bold text-slate-700">📜 รายการสต๊อกของสินค้านี้ ({rows.length} รายการ)</h4>
-          <span className="text-xs text-slate-500">กด Detail เพื่อดู row ปัจจุบัน</span>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="rounded-lg bg-white border border-slate-200 p-3 shadow-sm">
+          <div className="text-[10px] text-slate-400 font-semibold uppercase">📊 คงเหลือ</div>
+          <div className={`text-lg font-bold mt-1 tabular-nums ${info.qty > 0 ? 'text-emerald-700' : 'text-red-650'}`}>{formatMoney(info.qty)} <span className="text-xs font-normal">กก.</span></div>
         </div>
-        <div className="max-h-[400px] overflow-x-auto overflow-y-auto">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-slate-100">
-              <tr><th className="p-2 text-left">วันที่ล่าสุด</th><th className="p-2 text-left">คลัง</th><th className="p-2 text-left">สาขา/คลัง</th><th className="p-2 text-left">Lot</th><th className="p-2 text-right">คงเหลือ</th><th className="p-2 text-right">จองไว้</th><th className="p-2 text-right">พร้อมส่ง</th><th className="p-2 text-right">มูลค่า</th><th className="p-2 text-center">Action</th></tr>
+        <div className="rounded-lg bg-white border border-slate-200 p-3 shadow-sm">
+          <div className="text-[10px] text-slate-400 font-semibold uppercase">💰 มูลค่ารวม (WAC)</div>
+          <div className="text-lg font-bold mt-1 text-blue-700 tabular-nums">{formatMoney(info.value)} <span className="text-xs font-normal">บาท</span></div>
+        </div>
+        <div className="rounded-lg bg-white border border-slate-200 p-3 shadow-sm">
+          <div className="text-[10px] text-slate-400 font-semibold uppercase">⚖ ราคาเฉลี่ย/กก.</div>
+          <div className="text-lg font-bold mt-1 text-amber-700 tabular-nums">{formatMoney(averageCost)} <span className="text-xs font-normal">บ./กก.</span></div>
+        </div>
+        <div className="rounded-lg bg-white border border-slate-200 p-3 shadow-sm">
+          <div className="text-[10px] text-slate-400 font-semibold uppercase">จองไว้</div>
+          <div className="text-lg font-bold mt-1 text-amber-700 tabular-nums">{formatMoney(info.onHold)} <span className="text-xs font-normal">กก.</span></div>
+        </div>
+        <div className="rounded-lg bg-white border border-slate-200 p-3 shadow-sm">
+          <div className="text-[10px] text-slate-400 font-semibold uppercase">พร้อมส่ง</div>
+          <div className="text-lg font-bold mt-1 text-emerald-700 tabular-nums">{formatMoney(info.ready)} <span className="text-xs font-normal">กก.</span></div>
+        </div>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">📜 รายการสต๊อกของสินค้านี้ ({rows.length} รายการ)</h4>
+          <span className="text-[10px] text-slate-400 font-medium">กด Detail เพื่อดูข้อมูลย่อย</span>
+        </div>
+        <div className="max-h-[400px] overflow-auto">
+          <table className="w-full text-xs text-slate-750">
+            <thead className="sticky top-0 bg-slate-50 border-b border-slate-200/60 text-slate-600 font-semibold z-10">
+              <tr>
+                <th className="p-3 text-left">วันที่ล่าสุด</th>
+                <th className="p-3 text-center">คลัง</th>
+                <th className="p-3 text-left">สาขา/คลัง</th>
+                <th className="p-3 text-left">Lot</th>
+                <th className="p-3 text-right">คงเหลือ</th>
+                <th className="p-3 text-right">จองไว้</th>
+                <th className="p-3 text-right">พร้อมส่ง</th>
+                <th className="p-3 text-right">มูลค่า</th>
+                <th className="p-3 text-center">Action</th>
+              </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {rows.map((row) => (
-                <tr key={row.key} className="border-t border-slate-100 hover:bg-blue-50/30">
-                  <td className="p-2">{row.lastDate}</td>
-                  <td className="p-2"><StockStatusCell row={row} /></td>
-                  <td className="p-2 text-slate-500">{row.branchName} / {row.warehouseName}</td>
-                  <td className="p-2 font-mono">{row.lotNo || '-'}</td>
-                  <td className={`p-2 text-right font-medium ${row.qty < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(row.qty)}</td>
-                  <td className="p-2 text-right text-amber-700">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
-                  <td className="p-2 text-right text-emerald-700">{formatMoney(row.readyQty)}</td>
-                  <td className="p-2 text-right">{formatMoney(row.value)}</td>
-                  <td className="p-2 text-center"><button className="rounded-md bg-blue-50 px-2 py-1 text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
+                <tr key={row.key} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="p-3 text-slate-500">{row.lastDate}</td>
+                  <td className="p-3 text-center"><StockStatusCell row={row} /></td>
+                  <td className="p-3 text-slate-500">{row.branchName} / {row.warehouseName}</td>
+                  <td className="p-3 font-mono text-slate-600">{row.lotNo || '-'}</td>
+                  <td className={`p-3 text-right font-semibold tabular-nums ${row.qty < 0 ? 'text-red-650' : 'text-slate-800'}`}>{formatMoney(row.qty)}</td>
+                  <td className="p-3 text-right text-amber-700 font-medium tabular-nums">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
+                  <td className="p-3 text-right text-emerald-700 font-medium tabular-nums">{formatMoney(row.readyQty)}</td>
+                  <td className="p-3 text-right font-mono text-slate-600">{formatMoney(row.value)}</td>
+                  <td className="p-3 text-center">
+                    <button 
+                      className="rounded-lg bg-blue-50 hover:bg-blue-100/60 px-3 py-1.5 text-xs font-semibold text-blue-700 outline-none focus:ring-0 transition-colors" 
+                      type="button" 
+                      onClick={() => onOpen(row)}
+                    >
+                      Detail
+                    </button>
+                  </td>
                 </tr>
               ))}
               {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={9}>ยังไม่มีรายการ</td></tr> : null}
@@ -771,34 +816,39 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
   const maxGroup = Math.max(1, ...matrixRows.map((row) => row.rmVal + row.wipVal + row.fgVal))
   return (
     <div className="mb-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div className="rounded-md bg-white p-4 shadow">
-        <h3 className="mb-2 font-bold text-slate-800">🥧 สัดส่วน Stock RM/WIP/FG (มูลค่า)</h3>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-3 font-semibold text-sm text-slate-800 uppercase tracking-wider">🥧 สัดส่วน Stock RM/WIP/FG (มูลค่า)</h3>
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-[180px] w-[180px] items-center justify-center rounded-full" style={{ background: totalValue > 0 ? `conic-gradient(#3b82f6 0deg ${rmDeg}deg, #f59e0b ${rmDeg}deg ${rmDeg + wipDeg}deg, #10b981 ${rmDeg + wipDeg}deg 360deg)` : '#e5e7eb' }}>
-            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white text-center">
-              <span className="text-xs text-slate-500">รวม</span>
-              <span className="text-xs font-bold text-slate-900">{formatMoney(totalValue)}</span>
+          <div className="flex h-[180px] w-[180px] items-center justify-center rounded-full shadow-inner" style={{ background: totalValue > 0 ? `conic-gradient(#3b82f6 0deg ${rmDeg}deg, #f59e0b ${rmDeg}deg ${rmDeg + wipDeg}deg, #10b981 ${rmDeg + wipDeg}deg 360deg)` : '#e5e7eb' }}>
+            <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white text-center border border-slate-100 shadow-sm leading-tight">
+              <span className="text-[10px] text-slate-500 font-semibold uppercase">รวม</span>
+              <span className="text-xs font-extrabold text-slate-900 mt-0.5">{formatMoney(totalValue)}</span>
             </div>
           </div>
-          <div className="min-w-56 flex-1 space-y-2 text-sm">
+          <div className="min-w-[220px] flex-1 space-y-2 text-xs text-slate-700">
             <LegendRow color="bg-blue-500" label="📦 RM" value={rm} />
             <LegendRow color="bg-amber-500" label="⚙️ WIP" value={wip} />
             <LegendRow color="bg-emerald-500" label="✅ FG" value={fg} />
-            <div className="flex justify-between border-t border-slate-200 pt-2 font-bold"><span>รวม</span><span>{formatMoney(totalValue)}</span></div>
+            <div className="flex justify-between border-t border-slate-100 pt-2 font-bold text-slate-800"><span>รวม</span><span>{formatMoney(totalValue)}</span></div>
           </div>
         </div>
       </div>
-      <div className="rounded-md bg-white p-4 shadow">
-        <h3 className="mb-2 font-bold text-slate-800">📊 Top หมวดสินค้า (มูลค่าสต๊อก)</h3>
-        {matrixRows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีข้อมูล</div> : null}
-        <div className="space-y-2">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-3 font-semibold text-sm text-slate-800 uppercase tracking-wider">📊 Top หมวดสินค้า (มูลค่าสต๊อก)</h3>
+        {matrixRows.length === 0 ? <div className="py-8 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div> : null}
+        <div className="space-y-3">
           {matrixRows.slice(0, 8).map((row, index) => {
             const value = row.rmVal + row.wipVal + row.fgVal
-            const colors = ['from-blue-500 to-blue-400', 'from-emerald-500 to-emerald-400', 'from-amber-500 to-amber-400', 'from-red-500 to-red-400', 'from-indigo-500 to-indigo-400', 'from-cyan-500 to-cyan-400', 'from-pink-500 to-pink-400', 'from-lime-500 to-lime-400']
+            const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-red-500', 'bg-indigo-500', 'bg-cyan-500', 'bg-pink-500', 'bg-lime-500']
             return (
               <div key={row.group}>
-                <div className="mb-0.5 flex justify-between text-sm"><span className="font-medium">{row.group} <span className="text-xs text-slate-400">({formatMoney(row.rmQty + row.wipQty + row.fgQty)} กก.)</span></span><span className="font-mono font-bold">{formatMoney(value)}</span></div>
-                <div className="h-2 w-full rounded-full bg-slate-100"><div className={`h-2 rounded-full bg-gradient-to-r ${colors[index % colors.length]}`} style={{ width: `${Math.max(2, value / maxGroup * 100)}%` }} /></div>
+                <div className="mb-1 flex justify-between text-xs text-slate-700">
+                  <span className="font-semibold text-slate-800">{row.group} <span className="text-[10px] text-slate-400 font-normal">({formatMoney(row.rmQty + row.wipQty + row.fgQty)} กก.)</span></span>
+                  <span className="font-mono font-bold">{formatMoney(value)}</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-100">
+                  <div className={`h-2 rounded-full ${colors[index % colors.length]} transition-all`} style={{ width: `${Math.max(2, value / maxGroup * 100)}%` }} />
+                </div>
               </div>
             )
           })}
@@ -809,69 +859,92 @@ function StockCharts({ byStatus, matrixRows, totalValue }: { byStatus: StatusSum
 }
 
 function LegendRow({ color, label, value }: { color: string; label: string; value: number }) {
-  return <div className="flex justify-between"><span className="flex items-center gap-2"><span className={`h-3 w-3 rounded-md ${color}`} />{label}</span><span className="font-bold">{formatMoney(value)}</span></div>
+  return <div className="flex justify-between items-center"><span className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-sm ${color}`} />{label}</span><span className="font-bold text-slate-900 font-mono">{formatMoney(value)}</span></div>
 }
+
 
 function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: { byStatus: StatusSummary[]; isLoading: boolean; matrixRows: MatrixRow[]; totalQty: number; totalValue: number }) {
   const valueFor = (status: string) => byStatus.find((item) => item.status === status) ?? { count: 0, qty: 0, status, value: 0 }
   return (
     <>
       {/* Desktop View (Table) */}
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/85 bg-white shadow-sm">
         <table className="w-full min-w-[980px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-2 text-left">หมวดสินค้า</th><th className="bg-blue-50 p-2 text-right">📦 RM (กก.)</th><th className="bg-blue-50 p-2 text-right">RM มูลค่า</th><th className="bg-amber-50 p-2 text-right">⚙️ WIP (กก.)</th><th className="bg-amber-50 p-2 text-right">WIP มูลค่า</th><th className="bg-emerald-50 p-2 text-right">✅ FG (กก.)</th><th className="bg-emerald-50 p-2 text-right">FG มูลค่า</th><th className="p-2 text-right">รวม กก.</th><th className="p-2 text-right">รวมมูลค่า</th></tr></thead>
-          <tbody>
+          <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-600 font-medium">
+            <tr>
+              <th className="p-3.5 text-left">หมวดสินค้า</th>
+              <th className="bg-blue-50/40 p-3.5 text-right text-blue-800 border-x border-slate-100">📦 RM (กก.)</th>
+              <th className="bg-blue-50/40 p-3.5 text-right text-blue-800 border-r border-slate-100">RM มูลค่า</th>
+              <th className="bg-amber-50/40 p-3.5 text-right text-amber-800 border-r border-slate-100">⚙️ WIP (กก.)</th>
+              <th className="bg-amber-50/40 p-3.5 text-right text-amber-800 border-r border-slate-100">WIP มูลค่า</th>
+              <th className="bg-emerald-50/40 p-3.5 text-right text-emerald-800 border-r border-slate-100">✅ FG (กก.)</th>
+              <th className="bg-emerald-50/40 p-3.5 text-right text-emerald-800 border-r border-slate-100">FG มูลค่า</th>
+              <th className="p-3.5 text-right">รวม กก.</th>
+              <th className="p-3.5 text-right">รวมมูลค่า</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-slate-700">
             {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && matrixRows.map((row) => (
-              <tr key={row.group} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="p-2 font-bold">{row.group}</td>
-                <td className="p-2 text-right text-blue-700">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
-                <td className="p-2 text-right text-blue-700">{row.rmVal ? formatMoney(row.rmVal) : '-'}</td>
-                <td className="p-2 text-right text-amber-700">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
-                <td className="p-2 text-right text-amber-700">{row.wipVal ? formatMoney(row.wipVal) : '-'}</td>
-                <td className="p-2 text-right text-emerald-700">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
-                <td className="p-2 text-right text-emerald-700">{row.fgVal ? formatMoney(row.fgVal) : '-'}</td>
-                <td className="p-2 text-right font-bold">{formatMoney(row.rmQty + row.wipQty + row.fgQty)}</td>
-                <td className="p-2 text-right font-bold text-emerald-700">{formatMoney(row.rmVal + row.wipVal + row.fgVal)}</td>
+              <tr key={row.group} className="hover:bg-slate-50/50 transition-colors">
+                <td className="p-3.5 font-bold text-slate-800">{row.group}</td>
+                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
+                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{row.rmVal ? formatMoney(row.rmVal) : '-'}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipVal ? formatMoney(row.wipVal) : '-'}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgVal ? formatMoney(row.fgVal) : '-'}</td>
+                <td className="p-3.5 text-right font-bold">{formatMoney(row.rmQty + row.wipQty + row.fgQty)}</td>
+                <td className="p-3.5 text-right font-bold text-emerald-700">{formatMoney(row.rmVal + row.wipVal + row.fgVal)}</td>
               </tr>
             ))}
             {!isLoading && matrixRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่มีสต๊อก</td></tr> : null}
           </tbody>
           {matrixRows.length ? (
-            <tfoot className="bg-slate-100 font-bold">
-              <tr><td className="p-2">รวมทั้งหมด ({matrixRows.length} หมวด)</td><td className="p-2 text-right text-blue-700">{formatMoney(valueFor('RM').qty)}</td><td className="p-2 text-right text-blue-700">{formatMoney(valueFor('RM').value)}</td><td className="p-2 text-right text-amber-700">{formatMoney(valueFor('WIP').qty)}</td><td className="p-2 text-right text-amber-700">{formatMoney(valueFor('WIP').value)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(valueFor('FG').qty)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(valueFor('FG').value)}</td><td className="p-2 text-right">{formatMoney(totalQty)}</td><td className="p-2 text-right text-base text-emerald-700">{formatMoney(totalValue)}</td></tr>
+            <tfoot className="bg-slate-50 border-t border-slate-200/80 font-bold text-slate-800">
+              <tr>
+                <td className="p-3.5">รวมทั้งหมด ({matrixRows.length} หมวด)</td>
+                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{formatMoney(valueFor('RM').qty)}</td>
+                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{formatMoney(valueFor('RM').value)}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{formatMoney(valueFor('WIP').qty)}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{formatMoney(valueFor('WIP').value)}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{formatMoney(valueFor('FG').qty)}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{formatMoney(valueFor('FG').value)}</td>
+                <td className="p-3.5 text-right">{formatMoney(totalQty)}</td>
+                <td className="p-3.5 text-right text-base text-emerald-700 font-mono">{formatMoney(totalValue)}</td>
+              </tr>
             </tfoot>
           ) : null}
         </table>
       </div>
 
       {/* Mobile View (Card List) */}
-      <div className="md:hidden space-y-3">
+      <div className="lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow">กำลังโหลดข้อมูล</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm text-xs">กำลังโหลดข้อมูล</div>
         ) : null}
         {!isLoading && matrixRows.map((row) => {
           const totalRowQty = row.rmQty + row.wipQty + row.fgQty
           const totalRowVal = row.rmVal + row.wipVal + row.fgVal
           return (
-            <div key={row.group} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+            <div key={row.group} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
               <div className="border-b border-slate-100 pb-2">
                 <span className="font-bold text-slate-800 text-sm">{row.group}</span>
               </div>
               <div className="space-y-2 text-xs text-slate-600">
-                <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded">
+                <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-lg">
                   <span className="font-medium text-blue-800">📦 RM (วัตถุดิบ)</span>
                   <span className="font-semibold text-right text-blue-700 tabular-nums">
                     {row.rmQty ? `${formatMoney(row.rmQty)} กก.` : '-'} {row.rmVal ? `(${formatMoney(row.rmVal)} บ.)` : ''}
                   </span>
                 </div>
-                <div className="flex justify-between items-center bg-amber-50/50 p-2 rounded">
+                <div className="flex justify-between items-center bg-amber-50/50 p-2 rounded-lg">
                   <span className="font-medium text-amber-800">⚙️ WIP (ระหว่างผลิต)</span>
                   <span className="font-semibold text-right text-amber-700 tabular-nums">
                     {row.wipQty ? `${formatMoney(row.wipQty)} กก.` : '-'} {row.wipVal ? `(${formatMoney(row.wipVal)} บ.)` : ''}
                   </span>
                 </div>
-                <div className="flex justify-between items-center bg-emerald-50/50 p-2 rounded">
+                <div className="flex justify-between items-center bg-emerald-50/50 p-2 rounded-lg">
                   <span className="font-medium text-emerald-800">✅ FG (สินค้าสำเร็จรูป)</span>
                   <span className="font-semibold text-right text-emerald-700 tabular-nums">
                     {row.fgQty ? `${formatMoney(row.fgQty)} กก.` : '-'} {row.fgVal ? `(${formatMoney(row.fgVal)} บ.)` : ''}
@@ -888,16 +961,16 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: 
           )
         })}
         {!isLoading && matrixRows.length === 0 ? (
-          <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow">ไม่มีสต๊อก</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm text-xs">ไม่มีสต๊อก</div>
         ) : null}
 
         {/* Mobile Footer Summary */}
         {!isLoading && matrixRows.length ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-900 text-white p-4 shadow space-y-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-900 text-white p-4 shadow-sm space-y-2.5">
             <div className="border-b border-slate-800 pb-2 text-xs font-bold text-slate-400">
               รวมทั้งหมด ({matrixRows.length} หมวด)
             </div>
-            <div className="text-xs space-y-1">
+            <div className="text-xs space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-slate-400">RM:</span>
                 <span className="font-semibold text-blue-300 tabular-nums">{formatMoney(valueFor('RM').qty)} กก. ({formatMoney(valueFor('RM').value)} บ.)</span>
@@ -911,7 +984,7 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: 
                 <span className="font-semibold text-emerald-300 tabular-nums">{formatMoney(valueFor('FG').qty)} กก. ({formatMoney(valueFor('FG').value)} บ.)</span>
               </div>
             </div>
-            <div className="border-t border-slate-800 pt-2 flex justify-between text-sm font-bold">
+            <div className="border-t border-slate-800 pt-2 flex justify-between text-xs font-bold">
               <span>รวมสะสมสุทธิ</span>
               <span className="tabular-nums text-emerald-400">{formatMoney(totalQty)} กก. | {formatMoney(totalValue)} บาท</span>
             </div>
@@ -924,46 +997,153 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalQty, totalValue }: 
 
 function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: (row: BalanceRow) => void; rows: BalanceRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-md bg-white shadow">
-      <table className="w-full min-w-[1260px] text-sm">
-        <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-left">หมวด</th><th className="p-2 text-center">คลัง</th><th className="p-2 text-left">สาขา</th><th className="p-2 text-right">คงเหลือ (กก.)</th><th className="bg-amber-50 p-2 text-right">จองไว้</th><th className="bg-emerald-50 p-2 text-right">พร้อมส่ง</th><th className="p-2 text-right">ต้นทุน/กก.</th><th className="p-2 text-right">มูลค่า</th><th className="bg-red-50 p-2 text-right">ไม่พร้อมขาย</th><th className="p-2 text-center">Action</th></tr></thead>
-        <tbody>
-          {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
-          {!isLoading && rows.map((row) => (
-            <tr key={row.key} className={`border-t border-slate-100 ${row.qty < 0 ? 'bg-red-50/60' : 'hover:bg-slate-50'}`}>
-              <td className="p-2"><span className="font-mono text-xs text-slate-500">{row.productCode}</span> {row.productName}<div className="text-xs text-slate-400">Lot: {row.lotNo || '-'}</div></td>
-              <td className="p-2">{row.productMetalGroup || 'อื่นๆ'}</td>
-              <td className="p-2 text-center"><StockStatusCell row={row} /></td>
-              <td className="p-2">{row.branchName}<div className="text-xs text-slate-500">{row.warehouseName}</div></td>
-              <td className={`p-2 text-right font-medium ${row.qty < 0 ? 'text-red-600' : ''}`}>{formatMoney(row.qty)}</td>
-              <td className="p-2 text-right text-amber-700">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
-              <td className="p-2 text-right text-emerald-700">{formatMoney(row.readyQty)}</td>
-              <td className="p-2 text-right text-slate-500">{formatMoney(row.avgCost)}</td>
-              <td className="p-2 text-right font-bold text-emerald-700">{formatMoney(row.value)}</td>
-              <td className={`p-2 text-right ${row.notAvailable ? 'font-medium text-red-600' : 'text-slate-400'}`}>{row.notAvailable ? formatMoney(row.qty) : '-'}</td>
-              <td className="p-2 text-center"><button className="rounded-md bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700" type="button" onClick={() => onOpen(row)}>Detail</button></td>
+    <>
+      {/* Mobile View */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm text-xs">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && rows.map((row) => (
+          <div 
+            key={row.key} 
+            className={`rounded-xl border p-4 shadow-sm space-y-3 bg-white ${row.qty < 0 ? 'border-red-200 bg-red-50/10' : 'border-slate-200'}`}
+          >
+            <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+              <div>
+                <span className="font-mono text-[10px] text-slate-400 block">{row.productCode}</span>
+                <span className="font-bold text-slate-800 text-xs">{row.productName}</span>
+                <div className="text-[10px] text-slate-400 mt-0.5">Lot: {row.lotNo || '-'}</div>
+              </div>
+              <StockStatusCell row={row} />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-slate-650">
+              <div className="flex justify-between">
+                <span>หมวด:</span>
+                <span className="font-semibold text-slate-800">{row.productMetalGroup || 'อื่นๆ'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>คลัง:</span>
+                <span className="font-semibold text-slate-850 truncate max-w-[100px]">{row.branchName} / {row.warehouseName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>คงเหลือ:</span>
+                <span className={`font-semibold tabular-nums ${row.qty < 0 ? 'text-red-650' : 'text-slate-800'}`}>{formatMoney(row.qty)} กก.</span>
+              </div>
+              <div className="flex justify-between">
+                <span>จองไว้:</span>
+                <span className="font-semibold text-amber-700 tabular-nums">{row.onHoldQty ? `${formatMoney(row.onHoldQty)} กก.` : '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>พร้อมส่ง:</span>
+                <span className="font-semibold text-emerald-750 tabular-nums">{formatMoney(row.readyQty)} กก.</span>
+              </div>
+              <div className="flex justify-between">
+                <span>ต้นทุน/กก.:</span>
+                <span className="font-semibold text-slate-700 font-mono">{formatMoney(row.avgCost)} บ.</span>
+              </div>
+            </div>
+            
+            <div className="border-t border-slate-100 pt-2 flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-850">มูลค่า: <span className="text-emerald-700 font-mono font-bold">{formatMoney(row.value)} บาท</span></span>
+              <button 
+                className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100/60 outline-none focus:ring-0 transition-colors" 
+                type="button" 
+                onClick={() => onOpen(row)}
+              >
+                ดูรายละเอียด
+              </button>
+            </div>
+          </div>
+        ))}
+        {!isLoading && rows.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm text-xs">ไม่มีสต๊อก</div>
+        ) : null}
+      </div>
+
+      {/* Desktop View */}
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/85 bg-white shadow-sm">
+        <table className="w-full min-w-[1260px] text-sm text-slate-700">
+          <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-650 font-medium">
+            <tr>
+              <th className="p-3.5 text-left">สินค้า</th>
+              <th className="p-3.5 text-left">หมวด</th>
+              <th className="p-3.5 text-center">คลัง</th>
+              <th className="p-3.5 text-left">สาขา</th>
+              <th className="p-3.5 text-right">คงเหลือ (กก.)</th>
+              <th className="bg-amber-50/40 p-3.5 text-right text-amber-805 border-x border-slate-100">จองไว้</th>
+              <th className="bg-emerald-50/40 p-3.5 text-right text-emerald-805 border-r border-slate-100">พร้อมส่ง</th>
+              <th className="p-3.5 text-right">ต้นทุน/กก.</th>
+              <th className="p-3.5 text-right">มูลค่า</th>
+              <th className="bg-red-50/40 p-3.5 text-right text-red-805 border-l border-slate-100">ไม่พร้อมขาย</th>
+              <th className="p-3.5 text-center">Action</th>
             </tr>
-          ))}
-          {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ไม่มีสต๊อก</td></tr> : null}
-        </tbody>
-        {rows.length ? <tfoot className="bg-slate-100 font-bold"><tr><td className="p-2" colSpan={4}>รวม</td><td className="p-2 text-right">{formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))}</td><td className="p-2 text-right text-amber-700">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(rows.reduce((sum, row) => sum + row.readyQty, 0))}</td><td /><td className="p-2 text-right text-emerald-700">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td><td className="p-2 text-right text-red-700">{formatMoney(rows.filter((row) => row.notAvailable).reduce((sum, row) => sum + row.qty, 0))}</td><td /></tr></tfoot> : null}
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && rows.map((row) => (
+              <tr key={row.key} className={`transition-colors ${row.qty < 0 ? 'bg-red-50/30' : 'hover:bg-slate-50/50'}`}>
+                <td className="p-3.5">
+                  <span className="font-mono text-xs text-slate-500">{row.productCode}</span> {row.productName}
+                  <div className="text-xs text-slate-400">Lot: {row.lotNo || '-'}</div>
+                </td>
+                <td className="p-3.5">{row.productMetalGroup || 'อื่นๆ'}</td>
+                <td className="p-3.5 text-center"><StockStatusCell row={row} /></td>
+                <td className="p-3.5">
+                  {row.branchName}
+                  <div className="text-xs text-slate-500">{row.warehouseName}</div>
+                </td>
+                <td className={`p-3.5 text-right font-semibold ${row.qty < 0 ? 'text-red-650' : ''}`}>{formatMoney(row.qty)}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-x border-slate-100 font-semibold">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 font-semibold">{formatMoney(row.readyQty)}</td>
+                <td className="p-3.5 text-right text-slate-500 font-mono">{formatMoney(row.avgCost)}</td>
+                <td className="p-3.5 text-right font-bold text-emerald-700 font-mono">{formatMoney(row.value)}</td>
+                <td className={`p-3.5 text-right bg-red-50/10 border-l border-slate-100 ${row.notAvailable ? 'font-medium text-red-650' : 'text-slate-450'}`}>{row.notAvailable ? formatMoney(row.qty) : '-'}</td>
+                <td className="p-3.5 text-center">
+                  <button 
+                    className="rounded-lg bg-blue-50 hover:bg-blue-100/60 px-3 py-1.5 text-xs font-semibold text-blue-700 outline-none focus:ring-0 transition-colors" 
+                    type="button" 
+                    onClick={() => onOpen(row)}
+                  >
+                    Detail
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ไม่มีสต๊อก</td></tr> : null}
+          </tbody>
+          {rows.length ? (
+            <tfoot className="bg-slate-50 border-t border-slate-200/80 font-bold text-slate-800">
+              <tr>
+                <td className="p-3.5" colSpan={4}>รวม ({rows.length} รายการ)</td>
+                <td className="p-3.5 text-right font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-x border-slate-100 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.readyQty, 0))}</td>
+                <td />
+                <td className="p-3.5 text-right text-emerald-700 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td>
+                <td className="p-3.5 text-right text-red-700 bg-red-50/10 border-l border-slate-100 font-mono">{formatMoney(rows.filter((row) => row.notAvailable).reduce((sum, row) => sum + row.qty, 0))}</td>
+                <td />
+              </tr>
+            </tfoot>
+          ) : null}
+        </table>
+      </div>
+    </>
   )
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const className = status === 'FG' ? 'bg-emerald-100 text-emerald-700' : status === 'WIP' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-  return <span className={`rounded-md px-2 py-0.5 text-xs ${className}`}>{status || '-'}</span>
+  const className = status === 'FG' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : status === 'WIP' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-blue-50 text-blue-700 border-blue-100'
+  return <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${className}`}>{status || '-'}</span>
 }
 
 function HoldBadge() {
-  return <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800">On Hold</span>
+  return <span className="rounded-full border border-amber-200 bg-amber-55/40 px-2 py-0.5 text-[10px] font-semibold text-amber-800">On Hold</span>
 }
 
 function StockStatusCell({ row }: { row: BalanceRow }) {
   return (
-    <div className="flex flex-wrap justify-center gap-1">
+    <div className="flex flex-wrap justify-center gap-1 shrink-0">
       <StatusBadge status={row.status} />
       {row.onHoldQty > 0 ? <HoldBadge /> : null}
     </div>
@@ -973,3 +1153,4 @@ function StockStatusCell({ row }: { row: BalanceRow }) {
 function stockStatusText(row: BalanceRow) {
   return row.onHoldQty > 0 ? `${row.status || '-'} / On Hold` : row.status || '-'
 }
+

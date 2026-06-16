@@ -310,7 +310,7 @@ export function WeightTicketListPageClient() {
   return (
     <div className="space-y-5">
       {/* Floating Action Button (Mobile Only) */}
-      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
           onClick={() => setActiveForm({ type: typeFilter })}
@@ -338,7 +338,7 @@ export function WeightTicketListPageClient() {
       </Tabs>
 
       {/* Desktop Filters (Hidden on Mobile) */}
-      <Card className="hidden md:block p-4">
+      <Card className="hidden lg:block p-4">
         <div className="space-y-3">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -398,7 +398,7 @@ export function WeightTicketListPageClient() {
       </Card>
 
       {/* Mobile Filters Toolbar (Hidden on Desktop) */}
-      <div className="space-y-2 p-3 border border-slate-200 bg-white rounded-md md:hidden">
+      <div className="space-y-2 p-3 border border-slate-200 bg-white rounded-md lg:hidden">
         <div className="flex gap-2 items-center">
           <label className="relative block flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -424,7 +424,7 @@ export function WeightTicketListPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-955/40 md:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-955/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองใบรับ-ส่งของ</h4>
@@ -518,7 +518,7 @@ export function WeightTicketListPageClient() {
       </div>
 
       {/* Mobile Card List (Hidden on Desktop) */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : loadError ? (
@@ -617,7 +617,7 @@ export function WeightTicketListPageClient() {
       </div>
 
       {/* Desktop Tables (Hidden on Mobile) */}
-      <div className="hidden md:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>

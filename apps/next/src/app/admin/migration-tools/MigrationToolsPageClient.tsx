@@ -96,13 +96,13 @@ export function MigrationToolsPageClient() {
   return (
     <section className="space-y-4">
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-4 text-white shadow">
+      <div className="hidden lg:block rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-4 text-white shadow">
         <h1 className="text-xl font-bold">💾 Backup / Restore — สำรองข้อมูล</h1>
         <p className="mt-1 text-sm opacity-90">สำคัญมาก — หน้านี้เป็น safe baseline สำหรับตรวจสถานะและแผนกู้คืนเท่านั้น</p>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="md:hidden rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-3.5 text-white shadow animate-fade-in">
+      <div className="lg:hidden rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-3.5 text-white shadow animate-fade-in">
         <h1 className="text-lg font-bold">💾 Backup / Restore — สำรองข้อมูล</h1>
         <p className="mt-0.5 text-xs opacity-90">safe baseline สำหรับตรวจสถานะและแผนกู้คืนข้อมูล</p>
       </div>

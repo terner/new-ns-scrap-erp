@@ -295,7 +295,7 @@ export function WeightTicketDetailModal({
                       <SectionTitle subtitle="รองรับเอกสารยาวหลายสิบรายการ" title="รายการสินค้าแยกตาม lot" />
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="hidden md:table min-w-full divide-y divide-slate-200 text-sm">
+                      <table className="hidden lg:table min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-200/80 border-b border-slate-300/80 text-xs font-semibold text-slate-600">
                           <tr>
                             <th className="px-3 py-3 text-left">ลำดับ</th>
@@ -357,7 +357,7 @@ export function WeightTicketDetailModal({
                         </tbody>
                       </table>
 
-                      <div className="block md:hidden divide-y divide-slate-100 bg-white">
+                      <div className="block lg:hidden divide-y divide-slate-100 bg-white">
                         {ticket.lines.map((line, index) => (
                           <div key={line.id} className="p-4 space-y-2">
                             <div className="flex justify-between items-start gap-2">
@@ -421,7 +421,7 @@ export function WeightTicketDetailModal({
                       <SectionTitle subtitle="รวมสินค้าชนิดเดียวกันในเอกสารเดียวกันก่อนนำไปใช้ออกบิล" title="สรุปต่อสินค้า" />
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="hidden md:table min-w-full divide-y divide-slate-200 text-sm">
+                      <table className="hidden lg:table min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-200/80 border-b border-slate-300/80 text-xs font-semibold text-slate-600">
                           <tr>
                             <th className="px-3 py-3 text-left">ลำดับ</th>
@@ -446,7 +446,7 @@ export function WeightTicketDetailModal({
                         </tbody>
                       </table>
 
-                      <div className="block md:hidden divide-y divide-slate-100 bg-white">
+                      <div className="block lg:hidden divide-y divide-slate-100 bg-white">
                         {ticket.productSummaries.map((summary, index) => (
                           <div key={summary.id} className="p-4 space-y-2">
                             <div className="flex justify-between items-center">
@@ -521,7 +521,7 @@ export function WeightTicketDetailModal({
                   <SectionTitle subtitle="บันทึกการนำใบรับของไปออกบิลและการคืนยอด" title="ประวัติการใช้งานใบรับของ" />
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="hidden md:table min-w-full divide-y divide-slate-200 text-sm">
+                  <table className="hidden lg:table min-w-full divide-y divide-slate-200 text-sm">
                     <thead className="bg-slate-200/80 border-b border-slate-300/80 text-xs font-semibold text-slate-600">
                       <tr>
                         <th className="px-3 py-3 text-left">เวลา</th>
@@ -573,7 +573,7 @@ export function WeightTicketDetailModal({
                     </tbody>
                   </table>
 
-                  <div className="block md:hidden divide-y divide-slate-100 bg-white">
+                  <div className="block lg:hidden divide-y divide-slate-100 bg-white">
                     {ticket.usageTimeline.length === 0 ? (
                       <div className="p-4 text-center text-sm text-slate-400">ยังไม่มีประวัติการใช้งาน</div>
                     ) : ticket.usageTimeline.map((event) => (

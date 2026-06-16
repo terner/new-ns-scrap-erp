@@ -316,7 +316,7 @@ export function TransactionLedgerPageClient() {
       </div>
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block rounded-md bg-white p-3 shadow">
+      <div className="hidden lg:block rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <input className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm h-9 border-slate-300" placeholder="ค้นหา เลขที่ / รายละเอียด / ผู้รับ-ส่ง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <DatePickerInput className="w-[130px]" value={dateFrom} onChange={setDateFrom} />
@@ -343,7 +343,7 @@ export function TransactionLedgerPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="md:hidden rounded-md bg-white p-3 shadow space-y-2">
+      <div className="lg:hidden rounded-md bg-white p-3 shadow space-y-2">
         <div className="flex gap-2 items-center">
           <input className="flex-1 rounded-md border px-3 h-9 text-sm border-slate-300" placeholder="ค้นหา..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <button
@@ -365,7 +365,7 @@ export function TransactionLedgerPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการ</h4>
@@ -455,7 +455,7 @@ export function TransactionLedgerPageClient() {
       ) : null}
 
       {/* Desktop Table View (Hidden on Mobile) */}
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm min-w-[1000px]">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
@@ -502,7 +502,7 @@ export function TransactionLedgerPageClient() {
 
       {/* Mobile View: Dense Card List (Hidden on Desktop) */}
       {!isLoading && ledger.length > 0 ? (
-        <div className="space-y-3 md:hidden">
+        <div className="space-y-3 lg:hidden">
           {ledger.map((row) => (
             <div key={row.id} className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm space-y-2.5 animate-fade-in">
               <div className="flex items-start justify-between gap-2">
@@ -553,13 +553,13 @@ export function TransactionLedgerPageClient() {
       ) : null}
 
       {!isLoading && ledger.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm md:hidden">
+        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm lg:hidden">
           ไม่มีรายการ
         </div>
       ) : null}
 
       {isLoading ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm md:hidden">
+        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm lg:hidden">
           กำลังโหลด Transaction Ledger...
         </div>
       ) : null}

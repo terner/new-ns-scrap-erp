@@ -27,9 +27,13 @@ function periodKey(periodYear: number, periodMonth: number) {
 
 function parsePeriod(search: URLSearchParams, body?: Record<string, unknown>) {
   const now = new Date()
+  const monthVal = body?.periodMonth ?? search.get('periodMonth') ?? search.get('month') ?? now.getMonth() + 1
   const periodYear = Number(body?.periodYear ?? search.get('periodYear') ?? search.get('year') ?? now.getFullYear())
-  const periodMonth = Number(body?.periodMonth ?? search.get('periodMonth') ?? search.get('month') ?? now.getMonth() + 1)
   if (!Number.isInteger(periodYear) || periodYear < 2000 || periodYear > 2100) throw new Error('ปีงวดไม่ถูกต้อง')
+  if (monthVal === 'all' || monthVal === 'All' || monthVal === '') {
+    return { periodMonth: 'all' as const, periodYear }
+  }
+  const periodMonth = Number(monthVal)
   if (!Number.isInteger(periodMonth) || periodMonth < 1 || periodMonth > 12) throw new Error('เดือนงวดไม่ถูกต้อง')
   return { periodMonth, periodYear }
 }
@@ -110,7 +114,14 @@ async function previewRun(periodYear: number, periodMonth: number) {
   )
   const rows = assets
     .filter((asset) => !alreadyRun.has(String(asset.id)))
-    .map((asset) => assetRunRow(asset, periodYear, periodMonth))
+    .map((asset) => {
+      const run = assetRunRow(asset, periodYear, periodMonth)
+      return {
+        ...run,
+        category: asset.category || 'Other',
+        department: asset.department || '',
+      }
+    })
     .filter((row) => row.depreciationAmount > 0)
   return {
     periodDate: toDateOnly(periodDate(periodYear, periodMonth)),
@@ -126,10 +137,15 @@ async function previewRun(periodYear: number, periodMonth: number) {
 
 async function payload(search = new URLSearchParams()) {
   const { periodMonth, periodYear } = parsePeriod(search)
+  const isAllMonths = periodMonth === 'all'
   const [preview, deps] = await Promise.all([
-    previewRun(periodYear, periodMonth),
+    isAllMonths ? { rows: [], periodDate: '', periodKey: `${periodYear}` } : previewRun(periodYear, periodMonth),
     prisma.depreciations.findMany({
-      include: { assets: { select: { code: true, name: true } } },
+      include: { assets: { select: { code: true, name: true, category: true, department: true } } },
+      where: {
+        period_year: periodYear,
+        ...(isAllMonths ? {} : { period_month: periodMonth }),
+      },
       orderBy: [{ date: 'desc' }, { id: 'desc' }],
       take: 5000,
     }),
@@ -142,6 +158,8 @@ async function payload(search = new URLSearchParams()) {
       accumBefore: toNumber(dep.accumulated) - toNumber(dep.amount),
       assetCode: dep.assets?.code || '-',
       assetName: dep.assets?.name || '-',
+      category: dep.assets?.category || 'Other',
+      department: dep.assets?.department || '',
       date,
       depreciationAmount: toNumber(dep.amount),
       id: String(dep.id),
@@ -156,7 +174,9 @@ async function payload(search = new URLSearchParams()) {
       status: dep.status || 'posted',
     }
   })
-  const periodRuns = rows.filter((row) => row.periodMonth === periodMonth && row.periodYear === periodYear && row.status !== 'reversed')
+  const periodRuns = isAllMonths
+    ? rows.filter((row) => row.status !== 'reversed')
+    : rows.filter((row) => row.periodMonth === periodMonth && row.status !== 'reversed')
   return {
     designState: {
       glPosting: 'deferred_dev_scope_no_gl_journal',
@@ -172,6 +192,8 @@ async function payload(search = new URLSearchParams()) {
       name: row.assetName,
       nbv: row.nbvBefore,
       netAssetCost: row.netAssetCost,
+      category: row.category,
+      department: row.department,
     })),
     period: { date: preview.periodDate, key: preview.periodKey, month: periodMonth, postedRuns: periodRuns.length, pendingAssets: preview.rows.length, year: periodYear },
     rows,
@@ -201,6 +223,9 @@ export async function POST(request: NextRequest) {
     requirePermission(context, MANAGE_PERMISSION)
     const body = await request.json()
     const { periodMonth, periodYear } = parsePeriod(new URLSearchParams(), body)
+    if (periodMonth === 'all') {
+      return NextResponse.json({ error: 'ไม่สามารถประมวลผลรายปีได้' }, { status: 400 })
+    }
     const preview = await previewRun(periodYear, periodMonth)
     if (body.action === 'preview') return NextResponse.json(preview)
     if (body.action !== 'commit') return NextResponse.json({ error: 'invalid action' }, { status: 400 })

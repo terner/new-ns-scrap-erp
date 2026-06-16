@@ -8,13 +8,13 @@ export function DualCostingPageSection({ children, className }: { children: Reac
 }
 
 export function DualCostingFilterCard({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('rounded-md bg-white p-3 shadow', className)}>{children}</div>
+  return <div className={cn('rounded-xl bg-white p-3.5 border border-slate-200/80 shadow-sm', className)}>{children}</div>
 }
 
 export function DualCostingPanel({ children, className, title }: { children: ReactNode; className?: string; title?: string }) {
   return (
-    <div className={cn('rounded-md bg-white p-4 shadow', className)}>
-      {title ? <h3 className="mb-3 text-sm font-semibold text-slate-800">{title}</h3> : null}
+    <div className={cn('rounded-xl bg-white p-4 border border-slate-200/80 shadow-sm', className)}>
+      {title ? <h3 className="mb-3 text-sm font-bold text-slate-800">{title}</h3> : null}
       {children}
     </div>
   )
@@ -22,16 +22,27 @@ export function DualCostingPanel({ children, className, title }: { children: Rea
 
 export function DualCostingStatCard({
   children,
+  icon,
   label,
   tone = 'slate',
   value,
 }: {
   children?: ReactNode
+  icon?: string
   label: string
   tone?: 'amber' | 'blue' | 'emerald' | 'purple' | 'red' | 'slate'
   value: string
 }) {
   const tones = {
+    amber: 'bg-amber-100 text-amber-700 border-amber-200/50',
+    blue: 'bg-blue-100 text-blue-700 border-blue-200/50',
+    emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200/50',
+    purple: 'bg-purple-100 text-purple-700 border-purple-200/50',
+    red: 'bg-red-100 text-red-700 border-red-200/50',
+    slate: 'bg-slate-100 text-slate-700 border-slate-200/50',
+  }[tone]
+
+  const textTones = {
     amber: 'text-amber-700',
     blue: 'text-blue-700',
     emerald: 'text-emerald-700',
@@ -40,10 +51,23 @@ export function DualCostingStatCard({
     slate: 'text-slate-900',
   }[tone]
 
+  if (icon) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+        <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl', tones.split(' ')[0])}>{icon}</div>
+        <div className="min-w-0">
+          <div className={cn('text-xs font-semibold', tones.split(' ')[1])}>{label}</div>
+          <div className={cn('truncate font-mono font-bold text-slate-900 text-base sm:text-lg', textTones)}>{value}</div>
+          {children}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="rounded-md bg-white p-3 shadow">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={cn('mt-1 text-lg font-bold', tones)}>{value}</div>
+    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+      <div className="text-xs text-slate-500 font-semibold">{label}</div>
+      <div className={cn('mt-1 text-base sm:text-lg font-bold font-mono', textTones)}>{value}</div>
       {children ? <div className="mt-1">{children}</div> : null}
     </div>
   )
@@ -69,7 +93,7 @@ export function DualCostingCountRow({
 }
 
 export function DualCostingErrorBox({ error }: { error: string | null }) {
-  return error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null
+  return error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null
 }
 
 export function DualCostingWorkflowStrip({ active }: { active: 'allocator' | 'ledger' | 'pool' | 'waiting' }) {
@@ -84,7 +108,7 @@ export function DualCostingWorkflowStrip({ active }: { active: 'allocator' | 'le
     <div className="flex flex-wrap items-center gap-2 text-xs">
       {steps.map((step, index) => (
         <div key={step.key} className="flex items-center gap-2">
-          <span className={cn('rounded-md border px-2.5 py-1 font-medium', active === step.key ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-600')}>{step.label}</span>
+          <span className={cn('rounded-lg border px-3 py-1 font-semibold transition-colors shadow-xs', active === step.key ? 'border-slate-800 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-600')}>{step.label}</span>
           {index < steps.length - 1 ? <span className="text-slate-400">→</span> : null}
         </div>
       ))}
@@ -100,13 +124,13 @@ export function DualCostingHint({
   tone?: 'amber' | 'blue' | 'emerald' | 'indigo' | 'purple' | 'slate'
 }) {
   const tones = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    blue: 'border-blue-200 bg-blue-50 text-blue-800',
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    indigo: 'border-indigo-200 bg-indigo-50 text-indigo-800',
-    purple: 'border-purple-200 bg-purple-50 text-purple-800',
+    amber: 'border-amber-200/70 bg-amber-50/50 text-amber-800',
+    blue: 'border-blue-200/70 bg-blue-50/50 text-blue-800',
+    emerald: 'border-emerald-200/70 bg-emerald-50/50 text-emerald-800',
+    indigo: 'border-indigo-200/70 bg-indigo-50/50 text-indigo-800',
+    purple: 'border-purple-200/70 bg-purple-50/50 text-purple-800',
     slate: 'border-slate-200 bg-slate-50 text-slate-700',
   }[tone]
 
-  return <div className={cn('rounded-md border p-3 text-sm', tones)}>{children}</div>
+  return <div className={cn('rounded-xl border p-3.5 text-sm leading-relaxed shadow-xs', tones)}>{children}</div>
 }

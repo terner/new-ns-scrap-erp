@@ -777,7 +777,7 @@ export function PoBuyPageClient() {
       </div>
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden lg:block space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <UiInput className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลข PO / ชื่อผู้ขาย / ชื่อสินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-xs text-slate-500">วันที่:</label>
@@ -829,7 +829,7 @@ export function PoBuyPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+      <div className="space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
         <div className="flex gap-2 items-center">
           <UiInput className="min-w-[200px] flex-1 rounded-md h-9" placeholder="ค้นหาเลข PO / ผู้ขาย / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <button
@@ -847,7 +847,7 @@ export function PoBuyPageClient() {
         <div className="flex flex-wrap items-center gap-2">
           {columnResize.hasCustomWidths ? (
             <UiButton
-              className="h-9 font-normal hidden md:inline-flex"
+              className="h-9 font-normal hidden lg:inline-flex"
               size="sm"
               type="button"
               variant="outline"
@@ -875,7 +875,7 @@ export function PoBuyPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการจองซื้อ</h4>
@@ -964,7 +964,7 @@ export function PoBuyPageClient() {
       ) : null}
 
       {/* Mobile Card List (Hidden on Desktop) */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : null}
@@ -1024,7 +1024,7 @@ export function PoBuyPageClient() {
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden md:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs font-semibold" style={{ fontFamily: "'Noto Sans Thai', Arial, sans-serif", tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
           <colgroup>
             {poBuyColumns.map((column) => {
@@ -1110,7 +1110,7 @@ export function PoBuyPageClient() {
         </Table>
       </div>
 
-      <div className="fixed bottom-6 right-6 md:hidden">
+      <div className="fixed bottom-6 right-6 lg:hidden">
         <button
           className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
           onClick={openCreateForm}
@@ -1343,26 +1343,29 @@ function PoBuyCancelModal({
     <Dialog open onOpenChange={(open) => {
       if (!open && !isSaving) onClose()
     }}>
-      <DialogContent aria-labelledby="po-buy-cancel-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
-        <DialogHeader className="">
-          <DialogTitle id="po-buy-cancel-title">ยกเลิก PO Buy {row.docNo}</DialogTitle>
-          <DialogDescription>{row.supplierName}</DialogDescription>
+      <DialogContent aria-labelledby="po-buy-cancel-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-2xl overflow-hidden !p-0" hideClose>
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle id="po-buy-cancel-title" className="text-white font-bold">ยกเลิก PO Buy {row.docNo}</DialogTitle>
+            <DialogDescription className="text-slate-300">{row.supplierName}</DialogDescription>
+          </div>
+          <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={onClose}>✕</button>
         </DialogHeader>
-        <div className="space-y-2 p-4 text-sm">
-          <label className="block text-xs font-medium text-slate-600" htmlFor="po-buy-cancel-note">หมายเหตุการยกเลิก *</label>
+        <div className="space-y-2 p-5 text-sm">
+          <label className="block text-xs font-medium text-slate-655" htmlFor="po-buy-cancel-note">หมายเหตุการยกเลิก *</label>
           <textarea
             id="po-buy-cancel-note"
-            className="w-full rounded-md border px-3 py-2"
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-750 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
             maxLength={500}
             rows={3}
             value={note}
             onChange={(event) => onChangeNote(event.target.value)}
           />
-          {error ? <div className="text-xs text-red-600">{error}</div> : null}
+          {error ? <div className="text-xs text-red-650">{error}</div> : null}
         </div>
-        <DialogFooter>
+        <DialogFooter className="bg-slate-50 border-t border-slate-200 px-5 py-3.5 flex justify-end gap-2">
           <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ปิด</UiButton>
-          <UiButton className="bg-red-600 font-normal hover:bg-red-700" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</UiButton>
+          <UiButton className="bg-red-650 font-semibold hover:bg-red-750 text-white h-9 px-4 rounded-xl transition-colors" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</UiButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1390,26 +1393,29 @@ function PoBuyShortCloseModal({
     <Dialog open onOpenChange={(open) => {
       if (!open && !isSaving) onClose()
     }}>
-      <DialogContent aria-labelledby="po-buy-short-close-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-md" hideClose>
-        <DialogHeader className="">
-          <DialogTitle id="po-buy-short-close-title">ปิดรับไม่ครบ {row.docNo}</DialogTitle>
-          <DialogDescription>{row.supplierName} · คงเหลือ {formatMoney(row.remainingQty)} กก.</DialogDescription>
+      <DialogContent aria-labelledby="po-buy-short-close-title" className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-md md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-2xl overflow-hidden !p-0" hideClose>
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle id="po-buy-short-close-title" className="text-white font-bold">ปิดรับไม่ครบ {row.docNo}</DialogTitle>
+            <DialogDescription className="text-slate-300">{row.supplierName} · คงเหลือ {formatMoney(row.remainingQty)} กก.</DialogDescription>
+          </div>
+          <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={onClose}>✕</button>
         </DialogHeader>
-        <div className="space-y-2 p-4 text-sm">
-          <label className="block text-xs font-medium text-slate-600" htmlFor="po-buy-short-close-note">เหตุผลการปิดรับไม่ครบ *</label>
+        <div className="space-y-2 p-5 text-sm">
+          <label className="block text-xs font-medium text-slate-655" htmlFor="po-buy-short-close-note">เหตุผลการปิดรับไม่ครบ *</label>
           <textarea
             id="po-buy-short-close-note"
-            className="w-full rounded-md border px-3 py-2"
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-750 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
             maxLength={500}
             rows={3}
             value={note}
             onChange={(event) => onChangeNote(event.target.value)}
           />
-          {error ? <div className="text-xs text-red-600">{error}</div> : null}
+          {error ? <div className="text-xs text-red-650">{error}</div> : null}
         </div>
-        <DialogFooter>
+        <DialogFooter className="bg-slate-50 border-t border-slate-200 px-5 py-3.5 flex justify-end gap-2">
           <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ปิด</UiButton>
-          <UiButton className="bg-amber-600 font-normal hover:bg-amber-700" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'ยืนยันปิดรับไม่ครบ'}</UiButton>
+          <UiButton className="bg-amber-600 font-semibold hover:bg-amber-700 text-white h-9 px-4 rounded-xl transition-colors" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'ยืนยันปิดรับไม่ครบ'}</UiButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1673,13 +1679,14 @@ function PoBuyFormModal({
     <Dialog open onOpenChange={(open) => {
       if (!open && !isSaving) onClose()
     }}>
-      <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-5xl overflow-y-auto rounded-md p-0" data-combobox-portal-root="true" hideClose>
-        <DialogHeader className="px-5 py-3">
-          <DialogTitle id="po-buy-form-title">{heading}</DialogTitle>
+      <DialogContent aria-labelledby="po-buy-form-title" className="max-h-[90vh] max-w-5xl overflow-y-auto rounded-2xl p-0 border-0" data-combobox-portal-root="true" hideClose>
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white flex flex-row items-center justify-between rounded-t-2xl">
+          <DialogTitle id="po-buy-form-title" className="text-white font-bold">{heading}</DialogTitle>
+          <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={onClose}>✕</button>
         </DialogHeader>
-        <div className="space-y-3 p-5 text-sm">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div>
+        <div className="space-y-4 p-5 text-sm">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="col-span-2 sm:col-span-1">
               <SupplierSearchCombobox
                 error={errors.supplierId}
                 options={activeSuppliers}
@@ -1688,7 +1695,7 @@ function PoBuyFormModal({
               />
               {fieldError('supplierId')}
             </div>
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <label className="mb-1 block text-xs">สาขา <span className="text-red-600">*</span></label>
               <UiSelect className={`!h-9 w-full px-2 py-1.5 text-sm ${form.branchId ? '' : 'text-slate-400'}`} value={form.branchId} onChange={(event) => onUpdate('branchId', event.target.value)}>
                 <option disabled value="">เลือกสาขา</option>
@@ -1696,7 +1703,7 @@ function PoBuyFormModal({
               </UiSelect>
               {fieldError('branchId')}
             </div>
-            <div>
+            <div className="col-span-2 lg:col-span-1">
               <label className="mb-1 block text-xs">วันส่งมอบ <span className="text-red-600">*</span></label>
               <DatePickerInput className="!h-9 w-full" required value={form.expectedDelivery} onChange={(value) => onUpdate('expectedDelivery', value)} />
               {fieldError('expectedDelivery')}
@@ -1705,10 +1712,10 @@ function PoBuyFormModal({
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="font-medium">📋 รายการสินค้า ({form.items.length})</label>
-              <UiButton className="bg-emerald-600 font-normal hover:bg-emerald-700" size="xs" type="button" variant="default" onClick={onAddItem}>+ เพิ่มรายการ</UiButton>
+              <label className="font-semibold">📋 รายการสินค้า ({form.items.length})</label>
+              <UiButton className="bg-emerald-600 font-semibold hover:bg-emerald-700 text-white rounded-xl h-8 transition-colors" size="xs" type="button" variant="default" onClick={onAddItem}>+ เพิ่มรายการ</UiButton>
             </div>
-            <div className="overflow-x-auto rounded-md border">
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
               <Table className="min-w-[820px] border-0">
                 <TableHeader>
                   <tr><TableHead>สินค้า</TableHead><TableHead className="w-36 text-right">จำนวน (กก.) *</TableHead><TableHead className="w-36 text-right">ราคา/หน่วย *</TableHead><TableHead className="w-36 text-right">มูลค่ารวม</TableHead><TableHead className="w-10" /></tr>
@@ -1735,11 +1742,11 @@ function PoBuyFormModal({
                         {fieldError(`items.${index}.unitPrice`)}
                       </TableCell>
                       <TableCell className="bg-blue-50 p-1 px-2 text-right font-bold text-blue-700">{formatMoney(item.qty * item.unitPrice)}</TableCell>
-                      <TableCell className="p-1 text-center">{form.items.length > 1 ? <UiButton className="h-8 w-8 px-0 text-red-500" size="icon" type="button" variant="ghost" onClick={() => onRemoveItem(index)}>×</UiButton> : null}</TableCell>
+                      <TableCell className="p-1 text-center">{form.items.length > 1 ? <UiButton className="h-8 w-8 px-0 text-red-500 hover:text-red-700 outline-none" size="icon" type="button" variant="ghost" onClick={() => onRemoveItem(index)}>×</UiButton> : null}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-                <tfoot className="bg-slate-50 font-bold">
+                <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                   <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.subtotal)}</td><td /></tr>
                 </tfoot>
               </Table>
@@ -1747,17 +1754,19 @@ function PoBuyFormModal({
             {fieldError('items')}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_320px]">
-            <label className={`flex cursor-pointer items-center gap-3 rounded-md border-2 p-3 ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-              <input
-                checked={form.hasVat}
-                className="size-5"
-                type="checkbox"
-                onChange={(event) => onUpdate('hasVat', event.target.checked)}
-              />
-              <span className="font-bold text-slate-700">มี VAT</span>
-            </label>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 lg:col-span-1">
+              <label className={`flex h-full items-center gap-3 rounded-xl border p-3 cursor-pointer ${form.hasVat ? 'border-amber-500 bg-amber-50' : 'border-slate-300 bg-white'}`}>
+                <input
+                  checked={form.hasVat}
+                  className="size-5"
+                  type="checkbox"
+                  onChange={(event) => onUpdate('hasVat', event.target.checked)}
+                />
+                <span className="font-bold text-slate-700">มี VAT</span>
+              </label>
+            </div>
+            <div className="col-span-2 lg:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <SummaryLine label="ยอดก่อน VAT" value={formatMoney(formTotals.subtotal)} />
               <SummaryLine label={`VAT ${formatMoney(formTotals.vatRatePercent)}%`} value={formatMoney(formTotals.vatAmount)} />
               <SummaryLine label="ยอดรวม" strong value={formatMoney(formTotals.totalCost)} />
@@ -1766,13 +1775,13 @@ function PoBuyFormModal({
 
           <div>
             <label className="mb-1 block text-xs">หมายเหตุ</label>
-            <textarea className="min-h-16 w-full rounded-md border px-2 py-1.5 text-sm" rows={2} value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
+            <textarea className="min-h-16 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" rows={2} value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} />
             {fieldError('notes')}
           </div>
         </div>
-        <DialogFooter className="px-5">
+        <DialogFooter className="px-5 border-t border-slate-200 bg-slate-50 py-3 flex justify-end gap-2 rounded-b-2xl">
           <UiButton className="font-normal" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ยกเลิก</UiButton>
-          <UiButton className="bg-blue-600 font-normal hover:bg-blue-700" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</UiButton>
+          <UiButton className="bg-blue-600 font-semibold hover:bg-blue-700 text-white rounded-xl h-9 transition-colors px-4" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</UiButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1800,12 +1809,13 @@ function PoBuyDetailModal({
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
     }}>
-      <DialogContent aria-labelledby="po-buy-detail-title" className="max-h-[90vh] max-w-3xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" hideClose>
-        <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
+      <DialogContent aria-labelledby="po-buy-detail-title" className="max-h-[90vh] max-w-3xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" hideClose>
+        <DialogHeader className="p-4 bg-slate-900 text-white shrink-0 flex flex-row items-start justify-between gap-3 rounded-t-2xl">
           <div>
-            <DialogTitle id="po-buy-detail-title" className="text-white">รายละเอียด {row.docNo}</DialogTitle>
+            <DialogTitle id="po-buy-detail-title" className="text-white text-base font-bold">รายละเอียด {row.docNo}</DialogTitle>
             <DialogDescription className="text-slate-300">{row.supplierName}</DialogDescription>
           </div>
+          <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={onClose}>✕</button>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4 text-sm">

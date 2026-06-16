@@ -274,7 +274,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="relative hidden w-[min(360px,38vw)] min-w-64 shrink-0 md:block" onBlur={handleMenuSearchBlur}>
+            <div className="relative hidden w-[min(360px,38vw)] min-w-64 shrink-0 lg:block" onBlur={handleMenuSearchBlur}>
               <label className="relative block">
                 <span className="sr-only">ค้นหาเมนู</span>
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />

@@ -156,7 +156,7 @@ export function ChangePasswordPageClient() {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block rounded-md bg-white p-4 shadow border border-slate-200">
+      <div className="hidden lg:block rounded-md bg-white p-4 shadow border border-slate-200">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
@@ -170,7 +170,7 @@ export function ChangePasswordPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="md:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 border border-slate-200 animate-fade-in">
+      <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 border border-slate-200 animate-fade-in">
         <div>
           <h2 className="text-lg font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
           <p className="mt-0.5 text-xs text-slate-500">ยืนยันรหัสผ่านเดิมก่อนตั้งรหัสผ่านใหม่</p>

@@ -83,6 +83,8 @@ export function FxRatePageClient() {
   const [isSaving, setIsSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [toDate, setToDate] = useState('')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const hasFilters = Boolean(fromDate || toDate || fromCurrency !== 'all' || active !== 'true')
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -194,36 +196,100 @@ export function FxRatePageClient() {
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        {latestRates.slice(0, 5).map((rate) => (
-          <div key={rate.id} className="rounded-md bg-white p-3 text-center shadow">
-            <div className="text-xs text-slate-500">{rate.fromCurrency} -&gt; {rate.toCurrency}</div>
-            <div className="text-2xl font-bold text-blue-600">{formatRate(rate.rate)}</div>
-            <div className="mt-1 text-xs text-slate-400">{formatDateDisplay(rate.rateDate)}</div>
-          </div>
-        ))}
-        {!isLoading && (data?.latestRates.length ?? 0) === 0 ? <div className="rounded-md bg-white p-3 text-sm text-slate-500 shadow">ยังไม่มี FX Rate</div> : null}
+      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          {latestRates.slice(0, 5).map((rate) => (
+            <div key={rate.id} className="bg-white border border-slate-200 rounded-xl p-3.5 text-center shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-xs font-semibold text-slate-500">{rate.fromCurrency} &rarr; {rate.toCurrency}</div>
+              <div className="text-2xl font-bold text-slate-900 mt-1">{formatRate(rate.rate)}</div>
+              <div className="mt-1.5 text-[10px] font-medium text-slate-400">{formatDateDisplay(rate.rateDate)}</div>
+            </div>
+          ))}
+          {!isLoading && (data?.latestRates.length ?? 0) === 0 ? <div className="col-span-full rounded-xl bg-white border border-slate-200 p-6 text-center text-sm text-slate-500 shadow-sm">ยังไม่มี FX Rate</div> : null}
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-lg font-semibold text-slate-900">FX Rate History</h2>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+      {/* Filters Toolbar */}
+      <div className="rounded-md bg-white p-3 shadow">
+        {/* Desktop View */}
+        <div className="hidden lg:flex flex-wrap items-center gap-2">
+          <h2 className="mr-auto text-base font-semibold text-slate-950">FX Rate History</h2>
+          <span className="text-xs text-slate-500">วันที่:</span>
           <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" value={fromDate} onChange={setFromDate} />
+          <span className="text-slate-400">→</span>
           <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" value={toDate} onChange={setToDate} />
-          <select aria-label="สกุลต้นทาง" className="rounded-md border border-slate-200 px-3 py-2" value={fromCurrency} onChange={(event) => setFromCurrency(event.target.value)}>
+          
+          <select aria-label="สกุลต้นทาง" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={fromCurrency} onChange={(event) => setFromCurrency(event.target.value)}>
             <option value="all">ทุกสกุล</option>
             {(data?.filters.fromCurrencies ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <select aria-label="สถานะ" className="rounded-md border border-slate-200 px-3 py-2" value={active} onChange={(event) => setActive(event.target.value)}>
+          
+          <select aria-label="สถานะ" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={active} onChange={(event) => setActive(event.target.value)}>
             <option value="true">Active</option>
             <option value="false">Inactive</option>
             <option value="all">ทั้งหมด</option>
           </select>
-          <button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white" type="button" onClick={openCreate}>+ เพิ่ม FX Rate</button>
+
+          {hasFilters && (
+            <button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors" type="button" onClick={() => { setFromDate(''); setToDate(''); setFromCurrency('all'); setActive('true') }}>✕ ล้าง</button>
+          )}
+
+          <button className="rounded-md bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition-colors flex items-center justify-center" type="button" onClick={openCreate}>+ เพิ่ม FX Rate</button>
+        </div>
+
+        {/* Mobile View */}
+        <div className="block lg:hidden space-y-2.5">
+          <div className="flex gap-2">
+            <button
+              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-1 ${
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              type="button"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+            >
+              🔍 ตัวกรอง {hasFilters ? '(มี)' : ''}
+            </button>
+            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white flex items-center justify-center" type="button" onClick={openCreate}>+ เพิ่ม</button>
+          </div>
+
+          {showMobileFilters && (
+            <div className="grid grid-cols-1 gap-2 pt-2 border-t border-slate-100 animate-in slide-in-from-top-2 duration-100">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-slate-500">
+                  จากวันที่
+                  <DatePickerInput className="mt-1 w-full" value={fromDate} onChange={setFromDate} />
+                </label>
+                <label className="text-xs text-slate-500">
+                  ถึงวันที่
+                  <DatePickerInput className="mt-1 w-full" value={toDate} onChange={setToDate} />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-slate-500">
+                  สกุลต้นทาง
+                  <select aria-label="สกุลต้นทาง" className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" value={fromCurrency} onChange={(event) => setFromCurrency(event.target.value)}>
+                    <option value="all">ทุกสกุล</option>
+                    {(data?.filters.fromCurrencies ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs text-slate-500">
+                  สถานะ
+                  <select aria-label="สถานะ" className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" value={active} onChange={(event) => setActive(event.target.value)}>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                    <option value="all">ทั้งหมด</option>
+                  </select>
+                </label>
+              </div>
+              {hasFilters && (
+                <button className="w-full rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={() => { setFromDate(''); setToDate(''); setFromCurrency('all'); setActive('true') }}>ล้างตัวกรอง</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -241,7 +307,7 @@ export function FxRatePageClient() {
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>ยังไม่มี FX Rate</td></tr> : null}
             {!isLoading && data?.rows.map((row) => (
-              <tr key={row.id} className="border-t hover:bg-slate-50">
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="p-2">{formatDateDisplay(row.rateDate)}</td>
                 <td className="p-2 font-medium">{row.fromCurrency}</td>
                 <td className="p-2 font-medium">{row.toCurrency}</td>
@@ -256,26 +322,68 @@ export function FxRatePageClient() {
         </table>
       </div>
 
+      {/* Mobile Card list */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && (data?.rows.length ?? 0) === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มี FX Rate</div>
+        ) : null}
+        {!isLoading && data?.rows.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm space-y-2 text-sm"
+          >
+            <div className="flex justify-between items-start">
+              <span className="font-mono text-slate-500 text-xs">{formatDateDisplay(row.rateDate)}</span>
+              <span className={`rounded-md px-1.5 py-0.5 text-xs font-bold ${row.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                {row.active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center text-sm">
+              <div>
+                <span className="font-bold text-slate-800 text-sm">{row.fromCurrency} &rarr; {row.toCurrency}</span>
+                <span className="text-slate-400 text-xs ml-2 font-medium">({row.rateType})</span>
+              </div>
+              <span className="text-lg font-bold text-blue-700 font-mono">{formatRate(row.rate)}</span>
+            </div>
+            
+            <div className="flex justify-between pt-1.5 border-t border-slate-100/60 mt-1 text-slate-500 text-xs items-center">
+              <span>Source: {row.source || '-'}</span>
+              <button
+                className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                type="button"
+                onClick={() => openEdit(row)}
+              >
+                จัดการ
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {showForm ? (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 p-4">
-          <div className="mx-auto my-10 max-w-lg rounded-md bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b px-5 py-3">
-              <h3 className="font-semibold">{form.id ? 'แก้ไข FX Rate' : 'เพิ่ม FX Rate'}</h3>
-              <button className="text-2xl text-slate-400" type="button" onClick={() => setShowForm(false)}>&times;</button>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10" onClick={() => setShowForm(false)}>
+          <div className="w-full max-w-lg overflow-hidden rounded-md bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4">
+              <h3 className="font-bold text-white">{form.id ? 'แก้ไข FX Rate' : 'เพิ่ม FX Rate'}</h3>
+              <button className="text-2xl text-white/80 hover:text-white" type="button" onClick={() => setShowForm(false)}>&times;</button>
             </div>
             <div className="grid gap-3 p-5 text-sm md:grid-cols-2">
-              <Field label="วันที่" error={fieldErrors.rateDate}><DatePickerInput className="w-full" value={form.rateDate} onChange={(value) => setForm({ ...form, rateDate: value })} /></Field>
-              <Field label="Rate Type" error={fieldErrors.rateType}><select className="w-full rounded-md border px-2 py-1.5" value={form.rateType} onChange={(event) => setForm({ ...form, rateType: event.target.value })}>{rateTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
+              <Field label="วันที่" error={fieldErrors.rateDate}><DatePickerInput className="w-full h-9 text-sm" value={form.rateDate} onChange={(value) => setForm({ ...form, rateDate: value })} /></Field>
+              <Field label="Rate Type" error={fieldErrors.rateType}><select className="w-full rounded-md border px-2 py-1.5 h-9 text-sm outline-none" value={form.rateType} onChange={(event) => setForm({ ...form, rateType: event.target.value })}>{rateTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
               <Field label="From" error={fieldErrors.fromCurrency}><CurrencySelect options={currencyOptions} value={form.fromCurrency} onChange={(value) => setForm({ ...form, fromCurrency: value })} /></Field>
               <Field label="To" error={fieldErrors.toCurrency}><CurrencySelect options={currencyOptions} value={form.toCurrency} onChange={(value) => setForm({ ...form, toCurrency: value })} /></Field>
-              <Field label="Rate" error={fieldErrors.rate}><input className="w-full rounded-md border px-2 py-1.5 text-right font-bold" inputMode="decimal" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} /></Field>
-              <Field label="Source"><input className="w-full rounded-md border px-2 py-1.5" value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} /></Field>
-              <Field label="สถานะ"><select className="w-full rounded-md border px-2 py-1.5" value={String(form.active)} onChange={(event) => setForm({ ...form, active: event.target.value === 'true' })}><option value="true">Active</option><option value="false">Inactive</option></select></Field>
-              <Field label="หมายเหตุ"><input className="w-full rounded-md border px-2 py-1.5" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
+              <Field label="Rate" error={fieldErrors.rate}><input className="w-full rounded-md border px-2 py-1.5 text-right font-bold h-9 text-sm outline-none" inputMode="decimal" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} /></Field>
+              <Field label="Source"><input className="w-full rounded-md border px-2 py-1.5 h-9 text-sm outline-none" value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} /></Field>
+              <Field label="สถานะ"><select className="w-full rounded-md border px-2 py-1.5 h-9 text-sm outline-none" value={String(form.active)} onChange={(event) => setForm({ ...form, active: event.target.value === 'true' })}><option value="true">Active</option><option value="false">Inactive</option></select></Field>
+              <Field label="หมายเหตุ"><input className="w-full rounded-md border px-2 py-1.5 h-9 text-sm outline-none" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
             </div>
-            <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3">
-              <button className="px-4 py-2 text-sm" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
-              <button className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-60" disabled={isSaving} type="button" onClick={() => void saveRate()}>{isSaving ? 'กำลังบันทึก' : 'บันทึก'}</button>
+            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="button" onClick={() => void saveRate()}>{isSaving ? 'กำลังบันทึก' : 'บันทึก'}</button>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { SearchCombobox } from '@/components/ui/SearchCombobox'
 
 type AssetRegisterRow = {
   acquisitionType: string
@@ -44,6 +45,7 @@ type AssetRegisterPayload = {
     assetStatuses: string[]
     branches: { code: string; id: string; name: string }[]
     categories: string[]
+    departments: string[]
     depreciationMethods: string[]
     suppliers: { code: string; id: string; name: string }[]
   }
@@ -113,9 +115,9 @@ const fieldClass = 'w-full rounded-md border border-slate-200 px-3 py-2 text-sm 
 
 type DepreciationPayload = {
   designState: { glPosting: string; reverseWrite: string; runWrite: string }
-  pendingAssets: { accumDep: number; assetStatus: string; code: string; id: string; monthlyDep: number; name: string; nbv: number; netAssetCost: number }[]
-  period: { date: string; key: string; month: number; postedRuns: number; pendingAssets: number; year: number }
-  rows: { accumAfter: number; accumBefore: number; assetCode: string; assetName: string; date: string; depreciationAmount: number; id: string; nbvAfter: number; nbvBefore: number; period: string; refNo: string; reversalReason: string; reversedAt: string; status: string }[]
+  pendingAssets: { accumDep: number; assetStatus: string; code: string; id: string; monthlyDep: number; name: string; nbv: number; netAssetCost: number; category: string; department: string }[]
+  period: { date: string; key: string; month: number | 'all'; postedRuns: number; pendingAssets: number; year: number }
+  rows: { accumAfter: number; accumBefore: number; assetCode: string; assetName: string; date: string; depreciationAmount: number; id: string; nbvAfter: number; nbvBefore: number; period: string; refNo: string; reversalReason: string; reversedAt: string; status: string; category: string; department: string }[]
   summary: { pendingAssets: number; postedRuns: number; reversedRuns: number; totalDepreciation: number }
 }
 
@@ -170,6 +172,14 @@ export function AssetRegisterPageClient() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
 
+  const supplierOptions = useMemo(() => {
+    return (data?.options.suppliers ?? []).map((row) => ({
+      id: row.id,
+      label: `${row.code} - ${row.name}`,
+      searchText: `${row.code} ${row.name}`
+    }))
+  }, [data?.options.suppliers])
+
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
     if (search.trim()) params.set('q', search.trim())
@@ -215,10 +225,12 @@ export function AssetRegisterPageClient() {
   const updateForm = (field: keyof AssetFormState, value: string) => {
     setForm((current) => {
       const next = { ...current, [field]: value }
-      if (field === 'originalCost' || field === 'vatAmount') {
-        const originalCost = decimalValue(field === 'originalCost' ? value : next.originalCost)
-        const vatAmount = decimalValue(field === 'vatAmount' ? value : next.vatAmount)
-        if (originalCost > 0) next.netAssetCost = formatInputNumber(Math.max(0, originalCost - vatAmount))
+      if (field === 'originalCost') {
+        const originalCost = decimalValue(value)
+        if (originalCost > 0) {
+          next.netAssetCost = formatInputNumber(originalCost)
+          next.vatAmount = '0'
+        }
       }
       return next
     })
@@ -324,12 +336,17 @@ export function AssetRegisterPageClient() {
       {error ? <ErrorBox message={error} /> : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl bg-gradient-to-br from-amber-600 via-orange-600 to-red-600 p-6 text-white shadow-md">
-          <div className="text-xs opacity-90 font-medium">Net Book Value (มูลค่าคงเหลือสุทธิ)</div>
-          <div className="mt-2 text-3xl font-extrabold tracking-tight">{formatMoney(data?.summary.nbv)} ฿</div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-xs pt-4 border-t border-white/20">
-            <div><div className="opacity-75">ต้นทุนสุทธิ</div><div className="font-bold text-sm">{formatMoney(data?.summary.netAssetCost)}</div></div>
-            <div><div className="opacity-75">ค่าเสื่อมสะสม</div><div className="font-bold text-sm">{formatMoney(data?.summary.accumDep)}</div></div>
+        <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+            🏢
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold text-emerald-600 truncate">Net Book Value (มูลค่าคงเหลือสุทธิ)</div>
+            <div className="mt-0.5 text-2xl font-extrabold text-slate-900 tracking-tight">{formatMoney(data?.summary.nbv)} ฿</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-slate-100">
+              <div><div className="text-slate-400">ต้นทุนสุทธิ</div><div className="font-bold text-slate-800 text-xs">{formatMoney(data?.summary.netAssetCost)}</div></div>
+              <div><div className="text-slate-400">ค่าเสื่อมสะสม</div><div className="font-bold text-slate-500 text-xs">{formatMoney(data?.summary.accumDep)}</div></div>
+            </div>
           </div>
         </div>
         <Panel title="NBV ตามหมวด">
@@ -364,7 +381,7 @@ export function AssetRegisterPageClient() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 w-full md:w-auto">
+        <div className="grid grid-cols-2 gap-2 lg:flex md:items-center md:gap-2 w-full md:w-auto">
           <select
             className="w-full md:w-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-0 focus:outline-none focus:border-slate-400 transition cursor-pointer"
             value={category}
@@ -385,7 +402,7 @@ export function AssetRegisterPageClient() {
       </div>
 
       {/* Desktop View Table */}
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <TableShell>
           <table className="w-full text-xs">
             <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
@@ -428,7 +445,7 @@ export function AssetRegisterPageClient() {
       </div>
 
       {/* Mobile View Card List */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="bg-white rounded-xl p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-200/60">กำลังโหลดข้อมูล...</div>
         ) : rows.length === 0 ? (
@@ -453,9 +470,9 @@ export function AssetRegisterPageClient() {
                 <div><span className="text-slate-400 block text-[10px]">ค่าเสื่อม/เดือน</span><span className="font-bold text-amber-700 block">{formatMoney(row.monthlyDep)}</span></div>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-end gap-2">
-                <button className="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
+                <button className="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition outline-none focus:ring-0" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
                 {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? (
-                  <button className="rounded border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition" disabled={isSaving} onClick={() => deactivateAsset(row)} type="button">ปิดใช้งาน</button>
+                  <button className="rounded border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition outline-none focus:ring-0" disabled={isSaving} onClick={() => deactivateAsset(row)} type="button">ปิดใช้งาน</button>
                 ) : null}
               </div>
             </div>
@@ -465,19 +482,55 @@ export function AssetRegisterPageClient() {
 
       {modal === 'asset' ? (
         <Modal title={form.id ? `แก้ไขทรัพย์สิน ${form.code}` : 'เพิ่มทรัพย์สิน'}>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Field label="รหัสทรัพย์สิน"><input className={fieldClass} value={form.code} onChange={(event) => updateForm('code', event.target.value.toUpperCase())} /></Field>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <Field label="รหัสทรัพย์สิน">
+              <input 
+                className={fieldClass} 
+                disabled 
+                placeholder={form.id ? "" : "(ระบบสร้างให้อัตโนมัติ)"} 
+                value={form.id ? form.code : "(ระบบสร้างให้อัตโนมัติ)"} 
+              />
+            </Field>
             <Field label="ชื่อทรัพย์สิน"><input className={fieldClass} value={form.name} onChange={(event) => updateForm('name', event.target.value)} /></Field>
-            <Field label="หมวด"><SelectControl options={data?.options.categories ?? []} value={form.category} onChange={(value) => updateForm('category', value)} /></Field>
+            <Field label="หมวด">
+              <input 
+                list="asset-categories-list" 
+                className={fieldClass} 
+                value={form.category} 
+                onChange={(event) => updateForm('category', event.target.value)} 
+                placeholder="เลือกหรือพิมพ์หมวด"
+              />
+              <datalist id="asset-categories-list">
+                {(data?.options.categories ?? []).map(cat => <option key={cat} value={cat} />)}
+              </datalist>
+            </Field>
             <Field label="สาขา"><OptionSelect blankLabel="ไม่ระบุสาขา" options={data?.options.branches ?? []} value={form.branchId} onChange={(value) => updateForm('branchId', value)} /></Field>
-            <Field label="แผนก"><input className={fieldClass} value={form.department} onChange={(event) => updateForm('department', event.target.value)} /></Field>
+            <Field label="แผนก">
+              <input 
+                list="asset-departments-list" 
+                className={fieldClass} 
+                value={form.department} 
+                onChange={(event) => updateForm('department', event.target.value)} 
+                placeholder="เลือกหรือพิมพ์แผนก"
+              />
+              <datalist id="asset-departments-list">
+                {(data?.options.departments ?? []).map(dept => <option key={dept} value={dept} />)}
+              </datalist>
+            </Field>
             <Field label="สถานที่"><input className={fieldClass} value={form.location} onChange={(event) => updateForm('location', event.target.value)} /></Field>
             <Field label="วันที่ซื้อ"><input className={fieldClass} type="date" value={form.purchaseDate} onChange={(event) => updateForm('purchaseDate', event.target.value)} /></Field>
             <Field label="ประเภทการได้มา"><SelectControl options={data?.options.acquisitionTypes ?? []} value={form.acquisitionType} onChange={(value) => updateForm('acquisitionType', value)} /></Field>
-            <Field label="ผู้ขาย"><OptionSelect blankLabel="ไม่ระบุผู้ขาย" options={data?.options.suppliers ?? []} value={form.supplierId} onChange={(value) => updateForm('supplierId', value)} /></Field>
+            <div className="w-full">
+              <SearchCombobox 
+                inputId="form-supplier" 
+                label="ผู้ขาย" 
+                options={supplierOptions} 
+                value={form.supplierId} 
+                onChange={(value) => updateForm('supplierId', value)} 
+                placeholder="พิมพ์เพื่อค้นหาผู้ขาย..."
+              />
+            </div>
             <MoneyField label="ราคาทุน" value={form.originalCost} onChange={(value) => updateForm('originalCost', value)} />
-            <MoneyField label="VAT" value={form.vatAmount} onChange={(value) => updateForm('vatAmount', value)} />
-            <MoneyField label="Net Asset Cost" value={form.netAssetCost} onChange={(value) => updateForm('netAssetCost', value)} />
             <MoneyField label="มูลค่าซาก" value={form.salvageValue} onChange={(value) => updateForm('salvageValue', value)} />
             <Field label="อายุใช้งาน (เดือน)"><input className={fieldClass} inputMode="numeric" value={form.usefulLifeMonths} onChange={(event) => updateForm('usefulLifeMonths', event.target.value)} /></Field>
             <Field label="วิธีคิดค่าเสื่อม"><SelectControl options={data?.options.depreciationMethods ?? []} value={form.depreciationMethod} onChange={(value) => updateForm('depreciationMethod', value)} /></Field>
@@ -489,7 +542,7 @@ export function AssetRegisterPageClient() {
             <Field label="กรมธรรม์"><input className={fieldClass} value={form.insurancePolicyNo} onChange={(event) => updateForm('insurancePolicyNo', event.target.value)} /></Field>
             <Field label="หมดประกัน"><input className={fieldClass} type="date" value={form.warrantyExpireDate} onChange={(event) => updateForm('warrantyExpireDate', event.target.value)} /></Field>
             <Field label="ผู้รับผิดชอบ"><input className={fieldClass} value={form.responsiblePerson} onChange={(event) => updateForm('responsiblePerson', event.target.value)} /></Field>
-            <div className="md:col-span-3"><Field label="หมายเหตุ"><textarea className={`${fieldClass} min-h-20`} value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} /></Field></div>
+            <div className="col-span-2 md:col-span-3"><Field label="หมายเหตุ"><textarea className={`${fieldClass} min-h-20`} value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} /></Field></div>
           </div>
           <ModalActions>
             <ActionButton onClick={() => setModal(null)}>ยกเลิก</ActionButton>
@@ -554,6 +607,9 @@ export function DepreciationPageClient() {
   const [reverseReason, setReverseReason] = useState('')
   const [year, setYear] = useState(String(now.getFullYear()))
 
+  const [filterCategory, setFilterCategory] = useState('all')
+  const [filterDepartment, setFilterDepartment] = useState('all')
+
   const loadData = useCallback(() => {
     setIsLoading(true)
     const params = new URLSearchParams({ month, year })
@@ -565,7 +621,41 @@ export function DepreciationPageClient() {
 
   useEffect(() => loadData(), [loadData])
 
-  const periodDate = useMemo(() => new Date(Number(year), Number(month), 0).toISOString().slice(0, 10), [month, year])
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>()
+    data?.pendingAssets.forEach((item) => { if (item.category) set.add(item.category) })
+    data?.rows.forEach((item) => { if (item.category) set.add(item.category) })
+    return Array.from(set).sort()
+  }, [data])
+
+  const departmentOptions = useMemo(() => {
+    const set = new Set<string>()
+    data?.pendingAssets.forEach((item) => { if (item.department) set.add(item.department) })
+    data?.rows.forEach((item) => { if (item.department) set.add(item.department) })
+    return Array.from(set).sort()
+  }, [data])
+
+  const filteredPendingAssets = useMemo(() => {
+    return (data?.pendingAssets ?? []).filter((item) => {
+      const matchCat = filterCategory === 'all' || item.category === filterCategory
+      const matchDept = filterDepartment === 'all' || item.department === filterDepartment
+      return matchCat && matchDept
+    })
+  }, [data?.pendingAssets, filterCategory, filterDepartment])
+
+  const filteredRows = useMemo(() => {
+    return (data?.rows ?? []).filter((item) => {
+      const matchCat = filterCategory === 'all' || item.category === filterCategory
+      const matchDept = filterDepartment === 'all' || item.department === filterDepartment
+      return matchCat && matchDept
+    })
+  }, [data?.rows, filterCategory, filterDepartment])
+
+  const totalDepreciationAmount = useMemo(() => {
+    return filteredRows.filter((row) => row.status !== 'reversed').reduce((sum, row) => sum + row.depreciationAmount, 0)
+  }, [filteredRows])
+
+  const periodDate = useMemo(() => month === 'all' ? '-' : new Date(Number(year), Number(month), 0).toISOString().slice(0, 10), [month, year])
   const runPreview = async () => {
     setIsSaving(true)
     setError(null)
@@ -622,28 +712,39 @@ export function DepreciationPageClient() {
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
       <FilterPanel>
-        <select aria-label="Depreciation month" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
+        <select aria-label="Depreciation month" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={month} onChange={(event) => setMonth(event.target.value)}>
+          <option value="all">ดูรายปี (ทุกเดือน)</option>
           {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((item) => <option key={item} value={item}>เดือน {item}</option>)}
         </select>
-        <input aria-label="Depreciation year" className="w-28 rounded-md border border-slate-200 px-3 py-2 text-sm" value={year} onChange={(event) => setYear(event.target.value)} />
-        <input aria-label="Depreciation period date" className="rounded-md border border-slate-200 px-3 py-2 text-sm" readOnly value={periodDate} />
-        <Chip tone="blue">Asset ที่คิดค่าเสื่อม {data?.period.pendingAssets ?? 0}</Chip>
+        <input aria-label="Depreciation year" className="w-24 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition" value={year} onChange={(event) => setYear(event.target.value)} />
+        <input aria-label="Depreciation period date" className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition" readOnly value={periodDate} />
+        
+        <select aria-label="Filter category" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)}>
+          <option value="all">ทุกหมวด</option>
+          {categoryOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+        <select aria-label="Filter department" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={filterDepartment} onChange={(event) => setFilterDepartment(event.target.value)}>
+          <option value="all">ทุกแผนก</option>
+          {departmentOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+
+        <Chip tone="blue">Asset ที่คิดค่าเสื่อม {filteredPendingAssets.length}</Chip>
         <Chip tone="emerald">Run แล้วงวดนี้ {data?.period.postedRuns ?? 0}</Chip>
-        <Chip tone="amber">รอ Run {data?.summary.pendingAssets ?? 0}</Chip>
+        <Chip tone="amber">รอ Run {filteredPendingAssets.length}</Chip>
         <span className="flex-1" />
-        <ActionButton disabled={isSaving || (data?.summary.pendingAssets ?? 0) === 0} strong onClick={runPreview}>Preview ค่าเสื่อมงวดนี้</ActionButton>
+        <ActionButton disabled={isSaving || month === 'all' || filteredPendingAssets.length === 0} strong onClick={runPreview}>Preview ค่าเสื่อมงวดนี้</ActionButton>
       </FilterPanel>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <StatCard label="สินทรัพย์รอประมวลผล" value={data?.summary.pendingAssets ?? 0} tone="amber" icon="⏳" />
-        <StatCard label="ประวัติประมวลผลค่าเสื่อม" value={data?.summary.postedRuns ?? 0} tone="blue" icon="📊" />
-        <StatCard label="ค่าเสื่อมราคารวมงวดนี้" value={formatMoney(data?.summary.totalDepreciation)} tone="red" icon="💰" />
+        <StatCard label="สินทรัพย์รอประมวลผล" value={filteredPendingAssets.length} tone="amber" icon="⏳" />
+        <StatCard label="ประวัติประมวลผลค่าเสื่อม" value={data?.period.postedRuns ?? 0} tone="blue" icon="📊" />
+        <StatCard label="ค่าเสื่อมราคารวมงวดนี้" value={formatMoney(totalDepreciationAmount)} tone="red" icon="💰" />
       </div>
       <Panel title="สินทรัพย์รอประมวลผลค่าเสื่อม">
-        <MiniAssetTable isLoading={isLoading} rows={data?.pendingAssets ?? []} />
+        <MiniAssetTable isLoading={isLoading} rows={filteredPendingAssets} />
       </Panel>
       <TableShell title="ประวัติการประมวลผลค่าเสื่อม (Depreciation History)">
         {/* Desktop view */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-100 text-slate-600">
               <tr>
@@ -660,8 +761,8 @@ export function DepreciationPageClient() {
               </tr>
             </thead>
             <tbody>
-              <LoadingOrEmpty colSpan={10} isLoading={isLoading} rows={data?.rows.length ?? 0} />
-              {(data?.rows ?? []).map((row) => (
+              <LoadingOrEmpty colSpan={10} isLoading={isLoading} rows={filteredRows.length} />
+              {filteredRows.map((row) => (
                 <tr key={row.id} className={`border-t border-slate-100 hover:bg-slate-50/50 transition ${row.status === 'reversed' ? 'bg-slate-50 opacity-70' : ''}`}>
                   <Td><span className="font-mono font-bold text-red-700">{row.refNo}</span></Td>
                   <Td>{row.period}</Td>
@@ -698,13 +799,13 @@ export function DepreciationPageClient() {
         </div>
 
         {/* Mobile view */}
-        <div className="block md:hidden divide-y divide-slate-100/60 max-h-[60vh] overflow-y-auto">
+        <div className="block lg:hidden divide-y divide-slate-100/60 max-h-[60vh] overflow-y-auto">
           {isLoading ? (
             <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล...</div>
-          ) : (data?.rows ?? []).length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <div className="py-8 text-center text-slate-400 text-xs">ยังไม่มีประวัติการประมวลผลค่าเสื่อม</div>
           ) : (
-            (data?.rows ?? []).map((row) => (
+            filteredRows.map((row) => (
               <div key={row.id} className={`p-4 space-y-2.5 text-xs ${row.status === 'reversed' ? 'opacity-70 bg-slate-50/50' : 'bg-white'}`}>
                 <div className="flex justify-between items-center">
                   <span className="font-mono font-bold text-red-700">{row.refNo}</span>
@@ -820,6 +921,14 @@ export function AssetDisposalPageClient() {
   const [reverseReason, setReverseReason] = useState('')
   const [reverseRow, setReverseRow] = useState<DisposalPayload['rows'][number] | null>(null)
 
+  const customerOptions = useMemo(() => {
+    return (data?.customerOptions ?? []).map((row) => ({
+      id: row.id,
+      label: `${row.code} - ${row.name}`,
+      searchText: `${row.code} ${row.name}`
+    }))
+  }, [data?.customerOptions])
+
   const loadData = useCallback(() => {
     setIsLoading(true)
     dailyFetchJson<DisposalPayload>('/api/finance-accounting/asset-disposal')
@@ -904,7 +1013,7 @@ export function AssetDisposalPageClient() {
       </div>
       <TableShell title="ประวัติการจำหน่ายสินทรัพย์ (Asset Disposal History)">
         {/* Desktop view */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
               <tr>
@@ -959,7 +1068,7 @@ export function AssetDisposalPageClient() {
         </div>
 
         {/* Mobile view */}
-        <div className="block md:hidden divide-y divide-slate-100/60 max-h-[60vh] overflow-y-auto">
+        <div className="block lg:hidden divide-y divide-slate-100/60 max-h-[60vh] overflow-y-auto">
           {isLoading ? (
             <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล...</div>
           ) : (data?.rows ?? []).length === 0 ? (
@@ -1027,15 +1136,24 @@ export function AssetDisposalPageClient() {
 
       {modal === 'create' ? (
         <Modal title="Asset Disposal">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-2">
             <Field label="Asset"><IdOptionSelect blankLabel="-เลือก Asset-" options={data?.assetOptions ?? []} value={form.assetId} onChange={(value) => updateForm('assetId', value)} /></Field>
             <Field label="วันที่"><input className={fieldClass} type="date" value={form.disposalDate} onChange={(event) => updateForm('disposalDate', event.target.value)} /></Field>
             <Field label="ประเภท"><SelectControl options={data?.disposalTypes ?? []} value={form.disposalType} onChange={(value) => updateForm('disposalType', value)} /></Field>
             <MoneyField label="ราคาขาย" value={form.sellingPrice} onChange={(value) => updateForm('sellingPrice', value)} />
-            <Field label="ลูกค้า"><OptionSelect blankLabel="ไม่ระบุลูกค้า" options={data?.customerOptions ?? []} value={form.customerId} onChange={(value) => updateForm('customerId', value)} /></Field>
+            <div className="w-full">
+                <SearchCombobox 
+                  inputId="form-customer" 
+                  label="ลูกค้า" 
+                  options={customerOptions} 
+                  value={form.customerId} 
+                  onChange={(value) => updateForm('customerId', value)} 
+                  placeholder="พิมพ์เพื่อค้นหาลูกค้า..."
+                />
+            </div>
             <Field label="Receipt Ref."><input className={fieldClass} value={form.receiptRefNo} onChange={(event) => updateForm('receiptRefNo', event.target.value)} /></Field>
-            <div className="md:col-span-2"><Field label="เหตุผล"><textarea className={`${fieldClass} min-h-20`} value={form.reason} onChange={(event) => updateForm('reason', event.target.value)} /></Field></div>
-            <div className="md:col-span-2"><Field label="หมายเหตุ"><textarea className={`${fieldClass} min-h-20`} value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} /></Field></div>
+            <div className="col-span-2"><Field label="เหตุผล"><textarea className={`${fieldClass} min-h-20`} value={form.reason} onChange={(event) => updateForm('reason', event.target.value)} /></Field></div>
+            <div className="col-span-2"><Field label="หมายเหตุ"><textarea className={`${fieldClass} min-h-20`} value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} /></Field></div>
           </div>
           {selectedAsset ? (
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
@@ -1185,9 +1303,13 @@ function splitDelimitedLine(line: string, delimiter: string) {
 function Modal({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4">
-      <div className="mt-8 w-full max-w-5xl rounded-md bg-white p-4 shadow-xl">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">{title}</h2>
-        {children}
+      <div className="mt-8 w-full max-w-5xl rounded-2xl bg-white shadow-xl overflow-hidden">
+        <div className="bg-slate-900 px-6 py-4 border-b border-slate-800">
+          <h2 className="text-sm font-semibold text-white">{title}</h2>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
       </div>
     </div>
   )
@@ -1308,7 +1430,7 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
   return (
     <div>
       {/* Desktop view */}
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
             <tr>
@@ -1339,7 +1461,7 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
       </div>
 
       {/* Mobile view */}
-      <div className="block md:hidden space-y-2.5">
+      <div className="block lg:hidden space-y-2.5">
         {isLoading ? (
           <div className="text-center text-xs text-slate-400 py-6">กำลังโหลดข้อมูล...</div>
         ) : rows.length === 0 ? (

@@ -1463,7 +1463,7 @@ export function MoneyMovementPageClient({
       ) : null}
 
       {mode === 'receipt' && showEntrySection ? (
-        <div className="hidden md:flex flex-wrap items-center justify-end gap-2 rounded-md bg-white p-3 shadow">
+        <div className="hidden lg:flex flex-wrap items-center justify-end gap-2 rounded-md bg-white p-3 shadow">
           <UiButton className="font-bold shadow" type="button" variant="default" onClick={openForm}>
             + รับเงิน Customer
           </UiButton>
@@ -1517,7 +1517,7 @@ export function MoneyMovementPageClient({
           </div>
 
           {/* Mobile Card List for Payment Entry Queue */}
-          <div className="block md:hidden space-y-3">
+          <div className="block lg:hidden space-y-3">
             {isLoading ? (
               <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
             ) : null}
@@ -1587,7 +1587,7 @@ export function MoneyMovementPageClient({
           </div>
 
           {/* Desktop Table */}
-          <div className="hidden md:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <Table className="text-xs" style={{ minWidth: paymentQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
                 {paymentQueueColumns.map((column, index) => {
@@ -1889,7 +1889,7 @@ export function MoneyMovementPageClient({
       {showHistorySection ? (
         <>
           {/* Desktop Toolbar (Hidden on Mobile) */}
-          <div className="hidden md:block space-y-2 rounded-md bg-white p-3 shadow">
+          <div className="hidden lg:block space-y-2 rounded-md bg-white p-3 shadow">
             <div className="flex flex-wrap items-center gap-2">
               <UiInput
                 className="h-9 min-w-[260px] flex-1 rounded-md"
@@ -1955,7 +1955,7 @@ export function MoneyMovementPageClient({
           </div>
 
           {/* Mobile Toolbar */}
-          <div className="space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+          <div className="space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
             <div className="flex gap-2 items-center">
               <UiInput
                 className="h-9 min-w-[200px] flex-1 rounded-md"
@@ -1976,7 +1976,7 @@ export function MoneyMovementPageClient({
 
           {/* Bottom Sheet Filter for History (Mobile) */}
           {showMobileFilters ? (
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
               <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                   <h4 className="font-bold text-slate-800">ตัวกรองประวัติ</h4>
@@ -2093,7 +2093,7 @@ export function MoneyMovementPageClient({
             </div>
 
             {/* Mobile Card List for History */}
-            <div className="block md:hidden space-y-3 mt-3">
+            <div className="block lg:hidden space-y-3 mt-3">
               {isLoading ? (
                 <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
               ) : null}
@@ -2153,7 +2153,7 @@ export function MoneyMovementPageClient({
             </div>
 
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm mt-3">
+            <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm mt-3">
               <Table className="text-xs" style={{ minWidth: historyColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
                   {historyColumns.map((column, index) => {
@@ -2382,7 +2382,7 @@ export function MoneyMovementPageClient({
 
       {/* Floating Action Button (FAB) for Mobile (Receipt Mode) */}
       {mode === 'receipt' && showEntrySection ? (
-        <div className="fixed bottom-6 right-6 z-40 md:hidden">
+        <div className="fixed bottom-6 right-6 z-40 lg:hidden">
           <button
             className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg active:scale-95 transition-transform"
             onClick={openForm}

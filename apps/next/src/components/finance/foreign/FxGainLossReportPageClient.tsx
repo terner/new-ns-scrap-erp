@@ -34,7 +34,9 @@ export function FxGainLossReportPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [refType, setRefType] = useState('all')
   const [toDate, setToDate] = useState('')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const latestLoadRequestRef = useRef(0)
+  const hasFilters = Boolean(fromDate || toDate || currency !== 'all' || refType !== 'all')
 
   const query = useMemo(() => {
     const params = new URLSearchParams()
@@ -75,26 +77,89 @@ export function FxGainLossReportPageClient() {
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="flex flex-wrap gap-2">
-        <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" value={fromDate} onChange={setFromDate} />
-        <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" value={toDate} onChange={setToDate} />
-        <select aria-label="สกุลเงิน" className="rounded-md border border-slate-200 px-3 py-2 text-sm" value={currency} onChange={(event) => setCurrency(event.target.value)}>
-          <option value="all">ทุกสกุล</option>
-          {(data?.filters.currencies ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
-        <select aria-label="ประเภท" className="rounded-md border border-slate-200 px-3 py-2 text-sm" value={refType} onChange={(event) => setRefType(event.target.value)}>
-          <option value="all">ทุกประเภท</option>
-          {(data?.filters.refTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
+      {/* Filters Toolbar */}
+      <div className="rounded-md bg-white p-3 shadow">
+        {/* Desktop View */}
+        <div className="hidden lg:flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">วันที่:</span>
+          <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" value={fromDate} onChange={setFromDate} />
+          <span className="text-slate-400">→</span>
+          <DatePickerInput ariaLabel="ถึงวันที่" className="w-[130px]" value={toDate} onChange={setToDate} />
+          
+          <select aria-label="สกุลเงิน" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={currency} onChange={(event) => setCurrency(event.target.value)}>
+            <option value="all">ทุกสกุล</option>
+            {(data?.filters.currencies ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          
+          <select aria-label="ประเภท" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={refType} onChange={(event) => setRefType(event.target.value)}>
+            <option value="all">ทุกประเภท</option>
+            {(data?.filters.refTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+
+          {hasFilters && (
+            <button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors" type="button" onClick={() => { setFromDate(''); setToDate(''); setCurrency('all'); setRefType('all') }}>✕ ล้าง</button>
+          )}
+        </div>
+
+        {/* Mobile View */}
+        <div className="block lg:hidden space-y-2.5">
+          <div className="flex gap-2">
+            <button
+              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-1 ${
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              type="button"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+            >
+              🔍 ตัวกรอง {hasFilters ? '(มี)' : ''}
+            </button>
+          </div>
+
+          {showMobileFilters && (
+            <div className="grid grid-cols-1 gap-2 pt-2 border-t border-slate-100 animate-in slide-in-from-top-2 duration-100">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-slate-500">
+                  จากวันที่
+                  <DatePickerInput className="mt-1 w-full" value={fromDate} onChange={setFromDate} />
+                </label>
+                <label className="text-xs text-slate-500">
+                  ถึงวันที่
+                  <DatePickerInput className="mt-1 w-full" value={toDate} onChange={setToDate} />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-slate-500">
+                  สกุลเงิน
+                  <select aria-label="สกุลเงิน" className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" value={currency} onChange={(event) => setCurrency(event.target.value)}>
+                    <option value="all">ทุกสกุล</option>
+                    {(data?.filters.currencies ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs text-slate-500">
+                  ประเภท
+                  <select aria-label="ประเภท" className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" value={refType} onChange={(event) => setRefType(event.target.value)}>
+                    <option value="all">ทุกประเภท</option>
+                    {(data?.filters.refTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+              </div>
+              {hasFilters && (
+                <button className="w-full rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={() => { setFromDate(''); setToDate(''); setCurrency('all'); setRefType('all') }}>ล้างตัวกรอง</button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <MetricCard label="FX Gain รวม" tone="gain" value={data?.summary.totalGain ?? 0} />
-        <MetricCard label="FX Loss รวม" tone="loss" value={data?.summary.totalLoss ?? 0} />
-        <MetricCard label="Net FX G/L" tone="net" value={data?.summary.net ?? 0} />
+      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <MetricCard label="FX Gain รวม" tone="gain" value={data?.summary.totalGain ?? 0} />
+          <MetricCard label="FX Loss รวม" tone="loss" value={data?.summary.totalLoss ?? 0} />
+          <MetricCard label="Net FX G/L" tone="net" value={data?.summary.net ?? 0} />
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -114,7 +179,7 @@ export function FxGainLossReportPageClient() {
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={10}>ยังไม่มี FX Gain/Loss</td></tr> : null}
             {!isLoading && data?.rows.map((row) => (
-              <tr key={row.id} className="border-t hover:bg-slate-50">
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="p-2">{formatDateDisplay(row.date)}</td>
                 <td className="p-2 text-xs">{row.transactionType}</td>
                 <td className="p-2 font-mono text-xs">{row.reference}</td>
@@ -130,15 +195,90 @@ export function FxGainLossReportPageClient() {
           </tbody>
         </table>
       </div>
+
+      {/* Mobile Card list */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && (data?.rows.length ?? 0) === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มี FX Gain/Loss</div>
+        ) : null}
+        {!isLoading && data?.rows.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm space-y-2 text-sm"
+          >
+            <div className="flex justify-between items-start">
+              <span className="font-mono text-slate-500 text-xs">{formatDateDisplay(row.date)}</span>
+              <span className={`rounded-md px-1.5 py-0.5 text-xs font-bold ${row.fxGainLossAmount >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                {row.fxGainLossAmount >= 0 ? 'Gain' : 'Loss'}
+              </span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <span className="font-semibold text-slate-800">{row.transactionType}</span>
+              <span className="font-mono text-blue-600">Ref: {row.reference}</span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100/60 mt-1">
+              <div>
+                <span className="text-slate-400 block text-xs">Foreign Amount:</span>
+                <span className="font-bold text-slate-800 font-mono text-sm">{formatMoney(row.foreignAmount)} {row.currency}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-400 block text-xs">FX Gain/Loss Amount:</span>
+                <span className={`font-bold tabular-nums text-sm ${row.fxGainLossAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {formatMoney(row.fxGainLossAmount)} THB
+                </span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1.5 border-t border-slate-100/60 mt-1 font-mono text-xs">
+              <div className="space-y-0.5">
+                <div className="flex justify-between text-slate-400 font-sans"><span>Original:</span></div>
+                <div className="flex justify-between"><span>Rate:</span><span>{formatMoney(row.originalFxRate)}</span></div>
+                <div className="flex justify-between"><span>Value:</span><span>{formatMoney(row.originalThbValue)}</span></div>
+              </div>
+              <div className="space-y-0.5 text-right">
+                <div className="flex justify-between text-slate-400 font-sans"><span>Settlement:</span></div>
+                <div className="flex justify-between"><span>Rate:</span><span>{formatMoney(row.settlementFxRate)}</span></div>
+                <div className="flex justify-between"><span>Value:</span><span>{formatMoney(row.settlementThbValue)}</span></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
 
 function MetricCard({ label, tone, value }: { label: string; tone: 'gain' | 'loss' | 'net'; value: number }) {
-  if (tone === 'net') {
-    return <div className="rounded-md bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white shadow"><div className="text-xs opacity-80">{label}</div><div className="text-2xl font-bold">{formatMoney(value)}</div></div>
+  let config = { bg: 'bg-slate-100 text-slate-600', emoji: '📊', labelColor: 'text-slate-500', valueColor: 'text-slate-900' }
+
+  if (tone === 'gain') {
+    config = { bg: 'bg-emerald-100 text-emerald-600', emoji: '📈', labelColor: 'text-emerald-600', valueColor: 'text-emerald-700' }
+  } else if (tone === 'loss') {
+    config = { bg: 'bg-rose-100 text-rose-600', emoji: '📉', labelColor: 'text-rose-600', valueColor: 'text-rose-700' }
+  } else if (tone === 'net') {
+    if (value > 0) {
+      config = { bg: 'bg-emerald-100 text-emerald-600', emoji: '💰', labelColor: 'text-emerald-600', valueColor: 'text-emerald-700' }
+    } else if (value < 0) {
+      config = { bg: 'bg-rose-100 text-rose-600', emoji: '💰', labelColor: 'text-rose-600', valueColor: 'text-rose-700' }
+    } else {
+      config = { bg: 'bg-slate-100 text-slate-600', emoji: '💰', labelColor: 'text-slate-500', valueColor: 'text-slate-900' }
+    }
   }
-  const colors = tone === 'gain' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-  const labelColor = tone === 'gain' ? 'text-emerald-600' : 'text-red-600'
-  return <div className={`rounded-md p-4 shadow ${colors}`}><div className={`text-xs ${labelColor}`}>{label}</div><div className="text-2xl font-bold">{formatMoney(value)}</div></div>
+
+  return (
+    <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
+        {config.emoji}
+      </div>
+      <div>
+        <div className={`text-xs ${config.labelColor}`}>{label}</div>
+        <div className={`text-2xl font-bold ${config.valueColor}`}>{formatMoney(value)}</div>
+      </div>
+    </div>
+  )
 }

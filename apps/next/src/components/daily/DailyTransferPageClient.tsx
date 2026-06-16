@@ -250,14 +250,14 @@ export function DailyTransferPageClient() {
             {/* Mobile Filter Button */}
             <button
               type="button"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:hidden"
               onClick={() => setShowMobileFilters(true)}
             >
               <span className="text-slate-500">🔍</span> ตัวกรอง {(dateFrom || dateTo || fromAccountId || toAccountId) ? '(1)' : ''}
             </button>
 
             {/* Desktop Filters */}
-            <div className="hidden md:flex flex-wrap items-center gap-2">
+            <div className="hidden lg:flex flex-wrap items-center gap-2">
               <DatePickerInput className="w-[130px]" value={dateFrom} onChange={(value) => { setDateFrom(value); setPeriod('') }} />
               <span className="text-slate-400">→</span>
               <DatePickerInput className="w-[130px]" value={dateTo} onChange={(value) => { setDateTo(value); setPeriod('') }} />
@@ -272,11 +272,11 @@ export function DailyTransferPageClient() {
               {search || dateFrom || dateTo || fromAccountId || toAccountId ? <Button size="sm" type="button" variant="secondary" onClick={clearFilters}>ล้าง</Button> : null}
             </div>
           </div>
-          <Button className="hidden md:inline-flex ml-auto" size="sm" type="button" onClick={openCreateForm}>+ โอนใหม่</Button>
+          <Button className="hidden lg:inline-flex ml-auto" size="sm" type="button" onClick={openCreateForm}>+ โอนใหม่</Button>
         </div>
 
         {/* Desktop Period Buttons */}
-        <div className="hidden md:flex flex-wrap items-center gap-2">
+        <div className="hidden lg:flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">ช่วง:</span>
           <PeriodButton active={period === ''} label="ทั้งหมด" tone="slate" onClick={() => applyPeriod('')} />
           <PeriodButton active={period === 'today'} label="วันนี้" tone="blue" onClick={() => applyPeriod('today')} />
@@ -286,7 +286,7 @@ export function DailyTransferPageClient() {
       </div>
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
           onClick={openCreateForm}
@@ -299,7 +299,7 @@ export function DailyTransferPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
@@ -437,44 +437,54 @@ export function DailyTransferPageClient() {
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4">
-          <form noValidate className="mx-auto my-4 w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
-              <h3 className="font-bold text-slate-900">{form.id ? 'แก้ไขรายการโอนเงิน' : 'โอนเงินระหว่างบัญชี'}</h3>
-              <button className="text-3xl leading-none text-slate-400 hover:text-slate-700" type="button" onClick={() => setFormOpen(false)}>&times;</button>
+          <form noValidate className="mx-auto my-4 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveForm}>
+            <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-900 px-5 py-4">
+              <h3 className="font-bold text-white">{form.id ? 'แก้ไขรายการโอนเงิน' : 'โอนเงินระหว่างบัญชี'}</h3>
+              <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={() => setFormOpen(false)}>&times;</button>
             </div>
             {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div> : null}
-            <div className="grid gap-3 p-5 md:grid-cols-2">
-              <SelectField error={fieldErrors.fromAccountId} label="บัญชีต้นทาง" required value={form.fromAccountId} onChange={(value) => updateForm('fromAccountId', value)} options={activeAccounts} />
-              <SelectField error={fieldErrors.toAccountId} label="บัญชีปลายทาง" required value={form.toAccountId} onChange={(value) => updateForm('toAccountId', value)} options={activeAccounts} />
-              <MoneyField
-                error={fieldErrors.amount}
-                inputKey="amount"
-                label="จำนวนเงิน"
-                required
-                value={form.amount}
-                valueText={moneyInputValue('amount', form.amount)}
-                onChange={(value) => updateForm('amount', value)}
-                onChangeMoneyInput={changeMoneyInput}
-                onFinishMoneyInput={finishMoneyInput}
-                onStartMoneyInput={startMoneyInput}
-              />
-              <MoneyField
-                error={fieldErrors.fee}
-                inputKey="fee"
-                label="ค่าธรรมเนียม"
-                value={form.fee}
-                valueText={moneyInputValue('fee', form.fee)}
-                onChange={(value) => updateForm('fee', value)}
-                onChangeMoneyInput={changeMoneyInput}
-                onFinishMoneyInput={finishMoneyInput}
-                onStartMoneyInput={startMoneyInput}
-              />
-              <TextAreaField className="md:col-span-2" error={fieldErrors.notes} label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => updateForm('notes', value)} />
+            <div className="grid grid-cols-2 gap-3 p-5">
+              <div className="col-span-2 sm:col-span-1">
+                <SelectField error={fieldErrors.fromAccountId} label="บัญชีต้นทาง" required value={form.fromAccountId} onChange={(value) => updateForm('fromAccountId', value)} options={activeAccounts} />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <SelectField error={fieldErrors.toAccountId} label="บัญชีปลายทาง" required value={form.toAccountId} onChange={(value) => updateForm('toAccountId', value)} options={activeAccounts} />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <MoneyField
+                  error={fieldErrors.amount}
+                  inputKey="amount"
+                  label="จำนวนเงิน"
+                  required
+                  value={form.amount}
+                  valueText={moneyInputValue('amount', form.amount)}
+                  onChange={(value) => updateForm('amount', value)}
+                  onChangeMoneyInput={changeMoneyInput}
+                  onFinishMoneyInput={finishMoneyInput}
+                  onStartMoneyInput={startMoneyInput}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <MoneyField
+                  error={fieldErrors.fee}
+                  inputKey="fee"
+                  label="ค่าธรรมเนียม"
+                  value={form.fee}
+                  valueText={moneyInputValue('fee', form.fee)}
+                  onChange={(value) => updateForm('fee', value)}
+                  onChangeMoneyInput={changeMoneyInput}
+                  onFinishMoneyInput={finishMoneyInput}
+                  onStartMoneyInput={startMoneyInput}
+                />
+              </div>
+              <TextAreaField className="col-span-2" error={fieldErrors.notes} label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => updateForm('notes', value)} />
             </div>
-            <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:grid-cols-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
               <SummaryBox label="ยอดโอน" value={formatMoney(form.amount)} />
               <SummaryBox label="ค่าธรรมเนียม" value={formatMoney(form.fee)} />
-              <SummaryBox label="ยอดออกจากบัญชีต้นทาง" value={formatMoney(form.amount + form.fee)} />
+              <div className="col-span-2 sm:col-span-1">
+                <SummaryBox label="ยอดออกจากบัญชีต้นทาง" value={formatMoney(form.amount + form.fee)} />
+              </div>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
               <Button className="font-normal" size="sm" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
@@ -494,22 +504,32 @@ export function DailyTransferPageClient() {
               </div>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto bg-slate-50 p-5 space-y-4 text-sm">
-              <div className="grid gap-3 md:grid-cols-3 bg-white rounded-lg border border-slate-200 shadow-sm p-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-white rounded-lg border border-slate-200 shadow-sm p-5">
                 <SummaryBox label="ยอดโอน" value={formatMoney(selectedRow.amount)} />
                 <SummaryBox label="ค่าธรรมเนียม" value={formatMoney(selectedRow.fee)} />
-                <SummaryBox label="ยอดออกจากบัญชีต้นทาง" value={formatMoney(selectedRow.amount + selectedRow.fee)} />
+                <div className="col-span-2 sm:col-span-1">
+                  <SummaryBox label="ยอดออกจากบัญชีต้นทาง" value={formatMoney(selectedRow.amount + selectedRow.fee)} />
+                </div>
               </div>
-              <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
-                <DetailItem label="วันที่" value={formatDateDisplay(selectedRow.date)} />
-                <DetailItem label="ผู้ทำรายการ" value={selectedRow.byPerson || '-'} />
-                <DetailItem label="บัญชีต้นทาง" tone="red" value={selectedRow.fromAccountName} />
-                <DetailItem label="บัญชีปลายทาง" tone="emerald" value={selectedRow.toAccountName} />
-                <DetailItem className="md:col-span-2" label="หมายเหตุ" value={selectedRow.notes || '-'} />
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="col-span-2 sm:col-span-1">
+                  <DetailItem label="วันที่" value={formatDateDisplay(selectedRow.date)} />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <DetailItem label="ผู้ทำรายการ" value={selectedRow.byPerson || '-'} />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <DetailItem label="บัญชีต้นทาง" tone="red" value={selectedRow.fromAccountName} />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <DetailItem label="บัญชีปลายทาง" tone="emerald" value={selectedRow.toAccountName} />
+                </div>
+                <DetailItem className="col-span-2" label="หมายเหตุ" value={selectedRow.notes || '-'} />
               </div>
               <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">ผลกระทบ Bank Statement</div>
-                <div className="grid gap-0 text-sm md:grid-cols-2">
-                  <div className="border-b border-slate-200 px-4 py-3 md:border-b-0 md:border-r">
+                <div className="grid grid-cols-2 gap-0 text-sm">
+                  <div className="border-r border-slate-200 px-4 py-3">
                     <div className="text-xs font-medium text-slate-500">เงินออกจากบัญชีต้นทาง</div>
                     <div className="mt-1 font-semibold text-red-700">{selectedRow.fromAccountName}</div>
                     <div className="mt-2 text-right font-mono text-base font-bold text-slate-900">-{formatMoney(selectedRow.amount + selectedRow.fee)}</div>
@@ -531,7 +551,7 @@ export function DailyTransferPageClient() {
       ) : null}
 
       {/* Mobile Card List */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : null}
@@ -568,7 +588,7 @@ export function DailyTransferPageClient() {
         ) : null}
       </div>
 
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {transferColumns.map((column, index) => {

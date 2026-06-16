@@ -156,9 +156,14 @@ textarea {
 }
 
 /* Table baseline: cell borders should default to theme line color, not text color (black). */
+table,
+thead,
+tbody,
+tfoot,
+tr,
 th,
 td {
-  border-color: var(--color-scrap-line);
+  border-color: var(--color-scrap-line) !important;
 }
 
 input.border:not([class*="bg-"]),

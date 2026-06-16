@@ -79,7 +79,7 @@ export function PlStatementPageClient() {
         <QuickButton onClick={() => setFrom(monthStart())}>เดือนนี้</QuickButton>
         <DateInput label="จาก" value={from} onChange={setFrom} /><DateInput label="ถึง" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={mode} onChange={(event) => setMode(event.target.value)}>
+        <select className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={mode} onChange={(event) => setMode(event.target.value)}>
           <option value="ALL">All (Stock+Trading)</option><option value="STOCK">Stock Only</option><option value="TRADING">Trading Only</option>
         </select>
         <DisabledButton>📥 Excel</DisabledButton>
@@ -118,7 +118,7 @@ export function BalanceSheetPageClient() {
       <FilterPanel>
         <DateInput label="As of" value={asOf} onChange={setAsOf} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <span className={`rounded-md-full px-3 py-2 text-xs font-bold ${data?.balanceCheck.balanced ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{data?.balanceCheck.balanced ? 'BALANCED' : `OFF BY ${money(data?.balanceCheck.difference)}`}</span>
+        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${data?.balanceCheck.balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{data?.balanceCheck.balanced ? 'BALANCED' : `OFF BY ${money(data?.balanceCheck.difference)}`}</span>
         <DisabledButton>📥 Excel</DisabledButton>
       </FilterPanel>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -194,11 +194,17 @@ function money(value?: number) {
 }
 
 function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
-  return <div className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"><b>Management statement / read baseline</b><span className="ml-2">รายงานเพื่อผู้บริหารจากข้อมูลธุรกรรม ยังไม่ใช่งบการเงินตามบัญชี GL</span>{sourceState ? <div className="mt-1 text-xs text-amber-800">{sourceState.limitations[0]}</div> : null}</div>
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 text-xs text-amber-900 shadow-sm">
+      <span className="font-bold">⚠️ Management statement / read baseline</span>
+      <span className="ml-2">รายงานเพื่อผู้บริหารจากข้อมูลธุรกรรม ยังไม่ใช่งบการเงินตามบัญชี GL</span>
+      {sourceState ? <div className="mt-1 text-[11px] text-amber-800">{sourceState.limitations[0]}</div> : null}
+    </div>
+  )
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">{children}</div>
 }
 
 function DateInput({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
@@ -206,51 +212,237 @@ function DateInput({ label, onChange, value }: { label: string; onChange: (value
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function Segment({ active = false, children }: { active?: boolean; children: ReactNode }) {
-  return <span className={`rounded-md px-3 py-2 text-xs font-semibold ${active ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{children}</span>
+  return (
+    <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition'}`}>
+      {children}
+    </span>
+  )
 }
 
 function QuickButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={onClick}>{children}</button>
+  return <button className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition outline-none focus:ring-0" type="button" onClick={onClick}>{children}</button>
 }
 
 function DisabledButton({ children }: { children: ReactNode }) {
-  return <button className="rounded-md bg-slate-800 px-3 py-2 text-sm font-bold text-white opacity-50" disabled type="button">{children}</button>
+  return <button className="rounded-lg bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400 opacity-60 cursor-not-allowed outline-none focus:ring-0" disabled type="button">{children}</button>
 }
 
 function MegaCard({ footer, label, tone, value }: { footer: string; label: string; tone: 'bs' | 'cf' | 'pl'; value: string }) {
-  const tones = { bs: 'from-blue-700 via-indigo-700 to-violet-800', cf: 'from-cyan-600 via-sky-700 to-blue-800', pl: 'from-emerald-600 via-teal-700 to-cyan-700' }
-  return <div className={`rounded-md bg-gradient-to-br ${tones[tone]} p-6 text-white shadow-lg lg:col-span-2`}><div className="text-sm uppercase opacity-80">{label}</div><div className="mt-2 text-4xl font-bold md:text-5xl">{value}</div><div className="mt-4 border-t border-white/20 pt-3 text-sm text-white/85">{footer}</div></div>
+  const toneColors = {
+    pl: { text: 'text-emerald-600', bg: 'bg-emerald-50 text-emerald-600', icon: '📈' },
+    bs: { text: 'text-blue-600', bg: 'bg-blue-50 text-blue-600', icon: '🏢' },
+    cf: { text: 'text-cyan-600', bg: 'bg-cyan-50 text-cyan-600', icon: '🌊' }
+  }
+  const current = toneColors[tone]
+  return (
+    <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-4 lg:col-span-2">
+      <div className={`w-12 h-12 rounded-full ${current.bg} flex items-center justify-center text-xl shrink-0`}>
+        {current.icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className={`text-xs font-semibold ${current.text} uppercase`}>{label}</div>
+        <div className="mt-0.5 text-2xl font-extrabold text-slate-900 tracking-tight">{value}</div>
+        <div className="mt-3 text-xs text-slate-400 pt-2 border-t border-slate-100">{footer}</div>
+      </div>
+    </div>
+  )
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-md bg-white p-4 shadow"><h2 className="mb-3 text-sm font-bold text-slate-700">{title}</h2>{children}</div>
+  return <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
 }
 
 function StatCard({ label, tone, value }: { label: string; tone: 'blue' | 'cyan' | 'emerald' | 'purple' | 'red'; value: string }) {
-  const color = { blue: 'text-blue-700', cyan: 'text-cyan-700', emerald: 'text-emerald-700', purple: 'text-purple-700', red: 'text-red-700' }[tone]
-  return <div className="rounded-md bg-white p-4 shadow"><div className={`text-xs ${color}`}>{label}</div><div className={`mt-1 text-xl font-bold ${color}`}>{value}</div></div>
+  const toneStyles = {
+    blue: { text: 'text-blue-600', bg: 'bg-blue-50', icon: '💰' },
+    cyan: { text: 'text-cyan-600', bg: 'bg-cyan-50', icon: '📊' },
+    emerald: { text: 'text-emerald-600', bg: 'bg-emerald-50', icon: '💵' },
+    purple: { text: 'text-purple-600', bg: 'bg-purple-50', icon: '📈' },
+    red: { text: 'text-red-600', bg: 'bg-red-50', icon: '📉' }
+  }
+  const current = toneStyles[tone]
+  return (
+    <div className="bg-white p-3.5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-full ${current.bg} ${current.text} flex items-center justify-center text-lg shrink-0`}>
+        {current.icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate">{label}</div>
+        <div className="mt-0.5 text-sm sm:text-base font-bold text-slate-900 tracking-tight">{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function SplitCard({ cogs, label, revenue, tone }: { cogs: number; label: string; revenue: number; tone: 'emerald' | 'purple' }) {
-  const color = tone === 'emerald' ? 'from-emerald-50 text-emerald-800' : 'from-purple-50 text-purple-800'
-  return <div className={`rounded-md bg-gradient-to-br ${color} to-white p-4 shadow`}><div className="text-sm font-bold">{label}</div><div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><div>Revenue</div><b>{money(revenue)}</b></div><div><div>COGS</div><b>{money(cogs)}</b></div><div><div>Gross</div><b>{money(revenue - cogs)}</b></div></div></div>
+  const color = tone === 'emerald' ? 'border-emerald-100 bg-emerald-50/20 text-emerald-800' : 'border-purple-100 bg-purple-50/20 text-purple-800'
+  return (
+    <div className={`rounded-xl border ${color} p-4 shadow-sm`}>
+      <div className="text-xs font-bold">{label} Split</div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+        <div><div className="text-slate-400 text-[10px]">Revenue</div><b className="text-slate-800">{money(revenue)}</b></div>
+        <div><div className="text-slate-400 text-[10px]">COGS</div><b className="text-slate-800">{money(cogs)}</b></div>
+        <div><div className="text-slate-400 text-[10px]">Gross Profit</div><b className={tone === 'emerald' ? 'text-emerald-700' : 'text-purple-700'}>{money(revenue - cogs)}</b></div>
+      </div>
+    </div>
+  )
 }
 
 function Waterfall({ rows }: { rows: Array<[string, number]> }) {
   const max = Math.max(...rows.map((row) => Math.abs(row[1])), 1)
-  return <div className="space-y-2">{rows.map(([label, value]) => <div key={label} className="text-xs"><div className="mb-1 flex justify-between gap-2"><span>{label}</span><b className={value < 0 ? 'text-red-700' : 'text-slate-800'}>{money(value)}</b></div><div className="h-3 rounded-md-full bg-slate-100"><div className={`h-3 rounded-md-full ${value < 0 ? 'bg-red-400' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} /></div></div>)}</div>
+  return (
+    <div className="space-y-2">
+      {rows.map(([label, value]) => (
+        <div key={label} className="text-xs">
+          <div className="mb-1 flex justify-between gap-2">
+            <span className="text-slate-600">{label}</span>
+            <b className={value < 0 ? 'text-red-700' : 'text-slate-800'}>{money(value)}</b>
+          </div>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div className={`h-full rounded-full ${value < 0 ? 'bg-red-400' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Math.abs(value) / max * 100)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function StatementTable({ isLoading, onDrill, rows, title = 'Statement' }: { isLoading: boolean; onDrill: (line: StatementLine) => void | undefined; rows: StatementLine[]; title?: string }) {
-  return <div className="overflow-hidden rounded-md bg-white shadow"><div className="border-b bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{title}</div><div className="max-h-[62vh] overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-100 text-slate-600"><tr><Th>รายการ</Th><Th>Section</Th><Th align="right">จำนวนเงิน</Th><Th align="center">Drill</Th></tr></thead><tbody><LoadingOrEmpty colSpan={4} isLoading={isLoading} rows={rows.length} />{rows.map((line) => <tr key={`${line.section}-${line.label}`} className={`border-t hover:bg-slate-50 ${line.tone === 'total' ? 'bg-slate-50 font-bold' : ''}`}><Td><span className={line.level ? 'pl-5' : ''}>{line.label}</span></Td><Td><span className="rounded-md bg-slate-100 px-2 py-1 text-slate-500">{line.section}</span></Td><Td align="right"><span className={line.amount < 0 ? 'font-semibold text-red-700' : line.tone === 'good' ? 'font-semibold text-emerald-700' : 'font-semibold text-slate-900'}>{money(line.amount)}</span></Td><Td align="center">{line.details?.length ? <button className="font-semibold text-blue-600 hover:underline" type="button" onClick={() => onDrill(line)}>🔍 {line.details.length}</button> : <span className="text-slate-300">-</span>}</Td></tr>)}</tbody></table></div></div>
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+      <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{title}</div>
+      <div className="max-h-[62vh] overflow-auto">
+        {/* Desktop Table View */}
+        <table className="hidden lg:table w-full text-xs">
+          <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+            <tr>
+              <Th>รายการ</Th>
+              <Th>Section</Th>
+              <Th align="right">จำนวนเงิน</Th>
+              <Th align="center">Drill</Th>
+            </tr>
+          </thead>
+          <tbody>
+            <LoadingOrEmpty colSpan={4} isLoading={isLoading} rows={rows.length} />
+            {rows.map((line) => (
+              <tr key={`${line.section}-${line.label}`} className={`border-t border-slate-100 hover:bg-slate-50/50 transition ${line.tone === 'total' ? 'bg-slate-50/50 font-bold' : ''}`}>
+                <Td><span className={line.level ? 'pl-5' : ''}>{line.label}</span></Td>
+                <Td><span className="rounded-md bg-slate-100/80 px-2 py-0.5 text-slate-500 font-medium">{line.section}</span></Td>
+                <Td align="right">
+                  <span className={line.amount < 0 ? 'font-bold text-red-700' : line.tone === 'good' ? 'font-bold text-emerald-700' : 'font-bold text-slate-900'}>
+                    {money(line.amount)}
+                  </span>
+                </Td>
+                <Td align="center">
+                  {line.details?.length ? (
+                    <button className="font-semibold text-blue-600 hover:underline outline-none focus:ring-0" type="button" onClick={() => onDrill(line)}>🔍 {line.details.length}</button>
+                  ) : (
+                    <span className="text-slate-300">-</span>
+                  )}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Mobile Card List View */}
+        <div className="block lg:hidden divide-y divide-slate-100">
+          <LoadingOrEmptyMobile isLoading={isLoading} rows={rows.length} />
+          {!isLoading && rows.map((line) => (
+            <div key={`${line.section}-${line.label}`} className={`p-4 transition ${line.tone === 'total' ? 'bg-slate-50/50 font-bold' : ''}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <div className={`${line.level ? 'pl-4' : ''} text-sm text-slate-900 font-semibold`}>
+                    {line.label}
+                  </div>
+                  <div>
+                    <span className="rounded-md bg-slate-100/80 px-2 py-0.5 text-[10px] text-slate-500 font-medium">
+                      {line.section}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right flex flex-col items-end gap-1 shrink-0">
+                  <span className={`text-sm ${line.amount < 0 ? 'font-bold text-red-700' : line.tone === 'good' ? 'font-bold text-emerald-700' : 'font-bold text-slate-900'}`}>
+                    {money(line.amount)}
+                  </span>
+                  {line.details?.length ? (
+                    <button className="text-xs font-semibold text-blue-600 hover:underline outline-none focus:ring-0" type="button" onClick={() => onDrill(line)}>🔍 ดูรายละเอียด ({line.details.length})</button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function DrillModal({ onClose, rows, title }: { onClose: () => void; rows: DetailRow[]; title: string }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"><div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-md bg-white shadow-xl"><div className="flex items-center justify-between border-b p-4"><h2 className="text-lg font-bold text-slate-800">🔍 {title}</h2><button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><div className="max-h-[65vh] overflow-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-100"><tr><Th>วันที่</Th><Th>เลขที่</Th><Th>รายละเอียด</Th><Th align="right">จำนวนเงิน</Th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.refNo}-${index}`} className="border-t"><Td>{row.date}</Td><Td><span className="font-mono text-blue-700">{row.refNo}</span></Td><Td>{row.description}</Td><Td align="right"><span className={row.amount < 0 ? 'text-red-700' : 'text-slate-800'}>{money(row.amount)}</span></Td></tr>)}</tbody></table></div></div></div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+          <h2 className="text-sm font-bold">🔍 {title}</h2>
+          <button className="text-slate-300 hover:text-white text-xs font-semibold outline-none focus:ring-0" type="button" onClick={onClose}>
+            ปิด
+          </button>
+        </div>
+        <div className="max-h-[60vh] overflow-auto">
+          {/* Desktop Table View */}
+          <table className="hidden lg:table w-full text-xs">
+            <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+              <tr>
+                <Th>วันที่</Th>
+                <Th>เลขที่</Th>
+                <Th>รายละเอียด</Th>
+                <Th align="right">จำนวนเงิน</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={`${row.refNo}-${index}`} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
+                  <Td>{row.date}</Td>
+                  <Td><span className="font-mono text-blue-700 font-semibold">{row.refNo}</span></Td>
+                  <Td className="max-w-xs truncate">{row.description}</Td>
+                  <Td align="right"><span className={row.amount < 0 ? 'text-red-700' : 'text-slate-800'}>{money(row.amount)}</span></Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Mobile Card List View */}
+          <div className="block lg:hidden divide-y divide-slate-100">
+            {rows.map((row, index) => (
+              <div key={`${row.refNo}-${index}`} className="p-4 space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">{row.date}</span>
+                  <span className="font-mono text-blue-700 font-semibold">{row.refNo}</span>
+                </div>
+                <div className="text-slate-700 break-words">{row.description}</div>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-slate-400">จำนวนเงิน</span>
+                  <span className={`font-bold ${row.amount < 0 ? 'text-red-700' : 'text-slate-800'}`}>
+                    {money(row.amount)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LoadingOrEmptyMobile({ isLoading, rows }: { isLoading: boolean; rows: number }) {
+  if (isLoading) return <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>
+  if (rows === 0) return <div className="py-8 text-center text-slate-400 text-xs">ยังไม่มีข้อมูล</div>
+  return null
 }
 
 function LoadingOrEmpty({ colSpan, isLoading, rows }: { colSpan: number; isLoading: boolean; rows: number }) {
@@ -261,12 +453,12 @@ function LoadingOrEmpty({ colSpan, isLoading, rows }: { colSpan: number; isLoadi
 
 function Th({ align = 'left', children }: { align?: 'center' | 'left' | 'right'; children: ReactNode }) {
   const textAlign = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
-  return <th className={`whitespace-nowrap px-3 py-2 font-semibold ${textAlign}`}>{children}</th>
+  return <th className={`whitespace-nowrap px-4 py-2.5 font-bold text-slate-600 bg-slate-50 border-b border-slate-100 ${textAlign}`}>{children}</th>
 }
 
-function Td({ align = 'left', children }: { align?: 'center' | 'left' | 'right'; children: ReactNode }) {
+function Td({ align = 'left', children, className = '' }: { align?: 'center' | 'left' | 'right'; children: ReactNode; className?: string }) {
   const textAlign = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
-  return <td className={`whitespace-nowrap px-3 py-2 ${textAlign} text-slate-700`}>{children}</td>
+  return <td className={`whitespace-nowrap px-4 py-3 border-b border-slate-100/60 ${textAlign} text-slate-700 ${className}`}>{children}</td>
 }
 
 function ErrorBox({ message }: { message: string }) {

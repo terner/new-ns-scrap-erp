@@ -230,7 +230,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden md:inline-flex" onClick={resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
+          {hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden lg:inline-flex" onClick={resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <Select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto px-2 py-1"
@@ -249,7 +249,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
       </div>
 
       {/* Mobile Card List (Hidden on Desktop) */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : null}
@@ -312,7 +312,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
         ) : null}
       </div>
 
-      <div className="hidden md:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-xs" style={{ minWidth: tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {billSwapColumns.map((column, index) => {

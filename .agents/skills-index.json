@@ -94,5 +94,65 @@
     "date_added": null,
     "category_confidence": 0.92,
     "category_reason": "keyword-match:obsidian,adr,documentation"
+  },
+  {
+    "id": "ponytail",
+    "path": "skills/ponytail",
+    "category": "optimization",
+    "name": "ponytail",
+    "description": "Forces the laziest solution that actually works, simplest, shortest, most minimal. Channels a senior dev who has seen everything: question whether the task needs to exist at all (YAGNI), reach for the standard library before custom code, native platform features before dependencies, one line before fifty. Supports intensity levels: lite, full (default), ultra.",
+    "risk": "low",
+    "source": "project",
+    "date_added": "2026-06-16",
+    "category_confidence": 1.0,
+    "category_reason": "override:id"
+  },
+  {
+    "id": "ponytail-review",
+    "path": "skills/ponytail-review",
+    "category": "testing-qa",
+    "name": "ponytail-review",
+    "description": "Code review focused exclusively on over-engineering. Finds what to delete: reinvented standard library, unneeded dependencies, speculative abstractions, dead flexibility. One line per finding: location, what to cut, what replaces it.",
+    "risk": "low",
+    "source": "project",
+    "date_added": "2026-06-16",
+    "category_confidence": 1.0,
+    "category_reason": "override:id"
+  },
+  {
+    "id": "ponytail-audit",
+    "path": "skills/ponytail-audit",
+    "category": "testing-qa",
+    "name": "ponytail-audit",
+    "description": "Whole-repo audit for over-engineering. Like ponytail-review, but scans the entire codebase instead of a diff: a ranked list of what to delete, simplify, or replace with stdlib/native equivalents.",
+    "risk": "low",
+    "source": "project",
+    "date_added": "2026-06-16",
+    "category_confidence": 1.0,
+    "category_reason": "override:id"
+  },
+  {
+    "id": "ponytail-debt",
+    "path": "skills/ponytail-debt",
+    "category": "documentation",
+    "name": "ponytail-debt",
+    "description": "Harvest every ponytail: comment in the codebase into a debt ledger, so the deliberate shortcuts and deferrals ponytail leaves behind get tracked instead of rotting into later means never.",
+    "risk": "low",
+    "source": "project",
+    "date_added": "2026-06-16",
+    "category_confidence": 1.0,
+    "category_reason": "override:id"
+  },
+  {
+    "id": "ponytail-help",
+    "path": "skills/ponytail-help",
+    "category": "documentation",
+    "name": "ponytail-help",
+    "description": "Quick-reference card for all ponytail modes, skills, and commands.",
+    "risk": "low",
+    "source": "project",
+    "date_added": "2026-06-16",
+    "category_confidence": 1.0,
+    "category_reason": "override:id"
   }
 ]

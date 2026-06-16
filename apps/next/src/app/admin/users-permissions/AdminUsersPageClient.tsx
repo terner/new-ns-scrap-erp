@@ -374,7 +374,7 @@ export function AdminUsersPageClient() {
   return (
     <section className="space-y-4">
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block rounded-md bg-white p-4 shadow">
+      <div className="hidden lg:block rounded-md bg-white p-4 shadow">
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Users & Permissions</h2>
@@ -396,7 +396,7 @@ export function AdminUsersPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="md:hidden rounded-md bg-white p-3.5 shadow space-y-2.5">
+      <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Users & Permissions</h2>
           <p className="text-xs text-slate-500">ผู้ใช้ {data?.users.length ?? 0} รายการ · Roles {data?.roles.length ?? 0} รายการ</p>
@@ -559,7 +559,7 @@ export function AdminUsersPageClient() {
         {!isLoading && tab === 'users' ? (
           <>
             {/* Desktop Table View (Hidden on Mobile) */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm min-w-[1000px]">
                 <thead className="bg-slate-100 text-slate-700 border-b">
                   <tr>
@@ -613,7 +613,7 @@ export function AdminUsersPageClient() {
             </div>
 
             {/* Mobile View: Dense Card List (Hidden on Desktop) */}
-            <div className="md:hidden divide-y divide-slate-100">
+            <div className="lg:hidden divide-y divide-slate-100">
               {filteredUsers.map((user) => (
                 <div key={user.id} className="p-4 bg-white space-y-3 animate-fade-in">
                   <div className="flex items-start justify-between">
@@ -672,7 +672,7 @@ export function AdminUsersPageClient() {
         {!isLoading && tab === 'roles' ? (
           <>
             {/* Desktop Table View (Hidden on Mobile) */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm min-w-[1000px]">
                 <thead className="bg-slate-100 text-slate-700 border-b">
                   <tr>
@@ -726,7 +726,7 @@ export function AdminUsersPageClient() {
             </div>
 
             {/* Mobile View: Dense Card List (Hidden on Desktop) */}
-            <div className="md:hidden divide-y divide-slate-100">
+            <div className="lg:hidden divide-y divide-slate-100">
               {filteredRoles.map((role) => (
                 <div key={role.id} className="p-4 bg-white space-y-3 animate-fade-in">
                   <div className="flex items-start justify-between">

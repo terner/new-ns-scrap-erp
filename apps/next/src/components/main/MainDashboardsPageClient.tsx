@@ -223,30 +223,30 @@ function DashboardView(props: {
             ['week', '7 วัน'],
             ['today', 'วันนี้'],
           ].map(([key, label]) => (
-            <button className={`rounded-md px-3 py-1.5 text-xs font-bold ${rangeMode === key ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
+            <button className={`rounded-md px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-400 ${rangeMode === key ? 'bg-amber-400 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} key={key} onClick={() => applyPeriod(key)} type="button">{label}</button>
           ))}
           <span className="mx-2 opacity-30">|</span>
-          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white outline-none focus:ring-2 focus:ring-amber-400" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
           <span>→</span>
-          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+          <DatePickerInput className="w-[130px] border-white/20 bg-white/10 text-white outline-none focus:ring-2 focus:ring-amber-400" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
           <span className="ml-auto rounded-md bg-white/10 px-2 py-1 text-xs">📊 {filteredCount}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option className="text-slate-900" value="">🏢 ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option className="text-slate-900" value="">📦 ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option className="text-slate-900" key={group} value={group}>{group}</option>)}</select>
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardSupplierId} onChange={(event) => setDashboardSupplierId(event.target.value)}><option className="text-slate-900" value="">🏭 ทุก Supplier</option>{(data?.filterOptions.suppliers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardCustomerId} onChange={(event) => setDashboardCustomerId(event.target.value)}><option className="text-slate-900" value="">👥 ทุก Customer</option>{(data?.filterOptions.customers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.code ? `${row.code} - ${row.name}` : row.name}</option>)}</select>
-          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white" value={dashboardProductId} onChange={(event) => setDashboardProductId(event.target.value)}><option className="text-slate-900" value="">🏷 ทุกสินค้า</option>{(data?.filterOptions.products ?? []).slice(0, 300).map((row) => <option className="text-slate-900" key={`${row.id}-${row.code}`} value={row.id}>{row.code} - {row.name}</option>)}</select>
-          <button className="ml-auto rounded-md bg-amber-500 px-3 py-1 font-bold text-slate-900 hover:bg-amber-600" onClick={clearFilters} type="button">✕ ล้าง Filter</button>
+          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardBranchId} onChange={(event) => setDashboardBranchId(event.target.value)}><option className="text-slate-900" value="">🏢 ทุกสาขา</option>{(data?.filterOptions.branches ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
+          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardGroup} onChange={(event) => setDashboardGroup(event.target.value)}><option className="text-slate-900" value="">📦 ทุกหมวด</option>{(data?.filterOptions.groups ?? []).map((group) => <option className="text-slate-900" key={group} value={group}>{group}</option>)}</select>
+          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardSupplierId} onChange={(event) => setDashboardSupplierId(event.target.value)}><option className="text-slate-900" value="">🏭 ทุก Supplier</option>{(data?.filterOptions.suppliers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.name}</option>)}</select>
+          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardCustomerId} onChange={(event) => setDashboardCustomerId(event.target.value)}><option className="text-slate-900" value="">👥 ทุก Customer</option>{(data?.filterOptions.customers ?? []).map((row) => <option className="text-slate-900" key={row.id} value={row.id}>{row.code ? `${row.code} - ${row.name}` : row.name}</option>)}</select>
+          <select className="max-w-xs rounded-md border border-white/20 bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-amber-400" value={dashboardProductId} onChange={(event) => setDashboardProductId(event.target.value)}><option className="text-slate-900" value="">🏷 ทุกสินค้า</option>{(data?.filterOptions.products ?? []).slice(0, 300).map((row) => <option className="text-slate-900" key={`${row.id}-${row.code}`} value={row.id}>{row.code} - {row.name}</option>)}</select>
+          <button className="ml-auto rounded-md bg-amber-500 px-3 py-1 font-bold text-slate-900 hover:bg-amber-600 outline-none focus:ring-2 focus:ring-amber-400" onClick={clearFilters} type="button">✕ ล้าง Filter</button>
         </div>
       </div>
-      <div className="rounded-md border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50 p-4 shadow-sm">
+      <div>
         {(data?.dashboard.historical.rows ?? 0) > 0 ? (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs">
             <span className="font-bold text-amber-800">📅 รวมยอด Historical:</span>
-            <span className="rounded-md bg-white px-2 py-0.5">Revenue <b className="text-emerald-700">{money(data?.dashboard.historical.revenue)}</b></span>
-            <span className="rounded-md bg-white px-2 py-0.5">COGS <b className="text-red-700">{money(data?.dashboard.historical.cogs)}</b></span>
-            <span className="rounded-md bg-white px-2 py-0.5">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
+            <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Revenue <b className="text-emerald-700">{money(data?.dashboard.historical.revenue)}</b></span>
+            <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">COGS <b className="text-red-700">{money(data?.dashboard.historical.cogs)}</b></span>
+            <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
             <span className="text-slate-500">({data?.dashboard.historical.rows ?? 0} rows)</span>
           </div>
         ) : <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-500">ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026</div>}
@@ -289,7 +289,7 @@ function DashboardView(props: {
         </div>
       </div>
 
-      {alerts.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{alerts.map((alert) => <span className="mr-2 inline-flex rounded-md bg-white px-2 py-1 font-semibold" key={alert.text}>⚠ {alert.text}</span>)}</div> : null}
+      {alerts.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{alerts.map((alert) => <span className="mr-2 inline-flex rounded-md bg-white px-2 py-1 font-semibold border border-slate-100" key={alert.text}>⚠ {alert.text}</span>)}</div> : null}
 
       <div className="grid gap-4 lg:grid-cols-2"><RankTable color="blue" rows={analytics?.topSuppliers ?? []} title="🥇 Top Suppliers" /><RankTable color="emerald" rows={analytics?.topCustomers ?? []} title="🥇 Top Customers" /></div>
 
@@ -303,28 +303,28 @@ function DashboardView(props: {
         </DashboardChartCard>
       </div>
 
-      <Section border="border-blue-500" title="📥 ฝั่งซื้อ (เดือนนี้) — Purchase / Supplier">
+      <Section title="📥 ฝั่งซื้อ (เดือนนี้) — Purchase / Supplier">
         <Metric label="ซื้อวันนี้" value={money(section?.purchase.today)} />
         <Metric label="ซื้อเดือนนี้" tone="blue" value={money(section?.purchase.amount)} />
         <Metric label="น้ำหนักซื้อ" value={`${money(section?.purchase.qty)} กก.`} />
         <Metric label="ราคาซื้อเฉลี่ย" value={`${money(purchaseWeight > 0 ? purchaseAmount / purchaseWeight : 0)} ฿/กก.`} />
         <Metric label="เจ้าหนี้รวม" tone="red" value={money(k.ap)} />
       </Section>
-      <Section border="border-emerald-500" title="📤 ฝั่งขาย (เดือนนี้) — Sales / Customer">
+      <Section title="📤 ฝั่งขาย (เดือนนี้) — Sales / Customer">
         <Metric label="ขายวันนี้" value={money(section?.sales.today)} />
         <Metric label="ขายเดือนนี้" tone="emerald" value={money(section?.sales.amount)} />
         <Metric label="น้ำหนักขาย" value={`${money(section?.sales.qty)} กก.`} />
         <Metric label="Gross Profit" tone="emerald" value={money(section?.sales.gp)} />
         <Metric label="Margin %" tone={(gpPct ?? 0) >= 0 ? 'emerald' : 'red'} value={`${money(gpPct)}%`} />
       </Section>
-      <Section border="border-amber-500" title="💰 ฝั่งการเงิน — Cash / Bank / OD">
+      <Section title="💰 ฝั่งการเงิน — Cash / Bank / OD">
         <Metric label="💵 เงินสดรวม" tone="emerald" value={money(section?.cash.cash)} />
         <Metric label="🏦 ธนาคารรวม" tone="blue" value={money(section?.cash.bank)} />
         <Metric label="💱 FCD" tone="purple" value={money(section?.cash.fcd)} />
         <Metric label="⚠ OD ใช้ / เหลือ" tone="orange" value={`${money(section?.cash.odUsed)} / ${money(section?.cash.odLimit)}`} />
         <Metric label="💎 Net Cash Position" tone="purple" value={money(section?.cash.netCash)} />
       </Section>
-      <Section border="border-orange-500" title="📦 ฝั่ง Stock — Inventory / WAC">
+      <Section title="📦 ฝั่ง Stock — Inventory / WAC">
         <Metric label="⚖ น้ำหนักรวม" value={`${money(section?.stock.qty)} กก.`} />
         <Metric label="💰 มูลค่าสต๊อกรวม" tone="orange" value={money(section?.stock.value)} />
         <Metric label="📊 ราคาต่อหน่วยเฉลี่ย" value={`${money(stockQty > 0 ? stockValue / stockQty : 0)} ฿/กก.`} />
@@ -346,11 +346,32 @@ function AgingRow({ buckets, label, tone, total }: { buckets?: Record<string, nu
 }
 
 function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: string; sub: string; tone: string; value: string }) {
-  return <div className={`relative overflow-hidden rounded-md bg-gradient-to-br ${tone} p-4 text-white shadow-lg`}><div className="absolute -right-3 -top-3 text-6xl opacity-10">{icon}</div><div className="relative"><div className="text-xs font-medium opacity-80">{label}</div><div className="text-xs opacity-60">{sub}</div><div className="mt-1 font-mono text-2xl font-bold">{value}</div><div className="mt-2 inline-block rounded-md-full bg-white/20 px-2 py-0.5 text-xs">Read only</div></div></div>
+  const toneMap: Record<string, { bg: string; text: string }> = {
+    'from-blue-500 to-blue-700': { bg: 'bg-blue-50', text: 'text-blue-600' },
+    'from-rose-500 to-red-600': { bg: 'bg-red-50', text: 'text-red-600' },
+    'from-emerald-500 to-teal-600': { bg: 'bg-emerald-50', text: 'text-emerald-600' },
+    'from-cyan-500 to-blue-600': { bg: 'bg-cyan-50', text: 'text-cyan-600' },
+    'from-purple-500 to-fuchsia-600': { bg: 'bg-purple-50', text: 'text-purple-600' },
+    'from-orange-500 to-red-600': { bg: 'bg-orange-50', text: 'text-orange-600' },
+  }
+  const style = toneMap[tone] || { bg: 'bg-slate-50', text: 'text-slate-600' }
+
+  return (
+    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.text} text-2xl`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold text-slate-500">{label}</div>
+        {sub && <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>}
+        <div className="mt-0.5 font-mono text-lg font-bold text-slate-900 truncate">{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function DashboardChartCard({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-md border border-slate-100 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
+  return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
 }
 
 function OwnerDailyView({ data }: { data: MainPayload | null }) {
@@ -358,25 +379,28 @@ function OwnerDailyView({ data }: { data: MainPayload | null }) {
   const pending = data?.ownerDaily.pending ?? {}
   const actual = data?.ownerDaily.actualActivity
   const gapPositive = (plan?.gap ?? 0) >= 0
+  const cardBg = gapPositive ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'
+  const iconColor = gapPositive ? 'text-emerald-500' : 'text-rose-500'
+
   return (
     <>
-      <div className={`relative overflow-hidden rounded-md p-6 text-white shadow-xl ${gapPositive ? 'bg-gradient-to-br from-emerald-500 to-teal-700' : 'bg-gradient-to-br from-red-500 to-rose-700 ring-4 ring-red-200'}`}>
-        <div className="absolute right-3 top-2 text-7xl opacity-15">{gapPositive ? '✅' : '⚠️'}</div>
+      <div className={`relative overflow-hidden rounded-xl p-6 shadow-sm border ${cardBg}`}>
+        <div className={`absolute right-3 top-2 text-7xl opacity-20 ${iconColor}`}>{gapPositive ? '✅' : '⚠️'}</div>
         <div className="relative">
-          <div className="text-sm opacity-80">{gapPositive ? '✓ คาดการณ์เงินเหลือสิ้นวัน' : '⚠ คาดการณ์เงินขาด ต้องเตรียม!'}</div>
-          <div className="mt-1 font-mono text-5xl font-bold">{money(plan?.gap)}</div>
-          <div className="mt-2 text-sm opacity-90">= 💵 เงินสด {money(plan?.available)} + 📥 คาดเข้า {money(plan?.expectedIn)} − 📤 คาดออก {money(plan?.expectedOut)}</div>
+          <div className="text-sm opacity-90">{gapPositive ? '✓ คาดการณ์เงินเหลือสิ้นวัน' : '⚠ คาดการณ์เงินขาด ต้องเตรียม!'}</div>
+          <div className="mt-1 font-mono text-4xl font-bold">{money(plan?.gap)}</div>
+          <div className="mt-2 text-xs opacity-90 font-medium">= 💵 เงินสด {money(plan?.available)} + 📥 คาดเข้า {money(plan?.expectedIn)} − 📤 คาดออก {money(plan?.expectedOut)}</div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <LegacyKpi border="border-blue-500" label="💵 เงินสดในมือ" sub="รวม Cash + Bank" tone="blue" value={money(plan?.available)} />
-        <LegacyKpi border="border-emerald-500" label="📥 คาดรับวันนี้" sub={`${data?.ownerDaily.due.ar.length ?? 0} ลูกค้าครบกำหนด`} tone="emerald" value={`+${money(plan?.expectedIn)}`} />
-        <LegacyKpi border="border-red-500" label="📤 คาดจ่ายวันนี้" sub={`AP ${money(data?.ownerDaily.due.ap.reduce((sum, row) => sum + row.amount, 0))} · Loan ${money(data?.ownerDaily.loanToday.reduce((sum, row) => sum + row.amount, 0))} · Exp ${money(data?.ownerDaily.expensesToday.reduce((sum, row) => sum + row.amount, 0))}`} tone="red" value={`-${money(plan?.expectedOut)}`} />
+        <LegacyKpi label="💵 เงินสดในมือ" sub="รวม Cash + Bank" tone="blue" value={money(plan?.available)} />
+        <LegacyKpi label="📥 คาดรับวันนี้" sub={`${data?.ownerDaily.due.ar.length ?? 0} ลูกค้าครบกำหนด`} tone="emerald" value={`+${money(plan?.expectedIn)}`} />
+        <LegacyKpi label="📤 คาดจ่ายวันนี้" sub={`AP ${money(data?.ownerDaily.due.ap.reduce((sum, row) => sum + row.amount, 0))} · Loan ${money(data?.ownerDaily.loanToday.reduce((sum, row) => sum + row.amount, 0))} · Exp ${money(data?.ownerDaily.expensesToday.reduce((sum, row) => sum + row.amount, 0))}`} tone="red" value={`-${money(plan?.expectedOut)}`} />
       </div>
       {(pending.tradingPending ?? 0) > 0 ? <PendingBlock color="purple" cta="→ ไป Trading Matching" title="🔄 Trading Pending รับเงิน — จ่ายซื้อ Trading แล้ว แต่ยังไม่เปิดบิลขาย" cards={[['📋 บิลซื้อ Trading', String(pending.tradingPending)], ['💸 จ่ายไปแล้ว', money(pending.tradingPaidTotal)], ['✓ Match แล้ว', money(pending.tradingMatchedTotal)], ['⏳ Pending รับเงิน', money(pending.tradingPendingValue)]]} /> : null}
       {(pending.pendingIssueCount ?? 0) > 0 ? <PendingBlock color="amber" cta="→ ดูทั้งหมด" title="📦 ต้นทุนรอเปิดบิล (Pending Sale) — เงินค้างใน Stock ที่เบิกออกไปแล้ว" cards={[['⏰ จำนวนใบ', `${pending.pendingIssueCount} ใบ`], ['⚖ น้ำหนักรวม', `${money(pending.pendingIssueQty)} กก.`], ['💰 ต้นทุน (เงินที่ค้างอยู่)', money(pending.pendingIssueCost)], ['📈 ยอดขายคาด', money(pending.pendingIssueEst)]]} /> : null}
-      <div className="rounded-md bg-white p-4 shadow-lg">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">📊 ที่เกิดขึ้นจริงวันนี้แล้ว</h3>
+      <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+        <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">📊 ที่เกิดขึ้นจริงวันนี้แล้ว</h3>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Tile tone="emerald" label="📥 รับเงินจริง" value={`+${money(actual?.cashIn)}`} />
           <Tile tone="red" label="📤 จ่าย Supplier" value={`-${money(actual?.paymentOut)}`} />
@@ -432,11 +456,11 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
   }
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
-        <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200" type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+        <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 outline-none" type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
         <DatePickerInput className="w-[140px]" value={date} onChange={setDate} />
-        <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30" disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
-        <button className={isToday ? 'rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white' : 'rounded-md bg-yellow-300 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-yellow-200'} type="button" onClick={() => setDate(today())}>📍 วันนี้</button>
+        <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 outline-none" disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
+        <button className={isToday ? 'rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white outline-none' : 'rounded-lg bg-yellow-300 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-yellow-200 outline-none'} type="button" onClick={() => setDate(today())}>📍 วันนี้</button>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <DailyBigCard count={purchaseCount} icon="📥" label="ยอดรับซื้อ" sub={`เฉลี่ย ${money((summary.purchaseAmount ?? 0) / Math.max(1, summary.purchaseQty ?? 0))} ฿/กก.`} tone="from-blue-600 to-indigo-700" value={money(summary.purchaseAmount)} weight={money(summary.purchaseQty)} />
@@ -446,16 +470,16 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
       <div className="grid gap-4 lg:grid-cols-2"><DailyBillTable rows={data?.dailyReport.purchaseBills ?? []} title={`📋 บิลรับซื้อประจำวัน (${purchaseCount})`} total={summary.purchaseAmount ?? 0} tone="blue" /><DailyBillTable rows={data?.dailyReport.salesBills ?? []} title={`📋 บิลขายประจำวัน (${salesCount})`} total={summary.salesAmount ?? 0} tone="emerald" /></div>
       <ExpenseSummary rows={data?.dailyReport.expenseByCategory ?? []} total={summary.expenseAmount ?? 0} />
       <CashMovement movement={data?.dailyReport.cashMovement} />
-      <div className="border-t-4 border-amber-300 pt-4">
-        <div className="mb-4 rounded-md bg-gradient-to-r from-purple-600 to-indigo-600 p-5 text-white shadow-lg">
+      <div className="border-t border-slate-200 pt-4">
+        <div className="mb-4 rounded-xl bg-slate-900 p-5 text-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="text-2xl font-bold">📊 Analytics Dashboard</h2><p className="mt-1 text-xs opacity-90">รายงานสรุปแบบช่วงเวลา + Top 10/5 + Charts</p></div>
+            <div><h2 className="text-xl font-bold">📊 Analytics Dashboard</h2><p className="mt-1 text-xs opacity-85">รายงานสรุปแบบช่วงเวลา + Top 10/5 + Charts</p></div>
             <div className="flex flex-wrap items-center gap-2">
-              {['today', 'yesterday', 'last7', 'last30', 'last90', 'month'].map((mode) => <button key={mode} className={rangeMode === mode ? 'rounded-md bg-white px-3 py-1.5 text-xs font-bold text-purple-700' : 'rounded-md bg-white/20 px-3 py-1.5 text-xs hover:bg-white/30'} type="button" onClick={() => applyRange(mode)}>{rangeLabel(mode)}</button>)}
-              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
+              {['today', 'yesterday', 'last7', 'last30', 'last90', 'month'].map((mode) => <button key={mode} className={rangeMode === mode ? 'rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-900 outline-none' : 'rounded-lg bg-white/10 px-3 py-1.5 text-xs hover:bg-white/20 outline-none'} type="button" onClick={() => applyRange(mode)}>{rangeLabel(mode)}</button>)}
+              <DatePickerInput className="w-[130px] bg-white text-slate-900 border-slate-300 outline-none" value={rangeFrom} onChange={(value) => { setRangeMode('custom'); setRangeFrom(value) }} />
               <span className="text-xs">→</span>
-              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
-              <button className="rounded-md bg-white px-3 py-1.5 text-xs font-bold text-purple-700" type="button" onClick={printReport}>🖨 Export PDF / Print</button>
+              <DatePickerInput className="w-[130px] bg-white text-slate-900 border-slate-300 outline-none" value={rangeTo} onChange={(value) => { setRangeMode('custom'); setRangeTo(value) }} />
+              <button className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-900 hover:bg-slate-100 outline-none" type="button" onClick={printReport}>🖨 Export PDF / Print</button>
             </div>
           </div>
         </div>
@@ -467,9 +491,9 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
           <Metric label="💸 ค่าใช้จ่าย" tone="orange" value={money(analytics?.rangeKpi.expenseAmount)} />
         </div>
         <div className="mb-4 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-md bg-white p-4 shadow-lg">
-            <h3 className="mb-2 font-bold text-slate-700">📈 ยอดซื้อ vs ขาย (รายวัน)</h3>
-            {(analytics?.dailyTrend ?? []).map((row) => <div key={row.label} className="mb-2 grid grid-cols-12 items-center gap-2 text-xs"><div className="col-span-3 font-mono">{row.label}</div><div className="col-span-4 rounded-md bg-blue-100"><div className="rounded-md bg-blue-500 p-1 text-right text-white" style={{ width: `${Math.max(10, row.purchase / trendMax * 100)}%` }}>{money(row.purchase)}</div></div><div className="col-span-5 rounded-md bg-emerald-100"><div className="rounded-md bg-emerald-500 p-1 text-right text-white" style={{ width: `${Math.max(10, row.sales / trendMax * 100)}%` }}>{money(row.sales)}</div></div></div>)}
+          <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+            <h3 className="mb-3 font-bold text-slate-700 text-sm">📈 ยอดซื้อ vs ขาย (รายวัน)</h3>
+            {(analytics?.dailyTrend ?? []).map((row) => <div key={row.label} className="mb-2.5 grid grid-cols-12 items-center gap-2 text-xs"><div className="col-span-3 font-mono text-slate-600">{row.label}</div><div className="col-span-4 rounded-full bg-slate-100 h-5 overflow-hidden"><div className="rounded-full bg-blue-500 h-full text-right text-white pr-2 font-bold text-[10px] flex items-center justify-end" style={{ width: `${Math.max(15, row.purchase / trendMax * 100)}%` }}>{money(row.purchase)}</div></div><div className="col-span-5 rounded-full bg-slate-100 h-5 overflow-hidden"><div className="rounded-full bg-emerald-500 h-full text-right text-white pr-2 font-bold text-[10px] flex items-center justify-end" style={{ width: `${Math.max(15, row.sales / trendMax * 100)}%` }}>{money(row.sales)}</div></div></div>)}
           </div>
           <TopSimpleTable rows={analytics?.groupSummary ?? []} title="🥧 มูลค่าตามหมวดสินค้า" />
         </div>
@@ -486,88 +510,690 @@ function rangeLabel(mode: string) {
   return labels[mode] ?? mode
 }
 
-function LegacyKpi({ border, label, sub, tone, value }: { border: string; label: string; sub: string; tone: string; value: string }) {
-  const text = tone === 'blue' ? 'text-blue-700' : tone === 'emerald' ? 'text-emerald-700' : tone === 'red' ? 'text-red-700' : 'text-slate-700'
-  return <div className={`rounded-md border-l-4 ${border} bg-gradient-to-br from-white to-slate-50 p-4 shadow-md`}><div className={`text-xs font-bold ${text}`}>{label}</div><div className={`mt-1 font-mono text-3xl font-bold ${text}`}>{value}</div><div className="mt-1 text-xs text-slate-500">{sub}</div></div>
+function LegacyKpi({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
+  const toneMap: Record<string, { bg: string; text: string }> = {
+    blue: { bg: 'bg-blue-50', text: 'text-blue-600' },
+    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600' },
+    red: { bg: 'bg-red-50', text: 'text-red-600' },
+  }
+  const style = toneMap[tone] || { bg: 'bg-slate-50', text: 'text-slate-600' }
+  const icon = label.slice(0, 2)
+  const cleanLabel = label.slice(2).trim()
+
+  return (
+    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.text} text-2xl`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold text-slate-500">{cleanLabel}</div>
+        {sub && <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>}
+        <div className={`mt-0.5 font-mono text-lg font-bold truncate ${style.text}`}>{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function PendingBlock({ cards, color, cta, title }: { cards: [string, string][]; color: 'amber' | 'purple'; cta: string; title: string }) {
-  const gradient = color === 'purple' ? 'from-purple-50 to-pink-50' : 'from-amber-50 to-orange-50'
-  const border = color === 'purple' ? 'border-purple-500' : 'border-amber-500'
   const text = color === 'purple' ? 'text-purple-700' : 'text-amber-700'
-  const button = color === 'purple' ? 'bg-purple-600' : 'bg-amber-600'
+  const button = color === 'purple' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
   return (
-    <div className={`rounded-md border-l-4 ${border} bg-gradient-to-r ${gradient} p-4 shadow`}>
+    <div className="bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className={`text-sm font-bold ${text}`}>{title}</h3>
-        <button className={`rounded-md ${button} px-3 py-1.5 text-xs font-bold text-white opacity-60`} disabled type="button">{cta}</button>
+        <button className={`rounded-lg ${button} px-3 py-1.5 text-xs font-bold opacity-80 outline-none`} disabled type="button">{cta}</button>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{cards.map(([label, value]) => <div key={label} className="rounded-md border bg-white p-3"><div className={`text-xs ${text}`}>{label}</div><div className={`font-mono text-2xl font-bold ${text}`}>{value}</div></div>)}</div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {cards.map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+            <div className="text-xs text-slate-500">{label}</div>
+            <div className={`font-mono text-lg font-bold mt-1 ${text}`}>{value}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
 function Tile({ label, sub, tone, value }: { label: string; sub?: string; tone: string; value: string }) {
-  return <div className={`rounded-md p-3 text-center ${toneClass(tone)}`}><div className="text-xs">{label}</div><div className="font-mono text-2xl font-bold">{value}</div>{sub ? <div className="text-xs text-slate-400">{sub}</div> : null}</div>
+  const toneMap: Record<string, string> = {
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    cyan: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    orange: 'bg-orange-50 text-orange-700 border-orange-100',
+    purple: 'bg-purple-50 text-purple-700 border-purple-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    slate: 'bg-slate-50 text-slate-700 border-slate-100',
+  }
+  const cls = toneMap[tone] || toneMap.slate
+  return (
+    <div className={`rounded-xl border p-3 text-center ${cls}`}>
+      <div className="text-xs font-semibold">{label}</div>
+      <div className="font-mono text-lg font-bold mt-1">{value}</div>
+      {sub ? <div className="text-[10px] opacity-85 mt-0.5">{sub}</div> : null}
+    </div>
+  )
 }
 
 function MiniLine({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between rounded-md bg-slate-50 p-2"><span>{label}</span><span className="font-bold text-amber-700">{value}</span></div>
+  return <div className="flex items-center justify-between rounded-lg bg-slate-50 p-2 text-xs border border-slate-100"><span>{label}</span><span className="font-bold text-slate-800">{value}</span></div>
 }
 
 function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; daysOverdue?: number; docNo: string; due: string; name: string }>; title: string; type: 'ap' | 'ar' }) {
-  const header = type === 'ar' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-  return <div className="overflow-hidden rounded-md bg-white shadow"><div className={`flex justify-between border-b p-3 font-bold ${header}`}><span>{title} ({rows.length})</span><span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span></div><div className="max-h-64 overflow-x-auto"><table className="w-full text-sm"><thead className="sticky top-0 bg-slate-100"><tr><th className="p-2 text-left">{type === 'ar' ? 'ลูกค้า' : 'Supplier'}</th><th className="p-2 text-left">บิล</th><th className="p-2 text-left">Due</th><th className="p-2 text-right">ค้าง</th>{type === 'ar' ? <th className="p-2 text-right">เกินวัน</th> : null}</tr></thead><tbody>{rows.map((row) => <tr key={row.docNo} className="border-t"><td className="p-2 text-xs">{row.name}</td><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2 text-xs">{row.due}</td><td className="p-2 text-right font-bold">{money(row.amount)}</td>{type === 'ar' ? <td className={row.daysOverdue ? 'p-2 text-right font-bold text-red-700' : 'p-2 text-right text-slate-400'}>{row.daysOverdue || '-'}</td> : null}</tr>)}{rows.length === 0 ? <tr><td className="py-4 text-center text-slate-400" colSpan={type === 'ar' ? 5 : 4}>{type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด ✓' : 'ไม่มี ✓'}</td></tr> : null}</tbody></table></div></div>
+  const header = type === 'ar' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
+  return (
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
+        <span>{title} ({rows.length})</span>
+        <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+      </div>
+      
+      {/* Desktop view */}
+      <div className="hidden lg:block max-h-64 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 text-xs">
+            <tr>
+              <th className="p-2 text-left font-semibold">ชื่อ</th>
+              <th className="p-2 text-left font-semibold">บิล</th>
+              <th className="p-2 text-left font-semibold">Due</th>
+              <th className="p-2 text-right font-semibold">ค้าง</th>
+              {type === 'ar' ? <th className="p-2 text-right font-semibold">เกินวัน</th> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.docNo} className="border-t border-slate-100 hover:bg-slate-50/50">
+                <td className="p-2 text-xs text-slate-700">{row.name}</td>
+                <td className="p-2 font-mono text-xs text-slate-600">{row.docNo}</td>
+                <td className="p-2 text-xs text-slate-600">{row.due}</td>
+                <td className="p-2 text-right font-bold text-slate-800">{money(row.amount)}</td>
+                {type === 'ar' ? (
+                  <td className={row.daysOverdue ? 'p-2 text-right font-bold text-red-600' : 'p-2 text-right text-slate-400'}>
+                    {row.daysOverdue || '-'}
+                  </td>
+                ) : null}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="py-4 text-center text-slate-400" colSpan={type === 'ar' ? 5 : 4}>
+                  {type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด ✓' : 'ไม่มี ✓'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile view (Dense Card List) */}
+      <div className="block lg:hidden max-h-64 overflow-y-auto divide-y divide-slate-100 p-2 bg-slate-50/30">
+        {rows.map((row) => (
+          <div key={row.docNo} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800 line-clamp-1">{row.name}</span>
+              <span className="font-bold text-slate-900">{money(row.amount)}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-500 text-[11px]">
+              <span>บิล: <span className="font-mono">{row.docNo}</span></span>
+              <span>Due: {row.due}</span>
+            </div>
+            {type === 'ar' && row.daysOverdue ? (
+              <div className="text-right text-[11px] font-semibold text-red-600">
+                เกินกำหนด: {row.daysOverdue} วัน
+              </div>
+            ) : null}
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-6 text-center text-slate-400 text-xs">
+            {type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด ✓' : 'ไม่มี ✓'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function OwnerSmallTable({ rows, title }: { rows: Array<{ amount: number; contractNo?: string; docNo?: string; installmentNo?: number; name?: string }>; title: string }) {
-  return <div className="overflow-hidden rounded-md bg-white shadow"><div className="flex justify-between border-b bg-amber-50 p-3 font-bold text-amber-700"><span>{title} ({rows.length})</span><span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span></div><table className="w-full text-xs"><tbody>{rows.map((row, index) => <tr key={`${row.docNo ?? row.contractNo ?? index}`} className="border-t"><td className="p-2 font-mono">{row.docNo ?? row.contractNo}</td><td className="p-2">{row.name ?? row.installmentNo ?? '-'}</td><td className="p-2 text-right font-bold">{money(row.amount)}</td></tr>)}{rows.length === 0 ? <tr><td className="py-4 text-center text-slate-400" colSpan={3}>ไม่มี ✓</td></tr> : null}</tbody></table></div>
+  return (
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className="flex justify-between border-b bg-amber-50 text-amber-700 p-3 font-bold border-amber-100 text-sm">
+        <span>{title} ({rows.length})</span>
+        <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+      </div>
+      
+      {/* Desktop view */}
+      <div className="hidden lg:block">
+        <table className="w-full text-xs">
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.docNo ?? row.contractNo ?? index}`} className="border-t border-slate-100 hover:bg-slate-50/50">
+                <td className="p-2 font-mono text-slate-600">{row.docNo ?? row.contractNo}</td>
+                <td className="p-2 text-slate-700">{row.name ?? row.installmentNo ?? '-'}</td>
+                <td className="p-2 text-right font-bold text-slate-800">{money(row.amount)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="py-4 text-center text-slate-400" colSpan={3}>ไม่มี ✓</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile view */}
+      <div className="block lg:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
+        {rows.map((row, index) => (
+          <div key={`${row.docNo ?? row.contractNo ?? index}`} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="font-mono text-slate-600">{row.docNo ?? row.contractNo}</span>
+              <span className="font-bold text-slate-900">{money(row.amount)}</span>
+            </div>
+            <div className="text-slate-500 text-[11px]">
+              รายละเอียด: {row.name ?? row.installmentNo ?? '-'}
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี ✓</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count: number; icon: string; label: string; sub: string; tone: string; value: string; weight: string }) {
-  return <div className={`relative overflow-hidden rounded-md bg-gradient-to-br ${tone} p-6 text-white shadow-xl`}><div className="absolute right-4 top-3 text-7xl opacity-15">{icon}</div><div className="relative"><div className="text-sm font-bold opacity-90">{icon} {label} ({count} บิล)</div><div className="mt-3 grid grid-cols-2 gap-6"><div><div className="text-xs opacity-80">น้ำหนัก</div><div className="font-mono text-4xl font-bold">{weight}</div><div className="text-xs opacity-80">กิโลกรัม</div></div><div><div className="text-xs opacity-80">ยอดเงิน</div><div className="font-mono text-4xl font-bold">{value}</div><div className="text-xs opacity-80">{sub}</div></div></div></div></div>
+  const toneMap: Record<string, { bg: string; text: string; iconBg: string; border: string }> = {
+    'from-blue-600 to-indigo-700': { bg: 'bg-white', text: 'text-blue-700', iconBg: 'bg-blue-50 text-blue-600', border: 'border-slate-200' },
+    'from-emerald-600 to-teal-700': { bg: 'bg-white', text: 'text-emerald-700', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-slate-200' },
+  }
+  const style = toneMap[tone] || { bg: 'bg-white', text: 'text-slate-700', iconBg: 'bg-slate-50 text-slate-600', border: 'border-slate-200' }
+  
+  return (
+    <div className={`relative overflow-hidden rounded-xl bg-white border ${style.border} p-5 shadow-sm flex items-start gap-4`}>
+      <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${style.iconBg} text-3xl`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{count} บิล</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-[10px] text-slate-400 font-semibold">น้ำหนักรวม</div>
+            <div className="font-mono text-xl font-bold text-slate-900 leading-none mt-1">{weight} <span className="text-xs font-normal text-slate-500">กก.</span></div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400 font-semibold">ยอดเงินรวม</div>
+            <div className="font-mono text-xl font-bold text-slate-900 leading-none mt-1">{value}</div>
+            <div className="text-[10px] text-slate-500 mt-1">{sub}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function GroupBreakdown({ expandedGroup, groups, setExpandedGroup }: { expandedGroup: string; groups: MainPayload['dailyReport']['groupBreakdown']; setExpandedGroup: (value: string) => void }) {
   const max = Math.max(1, ...groups.map((row) => Math.max(row.buyAmt, row.sellAmt)))
-  return <div className="rounded-md bg-white p-5 shadow-lg"><h3 className="mb-3 font-bold text-slate-800">📊 หมวดสินค้า — ซื้อ vs ขาย <span className="text-xs font-normal text-slate-500">(กดที่หมวด → ดูรายละเอียดสินค้า)</span></h3>{groups.length === 0 ? <div className="py-10 text-center text-slate-400">ไม่มีรายการในวันนี้</div> : <div className="space-y-3">{groups.map((group) => <div key={group.group} className="overflow-hidden rounded-md border"><button className="w-full p-3 text-left hover:bg-slate-50" type="button" onClick={() => setExpandedGroup(expandedGroup === group.group ? '' : group.group)}><div className="mb-2 flex items-center justify-between"><span className="font-bold text-slate-700">{expandedGroup === group.group ? '▼' : '▶'} {group.group} <span className="text-xs text-slate-400">({group.products.length} สินค้า)</span></span><span className="text-xs text-slate-500">รวม <b>{money(group.buyAmt + group.sellAmt)}</b> บาท</span></div><div className="grid grid-cols-2 gap-3 text-xs"><div><div className="mb-1 flex justify-between"><span className="text-blue-700">📥 ซื้อ</span><b>{money(group.buyQty)} กก. · {money(group.buyAmt)}</b></div><div className="h-3 rounded-md-full bg-slate-100"><div className="h-3 rounded-md-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${Math.min(100, group.buyAmt / max * 100)}%` }} /></div></div><div><div className="mb-1 flex justify-between"><span className="text-emerald-700">📤 ขาย</span><b>{money(group.sellQty)} กก. · {money(group.sellAmt)}</b></div><div className="h-3 rounded-md-full bg-slate-100"><div className="h-3 rounded-md-full bg-gradient-to-r from-emerald-500 to-teal-500" style={{ width: `${Math.min(100, group.sellAmt / max * 100)}%` }} /></div></div></div></button>{expandedGroup === group.group ? <div className="overflow-x-auto border-t p-3"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-100"><tr><th className="p-2 text-left">Code</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">ซื้อ กก.</th><th className="p-2 text-right">ซื้อ</th><th className="p-2 text-right">ขาย กก.</th><th className="p-2 text-right">ขาย</th><th className="p-2 text-right">Spread/กก.</th></tr></thead><tbody>{group.products.map((row) => <tr key={row.productId} className="border-t"><td className="p-2 font-mono">{row.productCode}</td><td className="p-2">{row.productName}</td><td className="p-2 text-right">{money(row.buyQty)}</td><td className="p-2 text-right text-blue-700">{money(row.buyAmt)}</td><td className="p-2 text-right">{money(row.sellQty)}</td><td className="p-2 text-right text-emerald-700">{money(row.sellAmt)}</td><td className="p-2 text-right font-bold">{row.sellQty && row.buyQty ? money(row.sellAmt / row.sellQty - row.buyAmt / row.buyQty) : '-'}</td></tr>)}</tbody></table></div> : null}</div>)}</div>}</div>
+  return (
+    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-200">
+      <h3 className="mb-3 font-bold text-slate-800 text-sm">📊 หมวดสินค้า — ซื้อ vs ขาย <span className="text-xs font-normal text-slate-500">(กดที่หมวด → ดูรายละเอียดสินค้า)</span></h3>
+      {groups.length === 0 ? (
+        <div className="py-10 text-center text-slate-400 text-xs">ไม่มีรายการในวันนี้</div>
+      ) : (
+        <div className="space-y-3">
+          {groups.map((group) => (
+            <div key={group.group} className="overflow-hidden rounded-xl border border-slate-200">
+              <button className="w-full p-3 text-left hover:bg-slate-50 outline-none" type="button" onClick={() => setExpandedGroup(expandedGroup === group.group ? '' : group.group)}>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-bold text-slate-700 text-sm">{expandedGroup === group.group ? '▼' : '▶'} {group.group} <span className="text-xs font-normal text-slate-400">({group.products.length} สินค้า)</span></span>
+                  <span className="text-xs text-slate-500">รวม <b>{money(group.buyAmt + group.sellAmt)}</b> บาท</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <div className="mb-1 flex justify-between"><span className="text-blue-700 font-medium">📥 ซื้อ</span><b>{money(group.buyQty)} กก. · {money(group.buyAmt)}</b></div>
+                    <div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.min(100, group.buyAmt / max * 100)}%` }} /></div>
+                  </div>
+                  <div>
+                    <div className="mb-1 flex justify-between"><span className="text-emerald-700 font-medium">📤 ขาย</span><b>{money(group.sellQty)} กก. · {money(group.sellAmt)}</b></div>
+                    <div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-emerald-500" style={{ width: `${Math.min(100, group.sellAmt / max * 100)}%` }} /></div>
+                  </div>
+                </div>
+              </button>
+              {expandedGroup === group.group ? (
+                <>
+                  {/* Desktop view */}
+                  <div className="hidden lg:block overflow-x-auto border-t border-slate-100 p-3">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                          <th className="p-2 text-left font-semibold">Code</th>
+                          <th className="p-2 text-left font-semibold">สินค้า</th>
+                          <th className="p-2 text-right font-semibold">ซื้อ กก.</th>
+                          <th className="p-2 text-right font-semibold">ซื้อ</th>
+                          <th className="p-2 text-right font-semibold">ขาย กก.</th>
+                          <th className="p-2 text-right font-semibold">ขาย</th>
+                          <th className="p-2 text-right font-semibold">Spread/กก.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.products.map((row) => (
+                          <tr key={row.productId} className="border-t border-slate-100">
+                            <td className="p-2 font-mono text-slate-600">{row.productCode}</td>
+                            <td className="p-2 text-slate-700">{row.productName}</td>
+                            <td className="p-2 text-right">{money(row.buyQty)}</td>
+                            <td className="p-2 text-right text-blue-700 font-bold">{money(row.buyAmt)}</td>
+                            <td className="p-2 text-right">{money(row.sellQty)}</td>
+                            <td className="p-2 text-right text-emerald-700 font-bold">{money(row.sellAmt)}</td>
+                            <td className="p-2 text-right font-bold text-slate-700">{row.sellQty && row.buyQty ? money(row.sellAmt / row.sellQty - row.buyAmt / row.buyQty) : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {/* Mobile view */}
+                  <div className="block lg:hidden border-t border-slate-100 divide-y divide-slate-100 bg-slate-50/30 p-2">
+                    {group.products.map((row) => (
+                      <div key={row.productId} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-slate-800">{row.productName}</span>
+                          <span className="font-mono text-[10px] text-slate-400">{row.productCode}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-1 text-[11px]">
+                          <div className="text-blue-700 bg-blue-50/50 p-1.5 rounded-lg">
+                            <div className="font-semibold text-xs">📥 ซื้อ</div>
+                            <div className="mt-0.5">{money(row.buyQty)} กก.</div>
+                            <div className="font-bold mt-0.5">{money(row.buyAmt)} ฿</div>
+                          </div>
+                          <div className="text-emerald-700 bg-emerald-50/50 p-1.5 rounded-lg">
+                            <div className="font-semibold text-xs">📤 ขาย</div>
+                            <div className="mt-0.5">{money(row.sellQty)} กก.</div>
+                            <div className="font-bold mt-0.5">{money(row.sellAmt)} ฿</div>
+                          </div>
+                        </div>
+                        {row.sellQty && row.buyQty ? (
+                          <div className="text-right text-[11px] font-semibold text-purple-700 mt-1">
+                            Spread: {money(row.sellAmt / row.sellQty - row.buyAmt / row.buyQty)} ฿/กก.
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function DailyBillTable({ rows, title, tone, total }: { rows: { amount: number; docNo: string; name: string; qty: number }[]; title: string; tone: 'blue' | 'emerald'; total: number }) {
-  const header = tone === 'blue' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+  const header = tone === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
   const hover = tone === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
   const amountColor = tone === 'blue' ? 'text-blue-700' : 'text-emerald-700'
-  return <div className="overflow-hidden rounded-md bg-white shadow-lg"><div className={`flex justify-between border-b p-3 ${header}`}><h3 className="font-bold">{title}</h3><span className="text-sm font-bold">{money(total)}</span></div><div className="max-h-[300px] overflow-x-auto"><table className="w-full text-sm"><thead className="sticky top-0 bg-slate-50"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">{tone === 'blue' ? 'Supplier' : 'Customer'}</th><th className="p-2 text-right">กก.</th><th className="p-2 text-right">ยอด</th></tr></thead><tbody>{rows.map((row) => <tr key={row.docNo} className={`border-t ${hover}`}><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2 text-xs">{row.name}</td><td className="p-2 text-right">{money(row.qty)}</td><td className={`p-2 text-right font-bold ${amountColor}`}>{money(row.amount)}</td></tr>)}{rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={4}>{tone === 'blue' ? 'ไม่มีบิลซื้อ' : 'ไม่มีบิลขาย'}</td></tr> : null}</tbody></table></div></div>
+  return (
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
+        <h3 className="font-bold">{title}</h3>
+        <span className="text-sm font-bold">{money(total)}</span>
+      </div>
+
+      {/* Desktop view */}
+      <div className="hidden lg:block max-h-[300px] overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 text-xs">
+            <tr>
+              <th className="p-2 text-left font-semibold">เลขที่</th>
+              <th className="p-2 text-left font-semibold">{tone === 'blue' ? 'Supplier' : 'Customer'}</th>
+              <th className="p-2 text-right font-semibold">กก.</th>
+              <th className="p-2 text-right font-semibold">ยอด</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.docNo} className={`border-t border-slate-100 ${hover}`}>
+                <td className="p-2 font-mono text-xs text-slate-600">{row.docNo}</td>
+                <td className="p-2 text-xs text-slate-700">{row.name}</td>
+                <td className="p-2 text-right text-slate-600">{money(row.qty)}</td>
+                <td className={`p-2 text-right font-bold ${amountColor}`}>{money(row.amount)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="py-8 text-center text-slate-400" colSpan={4}>
+                  {tone === 'blue' ? 'ไม่มีบิลซื้อ' : 'ไม่มีบิลขาย'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile view */}
+      <div className="block lg:hidden max-h-[300px] overflow-y-auto divide-y divide-slate-100 p-2 bg-slate-50/30">
+        {rows.map((row) => (
+          <div key={row.docNo} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800 line-clamp-1">{row.name}</span>
+              <span className={`font-bold ${amountColor}`}>{money(row.amount)}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-500 text-[11px]">
+              <span>บิล: <span className="font-mono">{row.docNo}</span></span>
+              <span>น้ำหนัก: {money(row.qty)} กก.</span>
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-6 text-center text-slate-400 text-xs">
+            {tone === 'blue' ? 'ไม่มีบิลซื้อ' : 'ไม่มีบิลขาย'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function ExpenseSummary({ rows, total }: { rows: { amount: number; count: number; name: string }[]; total: number }) {
   const max = Math.max(1, ...rows.map((row) => row.amount))
-  return <div className="rounded-md bg-white p-5 shadow-lg"><div className="mb-3 flex justify-between"><h3 className="font-bold text-slate-800">💸 ค่าใช้จ่ายประจำวัน ({rows.reduce((sum, row) => sum + row.count, 0)} รายการ)</h3><span className="text-lg font-bold text-red-600">รวม {money(total)} บาท</span></div>{rows.length === 0 ? <div className="py-8 text-center text-slate-400">ไม่มีค่าใช้จ่ายวันนี้</div> : <div className="space-y-2">{rows.map((row) => <div key={row.name}><div className="mb-1 flex justify-between text-sm"><span className="font-medium">📂 {row.name} <span className="text-xs text-slate-400">({row.count} รายการ)</span></span><span className="font-mono font-bold text-red-600">{money(row.amount)}</span></div><div className="h-2 rounded-md-full bg-slate-100"><div className="h-2 rounded-md-full bg-gradient-to-r from-red-500 to-orange-500" style={{ width: `${Math.min(100, row.amount / max * 100)}%` }} /></div></div>)}</div>}</div>
+  return (
+    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-200">
+      <div className="mb-3 flex justify-between items-center">
+        <h3 className="font-bold text-slate-800 text-sm">💸 ค่าใช้จ่ายประจำวัน ({rows.reduce((sum, row) => sum + row.count, 0)} รายการ)</h3>
+        <span className="text-base font-bold text-red-600">รวม {money(total)} บาท</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="py-8 text-center text-slate-400 text-xs">ไม่มีค่าใช้จ่ายวันนี้</div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((row) => (
+            <div key={row.name}>
+              <div className="mb-1 flex justify-between text-xs">
+                <span className="font-medium text-slate-700">📂 {row.name} <span className="text-xs text-slate-400 font-normal">({row.count} รายการ)</span></span>
+                <span className="font-mono font-bold text-red-600">{money(row.amount)}</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-100">
+                <div className="h-2 rounded-full bg-gradient-to-r from-red-500 to-orange-500" style={{ width: `${Math.min(100, row.amount / max * 100)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cashMovement'] }) {
-  return <div className="rounded-md bg-white p-5 shadow-lg"><h3 className="mb-3 font-bold text-slate-800">💰 เงินหมุนประจำวัน</h3><div className="mb-4 grid gap-3 md:grid-cols-3"><Tile tone="emerald" label="📥 เงินเข้ารวม" value={money(movement?.cashIn)} /><Tile tone="red" label="📤 เงินออกรวม" value={money(movement?.cashOut)} /><Tile tone={(movement?.net ?? 0) >= 0 ? 'blue' : 'red'} label="📊 Net Cash" value={money(movement?.net)} /></div><div className="mb-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">{(movement?.byType ?? []).map((row) => <div key={row.label} className="rounded-md bg-slate-50 p-3"><div className="text-xs text-slate-600">{row.label}</div><div className="mt-1 flex justify-between"><span className="text-sm text-emerald-600">+{money(row.cashIn)}</span><span className="text-sm text-red-600">-{money(row.cashOut)}</span></div></div>)}</div><div className="overflow-x-auto"><table className="w-full border-t text-sm"><thead className="bg-slate-50"><tr><th className="p-2 text-left">บัญชี</th><th className="p-2 text-right">เข้า</th><th className="p-2 text-right">ออก</th><th className="p-2 text-right">Net</th></tr></thead><tbody>{(movement?.accounts ?? []).map((row) => <tr key={row.name} className="border-t"><td className="p-2"><b>{row.name}</b> <span className="text-xs text-slate-400">{row.type}</span></td><td className="p-2 text-right font-mono text-emerald-700">{row.cashIn > 0 ? money(row.cashIn) : '-'}</td><td className="p-2 text-right font-mono text-red-600">{row.cashOut > 0 ? money(row.cashOut) : '-'}</td><td className={(row.cashIn - row.cashOut) >= 0 ? 'p-2 text-right font-mono font-bold text-blue-700' : 'p-2 text-right font-mono font-bold text-rose-600'}>{money(row.cashIn - row.cashOut)}</td></tr>)}</tbody></table></div></div>
+  return (
+    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-200">
+      <h3 className="mb-3 font-bold text-slate-800 text-sm">💰 เงินหมุนประจำวัน</h3>
+      <div className="mb-4 grid gap-3 md:grid-cols-3">
+        <Tile tone="emerald" label="📥 เงินเข้ารวม" value={money(movement?.cashIn)} />
+        <Tile tone="red" label="📤 เงินออกรวม" value={money(movement?.cashOut)} />
+        <Tile tone={(movement?.net ?? 0) >= 0 ? 'blue' : 'red'} label="📊 Net Cash" value={money(movement?.net)} />
+      </div>
+      <div className="mb-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+        {(movement?.byType ?? []).map((row) => (
+          <div key={row.label} className="rounded-xl bg-slate-50/50 p-3 border border-slate-100">
+            <div className="text-xs text-slate-500 font-semibold">{row.label}</div>
+            <div className="mt-1 flex justify-between items-center font-mono">
+              <span className="text-xs font-bold text-emerald-600">+{money(row.cashIn)}</span>
+              <span className="text-xs font-bold text-red-600">-{money(row.cashOut)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-t border-slate-100 text-xs">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="p-2 text-left font-semibold">บัญชี</th>
+              <th className="p-2 text-right font-semibold">เข้า</th>
+              <th className="p-2 text-right font-semibold">ออก</th>
+              <th className="p-2 text-right font-semibold">Net</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(movement?.accounts ?? []).map((row) => (
+              <tr key={row.name} className="border-t border-slate-100 hover:bg-slate-50/30">
+                <td className="p-2 text-slate-700">
+                  <b>{row.name}</b> <span className="text-[10px] text-slate-400">({row.type})</span>
+                </td>
+                <td className="p-2 text-right font-mono text-emerald-600">{row.cashIn > 0 ? money(row.cashIn) : '-'}</td>
+                <td className="p-2 text-right font-mono text-red-600">{row.cashOut > 0 ? money(row.cashOut) : '-'}</td>
+                <td className={(row.cashIn - row.cashOut) >= 0 ? 'p-2 text-right font-mono font-bold text-blue-600' : 'p-2 text-right font-mono font-bold text-rose-600'}>
+                  {money(row.cashIn - row.cashOut)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 function TopSimpleTable({ rows, title }: { rows: { amount: number; group: string; qty: number }[]; title: string }) {
-  return <div className="rounded-md bg-white p-4 shadow-lg"><h3 className="mb-2 font-bold text-slate-700">{title}</h3><table className="w-full text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-1.5 text-left">หมวด</th><th className="p-1.5 text-right">กก.</th><th className="p-1.5 text-right">มูลค่า</th></tr></thead><tbody>{rows.map((row) => <tr key={row.group} className="border-t"><td className="p-1.5 font-medium">{row.group}</td><td className="p-1.5 text-right">{money(row.qty)}</td><td className="p-1.5 text-right font-bold text-indigo-700">{money(row.amount)}</td></tr>)}</tbody></table></div>
+  return (
+    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+      <h3 className="mb-2 font-bold text-slate-700 text-sm">{title}</h3>
+      <table className="w-full text-xs">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            <th className="p-1.5 text-left font-semibold">หมวด</th>
+            <th className="p-1.5 text-right font-semibold">กก.</th>
+            <th className="p-1.5 text-right font-semibold">มูลค่า</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.group} className="border-t border-slate-100">
+              <td className="p-1.5 font-medium text-slate-700">{row.group}</td>
+              <td className="p-1.5 text-right text-slate-600">{money(row.qty)}</td>
+              <td className="p-1.5 text-right font-bold text-indigo-600">{money(row.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: { amount: number; bills: number; id: string; name: string; qty: number }[]; title: string }) {
-  const header = color === 'blue' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+  const header = color === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
   const hover = color === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
   const text = color === 'blue' ? 'text-blue-700' : 'text-emerald-700'
-  return <div className="overflow-hidden rounded-md bg-white shadow-lg"><div className={`border-b p-3 ${header}`}><h3 className="font-bold">{title}</h3></div><table className="w-full text-sm"><tbody>{rows.map((row, index) => <tr key={row.id} className={`border-t ${hover}`}><td className={`p-2 font-bold ${text}`}>{index + 1}</td><td className="p-2 text-xs">{row.name}</td><td className="p-2 text-right text-xs">{row.bills}</td><td className="p-2 text-right text-xs">{money(row.qty)}</td><td className={`p-2 text-right font-bold ${text}`}>{money(row.amount)}</td></tr>)}</tbody></table></div>
+  return (
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className={`border-b p-3 font-bold text-sm ${header}`}>
+        <h3 className="font-bold">{title}</h3>
+      </div>
+      
+      {/* Desktop view */}
+      <div className="hidden sm:block">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs">
+            <tr>
+              <th className="p-2 text-left font-semibold w-10">#</th>
+              <th className="p-2 text-left font-semibold">รายชื่อ</th>
+              <th className="p-2 text-right font-semibold">บิล</th>
+              <th className="p-2 text-right font-semibold">น้ำหนัก (กก.)</th>
+              <th className="p-2 text-right font-semibold">ยอดรวม</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.id} className={`border-t border-slate-100 ${hover}`}>
+                <td className={`p-2 font-bold ${text}`}>{index + 1}</td>
+                <td className="p-2 text-xs text-slate-700">{row.name}</td>
+                <td className="p-2 text-right text-xs text-slate-600">{row.bills}</td>
+                <td className="p-2 text-right text-xs text-slate-600">{money(row.qty)}</td>
+                <td className={`p-2 text-right font-bold ${text}`}>{money(row.amount)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="py-8 text-center text-slate-400 text-xs" colSpan={5}>ไม่มีข้อมูล</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile view */}
+      <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
+        {rows.map((row, index) => (
+          <div key={row.id} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800 line-clamp-1">
+                <span className={`font-bold mr-1.5 ${text}`}>#{index + 1}</span>
+                {row.name}
+              </span>
+              <span className={`font-bold ${text}`}>{money(row.amount)}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-500 text-[11px]">
+              <span>จำนวนบิล: {row.bills} บิล</span>
+              <span>น้ำหนัก: {money(row.qty)} กก.</span>
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-6 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function ProductRank({ rows, title, tone }: { rows: { amount: number; code: string; group: string; id: string; name: string; qty: number }[]; title: string; tone: 'indigo' | 'teal' }) {
-  const header = tone === 'indigo' ? 'bg-indigo-50 text-indigo-700' : 'bg-teal-50 text-teal-700'
+  const header = tone === 'indigo' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-teal-50 text-teal-700 border-teal-100'
   const text = tone === 'indigo' ? 'text-indigo-700' : 'text-teal-700'
-  return <div className="overflow-hidden rounded-md bg-white shadow-lg"><div className={`border-b p-3 ${header}`}><h3 className="font-bold">{title}</h3></div><table className="w-full text-sm"><tbody>{rows.map((row, index) => <tr key={row.id} className="border-t"><td className={`p-2 font-bold ${text}`}>{index + 1}</td><td className="p-2 font-mono text-xs">{row.code}</td><td className="p-2 text-xs">{row.name}</td><td className="p-2 text-xs text-slate-500">{row.group}</td><td className="p-2 text-right text-xs">{money(row.qty)}</td><td className={`p-2 text-right font-bold ${text}`}>{money(row.amount)}</td></tr>)}</tbody></table></div>
+  return (
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className={`border-b p-3 font-bold text-sm ${header}`}>
+        <h3 className="font-bold">{title}</h3>
+      </div>
+      
+      {/* Desktop view */}
+      <div className="hidden sm:block">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs">
+            <tr>
+              <th className="p-2 text-left font-semibold w-10">#</th>
+              <th className="p-2 text-left font-semibold">Code</th>
+              <th className="p-2 text-left font-semibold">สินค้า</th>
+              <th className="p-2 text-left font-semibold">หมวด</th>
+              <th className="p-2 text-right font-semibold">น้ำหนัก (กก.)</th>
+              <th className="p-2 text-right font-semibold">มูลค่า</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/30">
+                <td className={`p-2 font-bold ${text}`}>{index + 1}</td>
+                <td className="p-2 font-mono text-xs text-slate-600">{row.code}</td>
+                <td className="p-2 text-xs text-slate-700">{row.name}</td>
+                <td className="p-2 text-xs text-slate-500">{row.group}</td>
+                <td className="p-2 text-right text-xs text-slate-600">{money(row.qty)}</td>
+                <td className={`p-2 text-right font-bold ${text}`}>{money(row.amount)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="py-8 text-center text-slate-400 text-xs" colSpan={6}>ไม่มีข้อมูล</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile view */}
+      <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
+        {rows.map((row, index) => (
+          <div key={row.id} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800 line-clamp-1">
+                <span className={`font-bold mr-1.5 ${text}`}>#{index + 1}</span>
+                {row.name}
+              </span>
+              <span className={`font-bold ${text}`}>{money(row.amount)}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-500 text-[11px]">
+              <span>Code: <span className="font-mono">{row.code}</span> ({row.group})</span>
+              <span>น้ำหนัก: {money(row.qty)} กก.</span>
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-6 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id: string; name: string; qty: number; suppliers: number }[] }) {
-  return <div className="rounded-md bg-white p-4 shadow"><h3 className="mb-3 font-bold text-slate-700">🆕 ยอดซื้อแต่ละ Sale — จำนวน supplier/กก./ยอดซื้อ</h3><table className="w-full text-xs"><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="p-2">{row.name}</td><td className="p-2 text-right">{row.suppliers} supplier</td><td className="p-2 text-right">{money(row.qty)} กก.</td><td className="p-2 text-right font-bold text-blue-700">{money(row.amount)}</td><td className="p-2 text-right">{row.bills} บิล</td></tr>)}</tbody></table></div>
+  return (
+    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+      <h3 className="mb-3 font-bold text-slate-700 text-sm">🆕 ยอดซื้อแต่ละ Sale — จำนวน supplier/กก./ยอดซื้อ</h3>
+      
+      {/* Desktop view */}
+      <div className="hidden sm:block">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="p-2 text-left font-semibold">Sale</th>
+              <th className="p-2 text-right font-semibold">Suppliers</th>
+              <th className="p-2 text-right font-semibold">น้ำหนัก (กก.)</th>
+              <th className="p-2 text-right font-semibold">ยอดซื้อ</th>
+              <th className="p-2 text-right font-semibold">บิล</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/30">
+                <td className="p-2 text-slate-700 font-medium">{row.name}</td>
+                <td className="p-2 text-right text-slate-600">{row.suppliers} supplier</td>
+                <td className="p-2 text-right text-slate-600">{money(row.qty)} กก.</td>
+                <td className="p-2 text-right font-bold text-blue-600">{money(row.amount)}</td>
+                <td className="p-2 text-right text-slate-600">{row.bills} บิล</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="py-4 text-center text-slate-400" colSpan={5}>ไม่มีข้อมูล</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile view */}
+      <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
+        {rows.map((row) => (
+          <div key={row.id} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800">{row.name}</span>
+              <span className="font-bold text-blue-600">{money(row.amount)}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-500 text-[11px]">
+              <span>ผู้ขาย: {row.suppliers} ราย</span>
+              <span>น้ำหนัก: {money(row.qty)} กก. ({row.bills} บิล)</span>
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function money(value?: number) {
@@ -575,36 +1201,149 @@ function money(value?: number) {
 }
 
 function toneClass(tone: string) {
-  const map: Record<string, string> = { amber: 'bg-amber-50 text-amber-700', blue: 'bg-blue-50 text-blue-700', cyan: 'bg-cyan-50 text-cyan-700', emerald: 'bg-emerald-50 text-emerald-700', orange: 'bg-orange-50 text-orange-700', purple: 'bg-purple-50 text-purple-700', red: 'bg-red-50 text-red-700', slate: 'bg-slate-50 text-slate-700' }
+  const map: Record<string, string> = {
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    cyan: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    orange: 'bg-orange-50 text-orange-700 border-orange-100',
+    purple: 'bg-purple-50 text-purple-700 border-purple-100',
+    red: 'bg-red-50 text-red-700 border-red-100',
+    slate: 'bg-slate-50 text-slate-700 border-slate-100',
+  }
   return map[tone] ?? map.slate
 }
 
 function Metric({ label, tone = 'slate', value }: { label: string; tone?: string; value: string }) {
-  return <div className={`rounded-md p-4 shadow ${toneClass(tone)}`}><div className="text-xs opacity-75">{label}</div><div className="mt-1 text-xl font-bold">{value}</div></div>
+  const toneMap: Record<string, { bg: string; text: string }> = {
+    blue: { bg: 'bg-blue-50/50 text-blue-900 border-blue-100', text: 'text-blue-600' },
+    emerald: { bg: 'bg-emerald-50/50 text-emerald-900 border-emerald-100', text: 'text-emerald-600' },
+    red: { bg: 'bg-red-50/50 text-red-900 border-red-100', text: 'text-red-600' },
+    amber: { bg: 'bg-amber-50/50 text-amber-900 border-amber-100', text: 'text-amber-600' },
+    orange: { bg: 'bg-orange-50/50 text-orange-900 border-orange-100', text: 'text-orange-600' },
+    purple: { bg: 'bg-purple-50/50 text-purple-900 border-purple-100', text: 'text-purple-600' },
+    cyan: { bg: 'bg-cyan-50/50 text-cyan-900 border-cyan-100', text: 'text-cyan-600' },
+  }
+  const cls = toneMap[tone] || { bg: 'bg-slate-50/50 text-slate-900 border-slate-100', text: 'text-slate-500' }
+  const icon = label.slice(0, 2)
+  const isEmoji = /[\uD800-\uDFFF\u2600-\u27BF]/.test(icon)
+  const cleanLabel = isEmoji ? label.slice(2).trim() : label
+
+  return (
+    <div className={`rounded-xl border p-4 shadow-sm bg-white border-slate-200 flex items-center gap-3`}>
+      {isEmoji && (
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cls.bg} ${cls.text} text-xl`}>
+          {icon}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold text-slate-500">{cleanLabel}</div>
+        <div className="mt-0.5 font-mono text-lg font-bold text-slate-900 truncate">{value}</div>
+      </div>
+    </div>
+  )
 }
 
 function BigCard({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
-  return <div className={`rounded-md bg-gradient-to-br ${tone} p-6 text-white shadow-lg`}><div className="text-sm opacity-80">{label}</div><div className="mt-1 text-3xl font-bold">{value}</div><div className="text-sm opacity-90">{sub}</div></div>
+  return (
+    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-5">
+      <div className="text-xs font-semibold text-slate-500">{label}</div>
+      <div className="mt-2 font-mono text-2xl font-bold text-slate-950">{value}</div>
+      <div className="mt-1 text-xs text-slate-400">{sub}</div>
+    </div>
+  )
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="overflow-hidden rounded-md bg-white shadow-lg"><div className="border-b bg-slate-50 p-3 font-bold">{title}</div><div className="p-4">{children}</div></div>
+  return (
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className="border-b border-slate-100 bg-slate-50/50 p-3 font-bold text-slate-700 text-sm">{title}</div>
+      <div className="p-4">{children}</div>
+    </div>
+  )
 }
 
-function Section({ border, children, title }: { border: string; children: ReactNode; title: string }) {
-  return <div className={`rounded-md border-l-8 ${border} bg-white p-4 shadow-sm`}><h2 className="mb-3 font-bold">{title}</h2><div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">{children}</div></div>
+function Section({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <div className="bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+      <h2 className="mb-3 font-bold text-slate-800 text-sm">{title}</h2>
+      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">{children}</div>
+    </div>
+  )
 }
 
 function BarRows({ rows }: { rows: { label: string; value: number }[] }) {
   const max = Math.max(1, ...rows.map((row) => Math.abs(row.value)))
-  return <div className="space-y-2">{rows.map((row) => <div key={row.label}><div className="mb-1 flex justify-between text-xs"><span>{row.label}</span><b>{money(row.value)}</b></div><div className="h-3 rounded-md bg-slate-100"><div className="h-3 rounded-md bg-gradient-to-r from-blue-500 to-indigo-600" style={{ width: `${Math.min(100, Math.abs(row.value) / max * 100)}%` }} /></div></div>)}</div>
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <div className="mb-1 flex justify-between text-xs text-slate-600">
+            <span>{row.label}</span>
+            <b className="text-slate-800">{money(row.value)}</b>
+          </div>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, Math.abs(row.value) / max * 100)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function DueTable({ rows, title }: { rows: { amount: number; docNo: string; name: string }[]; title: string }) {
-  return <Panel title={title}><table className="w-full text-sm"><tbody>{rows.map((row) => <tr key={row.docNo} className="border-t"><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2">{row.name}</td><td className="p-2 text-right font-bold">{money(row.amount)}</td></tr>)}{rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={3}>ไม่มี</td></tr> : null}</tbody></table></Panel>
+  return (
+    <Panel title={title}>
+      <table className="w-full text-xs">
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.docNo} className="border-t border-slate-100 hover:bg-slate-50/30">
+              <td className="p-2 font-mono text-xs text-slate-600">{row.docNo}</td>
+              <td className="p-2 text-slate-700">{row.name}</td>
+              <td className="p-2 text-right font-bold text-slate-800">{money(row.amount)}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td className="py-6 text-center text-slate-400 text-xs" colSpan={3}>ไม่มี</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </Panel>
+  )
 }
 
 function BillTable({ rows, title, tone }: { rows: { amount: number; docNo: string; name: string; qty: number }[]; title: string; tone: 'amber' | 'blue' | 'emerald' }) {
-  const header = tone === 'blue' ? 'bg-blue-50 text-blue-700' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-  return <div className="overflow-hidden rounded-md bg-white shadow-lg"><div className={`border-b p-3 font-bold ${header}`}>{title}</div><table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">ชื่อ</th><th className="p-2 text-right">กก.</th><th className="p-2 text-right">ยอด</th></tr></thead><tbody>{rows.map((row) => <tr key={row.docNo} className="border-t"><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2">{row.name}</td><td className="p-2 text-right">{row.qty ? money(row.qty) : '-'}</td><td className="p-2 text-right font-bold">{money(row.amount)}</td></tr>)}{rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={4}>ไม่มีข้อมูล</td></tr> : null}</tbody></table></div>
+  const header = tone === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+  return (
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className={`border-b p-3 font-bold text-sm ${header}`}>{title}</div>
+      <table className="w-full text-xs">
+        <thead className="bg-slate-50 text-slate-500">
+          <tr>
+            <th className="p-2 text-left font-semibold">เลขที่</th>
+            <th className="p-2 text-left font-semibold">ชื่อ</th>
+            <th className="p-2 text-right font-semibold">กก.</th>
+            <th className="p-2 text-right font-semibold">ยอด</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.docNo} className="border-t border-slate-100 hover:bg-slate-50/30">
+              <td className="p-2 font-mono text-xs text-slate-600">{row.docNo}</td>
+              <td className="p-2 text-slate-700">{row.name}</td>
+              <td className="p-2 text-right text-slate-600">{row.qty ? money(row.qty) : '-'}</td>
+              <td className="p-2 text-right font-bold text-slate-800">{money(row.amount)}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td className="py-8 text-center text-slate-400 text-xs" colSpan={4}>ไม่มีข้อมูล</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
 }

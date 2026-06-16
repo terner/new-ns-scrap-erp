@@ -112,16 +112,16 @@ export function TradingMatchingPageClient() {
 
   return (
     <section className="space-y-4">
-      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-sm">{error}</div> : null}
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-fuchsia-600 via-purple-700 to-violet-800 p-6 text-white shadow-lg">
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-fuchsia-600 via-purple-700 to-violet-800 p-6 text-white shadow-lg">
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
           <div className="relative">
-            <div className="text-sm font-semibold uppercase opacity-85">Trading Matching / จับคู่ต้นทุนขาย Trading</div>
+            <div className="text-xs font-bold uppercase opacity-85">Trading Matching / จับคู่ต้นทุนขาย Trading</div>
             <div className={`mt-2 text-4xl font-bold ${totals.grossProfit >= 0 ? '' : 'text-red-200'}`}>{formatMoney(totals.grossProfit)}</div>
-            <div className="mt-1 text-sm opacity-90">Expected GP · GP% = GP / Sale Amount · {totals.allocationCount} allocation</div>
-            <div className="mt-4 grid gap-3 border-t border-white/20 pt-4 sm:grid-cols-4">
+            <div className="mt-1 text-xs opacity-90">Expected GP · GP% = GP / Sale Amount · {totals.allocationCount} allocation</div>
+            <div className="mt-4 grid gap-3 border-t border-white/20 pt-4 grid-cols-2 sm:grid-cols-4">
               <HeroMetric label="Sales Amount" value={formatMoney(totals.salesAmount)} />
               <HeroMetric label="Cost" value={formatMoney(totals.costAmount)} />
               <HeroMetric label="GP%" value={`${totals.grossProfitPct.toFixed(2)}%`} />
@@ -130,16 +130,18 @@ export function TradingMatchingPageClient() {
           </div>
         </div>
 
-        <div className="rounded-md border border-purple-100 bg-white p-4 shadow">
-          <div className="text-sm font-bold text-slate-800">เส้นทางข้อมูล</div>
-          <div className="mt-3 space-y-2 text-xs text-slate-600">
-            <FlowLine label="ฝั่งซื้อ" value="PO Buy / Purchase Bill Trading -> Cost Source" />
-            <FlowLine label="ฝั่งขาย" value="PO Sell -> Pending Sale -> Sales Bill Trading" />
-            <FlowLine label="ผลลัพธ์" value="allocation, expected GP, remaining qty, exposure tracking" />
+        <div className="rounded-xl border border-purple-100 bg-white p-4 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="text-sm font-bold text-slate-800">เส้นทางข้อมูล</div>
+            <div className="mt-3 space-y-2.5 text-xs text-slate-500 font-semibold leading-relaxed">
+              <FlowLine label="ฝั่งซื้อ" value="PO Buy / Purchase Bill Trading -> Cost Source" />
+              <FlowLine label="ฝั่งขาย" value="PO Sell -> Pending Sale -> Sales Bill Trading" />
+              <FlowLine label="ผลลัพธ์" value="allocation, expected GP, remaining qty, exposure tracking" />
+            </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             {allocationLinks.map((item) => (
-              <Link key={item.href} className="rounded-md border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100" href={item.href}>
+              <Link key={item.href} className="rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 text-xs font-bold text-purple-700 transition-colors outline-none focus:outline-none focus:ring-0 shadow-2xs" href={item.href}>
                 {item.label}
               </Link>
             ))}
@@ -154,80 +156,84 @@ export function TradingMatchingPageClient() {
         <Metric label="Remaining Cost" tone="amber" value={formatMoney(totals.remainingCost)} />
       </div>
 
-      <div className="rounded-md bg-white p-3 shadow">
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <DatePickerInput ariaLabel="วันที่เริ่มต้น" className="w-[130px]" value={fromDate} onChange={setFromDate} />
-          <DatePickerInput ariaLabel="วันที่สิ้นสุด" className="w-[130px]" value={toDate} onChange={setToDate} />
-          <input className="min-w-64 flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา Sales Bill / Purchase Bill / คู่ค้า / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-          {hasFilters ? <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={resetFilters}>ล้าง</button> : null}
-          <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => void loadData()}>Refresh</button>
-          <a className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" href={exportHref}>Export XLSX</a>
+          <DatePickerInput ariaLabel="วันที่เริ่มต้น" className="h-10 text-sm" value={fromDate} onChange={setFromDate} />
+          <DatePickerInput ariaLabel="วันที่สิ้นสุด" className="h-10 text-sm" value={toDate} onChange={setToDate} />
+          <input className="min-w-64 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white font-medium text-slate-750 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" placeholder="ค้นหา Sales Bill / Purchase Bill / คู่ค้า / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          {hasFilters ? <button className="rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-655 hover:text-slate-800 hover:bg-slate-50 transition-colors h-10 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={resetFilters}>ล้าง</button> : null}
+          <button className="rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-655 hover:text-slate-800 hover:bg-slate-50 transition-colors h-10 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={() => void loadData()}>Refresh</button>
+          <a className="inline-flex items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-800 px-4 h-10 text-sm font-semibold text-white transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" href={exportHref}>Export XLSX</a>
         </div>
       </div>
 
-      <div className="rounded-md border bg-white shadow">
-        <div className="flex flex-wrap items-center border-b">
-          <button className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'allocations' ? 'border-fuchsia-600 text-fuchsia-700' : 'border-transparent text-slate-500'}`} type="button" onClick={() => setTab('allocations')}>Allocation ({filteredDeals.length})</button>
-          <button className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'remaining' ? 'border-fuchsia-600 text-fuchsia-700' : 'border-transparent text-slate-500'}`} type="button" onClick={() => setTab('remaining')}>ต้นทุนคงเหลือ ({remainingPurchases.length})</button>
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="flex flex-wrap items-center border-b border-slate-200 bg-slate-50/50">
+          <button className={`border-b-2 px-5 py-3.5 text-sm font-semibold outline-none focus:outline-none focus:ring-0 transition-colors ${tab === 'allocations' ? 'border-purple-600 text-purple-700' : 'border-transparent text-slate-500 hover:text-slate-850'}`} type="button" onClick={() => setTab('allocations')}>Allocation ({filteredDeals.length})</button>
+          <button className={`border-b-2 px-5 py-3.5 text-sm font-semibold outline-none focus:outline-none focus:ring-0 transition-colors ${tab === 'remaining' ? 'border-purple-600 text-purple-700' : 'border-transparent text-slate-500 hover:text-slate-850'}`} type="button" onClick={() => setTab('remaining')}>ต้นทุนคงเหลือ ({remainingPurchases.length})</button>
         </div>
 
         {tab === 'allocations' ? (
           <>
-            <div className="block space-y-3 p-4 md:hidden">
-              {isLoading ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล</div> : null}
+            <div className="block space-y-3 p-4 lg:hidden">
+              {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-455 font-semibold text-xs shadow-sm">กำลังโหลดข้อมูล</div> : null}
               {!isLoading && filteredDeals.map((row) => (
-                <button key={row.id} className="block w-full rounded-md border border-slate-100 bg-white p-4 text-left shadow-sm active:bg-slate-50" type="button" onClick={() => setSelectedDeal(row)}>
-                  <div className="flex justify-between gap-3">
-                    <span className="font-bold text-slate-800">{row.salesBillNo || '-'}</span>
-                    <span className="text-xs text-slate-500">{formatDateDisplay(row.date)}</span>
+                <button key={row.id} className="block w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:bg-slate-50/50 active:bg-slate-100/50 transition-all outline-none focus:outline-none focus:ring-0 cursor-pointer" type="button" onClick={() => setSelectedDeal(row)}>
+                  <div className="flex justify-between gap-3 border-b border-slate-100 pb-2 mb-2">
+                    <span className="font-bold text-slate-800 text-sm">{row.salesBillNo || '-'}</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">{formatDateDisplay(row.date)}</span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">Cost source: {row.purchaseBillNo || '-'}</div>
-                  <div className="mt-2 text-xs text-slate-600">{row.supplierName} ไปยัง {row.customerName}</div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2 text-xs">
+                  <div className="text-xs text-slate-400 font-semibold">Cost source: <span className="font-mono text-slate-600 font-bold">{row.purchaseBillNo || '-'}</span></div>
+                  <div className="mt-1 text-xs text-slate-605 font-semibold">{row.supplierName} &rarr; {row.customerName}</div>
+                  <div className="mt-3.5 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2 text-xs">
                     <Amount label="Cost" tone="red" value={row.matchedPurchaseAmount} />
                     <Amount label="Sales" tone="emerald" value={row.matchedSalesAmount} />
                     <Amount label="GP" tone={row.grossProfit >= 0 ? 'purple' : 'red'} value={row.grossProfit} />
                   </div>
                 </button>
               ))}
-              {!isLoading && filteredDeals.length === 0 ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm">ยังไม่มี allocation ตามเงื่อนไขที่ค้นหา</div> : null}
+              {!isLoading && filteredDeals.length === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-455 font-semibold text-xs shadow-sm">ยังไม่มี allocation ตามเงื่อนไขที่ค้นหา</div> : null}
             </div>
 
-            <div className="hidden overflow-x-auto p-5 md:block">
-              <table className="w-full min-w-[1080px] text-sm">
-                <thead className="bg-slate-100">
+            <div className="hidden overflow-x-auto p-5 lg:block">
+              <table className="w-full min-w-[1080px] text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-655 font-semibold">
                   <tr>
-                    <th className="p-2 text-left">Sales Bill</th>
-                    <th className="p-2 text-left">วันที่</th>
-                    <th className="p-2 text-left">Cost Source</th>
-                    <th className="p-2 text-left">Supplier</th>
-                    <th className="p-2 text-left">Customer</th>
-                    <th className="p-2 text-left">สินค้า</th>
-                    <th className="p-2 text-right">Qty</th>
-                    <th className="p-2 text-right">Cost</th>
-                    <th className="p-2 text-right">Sales Amt</th>
-                    <th className="p-2 text-right">Expected GP</th>
-                    <th className="p-2 text-right">GP%</th>
-                    <th className="p-2 text-center">Action</th>
+                    <th className="p-2.5 text-left font-semibold">Sales Bill</th>
+                    <th className="p-2.5 text-left font-semibold">วันที่</th>
+                    <th className="p-2.5 text-left font-semibold">Cost Source</th>
+                    <th className="p-2.5 text-left font-semibold">Supplier</th>
+                    <th className="p-2.5 text-left font-semibold">Customer</th>
+                    <th className="p-2.5 text-left font-semibold">สินค้า</th>
+                    <th className="p-2.5 text-right font-semibold">Qty</th>
+                    <th className="p-2.5 text-right font-semibold">Cost</th>
+                    <th className="p-2.5 text-right font-semibold">Sales Amt</th>
+                    <th className="p-2.5 text-right font-semibold">Expected GP</th>
+                    <th className="p-2.5 text-right font-semibold">GP%</th>
+                    <th className="p-2.5 text-center font-semibold">Action</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
-                  {!isLoading && !error && filteredDeals.length === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={12}>ยังไม่มี allocation ตามเงื่อนไขที่ค้นหา</td></tr> : null}
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading ? <tr><td className="p-6 text-center text-slate-500 font-semibold" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
+                  {!isLoading && !error && filteredDeals.length === 0 ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={12}>ยังไม่มี allocation ตามเงื่อนไขที่ค้นหา</td></tr> : null}
                   {!isLoading && filteredDeals.map((row) => (
-                    <tr key={row.id} className="border-t hover:bg-slate-50">
-                      <td className="p-2 font-mono text-xs font-semibold text-slate-800">{row.salesBillNo || '-'}</td>
-                      <td className="p-2 text-xs">{formatDateDisplay(row.date)}</td>
-                      <td className="p-2 font-mono text-xs">{row.purchaseBillNo || '-'}</td>
-                      <td className="p-2 text-xs">{row.supplierName}</td>
-                      <td className="p-2 text-xs">{row.customerName}</td>
-                      <td className="p-2 text-xs">{row.productName}</td>
-                      <td className="p-2 text-right">{formatMoney(row.matchedQty)}</td>
-                      <td className="p-2 text-right text-red-600">{formatMoney(row.matchedPurchaseAmount)}</td>
-                      <td className="p-2 text-right text-emerald-700">{formatMoney(row.matchedSalesAmount)}</td>
-                      <td className={`p-2 text-right font-bold ${row.grossProfit >= 0 ? 'text-purple-700' : 'text-red-600'}`}>{formatMoney(row.grossProfit)}</td>
-                      <td className="p-2 text-right">{row.grossProfitPct.toFixed(2)}%</td>
-                      <td className="whitespace-nowrap p-2 text-center"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={() => setSelectedDeal(row)}>รายละเอียด</button></td>
+                    <tr key={row.id} className="hover:bg-slate-50/30 transition-colors">
+                      <td className="p-2.5 font-mono font-semibold text-slate-800">{row.salesBillNo || '-'}</td>
+                      <td className="p-2.5 text-slate-500 font-medium">{formatDateDisplay(row.date)}</td>
+                      <td className="p-2.5 font-mono text-slate-600 font-medium">{row.purchaseBillNo || '-'}</td>
+                      <td className="p-2.5 text-slate-700 font-medium">{row.supplierName}</td>
+                      <td className="p-2.5 text-slate-700 font-medium">{row.customerName}</td>
+                      <td className="p-2.5 text-slate-700 font-medium">{row.productName}</td>
+                      <td className="p-2.5 text-right font-medium">{formatMoney(row.matchedQty)}</td>
+                      <td className="p-2.5 text-right text-red-700 font-semibold">{formatMoney(row.matchedPurchaseAmount)}</td>
+                      <td className="p-2.5 text-right text-emerald-700 font-semibold">{formatMoney(row.matchedSalesAmount)}</td>
+                      <td className={`p-2.5 text-right font-bold ${row.grossProfit >= 0 ? 'text-purple-700' : 'text-red-700'}`}>{formatMoney(row.grossProfit)}</td>
+                      <td className="p-2.5 text-right font-medium text-slate-505">{row.grossProfitPct.toFixed(2)}%</td>
+                      <td className="whitespace-nowrap p-2.5 text-center">
+                        <button className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-655 hover:bg-slate-50 transition-colors outline-none focus:outline-none focus:ring-0 shadow-2xs cursor-pointer" type="button" onClick={() => setSelectedDeal(row)}>
+                          รายละเอียด
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -236,12 +242,12 @@ export function TradingMatchingPageClient() {
           </>
         ) : (
           <>
-            <div className="block space-y-3 p-4 md:hidden">
+            <div className="block space-y-3 p-4 lg:hidden">
               {remainingPurchases.map((row) => <RemainingPurchaseCard key={row.id} row={row} />)}
-              {!isLoading && remainingPurchases.length === 0 ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm">ไม่มีต้นทุน Trading คงเหลือ</div> : null}
+              {!isLoading && remainingPurchases.length === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-455 font-semibold text-xs shadow-sm">ไม่มีต้นทุน Trading คงเหลือ</div> : null}
             </div>
 
-            <div className="hidden p-5 md:block">
+            <div className="hidden p-5 lg:block">
               <RemainingPurchaseTable rows={remainingPurchases} />
             </div>
           </>
@@ -253,29 +259,29 @@ export function TradingMatchingPageClient() {
 }
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-[10px] opacity-75">{label}</div><div className="text-lg font-bold">{value}</div></div>
+  return <div><div className="text-[10px] opacity-75 font-semibold">{label}</div><div className="text-lg font-bold">{value}</div></div>
 }
 
 function FlowLine({ label, value }: { label: string; value: string }) {
-  return <div><span className="font-semibold text-slate-800">{label}: </span>{value}</div>
+  return <div><span className="font-bold text-slate-700">{label}: </span>{value}</div>
 }
 
 function Amount({ label, tone, value }: { label: string; tone: 'emerald' | 'purple' | 'red'; value: number }) {
-  const color = tone === 'emerald' ? 'text-emerald-700' : tone === 'purple' ? 'text-purple-700' : 'text-red-600'
-  return <div><span className="block text-slate-400">{label}</span><span className={`font-bold tabular-nums ${color}`}>{formatMoney(value)}</span></div>
+  const color = tone === 'emerald' ? 'text-emerald-700' : tone === 'purple' ? 'text-purple-700' : 'text-red-650'
+  return <div><span className="block text-slate-405 font-semibold">{label}</span><span className={`font-bold tabular-nums text-xs ${color}`}>{formatMoney(value)}</span></div>
 }
 
 function RemainingPurchaseCard({ row }: { row: TradingPurchaseRow }) {
   return (
-    <div className="rounded-md border border-slate-100 bg-white p-3 text-xs shadow-sm">
-      <div className="flex justify-between gap-3 font-bold text-slate-800">
-        <span>{row.docNo}</span>
-        <span>{formatDateDisplay(row.date)}</span>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs shadow-sm space-y-2.5">
+      <div className="flex justify-between gap-3 font-bold text-slate-800 border-b border-slate-100 pb-2">
+        <span className="font-mono">{row.docNo}</span>
+        <span className="text-slate-400 font-semibold">{formatDateDisplay(row.date)}</span>
       </div>
-      <div className="mt-1 text-slate-600">{row.supplierName}</div>
-      <div className="mt-2 flex justify-between border-t border-slate-50 pt-2 font-semibold">
-        <span>ต้นทุนรวม {formatMoney(row.totalAmount)}</span>
-        <span className="text-amber-700">คงเหลือ {formatMoney(row.remainingAmount)}</span>
+      <div className="text-slate-655 font-semibold">Supplier: {row.supplierName}</div>
+      <div className="flex justify-between border-t border-slate-50 pt-2 font-semibold text-xs">
+        <span className="text-slate-505">ต้นทุนรวม {formatMoney(row.totalAmount)}</span>
+        <span className="text-amber-700 font-bold">คงเหลือ {formatMoney(row.remainingAmount)}</span>
       </div>
     </div>
   )
@@ -284,54 +290,56 @@ function RemainingPurchaseCard({ row }: { row: TradingPurchaseRow }) {
 function RemainingPurchaseTable({ rows }: { rows: TradingPurchaseRow[] }) {
   return (
     <div>
-      <div className="mb-2 font-bold text-emerald-700">Trading Purchases / Cost Source — ยังไม่ได้จับ Matched</div>
-      <table className="w-full text-xs">
-        <thead className="bg-slate-100">
-          <tr>
-            <th className="p-2 text-left">บิลซื้อ</th>
-            <th className="p-2 text-left">วันที่</th>
-            <th className="p-2 text-left">Supplier</th>
-            <th className="p-2 text-right">มูลค่า</th>
-            <th className="p-2 text-right">Matched</th>
-            <th className="p-2 text-right">ต้นทุนคงเหลือ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-t">
-              <td className="p-2 font-mono">{row.docNo}</td>
-              <td className="p-2">{formatDateDisplay(row.date)}</td>
-              <td className="p-2">{row.supplierName}</td>
-              <td className="p-2 text-right">{formatMoney(row.totalAmount)}</td>
-              <td className="p-2 text-right">{formatMoney(row.matchedAmount)}</td>
-              <td className="p-2 text-right font-bold text-amber-700">{formatMoney(row.remainingAmount)}</td>
+      <div className="mb-3.5 font-bold text-emerald-755 text-sm">Trading Purchases / Cost Source — ยังไม่ได้จับ Matched</div>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-650">
+            <tr>
+              <th className="p-2.5 text-left font-semibold">บิลซื้อ</th>
+              <th className="p-2.5 text-left font-semibold">วันที่</th>
+              <th className="p-2.5 text-left font-semibold">Supplier</th>
+              <th className="p-2.5 text-right font-semibold">มูลค่า</th>
+              <th className="p-2.5 text-right font-semibold">Matched</th>
+              <th className="p-2.5 text-right font-semibold">ต้นทุนคงเหลือ</th>
             </tr>
-          ))}
-          {rows.length === 0 ? <tr><td className="py-4 text-center text-slate-400" colSpan={6}>ไม่มีต้นทุน Trading คงเหลือ</td></tr> : null}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row) => (
+              <tr key={row.id} className="hover:bg-slate-50/30 transition-colors">
+                <td className="p-2.5 font-mono font-medium">{row.docNo}</td>
+                <td className="p-2.5 text-slate-500 font-medium">{formatDateDisplay(row.date)}</td>
+                <td className="p-2.5 text-slate-800 font-medium">{row.supplierName}</td>
+                <td className="p-2.5 text-right font-medium">{formatMoney(row.totalAmount)}</td>
+                <td className="p-2.5 text-right text-slate-500 font-medium">{formatMoney(row.matchedAmount)}</td>
+                <td className="p-2.5 text-right font-bold text-amber-700">{formatMoney(row.remainingAmount)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={6}>ไม่มีต้นทุน Trading คงเหลือ</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
 
 function Metric({ label, tone = 'slate', value }: { label: string; tone?: 'amber' | 'emerald' | 'purple' | 'red' | 'slate'; value: string }) {
-  const configs = {
-    amber: { bg: 'bg-amber-100 text-amber-600', labelColor: 'text-amber-600', valueColor: 'text-amber-700' },
-    emerald: { bg: 'bg-emerald-100 text-emerald-600', labelColor: 'text-emerald-600', valueColor: 'text-emerald-700' },
-    purple: { bg: 'bg-purple-100 text-purple-600', labelColor: 'text-purple-600', valueColor: 'text-purple-700' },
-    red: { bg: 'bg-red-100 text-red-600', labelColor: 'text-red-600', valueColor: 'text-red-700' },
-    slate: { bg: 'bg-slate-100 text-slate-600', labelColor: 'text-slate-500', valueColor: 'text-slate-900' },
+  const tones = {
+    amber: { bg: 'bg-amber-50', text: 'text-amber-600', emoji: '⏳' },
+    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', emoji: '📈' },
+    purple: { bg: 'bg-purple-50', text: 'text-purple-655', emoji: '💰' },
+    red: { bg: 'bg-red-50', text: 'text-red-650', emoji: '📉' },
+    slate: { bg: 'bg-slate-100', text: 'text-slate-600', emoji: '📋' },
   }
-  const config = configs[tone]
+  const style = tones[tone] ?? tones.slate
 
   return (
-    <div className="flex flex-1 items-center gap-2.5 rounded-md border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold sm:h-12 sm:w-12 sm:text-xl ${config.bg}`}>
-        {label.slice(0, 1)}
+    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-3 w-full">
+      <div className={`w-10 h-10 rounded-full ${style.bg} ${style.text} flex items-center justify-center text-lg shrink-0`}>
+        {style.emoji}
       </div>
       <div>
-        <div className={`text-xs ${config.labelColor}`}>{label}</div>
-        <div className={`font-bold ${config.valueColor}`}>{value}</div>
+        <div className="text-xs text-slate-500 font-semibold mb-0.5">{label}</div>
+        <div className="text-lg font-bold text-slate-800 leading-tight">{value}</div>
       </div>
     </div>
   )
@@ -340,18 +348,21 @@ function Metric({ label, tone = 'slate', value }: { label: string; tone?: 'amber
 function DealDetailModal({ deal, onClose }: { deal: TradingDealRow; onClose: () => void }) {
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-h-[90vh] max-w-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0">
-        <DialogHeader className="flex shrink-0 flex-row items-start justify-between gap-3 bg-slate-900 p-4 text-white">
-          <div>
-            <DialogTitle className="text-lg font-bold text-white">Sales Bill {deal.salesBillNo || '-'}</DialogTitle>
-            <DialogDescription className="mt-1 text-xs text-slate-400">
-              Cost source {deal.purchaseBillNo || '-'} · {deal.productName}
-            </DialogDescription>
+      <DialogContent className="max-h-[90vh] max-w-2xl !p-0 overflow-hidden flex flex-col" fallbackTitle="รายละเอียด Deal" hideClose>
+        <DialogHeader className="bg-slate-900 text-white px-6 py-4">
+          <div className="flex items-start justify-between gap-3 w-full">
+            <div>
+              <DialogTitle className="text-white text-base font-bold">Sales Bill {deal.salesBillNo || '-'}</DialogTitle>
+              <DialogDescription className="text-slate-400 text-xs mt-1">
+                Cost source {deal.purchaseBillNo || '-'} · {deal.productName}
+              </DialogDescription>
+            </div>
+            <button className="rounded-xl px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white transition-colors outline-none focus:outline-none focus:ring-0 cursor-pointer" type="button" onClick={onClose}>✕</button>
           </div>
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-5 text-sm">
-          <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-3">
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-3">
             <Detail label="วันที่" value={deal.date || '-'} />
             <Detail label="Qty" value={formatMoney(deal.matchedQty)} />
             <Detail label="GP %" value={`${formatMoney(deal.grossProfitPct)}%`} />
@@ -367,8 +378,8 @@ function DealDetailModal({ deal, onClose }: { deal: TradingDealRow; onClose: () 
           </div>
         </div>
 
-        <DialogFooter className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
-          <Button className="font-normal" size="sm" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+        <DialogFooter className="bg-slate-50 border-t border-slate-200 px-6 py-3.5 flex justify-end">
+          <button className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-655 hover:text-slate-800 hover:bg-slate-50 transition-colors h-10 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer flex items-center justify-center" type="button" onClick={onClose}>ปิด</button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -378,8 +389,8 @@ function DealDetailModal({ deal, onClose }: { deal: TradingDealRow; onClose: () 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col py-1">
-      <div className="text-[10px] font-medium uppercase text-slate-400">{label}</div>
-      <div className="mt-0.5 text-xs font-semibold text-slate-800 sm:text-sm">{value}</div>
+      <div className="text-[10px] font-bold uppercase text-slate-400">{label}</div>
+      <div className="mt-0.5 text-xs font-semibold text-slate-850 sm:text-sm">{value}</div>
     </div>
   )
 }

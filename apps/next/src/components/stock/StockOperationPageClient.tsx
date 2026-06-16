@@ -1153,30 +1153,30 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
   const totalCost = detail.lines.reduce((sum, line) => sum + line.totalCost, 0)
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10">
-      <div className="w-full max-w-5xl overflow-hidden rounded-md bg-white shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-5 py-4">
+      <div className="w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl border-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 text-white px-5 py-4 rounded-t-2xl">
           <div>
-            <h3 className="font-bold">Cost Allocation Detail · {detail.refNo}</h3>
-            <div className="mt-1 text-xs text-slate-500">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
+            <h3 className="font-bold text-white text-base font-sans">Cost Allocation Detail · {detail.refNo}</h3>
+            <div className="mt-1 text-xs text-slate-400 font-sans">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
-            <button className="text-2xl text-slate-400 hover:text-slate-700" type="button" onClick={onClose}>&times;</button>
+          <div className="flex items-center gap-2.5">
+            <button className="rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-medium text-sm px-4 py-2 border-0 outline-none focus:ring-0 transition-colors" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
+            <button className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-xl leading-none" type="button" onClick={onClose}>&times;</button>
           </div>
         </div>
-        <div className="grid gap-3 border-b border-slate-200 p-5 md:grid-cols-5">
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Source Qty" value={`${formatMoney(detail.sourceQty)} กก.`} />
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Target Qty" value={`${formatMoney(detail.targetQty)} กก.`} />
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Loss" value={`${formatMoney(detail.lossQty)} กก.`} />
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Allocated Qty" value={`${formatMoney(totalQty)} กก.`} />
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Allocated Cost" value={formatMoney(totalCost)} />
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Target Policy" value={detail.targetCostPolicy} />
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Target ฿/กก." value={formatMoney(detail.targetUnitCost)} />
-          <Metric cardClassName="rounded-md bg-slate-50 p-3" label="Variance" value={formatMoney(detail.targetCostVariance)} />
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 border-b border-slate-100 p-5 bg-slate-50/30">
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Source Qty" value={`${formatMoney(detail.sourceQty)} กก.`} />
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Qty" value={`${formatMoney(detail.targetQty)} กก.`} />
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Loss" value={`${formatMoney(detail.lossQty)} กก.`} />
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Qty" value={`${formatMoney(totalQty)} กก.`} />
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Cost" value={formatMoney(totalCost)} />
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Policy" value={detail.targetCostPolicy} />
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Target ฿/กก." value={formatMoney(detail.targetUnitCost)} />
+          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Variance" value={formatMoney(detail.targetCostVariance)} />
         </div>
         <div className="max-h-[55vh] overflow-auto p-5">
           <table className="w-full min-w-[980px] text-sm">
-            <thead className="bg-slate-100 text-slate-600">
+            <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100">
               <tr>
                 <th className="p-2 text-left">Line</th>
                 <th className="p-2 text-left">Source Pool</th>
@@ -1215,7 +1215,7 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
             </tbody>
           </table>
         </div>
-        <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-500">
+        <div className="border-t border-slate-100 bg-slate-50 px-5 py-4 text-xs text-slate-500 rounded-b-2xl">
           เหตุผล: {detail.reason || '-'} · หมายเหตุ: {detail.notes || '-'} · เหตุผล override: {detail.targetCostReason || '-'}
         </div>
       </div>

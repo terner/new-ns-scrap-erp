@@ -222,7 +222,7 @@ export function ProductionOrdersPageClient() {
       {error ? <Alert tone="red" title="โหลดข้อมูลใบสั่งผลิตไม่ได้" text={error} /> : null}
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block mb-3 space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden lg:block mb-3 space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <input 
             className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm h-9 border-slate-300" 
@@ -270,7 +270,7 @@ export function ProductionOrdersPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-3 space-y-2 rounded-md bg-white p-3 shadow md:hidden animate-fade-in">
+      <div className="mb-3 space-y-2 rounded-md bg-white p-3 shadow lg:hidden animate-fade-in">
         <div className="flex gap-2 items-center">
           <input 
             className="min-w-[150px] flex-1 rounded-md border px-3 h-9 text-sm border-slate-300" 
@@ -294,7 +294,7 @@ export function ProductionOrdersPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองใบสั่งผลิต</h4>
@@ -456,7 +456,7 @@ export function ProductionOrdersPageClient() {
       </div>
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
           onClick={() => setModalMode('create')}
@@ -1167,7 +1167,7 @@ function MovementPanel({
       ) : null}
 
       <div className="overflow-x-auto rounded-md border border-slate-200">
-        <table className="hidden md:table w-full text-xs">
+        <table className="hidden lg:table w-full text-xs">
           <thead className="bg-slate-100">
             <tr>
               <th className="p-2 text-left">วันที่</th>
@@ -1230,7 +1230,7 @@ function MovementPanel({
           </tbody>
         </table>
 
-        <div className="block md:hidden divide-y divide-slate-100 bg-white">
+        <div className="block lg:hidden divide-y divide-slate-100 bg-white">
           {rows.map((row, index) => {
             const isRowActive = row.status?.toLowerCase() === 'active'
             const isRowReversed = row.status?.toLowerCase() === 'reversed'
@@ -1316,7 +1316,7 @@ function ProductStockPreview({
       </h5>
       
       {/* Desktop Table View */}
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white border border-indigo-100">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white border border-indigo-100">
         <table className="w-full text-xs">
           <thead className="bg-indigo-50 text-indigo-700">
             <tr>
@@ -1349,7 +1349,7 @@ function ProductStockPreview({
       </div>
 
       {/* Mobile Card List View */}
-      <div className="block md:hidden divide-y divide-indigo-100/60 bg-white rounded-md border border-indigo-100 overflow-hidden shadow-sm">
+      <div className="block lg:hidden divide-y divide-indigo-100/60 bg-white rounded-md border border-indigo-100 overflow-hidden shadow-sm">
         {stock.rows.map((row, index) => (
           <div key={index} className="p-3 space-y-2 text-xs">
             <div className="flex justify-between items-center">

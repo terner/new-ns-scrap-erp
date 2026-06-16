@@ -574,7 +574,7 @@ function ExportButton({ isExporting, onClick }: { isExporting: boolean; onClick:
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button aria-label="Export" className="hidden md:inline-flex ml-auto gap-2" disabled={isExporting} type="button" variant="export" onClick={onClick}>
+          <Button aria-label="Export" className="hidden lg:inline-flex ml-auto gap-2" disabled={isExporting} type="button" variant="export" onClick={onClick}>
             <Download aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span className="hidden sm:inline">{isExporting ? 'กำลัง Export...' : 'ส่งออก Excel'}</span>
           </Button>
@@ -2540,7 +2540,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden lg:block space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <Input
             className="min-w-[260px] flex-1 rounded-md"
@@ -2568,11 +2568,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           ) : null}
           {(search || branchFilter || dateFrom || dateTo || filterMode || statusFilter.length > 0) ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
           {mode === 'purchase' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
-          {mode === 'purchase' ? <Button type="button" className="hidden md:inline-flex" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</Button> : null}
+          {mode === 'purchase' ? <Button type="button" className="hidden lg:inline-flex" onClick={openPurchaseForm}>+ บิลรับซื้อใหม่</Button> : null}
           {mode === 'sales' ? <ExportButton isExporting={isExporting} onClick={() => void exportExcel()} /> : null}
-          {mode === 'sales' ? <Button disabled={isSaving} type="button" className="hidden md:inline-flex" onClick={openSalesForm}>+ บิลขายใหม่</Button> : null}
+          {mode === 'sales' ? <Button disabled={isSaving} type="button" className="hidden lg:inline-flex" onClick={openSalesForm}>+ บิลขายใหม่</Button> : null}
           {mode === 'stock-issue' ? (
-            <Button className="hidden md:inline-flex ml-auto" disabled={isSaving} type="button" onClick={() => void openStockIssueForm()}>+ เบิกออกใหม่</Button>
+            <Button className="hidden lg:inline-flex ml-auto" disabled={isSaving} type="button" onClick={() => void openStockIssueForm()}>+ เบิกออกใหม่</Button>
           ) : null}
         </div>
         {mode === 'stock-issue' ? (
@@ -2603,7 +2603,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+      <div className="space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
         <div className="flex gap-2 items-center">
           <Input
             className="min-w-[200px] flex-1 rounded-md h-9"
@@ -2624,7 +2624,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการ</h4>
@@ -2722,7 +2722,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</div>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden md:inline-flex" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
+          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" className="hidden lg:inline-flex" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
           <Select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto px-2 py-1"
@@ -2741,7 +2741,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       </div>
 
       {/* Mobile Card List (Hidden on Desktop) */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : null}
@@ -2930,7 +2930,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden md:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {tableColumns.map((column, index) => {
@@ -3109,7 +3109,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       </div>
 
       {/* Floating Action Button for Mobile */}
-      <div className="fixed bottom-6 right-6 md:hidden z-10">
+      <div className="fixed bottom-6 right-6 lg:hidden z-10">
         <button
           className="flex size-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform"
           onClick={mode === 'stock-issue' ? () => void openStockIssueForm() : mode === 'purchase' ? openPurchaseForm : openSalesForm}
@@ -4205,16 +4205,31 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           setCancelNote('')
           setCancelNoteError('')
         }}>
-          <DialogContent aria-labelledby={`${mode}-bill-cancel-title`} hideClose className="w-full rounded-md-t-md p-0 md:rounded-md">
-            <DialogHeader className="">
-              <DialogTitle id={`${mode}-bill-cancel-title`}>ยกเลิก{mode === 'sales' ? 'บิลขาย' : mode === 'stock-issue' ? 'เบิกออกรอบิล' : 'บิลรับซื้อ'} {cancelingBill.docNo}</DialogTitle>
-              <DialogDescription>{cancelDialogPartyName}</DialogDescription>
+          <DialogContent aria-labelledby={`${mode}-bill-cancel-title`} hideClose className="top-auto bottom-0 w-full max-w-lg translate-x-[-50%] translate-y-0 rounded-t-2xl md:top-1/2 md:bottom-auto md:-translate-y-1/2 md:rounded-2xl border-0 shadow-2xl p-0 overflow-hidden">
+            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-2xl flex flex-row items-center justify-between shrink-0">
+              <div>
+                <DialogTitle id={`${mode}-bill-cancel-title`} className="text-white">ยกเลิก{mode === 'sales' ? 'บิลขาย' : mode === 'stock-issue' ? 'เบิกออกรอบิล' : 'บิลรับซื้อ'} {cancelingBill.docNo}</DialogTitle>
+                <DialogDescription className="text-slate-350">{cancelDialogPartyName}</DialogDescription>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isSaving) return
+                  setCancelingBill(null)
+                  setCancelNote('')
+                  setCancelNoteError('')
+                }}
+                className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
             </DialogHeader>
-            <div className="space-y-2 p-4 text-sm">
+            <div className="space-y-2 p-5 text-sm">
               <label className="block text-xs font-medium text-slate-600" htmlFor={`${mode}-bill-cancel-note`}>หมายเหตุการยกเลิก *</label>
               <textarea
                 id={`${mode}-bill-cancel-note`}
-                className="w-full rounded-md border px-3 py-2"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-0 outline-none transition-colors"
                 maxLength={500}
                 rows={3}
                 value={cancelNote}
@@ -4225,14 +4240,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               />
               {cancelNoteError ? <div className="text-xs text-red-600">{cancelNoteError}</div> : null}
             </div>
-            <DialogFooter>
-              <Button disabled={isSaving} type="button" variant="ghost" onClick={() => {
+            <DialogFooter className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 shrink-0 rounded-b-2xl">
+              <Button disabled={isSaving} type="button" variant="ghost" className="font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" onClick={() => {
                 if (isSaving) return
                 setCancelingBill(null)
                 setCancelNote('')
                 setCancelNoteError('')
               }}>ปิด</Button>
-              <Button className="bg-red-600 hover:bg-red-700" disabled={isSaving} type="button" onClick={() => void cancelBill()}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</Button>
+              <Button className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors outline-none focus:ring-0 px-5" disabled={isSaving} type="button" onClick={() => void cancelBill()}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -4262,14 +4277,20 @@ function PurchaseBillDetailModal({
     <Dialog open onOpenChange={(open) => {
       if (!open) onClose()
     }}>
-      <DialogContent aria-labelledby="purchase-bill-detail-title" className="max-h-[90vh] max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" hideClose>
-        <DialogHeader className="p-4 bg-slate-900 text-white shrink-0">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <DialogTitle id="purchase-bill-detail-title">รายละเอียดบิลรับซื้อ</DialogTitle>
-              <DialogDescription className="font-mono text-xs">{detail?.docNo ?? docNo}</DialogDescription>
-            </div>
+      <DialogContent aria-labelledby="purchase-bill-detail-title" className="max-h-[90vh] max-w-6xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" hideClose>
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-2xl flex flex-row items-center justify-between shrink-0">
+          <div>
+            <DialogTitle id="purchase-bill-detail-title" className="text-white">รายละเอียดบิลรับซื้อ</DialogTitle>
+            <DialogDescription className="font-mono text-xs text-slate-350">{detail?.docNo ?? docNo}</DialogDescription>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-xl leading-none"
+            aria-label="Close"
+          >
+            &times;
+          </button>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto bg-slate-50">
@@ -4436,14 +4457,14 @@ function PurchaseBillDetailModal({
 
         </div>
 
-        <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50 shrink-0">
+        <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50/50 rounded-b-2xl shrink-0">
           {detail ? (
-            <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => onPrint(detail)}>
+            <Button className="rounded-xl border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-50 transition-colors outline-none focus:ring-0 px-4 py-2 gap-2 flex items-center justify-center font-normal" disabled={isPrinting} type="button" onClick={() => onPrint(detail)}>
               <Printer className="size-4" />
               {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
             </Button>
           ) : null}
-          <Button className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+          <Button className="font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" type="button" variant="ghost" onClick={onClose}>ปิด</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

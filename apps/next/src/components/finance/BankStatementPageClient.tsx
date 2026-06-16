@@ -64,6 +64,8 @@ export function BankStatementPageClient() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [to, setTo] = useState(todayDateInput())
   const [type, setType] = useState('')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
@@ -171,36 +173,107 @@ export function BankStatementPageClient() {
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
-        <select className="w-64 rounded-md border px-3 py-2 text-sm font-medium text-slate-900" value={accountId} onChange={(event) => { setPage(1); setAccountId(event.target.value) }}>
-          {(data?.filters.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{account.name} ({account.type})</option>)}
-        </select>
-        <DatePickerInput className="w-[130px]" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
-        <span className="text-xs text-slate-400">→</span>
-        <DatePickerInput className="w-[130px]" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
-        <button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : '📤 .xlsx'}</button>
-        <button className="rounded-md bg-red-100 px-3 py-2 text-xs font-bold text-red-700 opacity-70" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ลบ Duplicate</button>
+      {/* Filters Toolbar */}
+      <div className="rounded-md bg-white p-3 shadow">
+        {/* Desktop View */}
+        <div className="hidden lg:flex flex-wrap items-center gap-2">
+          <select className="w-64 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={accountId} onChange={(event) => { setPage(1); setAccountId(event.target.value) }}>
+            {(data?.filters.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{account.name} ({account.type})</option>)}
+          </select>
+          <DatePickerInput className="w-[130px]" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
+          <span className="text-xs text-slate-400">→</span>
+          <DatePickerInput className="w-[130px]" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
+          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-emerald-700 transition-colors flex items-center justify-center" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : 'ส่งออก Excel'}</button>
+          <button className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-60 disabled:cursor-not-allowed opacity-75" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ลบ Duplicate</button>
+        </div>
+
+        {/* Mobile View (Collapsible Filters) */}
+        <div className="block lg:hidden space-y-2.5">
+          <div className="flex gap-2">
+            <select className="flex-1 min-w-0 rounded-md border px-3 py-2 text-sm font-medium text-slate-900" value={accountId} onChange={(event) => { setPage(1); setAccountId(event.target.value) }}>
+              {(data?.filters.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{account.name} ({account.type})</option>)}
+            </select>
+            <button
+              className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors flex items-center gap-1 shrink-0 ${
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              type="button"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+            >
+              🔍 ตัวกรอง
+            </button>
+            <button
+              className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-60 shrink-0"
+              disabled={isExporting}
+              type="button"
+              onClick={() => void exportXlsx()}
+            >
+              {isExporting ? '...' : '📥 .xlsx'}
+            </button>
+          </div>
+
+          {showMobileFilters && (
+            <div className="grid grid-cols-1 gap-2 pt-2 border-t border-slate-100 animate-in slide-in-from-top-2 duration-100">
+              <div className="grid grid-cols-2 gap-2 items-center">
+                <label className="text-xs text-slate-500">
+                  จากวันที่
+                  <DatePickerInput className="mt-1 w-full" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
+                </label>
+                <label className="text-xs text-slate-500">
+                  ถึงวันที่
+                  <DatePickerInput className="mt-1 w-full" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
+                </label>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button className="w-full rounded-md bg-red-100 px-3 py-2 text-xs font-bold text-red-700 opacity-70" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ลบ Duplicate</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-md border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 p-4 shadow-md">
-          <div className="text-xs text-slate-500">🏦 บัญชี</div>
-          <div className="truncate text-lg font-bold text-slate-800">{selectedAccount?.name ?? 'กำลังโหลด'}</div>
-          <div className="mt-1 text-xs text-slate-400">{selectedAccount?.type ?? '-'}</div>
-        </div>
-        <div className="rounded-md border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 shadow-md">
-          <div className="text-xs text-emerald-600">📥 เงินเข้ารวม</div>
-          <div className="font-mono text-2xl font-bold text-emerald-700">{formatMoney(cashIn)}</div>
-          <div className="mt-1 text-xs text-emerald-500">บาท</div>
-        </div>
-        <div className="rounded-md border border-rose-200 bg-gradient-to-br from-rose-50 to-rose-100 p-4 shadow-md">
-          <div className="text-xs text-rose-600">📤 เงินออกรวม</div>
-          <div className="font-mono text-2xl font-bold text-rose-700">{formatMoney(cashOut)}</div>
-          <div className="mt-1 text-xs text-rose-500">บาท</div>
-        </div>
-        <div className="rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-md">
-          <div className="text-xs opacity-80">💰 ยอดคงเหลือ</div>
-          <div className="font-mono text-3xl font-bold">{formatMoney(closingBalance)}</div>
-          <div className="mt-1 text-xs opacity-80">บาท</div>
+
+      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
+              🏦
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-slate-500">บัญชี</div>
+              <div className="truncate text-lg font-bold text-slate-800">{selectedAccount?.name ?? 'กำลังโหลด'}</div>
+              <div className="text-[10px] text-slate-400 font-medium mt-0.5">{selectedAccount?.type ?? '-'}</div>
+            </div>
+          </div>
+          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
+              📥
+            </div>
+            <div>
+              <div className="text-xs text-emerald-600">เงินเข้ารวม</div>
+              <div className="font-mono text-2xl font-bold text-emerald-700">{formatMoney(cashIn)}</div>
+              <div className="text-[10px] text-slate-400 font-medium mt-0.5">บาท</div>
+            </div>
+          </div>
+          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
+              📤
+            </div>
+            <div>
+              <div className="text-xs text-rose-600">เงินออกรวม</div>
+              <div className="font-mono text-2xl font-bold text-rose-700">{formatMoney(cashOut)}</div>
+              <div className="text-[10px] text-slate-400 font-medium mt-0.5">บาท</div>
+            </div>
+          </div>
+          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
+              💰
+            </div>
+            <div>
+              <div className="text-xs text-blue-600">ยอดคงเหลือ</div>
+              <div className="font-mono text-2xl font-bold text-blue-700">{formatMoney(closingBalance)}</div>
+              <div className="text-[10px] text-slate-400 font-medium mt-0.5">บาท</div>
+            </div>
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -273,7 +346,7 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
       <div className="flex items-center justify-between border-b bg-slate-50 p-3">
         <h3 className="font-bold text-slate-700">📋 รายการเดินบัญชี ({totalRows} รายการ)</h3>
       </div>
-      <div className="overflow-x-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gradient-to-r from-slate-700 to-slate-900 text-white">
             <tr>
@@ -292,7 +365,7 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
             {!isLoading && rows.map((row) => {
               const isOpening = row.type === 'ยอดยกมา'
               return (
-                <tr key={row.id} className={`border-t transition hover:bg-yellow-50 ${isOpening ? 'bg-amber-50 font-bold' : ''}`}>
+                <tr key={row.id} className={`border-t border-slate-100 transition hover:bg-yellow-50 ${isOpening ? 'bg-amber-50 font-bold' : ''}`}>
                   <td className="p-2 font-mono text-xs">{isOpening ? row.date : formatDateDisplay(row.date)}</td>
                   <td className="p-2 text-xs"><span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${isOpening ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>{row.type || row.refType || '-'}</span></td>
                   <td className="max-w-96 truncate p-2 text-xs">{row.description || row.note || '-'}</td>
@@ -308,25 +381,76 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
           </tbody>
         </table>
       </div>
+
+      {/* Mobile Card list */}
+      <div className="block lg:hidden space-y-3 p-3 bg-slate-50/50 border-t border-slate-100">
+        {isLoading ? (
+          <div className="py-6 text-center text-slate-500 text-xs">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && rows.length === 0 ? (
+          <div className="py-6 text-center text-slate-400 text-xs">ไม่มีรายการ</div>
+        ) : null}
+        {!isLoading && rows.map((row) => {
+          const isOpening = row.type === 'ยอดยกมา'
+          return (
+            <div
+              key={row.id}
+              className={`rounded-md border border-slate-100 bg-white p-3.5 shadow-sm space-y-2 text-sm ${isOpening ? 'bg-amber-50/80 border-amber-200' : ''}`}
+            >
+              <div className="flex justify-between items-start">
+                <span className="font-mono text-slate-500 text-xs">{isOpening ? row.date : formatDateDisplay(row.date)}</span>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${isOpening ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>
+                  {row.type || row.refType || '-'}
+                </span>
+              </div>
+              
+              <div className="text-slate-700 font-medium line-clamp-2">{row.description || row.note || '-'}</div>
+              
+              {!isOpening && (
+                <div className="text-slate-600 font-mono text-xs">
+                  อ้างอิง: <button type="button" className="text-blue-600 underline font-semibold" onClick={() => onOpen(row)}>{row.refNo || row.refType || '-'}</button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100/60 mt-1 text-right text-xs">
+                <div>
+                  <span className="block text-[11px] text-slate-400">เข้า:</span>
+                  <span className="text-emerald-700 font-bold tabular-nums text-sm">{row.amountIn ? formatMoney(row.amountIn) : '-'}</span>
+                </div>
+                <div>
+                  <span className="block text-[11px] text-slate-400">ออก:</span>
+                  <span className="text-rose-700 font-bold tabular-nums text-sm">{row.amountOut ? formatMoney(row.amountOut) : '-'}</span>
+                </div>
+                <div>
+                  <span className="block text-[11px] text-slate-500">คงเหลือ:</span>
+                  <span className={`font-bold tabular-nums text-sm ${row.runningBalance >= 0 ? 'text-blue-700' : 'text-red-600'}`}>
+                    {formatMoney(row.runningBalance)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-      <div className="w-full max-w-2xl rounded-md bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 mb-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={onClose}>
+      <div className="w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{row.refNo || row.id}</h2>
-            <p className="text-sm text-slate-500">{row.accountName}</p>
+            <h2 className="text-lg font-bold text-white">{row.refNo || row.id}</h2>
+            <p className="text-xs text-slate-300">{row.accountName}</p>
           </div>
-          <button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button>
+          <button className="text-2xl text-white/80 hover:text-white" type="button" onClick={onClose}>&times;</button>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4 p-5">
           {/* ข้อมูลบัญชีและอ้างอิง */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลบัญชีและอ้างอิง</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">ข้อมูลบัญชีและอ้างอิง</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="วันที่" value={formatDateDisplay(row.date)} />
               <DetailItem label="บัญชี" value={row.accountName || '-'} />
@@ -339,8 +463,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
           </div>
 
           {/* ข้อมูลการเงิน */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลการเงิน</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">ข้อมูลการเงิน</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="เงินเข้า" value={`${formatMoney(row.amountIn)} บาท`} />
               <DetailItem label="เงินออก" value={`${formatMoney(row.amountOut)} บาท`} />
@@ -349,13 +473,16 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
           </div>
 
           {/* รายละเอียดและหมายเหตุ */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">รายละเอียดและหมายเหตุ</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">รายละเอียดและหมายเหตุ</div>
             <div className="grid grid-cols-1 gap-y-3">
               <DetailItem label="คำอธิบาย" value={row.description || '-'} />
               <DetailItem label="หมายเหตุ" value={row.note || '-'} />
             </div>
           </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+          <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
     </div>
@@ -364,9 +491,9 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
 
 function DetailItem({ className = '', label, value }: { className?: string; label: string; value: string }) {
   return (
-    <div className={`flex flex-col py-1 ${className}`}>
-      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
-      <div className="mt-0.5 text-xs sm:text-sm font-semibold text-slate-800">{value}</div>
+    <div className={`flex flex-col py-1.5 ${className}`}>
+      <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className="mt-1 text-sm sm:text-base font-bold text-slate-800">{value}</div>
     </div>
   )
 }

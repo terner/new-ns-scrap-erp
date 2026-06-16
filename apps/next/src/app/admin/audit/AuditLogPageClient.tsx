@@ -210,7 +210,7 @@ export function AuditLogPageClient() {
   return (
     <section className="space-y-4">
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block rounded-md bg-white p-4 shadow">
+      <div className="hidden lg:block rounded-md bg-white p-4 shadow">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Audit & Activity Log</h2>
@@ -223,7 +223,7 @@ export function AuditLogPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="md:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 animate-fade-in">
+      <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 animate-fade-in">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Audit & Activity Log</h2>
           <p className="mt-0.5 text-xs text-slate-500">ประวัติ user activity, auth event, และ sensitive actions</p>
@@ -249,7 +249,7 @@ export function AuditLogPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองกิจกรรม</h4>
@@ -353,7 +353,7 @@ export function AuditLogPageClient() {
       </div>
 
       {/* Desktop Filter Panel (Hidden on Mobile) */}
-      <div className="hidden md:block rounded-md bg-white p-4 shadow">
+      <div className="hidden lg:block rounded-md bg-white p-4 shadow">
         <div className="grid gap-3 lg:grid-cols-5">
           <label className="block text-sm font-medium lg:col-span-2">
             ค้นหา
@@ -426,7 +426,7 @@ export function AuditLogPageClient() {
 
         {/* Desktop Table View (Hidden on Mobile) */}
         {!isLoading && (
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-sm min-w-[1000px]">
               <thead className="bg-slate-100 text-slate-700 border-b">
                 <tr>
@@ -469,7 +469,7 @@ export function AuditLogPageClient() {
 
         {/* Mobile View: Dense Card List (Hidden on Desktop) */}
         {!isLoading && data.rows.length > 0 ? (
-          <div className="md:hidden divide-y divide-slate-100">
+          <div className="lg:hidden divide-y divide-slate-100">
             {data.rows.map((row) => {
               const groupLabel = eventGroup(row.eventType)
               return (
@@ -502,7 +502,7 @@ export function AuditLogPageClient() {
         ) : null}
 
         {!isLoading && data.rows.length === 0 ? (
-          <div className="md:hidden p-8 text-center text-sm text-slate-400">
+          <div className="lg:hidden p-8 text-center text-sm text-slate-400">
             ยังไม่มี Audit หรือ Activity Log ตามเงื่อนไขนี้
           </div>
         ) : null}

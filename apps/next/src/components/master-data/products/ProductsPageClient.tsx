@@ -381,7 +381,7 @@ export function ProductsPageClient() {
       ) : null}
 
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block mb-4 space-y-3 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">
+      <div className="hidden lg:block mb-4 space-y-3 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <input
             className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm h-9 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
@@ -451,7 +451,7 @@ export function ProductsPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 space-y-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm md:hidden">
+      <div className="mb-4 space-y-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden">
         <div className="flex gap-2 items-center">
           <input
             className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm h-9 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
@@ -474,7 +474,7 @@ export function ProductsPageClient() {
       </div>
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform focus:outline-none"
           onClick={openCreateForm}
@@ -487,7 +487,7 @@ export function ProductsPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
@@ -583,7 +583,7 @@ export function ProductsPageClient() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {columnResize.hasCustomWidths ? (
-              <Button className="hidden md:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
+              <Button className="hidden lg:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
                 คืนค่าเดิมตาราง
               </Button>
             ) : null}
@@ -647,7 +647,7 @@ export function ProductsPageClient() {
       {!isLoading ? (
         <>
           {/* Desktop Table View */}
-          <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm hidden md:block">
+          <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm hidden lg:block">
             <div className="overflow-x-auto">
               <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
@@ -717,7 +717,7 @@ export function ProductsPageClient() {
           </div>
 
           {/* Mobile Card List View */}
-          <div className="block md:hidden space-y-3">
+          <div className="block lg:hidden space-y-3">
             {paginatedProducts.map((product) => (
               <div
                 key={product.id}

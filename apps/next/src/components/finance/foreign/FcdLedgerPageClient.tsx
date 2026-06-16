@@ -85,22 +85,39 @@ export function FcdLedgerPageClient() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <div className="rounded-md bg-white p-4 shadow">
-          <div className="text-xs text-slate-500">บัญชี</div>
-          <div className="font-semibold">{data?.account?.name ?? '-'}</div>
-        </div>
-        <div className="rounded-md bg-indigo-50 p-4 shadow">
-          <div className="text-xs text-indigo-600">ยอดคงเหลือ ({currency || '-'})</div>
-          <div className="text-2xl font-bold text-indigo-700">{formatMoney(data?.summary.foreignBalance ?? 0)}</div>
-        </div>
-        <div className="rounded-md bg-blue-50 p-4 shadow">
-          <div className="text-xs text-blue-600">ยอดคงเหลือ THB Equivalent</div>
-          <div className="text-2xl font-bold text-blue-700">{formatMoney(data?.summary.thbBalance ?? 0)}</div>
+      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
+              🏦
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-slate-500">บัญชี</div>
+              <div className="truncate text-lg font-bold text-slate-800">{data?.account?.name ?? '-'}</div>
+            </div>
+          </div>
+          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
+              💱
+            </div>
+            <div>
+              <div className="text-xs text-indigo-600">ยอดคงเหลือ ({currency || '-'})</div>
+              <div className="font-mono text-2xl font-bold text-indigo-700">{formatMoney(data?.summary.foreignBalance ?? 0)}</div>
+            </div>
+          </div>
+          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
+              💰
+            </div>
+            <div>
+              <div className="text-xs text-blue-600">ยอดคงเหลือ THB Equivalent</div>
+              <div className="font-mono text-2xl font-bold text-blue-700">{formatMoney(data?.summary.thbBalance ?? 0)}</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -121,7 +138,7 @@ export function FcdLedgerPageClient() {
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการเดินบัญชี FCD</td></tr> : null}
             {!isLoading && data?.rows.map((row) => (
-              <tr key={row.id} className={`border-t ${row.type === 'ยอดยกมา' ? 'bg-slate-100 font-semibold' : 'hover:bg-slate-50'}`}>
+              <tr key={row.id} className={`border-t border-slate-100 ${row.type === 'ยอดยกมา' ? 'bg-slate-100 font-semibold' : 'hover:bg-slate-50'}`}>
                 <td className="p-2">{row.date}</td>
                 <td className="p-2 text-xs">{row.type}</td>
                 <td className="p-2 font-mono text-xs text-blue-600">{row.refNo}</td>
@@ -137,6 +154,61 @@ export function FcdLedgerPageClient() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card list */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && (data?.rows.length ?? 0) === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มีรายการเดินบัญชี FCD</div>
+        ) : null}
+        {!isLoading && data?.rows.map((row) => {
+          const isOpening = row.type === 'ยอดยกมา'
+          return (
+            <div
+              key={row.id}
+              className={`rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2 text-xs ${isOpening ? 'bg-slate-50' : ''}`}
+            >
+              <div className="flex justify-between items-start">
+                <span className="font-mono text-slate-500 text-[10px]">{row.date}</span>
+                <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold ${isOpening ? 'bg-slate-200 text-slate-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                  {row.type}
+                </span>
+              </div>
+              
+              {!isOpening && (
+                <div className="flex justify-between">
+                  <span className="font-mono text-blue-600 font-semibold">Ref: {row.refNo}</span>
+                  {row.fxRate ? <span className="text-slate-400">Rate: {formatMoney(row.fxRate)}</span> : null}
+                </div>
+              )}
+              
+              <div className="text-slate-700">{row.description || '-'}</div>
+
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-slate-100/60 mt-1">
+                <div>
+                  <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">ต่างประเทศ ({currency})</div>
+                  <div className="mt-0.5 space-y-0.5 font-mono">
+                    <div className="flex justify-between"><span>เข้า:</span><span className="text-emerald-700">{row.foreignIn ? formatMoney(row.foreignIn) : '-'}</span></div>
+                    <div className="flex justify-between"><span>ออก:</span><span className="text-red-600">{row.foreignOut ? formatMoney(row.foreignOut) : '-'}</span></div>
+                    <div className="flex justify-between border-t border-slate-100/60 pt-0.5 font-bold"><span>คงเหลือ:</span><span className="text-slate-800">{formatMoney(row.foreignBal)}</span></div>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Equivalent (THB)</div>
+                  <div className="mt-0.5 space-y-0.5 font-mono">
+                    <div className="flex justify-between"><span>เข้า:</span><span className="text-emerald-700">{row.thbIn ? formatMoney(row.thbIn) : '-'}</span></div>
+                    <div className="flex justify-between"><span>ออก:</span><span className="text-red-600">{row.thbOut ? formatMoney(row.thbOut) : '-'}</span></div>
+                    <div className="flex justify-between border-t border-slate-100/60 pt-0.5 font-bold"><span>คงเหลือ:</span><span className="text-slate-800">{formatMoney(row.thbBal)}</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </section>
   )

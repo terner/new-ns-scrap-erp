@@ -210,7 +210,38 @@ function InsightCard({ insight }: { insight: Insight }) {
 }
 
 function DetailTable({ isLoading, rows }: { isLoading: boolean; rows: AnalysisPayload['detailRows'] }) {
-  return <div className="rounded-md bg-white p-4 shadow"><h3 className="mb-3 font-bold">📊 ตารางรายละเอียด</h3><table className="w-full text-sm"><tbody>{isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={2}>กำลังโหลดข้อมูล</td></tr> : null}{rows.map((row) => <tr key={row.label} className={`border-t ${row.tone === 'warn' ? 'bg-amber-50' : row.tone === 'bad' ? 'bg-red-50' : row.label.includes('Projected') ? 'bg-blue-50' : ''}`}><td className="p-2">{row.label}</td><td className={`p-2 text-right font-bold ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : ''}`}>{row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}</td></tr>)}</tbody></table></div>
+  return (
+    <div className="rounded-md bg-white p-4 shadow">
+      <h3 className="mb-3 font-bold">📊 ตารางรายละเอียด</h3>
+      {/* Desktop Table View */}
+      <table className="hidden lg:table w-full text-sm">
+        <tbody>
+          {isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={2}>กำลังโหลดข้อมูล</td></tr> : null}
+          {rows.map((row) => (
+            <tr key={row.label} className={`border-t ${row.tone === 'warn' ? 'bg-amber-50' : row.tone === 'bad' ? 'bg-red-50' : row.label.includes('Projected') ? 'bg-blue-50' : ''}`}>
+              <td className="p-2">{row.label}</td>
+              <td className={`p-2 text-right font-bold ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : ''}`}>
+                {row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Mobile Card List View */}
+      <div className="block lg:hidden divide-y divide-slate-100">
+        {isLoading && <div className="py-6 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>}
+        {!isLoading && rows.map((row) => (
+          <div key={row.label} className={`flex justify-between items-center p-3 text-xs ${row.tone === 'warn' ? 'bg-amber-50/50' : row.tone === 'bad' ? 'bg-red-50/50' : row.label.includes('Projected') ? 'bg-blue-50/50' : ''}`}>
+            <span className="text-slate-700">{row.label}</span>
+            <span className={`font-bold ${row.tone === 'bad' ? 'text-red-750' : row.tone === 'good' ? 'text-emerald-700' : 'text-slate-900'}`}>
+              {row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function ForecastMega({ horizon, summary }: { horizon: number; summary?: ForecastPayload['summary'] }) {
@@ -235,20 +266,164 @@ function CalendarGrid({ days, isLoading, onSelect }: { days: ProjectionDay[]; is
 }
 
 function TopAr({ rows }: { rows: ForecastPayload['insights']['topAR'] }) {
-  return <InsightTable empty="ไม่มีลูกค้าค้างเกินกำหนด ✓" heading="📥 ต้องเร่งเก็บลูกค้าคนไหน (Top 10 Overdue)" tone="emerald"><tbody>{rows.map((row) => <tr key={row.id} className="border-t bg-red-50/30"><Td>{row.customerName}</Td><Td mono>{row.docNo}</Td><Td align="right" strong>{money(row.receivableBalance)}</Td><Td align="right" strong>{row.daysOverdue}</Td></tr>)}{!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={4}>ไม่มีลูกค้าค้างเกินกำหนด ✓</td></tr> : null}</tbody></InsightTable>
+  const headingCls = 'bg-emerald-50 text-emerald-700'
+  return (
+    <div className="rounded-md bg-white shadow">
+      <div className={`border-b p-3 font-bold ${headingCls}`}>📥 ต้องเร่งเก็บลูกค้าคนไหน (Top 10 Overdue)</div>
+      
+      {/* Desktop Table View */}
+      <table className="hidden lg:table w-full text-sm">
+        <thead className="bg-slate-100">
+          <tr>
+            <Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-t bg-red-50/30">
+              <Td>{row.customerName}</Td>
+              <Td mono>{row.docNo}</Td>
+              <Td align="right" strong>{money(row.receivableBalance)}</Td>
+              <Td align="right" strong>{row.daysOverdue}</Td>
+            </tr>
+          ))}
+          {!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={4}>ไม่มีลูกค้าค้างเกินกำหนด ✓</td></tr> : null}
+        </tbody>
+      </table>
+
+      {/* Mobile Card List View */}
+      <div className="block lg:hidden divide-y divide-slate-100">
+        {!rows.length ? (
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มีลูกค้าค้างเกินกำหนด ✓</div>
+        ) : (
+          rows.map((row) => (
+            <div key={row.id} className="p-3 space-y-1 text-xs hover:bg-slate-50/50 transition">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-900">{row.customerName}</span>
+                <span className="font-mono text-blue-750 font-semibold">{row.docNo}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] text-slate-500">
+                <span>ค้าง: <b className="text-slate-800">{money(row.receivableBalance)}</b></span>
+                <span>ค้างมาแล้ว: <b className="text-red-650 font-bold">{row.daysOverdue} วัน</b></span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
 }
 
 function TopAp({ rows }: { rows: ForecastPayload['insights']['topAP'] }) {
-  return <InsightTable empty="ไม่มี AP คงเหลือ" heading="📤 อาจจะต้องเลื่อนจ่าย Supplier คนไหน (Top 10 ยอดสูง)" tone="red"><tbody>{rows.map((row) => <tr key={row.id} className="border-t"><Td>{row.supplierName}</Td><Td mono>{row.docNo}</Td><Td align="right" strong>{money(row.payableBalance)}</Td><Td align="right"><span className={row.daysToDue < 7 ? 'text-red-700' : 'text-slate-600'}>{row.daysToDue}</span></Td></tr>)}{!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={4}>ไม่มี AP คงเหลือ</td></tr> : null}</tbody></InsightTable>
-}
+  const headingCls = 'bg-red-50 text-red-700'
+  return (
+    <div className="rounded-md bg-white shadow">
+      <div className={`border-b p-3 font-bold ${headingCls}`}>📤 อาจจะต้องเลื่อนจ่าย Supplier คนไหน (Top 10 ยอดสูง)</div>
+      
+      {/* Desktop Table View */}
+      <table className="hidden lg:table w-full text-sm">
+        <thead className="bg-slate-100">
+          <tr>
+            <Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-t">
+              <Td>{row.supplierName}</Td>
+              <Td mono>{row.docNo}</Td>
+              <Td align="right" strong>{money(row.payableBalance)}</Td>
+              <Td align="right"><span className={row.daysToDue < 7 ? 'text-red-700' : 'text-slate-650'}>{row.daysToDue}</span></Td>
+            </tr>
+          ))}
+          {!rows.length ? <tr><td className="py-4 text-center text-slate-400" colSpan={4}>ไม่มี AP คงเหลือ</td></tr> : null}
+        </tbody>
+      </table>
 
-function InsightTable({ children, heading, tone }: { children: ReactNode; empty: string; heading: string; tone: 'emerald' | 'red' }) {
-  const cls = tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-  return <div className="rounded-md bg-white shadow"><div className={`border-b p-3 font-bold ${cls}`}>{heading}</div><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th></tr></thead>{children}</table></div>
+      {/* Mobile Card List View */}
+      <div className="block lg:hidden divide-y divide-slate-100">
+        {!rows.length ? (
+          <div className="py-4 text-center text-slate-400 text-xs">ไม่มี AP คงเหลือ</div>
+        ) : (
+          rows.map((row) => (
+            <div key={row.id} className="p-3 space-y-1 text-xs hover:bg-slate-50/50 transition">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-900">{row.supplierName}</span>
+                <span className="font-mono text-blue-755 font-semibold">{row.docNo}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] text-slate-500">
+                <span>ยอด: <b className="text-slate-800">{money(row.payableBalance)}</b></span>
+                <span>ครบกำหนดใน: <b className={row.daysToDue < 7 ? 'text-red-700 font-bold' : 'text-slate-650 font-medium'}>{row.daysToDue} วัน</b></span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
 }
 
 function DayModal({ day, onClose }: { day: ProjectionDay; onClose: () => void }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"><div className="w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl"><div className="flex items-center justify-between border-b p-4"><h2 className="font-bold">📅 {day.date} · Closing {money(day.closing)}</h2><button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button></div><table className="w-full text-sm"><thead className="bg-slate-100"><tr><Th>Type</Th><Th>Ref</Th><Th>Label</Th><Th align="right">Amount</Th></tr></thead><tbody>{day.events.map((event) => <tr key={`${event.type}-${event.refNo}`} className="border-t"><Td>{event.type}</Td><Td mono>{event.refNo}</Td><Td>{event.label}</Td><Td align="right"><span className={event.inOut === 'IN' ? 'text-emerald-700' : 'text-red-700'}>{event.inOut === 'IN' ? '+' : '-'}{money(event.amount)}</span></Td></tr>)}{!day.events.length ? <tr><td className="py-5 text-center text-slate-400" colSpan={4}>ไม่มี event ในวันนี้</td></tr> : null}</tbody></table></div></div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+          <h2 className="text-sm font-bold">📅 {day.date} · Closing {money(day.closing)}</h2>
+          <button className="text-slate-300 hover:text-white text-xs font-semibold outline-none focus:ring-0" type="button" onClick={onClose}>
+            ปิด
+          </button>
+        </div>
+        <div className="max-h-[60vh] overflow-auto">
+          {/* Desktop Table View */}
+          <table className="hidden lg:table w-full text-sm">
+            <thead className="bg-slate-100">
+              <tr>
+                <Th>Type</Th><Th>Ref</Th><Th>Label</Th><Th align="right">Amount</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {day.events.map((event) => (
+                <tr key={`${event.type}-${event.refNo}`} className="border-t">
+                  <Td>{event.type}</Td>
+                  <Td mono>{event.refNo}</Td>
+                  <Td>{event.label}</Td>
+                  <Td align="right">
+                    <span className={event.inOut === 'IN' ? 'text-emerald-700' : 'text-red-700'}>
+                      {event.inOut === 'IN' ? '+' : '-'}{money(event.amount)}
+                    </span>
+                  </Td>
+                </tr>
+              ))}
+              {!day.events.length ? <tr><td className="py-5 text-center text-slate-400" colSpan={4}>ไม่มี event ในวันนี้</td></tr> : null}
+            </tbody>
+          </table>
+
+          {/* Mobile Card List View */}
+          <div className="block lg:hidden divide-y divide-slate-100">
+            {!day.events.length ? (
+              <div className="py-5 text-center text-slate-400 text-xs">ไม่มี event ในวันนี้</div>
+            ) : (
+              day.events.map((event) => (
+                <div key={`${event.type}-${event.refNo}`} className="p-3.5 space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-slate-900">{event.type}</span>
+                    <span className="font-mono text-blue-700 font-semibold">{event.refNo}</span>
+                  </div>
+                  <div className="text-slate-600">{event.label}</div>
+                  <div className="flex justify-between items-center pt-1.5 border-t border-slate-100/50">
+                    <span className="text-slate-400">จำนวนเงิน</span>
+                    <span className={`font-bold ${event.inOut === 'IN' ? 'text-emerald-700' : 'text-red-750'}`}>
+                      {event.inOut === 'IN' ? '+' : '-'}{money(event.amount)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function Th({ align = 'left', children }: { align?: 'center' | 'left' | 'right'; children: ReactNode }) {

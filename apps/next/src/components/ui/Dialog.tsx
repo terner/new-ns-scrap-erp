@@ -32,7 +32,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-md bg-white border border-slate-200/80 shadow-2xl duration-200 focus:outline-none outline-none',
+        'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-2xl duration-200 focus:outline-none outline-none focus-visible:outline-none focus-visible:ring-0',
         className,
       )}
       {...props}
@@ -40,7 +40,7 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Title className="sr-only">{fallbackTitle}</DialogPrimitive.Title>
       {children}
       {!hideClose ? (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 text-slate-400 hover:text-slate-200">
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 text-slate-400 hover:text-slate-200">
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -51,7 +51,7 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col space-y-1.5 bg-slate-900 text-white p-5 rounded-t-md', className)} {...props} />
+  <div className={cn('flex flex-col space-y-1.5 bg-slate-900 text-white p-5 rounded-t-2xl', className)} {...props} />
 )
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

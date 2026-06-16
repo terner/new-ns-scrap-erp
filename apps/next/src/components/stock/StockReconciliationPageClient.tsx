@@ -176,7 +176,7 @@ export function StockReconciliationPageClient() {
         </div>
       </div>
       {/* Mobile Card list */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังตรวจข้อมูล</div>
         ) : null}
@@ -248,7 +248,7 @@ export function StockReconciliationPageClient() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full min-w-[1080px] text-xs">
           <thead className="bg-slate-100 text-left text-slate-600">
             <tr>

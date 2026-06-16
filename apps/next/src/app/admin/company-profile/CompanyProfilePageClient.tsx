@@ -325,13 +325,13 @@ export function CompanyProfilePageClient() {
   return (
     <section className="space-y-3">
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-4 text-white shadow">
+      <div className="hidden lg:block rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-4 text-white shadow">
         <h1 className="text-xl font-bold">🏢 ข้อมูลบริษัทตามสาขา</h1>
         <p className="mt-1 text-sm opacity-90">เลือกสาขาก่อนแก้ไขข้อมูลหัวกระดาษสำหรับใบรับสินค้า / ใบส่งของ</p>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="md:hidden rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-3.5 text-white shadow animate-fade-in">
+      <div className="lg:hidden rounded-md bg-gradient-to-r from-blue-700 to-cyan-600 p-3.5 text-white shadow animate-fade-in">
         <h1 className="text-lg font-bold">🏢 ข้อมูลบริษัทตามสาขา</h1>
         <p className="mt-0.5 text-xs opacity-90">เลือกสาขาก่อนแก้ไขข้อมูลหัวกระดาษสำหรับใบพิมพ์</p>
       </div>

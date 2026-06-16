@@ -116,14 +116,14 @@ export function IntlTransferPageClient() {
         <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white" type="button" onClick={openForm}>+ โอนต่างประเทศใหม่</button>
       </div>
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
         <table className="w-full text-sm">
           <thead className="bg-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">ผู้รับ</th><th className="p-2 text-left">บัญชีต้นทาง</th><th className="p-2 text-left">ประเภท</th><th className="p-2 text-right">จำนวน</th><th className="p-2 text-left">สกุล</th><th className="p-2 text-right">FX</th><th className="p-2 text-right">มูลค่า THB</th><th className="p-2 text-right">Fee</th><th className="p-2 text-center">Bearer</th><th className="p-2 text-center">สถานะ</th><th></th></tr></thead>
           <tbody>
             {isLoading ? <tr><td className="py-10 text-center text-slate-400" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มีรายการโอนต่างประเทศ</td></tr> : null}
             {data?.rows.map((row) => (
-              <tr key={row.id} className="border-t">
+              <tr key={row.id} className="border-t border-slate-100">
                 <td className="p-2 font-mono">{row.docNo}</td><td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.description || '-'}</td><td className="p-2 text-xs">-</td><td className="p-2 text-xs">{row.type}</td><td className="p-2 text-right font-medium">-</td><td className="p-2">-</td><td className="p-2 text-right">-</td><td className="p-2 text-right">{formatMoney(row.amountThb)}</td><td className="p-2 text-right text-amber-700">{formatMoney(row.fee)}</td><td className="p-2 text-center text-xs">-</td><td className="p-2 text-center"><span className="rounded-md bg-purple-100 px-2 py-0.5 text-xs text-purple-700">{row.status}</span></td><td className="p-2 text-right text-xs text-slate-400">Read-only</td>
               </tr>
             ))}
@@ -131,10 +131,61 @@ export function IntlTransferPageClient() {
         </table>
       </div>
 
+      {/* Mobile Card list */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && (data?.rows.length ?? 0) === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มีรายการโอนต่างประเทศ</div>
+        ) : null}
+        {!isLoading && data?.rows.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm space-y-2 text-sm"
+          >
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800 text-sm font-mono">{row.docNo}</span>
+              <span className="rounded-md bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">{row.status}</span>
+            </div>
+            
+            <div className="text-sm text-slate-600 space-y-1.5">
+              <div>
+                <span className="font-semibold text-slate-500">ผู้รับ: </span>
+                <span className="text-slate-800 font-medium">{row.description || '-'}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <span className="font-semibold text-slate-500 block">วันที่: </span>
+                  <span className="text-slate-800">{formatDateDisplay(row.date)}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 block">ประเภท: </span>
+                  <span className="text-slate-800 truncate block">{row.type}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-100/60 mt-1 text-right text-xs">
+                <div>
+                  <span className="font-semibold text-slate-400 block text-xs">มูลค่า THB:</span>
+                  <span className="text-slate-800 font-bold tabular-nums text-sm">{formatMoney(row.amountThb)}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-400 block text-xs">ค่าธรรมเนียม:</span>
+                  <span className="text-amber-700 font-bold tabular-nums text-sm">{formatMoney(row.fee)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {showForm ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 p-4">
-          <div className="mx-auto my-4 max-w-3xl rounded-md bg-white shadow-2xl">
-            <div className="flex justify-between border-b px-5 py-3"><h3 className="font-semibold">โอนเงินต่างประเทศ</h3><button className="text-2xl text-slate-400" type="button" onClick={() => setShowForm(false)}>&times;</button></div>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={() => setShowForm(false)}>
+          <div className="w-full max-w-3xl overflow-hidden rounded-md bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4">
+              <h3 className="font-bold text-white">โอนเงินต่างประเทศ</h3>
+              <button className="text-2xl text-white/80 hover:text-white" type="button" onClick={() => setShowForm(false)}>&times;</button>
+            </div>
             <div className="space-y-3 p-5 text-sm">
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="เลขที่"><input className="w-full rounded-md border bg-slate-50 px-2 py-1.5 font-mono" readOnly value="ITF-DRAFT" /></Field>
@@ -173,7 +224,11 @@ export function IntlTransferPageClient() {
               </div>
               <Field label="หมายเหตุ"><textarea className="w-full rounded-md border px-2 py-1.5" rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
             </div>
-            <div className="flex justify-end gap-2 border-t bg-slate-50 px-5 py-3"><button className="px-4 py-2 text-sm" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button><button className="rounded-md bg-slate-600 px-4 py-2 text-sm text-white opacity-60" disabled type="button">บันทึกร่าง</button><button className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white opacity-60" disabled type="button">ส่งธนาคาร + ลด Cash/Bank</button></div>
+            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
+              <button className="rounded-md bg-slate-600 px-4 py-2 text-sm text-white opacity-60 transition-colors" disabled type="button">บันทึกร่าง</button>
+              <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white opacity-60 transition-colors" disabled type="button">ส่งธนาคาร + ลด Cash/Bank</button>
+            </div>
           </div>
         </div>
       ) : null}

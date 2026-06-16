@@ -685,7 +685,7 @@ export function PaymentApprovalPageClient() {
         </div>
 
         {/* Desktop Filters (Hidden on Mobile) */}
-        <div className="hidden md:block space-y-3 border-b border-slate-100 p-3">
+        <div className="hidden lg:block space-y-3 border-b border-slate-100 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <Input className="min-w-[260px] flex-1 rounded-md" placeholder="ค้นหาเลขที่ / ชื่อ / ช่องทางจ่าย..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <label className="text-xs text-slate-500">วันที่:</label>
@@ -715,7 +715,7 @@ export function PaymentApprovalPageClient() {
         </div>
 
         {/* Mobile Toolbar (Hidden on Desktop) */}
-        <div className="space-y-2 border-b border-slate-100 p-3 md:hidden">
+        <div className="space-y-2 border-b border-slate-100 p-3 lg:hidden">
           <div className="flex gap-2 items-center">
             <Input className="min-w-[200px] flex-1 rounded-md h-9" placeholder="ค้นหาเลขที่ / ชื่อ / ช่องทาง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <button
@@ -754,7 +754,7 @@ export function PaymentApprovalPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการอนุมัติ</h4>
@@ -823,7 +823,7 @@ export function PaymentApprovalPageClient() {
       ) : null}
 
       {/* Mobile Card List */}
-      <div className="block md:hidden space-y-3">
+      <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : null}
@@ -950,7 +950,7 @@ export function PaymentApprovalPageClient() {
       </div>
 
       {/* Desktop Tables (Hidden on Mobile) */}
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         {tab === 'ap' || tab === 'advance' ? (
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <Table className="text-xs" style={{ minWidth: apColumnResize.tableMinWidth + 40, tableLayout: 'fixed' }}>

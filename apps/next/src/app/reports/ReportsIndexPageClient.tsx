@@ -133,17 +133,16 @@ const reports: ReportLink[] = [
   { category: 'tracking', href: '/tracking/customer', label: 'Customer Tracking', owner: 'Tracking', status: 'read baseline', summary: 'Customer sales/receipt tracking' },
   { category: 'tracking', href: '/tracking/supplier', label: 'Supplier Tracking', owner: 'Tracking', status: 'read/export', summary: 'Supplier purchase/payment/product tracking' },
   { category: 'tracking', href: '/tracking/product', label: 'Product Tracking', owner: 'Tracking', status: 'read/export', summary: 'Product movement and slow mover report' },
-  // { category: 'production', href: '/production/dashboard', label: 'แดชบอร์ดการผลิต', owner: 'Production', status: 'read baseline', summary: 'Production KPIs and open order status' },
   { category: 'production', href: '/production/report', label: 'รายงานการผลิต / Yield', owner: 'Production', status: 'read baseline', summary: 'Production yield report' },
   { category: 'daily', href: '/po-reports/outstanding', label: 'PO ซื้อ/ขาย คงเหลือ', owner: 'PO Reports', status: 'read baseline', summary: 'Outstanding PO buy/sell report' },
   { category: 'daily', href: '/admin/transaction-ledger', label: 'Transaction Ledger', owner: 'Admin', status: 'read/export', summary: 'เงินเข้าออกทุกบัญชีพร้อม voucher refs' },
 ]
 
 function statusClass(status: string) {
-  if (status.includes('write')) return 'bg-amber-100 text-amber-700'
-  if (status.includes('design')) return 'bg-blue-100 text-blue-700'
-  if (status.includes('management')) return 'bg-purple-100 text-purple-700'
-  return 'bg-emerald-100 text-emerald-700'
+  if (status.includes('write')) return 'bg-amber-50 text-amber-800 border-amber-100/50'
+  if (status.includes('design')) return 'bg-blue-50 text-blue-800 border-blue-100/50'
+  if (status.includes('management')) return 'bg-purple-50 text-purple-800 border-purple-100/50'
+  return 'bg-emerald-50 text-emerald-800 border-emerald-100/50'
 }
 
 function numberFormat(value: number, digits = 0) {
@@ -264,19 +263,28 @@ export function ReportsIndexPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-md bg-white p-4 shadow">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <DatePickerInput className="w-[130px]" onChange={setFromDate} value={fromDate} />
-          <DatePickerInput className="w-[130px]" onChange={setToDate} value={toDate} />
-          <span className="text-xs text-slate-500">เว้นว่างเพื่อดูทุกช่วงเวลา</span>
-          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={exportActiveTab} type="button">
+          <DatePickerInput className="w-[130px] border-slate-200" onChange={setFromDate} value={fromDate} />
+          <DatePickerInput className="w-[130px] border-slate-200" onChange={setToDate} value={toDate} />
+          <span className="text-xs font-medium text-slate-450">เว้นว่างเพื่อดูทุกช่วงเวลา</span>
+          <button
+            className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:opacity-60 outline-none focus:outline-none"
+            disabled={loading}
+            onClick={exportActiveTab}
+            type="button"
+          >
             Export CSV รายงานนี้
           </button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {legacyTabs.map((item) => (
             <button
-              className={`rounded-md px-3 py-1.5 text-sm font-semibold ${legacyTab === item.k ? 'bg-blue-600 text-white shadow' : 'border bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold border transition-all duration-150 outline-none focus:outline-none ${
+                legacyTab === item.k
+                  ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                  : 'bg-white border-slate-200 text-slate-755 hover:bg-slate-50/80'
+              }`}
               key={item.k}
               onClick={() => setLegacyTab(item.k)}
               type="button"
@@ -287,78 +295,128 @@ export function ReportsIndexPageClient() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <div className="rounded-md bg-blue-50 p-4 shadow">
-          <div className="text-xs font-semibold text-blue-700">จำนวนรายการ</div>
-          <div className="text-2xl font-bold text-blue-800">{numberFormat(summary.count)}</div>
-        </div>
-        <div className="rounded-md bg-emerald-50 p-4 shadow">
-          <div className="text-xs font-semibold text-emerald-700">น้ำหนักรวม</div>
-          <div className="text-2xl font-bold text-emerald-800">{numberFormat(summary.weight, 2)}</div>
-        </div>
-        <div className="rounded-md bg-purple-50 p-4 shadow">
-          <div className="text-xs font-semibold text-purple-700">มูลค่ารวม</div>
-          <div className="text-2xl font-bold text-purple-800">{currency(summary.amount)}</div>
-        </div>
-        <div className="rounded-md bg-amber-50 p-4 shadow">
-          <div className="text-xs font-semibold text-amber-700">กำไร / ต้นทุน</div>
-          <div className="text-2xl font-bold text-amber-800">{currency(summary.profit || summary.cost)}</div>
-        </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        <MetricCard icon="📋" label="จำนวนรายการ" tone="blue" value={numberFormat(summary.count)} />
+        <MetricCard icon="⚖️" label="น้ำหนักรวม (กก.)" tone="emerald" value={numberFormat(summary.weight, 2)} />
+        <MetricCard icon="💰" label="มูลค่ารวม" tone="purple" value={currency(summary.amount)} />
+        <MetricCard icon="📈" label="กำไร / ต้นทุน" tone="amber" value={currency(summary.profit || summary.cost)} />
       </div>
 
-      {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50/40 p-4 text-sm font-semibold text-red-800 shadow-sm">
+          {error}
+        </div>
+      ) : null}
 
-      <div className="overflow-x-auto rounded-md bg-white shadow">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-slate-100">
-            <tr>
-              {columns.map((column) => (
-                <th className={`p-2 ${column.key === 'name' ? 'text-left' : 'text-right'}`} key={column.key}>{column.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td className="py-8 text-center text-slate-400" colSpan={columns.length}>กำลังโหลดรายงาน...</td></tr>
-            ) : rows.length ? rows.map((row) => (
-              <tr className="border-t hover:bg-slate-50" key={row.name}>
-                {columns.map((column) => (
-                  <td className={`p-2 ${column.key === 'name' ? 'font-semibold text-slate-900' : `text-right font-semibold ${column.tone === 'amount' ? 'text-blue-700' : column.tone === 'cost' ? 'text-red-700' : column.tone === 'profit' ? 'text-emerald-700' : 'text-slate-700'}`}`} key={column.key}>
-                    {rowValue(row, column)}
-                  </td>
-                ))}
-              </tr>
-            )) : (
-              <tr><td className="py-8 text-center text-slate-400" colSpan={columns.length}>ไม่พบข้อมูลตามเงื่อนไข</td></tr>
-            )}
-          </tbody>
-          {rows.length ? (
-            <tfoot className="border-t-2 bg-slate-50 font-bold text-slate-900">
+      {/* Main Table Panel */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* Desktop View */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm text-slate-700">
+            <thead className="bg-slate-50/80">
               <tr>
                 {columns.map((column) => (
-                  <td className={`p-2 ${column.key === 'name' ? 'text-left' : 'text-right'}`} key={column.key}>
-                    {column.key === 'name' ? 'รวม' : column.key === 'count' ? numberFormat(summary.count) : column.key === 'weight' ? numberFormat(summary.weight, 2) : column.key === 'amount' ? currency(summary.amount) : column.key === 'cost' ? currency(summary.cost) : column.key === 'profit' ? currency(summary.profit) : ''}
-                  </td>
+                  <th className={`p-3 text-slate-600 font-bold border-b border-slate-100 ${column.key === 'name' ? 'text-left' : 'text-right'}`} key={column.key}>
+                    {column.label}
+                  </th>
                 ))}
               </tr>
-            </tfoot>
-          ) : null}
-        </table>
-      </div>
-
-      <div className="rounded-md border border-slate-200 bg-white p-4 shadow">
-        <div className="flex flex-wrap items-center gap-2">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">รายงานอื่นในระบบ</h2>
-            <p className="text-xs text-slate-500">ส่วนนี้คงไว้เป็นทางลัดไปยังรายงาน Next ที่เปิดใช้งานแล้ว</p>
-          </div>
-          <input className="ml-auto min-w-52 rounded-md border px-3 py-2 text-sm" onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อรายงาน / module / path" type="search" value={query} />
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr><td className="py-8 text-center text-slate-400 font-medium" colSpan={columns.length}>กำลังโหลดรายงาน...</td></tr>
+              ) : rows.length ? rows.map((row) => (
+                <tr className="hover:bg-slate-50/30 transition-colors" key={row.name}>
+                  {columns.map((column) => (
+                    <td className={`p-3 ${column.key === 'name' ? 'font-semibold text-slate-900' : `text-right font-mono font-bold ${column.tone === 'amount' ? 'text-blue-600' : column.tone === 'cost' ? 'text-red-600' : column.tone === 'profit' ? 'text-emerald-600' : 'text-slate-800'}`}`} key={column.key}>
+                      {rowValue(row, column)}
+                    </td>
+                  ))}
+                </tr>
+              )) : (
+                <tr><td className="py-8 text-center text-slate-400 font-medium" colSpan={columns.length}>ไม่พบข้อมูลตามเงื่อนไข</td></tr>
+              )}
+            </tbody>
+            {rows.length && !loading ? (
+              <tfoot className="border-t border-slate-200 bg-slate-50/50 font-bold text-slate-900">
+                <tr>
+                  {columns.map((column) => (
+                    <td className={`p-3 font-bold ${column.key === 'name' ? 'text-left' : 'text-right font-mono'}`} key={column.key}>
+                      {column.key === 'name' ? 'รวม' : column.key === 'count' ? numberFormat(summary.count) : column.key === 'weight' ? numberFormat(summary.weight, 2) : column.key === 'amount' ? currency(summary.amount) : column.key === 'cost' ? currency(summary.cost) : column.key === 'profit' ? currency(summary.profit) : ''}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            ) : null}
+          </table>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        {/* Mobile Dense Card List View */}
+        <div className="block lg:hidden">
+          {loading ? (
+            <div className="py-8 text-center text-slate-400 font-medium text-sm">กำลังโหลดรายงาน...</div>
+          ) : rows.length ? (
+            <div className="divide-y divide-slate-200/60">
+              {rows.map((row) => (
+                <div className="p-4 hover:bg-slate-50/30 transition-colors" key={row.name}>
+                  <div className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-1.5 mb-2">{row.name}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {columns.filter((c) => c.key !== 'name').map((column) => (
+                      <div className="flex flex-col gap-0.5 text-xs" key={column.key}>
+                        <span className="font-semibold text-slate-500">{column.label}</span>
+                        <span className={`font-mono font-bold ${column.tone === 'amount' ? 'text-blue-600' : column.tone === 'cost' ? 'text-red-600' : column.tone === 'profit' ? 'text-emerald-600' : 'text-slate-800'}`}>
+                          {rowValue(row, column)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {/* Mobile Total Row */}
+              <div className="bg-slate-50 p-4 font-bold text-slate-900 border-t border-slate-200">
+                <div className="text-xs text-slate-500 font-bold mb-2">รวมทั้งหมด</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {columns.filter((c) => c.key !== 'name').map((column) => (
+                    <div className="flex flex-col gap-0.5 text-xs" key={column.key}>
+                      <span className="font-semibold text-slate-500">{column.label} (รวม)</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {column.key === 'count' ? numberFormat(summary.count) : column.key === 'weight' ? numberFormat(summary.weight, 2) : column.key === 'amount' ? currency(summary.amount) : column.key === 'cost' ? currency(summary.cost) : column.key === 'profit' ? currency(summary.profit) : '-'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-slate-400 font-medium text-sm">ไม่พบข้อมูลตามเงื่อนไข</div>
+          )}
+        </div>
+      </div>
+
+      {/* Reports Directory Section */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">รายงานอื่นในระบบ</h2>
+            <p className="text-xs font-semibold text-slate-400 mt-0.5">ส่วนนี้คงไว้เป็นทางลัดไปยังรายงาน Next ที่เปิดใช้งานแล้ว</p>
+          </div>
+          <input
+            className="ml-auto min-w-52 h-9 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:outline-none focus:border-slate-300 transition-colors"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="ค้นหาชื่อรายงาน / module / path"
+            type="search"
+            value={query}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
           {catalogTabs.map((item) => (
             <button
-              className={`rounded-md px-3 py-1.5 text-sm ${catalogTab === item.k ? 'bg-slate-700 text-white' : 'border bg-white text-slate-700'}`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all duration-150 outline-none focus:outline-none ${
+                catalogTab === item.k
+                  ? 'bg-slate-800 border-slate-800 text-white shadow-sm'
+                  : 'bg-white border-slate-200 text-slate-705 hover:bg-slate-50'
+              }`}
               key={item.k}
               onClick={() => setCatalogTab(item.k)}
               type="button"
@@ -368,43 +426,114 @@ export function ReportsIndexPageClient() {
           ))}
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <div className="rounded-md bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">รายงานที่พบ</div><div className="text-xl font-bold text-blue-700">{catalogSummary.count.toLocaleString('th-TH')}</div></div>
-          <div className="rounded-md bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Read / Design</div><div className="text-xl font-bold text-emerald-700">{catalogSummary.readOnly.toLocaleString('th-TH')}</div></div>
-          <div className="rounded-md bg-white p-3 ring-1 ring-slate-200"><div className="text-xs text-slate-500">Accounting / Finance</div><div className="text-xl font-bold text-purple-700">{catalogSummary.accounting.toLocaleString('th-TH')}</div></div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/20 p-3 shadow-sm">
+            <div className="text-xs font-semibold text-slate-500">รายงานที่พบ</div>
+            <div className="text-xl font-bold text-slate-800 mt-0.5">{catalogSummary.count.toLocaleString('th-TH')}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/20 p-3 shadow-sm">
+            <div className="text-xs font-semibold text-slate-500">Read / Design</div>
+            <div className="text-xl font-bold text-slate-800 mt-0.5">{catalogSummary.readOnly.toLocaleString('th-TH')}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/20 p-3 shadow-sm">
+            <div className="text-xs font-semibold text-slate-500">Accounting / Finance</div>
+            <div className="text-xl font-bold text-slate-800 mt-0.5">{catalogSummary.accounting.toLocaleString('th-TH')}</div>
+          </div>
         </div>
 
-        <div className="mt-3 overflow-x-auto rounded-md border">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="p-2 text-left">รายงาน</th>
-                <th className="p-2 text-left">หมวด</th>
-                <th className="p-2 text-left">สถานะ</th>
-                <th className="p-2 text-left">รายละเอียด</th>
-                <th className="p-2 text-right">เปิด</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((report) => (
-                <tr className="border-t" key={report.href}>
-                  <td className="p-2">
-                    <div className="font-semibold text-slate-900">{report.label}</div>
-                    <div className="font-mono text-xs text-slate-500">{report.href}</div>
-                  </td>
-                  <td className="p-2 text-slate-700">{report.owner}</td>
-                  <td className="p-2"><span className={`rounded-md-full px-2 py-1 text-xs font-semibold ${statusClass(report.status)}`}>{report.status}</span></td>
-                  <td className="p-2 text-slate-600">{report.summary}</td>
-                  <td className="p-2 text-right"><Link className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700" href={report.href} prefetch={false}>เปิดรายงาน</Link></td>
+        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+          {/* Desktop View */}
+          <div className="hidden lg:block overflow-x-auto bg-white">
+            <table className="w-full min-w-[760px] text-sm text-slate-700">
+              <thead className="bg-slate-50/80">
+                <tr>
+                  <th className="p-3 text-left font-bold text-slate-650 border-b border-slate-100">รายงาน</th>
+                  <th className="p-3 text-left font-bold text-slate-650 border-b border-slate-100">หมวด</th>
+                  <th className="p-3 text-left font-bold text-slate-650 border-b border-slate-100">สถานะ</th>
+                  <th className="p-3 text-left font-bold text-slate-650 border-b border-slate-100">รายละเอียด</th>
+                  <th className="p-3 text-right font-bold text-slate-650 border-b border-slate-100">เปิด</th>
                 </tr>
-              ))}
-              {!filtered.length ? (
-                <tr><td className="py-8 text-center text-slate-400" colSpan={5}>ไม่พบรายงานตามเงื่อนไข</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map((report) => (
+                  <tr className="hover:bg-slate-50/30 transition-colors" key={report.href}>
+                    <td className="p-3">
+                      <div className="font-semibold text-slate-900">{report.label}</div>
+                      <div className="font-mono text-xs text-slate-400 mt-0.5">{report.href}</div>
+                    </td>
+                    <td className="p-3 text-slate-600 font-medium">{report.owner}</td>
+                    <td className="p-3">
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${statusClass(report.status)}`}>
+                        {report.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-650 text-xs leading-relaxed">{report.summary}</td>
+                    <td className="p-3 text-right">
+                      <Link className="rounded-lg bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors outline-none focus:outline-none" href={report.href} prefetch={false}>
+                        เปิดรายงาน
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+                {!filtered.length ? (
+                  <tr><td className="py-8 text-center text-slate-400 font-medium" colSpan={5}>ไม่พบรายงานตามเงื่อนไข</td></tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile View */}
+          <div className="block lg:hidden bg-white divide-y divide-slate-200/60">
+            {filtered.map((report) => (
+              <div className="p-4 hover:bg-slate-50/30 transition-colors" key={report.href}>
+                <div className="flex justify-between items-start gap-2 mb-1.5">
+                  <div>
+                    <div className="font-bold text-slate-900 text-sm">{report.label}</div>
+                    <div className="font-mono text-xs text-slate-400 mt-0.5">{report.href}</div>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border shrink-0 ${statusClass(report.status)}`}>
+                    {report.status}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-650 mb-3 leading-relaxed">{report.summary}</div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-slate-500">หมวด: {report.owner}</span>
+                  <Link className="rounded-lg bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors outline-none focus:outline-none" href={report.href} prefetch={false}>
+                    เปิดรายงาน
+                  </Link>
+                </div>
+              </div>
+            ))}
+            {!filtered.length ? (
+              <div className="py-8 text-center text-slate-400 font-medium text-sm">ไม่พบรายงานตามเงื่อนไข</div>
+            ) : null}
+          </div>
         </div>
       </div>
     </section>
+  )
+}
+
+function MetricCard({ icon, label, tone, value }: { icon: string; label: string; tone: string; value: string }) {
+  const toneMap: Record<string, { bg: string; text: string }> = {
+    blue: { bg: 'bg-blue-50 text-blue-600', text: 'text-blue-600' },
+    emerald: { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600' },
+    purple: { bg: 'bg-purple-50 text-purple-600', text: 'text-purple-600' },
+    amber: { bg: 'bg-amber-50 text-amber-600', text: 'text-amber-600' },
+    slate: { bg: 'bg-slate-50 text-slate-650', text: 'text-slate-900' }
+  }
+  const config = toneMap[tone] ?? toneMap.slate
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl ${config.bg}`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold text-slate-500">{label}</div>
+        <div className="mt-0.5 break-words text-xl font-bold tracking-tight text-slate-900">
+          {value}
+        </div>
+      </div>
+    </div>
   )
 }

@@ -466,18 +466,25 @@ export function StockTransferPageClient() {
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
-          <form noValidate data-combobox-portal-root="true" className="w-full max-w-5xl overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
+          <form noValidate data-combobox-portal-root="true" className="w-full max-w-5xl overflow-hidden rounded-2xl bg-slate-900 shadow-xl flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
             <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0">
               <div>
                 <h3 className="font-bold text-slate-100 text-lg">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
                 <p className="mt-1 text-xs text-slate-400">ระบบจะตัด stock ต้นทางและรับเข้าปลายทางเมื่อส่งเข้าสต๊อกเท่านั้น</p>
               </div>
-              <button className="text-2xl text-slate-400 hover:text-white" type="button" onClick={() => setFormOpen(false)}>&times;</button>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
             </div>
 
             <div className="max-h-[76vh] overflow-y-auto bg-slate-50 p-4 sm:p-5 space-y-4 text-sm flex-1">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm col-span-2 md:col-span-1">
                   <h4 className="mb-3 font-bold text-slate-700">1. ต้นทาง</h4>
                   <div className="grid gap-3">
                     <SelectField displayMode="name" error={fieldErrors.fromBranchId} errorKey="fromBranchId" label="สาขาต้นทาง *" options={branchOptions} placeholder="เลือกสาขาต้นทาง" value={form.fromBranchId} onChange={(value) => updateForm('fromBranchId', value)} />
@@ -495,7 +502,7 @@ export function StockTransferPageClient() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm col-span-2 md:col-span-1">
                   <h4 className="mb-3 font-bold text-slate-700">2. ปลายทาง</h4>
                   <div className="grid gap-3">
                     <SelectField displayMode="name" error={fieldErrors.toBranchId} errorKey="toBranchId" label="สาขาปลายทาง *" options={branchOptions} placeholder="เลือกสาขาปลายทาง" value={form.toBranchId} onChange={(value) => updateForm('toBranchId', value)} />
@@ -687,10 +694,10 @@ export function StockTransferPageClient() {
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-              <Button size="sm" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
-              <Button disabled={isSaving} size="sm" type="button" variant="outline" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
-              <Button disabled={isSaving} size="sm" type="button" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-2xl">
+              <Button size="sm" type="button" variant="ghost" className="font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+              <Button disabled={isSaving} size="sm" type="button" variant="outline" className="rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:ring-0 px-4" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
+              <Button disabled={isSaving} size="sm" type="button" className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium transition-colors outline-none focus:ring-0 px-5" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
             </div>
           </form>
         </div>
@@ -878,7 +885,7 @@ function SelectField(props: {
     <FormField error={props.error} errorKey={props.errorKey} label={props.label}>
       <select
         data-error-key={props.errorKey}
-        className={`h-9 w-full rounded-md border px-3 py-2 text-sm outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : `border-slate-300 bg-white ${props.value ? 'text-slate-900' : 'text-slate-400'}`}`}
+        className={`h-9 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : `border-slate-300 bg-white ${props.value ? 'text-slate-900' : 'text-slate-400'}`}`}
         disabled={props.disabled}
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}

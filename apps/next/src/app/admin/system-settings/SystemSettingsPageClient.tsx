@@ -240,7 +240,7 @@ export function SystemSettingsPageClient() {
             </div>
 
             {/* Desktop Table View (Hidden on Mobile) */}
-            <div className="hidden md:block">
+            <div className="hidden lg:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -305,7 +305,7 @@ export function SystemSettingsPageClient() {
             </div>
 
             {/* Mobile View: Dense Card List (Hidden on Desktop) */}
-            <div className="space-y-3 md:hidden">
+            <div className="space-y-3 lg:hidden">
               {whtRecords.map((record) => {
                 const value = whtValues[record.id] ?? toPercentInput(record.ratePercent)
                 const saveKey = `wht:${record.id}`

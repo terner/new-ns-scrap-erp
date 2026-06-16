@@ -100,6 +100,9 @@ export function AccountsReceivablePageClient() {
   const [sortKey, setSortKey] = useState<SortKey>('dueDate')
   const [status, setStatus] = useState('')
   const [to, setTo] = useState(todayDateInput())
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const hasFilters = Boolean(branchId || bucket || channelId || customerId || from || q.trim() || status || to)
+
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
@@ -246,46 +249,132 @@ export function AccountsReceivablePageClient() {
         </div>
       </div>
 
+      {/* Filters Toolbar */}
       <div className="rounded-md bg-white p-3 shadow">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <select className="rounded-md border px-3 py-2 text-sm" value={customerId} onChange={(event) => { setPage(1); setCustomerId(event.target.value) }}>
-            <option value="">ทุก Customer</option>
-            {(data?.filters.customers ?? []).map((customer) => <option key={customer.id} value={customer.id}>{customer.code ? `${customer.code} - ${customer.name}` : customer.name}</option>)}
-          </select>
-          <select className="rounded-md border px-3 py-2 text-sm" value={channelId} onChange={(event) => { setPage(1); setChannelId(event.target.value) }}>
-            <option value="">ทุกช่องทาง</option>
-            {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
-          </select>
-          <select className="rounded-md border px-3 py-2 text-sm" value={bucket} onChange={(event) => { setPage(1); setBucket(event.target.value) }}>
-            <option value="">ทุกอายุหนี้</option>
-            <option value="Current">Current</option>
-            <option value="1-30">1-30</option>
-            <option value="31-60">31-60</option>
-            <option value="61-90">61-90</option>
-            <option value=">90">&gt;90</option>
-          </select>
-          <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : 'Export .xlsx'}</button>
+        {/* Desktop View */}
+        <div className="hidden lg:block space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <input className="min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" placeholder="ค้นหาเลขบิล / ลูกค้า / ช่องทาง / สาขา" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
+            
+            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={customerId} onChange={(event) => { setPage(1); setCustomerId(event.target.value) }}>
+              <option value="">ทุก Customer</option>
+              {(data?.filters.customers ?? []).map((customer) => <option key={customer.id} value={customer.id}>{customer.code ? `${customer.code} - ${customer.name}` : customer.name}</option>)}
+            </select>
+            
+            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={channelId} onChange={(event) => { setPage(1); setChannelId(event.target.value) }}>
+              <option value="">ทุกช่องทาง</option>
+              {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+            </select>
+            
+            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={bucket} onChange={(event) => { setPage(1); setBucket(event.target.value) }}>
+              <option value="">ทุกอายุหนี้</option>
+              <option value="Current">Current</option>
+              <option value="1-30">1-30</option>
+              <option value="31-60">31-60</option>
+              <option value="61-90">61-90</option>
+              <option value=">90">&gt;90</option>
+            </select>
+            
+            <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-emerald-700 transition-colors flex items-center" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : 'Export .xlsx'}</button>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={branchId} onChange={(event) => { setPage(1); setBranchId(event.target.value) }}>
+              <option value="">ทุกสาขา</option>
+              {(data?.filters.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+            
+            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}>
+              <option value="">ทุกสถานะ</option>
+              {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            
+            <span className="text-xs text-slate-500">วันที่บิล:</span>
+            <DatePickerInput className="w-[130px]" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
+            <span className="text-slate-400">→</span>
+            <DatePickerInput className="w-[130px]" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
+            
+            {hasFilters && (
+              <button className="rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors" type="button" onClick={() => { setBranchId(''); setBucket(''); setChannelId(''); setCustomerId(''); setFrom(''); setPage(1); setQ(''); setStatus(''); setTo('') }}>✕ ล้าง</button>
+            )}
+            
+            <span className="ml-auto text-xs text-slate-500">พบ {data?.pagination.totalRows ?? 0} รายการ</span>
+          </div>
         </div>
-        <div className="grid gap-3 lg:grid-cols-6">
-          <input className="rounded-md border px-3 py-2 text-sm lg:col-span-2" placeholder="ค้นหาเลขบิล / ลูกค้า / ช่องทาง / สาขา" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
-          <select className="rounded-md border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setPage(1); setBranchId(event.target.value) }}>
-            <option value="">ทุกสาขา</option>
-            {(data?.filters.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-          <select className="rounded-md border px-3 py-2 text-sm" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}>
-            <option value="">ทุกสถานะ</option>
-            {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-          <span className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500">พบ {data?.pagination.totalRows ?? 0} รายการ</span>
-          <label className="text-xs text-slate-500">
-            จากวันที่
-            <DatePickerInput className="mt-1 w-full" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
-          </label>
-          <label className="text-xs text-slate-500">
-            ถึงวันที่
-            <DatePickerInput className="mt-1 w-full" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
-          </label>
-          <button className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={() => { setBranchId(''); setBucket(''); setChannelId(''); setCustomerId(''); setFrom(''); setPage(1); setQ(''); setStatus(''); setTo('') }}>ล้างตัวกรอง</button>
+
+        {/* Mobile View (Collapsible Filters) */}
+        <div className="block lg:hidden space-y-2">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <input
+                className="w-full rounded-md border px-3 py-2 text-sm pr-8"
+                placeholder="ค้นหาบิล / ลูกค้า / ช่องทาง..."
+                type="search"
+                value={q}
+                onChange={(event) => { setPage(1); setQ(event.target.value) }}
+              />
+            </div>
+            <button
+              className={`rounded-md border px-3 py-2 text-sm font-semibold transition-colors flex items-center gap-1 shrink-0 ${
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              type="button"
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+            >
+              🔍 ตัวกรอง
+            </button>
+            <button
+              className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60 shrink-0"
+              disabled={isExporting}
+              type="button"
+              onClick={() => void exportXlsx()}
+            >
+              {isExporting ? '...' : '📥 .xlsx'}
+            </button>
+          </div>
+
+          {showMobileFilters && (
+            <div className="grid grid-cols-1 gap-2.5 pt-2 border-t border-slate-100 animate-in slide-in-from-top-2 duration-100">
+              <select className="w-full rounded-md border px-3 py-2 text-sm" value={customerId} onChange={(event) => { setPage(1); setCustomerId(event.target.value) }}>
+                <option value="">ทุก Customer</option>
+                {(data?.filters.customers ?? []).map((customer) => <option key={customer.id} value={customer.id}>{customer.code ? `${customer.code} - ${customer.name}` : customer.name}</option>)}
+              </select>
+              <select className="w-full rounded-md border px-3 py-2 text-sm" value={channelId} onChange={(event) => { setPage(1); setChannelId(event.target.value) }}>
+                <option value="">ทุกช่องทาง</option>
+                {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
+              </select>
+              <select className="w-full rounded-md border px-3 py-2 text-sm" value={bucket} onChange={(event) => { setPage(1); setBucket(event.target.value) }}>
+                <option value="">ทุกอายุหนี้</option>
+                <option value="Current">Current</option>
+                <option value="1-30">1-30</option>
+                <option value="31-60">31-60</option>
+                <option value="61-90">61-90</option>
+                <option value=">90">&gt;90</option>
+              </select>
+              <select className="w-full rounded-md border px-3 py-2 text-sm" value={branchId} onChange={(event) => { setPage(1); setBranchId(event.target.value) }}>
+                <option value="">ทุกสาขา</option>
+                {(data?.filters.branches ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              </select>
+              <select className="w-full rounded-md border px-3 py-2 text-sm" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}>
+                <option value="">ทุกสถานะ</option>
+                {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[11px] text-slate-500">
+                  จากวันที่
+                  <DatePickerInput className="mt-1 w-full" value={from} onChange={(value) => { setPage(1); setFrom(value) }} />
+                </label>
+                <label className="text-[11px] text-slate-500">
+                  ถึงวันที่
+                  <DatePickerInput className="mt-1 w-full" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
+                </label>
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-xs text-slate-500">พบ {data?.pagination.totalRows ?? 0} รายการ</span>
+                <button className="rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200" type="button" onClick={() => { setBranchId(''); setBucket(''); setChannelId(''); setCustomerId(''); setFrom(''); setPage(1); setQ(''); setStatus(''); setTo('') }}>ล้างตัวกรอง</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -305,58 +394,114 @@ export function AccountsReceivablePageClient() {
 function DetailTable({ isLoading, onOpen, onSort, rows, selectedSort, sortDirection }: { isLoading: boolean; onOpen: (row: ArRow) => void; onSort: (key: SortKey) => void; rows: ArRow[]; selectedSort: SortKey; sortDirection: 'asc' | 'desc' }) {
   const sortLabel = (key: SortKey) => selectedSort === key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''
   return (
-    <div className="overflow-x-auto rounded-md bg-white shadow">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-100">
-          <tr>
-            <th className="p-2 text-left"><button type="button" onClick={() => onSort('customerName')}>Customer{sortLabel('customerName')}</button></th>
-            <th className="p-2 text-left"><button type="button" onClick={() => onSort('docNo')}>บิล{sortLabel('docNo')}</button></th>
-            <th className="p-2 text-left"><button type="button" onClick={() => onSort('date')}>วันที่{sortLabel('date')}</button></th>
-            <th className="p-2 text-left"><button type="button" onClick={() => onSort('dueDate')}>Due{sortLabel('dueDate')}</button></th>
-            <th className="p-2 text-right"><button type="button" onClick={() => onSort('aging')}>อายุ(วัน){sortLabel('aging')}</button></th>
-            <th className="p-2 text-right">ยอด</th>
-            <th className="p-2 text-right">รับแล้ว</th>
-            <th className="p-2 text-right"><button type="button" onClick={() => onSort('receivableBalance')}>ค้างรับ{sortLabel('receivableBalance')}</button></th>
-            <th className="p-2 text-left">Channel</th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
-          {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={9}>ไม่มีลูกหนี้คงค้าง</td></tr> : null}
-          {!isLoading && rows.map((row) => (
-            <tr key={row.id} className={`border-t ${row.aging > 30 ? 'bg-red-50/50' : row.aging > 0 ? 'bg-amber-50/30' : ''}`}>
-              <td className="p-2">{row.customerName}</td>
-              <td className="p-2"><button className="font-mono text-xs text-blue-600" type="button" onClick={() => onOpen(row)}>{row.docNo}</button></td>
-              <td className="p-2">{formatDateDisplay(row.date)}</td>
-              <td className="p-2">{formatDateDisplay(row.dueDate)}</td>
-              <td className={`p-2 text-right ${row.aging > 30 ? 'font-bold text-red-600' : row.aging > 0 ? 'text-amber-600' : ''}`}>{row.aging}</td>
-              <td className="p-2 text-right">{formatMoney(row.totalAmount)}</td>
-              <td className="p-2 text-right text-emerald-600">{formatMoney(row.receivedAmount)}</td>
-              <td className="p-2 text-right font-bold text-amber-700">{formatMoney(row.receivableBalance)}</td>
-              <td className="p-2">{row.channelName}</td>
+    <>
+      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-100">
+            <tr>
+              <th className="p-2 text-left"><button type="button" onClick={() => onSort('customerName')}>Customer{sortLabel('customerName')}</button></th>
+              <th className="p-2 text-left"><button type="button" onClick={() => onSort('docNo')}>บิล{sortLabel('docNo')}</button></th>
+              <th className="p-2 text-left"><button type="button" onClick={() => onSort('date')}>วันที่{sortLabel('date')}</button></th>
+              <th className="p-2 text-left"><button type="button" onClick={() => onSort('dueDate')}>Due{sortLabel('dueDate')}</button></th>
+              <th className="p-2 text-right"><button type="button" onClick={() => onSort('aging')}>อายุ(วัน){sortLabel('aging')}</button></th>
+              <th className="p-2 text-right">ยอด</th>
+              <th className="p-2 text-right">รับแล้ว</th>
+              <th className="p-2 text-right"><button type="button" onClick={() => onSort('receivableBalance')}>ค้างรับ{sortLabel('receivableBalance')}</button></th>
+              <th className="p-2 text-left">Channel</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={9}>ไม่มีลูกหนี้คงค้าง</td></tr> : null}
+            {!isLoading && rows.map((row) => (
+              <tr key={row.id} className={`border-t border-slate-100 ${row.aging > 30 ? 'bg-red-50/50' : row.aging > 0 ? 'bg-amber-50/30' : ''}`}>
+                <td className="p-2">{row.customerName}</td>
+                <td className="p-2"><button className="font-mono text-xs text-blue-600" type="button" onClick={() => onOpen(row)}>{row.docNo}</button></td>
+                <td className="p-2">{formatDateDisplay(row.date)}</td>
+                <td className="p-2">{formatDateDisplay(row.dueDate)}</td>
+                <td className={`p-2 text-right ${row.aging > 30 ? 'font-bold text-red-600' : row.aging > 0 ? 'text-amber-600' : ''}`}>{row.aging}</td>
+                <td className="p-2 text-right">{formatMoney(row.totalAmount)}</td>
+                <td className="p-2 text-right text-emerald-600">{formatMoney(row.receivedAmount)}</td>
+                <td className="p-2 text-right font-bold text-amber-700">{formatMoney(row.receivableBalance)}</td>
+                <td className="p-2">{row.channelName}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card list */}
+      <div className="block lg:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+        ) : null}
+        {!isLoading && rows.length === 0 ? (
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ไม่มีลูกหนี้คงค้าง</div>
+        ) : null}
+        {!isLoading && rows.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm space-y-3.5 active:bg-slate-50 cursor-pointer"
+            onClick={() => onOpen(row)}
+          >
+            <div className="flex justify-between items-start gap-2">
+              <span className="font-bold text-slate-900 text-[15px] line-clamp-2 leading-snug flex-1 pr-1">{row.customerName}</span>
+              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold shrink-0 ${row.aging > 30 ? 'bg-red-100 text-red-700' : row.aging > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                {row.aging > 0 ? `เกินกำหนด ${row.aging} วัน` : 'ยังไม่ถึงกำหนด'}
+              </span>
+            </div>
+            <div className="text-xs text-slate-600 space-y-2">
+              <div className="flex justify-between items-center text-sm font-medium">
+                <span>บิล: <span className="font-mono text-blue-600 font-semibold">{row.docNo}</span></span>
+                <span className="text-slate-400 text-xs">{row.channelName}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-semibold">วันที่บิล:</span>
+                  <span className="text-slate-700 font-medium">{formatDateDisplay(row.date)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-semibold">ครบกำหนด:</span>
+                  <span className="text-slate-700 font-medium">{formatDateDisplay(row.dueDate)}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 font-mono text-[13px]">
+                <div>
+                  <span className="text-slate-400 block text-[10px] font-sans font-semibold">ยอดรวม:</span>
+                  <span className="text-slate-800 tabular-nums">{formatMoney(row.totalAmount)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px] font-sans font-semibold">รับแล้ว:</span>
+                  <span className="text-emerald-700 tabular-nums">{formatMoney(row.receivedAmount)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-sans font-bold">ค้างรับ:</span>
+                  <span className="text-amber-700 font-bold tabular-nums">{formatMoney(row.receivableBalance)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
 function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-      <div className="w-full max-w-2xl rounded-md bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 mb-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={onClose}>
+      <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{row.docNo}</h2>
-            <p className="text-sm text-slate-500">{row.customerName}</p>
+            <h2 className="text-xl font-bold text-white">{row.docNo}</h2>
+            <p className="text-xs text-slate-300 mt-0.5">{row.customerName}</p>
           </div>
-          <button className="rounded-md bg-slate-100 px-3 py-1 text-sm" type="button" onClick={onClose}>ปิด</button>
+          <button className="text-3xl text-white/80 hover:text-white" type="button" onClick={onClose}>&times;</button>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4 p-5">
           {/* ข้อมูลเอกสาร */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลเอกสาร</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-5">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">ข้อมูลเอกสาร</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="วันที่บิล" value={formatDateDisplay(row.date)} />
               <DetailItem label="ครบกำหนด" value={row.dueDate ? formatDateDisplay(row.dueDate) : '-'} />
@@ -369,8 +514,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
           </div>
 
           {/* ข้อมูลการเงิน */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลการเงิน</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-5">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">ข้อมูลการเงิน</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
               <DetailItem label="ยอดบิล" value={`${formatMoney(row.totalAmount)} บาท`} />
               <DetailItem label="รับแล้ว" value={`${formatMoney(row.receivedAmount)} บาท`} />
@@ -379,6 +524,9 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
             </div>
           </div>
         </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+          <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={onClose}>ปิด</button>
+        </div>
       </div>
     </div>
   )
@@ -386,9 +534,9 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ArRow }) {
 
 function DetailItem({ className = '', label, value }: { className?: string; label: string; value: string }) {
   return (
-    <div className={`flex flex-col py-1 ${className}`}>
-      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{label}</div>
-      <div className="mt-0.5 text-xs sm:text-sm font-semibold text-slate-800">{value}</div>
+    <div className={`flex flex-col py-1.5 ${className}`}>
+      <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">{label}</div>
+      <div className="mt-1 text-sm sm:text-base font-bold text-slate-800">{value}</div>
     </div>
   )
 }

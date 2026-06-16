@@ -881,7 +881,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             {/* Table Toolbar & Filters */}
             <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
               {/* Category SearchCombobox (visible on Desktop/Tablet) / native select (visible on Mobile) */}
-              <div className="hidden md:block w-full max-w-[240px]">
+              <div className="hidden lg:block w-full max-w-[240px]">
                 <SearchCombobox
                   hideLabel
                   inputClassName="h-9 text-xs"
@@ -893,7 +893,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   onChange={(val) => setCategoryId(val || '')}
                 />
               </div>
-              <div className="block md:hidden flex-1 max-w-[200px]">
+              <div className="block lg:hidden flex-1 max-w-[200px]">
                 <select
                   className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none"
                   value={categoryId}
@@ -912,7 +912,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               <button
                 type="button"
                 onClick={() => setShowDashboardMobileFilters(true)}
-                className="md:hidden flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                className="lg:hidden flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
               >
                 <span>🔍</span>
                 <span>ตัวกรอง</span>
@@ -924,7 +924,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               </button>
 
               {/* Desktop & Tablet Filters (hidden on mobile < md) */}
-              <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
+              <div className="hidden lg:flex items-center gap-3 flex-1 justify-end">
                 {/* Period Selector */}
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500">📅 ย้อนหลัง:</span>
@@ -1077,7 +1077,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* 2. Tablet Layout (Simplified Table) - Visible on md & lg screens */}
-            <div className="hidden md:block lg:hidden overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="hidden lg:block lg:hidden overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50/75 border-b border-slate-100">
                   <tr>
@@ -1135,7 +1135,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* 3. Mobile Layout (Expense Analytics Cards) - Visible on mobile < md */}
-            <div className="block md:hidden space-y-3">
+            <div className="block lg:hidden space-y-3">
               {isLoading ? (
                 <div className="py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
@@ -1202,7 +1202,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
             {/* 4. Mobile Category Detail Bottom Sheet */}
             {selectedCategoryRow ? (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
                 <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 animate-slide-up max-h-[85vh] overflow-y-auto">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                     <div className="flex items-center gap-2">
@@ -1343,7 +1343,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
             {/* 5. Mobile Filter Bottom Sheet */}
             {showDashboardMobileFilters ? (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
                 <div className="w-full rounded-t-2xl bg-white p-5 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                     <h4 className="font-bold text-slate-800 text-xs">ตัวกรองข้อมูลวิเคราะห์</h4>
@@ -1485,13 +1485,13 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               {/* Mobile Filter Button */}
               <button
                 type="button"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:hidden"
                 onClick={() => setShowMobileFilters(true)}
               >
                 <span>🔍</span> ตัวกรอง {(dateFrom || dateTo || categoryId || accountId || statusFilter.length > 0) ? '(1)' : ''}
               </button>
 
-              <div className="hidden md:flex flex-wrap items-center gap-2">
+              <div className="hidden lg:flex flex-wrap items-center gap-2">
                 <label className="text-xs text-slate-500">วันที่:</label>
                 <DatePickerInput className="h-9 w-[130px]" title="จากวันที่" value={dateFrom} onChange={setDateFrom} />
                 <span className="text-slate-400">→</span>
@@ -1509,15 +1509,15 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
               {search || dateFrom || dateTo || categoryId || accountId || statusFilter.length > 0 ? (
                 <Button className="h-9" size="sm" type="button" variant="outline" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setCategoryId(''); setAccountId(''); setStatusFilter([]) }}>ล้าง</Button>
               ) : null}
-              <Button className="hidden md:inline-flex ml-auto h-9" size="sm" type="button" onClick={openCreateForm}>+ เพิ่มค่าใช้จ่าย</Button>
-              <a className="hidden md:inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700" href={exportHref}>
+              <Button className="hidden lg:inline-flex ml-auto h-9" size="sm" type="button" onClick={openCreateForm}>+ เพิ่มค่าใช้จ่าย</Button>
+              <a className="hidden lg:inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700" href={exportHref}>
                 <Download className="h-4 w-4" aria-hidden="true" />
                 ส่งออก Excel
               </a>
             </div>
 
             {/* Desktop Status Filters */}
-            <div className="mt-1 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 hidden md:flex">
+            <div className="mt-1 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 hidden lg:flex">
               <span className="text-xs text-slate-500">สถานะ:</span>
               {expenseStatusOptions.map((option) => (
                 <SegmentMulti key={option.label} current={statusFilter} label={option.label} onClick={setStatusFilter} values={option.values} />
@@ -1526,7 +1526,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           </div>
 
           {/* Floating Action Button (FAB) for Mobile */}
-          <div className="fixed bottom-6 right-6 z-40 md:hidden">
+          <div className="fixed bottom-6 right-6 z-40 lg:hidden">
             <button
               className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg active:scale-95 transition-transform"
               onClick={openCreateForm}
@@ -1539,7 +1539,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           {/* Bottom Sheet Filter for Mobile */}
           {showMobileFilters ? (
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
               <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                   <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
@@ -1651,10 +1651,17 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           {formOpen ? (
             <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-              <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-md bg-white shadow-xl" onSubmit={saveForm}>
-                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
-                  <h3 className="font-bold">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
-                  <button className="text-2xl text-slate-400" type="button" onClick={() => setFormOpen(false)}>&times;</button>
+              <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-xl" onSubmit={saveForm}>
+                <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 rounded-t-2xl shrink-0">
+                  <h3 className="font-bold text-white text-base font-sans">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setFormOpen(false)}
+                    className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-xl leading-none"
+                    aria-label="Close"
+                  >
+                    &times;
+                  </button>
                 </div>
                 <div className="space-y-4 bg-slate-50 p-4">
                   <div className="rounded-md bg-white p-4 shadow">
@@ -1691,8 +1698,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลหลัก</div>
-                    <div className="grid gap-3 md:grid-cols-4">
-                      <div className="md:col-span-2">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div className="col-span-2 md:col-span-2">
                         <PayeeField
                           error={fieldErrors.supplierId ?? fieldErrors.payee}
                           options={payeeOptions}
@@ -1709,7 +1716,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                         />
                       </div>
                       {form.paymentAction === 'pay_now' ? (
-                        <label className="block md:col-span-2" data-field="supplierPaymentDestinationId">
+                        <label className="block col-span-2 md:col-span-2" data-field="supplierPaymentDestinationId">
                           <span className="mb-1 block text-xs font-medium text-slate-600">ช่องทางรับเงินของ Supplier{renderRequiredMark(true)}</span>
                           <select
                             aria-invalid={Boolean(fieldErrors.supplierPaymentDestinationId)}
@@ -1759,8 +1766,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   {form.paymentAction === 'pay_now' ? (
                     <div className="rounded-md bg-white p-4 shadow">
                       <div className="mb-3 text-sm font-semibold text-slate-900">วิธีการจ่าย</div>
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <label className="block" data-field="paymentMethod">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <label className="block col-span-2 sm:col-span-1" data-field="paymentMethod">
                           <span className="mb-1 block text-xs font-medium text-slate-600">วิธีจ่าย{renderRequiredMark(true)}</span>
                           <select
                             className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none"
@@ -1771,7 +1778,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                             {paymentMethods.map((method) => <option key={method.id} value={method.name}>{method.name}</option>)}
                           </select>
                         </label>
-                        <label className="block md:col-span-2" data-field="accountId">
+                        <label className="block col-span-2 md:col-span-2" data-field="accountId">
                           <span className="mb-1 block text-xs font-medium text-slate-600">บัญชีที่จ่ายของบริษัท{renderRequiredMark(true)}</span>
                           <select
                             aria-invalid={Boolean(fieldErrors.accountId)}
@@ -1796,7 +1803,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                             {fieldErrors.bankFee ? <span className="mt-1 block text-xs text-red-700">{fieldErrors.bankFee}</span> : null}
                           </label>
                         )}
-                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 md:col-span-2">
+                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 col-span-2">
                           <div>ยอด EXP: <b>{formatMoney(formTotals.netAmount)}</b></div>
                           <div>ยอดจ่าย Supplier หลัง Discount: <b>{formatMoney(formPaymentAmount)}</b></div>
                           <div>เงินออกจากบัญชีรวม Bank fee: <b className="text-red-700">{formatMoney(formCashOutAmount)}</b></div>
@@ -1807,10 +1814,14 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
                   <div className="rounded-md bg-white p-4 shadow">
                     <div className="mb-3 text-sm font-semibold text-slate-900">เอกสารอ้างอิงและหมายเหตุ</div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <TextField error={fieldErrors.refDocNo} fieldName="refDocNo" label="เลขอ้างอิง" value={form.refDocNo ?? ''} onChange={(value) => setForm({ ...form, refDocNo: value })} />
-                      <TextField error={fieldErrors.taxInvoiceNo} fieldName="taxInvoiceNo" label="เลขใบกำกับภาษี" value={form.taxInvoiceNo ?? ''} onChange={(value) => setForm({ ...form, taxInvoiceNo: value })} />
-                      <div className="md:col-span-3">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="col-span-2 sm:col-span-1">
+                        <TextField error={fieldErrors.refDocNo} fieldName="refDocNo" label="เลขอ้างอิง" value={form.refDocNo ?? ''} onChange={(value) => setForm({ ...form, refDocNo: value })} />
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <TextField error={fieldErrors.taxInvoiceNo} fieldName="taxInvoiceNo" label="เลขใบกำกับภาษี" value={form.taxInvoiceNo ?? ''} onChange={(value) => setForm({ ...form, taxInvoiceNo: value })} />
+                      </div>
+                      <div className="col-span-2 lg:col-span-3">
                         <TextAreaField error={fieldErrors.notes} fieldName="notes" label="หมายเหตุ" rows={3} value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
                       </div>
                     </div>
@@ -1821,8 +1832,8 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                       <div className="text-sm font-semibold">สรุปก่อนบันทึก</div>
                       <div className="text-xs text-slate-300">{form.paymentAction === 'pay_now' ? 'ตรวจยอดเอกสารและยอดเงินออกจากบัญชี' : 'ตรวจยอด EXP ก่อนส่งอนุมัติจ่ายเงิน'}</div>
                     </div>
-                    <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr]">
-                      <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                    <div className="grid grid-cols-2 gap-4 p-4">
+                      <div className="rounded-md border border-slate-200 bg-slate-50 p-4 col-span-2 lg:col-span-1">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <div>
                             <div className="text-sm font-semibold text-slate-800">ยอดเอกสาร EXP</div>
@@ -1840,7 +1851,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                         </div>
                       </div>
 
-                      <div className={`rounded-md border p-4 ${form.paymentAction === 'pay_now' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                      <div className={`rounded-md border p-4 col-span-2 lg:col-span-1 ${form.paymentAction === 'pay_now' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
                         {form.paymentAction === 'pay_now' ? (
                           <>
                             <div className="mb-3 flex items-center justify-between gap-3">
@@ -1880,9 +1891,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     ) : null}
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
-                  <Button className="h-9" type="button" variant="outline" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
-                  <Button className="h-9" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+                <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-2xl">
+                  <Button className="h-9 font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+                  <Button className="h-9 rounded-xl bg-slate-900 hover:bg-slate-850 text-white font-medium transition-colors outline-none focus:ring-0 px-5" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
                 </div>
               </form>
             </div>
@@ -1900,7 +1911,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           ) : null}
 
           {/* Mobile Card List */}
-          <div className="block md:hidden space-y-3">
+          <div className="block lg:hidden space-y-3">
             {isLoading ? (
               <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
             ) : null}
@@ -1956,7 +1967,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             ) : null}
           </div>
 
-          <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+          <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
             <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
                 {expenseColumns.map((column, index) => {
@@ -2042,8 +2053,8 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
 
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-h-[90vh] max-w-4xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0">
-        <DialogHeader className="p-4 bg-slate-900 text-white shrink-0 flex flex-row items-start justify-between gap-3">
+      <DialogContent className="max-h-[90vh] max-w-4xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl">
+        <DialogHeader className="px-5 py-4 bg-slate-900 text-white shrink-0 flex flex-row items-center justify-between gap-3 rounded-t-2xl">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <DialogTitle id="expense-detail-title" className="text-lg font-bold text-white">รายละเอียดค่าใช้จ่าย {row.docNo}</DialogTitle>
@@ -2054,6 +2065,14 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
             </div>
             <DialogDescription className="mt-1 text-xs text-slate-400">อ่านอย่างเดียวจากรายการค่าใช้จ่ายที่แสดงในตาราง</DialogDescription>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-2xl leading-none"
+            aria-label="Close"
+          >
+            &times;
+          </button>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-5 space-y-4 text-sm">
@@ -2145,9 +2164,9 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
           </div>
         </div>
 
-        <DialogFooter className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-          <Button className="h-9 font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
-          {canEdit ? <Button className="h-9" type="button" onClick={() => onEdit(row)}>แก้ไข</Button> : null}
+        <DialogFooter className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-2xl">
+          <Button className="h-9 font-normal border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:ring-0 px-5 rounded-xl" type="button" variant="outline" onClick={onClose}>ปิด</Button>
+          {canEdit ? <Button className="h-9 rounded-xl bg-slate-900 hover:bg-slate-850 text-white font-medium transition-colors outline-none focus:ring-0 px-5" type="button" onClick={() => onEdit(row)}>แก้ไข</Button> : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
