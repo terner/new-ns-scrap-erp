@@ -5,6 +5,7 @@ import { prisma } from '@/lib/server/prisma'
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 
 export type ProductionReportFilters = {
+  allowedBranchIds?: bigint[] | null
   branchId?: string
   dateFrom?: string
   dateTo?: string
@@ -79,8 +80,11 @@ const emptyLedgerMetric = (): ProductionLedgerMetric => ({
 })
 
 export function productionWhere(filters: ProductionReportFilters, branchId?: bigint | null, machineId?: bigint | null): Prisma.production_ordersWhereInput {
+  const requestedBranchAllowed = branchId != null && (filters.allowedBranchIds === undefined || filters.allowedBranchIds === null || filters.allowedBranchIds.some((allowedBranchId) => allowedBranchId === branchId))
   return {
-    ...(branchId != null ? { branch_id: branchId } : {}),
+    ...(branchId != null
+      ? requestedBranchAllowed ? { branch_id: branchId } : { branch_id: { in: [] } }
+      : filters.allowedBranchIds === undefined || filters.allowedBranchIds === null ? {} : { OR: [{ branch_id: null }, { branch_id: { in: filters.allowedBranchIds } }] }),
     ...(machineId != null ? { machine_id: machineId } : {}),
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.dateFrom || filters.dateTo ? {
@@ -109,63 +113,54 @@ export async function loadProductionMetrics(filters: ProductionReportFilters = {
     filters.branchId ? findActiveBranchReferenceByCodeOrId(filters.branchId) : Promise.resolve(null),
     resolveMachineId(filters.machineId),
   ])
-  const [orders, categories] = await Promise.all([
-    prisma.production_orders.findMany({
-      select: {
-        branches: { select: { name: true } },
-        cost_allocation_method: true,
-        date: true,
-        doc_no: true,
-        id: true,
-        normal_loss_percent: true,
-        process_costs: {
-          select: {
-            amount: true,
-            cost_type: true,
-            include_in_production: true,
-            status: true,
-          },
+  const orders = await prisma.production_orders.findMany({
+    select: {
+      branches: { select: { name: true } },
+      cost_allocation_method: true,
+      date: true,
+      doc_no: true,
+      id: true,
+      normal_loss_percent: true,
+      process_costs: {
+        select: {
+          amount: true,
+          cost_type: true,
+          include_in_production: true,
+          status: true,
         },
-        production_inputs: {
-          select: {
-            id: true,
-            qty: true,
-            total_cost: true,
-          },
-          where: { status: 'active' },
-        },
-        production_lines: { select: { name: true } },
-        production_machines: { select: { name: true, type: true } },
-        production_outputs: {
-          select: {
-            category_code: true,
-            id: true,
-            output_category: true,
-            output_status: true,
-            output_type: true,
-            qty: true,
-            source_wip_qty: true,
-            total_cost: true,
-          },
-          where: { status: 'active' },
-        },
-        production_type: true,
-        products: { select: { code: true, name: true } },
-        status: true,
-        variance: true,
-        warehouses: { select: { name: true } },
       },
-      orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
-      where: productionWhere(filters, branch?.id ?? null, machineId),
-    }),
-    prisma.production_output_categories.findMany({
-      select: {
-        id: true,
-        stock_effect: true,
+      production_inputs: {
+        select: {
+          id: true,
+          qty: true,
+          total_cost: true,
+        },
+        where: { status: 'active' },
       },
-    }),
-  ])
-  const categoryById = new Map(categories.map((category) => [category.id, category]))
+      production_lines: { select: { name: true } },
+      production_machines: { select: { name: true } },
+      production_outputs: {
+        select: {
+          category_code: true,
+          id: true,
+          output_category: true,
+          output_status: true,
+          output_type: true,
+          qty: true,
+          source_wip_qty: true,
+          total_cost: true,
+        },
+        where: { status: 'active' },
+      },
+      production_type: true,
+      products: { select: { code: true, name: true } },
+      status: true,
+      variance: true,
+      warehouses: { select: { name: true } },
+    },
+    orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
+    where: productionWhere(filters, branch?.id ?? null, machineId),
+  })
   const inputOwnerById = new Map<string, string>()
   const outputOwnerById = new Map<string, string>()
   const factMetricByOrder = new Map<string, ProductionLedgerMetric>()
@@ -181,10 +176,9 @@ export async function loadProductionMetrics(filters: ProductionReportFilters = {
       outputOwnerById.set(output.id.toString(), orderKey)
       const sourceWipQty = toNumber(output.source_wip_qty) || toNumber(output.qty)
       const totalCost = toNumber(output.total_cost)
-      const category = output.output_category != null ? categoryById.get(output.output_category) : null
       factMetric.wipConsumedQty += sourceWipQty
       factMetric.wipConsumedValue += totalCost
-      if (output.category_code === 'LOSS' || output.output_status === 'LOSS' || output.output_type === 'Loss' || category?.stock_effect === 'loss') {
+      if (output.category_code === 'LOSS' || output.output_status === 'LOSS' || output.output_type === 'Loss') {
         factMetric.lossQty += sourceWipQty
       } else {
         factMetric.outputQty += toNumber(output.qty)
@@ -271,16 +265,9 @@ export async function loadProductionMetrics(filters: ProductionReportFilters = {
     const ledgerBalanced = ledgerMismatchQty <= 0.000001
     const wipValue = Math.max(0, rawWipValue)
 
-    const mappedProductionType = order.production_machines?.type || (order.production_type ? ({
-      Processing: 'เครื่องตัด/เครื่องบด',
-      Baling: 'เครื่องอัด',
-      Sorting: 'สายพาน',
-      Melting: 'เครื่องหลอม',
-    }[order.production_type] || order.production_type) : '-')
-
     return {
       branchName: order.branches?.name ?? '-',
-      costAllocationMethod: order.cost_allocation_method ?? mappedProductionType,
+      costAllocationMethod: order.cost_allocation_method ?? order.production_type ?? '-',
       costPerKg: productionCostPerKg,
       costBreakdown: Object.fromEntries(order.process_costs
         .filter((cost) => cost.status !== 'reversed' && cost.include_in_production)
@@ -305,7 +292,7 @@ export async function loadProductionMetrics(filters: ProductionReportFilters = {
       productCode: order.products?.code ?? '',
       productName: order.products?.name ?? '-',
       productionLineName: order.production_lines?.name ?? '-',
-      productionType: mappedProductionType,
+      productionType: order.production_type ?? '-',
       rmCostPerKg,
       status: order.status ?? 'Open',
       totalCost,

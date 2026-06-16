@@ -9,6 +9,12 @@ import { createProductionOrder, createProductionOrderSchema, ProductionOrderErro
 
 export const runtime = 'nodejs'
 
+const productionOutputCategories = [
+  { availableForSale: true, code: 'FG', name: 'FG', stockEffect: 'stock_in' },
+  { availableForSale: true, code: 'RM', name: 'RM', stockEffect: 'stock_in' },
+  { availableForSale: false, code: 'LOSS', name: 'LOSS', stockEffect: 'loss' },
+]
+
 const allowedSorts = new Set(['date', 'docNo', 'status', 'qtyPlanned', 'inputCost', 'outputValue', 'variance'])
 
 function orderBy(sort: string, direction: 'asc' | 'desc'): Prisma.production_ordersOrderByWithRelationInput[] {
@@ -53,7 +59,7 @@ export async function GET(request: Request) {
       } : {}),
     }
 
-    const [total, rows, categories, warehouses] = await Promise.all([
+    const [total, rows, warehouses] = await Promise.all([
       prisma.production_orders.count({ where }),
       prisma.production_orders.findMany({
         include: {
@@ -62,23 +68,17 @@ export async function GET(request: Request) {
           production_inputs: { include: { products: true }, orderBy: [{ date: 'asc' }, { id: 'asc' }], where: { status: 'active' } },
           production_outputs: { include: { products: true }, orderBy: [{ date: 'asc' }, { id: 'asc' }], where: { status: 'active' } },
           warehouses: true,
-          production_machines: true,
         },
         orderBy: orderBy(sort, direction),
         skip: (page - 1) * pageSize,
         take: pageSize,
         where,
       }),
-      prisma.production_output_categories.findMany({
-        orderBy: [{ sort_order: 'asc' }, { code: 'asc' }],
-        where: { active: true },
-      }),
       prisma.warehouses.findMany({
         select: { code: true, id: true, name: true },
       }),
     ])
 
-    const categoryByCode = new Map(categories.map((category) => [category.code, category]))
     const warehouseById = new Map(warehouses.map((warehouse) => [warehouse.id.toString(), warehouse]))
     const payloadRows = rows.map((row) => {
       const inputQty = row.production_inputs.reduce((sum, input) => sum + toNumber(input.qty), 0)
@@ -123,17 +123,10 @@ export async function GET(request: Request) {
         })),
         inputQty,
         lossQty,
-        machineName: row.production_machines?.name ?? '-',
-        machineType: row.production_machines?.type || (row.production_type ? ({
-          Processing: 'เครื่องตัด/เครื่องบด',
-          Baling: 'เครื่องอัด',
-          Sorting: 'สายพาน',
-          Melting: 'เครื่องหลอม',
-        }[row.production_type] || row.production_type) : '-'),
         notes: row.notes ?? '',
         outputCategories: outputCategories.map((code) => ({
           code,
-          name: categoryByCode.get(String(code))?.name_th ?? String(code),
+          name: String(code),
         })),
         outputCount: row.production_outputs.length,
         outputs: row.production_outputs.map((output) => ({
@@ -174,12 +167,7 @@ export async function GET(request: Request) {
     }, { inputCost: 0, outputValue: 0, qtyPlanned: 0, variance: 0 })
 
     return NextResponse.json({
-      categories: categories.map((category) => ({
-        availableForSale: category.available_for_sale,
-        code: category.code,
-        name: category.name_th,
-        stockEffect: category.stock_effect,
-      })),
+      categories: productionOutputCategories,
       page,
       pageSize,
       rows: payloadRows,

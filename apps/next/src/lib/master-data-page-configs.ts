@@ -348,7 +348,6 @@ export const productionLinesPageConfig: MasterDataPageConfig = {
   ],
 }
 
-
 export const beneficiariesPageConfig: MasterDataPageConfig = {
   apiPath: '/api/master-data/beneficiaries',
   createLabel: 'เพิ่มผู้รับเงินต่างประเทศ',

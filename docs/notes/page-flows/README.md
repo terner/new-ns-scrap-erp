@@ -11,13 +11,13 @@ updated: 2026-06-11
 
 รายชื่อไฟล์ flow รายหน้าสำหรับทุก route ที่อยู่ในเมนูใหม่ `apps/next/src/lib/navigation.ts`.
 
-- จำนวน route ในเมนูใหม่: 107
+- จำนวน route ในเมนูใหม่: 109
 - Scope: active menu only
 - Legacy-only pages ที่ไม่มีในเมนูใหม่ไม่อยู่ใน index นี้
 
 ## Detail Completion Status
 
-ไฟล์รายหน้าทุก route ถูกสร้างครบและมี minimum detailed contract ครบ 107/107 routes แล้ว:
+ไฟล์รายหน้าทุก route ถูกสร้างครบและมี minimum detailed contract ครบ 109/109 routes แล้ว:
 
 - ทุกไฟล์มี responsibilities, non-responsibilities, lifecycle/read flow, API/data contract, validation/status rules, side effects, current gaps, และ implementation checklist
 - Batch 1 deepened page-specific details and Current API for core Purchase, Sales, Payment, and Stock pages:
@@ -50,7 +50,6 @@ updated: 2026-06-11
   - `/finance/cash-position`
   - `/finance/customer-advance`
   - `/production/orders`
-  - `/production/output-categories`
   - `/production/dashboard`
   - `/production/report`
 - Batch 3 deepened report/read-model pages across main dashboards, tracking, trading/PO reports, dual costing, general reports, and finance-accounting pages with Current API/read-model contracts.
@@ -58,8 +57,8 @@ updated: 2026-06-11
 - P0 transaction/stock/payment pages are now accepted as current implementation baseline per [[P0 Transaction Stock Payment Current Code Baseline]]; target-complete gaps remain active for runtime hardening.
 - Finance & Debt was deepened again into [[Finance Debt Flow]] plus 6 route-level files. The page files now record legacy baseline, current API query/response, side-effect boundaries, and remaining allocation/status/correction gaps for Petty Advance, AR, AP, Bank Statement, Cash Position, and Customer Advance.
 - Trading / PO Reports was deepened into [[Trading Flow]] plus 3 route-level files. The page files now record legacy ex-VAT Trading baseline, current `GET`/export APIs, PB/SB Trading matching boundaries, PO Outstanding include/exclude rules, and remaining write/reverse/filter/drilldown gaps.
-- Main Dashboard / Reports was deepened into [[Main Dashboard Reports Flow]] plus 10 route-level files. The page files now record current dashboard/report APIs, query params, source tables/helpers, response sections, no-side-effect boundaries, and remaining formula/drilldown/export gaps for Dashboard, Owner Daily, Daily Report, Profit & Cost, Sales Tracking, Cash/Business calendars, Cash & Others, Anomaly Detector, and `/reports`.
-- Finance Accounting was deepened into [[Finance Accounting Flow]]. The overview now records all 19 finance-accounting APIs, current query params, source builders/tables, read/design-only write states, and shared management-report boundaries; each route-level page-flow file now points to that overview.
+- Main Dashboard / Reports was deepened into [[Main Dashboard Reports Flow]] plus route-level files. The page files record current dashboard/report APIs, query params, source tables/helpers, response sections, no-side-effect boundaries, and remaining formula/drilldown/export gaps for active dashboard/report pages.
+- Finance Accounting was deepened into [[Finance Accounting Flow]]. The overview now records all 19 finance-accounting APIs, current query params, source builders/tables, read/design-only write states, and shared management-report boundaries; each route-level page-flow file now points to that overview. Legacy clone planning for this category is tracked in `docs/migration/22-finance-accounting-legacy-clone-plan.md`; use its FA0 reading inventory and page-flow update queue before changing Finance / Accounting runtime behavior.
 - Master Data current code is now accepted as the baseline per [[Master Data Current Code Baseline]]; master-data page-flow files should sync to current code rather than wait for legacy proof.
 - P1 finance/production/daily read-model pages are now accepted as current-code baseline per [[P1 Finance Production Current Code Baseline]]; remaining P1 work is source/cutoff/status/write-side-effect reconciliation when behavior changes.
 - P2 report/read-model pages are now accepted as current-code baseline per [[P2 Report Current Code Baseline]]; remaining P2 work is formula/source/cutoff reconciliation only when report definitions change or discrepancies are found.
@@ -71,7 +70,6 @@ updated: 2026-06-11
 | Route | Page | Page flow file | Existing detailed doc |
 |---|---|---|---|
 | `/owner-daily` | Owner Daily Control | [main-dashboard-reports-owner-daily.md](main-dashboard-reports-owner-daily.md) | [[Main Dashboard Reports Flow]] |
-| `/anomaly-detector` | ตรวจจับความผิดปกติ | [main-dashboard-reports-anomaly-detector.md](main-dashboard-reports-anomaly-detector.md) | [[Main Dashboard Reports Flow]] |
 | `/daily-report` | Daily Report | [main-dashboard-reports-daily-report.md](main-dashboard-reports-daily-report.md) | [[Main Dashboard Reports Flow]] |
 | `/dashboard` | Financial Dashboard | [main-dashboard-reports-dashboard.md](main-dashboard-reports-dashboard.md) | [[Main Dashboard Reports Flow]] |
 | `/profit-cost-analysis` | Profit & Cost Analysis | [main-dashboard-reports-profit-cost-analysis.md](main-dashboard-reports-profit-cost-analysis.md) | [[Main Dashboard Reports Flow]] |
@@ -88,7 +86,7 @@ updated: 2026-06-11
 | `/sales/bills` | บิลขาย | [daily-transactions-sales-bills.md](daily-transactions-sales-bills.md) | [[Sales Bills Page Flow]], [[Sales Flow]] |
 | `/sales/stock-issue` | เบิกออกรอบิล | [daily-transactions-sales-stock-issue.md](daily-transactions-sales-stock-issue.md) | [[Pending Sale Page Flow]] |
 | `/daily/payment-approval` | อนุมัติจ่ายเงิน | [daily-transactions-daily-payment-approval.md](daily-transactions-daily-payment-approval.md) | [[Payment Flow]] |
-| `/purchase/advance-payments` | จ่ายเงินล่วงหน้า / มัดจำ | [daily-transactions-purchase-advance-payments.md](daily-transactions-purchase-advance-payments.md) | [[Supplier Advance Payment Flow]] |
+| `/purchase/advance-payments` | เงินล่วงหน้า/มัดจำ | [daily-transactions-purchase-advance-payments.md](daily-transactions-purchase-advance-payments.md) | [[Supplier Advance Payment Flow]], [[Customer Advance Page Flow]] |
 | `/purchase/payments` | จ่ายเงิน Supplier | [daily-transactions-purchase-payments.md](daily-transactions-purchase-payments.md) | [[Payment Flow]] |
 | `/purchase/receipt-vouchers` | ใบสำคัญรับเงิน | [daily-transactions-purchase-receipt-vouchers.md](daily-transactions-purchase-receipt-vouchers.md) | [[Receipt Voucher Page Flow]], [[Printable Documents]], [[Payment Flow]] |
 | `/sales/receipts` | รับเงิน Customer | [daily-transactions-sales-receipts.md](daily-transactions-sales-receipts.md) | [[Sales Flow]], [[Payment Flow]] |
@@ -100,7 +98,6 @@ updated: 2026-06-11
 | `/sales/po-sell` | PO Sell | [daily-transactions-sales-po-sell.md](daily-transactions-sales-po-sell.md) | [[PO Sell Flow]], [[Sales Flow]] |
 | `/daily/design-mockup` | Design Mockup | [daily-transactions-daily-design-mockup.md](daily-transactions-daily-design-mockup.md) | [[Architecture Map]] |
 | `/production/orders` | ใบสั่งผลิต | [production-production-orders.md](production-production-orders.md) | [[Production Flow]] |
-| `/production/output-categories` | หมวดหมู่ผลผลิต | [production-production-output-categories.md](production-production-output-categories.md) | [[Production Flow]] |
 | `/production/dashboard` | Production Dashboard | [production-production-dashboard.md](production-production-dashboard.md) | [[Production Flow]] |
 | `/production/report` | รายงานการผลิต / Yield | [production-production-report.md](production-production-report.md) | [[Production Flow]] |
 | `/dual-costing/cost-pool` | Cost Pool | [dual-costing-dual-costing-cost-pool.md](dual-costing-dual-costing-cost-pool.md) | [[Dual Costing Flow]], [[Cost Pool]] |
@@ -116,7 +113,7 @@ updated: 2026-06-11
 | `/finance/ap` | เจ้าหนี้ (AP) | [finance-debt-finance-ap.md](finance-debt-finance-ap.md) | [[Finance AP Page Flow]] |
 | `/finance/bank` | Cash / Bank Statement | [finance-debt-finance-bank.md](finance-debt-finance-bank.md) | [[Finance Bank Statement Page Flow]] |
 | `/finance/cash-position` | Cash Position | [finance-debt-finance-cash-position.md](finance-debt-finance-cash-position.md) | [[Finance Cash Position Page Flow]] |
-| `/finance/customer-advance` | รับล่วงหน้าจาก Customer | [finance-debt-finance-customer-advance.md](finance-debt-finance-customer-advance.md) | [[Customer Advance Page Flow]] |
+| `/purchase/advance-payments?tab=customer` | รับล่วงหน้า Customer | [finance-debt-finance-customer-advance.md](finance-debt-finance-customer-advance.md) | [[Customer Advance Page Flow]] |
 | `/stock/transfer` | โอนสินค้าระหว่างสาขา | [stock-stock-transfer.md](stock-stock-transfer.md) | [[Stock Transfer Page Flow]], [[Stock Ledger and Stock Balance]] |
 | `/stock/balance` | สต๊อกคงเหลือ | [stock-stock-balance.md](stock-stock-balance.md) | [[Stock Balance Page Flow]], [[Stock Ledger and Stock Balance]] |
 | `/stock/ledger` | Stock Ledger | [stock-stock-ledger.md](stock-stock-ledger.md) | [[Stock Ledger Page Flow]], [[Stock Ledger and Stock Balance]] |
@@ -137,6 +134,7 @@ updated: 2026-06-11
 | `/finance-accounting/pl-statement` | งบกำไรขาดทุน | [finance-accounting-finance-accounting-pl-statement.md](finance-accounting-finance-accounting-pl-statement.md) | [[Finance Accounting Flow]] |
 | `/finance-accounting/balance-sheet` | งบดุล | [finance-accounting-finance-accounting-balance-sheet.md](finance-accounting-finance-accounting-balance-sheet.md) | [[Finance Accounting Flow]] |
 | `/finance-accounting/cash-flow-statement` | งบกระแสเงินสด | [finance-accounting-finance-accounting-cash-flow-statement.md](finance-accounting-finance-accounting-cash-flow-statement.md) | [[Finance Accounting Flow]] |
+| `/finance-accounting/gl-journals/[journalNo]` | GL Journal Detail | [finance-accounting-finance-accounting-gl-journal-detail.md](finance-accounting-finance-accounting-gl-journal-detail.md) | [[Finance Accounting Flow]], `docs/migration/23-finance-accounting-fa5-hardening-contract.md` |
 | `/finance-accounting/asset-register` | Fixed Assets | [finance-accounting-finance-accounting-asset-register.md](finance-accounting-finance-accounting-asset-register.md) | [[Finance Accounting Flow]] |
 | `/finance-accounting/depreciation` | ค่าเสื่อมราคา | [finance-accounting-finance-accounting-depreciation.md](finance-accounting-finance-accounting-depreciation.md) | [[Finance Accounting Flow]] |
 | `/finance-accounting/asset-disposal` | จำหน่ายทรัพย์สิน | [finance-accounting-finance-accounting-asset-disposal.md](finance-accounting-finance-accounting-asset-disposal.md) | [[Finance Accounting Flow]] |
@@ -145,6 +143,8 @@ updated: 2026-06-11
 | `/finance-accounting/asset-overview` | Net Worth / Track Asset | [finance-accounting-finance-accounting-asset-overview.md](finance-accounting-finance-accounting-asset-overview.md) | [[Finance Accounting Flow]] |
 | `/finance-accounting/equity-maint` | Equity / ทุนจดทะเบียน | [finance-accounting-finance-accounting-equity-maint.md](finance-accounting-finance-accounting-equity-maint.md) | [[Finance Accounting Flow]] |
 | `/finance-accounting/opening-balance` | Opening Balance | [finance-accounting-finance-accounting-opening-balance.md](finance-accounting-finance-accounting-opening-balance.md) | [[Finance Accounting Flow]] |
+| `/finance-accounting/accounting-periods` | Accounting Periods | [finance-accounting-finance-accounting-accounting-periods.md](finance-accounting-finance-accounting-accounting-periods.md) | [[Finance Accounting Flow]], `docs/migration/23-finance-accounting-fa5-hardening-contract.md` |
+| `/finance-accounting/posting-rules` | Posting Rules | [finance-accounting-finance-accounting-posting-rules.md](finance-accounting-finance-accounting-posting-rules.md) | [[Finance Accounting Flow]], `docs/migration/23-finance-accounting-fa5-hardening-contract.md` |
 | `/finance-accounting/historical-data` | Historical Data | [finance-accounting-finance-accounting-historical-data.md](finance-accounting-finance-accounting-historical-data.md) | [[Finance Accounting Flow]] |
 | `/master-data/customers` | ลูกค้า | [master-data-master-data-customers.md](master-data-master-data-customers.md) | This catalog |
 | `/master-data/salespersons` | พนักงานขาย | [master-data-master-data-salespersons.md](master-data-master-data-salespersons.md) | This catalog |

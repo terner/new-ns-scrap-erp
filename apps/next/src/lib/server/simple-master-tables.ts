@@ -4,10 +4,6 @@ import { prisma } from '@/lib/server/prisma'
 import { getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { findActiveBranchReferenceByCodeOrId } from '@/lib/server/branch-reference'
 import {
-  productionOutputCategoryCodeSchema,
-  productionOutputStockEffectSchema,
-} from '@/lib/production-output-categories'
-import {
   masterDataJson,
   masterDataListJson,
   nextSequentialCode,
@@ -17,7 +13,7 @@ import {
   updateMasterDataStatusSchema,
 } from '@/lib/server/master-data'
 
-type SimpleMasterKind = 'accountSubtypes' | 'bankNames' | 'directors' | 'expenseTypes' | 'machineTypes' | 'machines' | 'paymentMethods' | 'productionLines' | 'productionOutputCategories' | 'productTypes' | 'productUnits' | 'remittancePurposes' | 'vatSettings' | 'whtSettings'
+type SimpleMasterKind = 'accountSubtypes' | 'bankNames' | 'directors' | 'expenseTypes' | 'machineTypes' | 'machines' | 'paymentMethods' | 'productionLines' | 'productTypes' | 'productUnits' | 'remittancePurposes' | 'vatSettings' | 'whtSettings'
 
 type Delegate = {
   findMany: (args?: unknown) => Promise<unknown[]>
@@ -126,11 +122,6 @@ function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMaster
       nameTitle: values.nameTitle,
       type: values.type,
     })
-  }
-
-  if (kind === 'productionOutputCategories') {
-    productionOutputCategoryCodeSchema.parse(values.code)
-    productionOutputStockEffectSchema.nullable().parse(values.stockEffect)
   }
 
   if ((kind === 'vatSettings' || kind === 'whtSettings') && values.ratePercent === null) {
@@ -360,35 +351,6 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
       if (!branch) throw new Error('สาขาที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')
       return { ...values, branchId: String(branch.id) }
     },
-  },
-  productionOutputCategories: {
-    delegate: () => prisma.production_output_categories as Delegate,
-    prefix: 'POC',
-    orderBy: [{ sort_order: 'asc' }, { code: 'asc' }],
-    lookupKey: 'code',
-    map: (row) => {
-      const record = asRecord(row)
-      return {
-        id: record.code,
-        code: record.code,
-        name: record.name_th,
-        stockEffect: record.stock_effect,
-        availableForSale: record.available_for_sale,
-        sortOrder: toNumber(record.sort_order as number | null),
-        active: record.active,
-        createdAt: toIso(record.created_at as Date | null),
-        updatedAt: toIso(record.updated_at as Date | null),
-      }
-    },
-    data: (values, _id, code) => ({
-      code,
-      name_th: values.name,
-      name_en: null,
-      stock_effect: values.stockEffect || 'stock_in',
-      available_for_sale: values.availableForSale,
-      sort_order: values.sortOrder ?? 0,
-      active: values.active,
-    }),
   },
   productUnits: {
     delegate: () => prisma.product_units as Delegate,
