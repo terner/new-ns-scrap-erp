@@ -14,6 +14,7 @@ import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/Table'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
+import { openReceiptVoucherPrint, openReceiptVoucherPrintWindow, type ReceiptVoucherPrintDocument } from '@/lib/receipt-voucher-print'
 
 type VoucherItem = {
   amount?: number | string | null
@@ -242,8 +243,23 @@ export function ReceiptVouchersPageClient() {
   const [isSaving, setIsSaving] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [printingRow, setPrintingRow] = useState<ReceiptVoucherRow | null>(null)
+  const [printingDocNo, setPrintingDocNo] = useState<string | null>(null)
   const [companyProfile, setCompanyProfile] = useState<ReceiptVoucherCompanyProfile>(null)
+
+  const printReceiptVoucher = async (row: ReceiptVoucherRow) => {
+    if (printingDocNo) return
+    let printWindow: Window | null = null
+    setPrintingDocNo(row.docNo)
+    try {
+      printWindow = openReceiptVoucherPrintWindow()
+      await openReceiptVoucherPrint(row as unknown as ReceiptVoucherPrintDocument, printWindow)
+    } catch (err) {
+      printWindow?.close()
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการพิมพ์')
+    } finally {
+      setPrintingDocNo(null)
+    }
+  }
   const [form, setForm] = useState<ReceiptVoucherFormState>(() => blankForm())
   const [formError, setFormError] = useState<string | null>(null)
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null)
@@ -707,8 +723,8 @@ export function ReceiptVouchersPageClient() {
                   <TableNumberCell strong value={formatMoney(row.totalAmount)} />
                   <td className="whitespace-nowrap p-2 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60" type="button" onClick={(event) => { event.stopPropagation(); setPrintingRow(row) }}>
-                        พิมพ์
+                      <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60" type="button" disabled={printingDocNo === row.docNo} onClick={(event) => { event.stopPropagation(); void printReceiptVoucher(row) }}>
+                        {printingDocNo === row.docNo ? 'กำลังพิมพ์...' : 'พิมพ์'}
                       </button>
                       <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={row.status === 'cancelled'} type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
                       <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={row.status === 'cancelled'} type="button" onClick={(event) => { event.stopPropagation(); setCancelingRow(row); setCancelNote(''); setCancelError(null) }}>ยกเลิก</button>
@@ -738,7 +754,7 @@ export function ReceiptVouchersPageClient() {
         />
       ) : null}
 
-      {detailRow ? <ReceiptVoucherDetailModal row={detailRow} onClose={() => setDetailRow(null)} onPrint={() => setPrintingRow(detailRow)} /> : null}
+      {detailRow ? <ReceiptVoucherDetailModal row={detailRow} onClose={() => setDetailRow(null)} onPrint={() => void printReceiptVoucher(detailRow)} /> : null}
       {cancelingRow ? (
         <CancelReceiptVoucherDialog
           error={cancelError}
@@ -755,7 +771,6 @@ export function ReceiptVouchersPageClient() {
           onNoteChange={setCancelNote}
         />
       ) : null}
-      {printingRow ? <PrintPreview companyProfile={companyProfile} row={printingRow} onClose={() => setPrintingRow(null)} /> : null}
 
       {/* Floating Action Button (FAB) for Mobile */}
       <div className="fixed bottom-6 right-6 z-40 lg:hidden print:hidden">
@@ -1172,328 +1187,9 @@ function CancelReceiptVoucherDialog({
   )
 }
 
-function PrintPreview({ companyProfile, onClose, row }: { companyProfile: ReceiptVoucherCompanyProfile; onClose: () => void; row: ReceiptVoucherRow }) {
-  const items = normalizeItems(row)
-  const printItems = items.length
-    ? items
-    : [{ amount: row.totalAmount, description: row.purchaseBillDocNo || row.docNo, id: 'summary', price: row.totalQty ? row.totalAmount / row.totalQty : row.totalAmount, qty: row.totalQty, unit: 'กก.' }]
-  const quantitySummary = summarizeQuantityByUnit(printItems)
-  const companyName = companyProfile?.name || 'ไม่มีข้อมูล'
-  const companyAddress = companyProfile?.address || 'ไม่มีข้อมูล'
-  const companyPhone = companyProfile?.phone || 'ไม่มีข้อมูล'
-  const companyTaxId = companyProfile?.taxId || 'ไม่มีข้อมูล'
-
-  const [autoScale, setAutoScale] = useState(1)
-  const [zoom, setZoom] = useState<number | null>(null)
-
-  const zoomLevels = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5]
-
-  useEffect(() => {
-    const handleResize = () => {
-      // Calculate available dimensions:
-      // Height: viewport height minus modal header (68px), modal footer (60px), zoom toolbar (45px) and padding
-      const availableHeight = window.innerHeight - 210
-      // Width: viewport width minus modal padding
-      const availableWidth = window.innerWidth - 64
-
-      const targetHeight = 1123
-      const targetWidth = 794
-
-      const scaleHeight = availableHeight / targetHeight
-      const scaleWidth = availableWidth / targetWidth
-
-      const s = Math.min(1, scaleHeight, scaleWidth)
-      setAutoScale(s)
-    }
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  const currentScale = zoom === null ? autoScale : zoom
-
-  const handleZoomIn = () => {
-    const currentVal = zoom === null ? autoScale : zoom
-    const nextLevel = zoomLevels.find((level) => level > currentVal + 0.01)
-    if (nextLevel) {
-      setZoom(nextLevel)
-    }
-  }
-
-  const handleZoomOut = () => {
-    const currentVal = zoom === null ? autoScale : zoom
-    const prevLevel = [...zoomLevels].reverse().find((level) => level < currentVal - 0.01)
-    if (prevLevel) {
-      setZoom(prevLevel)
-    }
-  }
-
-  const handleResetZoom = () => {
-    setZoom(null)
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/40 p-3 flex justify-center items-center print:static print:p-0 print:bg-transparent overflow-hidden">
-      <div className="relative w-full max-w-4xl rounded-xl bg-white shadow-xl border border-slate-200 overflow-hidden print:border-none print:shadow-none print:w-full">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5 bg-slate-50 print:hidden">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">พรีวิวใบสำคัญรับเงิน {row.docNo}</h3>
-            <p className="text-xs text-slate-500">ตรวจสอบรายละเอียดรูปแบบพิมพ์เอกสาร (A4)</p>
-          </div>
-          <button className="text-2xl leading-none text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>&times;</button>
-        </div>
-
-        {/* Modal Content Preview Sheet */}
-        <div className="flex flex-col h-[calc(100vh-170px)] bg-slate-100 print:h-auto print:max-h-none print:overflow-visible print:bg-white print:p-0">
-
-          {/* Zoom Toolbar */}
-          <div className="flex items-center justify-center gap-3 border-b border-slate-200 bg-white px-4 py-2 shadow-sm print:hidden">
-            <button
-              type="button"
-              className="flex size-7 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 disabled:opacity-40"
-              onClick={handleZoomOut}
-              disabled={zoom !== null && zoom <= zoomLevels[0]}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="size-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" />
-              </svg>
-            </button>
-            <span className="min-w-[64px] text-center text-xs font-bold text-slate-700">
-              {zoom === null ? 'พอดีจอ' : `${Math.round(zoom * 100)}%`}
-            </span>
-            <button
-              type="button"
-              className="flex size-7 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 disabled:opacity-40"
-              onClick={handleZoomIn}
-              disabled={zoom !== null && zoom >= zoomLevels[zoomLevels.length - 1]}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="size-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-            </button>
-            <div className="h-4 w-px bg-slate-200" />
-            <button
-              type="button"
-              className="rounded-md px-2.5 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 disabled:opacity-40"
-              onClick={handleResetZoom}
-              disabled={zoom === null}
-            >
-              ปรับให้พอดี
-            </button>
-          </div>
-
-          {/* Scrollable Preview Area */}
-          <div className="flex-1 overflow-auto p-4 md:p-6 flex print:overflow-visible print:p-0">
-            {/* Scaled Wrapper */}
-            <div
-              className="relative flex justify-center items-start print:block print:w-full print:h-auto m-auto"
-              style={{
-                width: typeof window !== 'undefined' ? `${794 * currentScale}px` : '100%',
-                height: typeof window !== 'undefined' ? `${1123 * currentScale}px` : 'auto',
-              }}
-            >
-              <div
-                className="absolute top-0 left-0 origin-top-left bg-white p-[6mm] md:p-[9mm] text-slate-900 shadow-md print:static print:transform-none print:p-0 print:shadow-none print:w-full print:h-auto print:min-h-0"
-                style={{
-                  fontFamily: "'Noto Sans Thai', Arial, sans-serif",
-                  fontSize: '11px',
-                  lineHeight: 1.35,
-                  width: typeof window !== 'undefined' ? '794px' : '100%',
-                  height: typeof window !== 'undefined' ? '1123px' : 'auto',
-                  transform: typeof window !== 'undefined' ? `scale(${currentScale})` : 'none',
-                }}
-              >
-              {row.status === 'cancelled' ? (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[72px] font-black text-slate-200/70 rotate-[-18deg] print:text-[64px]">
-                  ยกเลิก
-                </div>
-              ) : null}
-              <div className="mb-3 h-1 rounded-full bg-gradient-to-r from-emerald-800 via-lime-600 to-slate-300 print:mb-2" />
-
-              <header className="grid grid-cols-[1fr_0.82fr] gap-4 border-b border-slate-300 pb-3 print:gap-3 print:pb-2">
-                <div className="grid grid-cols-[64px_1fr] gap-3 print:grid-cols-[48px_1fr] print:gap-2">
-                  {companyProfile?.logoUrl ? (
-                    <div
-                      aria-label="Company logo"
-                      className="size-16 bg-contain bg-center bg-no-repeat print:size-12"
-                      role="img"
-                      style={{ backgroundImage: `url("${companyProfile.logoUrl.replaceAll('"', '%22')}")` }}
-                    />
-                  ) : (
-                    <div className="flex size-16 items-center justify-center rounded-md border border-dashed border-slate-300 text-center text-[9px] font-bold text-slate-500 print:size-12 print:text-[8px]">ไม่มีข้อมูล</div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="text-base font-black leading-tight text-slate-950 print:text-sm">{companyName}</div>
-                    {companyProfile?.nameEn ? <div className="mt-0.5 text-[10px] font-bold text-slate-600">{companyProfile.nameEn}</div> : null}
-                    <div className="mt-1 text-[10px] leading-relaxed text-slate-600 print:text-[9px]">
-                      <div>{companyAddress}</div>
-                      <div>โทร {companyPhone}</div>
-                      <div>เลขประจำตัวผู้เสียภาษี {companyTaxId}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[22px] font-black text-emerald-900 print:text-[19px]">ใบสำคัญรับเงิน</div>
-                  <div className="mt-1 text-[10px] font-bold uppercase tracking-normal text-slate-500">Receipt Voucher</div>
-                  <div className="mt-3 grid grid-cols-2 gap-1.5 text-left print:mt-2">
-                    <PrintMeta label="เลขที่เอกสาร" value={row.docNo} />
-                    <PrintMeta label="วันที่ออกเอกสาร" value={formatDateDisplay(row.date)} />
-                    <PrintMeta label="อ้างอิงบิลซื้อ" value={row.purchaseBillDocNo || '-'} />
-                    <PrintMeta label="วิธีรับเงิน" value={row.paymentMethod || 'รับเงินสด'} />
-                  </div>
-                </div>
-              </header>
-
-              <section className="mt-3 grid grid-cols-2 gap-3 print:mt-2 print:gap-2">
-                <PrintPanel title="ผู้รับเงิน / Supplier Receiver">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    <PrintField label="ผู้รับเงิน" value={row.sellerName} />
-                    <PrintField label="เลขประจำตัวผู้เสียภาษี" value={row.sellerTaxId} />
-                    <PrintField label="ที่อยู่" value={row.sellerAddress} wide />
-                    <PrintField label="เบอร์โทร" value={row.sellerPhone} />
-                    <PrintField label="Sale contact" value={row.salesPerson} />
-                  </div>
-                </PrintPanel>
-                <PrintPanel title="ผู้จ่ายเงิน / Company Payer">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    <PrintField label="บริษัท" value={companyName} />
-                    <PrintField label="เลขประจำตัวผู้เสียภาษี" value={companyTaxId} />
-                    <PrintField label="ที่อยู่" value={companyAddress} wide />
-                    <PrintField label="โทร" value={companyPhone} />
-                    <PrintField label="ผู้จ่ายเงิน" value={row.payerSignerName || row.createdBy} />
-                  </div>
-                </PrintPanel>
-              </section>
-
-              <table className="mt-3 w-full table-fixed border-collapse text-[9px] print:mt-2 print:text-[8px]">
-                <thead>
-                  <tr className="bg-slate-200 text-slate-900">
-                    <th className="w-[8mm] border border-slate-300 p-1.5 text-center font-black print:p-1">#</th>
-                    <th className="border border-slate-300 p-1.5 text-left font-black print:p-1">รายการ</th>
-                    <th className="w-[28mm] border border-slate-300 p-1.5 text-right font-black print:p-1">จำนวน/หน่วย</th>
-                    <th className="w-[25mm] border border-slate-300 p-1.5 text-right font-black print:p-1">ราคา/หน่วย</th>
-                    <th className="w-[29mm] border border-slate-300 p-1.5 text-right font-black print:p-1">จำนวนเงิน</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {printItems.map((item, index) => (
-                    <tr key={item.id ?? index} className="break-inside-avoid">
-                      <td className="border border-slate-300 p-1.5 text-center print:p-1">{index + 1}</td>
-                      <td className="border border-slate-300 p-1.5 font-bold text-slate-900 print:p-1">{item.description || '-'}</td>
-                      <td className="border border-slate-300 p-1.5 text-right tabular-nums print:p-1">{formatMoney(toNumber(item.qty))} {item.unit || 'หน่วย'}</td>
-                      <td className="border border-slate-300 p-1.5 text-right tabular-nums print:p-1">{formatMoney(toNumber(item.price))}</td>
-                      <td className="border border-slate-300 p-1.5 text-right font-black tabular-nums print:p-1">{formatMoney(toNumber(item.amount))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <section className="mt-3 grid grid-cols-[1fr_70mm] gap-3 print:mt-2 print:gap-2">
-                <div className="space-y-2">
-                  <div className="rounded-md border border-slate-300">
-                    <div className="bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-700 print:text-[9px]">จำนวนเงิน (ตัวอักษร)</div>
-                    <div className="min-h-8 px-2 py-2 text-xs font-bold text-slate-900 print:min-h-6 print:py-1.5 print:text-[10px]">{row.amountInWords || '-'}</div>
-                  </div>
-                  <div className="rounded-md border border-slate-300">
-                    <div className="bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-700 print:text-[9px]">หมายเหตุ</div>
-                    <div className="min-h-10 whitespace-pre-wrap px-2 py-2 text-[10px] text-slate-700 print:min-h-7 print:py-1.5 print:text-[9px]">{row.note || 'แนบสำเนาบัตรประชาชนผู้รับเงิน (กรณีบุคคลธรรมดา)'}</div>
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-md border border-slate-300">
-                  <TotalLine label="จำนวนรวม" value={quantitySummary || '-'} />
-                  <TotalLine label="ยอดเงินรวม" value={formatMoney(row.totalAmount)} />
-                  <div className="grid grid-cols-[1fr_32mm] gap-2 bg-emerald-900 px-2 py-1.5 text-white">
-                    <div className="font-black">ยอดรับเงินสด</div>
-                    <div className="text-right font-black tabular-nums">{formatMoney(row.totalAmount)}</div>
-                  </div>
-                </div>
-              </section>
-
-              <div className="mt-12 grid grid-cols-2 gap-16 text-[10px] print:mt-9 print:gap-12 print:text-[9px]">
-                <SignatureBlock label="ผู้จ่ายเงิน" name={row.payerSignerName} />
-                <SignatureBlock label="ผู้รับเงิน" name={row.sellerName} />
-              </div>
-
-              <div className="mt-4 border-t border-slate-200 pt-2 text-center text-[9px] font-semibold text-slate-500 print:mt-3">
-                เอกสารนี้เป็นหลักฐานรับเงินสดจาก Supplier เท่านั้น ไม่ใช่เอกสารโอนเงินหรือรายการธนาคาร
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-        {/* Modal Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 print:hidden">
-          <Button type="button" variant="secondary" onClick={onClose}>ปิด</Button>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5" type="button" onClick={() => window.print()}>
-            🖨 พิมพ์เอกสาร
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PrintMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 print:px-1.5 print:py-0.5">
-      <div className="text-[9px] text-slate-500 print:text-[8px]">{label}</div>
-      <div className="mt-0.5 font-black text-slate-900">{value || '-'}</div>
-    </div>
-  )
-}
-
-function PrintPanel({ children, title }: { children: ReactNode; title: string }) {
-  return (
-    <div className="overflow-hidden rounded-md border border-slate-300 break-inside-avoid">
-      <div className="bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-700 print:text-[9px]">{title}</div>
-      <div className="p-2 print:p-1.5">{children}</div>
-    </div>
-  )
-}
-
-function PrintField({ label, value, wide = false }: { label: string; value?: string | null; wide?: boolean }) {
-  return (
-    <div className={wide ? 'col-span-2' : ''}>
-      <div className="text-[9px] text-slate-500 print:text-[8px]">{label}</div>
-      <div className="mt-0.5 font-bold text-slate-900 [overflow-wrap:anywhere]">{value || '-'}</div>
-    </div>
-  )
-}
-
-function TotalLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[1fr_32mm] gap-2 border-b border-slate-200 px-2 py-1.5 last:border-b-0 print:py-1">
-      <div className="font-bold text-slate-700">{label}</div>
-      <div className="text-right font-black tabular-nums text-slate-900">{value}</div>
-    </div>
-  )
-}
-
-function SignatureBlock({ label, name }: { label: string; name?: string | null }) {
-  return (
-    <div className="text-center text-slate-600">
-      <div className="mx-auto h-9 w-[78%] border-b border-slate-500 print:h-7" />
-      <div className="mt-1 font-black text-slate-800">{label}</div>
-      <div className="mt-0.5">( {name || '-'} )</div>
-      <div className="mt-1 text-[9px] text-slate-500">วันที่ ____ / ____ / ______</div>
-    </div>
-  )
-}
-
 function normalizeItems(row: ReceiptVoucherRow): VoucherItem[] {
   if (!Array.isArray(row.items)) return []
   return row.items.filter((item): item is VoucherItem => Boolean(item) && typeof item === 'object')
-}
-
-function summarizeQuantityByUnit(items: VoucherItem[]) {
-  const byUnit = new Map<string, number>()
-  for (const item of items) {
-    const unit = item.unit || 'หน่วย'
-    byUnit.set(unit, (byUnit.get(unit) ?? 0) + toNumber(item.qty))
-  }
-  return [...byUnit.entries()].map(([unit, qty]) => `${formatMoney(qty)} ${unit}`).join(' / ')
 }
 
 function toNumber(value: number | string | null | undefined) {
