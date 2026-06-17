@@ -43,6 +43,7 @@ type Bill = {
   paidAmount?: number
   payableBalance?: number
   receivableBalance?: number
+  receiptStatus?: string
   sourceDocNo?: string
   sourceType?: 'advance_payment' | 'expense' | 'purchase_bill'
   status?: string
@@ -542,10 +543,13 @@ function buildCustomerReceiptPrintHtml(row: MoneyRow) {
 }
 
 function receiptQueueDocNo(bill: Bill) {
-  return bill.activeReceiptDocNos?.[0] ?? 'รอออกเลขใบรับเงิน'
+  return bill.activeReceiptDocNos?.[0] ?? '-'
 }
 
 function receiptQueueStatusLabel(bill: Bill) {
+  const status = String(bill.receiptStatus ?? '').toLowerCase()
+  if (status === 'pending') return 'รอรับเงิน'
+  if (status === 'active') return 'รับเงินแล้ว'
   return bill.activeReceiptDocNos?.length ? 'รับเงินแล้ว' : 'รอรับเงิน'
 }
 
@@ -1013,6 +1017,7 @@ export function MoneyMovementPageClient({
         amount,
         billId: bill.id,
         customerId: bill.customerId ?? '',
+        docNo: bill.activeReceiptDocNos?.[0] ?? null,
         lines: [{
           ...newReceiptLine(),
           receiptAmount: amount,
@@ -1290,7 +1295,8 @@ export function MoneyMovementPageClient({
     const receiptDocNo = activeReceiptDocNos[0]
     if (!receiptDocNo) return null
     const customerName = partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'
-    const amount = bill.paidAmount ?? Math.max(0, (bill.totalAmount ?? 0) - (bill.receivableBalance ?? 0))
+    const amount = bill.receivableBalance ?? bill.totalAmount ?? 0
+    const receiptStatus = bill.receiptStatus ?? 'pending'
     return {
       accountName: '-',
       amount,
@@ -1312,7 +1318,7 @@ export function MoneyMovementPageClient({
         salesBillDocNo: billDocNo,
         withholdingTaxAmount: 0,
       }],
-      status: 'active',
+      status: receiptStatus,
       withholdingTax: 0,
     } satisfies MoneyRow
   }

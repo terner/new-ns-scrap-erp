@@ -10,6 +10,7 @@ const RECEIPT_REF_TYPE = 'RCP'
 const RECEIPT_CANCEL_REF_TYPE = 'RCP-CANCEL'
 const CUSTOMER_RECEIPT_STATUS_ACTIVE = 'active'
 const CUSTOMER_RECEIPT_STATUS_CANCELLED = 'cancelled'
+const CUSTOMER_RECEIPT_STATUS_PENDING = 'pending'
 const SALES_BILL_STATUS_OPEN = 'open'
 const SALES_BILL_STATUS_PARTIAL = 'partial'
 const SALES_BILL_STATUS_PAID = 'paid'
@@ -237,31 +238,74 @@ async function createCustomerReceiptInTransaction(
   }
 
   const branchId = distinctBranchIds.size === 1 ? [...distinctBranchIds][0] : null
-  const receiptHeader = await tx.customer_receipts.create({
-    data: {
-      account_code_snapshot: account.code,
-      account_id: account.id,
-      account_name_snapshot: account.name,
-      bank_fee_total: bankFeeTotal,
-      branch_id: branchId,
-      customer_code_snapshot: customer.code,
-      customer_id: customer.id,
-      customer_name_snapshot: customer.name,
-      date: normalizeDate(values.date),
-      discount_total: discountTotal,
-      doc_no: docNo,
-      gross_amount: grossAmount,
-      net_cash_in: netCashIn,
-      notes: values.notes,
-      payment_method_code_snapshot: paymentMethod.code,
-      payment_method_id: paymentMethod.id,
-      payment_method_name_snapshot: paymentMethod.name,
-      status: CUSTOMER_RECEIPT_STATUS_ACTIVE,
-      updated_by: actor,
-      withholding_tax_total: withholdingTaxTotal,
-      created_by: actor,
-    },
+  const existingReceipt = await tx.customer_receipts.findUnique({
+    select: { customer_id: true, id: true, status: true },
+    where: { doc_no: docNo },
   })
+  if (existingReceipt && existingReceipt.status !== CUSTOMER_RECEIPT_STATUS_PENDING) {
+    throw new Error(`เลขที่ Receipt Voucher ${docNo} ถูกใช้งานแล้ว`)
+  }
+  if (existingReceipt && existingReceipt.customer_id !== customer.id) {
+    throw new Error(`Receipt Voucher ${docNo} ไม่ใช่ของลูกค้าที่เลือก`)
+  }
+
+  const receiptHeader = existingReceipt
+    ? await tx.customer_receipts.update({
+      data: {
+        account_code_snapshot: account.code,
+        account_id: account.id,
+        account_name_snapshot: account.name,
+        bank_fee_total: bankFeeTotal,
+        branch_id: branchId,
+        customer_code_snapshot: customer.code,
+        customer_name_snapshot: customer.name,
+        date: normalizeDate(values.date),
+        discount_total: discountTotal,
+        gross_amount: grossAmount,
+        net_cash_in: netCashIn,
+        notes: values.notes,
+        payment_method_code_snapshot: paymentMethod.code,
+        payment_method_id: paymentMethod.id,
+        payment_method_name_snapshot: paymentMethod.name,
+        status: CUSTOMER_RECEIPT_STATUS_ACTIVE,
+        updated_at: new Date(),
+        updated_by: actor,
+        version: { increment: 1 },
+        withholding_tax_total: withholdingTaxTotal,
+      },
+      where: { id: existingReceipt.id },
+    })
+    : await tx.customer_receipts.create({
+      data: {
+        account_code_snapshot: account.code,
+        account_id: account.id,
+        account_name_snapshot: account.name,
+        bank_fee_total: bankFeeTotal,
+        branch_id: branchId,
+        customer_code_snapshot: customer.code,
+        customer_id: customer.id,
+        customer_name_snapshot: customer.name,
+        date: normalizeDate(values.date),
+        discount_total: discountTotal,
+        doc_no: docNo,
+        gross_amount: grossAmount,
+        net_cash_in: netCashIn,
+        notes: values.notes,
+        payment_method_code_snapshot: paymentMethod.code,
+        payment_method_id: paymentMethod.id,
+        payment_method_name_snapshot: paymentMethod.name,
+        status: CUSTOMER_RECEIPT_STATUS_ACTIVE,
+        updated_by: actor,
+        withholding_tax_total: withholdingTaxTotal,
+        created_by: actor,
+      },
+    })
+
+  if (existingReceipt) {
+    await tx.customer_receipt_allocations.deleteMany({
+      where: { receipt_id: receiptHeader.id, status: CUSTOMER_RECEIPT_STATUS_PENDING },
+    })
+  }
 
   const bankStatement = await tx.bank_statement.create({
     data: {
@@ -446,6 +490,52 @@ async function cancelCustomerReceiptInTransaction(
   })
   if (!receipt) {
     throw new Error('ไม่พบ Receipt Voucher ที่ต้องการยกเลิก')
+  }
+  if (receipt.status === CUSTOMER_RECEIPT_STATUS_PENDING) {
+    for (const allocation of receipt.customer_receipt_allocations) {
+      if (allocation.status !== CUSTOMER_RECEIPT_STATUS_PENDING) continue
+      await tx.customer_receipt_allocations.update({
+        data: {
+          status: CUSTOMER_RECEIPT_STATUS_CANCELLED,
+          updated_at: new Date(),
+          updated_by: actor,
+          version: { increment: 1 },
+        },
+        where: { id: allocation.id },
+      })
+    }
+
+    await tx.customer_receipts.update({
+      data: {
+        cancel_reason: normalizedReason,
+        cancelled_at: new Date(),
+        cancelled_by: actor,
+        status: CUSTOMER_RECEIPT_STATUS_CANCELLED,
+        updated_at: new Date(),
+        updated_by: actor,
+        version: { increment: 1 },
+      },
+      where: { id: receipt.id },
+    })
+
+    const statusLogAction = options.statusLogAction ?? 'pending_cancelled'
+    await tx.customer_receipt_status_logs.create({
+      data: {
+        action: statusLogAction,
+        created_by: actor,
+        event_key: `customer-receipt.${statusLogAction}.${receipt.doc_no}`,
+        from_status: CUSTOMER_RECEIPT_STATUS_PENDING,
+        gross_amount_snapshot: receipt.gross_amount,
+        meta: { reason: normalizedReason },
+        net_cash_in_snapshot: receipt.net_cash_in,
+        note: normalizedReason,
+        receipt_doc_no: receipt.doc_no,
+        receipt_id: receipt.id,
+        to_status: CUSTOMER_RECEIPT_STATUS_CANCELLED,
+      },
+    })
+
+    return { id: receipt.doc_no, status: CUSTOMER_RECEIPT_STATUS_CANCELLED }
   }
   if (receipt.status !== CUSTOMER_RECEIPT_STATUS_ACTIVE) {
     throw new Error('Receipt Voucher นี้ถูกยกเลิกแล้ว')
