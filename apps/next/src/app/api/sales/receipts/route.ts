@@ -11,6 +11,7 @@ import { prisma } from '@/lib/server/prisma'
 export const runtime = 'nodejs'
 
 const CUSTOMER_RECEIPT_LIST_LIMIT = 5000
+const CANCELLED_RECEIPT_STATUSES = ['cancelled', 'canceled']
 
 export async function GET() {
   try {
@@ -30,7 +31,7 @@ export async function GET() {
           status: true,
         },
         where: {
-          customer_receipts: { is: { status: { notIn: ['cancelled', 'canceled'] } } },
+          customer_receipts: { is: { status: { notIn: CANCELLED_RECEIPT_STATUSES } } },
           status: 'active',
         },
       },
