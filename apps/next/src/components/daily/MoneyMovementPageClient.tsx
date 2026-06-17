@@ -1261,6 +1261,17 @@ export function MoneyMovementPageClient({
     printWindow.focus()
   }
 
+  function findActiveReceiptForBill(bill: Bill) {
+    const billDocNo = bill.docNo
+    return data.rows.find((row) => {
+      const status = String(row.status ?? '').toLowerCase()
+      if (status === 'cancelled' || status === 'canceled') return false
+      if (row.billId === billDocNo || row.billDocNo === billDocNo) return true
+      if (row.billDocNos?.includes(billDocNo)) return true
+      return row.receiptLines?.some((line) => line.salesBillDocNo === billDocNo) ?? false
+    }) ?? null
+  }
+
   async function copyAccountNo(accountKey: string, accountNo: string) {
     try {
       if (navigator.clipboard) {
@@ -1760,6 +1771,7 @@ export function MoneyMovementPageClient({
             ) : null}
             {!isLoading && receiptBillPageRows.map((bill) => {
               const balance = bill.receivableBalance ?? 0
+              const cancelableReceipt = findActiveReceiptForBill(bill)
               return (
                 <div
                   key={bill.id}
@@ -1814,12 +1826,17 @@ export function MoneyMovementPageClient({
                     </UiButton>
                     <UiButton
                       className="font-normal border-red-200 text-red-700"
-                      disabled
+                      disabled={!cancelableReceipt}
                       size="xs"
-                      title="ยังไม่มี flow ยกเลิกบิลขายจากหน้ารับเงิน Customer"
+                      title={cancelableReceipt ? `ยกเลิกใบรับเงิน ${cancelableReceipt.docNo}` : 'ยังไม่มีใบรับเงินให้ยกเลิก'}
                       type="button"
                       variant="outline"
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (!cancelableReceipt) return
+                        setCancelReceiptTarget(cancelableReceipt)
+                        setCancelReceiptReason('')
+                      }}
                     >
                       ยกเลิก
                     </UiButton>
@@ -1861,6 +1878,7 @@ export function MoneyMovementPageClient({
                 {!isLoading && receiptBillPageRows.map((bill) => {
                   const balance = bill.receivableBalance ?? 0
                   const receivedAmount = Math.max(0, (bill.totalAmount ?? 0) - balance)
+                  const cancelableReceipt = findActiveReceiptForBill(bill)
                   return (
                     <TableRow key={bill.id} className="cursor-pointer hover:bg-slate-50" onClick={() => openReceivableBillDetail(bill)}>
                       <TableCell className="text-xs font-semibold text-slate-700">{bill.docNo}</TableCell>
@@ -1899,12 +1917,17 @@ export function MoneyMovementPageClient({
                         </UiButton>
                         <UiButton
                           className="font-normal border-red-200 text-red-700"
-                          disabled
+                          disabled={!cancelableReceipt}
                           size="xs"
-                          title="ยังไม่มี flow ยกเลิกบิลขายจากหน้ารับเงิน Customer"
+                          title={cancelableReceipt ? `ยกเลิกใบรับเงิน ${cancelableReceipt.docNo}` : 'ยังไม่มีใบรับเงินให้ยกเลิก'}
                           type="button"
                           variant="outline"
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            if (!cancelableReceipt) return
+                            setCancelReceiptTarget(cancelableReceipt)
+                            setCancelReceiptReason('')
+                          }}
                         >
                           ยกเลิก
                         </UiButton>
@@ -2721,8 +2744,15 @@ export function MoneyMovementPageClient({
       {mode === 'receipt' ? (
         <ReceivableBillDetailDialog
           bill={receiptBillDetailBill}
+          cancelableReceipt={receiptBillDetailBill ? findActiveReceiptForBill(receiptBillDetailBill) : null}
           customerName={receiptBillDetailBill ? (partyMap.get(receiptBillDetailBill.customerId ?? '') ?? receiptBillDetailBill.customerId ?? '-') : '-'}
           open={receiptBillDetailOpen}
+          onCancel={(row) => {
+            setReceiptBillDetailOpen(false)
+            setReceiptBillDetailBill(null)
+            setCancelReceiptTarget(row)
+            setCancelReceiptReason('')
+          }}
           onEdit={(bill) => {
             setReceiptBillDetailOpen(false)
             setReceiptBillDetailBill(null)
@@ -3059,14 +3089,18 @@ function PaymentHistoryDetailDialog({
 
 function ReceivableBillDetailDialog({
   bill,
+  cancelableReceipt,
   customerName,
+  onCancel,
   onEdit,
   onOpenChange,
   onPrint,
   open,
 }: {
   bill: Bill | null
+  cancelableReceipt: MoneyRow | null
   customerName: string
+  onCancel: (row: MoneyRow) => void
   onEdit: (bill: Bill) => void
   onOpenChange: (open: boolean) => void
   onPrint: (bill: Bill) => void
@@ -3125,7 +3159,16 @@ function ReceivableBillDetailDialog({
         <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4">
           <UiButton className="font-normal border-emerald-200 text-emerald-700 hover:bg-emerald-50" disabled={!bill} type="button" variant="outline" onClick={() => bill && onPrint(bill)}>พิมพ์</UiButton>
           <UiButton className="font-normal" disabled={!bill} type="button" variant="outline" onClick={() => bill && onEdit(bill)}>แก้ไข</UiButton>
-          <UiButton className="font-normal border-red-200 text-red-700" disabled title="ยังไม่มี flow ยกเลิกบิลขายจากหน้ารับเงิน Customer" type="button" variant="outline">ยกเลิก</UiButton>
+          <UiButton
+            className="font-normal border-red-200 text-red-700"
+            disabled={!cancelableReceipt}
+            title={cancelableReceipt ? `ยกเลิกใบรับเงิน ${cancelableReceipt.docNo}` : 'ยังไม่มีใบรับเงินให้ยกเลิก'}
+            type="button"
+            variant="outline"
+            onClick={() => cancelableReceipt && onCancel(cancelableReceipt)}
+          >
+            ยกเลิก
+          </UiButton>
           <UiButton className="font-normal text-slate-600" type="button" variant="ghost" onClick={() => onOpenChange(false)}>ปิด</UiButton>
         </DialogFooter>
       </DialogContent>
