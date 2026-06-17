@@ -271,9 +271,57 @@ export async function PATCH(request: NextRequest) {
     const reason = String(body.reason || '').trim()
     if (!reason) return NextResponse.json({ error: 'กรอกเหตุผลการ Reverse' }, { status: 400 })
     const actor = currentActor(context)
-    const dep = await prisma.depreciations.findUnique({ select: { period_month: true, period_year: true }, where: { id } })
+
+    const dep = await prisma.depreciations.findUnique({
+      where: { id },
+      include: { assets: { select: { asset_status: true } } }
+    })
     if (!dep) return NextResponse.json({ error: 'ไม่พบรายการค่าเสื่อม' }, { status: 404 })
-    await prisma.depreciations.update({ data: { reversed_at: new Date(), reversed_by: actor, reversal_reason: reason, status: 'reversed', updated_by: actor }, where: { id } })
+    if (dep.status === 'reversed') return NextResponse.json({ error: 'รายการนี้ถูกกลับรายการไปแล้ว' }, { status: 400 })
+
+    // ตรวจสอบการกลับรายการตามลำดับเวลา (Sequence Lock)
+    if (dep.period_year && dep.period_month && dep.asset_id) {
+      const newerDep = await prisma.depreciations.findFirst({
+        where: {
+          asset_id: dep.asset_id,
+          status: 'posted',
+          OR: [
+            { period_year: { gt: dep.period_year } },
+            {
+              period_year: dep.period_year,
+              period_month: { gt: dep.period_month }
+            }
+          ]
+        }
+      })
+      if (newerDep) {
+        return NextResponse.json({
+          error: 'ไม่สามารถยกเลิกได้ เนื่องจากมีรายการคำนวณในงวดถัดไปแล้ว กรุณายกเลิกงวดล่าสุดก่อน'
+        }, { status: 400 })
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.depreciations.update({
+        data: {
+          reversed_at: new Date(),
+          reversed_by: actor,
+          reversal_reason: reason,
+          status: 'reversed',
+          updated_by: actor
+        },
+        where: { id }
+      })
+
+      // หากสินทรัพย์มีสถานะเป็น Fully Depreciated ให้เปลี่ยนกลับมาเป็น Active
+      if (dep.assets && dep.assets.asset_status === 'Fully Depreciated' && dep.asset_id) {
+        await tx.assets.update({
+          where: { id: dep.asset_id },
+          data: { asset_status: 'Active' }
+        })
+      }
+    })
+
     const params = dep.period_month && dep.period_year ? new URLSearchParams({ month: String(dep.period_month), year: String(dep.period_year) }) : new URLSearchParams()
     return NextResponse.json({ ok: true, payload: await payload(params) })
   } catch (caught) {

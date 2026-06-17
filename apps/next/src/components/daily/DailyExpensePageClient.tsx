@@ -2053,7 +2053,7 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
 
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-h-[90vh] max-w-4xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl">
+      <DialogContent hideClose className="max-h-[90vh] max-w-4xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl">
         <DialogHeader className="px-5 py-4 bg-slate-900 text-white shrink-0 flex flex-row items-center justify-between gap-3 rounded-t-2xl">
           <div>
             <div className="flex flex-wrap items-center gap-2">

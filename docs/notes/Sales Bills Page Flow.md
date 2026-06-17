@@ -38,6 +38,11 @@ updated: 2026-06-14
 
 ## Current Runtime Assessment
 
+การปรับปรุงเพิ่มเติม ณ 2026-06-16:
+- **ปรับปรุงโครงสร้างคอลัมน์ A4 Print:** ในไฟล์ [sales-bill-print.ts](file:///c:/new-ns-scrap-erp/apps/next/src/lib/sales-bill-print.ts) ได้ทำการลบคอลัมน์ Gross, หัก และจำนวนเดิมออก เปลี่ยนชื่อหัวตารางเป็น "จำนวนสุทธิ" (แสดงเฉพาะตัวเลขน้ำหนักสุทธิไม่มีหน่วยวัด) ซ่อนรหัสสินค้า SKU, ซ่อนข้อความ Spot Sale, Matched COGS และคำอื่นๆ โดยแสดงเฉพาะ Trading Allocation (เช่น `Trading PB PB012606-0010:1`) ตามที่ผู้ใช้สั่งการ
+- **ปรับปรุงปุ่มปฏิบัติการ:** ในไฟล์ [TransactionBillsPageClient.tsx](file:///c:/new-ns-scrap-erp/apps/next/src/components/daily/TransactionBillsPageClient.tsx) เปลี่ยนปุ่ม "แก้ต้นทุน" (เฉพาะประเภท TRADING) ให้เป็นปุ่ม "แก้ไข" ดีไซน์ขอบ Slate-300 และแสดงปุ่มแก้ไข (แบบ disabled) ใน Mobile viewport เสมอ เพื่อการจัดเรียง 3 ปุ่มที่สวยงาม
+- **ตรวจสอบสิทธิ์และคุณภาพ:** ผ่านการรัน `npm run type-check` และ `lint` สำเร็จ 100%
+
 ตรวจจาก current code ณ 2026-06-14:
 
 - `GET /api/sales/bills` โหลด list/source options และส่ง `WTO` source เฉพาะสถานะ `delivered` สำหรับบิลขาย STOCK ใหม่

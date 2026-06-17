@@ -4,6 +4,7 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
 
 ## Must Follow
 
+- **MANDATORY STARTUP CHECK:** Every time you start a new conversation session, before doing any other work, checking files, or proposing changes, you MUST read the root [Peach.md](file:///c:/new-ns-scrap-erp/Peach.md), [.agents/rules/peach.md](file:///c:/new-ns-scrap-erp/.agents/rules/peach.md), and [.agents/rules/ponytail.md](file:///c:/new-ns-scrap-erp/.agents/rules/ponytail.md) using the `view_file` tool to ensure all UI standards, developer guidelines, operation constraints, and Ponytail lazy-mode coding rules are fully loaded into your context.
 - Use Thai for user-facing explanations unless the user explicitly requests another language.
 - Active implementation/deploy target is the Next.js app under `apps/next/`.
 - Treat `old-apps/legacy/` and `old-apps/vue/` as source material only. Do not route to, import, or execute them from the active app.
@@ -17,7 +18,7 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
   - never push, force-push, create branches, delete branches, open PRs, write tags, or otherwise mutate `origin` / `https://github.com/sirimasth/ns-scrap-erp.git`
   - use `origin` only for read operations such as fetch, log, diff, show, and checkout-to-inspect
   - if both remotes exist, verify the destination remote before push, branch deletion, or PR creation
-- Update docs at every meaningful checkpoint as if the session can close at any time.
+- Update docs at every meaningful checkpoint as if the session can close at any time. Every time development or browser/UAT testing of a business flow is completed, you MUST write or update a flow summary (e.g. in the walkthrough or a design note) explaining "what is what" (the business entities and states) and "why it has to be like this" (the rationale behind the design and logic).
 - Use a sub agent by default for Playwright/browser QA work; the main agent still defines scope and integrates findings.
 - If the user requests modifications or code improvements, only perform the code changes and verify compilation locally. Do NOT run browser or DOM UAT testing unless the user explicitly requests testing (i.e. do not use browser sub-agent unless told to test).
 - Split large refactors into reviewable batches with one clear module, transform, or behavior change per batch.

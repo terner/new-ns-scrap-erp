@@ -54,30 +54,39 @@ function totalsByUnit(bill: SalesBillDetail) {
   return Array.from(byUnit.entries()).map(([unit, value]) => ({ ...value, unit }))
 }
 
+function getTradingLabel(sourceLabel: string | null | undefined): string {
+  if (!sourceLabel) return ''
+  const parts = sourceLabel.split('/').map((p) => p.trim())
+  const found = parts.find((p) =>
+    p.startsWith('Trading PB') ||
+    p.startsWith('Cost Source') ||
+    p.startsWith('รอ Trading allocation')
+  )
+  return found || ''
+}
+
 function itemRows(bill: SalesBillDetail) {
-  return bill.items.map((item) => `
+  return bill.items.map((item) => {
+    const tradingLabel = getTradingLabel(item.sourceLabel)
+    return `
     <tr class="item-row">
       <td class="center rank-cell">${item.lineNo}</td>
       <td>
         <div class="item-name">${escapeHtml(item.productName)}</div>
-        <div class="muted">${escapeHtml([item.productCode || item.productId || null, item.sourceLabel || item.sourceType].filter(Boolean).join(' · '))}</div>
-        ${item.matchedCogs > 0 ? `<div class="muted">Matched COGS ${money(item.matchedCogs)}</div>` : ''}
+        ${tradingLabel ? `<div class="muted">${escapeHtml(tradingLabel)}</div>` : ''}
         ${item.note ? `<div class="muted">${escapeHtml(item.note)}</div>` : ''}
       </td>
-      <td class="num">${money(item.grossWeight)}</td>
-      <td class="num">${money(item.deductWeight)}</td>
       <td class="num strong">${money(item.netWeight || item.qty)}</td>
-      <td class="num strong">${money(item.qty)} ${escapeHtml(item.unit)}</td>
       <td class="num">${money(item.price)}</td>
       <td class="num">${money(item.discount)}</td>
       <td class="num strong">${money(item.amount)}</td>
     </tr>
-  `).join('')
+  `}).join('')
 }
 
 function emptyRows(count: number) {
   return Array.from({ length: Math.max(0, count) }, () => (
-    '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'
+    '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>'
   )).join('')
 }
 
@@ -242,15 +251,12 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
       <table class="items">
         <thead>
           <tr>
-            <th class="center rank-cell" style="width:5mm">#</th>
-            <th style="width:48mm">สินค้า</th>
-            <th class="num" style="width:16mm">Gross</th>
-            <th class="num" style="width:14mm">หัก</th>
-            <th class="num" style="width:16mm">สุทธิ</th>
-            <th class="num" style="width:18mm">จำนวน</th>
-            <th class="num" style="width:16mm">ราคา</th>
-            <th class="num" style="width:15mm">ส่วนลด</th>
-            <th class="num" style="width:18mm">รวม</th>
+            <th class="center rank-cell" style="width:8mm">#</th>
+            <th style="width:78mm">สินค้า</th>
+            <th class="num" style="width:24mm">จำนวนสุทธิ</th>
+            <th class="num" style="width:20mm">ราคา</th>
+            <th class="num" style="width:18mm">ส่วนลด</th>
+            <th class="num" style="width:22mm">รวม</th>
           </tr>
         </thead>
         <tbody>

@@ -110,6 +110,15 @@ function formatDateLocal(d: Date) {
   return `${yyyy}-${mm}-${dd}`
 }
 
+function statusLabel(status: string) {
+  if (status === 'Open') return 'ยังไม่เริ่ม'
+  if (status === 'In Production') return 'กำลังผลิต'
+  if (status === 'Partially Completed') return 'เสร็จบางส่วน'
+  if (status === 'Completed') return 'เสร็จสิ้น'
+  if (status === 'Cancelled') return 'ยกเลิก'
+  return status || 'ทุกสถานะ'
+}
+
 export function ProductionOrdersPageClient() {
   const [data, setData] = useState<ProductionOrdersPayload | null>(null)
   const [dateFrom, setDateFrom] = useState('')
@@ -258,11 +267,11 @@ export function ProductionOrdersPageClient() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 font-medium">สถานะ:</span>
               <MatchButton active={status === ''} label="ทุกสถานะ" onClick={() => { setStatus(''); setPage(1) }} tone="dark" />
-              <MatchButton active={status === 'Open'} label="Open" onClick={() => { setStatus('Open'); setPage(1) }} tone="dark" />
-              <MatchButton active={status === 'In Production'} label="In Production" onClick={() => { setStatus('In Production'); setPage(1) }} tone="amber" />
-              <MatchButton active={status === 'Partially Completed'} label="Partially Completed" onClick={() => { setStatus('Partially Completed'); setPage(1) }} tone="amber" />
-              <MatchButton active={status === 'Completed'} label="Completed" onClick={() => { setStatus('Completed'); setPage(1) }} tone="emerald" />
-              <MatchButton active={status === 'Cancelled'} label="Cancelled" onClick={() => { setStatus('Cancelled'); setPage(1) }} tone="red" />
+              <MatchButton active={status === 'Open'} label="ยังไม่เริ่ม" onClick={() => { setStatus('Open'); setPage(1) }} tone="dark" />
+              <MatchButton active={status === 'In Production'} label="กำลังผลิต" onClick={() => { setStatus('In Production'); setPage(1) }} tone="amber" />
+              <MatchButton active={status === 'Partially Completed'} label="เสร็จบางส่วน" onClick={() => { setStatus('Partially Completed'); setPage(1) }} tone="amber" />
+              <MatchButton active={status === 'Completed'} label="เสร็จสิ้น" onClick={() => { setStatus('Completed'); setPage(1) }} tone="emerald" />
+              <MatchButton active={status === 'Cancelled'} label="ยกเลิก" onClick={() => { setStatus('Cancelled'); setPage(1) }} tone="red" />
             </div>
           </div>
           <span className="text-xs text-slate-500">พบ <b className="text-slate-700">{data?.summary.total ?? 0}</b> ใบ</span>
@@ -299,7 +308,7 @@ export function ProductionOrdersPageClient() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองใบสั่งผลิต</h4>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold font-sans"
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
                 onClick={() => setShowMobileFilters(false)}
                 type="button"
               >
@@ -331,7 +340,7 @@ export function ProductionOrdersPageClient() {
                 <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะ</span>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    className={`h-9 rounded-md text-xs font-medium border font-sans outline-none ${
+                    className={`h-9 rounded-md text-xs font-medium border outline-none ${
                       status === '' 
                         ? 'border-slate-700 bg-slate-700 text-white' 
                         : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
@@ -342,7 +351,7 @@ export function ProductionOrdersPageClient() {
                     ทุกสถานะ
                   </button>
                   <button
-                    className={`h-9 rounded-md text-xs font-medium border font-sans outline-none ${
+                    className={`h-9 rounded-md text-xs font-medium border outline-none ${
                       status === 'Open' 
                         ? 'border-slate-700 bg-slate-700 text-white' 
                         : 'border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
@@ -350,10 +359,10 @@ export function ProductionOrdersPageClient() {
                     type="button"
                     onClick={() => { setStatus('Open'); setPage(1) }}
                   >
-                    Open
+                    ยังไม่เริ่ม
                   </button>
                   <button
-                    className={`h-9 rounded-md text-xs font-medium border font-sans outline-none ${
+                    className={`h-9 rounded-md text-xs font-medium border outline-none ${
                       status === 'In Production' 
                         ? 'border-amber-600 bg-amber-600 text-white' 
                         : 'border-slate-300 text-slate-700 bg-white hover:bg-amber-50'
@@ -361,10 +370,10 @@ export function ProductionOrdersPageClient() {
                     type="button"
                     onClick={() => { setStatus('In Production'); setPage(1) }}
                   >
-                    In Production
+                    กำลังผลิต
                   </button>
                   <button
-                    className={`h-9 rounded-md text-xs font-medium border font-sans outline-none ${
+                    className={`h-9 rounded-md text-xs font-medium border outline-none ${
                       status === 'Partially Completed' 
                         ? 'border-amber-600 bg-amber-600 text-white' 
                         : 'border-slate-300 text-slate-700 bg-white hover:bg-amber-50'
@@ -372,10 +381,10 @@ export function ProductionOrdersPageClient() {
                     type="button"
                     onClick={() => { setStatus('Partially Completed'); setPage(1) }}
                   >
-                    Partially Completed
+                    เสร็จบางส่วน
                   </button>
                   <button
-                    className={`h-9 rounded-md text-xs font-medium border font-sans outline-none ${
+                    className={`h-9 rounded-md text-xs font-medium border outline-none ${
                       status === 'Completed' 
                         ? 'border-emerald-600 bg-emerald-600 text-white' 
                         : 'border-slate-300 text-slate-700 bg-white hover:bg-emerald-50'
@@ -383,10 +392,10 @@ export function ProductionOrdersPageClient() {
                     type="button"
                     onClick={() => { setStatus('Completed'); setPage(1) }}
                   >
-                    Completed
+                    เสร็จสิ้น
                   </button>
                   <button
-                    className={`h-9 rounded-md text-xs font-medium border font-sans outline-none ${
+                    className={`h-9 rounded-md text-xs font-medium border outline-none ${
                       status === 'Cancelled' 
                         ? 'border-red-600 bg-red-600 text-white' 
                         : 'border-slate-300 text-slate-700 bg-white hover:bg-red-50'
@@ -394,14 +403,14 @@ export function ProductionOrdersPageClient() {
                     type="button"
                     onClick={() => { setStatus('Cancelled'); setPage(1) }}
                   >
-                    Cancelled
+                    ยกเลิก
                   </button>
                 </div>
               </div>
 
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-slate-600">เรียงลำดับ</span>
-                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800 font-sans" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1) }}>
+                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={sort} onChange={(event) => { setSort(event.target.value); setPage(1) }}>
                   {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
@@ -410,7 +419,7 @@ export function ProductionOrdersPageClient() {
             <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 font-sans"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => {
                   clearFilters()
                   setShowMobileFilters(false)
@@ -420,7 +429,7 @@ export function ProductionOrdersPageClient() {
               </button>
               <button
                 type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 font-sans"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
                 onClick={() => setShowMobileFilters(false)}
               >
                 ใช้ตัวกรอง
@@ -432,9 +441,82 @@ export function ProductionOrdersPageClient() {
 
       {isLoading ? <div className="rounded-md bg-white p-10 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
       {!isLoading && currentRows.length > 0 ? (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {currentRows.map((row) => <OrderCard key={row.id} row={row} onOpen={() => { setSelectedRow(row); setModalMode('detail') }} />)}
-        </div>
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto rounded-md bg-white border border-slate-200 shadow">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="p-3 text-left">วันที่</th>
+                  <th className="p-3 text-left">เลขที่</th>
+                  <th className="p-3 text-left">สาขา</th>
+                  <th className="p-3 text-left">สินค้าที่ผลิต</th>
+                  <th className="p-3 text-left">เครื่องจักร</th>
+                  <th className="p-3 text-left">คลังรับผลผลิต</th>
+                  <th className="p-3 text-right">ปริมาณเบิก (กก.)</th>
+                  <th className="p-3 text-right">WIP คงเหลือ</th>
+                  <th className="p-3 text-right">ปริมาณผลิต (กก.)</th>
+                  <th className="p-3 text-right">Yield</th>
+                  <th className="p-3 text-center">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {currentRows.map((row) => {
+                  const yieldPct = row.inputQty > 0 ? (row.outputQty / row.inputQty) * 100 : 0
+                  const wipQty = Math.max(0, row.wipQty ?? 0)
+                  return (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-slate-50 cursor-pointer transition-colors"
+                      onClick={() => { setSelectedRow(row); setModalMode('detail') }}
+                    >
+                      <td className="p-3 whitespace-nowrap">{formatDateDisplay(row.date)}</td>
+                      <td className="p-3 font-mono font-semibold text-slate-900">{row.docNo}</td>
+                      <td className="p-3">{row.branchName}</td>
+                      <td className="p-3">
+                        <span className="font-semibold text-slate-800">{row.productName || 'ยังไม่ได้กำหนดสินค้า'}</span>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">{row.productCode || row.productId || '-'}</div>
+                      </td>
+                      <td className="p-3 text-slate-600">
+                        {row.machineName ? (
+                          <div>
+                            <span className="font-medium text-slate-800">{row.machineName}</span>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{row.machineType || '-'}</div>
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 text-slate-600">{row.warehouseName || '-'}</td>
+                      <td className="p-3 text-right font-medium tabular-nums text-slate-700">{formatMoney(row.inputQty)}</td>
+                      <td className="p-3 text-right font-medium tabular-nums text-slate-600">{formatMoney(wipQty)}</td>
+                      <td className="p-3 text-right font-semibold tabular-nums text-slate-800">{formatMoney(row.outputQty)}</td>
+                      <td className="p-3 text-right font-bold tabular-nums">
+                        {row.inputQty > 0 ? (
+                          <span className={yieldPct >= 90 ? 'text-emerald-700' : yieldPct >= 70 ? 'text-blue-700' : 'text-amber-700'}>
+                            {yieldPct.toFixed(1)}%
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 text-center">
+                        <StatusBadge status={row.status} />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Grid/Card View */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
+            {currentRows.map((row) => (
+              <OrderCard
+                key={row.id}
+                row={row}
+                onOpen={() => { setSelectedRow(row); setModalMode('detail') }}
+              />
+            ))}
+          </div>
+        </>
       ) : null}
       {!isLoading && currentRows.length === 0 ? (
         <div className="rounded-md bg-white p-12 text-center text-slate-400 shadow">
@@ -799,7 +881,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
       ['branchCode', 'กรุณาเลือกสาขา'],
       ['productionType', 'กรุณาเลือกประเภทการผลิต'],
       ['targetProductCode', 'กรุณาเลือกสินค้าที่ผลิต'],
-      ['sourceWarehouseCode', 'กรุณาเลือกคลังต้นทาง'],
+      ['sourceWarehouseCode', 'กรุณาเลือกคลังวัตถุดิบ'],
       ['wipWarehouseCode', 'กรุณาเลือกคลัง WIP'],
       ['destinationWarehouseCode', 'กรุณาเลือกคลังรับผลผลิต'],
     ]
@@ -828,7 +910,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     const sourceWarehouseCode = readFormValue(formElement, 'production-input-source-warehouse') || inputForm.sourceWarehouseCode
     const stockStatus = (inputForm.stockStatus || 'RM') as 'RM' | 'FG'
     if (!productCode || !sourceWarehouseCode || !Number.isFinite(netQty) || netQty <= 0) {
-      setError('กรุณาเลือกสินค้า คลังต้นทาง และระบุ Net (กก.) มากกว่า 0')
+      setError('กรุณาเลือกสินค้า คลังวัตถุดิบ และระบุ Net (กก.) มากกว่า 0')
       return
     }
     await runAction(async () => {
@@ -852,7 +934,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     const categoryCode = 'FG'
     const destinationWarehouseCode = readFormValue(formElement, 'production-output-destination-warehouse') || outputForm.destinationWarehouseCode
     if (netQtyText && (!productCode || !destinationWarehouseCode || !Number.isFinite(netQty) || netQty <= 0)) {
-      setError('กรุณาเลือกสินค้า คลังรับ และระบุ Net (กก.) มากกว่า 0')
+      setError('กรุณาเลือกสินค้า คลังรับผลผลิต และระบุ Net (กก.) มากกว่า 0')
       return
     }
     if (!Number.isFinite(lossQty) || lossQty < 0) {
@@ -944,7 +1026,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
           {error ? <div className="mt-3"><Alert tone="red" title="บันทึกไม่สำเร็จ" text={error} /></div> : null}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 space-y-4 p-5">
+        <div className="flex-1 overflow-y-auto bg-slate-50 space-y-3 p-4">
           {!isCreate ? (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-6 text-sm">
               <Metric label="วัตถุดิบเบิก" value={formatMoney(row?.inputQty ?? 0)} tone="danger" />
@@ -971,54 +1053,76 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
           ) : null}
 
           {(isCreate || tab === 'header') ? (
-            <div className="rounded-md bg-white p-5 shadow">
-              {isCreate ? (
-                <div className="grid gap-3 text-sm md:grid-cols-3">
-                  <FormField error={createErrors.date} label="วันที่ *"><DatePickerInput value={createForm.date} onChange={(date) => updateCreateForm('date', date)} /></FormField>
-                  <SelectField error={createErrors.branchCode} label="สาขา *" placeholder="เลือกสาขา" value={createForm.branchCode} options={options.branches} onChange={updateCreateBranch} />
-                  <SearchCombobox
-                    error={createErrors.targetProductCode}
-                    errorKey="targetProductCode"
-                    inputId="production-order-target-product"
-                    label="สินค้าที่ผลิต *"
-                    options={productSearchOptions}
-                    placeholder="พิมพ์รหัส/ชื่อสินค้าที่ผลิต..."
-                    value={createForm.targetProductCode}
-                    onChange={(targetProductCode) => updateCreateForm('targetProductCode', targetProductCode)}
-                  />
-                  <SelectField label="เครื่องจักร" allowBlank value={createForm.machineCode} options={options.machines} onChange={updateCreateMachine} />
-                  <ReadField label="ประเภทเครื่องจักร" value={createForm.machineType || '-'} />
-                  <SelectField label="ไลน์ผลิต" allowBlank value={createForm.productionLineCode} options={options.productionLines} onChange={(productionLineCode) => updateCreateForm('productionLineCode', productionLineCode)} />
-                  <FormField label="Shift">
-                    <select
-                      className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white h-9 text-sm outline-none font-sans text-slate-800"
-                      value={createForm.shift}
-                      onChange={(event) => updateCreateForm('shift', event.target.value)}
-                    >
-                      <option value="เช้า">เช้า</option>
-                      <option value="บ่าย">บ่าย</option>
-                    </select>
-                  </FormField>
-                  <div className="md:col-span-2">
-                    <FormField label="หมายเหตุ">
-                      <input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={createForm.notes} onChange={(event) => updateCreateForm('notes', event.target.value)} />
+            isCreate ? (
+              <div className="space-y-3">
+                {/* กลุ่มที่ 1: ข้อมูลพื้นฐาน */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">ข้อมูลพื้นฐาน</h3>
+                  <div className="grid gap-3 text-sm md:grid-cols-3">
+                    <FormField error={createErrors.date} label="วันที่ *">
+                      <DatePickerInput value={createForm.date} onChange={(date) => updateCreateForm('date', date)} className="w-full !h-9" />
                     </FormField>
-                  </div>
-                  <div className="md:col-span-3">
-                    <ProductStockPreview
-                      destinationWarehouseName={selectedDestinationWarehouse?.name ?? ''}
-                      error={productStockError}
-                      isLoading={isStockPreviewLoading}
-                      isReady={Boolean(createForm.branchCode && createForm.targetProductCode && createForm.destinationWarehouseCode)}
-                      stock={productStock}
+                    <SelectField error={createErrors.branchCode} label="สาขา *" placeholder="เลือกสาขา" value={createForm.branchCode} options={options.branches} onChange={updateCreateBranch} />
+                    <SearchCombobox
+                      error={createErrors.targetProductCode}
+                      errorKey="targetProductCode"
+                      inputId="production-order-target-product"
+                      label="สินค้าที่ผลิต *"
+                      options={productSearchOptions}
+                      placeholder="พิมพ์รหัส/ชื่อสินค้าที่ผลิต..."
+                      value={createForm.targetProductCode}
+                      onChange={(targetProductCode) => updateCreateForm('targetProductCode', targetProductCode)}
                     />
+                    <div className="md:col-span-3">
+                      <ProductStockPreview
+                        destinationWarehouseName={selectedDestinationWarehouse?.name ?? ''}
+                        error={productStockError}
+                        isLoading={isStockPreviewLoading}
+                        isReady={Boolean(createForm.branchCode && createForm.targetProductCode && createForm.destinationWarehouseCode)}
+                        stock={productStock}
+                      />
+                    </div>
                   </div>
                 </div>
-              ) : (
+
+                {/* กลุ่มที่ 2: เครื่องจักร & ไลน์ผลิต */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">เครื่องจักร & ไลน์ผลิต</h3>
+                  <div className="grid gap-3 text-sm md:grid-cols-3">
+                    <SelectField label="เครื่องจักร" allowBlank value={createForm.machineCode} options={options.machines} onChange={updateCreateMachine} />
+                    <ReadField label="ประเภทเครื่องจักร" value={createForm.machineType || '-'} />
+                    <SelectField label="ไลน์ผลิต" allowBlank value={createForm.productionLineCode} options={options.productionLines} onChange={(productionLineCode) => updateCreateForm('productionLineCode', productionLineCode)} />
+                  </div>
+                </div>
+
+                {/* กลุ่มที่ 3: ข้อมูลเพิ่มเติม */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">ข้อมูลเพิ่มเติม</h3>
+                  <div className="grid gap-3 text-sm md:grid-cols-3">
+                    <FormField label="Shift">
+                      <select
+                        className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white h-9 text-sm outline-none font-sans text-slate-800"
+                        value={createForm.shift}
+                        onChange={(event) => updateCreateForm('shift', event.target.value)}
+                      >
+                        <option value="เช้า">เช้า</option>
+                        <option value="บ่าย">บ่าย</option>
+                      </select>
+                    </FormField>
+                    <div className="md:col-span-2">
+                      <FormField label="หมายเหตุ">
+                        <input className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white" value={createForm.notes} onChange={(event) => updateCreateForm('notes', event.target.value)} />
+                      </FormField>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-md bg-white p-5 shadow">
                 <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                   <ReadField label="เลขที่เอกสาร" value={row?.docNo ?? '-'} />
                   <ReadField label="วันที่" value={row?.date ?? '-'} />
-                  <ReadField label="สถานะ" value={row?.status ?? '-'} />
+                  <ReadField label="สถานะ" value={row?.status ? statusLabel(row.status) : '-'} />
                   <ReadField label="สินค้าเป้าหมาย" value={row?.productName ?? '-'} />
                   <ReadField label="สาขา" value={row?.branchName ?? '-'} />
                   <ReadField label="เครื่องจักร" value={row?.machineName ?? '-'} />
@@ -1027,8 +1131,8 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                   <ReadField label="WIP" value={formatMoney(rowWipQty)} />
                   <ReadField label="หมายเหตุ" value={row?.notes || '-'} />
                 </div>
-              )}
-            </div>
+              </div>
+            )
           ) : null}
 
           {!isCreate && tab === 'input' ? (
@@ -1048,7 +1152,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                   <SelectField
                     hideCode={true}
                     selectId="production-input-source-warehouse"
-                    label="คลังต้นทาง"
+                    label="คลังวัตถุดิบ"
                     value={inputForm.sourceWarehouseCode}
                     options={options.warehouses}
                     onChange={(sourceWarehouseCode) => {
@@ -1079,7 +1183,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                   <div className="md:col-span-2">
                     <SearchCombobox inputId="production-output-product" label="สินค้า/Grade" options={productSearchOptions} placeholder="พิมพ์รหัส/ชื่อสินค้า..." value={outputForm.productCode} onChange={(productCode) => setOutputForm((form) => ({ ...form, productCode }))} />
                   </div>
-                  <SelectField hideCode={true} selectId="production-output-destination-warehouse" label="คลังรับ" value={outputForm.destinationWarehouseCode} options={options.warehouses} onChange={(destinationWarehouseCode) => setOutputForm((form) => ({ ...form, destinationWarehouseCode }))} />
+                  <SelectField hideCode={true} selectId="production-output-destination-warehouse" label="คลังรับผลผลิต" value={outputForm.destinationWarehouseCode} options={options.warehouses} onChange={(destinationWarehouseCode) => setOutputForm((form) => ({ ...form, destinationWarehouseCode }))} />
                   <FormField label="Net (กก.)"><input key={`output-net-${row?.outputCount ?? 0}`} ref={outputNetQtyRef} id="production-output-net-qty" className="w-full rounded-md border px-3 py-2 text-right border-slate-300 bg-white" defaultValue={outputForm.netQty} inputMode="decimal" /></FormField>
                   <FormField label="Loss kg"><input key={`output-loss-${row?.outputCount ?? 0}`} ref={outputLossQtyRef} id="production-output-loss-qty" className="w-full rounded-md border px-3 py-2 text-right border-slate-300 bg-white" defaultValue={outputForm.lossQty} inputMode="decimal" /></FormField>
                   <label className="flex items-center gap-2 rounded-md border px-3 py-2 border-slate-300 bg-white h-9 mt-6 select-none cursor-pointer"><input checked={outputForm.completeOrder} type="checkbox" onChange={(event) => setOutputForm((form) => ({ ...form, completeOrder: event.target.checked }))} />จบงานหลังรับ</label>
@@ -1466,6 +1570,6 @@ function statusClass(status: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClass(status)}`}>{status}</span>
+  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClass(status)}`}>{statusLabel(status)}</span>
 }
 
