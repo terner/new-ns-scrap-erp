@@ -531,9 +531,9 @@ export function StockTransferPageClient() {
                 </div>
                 {fieldErrors.items ? <div className="mb-2 text-xs text-red-600">{fieldErrors.items}</div> : null}
                 {/* Desktop View (Table) */}
-                <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200 bg-white">
+                <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm overflow-hidden">
                   <table className="w-full min-w-[920px] text-sm">
-                    <thead className="border-b border-slate-300/80 bg-slate-200/80">
+                    <thead className="border-b border-slate-105 bg-slate-50 text-slate-500">
                       <tr>
                         <th className="p-2 text-left">สินค้า</th>
                         <th className="p-2 text-right">คงเหลือต้นทาง</th>
@@ -669,11 +669,11 @@ export function StockTransferPageClient() {
                   {/* Mobile Footer (Totals) */}
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs space-y-1.5 font-semibold">
                     <div className="flex justify-between">
-                      <span className="text-slate-500 font-sans">น้ำหนักรวม:</span>
+                      <span className="text-slate-500">น้ำหนักรวม:</span>
                       <span className="text-blue-700 tabular-nums">{formatMoney(formTotalQty)} กก.</span>
                     </div>
                     <div className="flex justify-between border-t border-slate-200/60 pt-1.5">
-                      <span className="text-slate-500 font-sans">มูลค่ารวม:</span>
+                      <span className="text-slate-500">มูลค่ารวม:</span>
                       <span className="text-emerald-700 tabular-nums">{formatMoney(formTotalValue)} บาท</span>
                     </div>
                   </div>
@@ -733,14 +733,11 @@ export function StockTransferPageClient() {
         {!isLoading && data.rows.length === 0 ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-400 shadow">ยังไม่มีรายการ</div> : null}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-md bg-white shadow md:block">
+      <div className="hidden md:block">
         <Table style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {stockTransferColumns.map((column) => {
               const style = columnResize.getColumnStyle(column.key)
-              if (column.key === 'from') {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />
-              }
               return <col key={column.key} style={style} />
             })}
           </colgroup>

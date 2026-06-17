@@ -91,12 +91,12 @@ export function LoanContractsPageClient() {
         <StatCard label="เกินกำหนด" value={formatMoney(data?.summary.overdue)} tone="red" />
       </div>
       <FilterPanel>
-        <input className="min-w-0 flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm" placeholder="ค้นหา loanNo/contractNo/lender..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={type} onChange={(event) => setType(event.target.value)}>
+        <input className="min-w-0 flex-1 rounded-md border border-slate-100 px-3 py-2 text-sm" placeholder="ค้นหา loanNo/contractNo/lender..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <select className="rounded-md border border-slate-100 bg-white px-3 py-2 text-sm" value={type} onChange={(event) => setType(event.target.value)}>
           <option value="all">Type: ทั้งหมด</option>
           {(data?.filters.types ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <select className="rounded-md border border-slate-100 bg-white px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="all">Status: ทั้งหมด</option>
           {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
@@ -105,17 +105,17 @@ export function LoanContractsPageClient() {
       <div className="hidden lg:block">
         <TableShell>
           <table className="w-full text-xs">
-            <thead className="bg-slate-100 text-slate-600"><tr><Th>เลขสัญญา</Th><Th>ผู้ให้กู้</Th><Th>ประเภท</Th><Th>Asset</Th><Th align="right">Financed</Th><Th align="right">คงเหลือ</Th><Th align="right">งวด</Th><Th align="center">จ่ายแล้ว</Th><Th>งวดถัดไป</Th><Th align="right">เกินกำหนด</Th><Th align="center">สถานะ</Th><Th align="center">actions</Th></tr></thead>
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><Th>เลขสัญญา</Th><Th>ผู้ให้กู้</Th><Th>ประเภท</Th><Th>Asset</Th><Th align="right">Financed</Th><Th align="right">คงเหลือ</Th><Th align="right">งวด</Th><Th align="center">จ่ายแล้ว</Th><Th>งวดถัดไป</Th><Th align="right">เกินกำหนด</Th><Th align="center">สถานะ</Th><Th align="center">actions</Th></tr></thead>
             <tbody>
               <LoadingOrEmpty colSpan={12} isLoading={isLoading} rows={rows.length} />
-              {rows.map((row) => <tr key={row.contractNo} className="border-t border-slate-100 hover:bg-slate-50"><Td><span className="font-mono text-blue-700">{row.contractNo}</span></Td><Td>{row.lenderName}</Td><Td>{row.loanType}</Td><Td>-</Td><Td align="right">{formatMoney(row.principalAmount)}</Td><Td align="right" className="font-bold">{formatMoney(row.outstanding)}</Td><Td align="right">{formatMoney(row.installmentAmount)}</Td><Td align="center">{row.duePaid}/{row.dueTotal}</Td><Td>{row.nextDue || '-'}</Td><Td align="right">{formatMoney(row.overdue)}</Td><Td align="center"><StatusPill status={row.status} /></Td><Td align="center"><div className="flex justify-end gap-2"><InlineDisabledButton>Generate Schedule</InlineDisabledButton><InlineDisabledButton>Schedule</InlineDisabledButton></div></Td></tr>)}
+              {rows.map((row) => <tr key={row.contractNo} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"><Td><span className="font-mono text-blue-700">{row.contractNo}</span></Td><Td>{row.lenderName}</Td><Td>{row.loanType}</Td><Td>-</Td><Td align="right">{formatMoney(row.principalAmount)}</Td><Td align="right" className="font-bold">{formatMoney(row.outstanding)}</Td><Td align="right">{formatMoney(row.installmentAmount)}</Td><Td align="center">{row.duePaid}/{row.dueTotal}</Td><Td>{row.nextDue || '-'}</Td><Td align="right">{formatMoney(row.overdue)}</Td><Td align="center"><StatusPill status={row.status} /></Td><Td align="center"><div className="flex justify-end gap-2"><InlineDisabledButton>Generate Schedule</InlineDisabledButton><InlineDisabledButton>Schedule</InlineDisabledButton></div></Td></tr>)}
             </tbody>
           </table>
         </TableShell>
       </div>
 
       {/* Mobile Card List View */}
-      <div className="block lg:hidden divide-y divide-slate-100 bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
+      <div className="block lg:hidden divide-y divide-slate-100 bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
         <div className="p-4 text-xs font-semibold text-slate-500 bg-slate-50">รายการสัญญาเงินกู้</div>
         {isLoading && <div className="p-4 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>}
         {!isLoading && rows.length === 0 && <div className="p-4 text-center text-slate-400 text-xs">ไม่มีสัญญา</div>}
@@ -212,12 +212,12 @@ export function OpeningBalancePageClient() {
       {/* Desktop Table View */}
       <div className="hidden lg:block">
         <TableShell>
-          <table className="w-full text-xs"><thead className="bg-slate-100 text-slate-600"><tr><Th>เลขที่บัญชี</Th><Th>ชื่อบัญชี</Th><Th>ประเภท</Th><Th>สาขา/คลัง</Th><Th>Currency</Th><Th align="right">Opening Balance</Th><Th align="right">OD Limit</Th></tr></thead><tbody><LoadingOrEmpty colSpan={7} isLoading={false} rows={data?.accounts.length ?? 0} />{(data?.accounts ?? []).map((account) => <tr key={`${account.code || account.name}-${account.name}`} className="border-t border-slate-100"><Td><span className="font-mono">{account.code || '-'}</span></Td><Td>{account.name}</Td><Td>{account.type}</Td><Td>{account.branchName || account.branchCode || '-'}</Td><Td>{account.currency}</Td><Td align="right">{formatMoney(account.openingBalance)}</Td><Td align="right">{formatMoney(account.odLimit)}</Td></tr>)}</tbody></table>
+          <table className="w-full text-xs"><thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><Th>เลขที่บัญชี</Th><Th>ชื่อบัญชี</Th><Th>ประเภท</Th><Th>สาขา/คลัง</Th><Th>Currency</Th><Th align="right">Opening Balance</Th><Th align="right">OD Limit</Th></tr></thead><tbody><LoadingOrEmpty colSpan={7} isLoading={false} rows={data?.accounts.length ?? 0} />{(data?.accounts ?? []).map((account) => <tr key={`${account.code || account.name}-${account.name}`} className="border-t border-slate-100"><Td><span className="font-mono">{account.code || '-'}</span></Td><Td>{account.name}</Td><Td>{account.type}</Td><Td>{account.branchName || account.branchCode || '-'}</Td><Td>{account.currency}</Td><Td align="right">{formatMoney(account.openingBalance)}</Td><Td align="right">{formatMoney(account.odLimit)}</Td></tr>)}</tbody></table>
         </TableShell>
       </div>
 
       {/* Mobile Card List View */}
-      <div className="block lg:hidden divide-y divide-slate-100 bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
+      <div className="block lg:hidden divide-y divide-slate-100 bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
         <div className="p-4 text-xs font-semibold text-slate-500 bg-slate-50">บัญชีและยอดเปิดบัญชี</div>
         {(!data?.accounts || data.accounts.length === 0) && <div className="p-4 text-center text-slate-400 text-xs">ไม่มีข้อมูล</div>}
         {(data?.accounts ?? []).map((account) => (
@@ -261,12 +261,12 @@ export function HistoricalDataPageClient() {
       {/* Desktop Table View */}
       <div className="hidden lg:block">
         <TableShell>
-          <table className="w-full text-xs"><thead className="bg-gray-100"><tr><Th>รายการ</Th>{(data?.months ?? []).map((month) => <Th key={month.label} align="right">{month.label}</Th>)}<Th align="right">รวม 4 เดือน</Th></tr></thead><tbody><HistoricalRows isLoading={isLoading} months={data?.months ?? []} rows={rows} /></tbody></table>
+          <table className="w-full text-xs"><thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium"><tr><Th>รายการ</Th>{(data?.months ?? []).map((month) => <Th key={month.label} align="right">{month.label}</Th>)}<Th align="right">รวม 4 เดือน</Th></tr></thead><tbody><HistoricalRows isLoading={isLoading} months={data?.months ?? []} rows={rows} /></tbody></table>
         </TableShell>
       </div>
 
       {/* Mobile Card List View */}
-      <div className="block lg:hidden divide-y divide-slate-100 bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
+      <div className="block lg:hidden divide-y divide-slate-100 bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
         <div className="p-4 text-xs font-semibold text-slate-500 bg-slate-50">ประวัติข้อมูลย้อนหลัง</div>
         <HistoricalRowsMobile isLoading={isLoading} months={data?.months ?? []} rows={rows} />
       </div>
@@ -291,7 +291,7 @@ function useApi<T>(url: string) {
 }
 
 function DisabledButton({ children, strong = false }: { children: ReactNode; strong?: boolean }) {
-  return <button className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${strong ? 'bg-[#0F172A] text-white hover:bg-slate-800' : 'bg-slate-50 border border-slate-200 text-slate-400 opacity-60'} outline-none focus:ring-0`} disabled type="button">{children}</button>
+  return <button className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${strong ? 'bg-[#0F172A] text-white hover:bg-slate-800' : 'bg-slate-50 border border-slate-100 text-slate-400 opacity-60'} outline-none focus:ring-0`} disabled type="button">{children}</button>
 }
 
 function InlineDisabledButton({ children }: { children: ReactNode }) {
@@ -299,15 +299,15 @@ function InlineDisabledButton({ children }: { children: ReactNode }) {
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">{children}</div>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
+  return <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
 }
 
 function TableShell({ children }: { children: ReactNode }) {
-  return <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm"><div className="max-h-[60vh] overflow-auto">{children}</div></div>
+  return <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm"><div className="max-h-[60vh] overflow-auto">{children}</div></div>
 }
 
 function StatCard({ label, tone, value }: { label: string; tone?: 'amber' | 'blue' | 'cyan' | 'red'; value: number | string }) {
@@ -320,7 +320,7 @@ function StatCard({ label, tone, value }: { label: string; tone?: 'amber' | 'blu
   }
   const current = toneStyles[tone ?? 'default']
   return (
-    <div className="bg-white p-3.5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-3">
+    <div className="bg-white p-3.5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-3">
       <div className={`w-10 h-10 rounded-full ${current.bg} ${current.text} flex items-center justify-center text-lg shrink-0`}>
         {current.icon}
       </div>
@@ -360,13 +360,13 @@ function Bar({ color, label, max, value }: { color: string; label: string; max: 
 function DueTable({ isLoading, rows, title, tone }: { isLoading: boolean; rows: DueRow[]; title: string; tone: 'amber' | 'red' }) {
   const heading = tone === 'red' ? 'border-red-105 bg-red-50/50 text-red-700' : 'border-amber-105 bg-amber-50/50 text-amber-700'
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className={`border-b px-4 py-3 font-bold text-xs ${heading}`}>{title} ({rows.length})</div>
       
       {/* Desktop Table View */}
       <div className="hidden lg:block max-h-96 overflow-auto">
         <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
             <tr>
               <Th>Due</Th><Th>สัญญา</Th><Th>ผู้ให้กู้</Th><Th align="right">ยอด</Th>
             </tr>
@@ -374,7 +374,7 @@ function DueTable({ isLoading, rows, title, tone }: { isLoading: boolean; rows: 
           <tbody>
             <LoadingOrEmpty colSpan={4} isLoading={isLoading} rows={rows.length} emptyText="ไม่มี" />
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
                 <Td>{row.dueDate}</Td>
                 <Td><span className="font-mono text-slate-800 font-semibold">{row.contractNo}</span></Td>
                 <Td>{row.lenderName}</Td>
@@ -426,7 +426,7 @@ function ReadField({ label, value }: { label: string; value: string }) {
   return (
     <label className="block text-xs font-medium text-slate-600">
       <span className="mb-1 block">{label}</span>
-      <input className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-right text-xs outline-none focus:ring-0" readOnly value={value} />
+      <input className="w-full rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-right text-xs outline-none focus:ring-0" readOnly value={value} />
     </label>
   )
 }
@@ -438,7 +438,7 @@ function HistoricalRows({ isLoading, months, rows }: { isLoading: boolean; month
   return categories.map((category) => {
     const total = months.reduce((sum, month) => sum + (rows.find((row) => row.categoryLabel === category && row.month === month.month && row.year === month.year)?.amount ?? 0), 0)
     return (
-      <tr key={category} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
+      <tr key={category} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
         <Td className="font-medium">{category}</Td>
         {months.map((month) => (
           <Td key={month.label} align="right">{formatMoney(rows.find((row) => row.categoryLabel === category && row.month === month.month && row.year === month.year)?.amount)}</Td>
@@ -480,8 +480,8 @@ function HistoricalRowsMobile({ isLoading, months, rows }: { isLoading: boolean;
 
 function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
   return (
-    <button 
-      className={`rounded-lg px-4 py-2 text-xs font-bold transition outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white hover:bg-slate-800 shadow-sm' : 'bg-slate-50 border border-slate-200 text-slate-650 hover:bg-slate-100'}`} 
+    <button
+      className={`rounded-lg px-4 py-2 text-xs font-bold transition outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white hover:bg-slate-800 shadow-sm' : 'bg-slate-50 border border-slate-100 text-slate-650 hover:bg-slate-100'}`}
       type="button" 
       onClick={onClick}
     >

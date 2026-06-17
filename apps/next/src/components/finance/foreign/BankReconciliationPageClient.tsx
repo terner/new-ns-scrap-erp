@@ -92,7 +92,7 @@ export function BankReconciliationPageClient() {
             </select>
             <button
               className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors flex items-center gap-1 shrink-0 ${
-                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-100'
               }`}
               type="button"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -125,7 +125,7 @@ export function BankReconciliationPageClient() {
         </div>
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Stat label="Bank รายการรวม" value={data?.stats.total ?? 0} />
           <Stat label="Matched" tone="matched" value={data?.stats.matched ?? 0} />
@@ -157,7 +157,7 @@ function Stat({ label, tone, value }: { label: string; tone?: 'matched' | 'unmat
   }
   const config = configs[tone || 'slate']
   return (
-    <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+    <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
         {config.emoji}
       </div>
@@ -178,7 +178,7 @@ function ImportedTable({ isLoading, rows }: { isLoading: boolean; rows: Imported
   return (
     <>
       <table className="hidden lg:table w-full text-xs">
-        <thead className="sticky top-0 bg-slate-100"><tr><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">รายละเอียด</th><th className="p-2 text-right">เข้า</th><th className="p-2 text-right">ออก</th><th className="p-2 text-center">Match</th><th></th></tr></thead>
+        <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium"><tr><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">วันที่</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">รายละเอียด</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">เข้า</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">ออก</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-center">Match</th><th></th></tr></thead>
         <tbody>
           {isLoading ? <tr><td className="py-6 text-center text-slate-400" colSpan={6}>กำลังโหลดข้อมูล</td></tr> : null}
           {!isLoading && rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={6}>ยังไม่ได้ import statement</td></tr> : null}
@@ -194,7 +194,7 @@ function ImportedTable({ isLoading, rows }: { isLoading: boolean; rows: Imported
           <div className="py-6 text-center text-slate-400 text-xs">ยังไม่ได้ import statement</div>
         ) : null}
         {!isLoading && rows.map((row) => (
-          <div key={row.id} className="rounded-md border border-slate-200 bg-white p-3.5 shadow-sm space-y-2 text-sm">
+          <div key={row.id} className="rounded-md border border-slate-100 bg-white p-3.5 shadow-sm space-y-2 text-sm">
             <div className="flex justify-between items-start">
               <span className="font-mono text-slate-500 text-xs">{formatDateDisplay(row.date)}</span>
               <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${row.matchStatus === 'Matched' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -223,13 +223,13 @@ function ErpTable({ isLoading, rows }: { isLoading: boolean; rows: ErpRow[] }) {
   return (
     <>
       <table className="hidden lg:table w-full text-xs">
-        <thead className="sticky top-0 bg-slate-100"><tr><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">ประเภท</th><th className="p-2 text-left">Ref</th><th className="p-2 text-right">เข้า</th><th className="p-2 text-right">ออก</th></tr></thead>
+        <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium"><tr><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">วันที่</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">ประเภท</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">Ref</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">เข้า</th><th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">ออก</th></tr></thead>
         <tbody>
           {isLoading ? <tr><td className="py-6 text-center text-slate-400" colSpan={5}>กำลังโหลดข้อมูล</td></tr> : null}
           {!isLoading && rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={5}>ไม่มีรายการใน ERP</td></tr> : null}
           {!isLoading && rows.map((row) => (
-            <tr key={row.id} className="border-t border-slate-100">
-              <td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.type}</td><td className="p-2 font-mono text-blue-600">{row.refNo}</td><td className="p-2 text-right text-emerald-600">{row.in ? formatMoney(row.in) : '-'}</td><td className="p-2 text-right text-red-600">{row.out ? formatMoney(row.out) : '-'}</td>
+            <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+              <td className="px-4 py-3.5">{formatDateDisplay(row.date)}</td><td className="px-4 py-3.5">{row.type}</td><td className="px-4 py-3.5 font-mono text-blue-600">{row.refNo}</td><td className="px-4 py-3.5 text-right text-emerald-600">{row.in ? formatMoney(row.in) : '-'}</td><td className="px-4 py-3.5 text-right text-red-600">{row.out ? formatMoney(row.out) : '-'}</td>
             </tr>
           ))}
         </tbody>
@@ -244,7 +244,7 @@ function ErpTable({ isLoading, rows }: { isLoading: boolean; rows: ErpRow[] }) {
           <div className="py-6 text-center text-slate-400 text-xs">ไม่มีรายการใน ERP</div>
         ) : null}
         {!isLoading && rows.map((row) => (
-          <div key={row.id} className="rounded-md border border-slate-200 bg-white p-3.5 shadow-sm space-y-2 text-sm">
+          <div key={row.id} className="rounded-md border border-slate-100 bg-white p-3.5 shadow-sm space-y-2 text-sm">
             <div className="flex justify-between items-start">
               <span className="font-mono text-slate-500 text-xs">{formatDateDisplay(row.date)}</span>
               <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{row.type}</span>

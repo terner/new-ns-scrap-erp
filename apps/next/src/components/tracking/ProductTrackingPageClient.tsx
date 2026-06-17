@@ -228,7 +228,7 @@ export function ProductTrackingPageClient({
       </div>
 
       {/* Filters Toolbar */}
-      <div className="rounded-xl bg-white p-3 border border-slate-200/80 shadow-sm">
+      <div className="rounded-xl bg-white p-3 border border-slate-100 shadow-sm">
         {/* Desktop View */}
         <div className="hidden lg:block space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -320,7 +320,7 @@ export function ProductTrackingPageClient({
             />
             <button
               className={`h-10 rounded-md border px-3 text-sm font-semibold transition-colors flex items-center gap-1 shrink-0 focus-visible:outline-none ${
-                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-100'
               }`}
               type="button"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -440,7 +440,7 @@ export function ProductTrackingPageClient({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="mb-3 text-sm font-semibold text-slate-700">ยอดขายรายเดือน {data?.year ?? year}</div>
           <div className="grid grid-cols-12 items-end gap-2">
             {(data?.monthly ?? []).map((item, index) => {
@@ -454,13 +454,13 @@ export function ProductTrackingPageClient({
             })}
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="mb-3 text-sm font-bold text-slate-700">🏆 Top 5 Product</div>
           <BarList rows={topRevenue.slice(0, 5).map((row) => ({ label: row.name ?? row.productName ?? '-', value: row.revenue ?? row.salesAmount ?? row.amount ?? 0 }))} />
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 border border-slate-200/80 shadow-sm">
+      <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 border border-slate-100 shadow-sm">
         <Tab active={view === 'list'} label="รายการ" onClick={() => setView('list')} />
         <Tab active={view === 'top10'} label="Top 10 ในหมวด" onClick={() => setView('top10')} />
         <Tab active={view === 'yearCompare'} label="รายปี" onClick={() => setView('yearCompare')} />
@@ -480,10 +480,10 @@ export function ProductTrackingPageClient({
       {view === 'list' ? (
         <>
         <div className="space-y-3 lg:hidden">
-          {isLoading ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล</div> : null}
-          {!isLoading && rows.length === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm">ไม่มีข้อมูล Product Tracking</div> : null}
+          {isLoading ? <div className="rounded-xl border border-slate-100 bg-white p-8 text-center text-slate-500 shadow-sm">กำลังโหลดข้อมูล</div> : null}
+          {!isLoading && rows.length === 0 ? <div className="rounded-xl border border-slate-100 bg-white p-8 text-center text-slate-400 shadow-sm">ไม่มีข้อมูล Product Tracking</div> : null}
           {!isLoading && rows.map((row) => (
-            <div key={row.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50/55 cursor-pointer transition-colors focus-visible:outline-none" role="button" tabIndex={0} onClick={() => void openDetail(row)} onKeyDown={(event) => { if (event.key === 'Enter') void openDetail(row) }}>
+            <div key={row.id} className="space-y-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50/55 cursor-pointer transition-colors focus-visible:outline-none" role="button" tabIndex={0} onClick={() => void openDetail(row)} onKeyDown={(event) => { if (event.key === 'Enter') void openDetail(row) }}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-bold text-slate-800">{row.name ?? row.productName}</div>
@@ -502,9 +502,9 @@ export function ProductTrackingPageClient({
             </div>
           ))}
         </div>
-        <div className="hidden overflow-x-auto rounded-xl bg-white border border-slate-200/80 shadow-sm lg:block">
+        <div className="hidden overflow-x-auto rounded-xl bg-white border border-slate-100 shadow-sm lg:block">
           <table className="w-full min-w-[1240px] text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-600 font-semibold">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-600 font-semibold">
               <tr>
                 <th className="p-3 pl-4 text-left">Code</th>
                 <th className="p-3 text-left">สินค้า</th>
@@ -560,7 +560,7 @@ function ProductDetailDialog({ detail, isLoading, onOpenChange }: { detail: Prod
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[72vh] space-y-4 overflow-y-auto p-5">
-          {isLoading ? <div className="rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500 border border-slate-200/60">กำลังโหลดรายละเอียด...</div> : null}
+          {isLoading ? <div className="rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500 border border-slate-100">กำลังโหลดรายละเอียด...</div> : null}
           {!isLoading && detail ? (
             <>
               <DetailSection title="Production / Allocation Signals">
@@ -631,8 +631,8 @@ function ProductDetailDialog({ detail, isLoading, onOpenChange }: { detail: Prod
 
 function DetailSection({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <section className="rounded-xl border border-slate-200/60 bg-slate-50 overflow-hidden shadow-sm">
-      <div className="border-b border-slate-200/60 bg-slate-100/60 px-4 py-2.5 text-sm font-bold text-slate-850">{title}</div>
+    <section className="rounded-xl border border-slate-100 bg-slate-50 overflow-hidden shadow-sm">
+      <div className="border-b border-slate-100 bg-slate-100/60 px-4 py-2.5 text-sm font-bold text-slate-850">{title}</div>
       {children}
     </section>
   )
@@ -646,7 +646,7 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: DetailCell[][
       {/* Desktop Table View */}
       <div className="hidden lg:block overflow-x-auto bg-white">
         <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200/60">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
               {headers.map((header, idx) => (
                 <th key={header} className={`p-2.5 text-slate-600 font-semibold text-xs text-left ${idx === 0 ? 'pl-4' : idx === headers.length - 1 ? 'pr-4' : ''}`}>
@@ -685,9 +685,9 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: DetailCell[][
 
       {/* Mobile Card List View */}
       <div className="block lg:hidden space-y-3 p-3">
-        {rows.length === 0 ? <div className="text-center text-xs text-slate-400 py-4 bg-white rounded-xl border border-slate-200/60">ไม่มีข้อมูล</div> : null}
+        {rows.length === 0 ? <div className="text-center text-xs text-slate-400 py-4 bg-white rounded-xl border border-slate-100">ไม่มีข้อมูล</div> : null}
         {rows.map((row, index) => (
-          <div key={index} className="rounded-xl border border-slate-200/60 bg-white p-3.5 shadow-sm space-y-2 text-xs">
+          <div key={index} className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm space-y-2 text-xs">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 font-semibold">
               <span className="text-slate-800 font-bold">
                 {typeof row[0] === 'string' ? row[0] : (
@@ -739,7 +739,7 @@ function SummaryCard({ className = '', icon, label, tone, value }: { className?:
     emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200/50',
   }[tone]
   return (
-    <div className={`flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-4 ${className}`}>
+    <div className={`flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-3 shadow-sm sm:gap-4 sm:p-4 ${className}`}>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl sm:h-11 sm:w-11 ${colors.split(' ')[0]}`}>{icon}</div>
       <div className="min-w-0">
         <div className={`text-xs ${colors.split(' ')[1]}`}>{label}</div>
@@ -761,7 +761,7 @@ function MiniLine({ label, tone = 'slate', value }: { label: string; tone?: 'ora
 
 function SignalMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-3.5 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className="mt-1.5 text-sm font-bold text-slate-900 font-mono">{value}</div>
     </div>
@@ -809,8 +809,8 @@ function BarList({ rows }: { rows: { label: string; value: number }[] }) {
 
 function TopPanel({ rows, suffix = '', title }: { rows: { label: string; value: number }[]; suffix?: string; title: string }) {
   return (
-    <div className="overflow-hidden rounded-xl bg-white border border-slate-200/80 shadow-sm">
-      <div className="border-b border-slate-200/60 bg-orange-50 p-3 font-bold text-orange-700">{title}</div>
+    <div className="overflow-hidden rounded-xl bg-white border border-slate-100 shadow-sm">
+      <div className="border-b border-slate-100 bg-orange-50 p-3 font-bold text-orange-700">{title}</div>
       <table className="w-full text-sm">
         <tbody>
           {rows.map((row, index) => (
@@ -830,9 +830,9 @@ function TopPanel({ rows, suffix = '', title }: { rows: { label: string; value: 
 
 function YearCompare({ monthly }: { monthly: ProductTrackingPayload['monthly'] }) {
   return (
-    <div className="overflow-x-auto rounded-xl bg-white border border-slate-200/80 shadow-sm">
+    <div className="overflow-x-auto rounded-xl bg-white border border-slate-100 shadow-sm">
       <table className="w-full min-w-[860px] text-sm">
-        <thead className="bg-slate-50 border-b border-slate-200/60">
+        <thead className="bg-slate-50 border-b border-slate-100">
           <tr>
             <th className="p-3 pl-4 text-left font-semibold text-slate-600">เดือน</th>
             <th className="p-3 text-right font-semibold text-slate-600">ขาย กก.</th>

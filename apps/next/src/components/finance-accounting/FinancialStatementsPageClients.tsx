@@ -79,7 +79,7 @@ export function PlStatementPageClient() {
         <QuickButton onClick={() => setFrom(monthStart())}>เดือนนี้</QuickButton>
         <DateInput label="จาก" value={from} onChange={setFrom} /><DateInput label="ถึง" value={to} onChange={setTo} />
         <BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} />
-        <select className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={mode} onChange={(event) => setMode(event.target.value)}>
+        <select className="rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={mode} onChange={(event) => setMode(event.target.value)}>
           <option value="ALL">All (Stock+Trading)</option><option value="STOCK">Stock Only</option><option value="TRADING">Trading Only</option>
         </select>
         <DisabledButton>📥 Excel</DisabledButton>
@@ -204,7 +204,7 @@ function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">{children}</div>
 }
 
 function DateInput({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
@@ -212,23 +212,23 @@ function DateInput({ label, onChange, value }: { label: string; onChange: (value
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function Segment({ active = false, children }: { active?: boolean; children: ReactNode }) {
   return (
-    <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition'}`}>
+    <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-0 ${active ? 'bg-[#0F172A] text-white' : 'bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 transition'}`}>
       {children}
     </span>
   )
 }
 
 function QuickButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition outline-none focus:ring-0" type="button" onClick={onClick}>{children}</button>
+  return <button className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition outline-none focus:ring-0" type="button" onClick={onClick}>{children}</button>
 }
 
 function DisabledButton({ children }: { children: ReactNode }) {
-  return <button className="rounded-lg bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400 opacity-60 cursor-not-allowed outline-none focus:ring-0" disabled type="button">{children}</button>
+  return <button className="rounded-lg bg-slate-100 border border-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 opacity-60 cursor-not-allowed outline-none focus:ring-0" disabled type="button">{children}</button>
 }
 
 function MegaCard({ footer, label, tone, value }: { footer: string; label: string; tone: 'bs' | 'cf' | 'pl'; value: string }) {
@@ -239,7 +239,7 @@ function MegaCard({ footer, label, tone, value }: { footer: string; label: strin
   }
   const current = toneColors[tone]
   return (
-    <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-4 lg:col-span-2">
+    <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4 lg:col-span-2">
       <div className={`w-12 h-12 rounded-full ${current.bg} flex items-center justify-center text-xl shrink-0`}>
         {current.icon}
       </div>
@@ -253,7 +253,7 @@ function MegaCard({ footer, label, tone, value }: { footer: string; label: strin
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
+  return <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><h2 className="mb-3 text-xs font-bold text-slate-800">{title}</h2>{children}</div>
 }
 
 function StatCard({ label, tone, value }: { label: string; tone: 'blue' | 'cyan' | 'emerald' | 'purple' | 'red'; value: string }) {
@@ -266,7 +266,7 @@ function StatCard({ label, tone, value }: { label: string; tone: 'blue' | 'cyan'
   }
   const current = toneStyles[tone]
   return (
-    <div className="bg-white p-3.5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-3">
+    <div className="bg-white p-3.5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-3">
       <div className={`w-10 h-10 rounded-full ${current.bg} ${current.text} flex items-center justify-center text-lg shrink-0`}>
         {current.icon}
       </div>
@@ -313,12 +313,12 @@ function Waterfall({ rows }: { rows: Array<[string, number]> }) {
 
 function StatementTable({ isLoading, onDrill, rows, title = 'Statement' }: { isLoading: boolean; onDrill: (line: StatementLine) => void | undefined; rows: StatementLine[]; title?: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">{title}</div>
       <div className="max-h-[62vh] overflow-auto">
         {/* Desktop Table View */}
         <table className="hidden lg:table w-full text-xs">
-          <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
             <tr>
               <Th>รายการ</Th>
               <Th>Section</Th>
@@ -395,7 +395,7 @@ function DrillModal({ onClose, rows, title }: { onClose: () => void; rows: Detai
         <div className="max-h-[60vh] overflow-auto">
           {/* Desktop Table View */}
           <table className="hidden lg:table w-full text-xs">
-            <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+            <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
               <tr>
                 <Th>วันที่</Th>
                 <Th>เลขที่</Th>

@@ -375,7 +375,7 @@ export function ImpuritiesPageClient() {
           </div>
 
           {/* Desktop Table View */}
-          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm hidden lg:block">
+          <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm hidden lg:block">
             <div className="overflow-x-auto">
               <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
@@ -390,7 +390,7 @@ export function ImpuritiesPageClient() {
                     <ResizableTableHead align="center" label="แก้ไข" resizeProps={columnResize.getResizeHandleProps('action', 'แก้ไข')} />
                   </tr>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="divide-y divide-slate-100">
                   {paginatedImpurities.map((impurity) => (
                     <TableRow
                       key={impurity.id}
@@ -525,10 +525,10 @@ function ImpurityForm({ impurity, isSaving, onCancel, onSubmit }: ImpurityFormPr
       </div>
 
       <div className="flex flex-wrap justify-end gap-3.5 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-        <button className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-normal text-slate-700 hover:bg-slate-50" type="button" onClick={onCancel}>
+        <button className="inline-flex h-9 items-center justify-center px-4 text-sm font-normal text-slate-600 hover:text-slate-800" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
-        <button className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-normal text-white hover:bg-slate-800 disabled:opacity-60 shadow-sm" disabled={isSaving} type="submit">
+        <button className="inline-flex h-9 items-center justify-center rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-4 text-sm font-normal text-white disabled:opacity-60 shadow-sm" disabled={isSaving} type="submit">
           {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>

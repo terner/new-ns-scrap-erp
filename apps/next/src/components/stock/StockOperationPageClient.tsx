@@ -889,9 +889,9 @@ function OperationTable({
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm">
         <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1280px] text-sm' : 'w-full min-w-[1500px] text-xs'}>
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
               {columns.map((column) => (
                 <th key={column.key} className={`p-2 ${column.headerClassName?.includes('text-') ? '' : 'text-left'} ${column.headerClassName ?? ''}`}>
@@ -1156,8 +1156,8 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
       <div className="w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl border-0">
         <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 text-white px-5 py-4 rounded-t-2xl">
           <div>
-            <h3 className="font-bold text-white text-base font-sans">Cost Allocation Detail · {detail.refNo}</h3>
-            <div className="mt-1 text-xs text-slate-400 font-sans">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
+            <h3 className="font-bold text-white text-base">Cost Allocation Detail · {detail.refNo}</h3>
+            <div className="mt-1 text-xs text-slate-400">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
           </div>
           <div className="flex items-center gap-2.5">
             <button className="rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-medium text-sm px-4 py-2 border-0 outline-none focus:ring-0 transition-colors" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>

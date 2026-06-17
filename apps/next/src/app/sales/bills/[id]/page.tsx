@@ -59,7 +59,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
             <Summary label="สถานะรับเงิน" value={bill.statusLabel} />
           </section>
 
-          <section className="rounded-md border border-slate-200 p-4">
+          <section className="rounded-md border border-slate-100 p-4">
             <h2 className="mb-3 text-base font-bold text-slate-800">ข้อมูลบิล</h2>
             <div className="grid gap-3 text-sm md:grid-cols-3">
               <Info label="เลขที่บิล" value={bill.docNo} />
@@ -77,9 +77,9 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
             </div>
           </section>
 
-          <section className="rounded-md border border-slate-200 p-4">
+          <section className="rounded-md border border-slate-100 p-4">
             <h2 className="mb-3 text-base font-bold text-slate-800">รายการสินค้า</h2>
-            <div className="overflow-x-auto rounded-md border border-slate-200">
+            <div className="overflow-x-auto rounded-md border border-slate-100">
               <table className="w-full min-w-[1120px] text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
@@ -96,7 +96,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
                 </thead>
                 <tbody>
                   {bill.items.map((item) => (
-                    <tr key={item.lineNo} className="border-t border-slate-200">
+                    <tr key={item.lineNo} className="border-t border-slate-100">
                       <td className="px-3 py-2 align-top">
                         <div className="font-medium text-slate-900">{item.productName}</div>
                         <div className="text-xs text-slate-500">{[item.productCode || null, `line ${item.lineNo}`].filter(Boolean).join(' · ')}</div>
@@ -126,7 +126,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-md border border-slate-200 p-4">
+            <div className="rounded-md border border-slate-100 p-4">
               <h2 className="mb-3 text-base font-bold text-slate-800">VAT / ยอดรวม</h2>
               <div className="space-y-2 text-sm">
                 <Line label="ยอดก่อนส่วนลด" value={formatMoney(bill.subtotal)} />
@@ -135,7 +135,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
                 <Line strong label="ยอดสุทธิ" value={formatMoney(bill.totalAmount)} />
               </div>
             </div>
-            <div className="rounded-md border border-slate-200 p-4">
+            <div className="rounded-md border border-slate-100 p-4">
               <h2 className="mb-3 text-base font-bold text-slate-800">ใบกำกับภาษี / หมายเหตุ</h2>
               <div className="grid gap-3 text-sm md:grid-cols-2">
                 <Info label="ออกใบกำกับภาษี" value={bill.vatInvoiceIssued ? 'ออกแล้ว' : 'ยังไม่ได้ออก'} />
@@ -146,7 +146,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
             </div>
           </section>
 
-          <section className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <section className="rounded-md border border-slate-100 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-medium text-slate-700">สถานะ SB</h2>
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusTextClass(bill.status)}`}>
@@ -171,7 +171,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
                       <div>{formatDateTime(event.createdAt)}</div>
                       <div className="mt-1 truncate text-[11px]">{event.actor}</div>
                     </div>
-                    <div className="relative border-l border-slate-200 pb-4 pl-4 last:pb-0">
+                    <div className="relative border-l border-slate-100 pb-4 pl-4 last:pb-0">
                       <span className={`absolute -left-1.5 top-1 h-3 w-3 rounded-full border-2 border-white ${index === 0 ? 'bg-blue-500' : 'bg-slate-300'}`} />
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-sm font-medium text-slate-800">{event.title}</div>
@@ -193,7 +193,7 @@ export default async function SalesBillDetailPage({ params }: PageProps) {
                 {bill.sourceUsageFacts.length === 0 ? (
                   <div className="rounded-md bg-white p-4 text-center text-xs text-slate-500">ยังไม่มี usage fact สำหรับบิลนี้</div>
                 ) : (
-                  <div className="max-h-[360px] overflow-auto rounded-md border border-slate-200 bg-white">
+                  <div className="max-h-[360px] overflow-auto rounded-md border border-slate-100 bg-white">
                     <table className="w-full min-w-[620px] text-xs">
                       <thead className="bg-slate-50 text-slate-600">
                         <tr>

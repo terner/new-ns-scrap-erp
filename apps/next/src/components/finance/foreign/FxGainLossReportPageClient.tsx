@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
@@ -159,41 +160,41 @@ export function FxGainLossReportPageClient() {
         </div>
       </div>
 
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-100">
+      <div className="hidden lg:block">
+        <Table className="text-xs">
+          <TableHeader>
             <tr>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">ประเภท</th>
-              <th className="p-2 text-left">Reference</th>
-              <th className="p-2 text-left">สกุล</th>
-              <th className="p-2 text-right">Foreign Amount</th>
-              <th className="p-2 text-right">Original Rate</th>
-              <th className="p-2 text-right">Settlement Rate</th>
-              <th className="p-2 text-right">Original THB</th>
-              <th className="p-2 text-right">Settlement THB</th>
-              <th className="p-2 text-right">FX G/L</th>
+              <TableHead className="p-3 pl-4">วันที่</TableHead>
+              <TableHead className="p-3">ประเภท</TableHead>
+              <TableHead className="p-3">Reference</TableHead>
+              <TableHead className="p-3">สกุล</TableHead>
+              <TableHead className="p-3 text-right">Foreign Amount</TableHead>
+              <TableHead className="p-3 text-right">Original Rate</TableHead>
+              <TableHead className="p-3 text-right">Settlement Rate</TableHead>
+              <TableHead className="p-3 text-right">Original THB</TableHead>
+              <TableHead className="p-3 text-right">Settlement THB</TableHead>
+              <TableHead className="p-3 pr-4 text-right">FX G/L</TableHead>
             </tr>
-          </thead>
-          <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="py-8 text-center text-slate-400" colSpan={10}>ยังไม่มี FX Gain/Loss</td></tr> : null}
+          </TableHeader>
+          <TableBody>
+            {isLoading ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+            {!isLoading && (data?.rows.length ?? 0) === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-400" colSpan={10}>ยังไม่มี FX Gain/Loss</TableCell></TableRow> : null}
             {!isLoading && data?.rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="p-2">{formatDateDisplay(row.date)}</td>
-                <td className="p-2 text-xs">{row.transactionType}</td>
-                <td className="p-2 font-mono text-xs">{row.reference}</td>
-                <td className="p-2">{row.currency || '-'}</td>
-                <td className="p-2 text-right">{formatMoney(row.foreignAmount)}</td>
-                <td className="p-2 text-right">{formatMoney(row.originalFxRate)}</td>
-                <td className="p-2 text-right">{formatMoney(row.settlementFxRate)}</td>
-                <td className="p-2 text-right">{formatMoney(row.originalThbValue)}</td>
-                <td className="p-2 text-right">{formatMoney(row.settlementThbValue)}</td>
-                <td className={`p-2 text-right font-bold ${row.fxGainLossAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(row.fxGainLossAmount)}</td>
-              </tr>
+              <TableRow key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                <TableCell className="p-3 pl-4 whitespace-nowrap text-slate-600">{formatDateDisplay(row.date)}</TableCell>
+                <TableCell className="p-3 text-xs text-slate-700">{row.transactionType}</TableCell>
+                <TableCell className="p-3 font-mono text-xs text-slate-700">{row.reference}</TableCell>
+                <TableCell className="p-3 text-slate-600">{row.currency || '-'}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.foreignAmount)}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.originalFxRate)}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.settlementFxRate)}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.originalThbValue)}</TableCell>
+                <TableCell className="p-3 text-right font-mono text-slate-700">{formatMoney(row.settlementThbValue)}</TableCell>
+                <TableCell className={`p-3 pr-4 text-right font-mono font-bold ${row.fxGainLossAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatMoney(row.fxGainLossAmount)}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {/* Mobile Card list */}
@@ -236,12 +237,12 @@ export function FxGainLossReportPageClient() {
             
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1.5 border-t border-slate-100/60 mt-1 font-mono text-xs">
               <div className="space-y-0.5">
-                <div className="flex justify-between text-slate-400 font-sans"><span>Original:</span></div>
+                <div className="flex justify-between text-slate-400"><span>Original:</span></div>
                 <div className="flex justify-between"><span>Rate:</span><span>{formatMoney(row.originalFxRate)}</span></div>
                 <div className="flex justify-between"><span>Value:</span><span>{formatMoney(row.originalThbValue)}</span></div>
               </div>
               <div className="space-y-0.5 text-right">
-                <div className="flex justify-between text-slate-400 font-sans"><span>Settlement:</span></div>
+                <div className="flex justify-between text-slate-400"><span>Settlement:</span></div>
                 <div className="flex justify-between"><span>Rate:</span><span>{formatMoney(row.settlementFxRate)}</span></div>
                 <div className="flex justify-between"><span>Value:</span><span>{formatMoney(row.settlementThbValue)}</span></div>
               </div>

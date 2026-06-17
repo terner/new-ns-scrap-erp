@@ -352,7 +352,7 @@ export function CompanyProfilePageClient() {
               const selected = branch.id === selectedBranchId
               return (
                 <button
-                  className={`w-full rounded-md border px-3 py-2 text-left transition ${selected ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50'}`}
+                  className={`w-full rounded-md border px-3 py-2 text-left transition ${selected ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-100 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50'}`}
                   disabled={isLoading || isSaving}
                   key={branch.id}
                   type="button"

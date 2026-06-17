@@ -35,10 +35,11 @@ import {
 
 type TypeFilter = WeightTicketType
 type StatusFilter = WeightTicketStatus
-type WeightTicketColumnKey = 'action' | 'branch' | 'createdAt' | 'deductionWeight' | 'documentNo' | 'impurityDeduction' | 'netWeight' | 'partyName' | 'status' | 'updatedAt' | 'vehicleNo'
+type WeightTicketColumnKey = 'index' | 'action' | 'branch' | 'createdAt' | 'deductionWeight' | 'documentNo' | 'impurityDeduction' | 'netWeight' | 'partyName' | 'status' | 'updatedAt' | 'vehicleNo'
 
 const pageSize = 10
 const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey>> = [
+  { key: 'index', defaultWidth: 70, minWidth: 50 },
   { key: 'documentNo', defaultWidth: 150, minWidth: 120 },
   { key: 'createdAt', defaultWidth: 170, minWidth: 130 },
   { key: 'partyName', defaultWidth: 210, minWidth: 150 },
@@ -636,20 +637,18 @@ export function WeightTicketListPageClient() {
       </div>
 
       {/* Desktop Tables (Hidden on Mobile) */}
-      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <table className="min-w-full divide-y divide-slate-100 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
-              {weightTicketColumns.map((column, index) => {
-              const style = columnResize.getColumnStyle(column.key);
-              if (index === weightTicketColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+              {weightTicketColumns.map((column) => {
+                const style = columnResize.getColumnStyle(column.key);
+                return <col key={column.key} style={style} />;
+              })}
             </colgroup>
-            <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
+            <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
               <tr>
+                <ResizableTableHead label="ลำดับ" resizeProps={columnResize.getResizeHandleProps('index', 'ลำดับ')} />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('documentNo', 'เลขที่')} onSort={toggleSort} sortKey="documentNo" />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="วันที่/เวลา" resizeProps={columnResize.getResizeHandleProps('createdAt', 'วันที่/เวลา')} onSort={toggleSort} sortKey="createdAt" />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label={typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า')} onSort={toggleSort} sortKey="partyName" />
@@ -676,12 +675,13 @@ export function WeightTicketListPageClient() {
                 <tr>
                   <td className="px-3 py-10 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการตามเงื่อนไข</td>
                 </tr>
-              ) : tickets.map((ticket) => (
+              ) : tickets.map((ticket, index) => (
                 <tr
                   className="cursor-pointer hover:bg-slate-50"
                   key={ticket.id}
                   onClick={() => setActiveDetailId(ticket.id)}
                 >
+                  <td className="whitespace-nowrap px-3 py-3 text-slate-500 font-mono text-xs text-left">{(page - 1) * pageSize + index + 1}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-900">{ticket.documentNo}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDateTime(ticket.createdAt)}</td>
                   <td className="px-3 py-3 text-slate-900">{ticket.partyName}</td>

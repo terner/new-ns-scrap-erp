@@ -177,19 +177,19 @@ function MarginCard({ label, tone, totals }: { label: string; tone: 'deal' | 'st
       <div className="mb-2 text-sm opacity-90 font-semibold">{label}</div>
       <div className="space-y-2 text-xs font-mono">
         <div className="flex justify-between">
-          <span className="font-sans opacity-95">{tone === 'deal' ? 'Total Revenue (PO Sell)' : 'Total Revenue (Sales Bills)'}</span>
+          <span className="opacity-95">{tone === 'deal' ? 'Total Revenue (PO Sell)' : 'Total Revenue (Sales Bills)'}</span>
           <span className="font-bold">{formatMoney(totals?.revenue ?? 0)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="font-sans opacity-95">{tone === 'deal' ? 'Total Matched Cost' : 'Total COGS (จาก WAC)'}</span>
+          <span className="opacity-95">{tone === 'deal' ? 'Total Matched Cost' : 'Total COGS (จาก WAC)'}</span>
           <span className="font-bold">{formatMoney(totals?.cost ?? 0)}</span>
         </div>
         <div className="flex justify-between border-t border-white/20 pt-2 text-base">
-          <span className="font-sans font-semibold opacity-95">{tone === 'deal' ? 'Gross Margin' : 'Gross Profit'}</span>
+          <span className="font-semibold opacity-95">{tone === 'deal' ? 'Gross Margin' : 'Gross Profit'}</span>
           <span className="font-bold">{formatMoney(totals?.margin ?? 0)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="font-sans opacity-95">{tone === 'deal' ? 'Margin %' : 'GP %'}</span>
+          <span className="opacity-95">{tone === 'deal' ? 'Margin %' : 'GP %'}</span>
           <span className="font-bold">{(totals?.marginPct ?? 0).toFixed(2)}%</span>
         </div>
       </div>

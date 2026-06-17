@@ -418,7 +418,7 @@ export function AdminUsersPageClient() {
       {/* AcexPOS Style KPI / Summary Cards */}
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm animate-fade-in">
         {/* 1. ผู้ใช้ Active */}
-        <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+        <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shrink-0">
             👥
           </div>
@@ -428,7 +428,7 @@ export function AdminUsersPageClient() {
           </div>
         </div>
         {/* 2. จำกัดสาขา */}
-        <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+        <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl shrink-0">
             🏢
           </div>
@@ -438,7 +438,7 @@ export function AdminUsersPageClient() {
           </div>
         </div>
         {/* 3. ยังไม่ link Auth */}
-        <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+        <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xl shrink-0">
             🔗
           </div>
@@ -448,7 +448,7 @@ export function AdminUsersPageClient() {
           </div>
         </div>
         {/* 4. ต้องเปลี่ยน Password */}
-        <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+        <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-100 text-purple-750 flex items-center justify-center text-xl shrink-0">
             🔑
           </div>
@@ -486,7 +486,7 @@ export function AdminUsersPageClient() {
                     <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
                   </label>
 
-                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="rounded-lg border border-slate-100 bg-white p-4">
                     <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Roles *</div>
                     <div className="grid gap-2">
                       {data?.roles.filter((role) => role.active).map((role) => (
@@ -499,7 +499,7 @@ export function AdminUsersPageClient() {
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="rounded-lg border border-slate-100 bg-white p-4">
                     <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">สาขาที่เข้าถึง</div>
                     <div className="grid gap-2">
                       {data?.branches.map((branch) => (
@@ -522,7 +522,7 @@ export function AdminUsersPageClient() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4 shrink-0">
+              <div className="flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 shrink-0">
                 <button className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 font-medium" disabled={isSaving} type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
                 <button className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors" disabled={isSaving} type="submit">
                   {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
@@ -533,8 +533,8 @@ export function AdminUsersPageClient() {
         </Dialog>
       ) : null}
 
-      <div className="rounded-md bg-white shadow overflow-hidden border border-slate-200">
-        <div className="flex border-b border-slate-200 bg-slate-50">
+      <div className="rounded-md bg-white shadow overflow-hidden border border-slate-100">
+        <div className="flex border-b border-slate-100 bg-slate-50">
           <button
             className={`border-b-2 px-5 py-3 text-sm font-bold transition-all outline-none ${tab === 'users' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
             type="button"
@@ -559,9 +559,9 @@ export function AdminUsersPageClient() {
         {!isLoading && tab === 'users' ? (
           <>
             {/* Desktop Table View (Hidden on Mobile) */}
-            <div className="hidden lg:block overflow-x-auto">
+            <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
               <table className="w-full text-sm min-w-[1000px]">
-                <thead className="bg-slate-100 text-slate-700 border-b">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                   <tr>
                     <th className="p-3 text-left font-semibold">Username</th>
                     <th className="p-3 text-left font-semibold">ชื่อ</th>
@@ -672,9 +672,9 @@ export function AdminUsersPageClient() {
         {!isLoading && tab === 'roles' ? (
           <>
             {/* Desktop Table View (Hidden on Mobile) */}
-            <div className="hidden lg:block overflow-x-auto">
+            <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
               <table className="w-full text-sm min-w-[1000px]">
-                <thead className="bg-slate-100 text-slate-700 border-b">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                   <tr>
                     <th className="p-3 text-left font-semibold">Role</th>
                     <th className="p-3 text-left font-semibold">รายละเอียด</th>

@@ -111,7 +111,7 @@ const blankAssetForm: AssetFormState = {
   warrantyExpireDate: '',
 }
 
-const fieldClass = 'w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
+const fieldClass = 'w-full rounded-md border border-slate-100 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
 
 type DepreciationPayload = {
   designState: { glPosting: string; reverseWrite: string; runWrite: string }
@@ -336,7 +336,7 @@ export function AssetRegisterPageClient() {
         <button
           type="button"
           onClick={() => { setError(null); setImportRows([]); setImportPreview(null); setModal('import') }}
-          className="rounded-lg bg-slate-50 border border-slate-200 text-slate-600 px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 transition outline-none focus:ring-0"
+          className="rounded-lg bg-slate-50 border border-slate-100 text-slate-600 px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 transition outline-none focus:ring-0"
         >
           📥 Import
         </button>
@@ -353,7 +353,7 @@ export function AssetRegisterPageClient() {
       {error ? <ErrorBox message={error} /> : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0">
             🏢
           </div>
@@ -390,9 +390,9 @@ export function AssetRegisterPageClient() {
         <StatCard label="NBV สุทธิรวม" value={formatMoney(data?.summary.nbv)} tone="emerald" icon="🏢" />
       </div>
 
-      <div className="flex flex-col gap-2 md:flex-row md:items-center rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
         <input
-          className="w-full md:flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:ring-0 focus:outline-none focus:border-slate-400 transition"
+          className="w-full md:flex-1 rounded-lg border border-slate-100 px-3 py-1.5 text-xs outline-none focus:ring-0 focus:outline-none focus:border-slate-400 transition"
           placeholder="ค้นหา รหัส / ชื่อ / สถานที่ / สาขา"
           type="search"
           value={search}
@@ -400,7 +400,7 @@ export function AssetRegisterPageClient() {
         />
         <div className="grid grid-cols-2 gap-2 lg:flex md:items-center md:gap-2 w-full md:w-auto">
           <select
-            className="w-full md:w-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-0 focus:outline-none focus:border-slate-400 transition cursor-pointer"
+            className="w-full md:w-auto rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:ring-0 focus:outline-none focus:border-slate-400 transition cursor-pointer"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
           >
@@ -408,7 +408,7 @@ export function AssetRegisterPageClient() {
             {(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
           <select
-            className="w-full md:w-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-0 focus:outline-none focus:border-slate-400 transition cursor-pointer"
+            className="w-full md:w-auto rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:ring-0 focus:outline-none focus:border-slate-400 transition cursor-pointer"
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
@@ -440,7 +440,7 @@ export function AssetRegisterPageClient() {
             <tbody>
               <LoadingOrEmpty colSpan={11} isLoading={isLoading} rows={rows.length} />
               {rows.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
+                <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
                   <Td><span className="font-mono font-bold text-amber-700">{row.code}</span></Td>
                   <Td><div className="font-semibold text-slate-900">{row.name}</div><div className="text-slate-400 text-[10px]">{row.location || '-'}</div></Td>
                   <Td>{row.category}</Td><Td>{row.branchName}</Td><Td>{row.purchaseDate || '-'}</Td>
@@ -448,7 +448,7 @@ export function AssetRegisterPageClient() {
                   <Td align="center"><StatusPill status={row.assetStatus} /></Td>
                   <Td align="center">
                     <div className="flex justify-center gap-1">
-                      <button className="rounded border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition outline-none" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
+                      <button className="rounded border border-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition outline-none" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
                       {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? (
                         <button className="rounded border border-red-200 px-2 py-0.5 text-[10px] font-semibold text-red-600 hover:bg-red-50 transition outline-none" disabled={isSaving} onClick={() => deactivateAsset(row)} type="button">ปิดใช้งาน</button>
                       ) : null}
@@ -464,12 +464,12 @@ export function AssetRegisterPageClient() {
       {/* Mobile View Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="bg-white rounded-xl p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-200/60">กำลังโหลดข้อมูล...</div>
+          <div className="bg-white rounded-xl p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-100">กำลังโหลดข้อมูล...</div>
         ) : rows.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-200/60">ยังไม่มีข้อมูลทะเบียนทรัพย์สิน</div>
+          <div className="bg-white rounded-xl p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-100">ยังไม่มีข้อมูลทะเบียนทรัพย์สิน</div>
         ) : (
           rows.map((row) => (
-            <div key={row.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200/60 space-y-3 hover:bg-slate-50/50 transition">
+            <div key={row.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-3 hover:bg-slate-50/50 transition">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div className="min-w-0 flex-1 pr-2">
                   <span className="font-mono font-bold text-xs text-amber-700 block">{row.code}</span>
@@ -487,7 +487,7 @@ export function AssetRegisterPageClient() {
                 <div><span className="text-slate-400 block text-[10px]">ค่าเสื่อม/เดือน</span><span className="font-bold text-amber-700 block">{formatMoney(row.monthlyDep)}</span></div>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-end gap-2">
-                <button className="rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition outline-none focus:ring-0" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
+                <button className="rounded border border-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition outline-none focus:ring-0" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
                 {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? (
                   <button className="rounded border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition outline-none focus:ring-0" disabled={isSaving} onClick={() => deactivateAsset(row)} type="button">ปิดใช้งาน</button>
                 ) : null}
@@ -569,7 +569,7 @@ export function AssetRegisterPageClient() {
           <div className="space-y-3">
             <input
               accept=".csv,.tsv,.txt"
-              className="block w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              className="block w-full rounded-md border border-slate-100 px-3 py-2 text-sm"
               type="file"
               onChange={(event) => {
                 const file = event.target.files?.[0]
@@ -586,7 +586,7 @@ export function AssetRegisterPageClient() {
             {importPreview ? (
               <TableShell>
                 <table className="w-full text-xs">
-                  <thead className="bg-slate-100 text-slate-600"><tr><Th>#</Th><Th>รหัส</Th><Th>ชื่อ</Th><Th>ผลตรวจ</Th></tr></thead>
+                  <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><Th>#</Th><Th>รหัส</Th><Th>ชื่อ</Th><Th>ผลตรวจ</Th></tr></thead>
                   <tbody>
                     {importPreview.slice(0, 100).map((row) => (
                       <tr key={`${row.index}-${row.code}`} className="border-t border-slate-100">
@@ -725,18 +725,18 @@ export function DepreciationPageClient() {
     <section className="space-y-4">
       {error ? <ErrorBox message={error} /> : null}
       <FilterPanel>
-        <select aria-label="Depreciation month" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={month} onChange={(event) => setMonth(event.target.value)}>
+        <select aria-label="Depreciation month" className="rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={month} onChange={(event) => setMonth(event.target.value)}>
           <option value="all">ดูรายปี (ทุกเดือน)</option>
           {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((item) => <option key={item} value={item}>เดือน {item}</option>)}
         </select>
-        <input aria-label="Depreciation year" className="w-24 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition" value={year} onChange={(event) => setYear(event.target.value)} />
-        <input aria-label="Depreciation period date" className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition" readOnly value={periodDate} />
+        <input aria-label="Depreciation year" className="w-24 rounded-lg border border-slate-100 px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition" value={year} onChange={(event) => setYear(event.target.value)} />
+        <input aria-label="Depreciation period date" className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition" readOnly value={periodDate} />
         
-        <select aria-label="Filter category" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)}>
+        <select aria-label="Filter category" className="rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)}>
           <option value="all">ทุกหมวด</option>
           {categoryOptions.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select aria-label="Filter department" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={filterDepartment} onChange={(event) => setFilterDepartment(event.target.value)}>
+        <select aria-label="Filter department" className="rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={filterDepartment} onChange={(event) => setFilterDepartment(event.target.value)}>
           <option value="all">ทุกแผนก</option>
           {departmentOptions.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
@@ -757,9 +757,9 @@ export function DepreciationPageClient() {
       </Panel>
       <TableShell title="ประวัติการประมวลผลค่าเสื่อม (Depreciation History)">
         {/* Desktop view */}
-        <div className="hidden lg:block overflow-x-auto">
+        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-slate-100 text-slate-600">
+            <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
               <tr>
                 <Th>DEP ID</Th>
                 <Th>งวด</Th>
@@ -886,10 +886,10 @@ export function DepreciationPageClient() {
           </div>
           <TableShell>
             <table className="w-full text-xs">
-              <thead className="bg-slate-100 text-slate-600"><tr><Th>Asset</Th><Th align="right">Acc ก่อน</Th><Th align="right">ค่าเสื่อม</Th><Th align="right">Acc หลัง</Th><Th align="right">NBV หลัง</Th><Th align="center">สถานะหลัง Run</Th></tr></thead>
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><Th>Asset</Th><Th align="right">Acc ก่อน</Th><Th align="right">ค่าเสื่อม</Th><Th align="right">Acc หลัง</Th><Th align="right">NBV หลัง</Th><Th align="center">สถานะหลัง Run</Th></tr></thead>
               <tbody>
                 {preview.rows.map((row) => (
-                  <tr key={row.assetId} className="border-t border-slate-100">
+                  <tr key={row.assetId} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
                     <Td><div className="font-medium">{row.assetCode}</div><div className="text-slate-400">{row.assetName}</div></Td>
                     <Td align="right">{formatMoney(row.accumBefore)}</Td><Td align="right">{formatMoney(row.depreciationAmount)}</Td><Td align="right">{formatMoney(row.accumAfter)}</Td><Td align="right">{formatMoney(row.nbvAfter)}</Td>
                     <Td align="center">{row.willFullyDepreciate ? <Chip tone="blue">Fully Depreciated</Chip> : <Chip tone="emerald">Active</Chip>}</Td>
@@ -1026,7 +1026,7 @@ export function AssetDisposalPageClient() {
       </div>
       <TableShell title="ประวัติการจำหน่ายสินทรัพย์ (Asset Disposal History)">
         {/* Desktop view */}
-        <div className="hidden lg:block overflow-x-auto">
+        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
           <table className="w-full text-xs">
             <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
               <tr>
@@ -1364,12 +1364,12 @@ function DisabledButton({ children, strong = false }: { children: ReactNode; str
 }
 
 function LinkButton({ children, href }: { children: ReactNode; href: string }) {
-  return <a className="rounded-lg bg-slate-50 border border-slate-200 text-slate-600 px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 transition outline-none focus:ring-0" href={href}>{children}</a>
+  return <a className="rounded-lg bg-slate-50 border border-slate-100 text-slate-600 px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 transition outline-none focus:ring-0" href={href}>{children}</a>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
       <h2 className="mb-3 font-semibold text-slate-900 text-sm">{title}</h2>
       {children}
     </div>
@@ -1378,7 +1378,7 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
 
 function FilterPanel({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
       {children}
     </div>
   )
@@ -1386,7 +1386,7 @@ function FilterPanel({ children }: { children: ReactNode }) {
 
 function TableShell({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       {title ? (
         <h2 className="border-b border-slate-100 px-4 py-3 font-bold text-slate-900 text-sm bg-slate-50/50">{title}</h2>
       ) : null}
@@ -1401,7 +1401,7 @@ function StatCard({ label, tone, value, icon }: { label: string; tone?: 'amber' 
   const labelColor = tone === 'amber' ? 'text-amber-600' : tone === 'emerald' ? 'text-emerald-600' : tone === 'red' ? 'text-red-600' : tone === 'blue' ? 'text-blue-600' : 'text-slate-500'
   const iconBgColor = tone === 'amber' ? 'bg-amber-50 text-amber-600' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-600' : tone === 'red' ? 'bg-red-50 text-red-600' : tone === 'blue' ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'
   return (
-    <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+    <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
       {icon && (
         <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${iconBgColor} flex items-center justify-center text-xl shrink-0`}>
           {icon}
@@ -1443,7 +1443,7 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
   return (
     <div>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
             <tr>
@@ -1459,7 +1459,7 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
           <tbody>
             <LoadingOrEmpty colSpan={7} isLoading={isLoading} rows={rows.length} />
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
                 <Td><span className="font-mono font-bold text-amber-700">{row.code}</span></Td>
                 <Td className="font-semibold text-slate-800">{row.name}</Td>
                 <Td align="right">{formatMoney(row.netAssetCost)}</Td>

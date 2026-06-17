@@ -79,15 +79,15 @@ export function FcdLedgerPageClient() {
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
       <div className="flex flex-wrap gap-2">
-        <select className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm md:w-80" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+        <select className="w-full rounded-md border border-slate-100 bg-white px-3 py-2 text-sm md:w-80" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
           {(data?.filters.accounts ?? []).map((account) => <option key={account.id} value={account.id}>{account.label} ({account.currency})</option>)}
           {!isLoading && (data?.filters.accounts.length ?? 0) === 0 ? <option value="">ไม่มีบัญชี FCD</option> : null}
         </select>
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
               🏦
             </div>
@@ -96,7 +96,7 @@ export function FcdLedgerPageClient() {
               <div className="truncate text-lg font-bold text-slate-800">{data?.account?.name ?? '-'}</div>
             </div>
           </div>
-          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
               💱
             </div>
@@ -105,7 +105,7 @@ export function FcdLedgerPageClient() {
               <div className="font-mono text-2xl font-bold text-indigo-700">{formatMoney(data?.summary.foreignBalance ?? 0)}</div>
             </div>
           </div>
-          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
               💰
             </div>
@@ -117,21 +117,21 @@ export function FcdLedgerPageClient() {
         </div>
       </div>
 
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">ประเภท</th>
-              <th className="p-2 text-left">เอกสาร</th>
-              <th className="p-2 text-left">รายละเอียด</th>
-              <th className="p-2 text-right">FCD เข้า</th>
-              <th className="p-2 text-right">FCD ออก</th>
-              <th className="p-2 text-right">FX</th>
-              <th className="p-2 text-right">THB เข้า</th>
-              <th className="p-2 text-right">THB ออก</th>
-              <th className="p-2 text-right">FCD Balance</th>
-              <th className="p-2 text-right">THB Balance</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">วันที่</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">ประเภท</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">เอกสาร</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">รายละเอียด</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">FCD เข้า</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">FCD ออก</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">FX</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">THB เข้า</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">THB ออก</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">FCD Balance</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">THB Balance</th>
             </tr>
           </thead>
           <tbody>
@@ -139,17 +139,17 @@ export function FcdLedgerPageClient() {
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการเดินบัญชี FCD</td></tr> : null}
             {!isLoading && data?.rows.map((row) => (
               <tr key={row.id} className={`border-t border-slate-100 ${row.type === 'ยอดยกมา' ? 'bg-slate-100 font-semibold' : 'hover:bg-slate-50'}`}>
-                <td className="p-2">{row.date}</td>
-                <td className="p-2 text-xs">{row.type}</td>
-                <td className="p-2 font-mono text-xs text-blue-600">{row.refNo}</td>
+                <td className="px-4 py-3.5">{row.date}</td>
+                <td className="px-4 py-3.5 text-xs">{row.type}</td>
+                <td className="px-4 py-3.5 font-mono text-xs text-blue-600">{row.refNo}</td>
                 <td className="max-w-80 truncate p-2 text-xs">{row.description || '-'}</td>
                 <MoneyCell tone="in" value={row.foreignIn} />
                 <MoneyCell tone="out" value={row.foreignOut} />
-                <td className="p-2 text-right">{row.fxRate ? formatMoney(row.fxRate) : '-'}</td>
+                <td className="px-4 py-3.5 text-right">{row.fxRate ? formatMoney(row.fxRate) : '-'}</td>
                 <MoneyCell tone="in" value={row.thbIn} />
                 <MoneyCell tone="out" value={row.thbOut} />
-                <td className="p-2 text-right font-medium">{formatMoney(row.foreignBal)}</td>
-                <td className="p-2 text-right font-medium">{formatMoney(row.thbBal)}</td>
+                <td className="px-4 py-3.5 text-right font-medium">{formatMoney(row.foreignBal)}</td>
+                <td className="px-4 py-3.5 text-right font-medium">{formatMoney(row.thbBal)}</td>
               </tr>
             ))}
           </tbody>
@@ -159,10 +159,10 @@ export function FcdLedgerPageClient() {
       {/* Mobile Card list */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
         {!isLoading && (data?.rows.length ?? 0) === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มีรายการเดินบัญชี FCD</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มีรายการเดินบัญชี FCD</div>
         ) : null}
         {!isLoading && data?.rows.map((row) => {
           const isOpening = row.type === 'ยอดยกมา'

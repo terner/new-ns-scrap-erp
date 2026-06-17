@@ -199,7 +199,7 @@ export function SupplierTrackingPageClient() {
           {/* Mobile Card list for main tracking list */}
           <div className="block lg:hidden space-y-3 mb-4">
             {isLoading ? (
-              <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+              <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-100">กำลังโหลดข้อมูล</div>
             ) : null}
             
             {!isLoading && rows.map((row) => (
@@ -258,7 +258,7 @@ export function SupplierTrackingPageClient() {
             ))}
 
             {!isLoading && rows.length === 0 ? (
-              <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+              <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-100">
                 ไม่มีข้อมูล Supplier Tracking
               </div>
             ) : null}
@@ -266,7 +266,7 @@ export function SupplierTrackingPageClient() {
 
           <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow mb-4">
             <table className="w-full min-w-[1180px] text-sm">
-              <thead className="bg-slate-100">
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
                 <tr>
                   <th className="p-2 text-left">Code</th>
                   <th className="p-2 text-left">Supplier</th>
@@ -341,16 +341,16 @@ export function SupplierTrackingPageClient() {
               </div>
             ))}
             {!isLoading && (data?.byProduct ?? []).length === 0 ? (
-              <div className="rounded-md bg-white p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-200">
+              <div className="rounded-md bg-white p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-100">
                 ไม่มี item detail สำหรับ product breakdown
               </div>
             ) : null}
           </div>
 
-          <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+          <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
             <div className="border-b bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">Product breakdown จากบิลรับซื้อ</div>
             <table className="w-full min-w-[760px] text-sm">
-              <thead className="bg-slate-100"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">Supplier</th><th className="p-2 text-right">บิล</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">Supplier</th><th className="p-2 text-right">บิล</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
               <tbody>
                 {(data?.byProduct ?? []).slice(0, 20).map((row) => (
                   <tr key={row.productName} className="border-t hover:bg-slate-50">
@@ -450,8 +450,8 @@ function SupplierDetailDialog({ detail, isLoading, onOpenChange }: { detail: Sup
 
 function DetailSection({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <section className="rounded-xl border border-slate-200/60 bg-slate-50 overflow-hidden shadow-sm">
-      <div className="border-b border-slate-200/60 bg-slate-100/60 px-4 py-2.5 text-sm font-bold text-slate-850">{title}</div>
+    <section className="rounded-xl border border-slate-100 bg-slate-50 overflow-hidden shadow-sm">
+      <div className="border-b border-slate-100 bg-slate-100/60 px-4 py-2.5 text-sm font-bold text-slate-850">{title}</div>
       {children}
     </section>
   )
@@ -465,7 +465,7 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: DetailCell[][
       {/* Desktop Table View */}
       <div className="hidden lg:block overflow-x-auto bg-white">
         <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200/60">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
               {headers.map((header, idx) => (
                 <th key={header} className={`p-2.5 text-slate-600 font-semibold text-xs text-left ${idx === 0 ? 'pl-4' : idx === headers.length - 1 ? 'pr-4' : ''}`}>
@@ -504,9 +504,9 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: DetailCell[][
 
       {/* Mobile Card List View */}
       <div className="block lg:hidden space-y-3 p-3">
-        {rows.length === 0 ? <div className="text-center text-xs text-slate-400 py-4 bg-white rounded-xl border border-slate-200/60">ไม่มีข้อมูล</div> : null}
+        {rows.length === 0 ? <div className="text-center text-xs text-slate-400 py-4 bg-white rounded-xl border border-slate-100">ไม่มีข้อมูล</div> : null}
         {rows.map((row, index) => (
-          <div key={index} className="rounded-xl border border-slate-200/60 bg-white p-3.5 shadow-sm space-y-2 text-xs">
+          <div key={index} className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm space-y-2 text-xs">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 font-semibold">
               <span className="text-slate-800 font-bold">
                 {typeof row[0] === 'string' ? row[0] : (
@@ -557,7 +557,7 @@ function SummaryCard({ className = '', icon, label, tone, value }: { className?:
     red: 'bg-red-100 text-red-700 border-red-200/50',
   }[tone]
   return (
-    <div className={`flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5 ${className}`}>
+    <div className={`flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-3 shadow-sm sm:gap-4 sm:p-5 ${className}`}>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl sm:h-12 sm:w-12 ${colors.split(' ')[0]}`}>{icon}</div>
       <div className="min-w-0">
         <div className={`text-xs ${colors.split(' ')[1]}`}>{label}</div>
@@ -569,7 +569,7 @@ function SummaryCard({ className = '', icon, label, tone, value }: { className?:
 
 function SignalMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-3.5 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className="mt-1.5 text-sm font-bold text-slate-900 font-mono">{value}</div>
     </div>
@@ -587,9 +587,9 @@ function TopPanel({ rows, title }: { rows: { label: string; value: number }[]; t
 function YearCompare({ monthly }: { monthly: SupplierTrackingPayload['monthly'] }) {
   return (
     <>
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full min-w-[680px] text-sm">
-          <thead className="bg-slate-100"><tr><th className="p-2 text-left">เดือน</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><th className="p-2 text-left">เดือน</th><th className="p-2 text-right">น้ำหนัก</th><th className="p-2 text-right">ยอดซื้อ</th><th className="p-2 text-right">ราคาเฉลี่ย</th></tr></thead>
           <tbody>{monthly.map((row, index) => <tr key={row.month} className="border-t"><td className="p-2">{monthLabels[index]}</td><td className="p-2 text-right">{formatMoney(row.qty)}</td><td className="p-2 text-right font-semibold text-blue-700">{formatMoney(row.amount)}</td><td className="p-2 text-right">{formatMoney(row.qty > 0 ? row.amount / row.qty : 0)}</td></tr>)}</tbody>
         </table>
       </div>

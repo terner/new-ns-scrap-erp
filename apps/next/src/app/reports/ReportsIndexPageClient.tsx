@@ -262,10 +262,10 @@ export function ReportsIndexPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <DatePickerInput className="w-[130px] border-slate-200" onChange={setFromDate} value={fromDate} />
-          <DatePickerInput className="w-[130px] border-slate-200" onChange={setToDate} value={toDate} />
+          <DatePickerInput className="w-[130px] border-slate-100" onChange={setFromDate} value={fromDate} />
+          <DatePickerInput className="w-[130px] border-slate-100" onChange={setToDate} value={toDate} />
           <span className="text-xs font-medium text-slate-450">เว้นว่างเพื่อดูทุกช่วงเวลา</span>
           <button
             className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:opacity-60 outline-none focus:outline-none"
@@ -282,7 +282,7 @@ export function ReportsIndexPageClient() {
               className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold border transition-all duration-150 outline-none focus:outline-none ${
                 legacyTab === item.k
                   ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                  : 'bg-white border-slate-200 text-slate-755 hover:bg-slate-50/80'
+                  : 'bg-white border-slate-100 text-slate-755 hover:bg-slate-50/80'
               }`}
               key={item.k}
               onClick={() => setLegacyTab(item.k)}
@@ -308,9 +308,9 @@ export function ReportsIndexPageClient() {
       ) : null}
 
       {/* Main Table Panel */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
         {/* Desktop View */}
-        <div className="hidden lg:block overflow-x-auto">
+        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
           <table className="w-full min-w-[760px] text-sm text-slate-700">
             <thead className="bg-slate-50/80">
               <tr>
@@ -337,7 +337,7 @@ export function ReportsIndexPageClient() {
               )}
             </tbody>
             {rows.length && !loading ? (
-              <tfoot className="border-t border-slate-200 bg-slate-50/50 font-bold text-slate-900">
+              <tfoot className="border-t border-slate-100 bg-slate-50/50 font-bold text-slate-900">
                 <tr>
                   {columns.map((column) => (
                     <td className={`p-3 font-bold ${column.key === 'name' ? 'text-left' : 'text-right font-mono'}`} key={column.key}>
@@ -355,7 +355,7 @@ export function ReportsIndexPageClient() {
           {loading ? (
             <div className="py-8 text-center text-slate-400 font-medium text-sm">กำลังโหลดรายงาน...</div>
           ) : rows.length ? (
-            <div className="divide-y divide-slate-200/60">
+            <div className="divide-y divide-slate-100">
               {rows.map((row) => (
                 <div className="p-4 hover:bg-slate-50/30 transition-colors" key={row.name}>
                   <div className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-1.5 mb-2">{row.name}</div>
@@ -372,7 +372,7 @@ export function ReportsIndexPageClient() {
                 </div>
               ))}
               {/* Mobile Total Row */}
-              <div className="bg-slate-50 p-4 font-bold text-slate-900 border-t border-slate-200">
+              <div className="bg-slate-50 p-4 font-bold text-slate-900 border-t border-slate-100">
                 <div className="text-xs text-slate-500 font-bold mb-2">รวมทั้งหมด</div>
                 <div className="grid grid-cols-2 gap-2">
                   {columns.filter((c) => c.key !== 'name').map((column) => (
@@ -393,14 +393,14 @@ export function ReportsIndexPageClient() {
       </div>
 
       {/* Reports Directory Section */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <h2 className="text-base font-bold text-slate-950">รายงานอื่นในระบบ</h2>
             <p className="text-xs font-semibold text-slate-400 mt-0.5">ส่วนนี้คงไว้เป็นทางลัดไปยังรายงาน Next ที่เปิดใช้งานแล้ว</p>
           </div>
           <input
-            className="ml-auto min-w-52 h-9 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:outline-none focus:border-slate-300 transition-colors"
+            className="ml-auto min-w-52 h-9 rounded-lg border border-slate-100 px-3 py-2 text-sm outline-none focus:outline-none focus:border-slate-300 transition-colors"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="ค้นหาชื่อรายงาน / module / path"
             type="search"
@@ -414,7 +414,7 @@ export function ReportsIndexPageClient() {
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all duration-150 outline-none focus:outline-none ${
                 catalogTab === item.k
                   ? 'bg-slate-800 border-slate-800 text-white shadow-sm'
-                  : 'bg-white border-slate-200 text-slate-705 hover:bg-slate-50'
+                  : 'bg-white border-slate-100 text-slate-705 hover:bg-slate-50'
               }`}
               key={item.k}
               onClick={() => setCatalogTab(item.k)}
@@ -426,21 +426,21 @@ export function ReportsIndexPageClient() {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/20 p-3 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/20 p-3 shadow-sm">
             <div className="text-xs font-semibold text-slate-500">รายงานที่พบ</div>
             <div className="text-xl font-bold text-slate-800 mt-0.5">{catalogSummary.count.toLocaleString('th-TH')}</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/20 p-3 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/20 p-3 shadow-sm">
             <div className="text-xs font-semibold text-slate-500">Read / Design</div>
             <div className="text-xl font-bold text-slate-800 mt-0.5">{catalogSummary.readOnly.toLocaleString('th-TH')}</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/20 p-3 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/20 p-3 shadow-sm">
             <div className="text-xs font-semibold text-slate-500">Accounting / Finance</div>
             <div className="text-xl font-bold text-slate-800 mt-0.5">{catalogSummary.accounting.toLocaleString('th-TH')}</div>
           </div>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+        <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
           {/* Desktop View */}
           <div className="hidden lg:block overflow-x-auto bg-white">
             <table className="w-full min-w-[760px] text-sm text-slate-700">
@@ -482,7 +482,7 @@ export function ReportsIndexPageClient() {
           </div>
 
           {/* Mobile View */}
-          <div className="block lg:hidden bg-white divide-y divide-slate-200/60">
+          <div className="block lg:hidden bg-white divide-y divide-slate-100">
             {filtered.map((report) => (
               <div className="p-4 hover:bg-slate-50/30 transition-colors" key={report.href}>
                 <div className="flex justify-between items-start gap-2 mb-1.5">
@@ -523,7 +523,7 @@ function MetricCard({ icon, label, tone, value }: { icon: string; label: string;
   }
   const config = toneMap[tone] ?? toneMap.slate
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl ${config.bg}`}>
         {icon}
       </div>

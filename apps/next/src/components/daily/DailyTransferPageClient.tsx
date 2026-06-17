@@ -25,11 +25,13 @@ type TransferPayload = {
   accounts: DailyAccountOption[]
   rows: TransferRow[]
 }
-type TransferColumnKey = 'action' | 'amount' | 'byPerson' | 'date' | 'docNo' | 'fee' | 'from' | 'to'
+type TransferColumnKey = 'index' | 'action' | 'amount' | 'byPerson' | 'date' | 'docNo' | 'fee' | 'from' | 'to'
 type Period = '' | 'month' | 'today' | 'week'
+type SortKey = 'docNo' | 'date' | 'from' | 'to' | 'amount' | 'fee' | 'byPerson'
 
 const pageSizeOptions = [10, 25, 50, 100]
 const transferColumns: Array<ResizableColumnDefinition<TransferColumnKey>> = [
+  { key: 'index', defaultWidth: 70, minWidth: 50 },
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 120, minWidth: 100 },
   { key: 'from', defaultWidth: 280, minWidth: 150 },
@@ -73,6 +75,17 @@ export function DailyTransferPageClient() {
   const [toAccountId, setToAccountId] = useState('')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const columnResize = useResizableColumns('daily.transfer', transferColumns)
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  const changeSort = useCallback((nextKey: SortKey) => {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(nextKey)
+    setSortDirection(nextKey === 'date' || nextKey === 'amount' || nextKey === 'fee' ? 'desc' : 'asc')
+  }, [sortKey])
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -100,8 +113,47 @@ export function DailyTransferPageClient() {
       .filter((row) => !fromAccountId || row.fromAccountId === fromAccountId)
       .filter((row) => !toAccountId || row.toAccountId === toAccountId)
       .filter((row) => !query || `${row.docNo} ${row.notes ?? ''} ${row.byPerson ?? ''}`.toLowerCase().includes(query))
-      .sort((left, right) => right.date.localeCompare(left.date) || right.docNo.localeCompare(left.docNo))
-  }, [dateFrom, dateTo, fromAccountId, rows, search, toAccountId])
+      .sort((left, right) => {
+        let leftValue: string | number = ''
+        let rightValue: string | number = ''
+
+        if (sortKey === 'docNo') {
+          leftValue = left.docNo || ''
+          rightValue = right.docNo || ''
+        } else if (sortKey === 'date') {
+          leftValue = left.date || ''
+          rightValue = right.date || ''
+        } else if (sortKey === 'from') {
+          leftValue = left.fromAccountName || ''
+          rightValue = right.fromAccountName || ''
+        } else if (sortKey === 'to') {
+          leftValue = left.toAccountName || ''
+          rightValue = right.toAccountName || ''
+        } else if (sortKey === 'amount') {
+          leftValue = left.amount || 0
+          rightValue = right.amount || 0
+        } else if (sortKey === 'fee') {
+          leftValue = left.fee || 0
+          rightValue = right.fee || 0
+        } else if (sortKey === 'byPerson') {
+          leftValue = left.byPerson || ''
+          rightValue = right.byPerson || ''
+        }
+
+        let comparison = 0
+        if (typeof leftValue === 'number' && typeof rightValue === 'number') {
+          comparison = leftValue - rightValue
+        } else {
+          comparison = String(leftValue).localeCompare(String(rightValue))
+        }
+
+        if (comparison === 0) {
+          comparison = (left.docNo || '').localeCompare(right.docNo || '')
+        }
+
+        return sortDirection === 'asc' ? comparison : -comparison
+      })
+  }, [dateFrom, dateTo, fromAccountId, rows, search, toAccountId, sortKey, sortDirection])
 
   const totalAmount = filteredRows.reduce((sum, row) => sum + row.amount, 0)
   const totalRows = filteredRows.length
@@ -526,10 +578,10 @@ export function DailyTransferPageClient() {
                 </div>
                 <DetailItem className="col-span-2" label="หมายเหตุ" value={selectedRow.notes || '-'} />
               </div>
-              <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">ผลกระทบ Bank Statement</div>
+              <div className="rounded-lg border border-slate-100 bg-white shadow-sm overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900">ผลกระทบ Bank Statement</div>
                 <div className="grid grid-cols-2 gap-0 text-sm">
-                  <div className="border-r border-slate-200 px-4 py-3">
+                  <div className="border-r border-slate-100 px-4 py-3">
                     <div className="text-xs font-medium text-slate-500">เงินออกจากบัญชีต้นทาง</div>
                     <div className="mt-1 font-semibold text-red-700">{selectedRow.fromAccountName}</div>
                     <div className="mt-2 text-right font-mono text-base font-bold text-slate-900">-{formatMoney(selectedRow.amount + selectedRow.fee)}</div>
@@ -588,32 +640,30 @@ export function DailyTransferPageClient() {
         ) : null}
       </div>
 
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {transferColumns.map((column, index) => {
+            {transferColumns.map((column) => {
               const style = columnResize.getColumnStyle(column.key);
-              if (index === transferColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
               return <col key={column.key} style={style} />;
             })}
           </colgroup>
           <TableHeader>
             <tr>
-              <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
-              <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
-              <ResizableTableHead label="จาก" resizeProps={columnResize.getResizeHandleProps('from', 'จาก')} />
-              <ResizableTableHead label="เข้า" resizeProps={columnResize.getResizeHandleProps('to', 'เข้า')} />
-              <ResizableTableHead align="right" label="จำนวน" resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวน')} />
-              <ResizableTableHead align="right" label="ค่าธรรมเนียม" resizeProps={columnResize.getResizeHandleProps('fee', 'ค่าธรรมเนียม')} />
-              <ResizableTableHead label="ผู้ทำรายการ" resizeProps={columnResize.getResizeHandleProps('byPerson', 'ผู้ทำรายการ')} />
+              <ResizableTableHead label="ลำดับ" resizeProps={columnResize.getResizeHandleProps('index', 'ลำดับ')} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} sortKey="date" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="จาก" resizeProps={columnResize.getResizeHandleProps('from', 'จาก')} sortKey="from" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เข้า" resizeProps={columnResize.getResizeHandleProps('to', 'เข้า')} sortKey="to" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} align="right" label="จำนวน" resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวน')} sortKey="amount" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} align="right" label="ค่าธรรมเนียม" resizeProps={columnResize.getResizeHandleProps('fee', 'ค่าธรรมเนียม')} sortKey="fee" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้ทำรายการ" resizeProps={columnResize.getResizeHandleProps('byPerson', 'ผู้ทำรายการ')} sortKey="byPerson" onSort={changeSort} />
               <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'Action')} />
             </tr>
           </TableHeader>
           <TableBody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={8}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && pagedRows.map((row) => (
+            {isLoading ? <TableRow><td className="p-8 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></TableRow> : null}
+            {!isLoading && pagedRows.map((row, index) => (
               <TableRow
                 key={row.id}
                 className="cursor-pointer hover:bg-slate-50"
@@ -626,6 +676,7 @@ export function DailyTransferPageClient() {
                   }
                 }}
               >
+                <TableCell className="whitespace-nowrap text-xs font-semibold text-slate-500 font-mono text-left">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                 <TableCell className="whitespace-nowrap text-xs font-semibold text-slate-700">{row.docNo}</TableCell>
                 <TableCell className="whitespace-nowrap text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</TableCell>
                 <TableCell className="text-xs font-semibold text-red-600">{row.fromAccountName}</TableCell>
@@ -639,7 +690,7 @@ export function DailyTransferPageClient() {
                 </TableCell>
               </TableRow>
             ))}
-            {!isLoading && pagedRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={8}>ยังไม่มีรายการ</td></tr> : null}
+            {!isLoading && pagedRows.length === 0 ? <TableRow><td className="p-8 text-center text-slate-400" colSpan={9}>ยังไม่มีรายการ</td></TableRow> : null}
           </TableBody>
         </Table>
       </div>

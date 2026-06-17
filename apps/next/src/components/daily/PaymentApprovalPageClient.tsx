@@ -964,17 +964,14 @@ export function PaymentApprovalPageClient() {
       {/* Desktop Tables (Hidden on Mobile) */}
       <div className="hidden lg:block">
         {tab === 'ap' || tab === 'advance' ? (
-          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
             <Table className="text-xs" style={{ minWidth: apColumnResize.tableMinWidth + 40, tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: '40px' }} />
-                {paymentApprovalApColumns.map((column, index) => {
-              const style = apColumnResize.getColumnStyle(column.key);
-              if (index === paymentApprovalApColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+                {paymentApprovalApColumns.map((column) => {
+                  const style = apColumnResize.getColumnStyle(column.key);
+                  return <col key={column.key} style={style} />;
+                })}
               </colgroup>
               <TableHeader>
                 <tr>
@@ -1054,17 +1051,14 @@ export function PaymentApprovalPageClient() {
             </Table>
           </div>
           ) : (
-            <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
               <Table className="text-xs" style={{ minWidth: expenseColumnResize.tableMinWidth + 40, tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: '40px' }} />
-                {paymentApprovalExpenseColumns.map((column, index) => {
-              const style = expenseColumnResize.getColumnStyle(column.key);
-              if (index === paymentApprovalExpenseColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+                {paymentApprovalExpenseColumns.map((column) => {
+                  const style = expenseColumnResize.getColumnStyle(column.key);
+                  return <col key={column.key} style={style} />;
+                })}
               </colgroup>
               <TableHeader>
                 <tr>

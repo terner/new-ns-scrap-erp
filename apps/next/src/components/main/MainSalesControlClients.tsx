@@ -232,7 +232,7 @@ export function SalesPlanPageClient() {
       </div>
 
       {/* 1. Sales Plan Section */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-semibold text-slate-600">
           📝 ตารางวางแผน — ปลดล็อก = อยู่ในขั้นเสนอ / ล็อก = ราคายืนยันแล้ว ตู้จะถูกหักจากรอขาย
         </div>
@@ -326,7 +326,7 @@ export function SalesPlanPageClient() {
       </div>
 
       {/* 2. Analysis Section */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm">📊 วิเคราะห์ขาย vs รายการรอขาย — ผู้บริหารตัดสินใจ</h3>
@@ -377,7 +377,7 @@ export function SalesPlanPageClient() {
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
           {analysisRows.map((row) => (
-            <div key={text(row.code)} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div key={text(row.code)} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
                   <div className="font-bold text-slate-850 text-sm">{text(row.name)}</div>
@@ -418,7 +418,7 @@ export function SalesPlanPageClient() {
       </div>
 
       {/* 3. Containers Remaining Section */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/50 p-4">
           <h3 className="font-bold text-slate-800 text-sm">📦 ตู้รอขาย คงเหลือหลังหักล็อกราคา — เดือน {(month || data?.filters.month) ?? ''}</h3>
           <div className="text-xs flex items-center gap-1.5">
@@ -461,14 +461,14 @@ export function SalesPlanPageClient() {
               ))}
               {!analysisRows.length ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={10}>ไม่มีสต๊อกทองแดง/ทองเหลือง</td></tr> : null}
             </tbody>
-            {analysisRows.length ? <tfoot className="border-t border-slate-200 bg-slate-50/50 font-bold text-slate-700"><tr><td className="p-3 text-xs" colSpan={3}>รวม</td><td className="p-3 text-right text-slate-700 text-xs">{money(stockTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(lockedTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(0)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingKgTotal)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingContainers)}</td><td /><td className="p-3 text-right text-slate-750 text-xs">{money(remainingValueTotal)}</td></tr></tfoot> : null}
+            {analysisRows.length ? <tfoot className="border-t border-slate-100 bg-slate-50/50 font-bold text-slate-700"><tr><td className="p-3 text-xs" colSpan={3}>รวม</td><td className="p-3 text-right text-slate-700 text-xs">{money(stockTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(lockedTotal)}</td><td className="p-3 text-right text-emerald-600 text-xs">{money(0)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingKgTotal)}</td><td className="bg-yellow-50/20 p-3 text-right text-yellow-600 text-xs">{money(remainingContainers)}</td><td /><td className="p-3 text-right text-slate-750 text-xs">{money(remainingValueTotal)}</td></tr></tfoot> : null}
           </table>
         </div>
 
         {/* Mobile View */}
         <div className="block lg:hidden p-4 space-y-3 bg-slate-50/20 border-t border-slate-100">
           {analysisRows.map((row) => (
-            <div key={`${text(row.code)}-remain`} className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3 ${num(row.remainingKg) > 0 ? '' : 'opacity-65'}`}>
+            <div key={`${text(row.code)}-remain`} className={`bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3 ${num(row.remainingKg) > 0 ? '' : 'opacity-65'}`}>
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div>
                   <div className="font-bold text-slate-800 text-sm">{text(row.name)}</div>
@@ -517,7 +517,7 @@ export function SalesCommissionPageClient() {
   if (selectedSales && sales) {
     return (
       <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
           <div>
             <div className="font-bold text-slate-800 text-base">{text(sales.name)}</div>
             <div className="text-xs text-slate-500 font-semibold">{text(sales.code)} · {text(sales.phone) || '-'}</div>
@@ -543,7 +543,7 @@ export function SalesCommissionPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold text-slate-550">📅 ช่วงเวลา:</span>
           {['วันนี้', '7 วัน', 'เดือนนี้', 'ไตรมาส', 'ปีนี้'].map((p) => (
@@ -565,7 +565,7 @@ export function SalesCommissionPageClient() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {(data?.salesRows ?? []).map((row) => (
-          <button key={text(row.id)} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-slate-350 hover:bg-slate-50/30 outline-none transition-all duration-200" type="button" onClick={() => setSelectedSales(text(row.id))}>
+          <button key={text(row.id)} className="rounded-xl border border-slate-100 bg-white p-5 text-left shadow-sm hover:border-slate-350 hover:bg-slate-50/30 outline-none transition-all duration-200" type="button" onClick={() => setSelectedSales(text(row.id))}>
             <div className="font-bold text-slate-800 text-base">{text(row.name)}</div>
             <div className="text-xs text-slate-500 font-semibold mt-0.5">{text(row.code)} · {text(row.phone)}</div>
             <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs">
@@ -599,7 +599,7 @@ function LmeCard({ config, products }: { config?: LmeConfig; products: AnyRow[] 
   const lmeProducts = products.filter((row) => text(row.metalGroup).includes('ทองแดง') || text(row.metalGroup).includes('ทองเหลือง') || text(row.metalGroup).toLowerCase().includes('copper') || text(row.metalGroup).toLowerCase().includes('brass'))
   return (
     <>
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-bold text-slate-800">📊 LME Reference Pricing</h3>
           <button className="btn-disabled opacity-60 cursor-not-allowed rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-400 font-semibold h-10 outline-none focus:outline-none" disabled title="รอ schema/audit สำหรับบันทึก LME config" type="button">💾 บันทึก</button>
@@ -612,7 +612,7 @@ function LmeCard({ config, products }: { config?: LmeConfig; products: AnyRow[] 
         </div>
         <div className="mt-2.5 text-[10px] font-medium text-slate-400">⏰ อัปเดตล่าสุด: {config?.updatedAt ?? '-'} โดย {config?.updatedBy ?? '-'}</div>
       </div>
-      <details className="group rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden transition-all">
+      <details className="group rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden transition-all">
         <summary className="flex items-center justify-between cursor-pointer p-4 font-bold text-slate-700 select-none hover:bg-slate-50/50">
           <span>📋 ตั้งค่าผู้ซื้อซื้อที่ LME กี่ % ต่อสินค้า — เฉพาะ 🥉 ทองแดง / 🌟 ทองเหลือง ({lmeProducts.length} รายการ)</span>
           <span className="transition-transform group-open:rotate-180 text-slate-400">&darr;</span>
@@ -709,7 +709,7 @@ function PendingSummary({ mode, onSelect, rows }: { mode: string; onSelect: (id:
 function PendingDetails({ details, name, onBack }: { details: AnyRow[]; name: string; onBack: () => void }) {
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex justify-between items-center rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
         <div>
           <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">เลือกสินค้า</div>
           <div className="font-bold text-slate-800 text-base">{name}</div>
@@ -783,7 +783,7 @@ function PendingSaleInventory({ rows, totals }: { rows: AnyRow[]; totals: Record
           </div>
         </div>
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-3.5">
           <h3 className="text-sm font-bold text-slate-800">🟡 ตารางรอขาย — ทองแดง / ทองเหลือง ({rows.length} รายการ)</h3>
           <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 active:bg-slate-750 outline-none focus:outline-none focus:ring-0 transition-colors shadow-xs h-10 flex items-center justify-center" type="button" onClick={exportRows}>📥 Export CSV</button>
@@ -899,7 +899,7 @@ function SimpleTable({ empty = 'ไม่มีข้อมูล', headers, row
   return (
     <div>
       {/* Desktop View Table */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
@@ -975,7 +975,7 @@ function SimpleTable({ empty = 'ไม่มีข้อมูล', headers, row
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="bg-slate-900 p-3 text-sm font-bold text-white">{title}</div>
       <div className="p-4">{children}</div>
     </div>

@@ -395,19 +395,19 @@ function DetailTable({ isLoading, onOpen, onSort, rows, selectedSort, sortDirect
   const sortLabel = (key: SortKey) => selectedSort === key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''
   return (
     <>
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
-              <th className="p-2 text-left"><button type="button" onClick={() => onSort('customerName')}>Customer{sortLabel('customerName')}</button></th>
-              <th className="p-2 text-left"><button type="button" onClick={() => onSort('docNo')}>บิล{sortLabel('docNo')}</button></th>
-              <th className="p-2 text-left"><button type="button" onClick={() => onSort('date')}>วันที่{sortLabel('date')}</button></th>
-              <th className="p-2 text-left"><button type="button" onClick={() => onSort('dueDate')}>Due{sortLabel('dueDate')}</button></th>
-              <th className="p-2 text-right"><button type="button" onClick={() => onSort('aging')}>อายุ(วัน){sortLabel('aging')}</button></th>
-              <th className="p-2 text-right">ยอด</th>
-              <th className="p-2 text-right">รับแล้ว</th>
-              <th className="p-2 text-right"><button type="button" onClick={() => onSort('receivableBalance')}>ค้างรับ{sortLabel('receivableBalance')}</button></th>
-              <th className="p-2 text-left">Channel</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left"><button type="button" onClick={() => onSort('customerName')}>Customer{sortLabel('customerName')}</button></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left"><button type="button" onClick={() => onSort('docNo')}>บิล{sortLabel('docNo')}</button></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left"><button type="button" onClick={() => onSort('date')}>วันที่{sortLabel('date')}</button></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left"><button type="button" onClick={() => onSort('dueDate')}>Due{sortLabel('dueDate')}</button></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right"><button type="button" onClick={() => onSort('aging')}>อายุ(วัน){sortLabel('aging')}</button></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">ยอด</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">รับแล้ว</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right"><button type="button" onClick={() => onSort('receivableBalance')}>ค้างรับ{sortLabel('receivableBalance')}</button></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">Channel</th>
             </tr>
           </thead>
           <tbody>
@@ -415,15 +415,15 @@ function DetailTable({ isLoading, onOpen, onSort, rows, selectedSort, sortDirect
             {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={9}>ไม่มีลูกหนี้คงค้าง</td></tr> : null}
             {!isLoading && rows.map((row) => (
               <tr key={row.id} className={`border-t border-slate-100 ${row.aging > 30 ? 'bg-red-50/50' : row.aging > 0 ? 'bg-amber-50/30' : ''}`}>
-                <td className="p-2">{row.customerName}</td>
-                <td className="p-2"><button className="font-mono text-xs text-blue-600" type="button" onClick={() => onOpen(row)}>{row.docNo}</button></td>
-                <td className="p-2">{formatDateDisplay(row.date)}</td>
-                <td className="p-2">{formatDateDisplay(row.dueDate)}</td>
+                <td className="px-4 py-3.5">{row.customerName}</td>
+                <td className="px-4 py-3.5"><button className="font-mono text-xs text-blue-600" type="button" onClick={() => onOpen(row)}>{row.docNo}</button></td>
+                <td className="px-4 py-3.5">{formatDateDisplay(row.date)}</td>
+                <td className="px-4 py-3.5">{formatDateDisplay(row.dueDate)}</td>
                 <td className={`p-2 text-right ${row.aging > 30 ? 'font-bold text-red-600' : row.aging > 0 ? 'text-amber-600' : ''}`}>{row.aging}</td>
-                <td className="p-2 text-right">{formatMoney(row.totalAmount)}</td>
-                <td className="p-2 text-right text-emerald-600">{formatMoney(row.receivedAmount)}</td>
-                <td className="p-2 text-right font-bold text-amber-700">{formatMoney(row.receivableBalance)}</td>
-                <td className="p-2">{row.channelName}</td>
+                <td className="px-4 py-3.5 text-right">{formatMoney(row.totalAmount)}</td>
+                <td className="px-4 py-3.5 text-right text-emerald-600">{formatMoney(row.receivedAmount)}</td>
+                <td className="px-4 py-3.5 text-right font-bold text-amber-700">{formatMoney(row.receivableBalance)}</td>
+                <td className="px-4 py-3.5">{row.channelName}</td>
               </tr>
             ))}
           </tbody>
@@ -467,15 +467,15 @@ function DetailTable({ isLoading, onOpen, onSort, rows, selectedSort, sortDirect
               </div>
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 font-mono text-[13px]">
                 <div>
-                  <span className="text-slate-400 block text-[10px] font-sans font-semibold">ยอดรวม:</span>
+                  <span className="text-slate-400 block text-[10px] font-semibold">ยอดรวม:</span>
                   <span className="text-slate-800 tabular-nums">{formatMoney(row.totalAmount)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] font-sans font-semibold">รับแล้ว:</span>
+                  <span className="text-slate-400 block text-[10px] font-semibold">รับแล้ว:</span>
                   <span className="text-emerald-700 tabular-nums">{formatMoney(row.receivedAmount)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px] font-sans font-bold">ค้างรับ:</span>
+                  <span className="text-slate-500 block text-[10px] font-bold">ค้างรับ:</span>
                   <span className="text-amber-700 font-bold tabular-nums">{formatMoney(row.receivableBalance)}</span>
                 </div>
               </div>

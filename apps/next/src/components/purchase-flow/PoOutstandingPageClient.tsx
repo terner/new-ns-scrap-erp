@@ -103,12 +103,12 @@ export function PoOutstandingPageClient() {
       </div>
 
       {tab === 'buy' ? (
-        <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
           <div className="border-l-4 border-amber-500 bg-amber-50 p-2 text-xs text-amber-700">
             ตัดต้นทุนเป็น write/cost-pool side effect ใน legacy จึงแสดงเป็นคอลัมน์อ่านอย่างเดียวใน Next จนกว่าจะออกแบบ audit และ permission
           </div>
           <table className="w-full text-sm">
-            <thead className="bg-slate-100"><tr><th className="w-20 p-2 text-center">ตัดต้นทุน</th><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Supplier</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">จำนวนสั่ง</th><th className="p-2 text-right">ราคา/หน่วย</th><th className="p-2 text-right">รับแล้ว</th><th className="p-2 text-right">รอรับ</th><th className="p-2 text-right">มูลค่ารอรับ</th><th className="p-2 text-left">วันส่งมอบ</th><th className="p-2 text-center">สถานะ</th></tr></thead>
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><th className="w-20 p-2 text-center">ตัดต้นทุน</th><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Supplier</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">จำนวนสั่ง</th><th className="p-2 text-right">ราคา/หน่วย</th><th className="p-2 text-right">รับแล้ว</th><th className="p-2 text-right">รอรับ</th><th className="p-2 text-right">มูลค่ารอรับ</th><th className="p-2 text-left">วันส่งมอบ</th><th className="p-2 text-center">สถานะ</th></tr></thead>
             <tbody>
               {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
               {!isLoading && rows.map((row) => <tr key={row.id} className="border-t hover:bg-blue-50/30"><td className="p-2 text-center"><input className="h-5 w-5" disabled type="checkbox" title="รอออกแบบ cost-pool write/audit" /></td><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.partnerName}</td><td className="p-2">{row.productName || '-'}</td><td className="p-2 text-right">{formatMoney(row.qty)}</td><td className="p-2 text-right">{formatMoney(row.unitPrice)}</td><td className="p-2 text-right text-emerald-700">{formatMoney(row.receivedQty ?? row.qty - row.remainingQty)}</td><td className="p-2 text-right font-bold text-amber-700">{formatMoney(row.remainingQty)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(row.remainingValue)}</td><td className="p-2 text-xs">{formatDateDisplay(row.expectedDelivery)}</td><td className="p-2 text-center text-xs">{row.status}</td></tr>)}
@@ -118,9 +118,9 @@ export function PoOutstandingPageClient() {
           </table>
         </div>
       ) : (
-        <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
           <table className="w-full text-sm">
-            <thead className="bg-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Customer</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">จำนวนขาย</th><th className="p-2 text-right">ราคาขาย</th><th className="p-2 text-right">ขายแล้ว</th><th className="p-2 text-right">รอส่ง</th><th className="p-2 text-right">มูลค่ารอส่ง</th><th className="p-2 text-left">วันส่งมอบ</th><th className="p-2 text-center">สถานะ</th></tr></thead>
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-left">Customer</th><th className="p-2 text-left">สินค้า</th><th className="p-2 text-right">จำนวนขาย</th><th className="p-2 text-right">ราคาขาย</th><th className="p-2 text-right">ขายแล้ว</th><th className="p-2 text-right">รอส่ง</th><th className="p-2 text-right">มูลค่ารอส่ง</th><th className="p-2 text-left">วันส่งมอบ</th><th className="p-2 text-center">สถานะ</th></tr></thead>
             <tbody>
               {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
               {!isLoading && rows.map((row) => <tr key={row.id} className="border-t hover:bg-emerald-50/30"><td className="p-2 font-mono text-xs">{row.docNo}</td><td className="p-2">{formatDateDisplay(row.date)}</td><td className="p-2">{row.partnerName}</td><td className="p-2">{row.productName || '-'}</td><td className="p-2 text-right">{formatMoney(row.qty)}</td><td className="p-2 text-right">{formatMoney(row.unitPrice)}</td><td className="p-2 text-right text-blue-700">{formatMoney(row.soldQty ?? row.qty - row.remainingQty)}</td><td className="p-2 text-right font-bold text-amber-700">{formatMoney(row.remainingQty)}</td><td className="p-2 text-right font-bold text-emerald-700">{formatMoney(row.remainingValue)}</td><td className="p-2 text-xs">{formatDateDisplay(row.expectedDelivery)}</td><td className="p-2 text-center text-xs">{row.status}</td></tr>)}
@@ -134,7 +134,7 @@ export function PoOutstandingPageClient() {
       {/* Mobile Card list */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
         
         {!isLoading && rows.map((row) => (
@@ -188,7 +188,7 @@ export function PoOutstandingPageClient() {
         ))}
 
         {!isLoading && rows.length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-100">
             {tab === 'buy' ? 'ไม่มี PO ซื้อค้างรับ' : 'ไม่มี PO ขายค้างส่ง'}
           </div>
         ) : null}

@@ -122,7 +122,7 @@ export function ProfitCostAnalysisPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+      <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-100">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           <Field label="จากวันที่"><DatePickerInput className="w-full" value={from} onChange={setFrom} /></Field>
           <Field label="ถึงวันที่"><DatePickerInput className="w-full" value={to} onChange={setTo} /></Field>
@@ -191,7 +191,7 @@ export function ProfitCostAnalysisPageClient() {
         </Panel>
       </div>
 
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
         <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-slate-50/50 p-3">
           {[
             ['products', 'Product'],
@@ -200,7 +200,7 @@ export function ProfitCostAnalysisPageClient() {
             ['channels', 'Channel'],
             ['trend', 'Trend'],
             ['alerts', 'Alerts'],
-          ].map(([key, label]) => <button key={key} className={`rounded-lg border px-3 py-2 text-sm font-bold outline-none ${activeTab === key ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`} type="button" onClick={() => setActiveTab(key as Tab)}>{label}</button>)}
+          ].map(([key, label]) => <button key={key} className={`rounded-lg border px-3 py-2 text-sm font-bold outline-none ${activeTab === key ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50'}`} type="button" onClick={() => setActiveTab(key as Tab)}>{label}</button>)}
         </div>
         <div className="p-3">
           {activeTab === 'products' ? <ProductTable rows={data?.rows.products ?? []} onSelect={setSelectedProduct} /> : null}
@@ -257,7 +257,7 @@ function toneClass(tone: string) {
 
 function Metric({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
   return (
-    <div className="bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+    <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className="mt-1 font-mono text-lg font-bold text-slate-900 truncate">{value}</div>
       <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>
@@ -285,7 +285,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className="border-b border-slate-100 bg-slate-50/50 p-3 font-bold text-slate-700 text-sm">{title}</div>
       <div className="p-4">{children}</div>
     </div>
@@ -315,7 +315,7 @@ function ProductTable({ onSelect, rows }: { onSelect: (row: ProductRow) => void;
   return (
     <>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="min-w-[1180px] w-full text-sm">
           <thead className="bg-slate-900 text-white text-xs">
             <tr>
@@ -431,7 +431,7 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] })
   return (
     <>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="min-w-[720px] w-full text-sm">
           <thead className="bg-slate-900 text-white text-xs"><tr>{headers.map((header) => <th key={header} className="p-2 text-left font-semibold">{header}</th>)}</tr></thead>
           <tbody>

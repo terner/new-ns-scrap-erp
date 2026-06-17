@@ -221,7 +221,7 @@ export function ProductionReconciliationPageClient() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรอง Issue</h4>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold font-sans"
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
                 onClick={() => setShowMobileFilters(false)}
                 type="button"
               >
@@ -232,7 +232,7 @@ export function ProductionReconciliationPageClient() {
             <div className="space-y-4">
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ประเภท Issue</span>
-                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800 font-sans" value={issueFilter} onChange={(event) => setIssueFilter(event.target.value)}>
+                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={issueFilter} onChange={(event) => setIssueFilter(event.target.value)}>
                   <option value="all">ทุกประเภท issue</option>
                   {issueKeys.map((issue) => <option key={issue} value={issue}>{issueLabel(issue)}</option>)}
                 </select>
@@ -242,7 +242,7 @@ export function ProductionReconciliationPageClient() {
             <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 font-sans"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => {
                   setIssueFilter('all')
                   setShowMobileFilters(false)
@@ -252,7 +252,7 @@ export function ProductionReconciliationPageClient() {
               </button>
               <button
                 type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 font-sans"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
                 onClick={() => setShowMobileFilters(false)}
               >
                 ใช้ตัวกรอง
@@ -263,42 +263,44 @@ export function ProductionReconciliationPageClient() {
       ) : null}
 
       {/* Desktop Table View (Hidden on Mobile) */}
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
-        <table className="w-full min-w-[1120px] text-xs">
-          <thead className="bg-slate-100 text-left text-slate-600">
-            <tr>
-              <th className="px-3 py-2 font-semibold">ประเภท issue</th>
-              <th className="px-3 py-2 font-semibold">Ref Type</th>
-              <th className="px-3 py-2 font-semibold">Order No</th>
-              <th className="px-3 py-2 font-semibold">Doc No</th>
-              <th className="px-3 py-2 text-right font-semibold">Expected Qty</th>
-              <th className="px-3 py-2 text-right font-semibold">Actual Qty</th>
-              <th className="px-3 py-2 text-right font-semibold">Expected Value</th>
-              <th className="px-3 py-2 text-right font-semibold">Actual Value</th>
-              <th className="px-3 py-2 font-semibold">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={9}>กำลังตรวจข้อมูล</td></tr> : null}
-            {!isLoading && rows.map((issue, index) => (
-              <tr key={`${issue.issue}-${issue.refType}-${issue.docNo}-${index}`} className="hover:bg-slate-50">
-                <td className="px-3 py-2 align-top">
-                  <div className="font-semibold text-slate-900">{issueLabel(issue.issue)}</div>
-                  <div className="mt-0.5 max-w-64 text-[11px] leading-4 text-slate-500">{issueNote(issue.issue)}</div>
-                </td>
-                <td className="px-3 py-2 align-top font-semibold text-slate-700">{issue.refType || '-'}</td>
-                <td className="px-3 py-2 align-top font-semibold text-slate-900">{issue.orderDocNo || '-'}</td>
-                <td className="px-3 py-2 align-top font-mono text-slate-700">{issue.docNo || '-'}</td>
-                <td className="px-3 py-2 text-right align-top tabular-nums">{formatMoney(issue.expectedQty)}</td>
-                <td className="px-3 py-2 text-right align-top tabular-nums">{formatMoney(issue.actualQty)}</td>
-                <td className="px-3 py-2 text-right align-top tabular-nums">{formatMoney(issue.expectedValue)}</td>
-                <td className="px-3 py-2 text-right align-top tabular-nums">{formatMoney(issue.actualValue)}</td>
-                <td className="max-w-[360px] px-3 py-2 align-top text-slate-600">{detailsText(issue.details)}</td>
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1120px] text-xs">
+            <thead className="bg-slate-50 border-b border-slate-100 text-left text-slate-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">ประเภท issue</th>
+                <th className="px-3 py-2 font-semibold">Ref Type</th>
+                <th className="px-3 py-2 font-semibold">Order No</th>
+                <th className="px-3 py-2 font-semibold">Doc No</th>
+                <th className="px-3 py-2 text-right font-semibold">Expected Qty</th>
+                <th className="px-3 py-2 text-right font-semibold">Actual Qty</th>
+                <th className="px-3 py-2 text-right font-semibold">Expected Value</th>
+                <th className="px-3 py-2 text-right font-semibold">Actual Value</th>
+                <th className="px-3 py-2 font-semibold">Details</th>
               </tr>
-            ))}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-500" colSpan={9}>ไม่พบ issue ตามเงื่อนไข</td></tr> : null}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={9}>กำลังตรวจข้อมูล</td></tr> : null}
+              {!isLoading && rows.map((issue, index) => (
+                <tr key={`${issue.issue}-${issue.refType}-${issue.docNo}-${index}`} className="hover:bg-slate-50">
+                  <td className="px-3 py-2 align-top">
+                    <div className="font-semibold text-slate-900">{issueLabel(issue.issue)}</div>
+                    <div className="mt-0.5 max-w-64 text-[11px] leading-4 text-slate-500">{issueNote(issue.issue)}</div>
+                  </td>
+                  <td className="px-3 py-2 align-top font-semibold text-slate-700">{issue.refType || '-'}</td>
+                  <td className="px-3 py-2 align-top font-semibold text-slate-900">{issue.orderDocNo || '-'}</td>
+                  <td className="px-3 py-2 align-top font-mono text-slate-700">{issue.docNo || '-'}</td>
+                  <td className="px-3 py-2 text-right align-top tabular-nums text-slate-700">{formatMoney(issue.expectedQty)}</td>
+                  <td className="px-3 py-2 text-right align-top tabular-nums text-slate-700">{formatMoney(issue.actualQty)}</td>
+                  <td className="px-3 py-2 text-right align-top tabular-nums text-slate-700">{formatMoney(issue.expectedValue)}</td>
+                  <td className="px-3 py-2 text-right align-top tabular-nums text-slate-700">{formatMoney(issue.actualValue)}</td>
+                  <td className="max-w-[360px] px-3 py-2 align-top text-slate-600">{detailsText(issue.details)}</td>
+                </tr>
+              ))}
+              {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-500" colSpan={9}>ไม่พบ issue ตามเงื่อนไข</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Mobile View: Dense Card List (Hidden on Desktop) */}

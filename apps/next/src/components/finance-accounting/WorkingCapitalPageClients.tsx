@@ -92,7 +92,7 @@ export function WorkingCapitalPageClient() {
         <span className="text-xs text-slate-500">ตั้งแต่ {data?.filters.from ?? '-'} ถึง {data?.filters.asOf ?? asOf}</span>
       </FilterPanel>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4">
           <div className={`w-12 h-12 rounded-full ${(s?.ccc ?? 0) < 60 ? 'bg-emerald-50 text-emerald-600' : (s?.ccc ?? 0) < 90 ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'} flex items-center justify-center text-xl shrink-0`}>
             ⏱
           </div>
@@ -152,7 +152,7 @@ export function StockFinancePageClient() {
       {error ? <ErrorBox message={error} /> : null}
       <FilterPanel><DateInput label="As of" value={asOf} onChange={setAsOf} /><BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} /></FilterPanel>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-4 lg:col-span-2">
+        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-4 lg:col-span-2">
           <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0">
             📦
           </div>
@@ -195,7 +195,7 @@ export function ProfitLeakPageClient() {
     <section className="space-y-4">
       <BaselineNotice sourceState={data?.sourceState} />
       {error ? <ErrorBox message={error} /> : null}
-      <FilterPanel><DateInput label="From" value={from} onChange={setFrom} /><DateInput label="To" value={to} onChange={setTo} /><label className="flex items-center gap-2 text-xs text-slate-600"><span>Target GP %</span><input className="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-right text-xs outline-none focus:outline-none focus:border-slate-400 transition" step="0.1" type="number" value={targetMargin} onChange={(event) => setTargetMargin(Number(event.target.value))} /></label><BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} /><span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-bold text-red-700">รวมรั่วไหล: {money(data?.summary.totalLeak)}</span></FilterPanel>
+      <FilterPanel><DateInput label="From" value={from} onChange={setFrom} /><DateInput label="To" value={to} onChange={setTo} /><label className="flex items-center gap-2 text-xs text-slate-600"><span>Target GP %</span><input className="w-20 rounded-lg border border-slate-100 px-3 py-1.5 text-right text-xs outline-none focus:outline-none focus:border-slate-400 transition" step="0.1" type="number" value={targetMargin} onChange={(event) => setTargetMargin(Number(event.target.value))} /></label><BranchSelect branches={data?.branches ?? []} value={branchId} onChange={setBranchId} /><span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-bold text-red-700">รวมรั่วไหล: {money(data?.summary.totalLeak)}</span></FilterPanel>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="bg-white p-5 border border-red-200 rounded-xl shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center text-xl shrink-0">
@@ -267,7 +267,7 @@ function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">{children}</div>
 }
 
 function DateInput({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
@@ -275,11 +275,11 @@ function DateInput({ label, onChange, value }: { label: string; onChange: (value
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
-  return <select className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
+  return <select className="rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs outline-none focus:outline-none focus:border-slate-400 transition cursor-pointer" value={value} onChange={(event) => onChange(event.target.value)}><option value="">ทุกสาขา</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
 }
 
 function Panel({ children, className = '', title }: { children: ReactNode; className?: string; title: string }) {
-  return <div className={`rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm ${className}`}><div className="mb-3 text-xs font-bold text-slate-800">{title}</div>{children}</div>
+  return <div className={`rounded-xl border border-slate-100 bg-white p-4 shadow-sm ${className}`}><div className="mb-3 text-xs font-bold text-slate-800">{title}</div>{children}</div>
 }
 
 function BreakdownBar({ amount, label, max, tone, value }: { amount: number; label: string; max: number; tone: 'amber' | 'blue' | 'emerald'; value: number }) {
@@ -315,7 +315,7 @@ function Kpi({ label, tone, value }: { label: string; tone: string; value: strin
     purple: 'border-purple-200 bg-purple-50/40 text-purple-800',
     red: 'border-red-200 bg-red-50/40 text-red-800',
     rose: 'border-rose-200 bg-rose-50/40 text-rose-800',
-    slate: 'border-slate-200 bg-slate-50/40 text-slate-800',
+    slate: 'border-slate-100 bg-slate-50/40 text-slate-800',
     yellow: 'border-yellow-200 bg-yellow-50/40 text-yellow-800'
   }
   const cls = map[tone] ?? map.slate
@@ -346,7 +346,7 @@ function Insight({ body, title, tone, value }: { body: string; title: string; to
 
 function DetailTable({ isLoading, rows }: { isLoading: boolean; rows: WorkingPayload['calculationRows'] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <h3 className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">📋 ตารางคำนวณ</h3>
       <div className="overflow-auto">
         {/* Desktop View */}
@@ -435,13 +435,13 @@ function TopProduct({ index, max, row }: { index: number; max: number; row: Stoc
 
 function ProductTable({ rows }: { rows: StockProduct[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="border-b border-red-100 bg-red-50/50 px-4 py-3 font-bold text-red-700 text-sm">Slow Moving / สินค้าที่ควรรีบขาย (Top 15 — ไม่ขาย &gt; 60 วัน)</div>
       
       {/* Desktop View */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-xs">
-          <thead>
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <Th>รหัส</Th><Th>ชื่อ</Th><Th>หมวด</Th>
               <Th align="right">จำนวน</Th><Th align="right">WAC</Th><Th align="right">มูลค่า</Th>
@@ -499,16 +499,16 @@ function ProductTable({ rows }: { rows: StockProduct[] }) {
 
 function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginItems']; total: number }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="flex justify-between border-b border-red-100 bg-red-50/50 px-4 py-3 font-bold text-red-700 text-sm">
         <span>📉 ขายต่ำกว่า WAC ({rows.length} รายการ)</span>
         <span>รวมขาดทุน {money(total)}</span>
       </div>
       
       {/* Desktop View */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-xs">
-          <thead>
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <Th>วันที่</Th><Th>บิล</Th><Th>ลูกค้า</Th><Th>สินค้า</Th>
               <Th align="right">Qty</Th><Th align="right">ราคา</Th><Th align="right">WAC</Th><Th align="right">ขาดทุน</Th>
@@ -516,7 +516,7 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
                 <Td>{row.date}</Td>
                 <Td mono className="font-semibold text-slate-800">{row.docNo}</Td>
                 <Td>{row.customer}</Td>
@@ -562,13 +562,13 @@ function NegativeMarginTable({ rows, total }: { rows: ProfitPayload['negMarginIt
 
 function LowMarginTable({ rows, targetMargin }: { rows: ProfitPayload['lowMarginBills']; targetMargin: number }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700 text-xs">⬇ บิลที่ GP &lt; {targetMargin}%</div>
       
       {/* Desktop View */}
       <div className="hidden lg:block max-h-64 overflow-auto">
         <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
             <tr>
               <Th>บิล</Th><Th>ลูกค้า</Th><Th align="right">GP%</Th><Th align="right">ขาด</Th>
             </tr>
@@ -612,13 +612,13 @@ function LowMarginTable({ rows, targetMargin }: { rows: ProfitPayload['lowMargin
 
 function LowCustomerTable({ rows }: { rows: ProfitPayload['lowCustomers'] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700 text-xs">👥 ลูกค้ากำไรต่ำ (Top 10)</div>
       
       {/* Desktop View */}
       <div className="hidden lg:block max-h-64 overflow-auto">
         <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
             <tr>
               <Th>ลูกค้า</Th><Th align="right">ยอดขาย</Th><Th align="right">GP%</Th>
             </tr>
@@ -658,13 +658,13 @@ function LowCustomerTable({ rows }: { rows: ProfitPayload['lowCustomers'] }) {
 
 function HighSupplierTable({ rows }: { rows: ProfitPayload['highSuppliers'] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 font-bold text-slate-700 text-xs">🏭 Supplier ต้นทุนสูง (Top 10)</div>
       
       {/* Desktop View */}
       <div className="hidden lg:block max-h-64 overflow-auto">
         <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-slate-100 text-slate-600 z-10">
+          <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium z-10">
             <tr>
               <Th>Supplier</Th><Th>สินค้า</Th><Th align="right">+%</Th><Th align="right">ส่วนเกิน</Th>
             </tr>
@@ -708,12 +708,12 @@ function HighSupplierTable({ rows }: { rows: ProfitPayload['highSuppliers'] }) {
 
 function OutlierTable({ rows }: { rows: ProfitPayload['outliers'] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="border-b border-orange-100 bg-orange-50/50 px-4 py-3 font-bold text-orange-700 text-sm">⚠ ค่าใช้จ่ายผิดปกติ ({rows.length}) — สูงเกิน mean + 1.5×stddev</div>
       <div className="overflow-x-auto">
         {/* Desktop View */}
         <table className="hidden lg:table w-full text-xs">
-          <thead>
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <Th>วันที่</Th><Th>หมวด</Th><Th>เลขที่</Th><Th>ผู้รับ</Th>
               <Th align="right">จำนวน</Th><Th align="right">ค่าเฉลี่ย</Th><Th align="right">เกินกว่าปกติ</Th>

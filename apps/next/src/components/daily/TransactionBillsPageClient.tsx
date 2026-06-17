@@ -2942,11 +2942,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {tableColumns.map((column, index) => {
+            {tableColumns.map((column) => {
               const style = columnResize.getColumnStyle(column.key);
-              if (index === tableColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
               return <col key={column.key} style={style} />;
             })}
           </colgroup>
@@ -3269,7 +3266,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       ) : null}
                       <div className="overflow-x-auto rounded-md border">
                       <table className="w-full min-w-[920px] text-sm">
-                        <thead className="bg-slate-100">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                           <tr>
                             <th className="p-2 text-left">สินค้า</th>
                             <th className="p-2 text-right">Gross</th>
@@ -3843,7 +3840,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                      ) : null}
 	                      <div className="overflow-x-auto rounded-md border">
 	                      <table className="w-full min-w-[1260px] text-sm">
-                        <thead className="bg-slate-100">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                           <tr>
                             <th className="p-2 text-left">สินค้า</th>
                             <th className="p-2 text-right">Gross</th>
@@ -3976,7 +3973,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 ) : (
                   <div className="overflow-x-auto rounded-md border">
                     <table className="w-full min-w-[1240px] text-sm">
-                      <thead className="bg-slate-100 text-xs text-slate-600">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium text-xs">
                         <tr>
                           <th className="p-2 text-left">สินค้า</th>
                           <th className="p-2 text-left">แหล่งสินค้า</th>
@@ -5011,7 +5008,7 @@ function StockIssueDetailModal({ onClose, row }: { onClose: () => void; row: Sto
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">รายการสินค้า</div>
             <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
               <table className="min-w-full text-xs">
-                <thead className="bg-slate-100 text-slate-600">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                   <tr>
                     <th className="p-2 text-left">สินค้า</th>
                     <th className="p-2 text-right">จำนวน</th>

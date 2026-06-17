@@ -70,7 +70,7 @@ function DisabledActionButton({ children, tone = 'slate' }: { children: string; 
     emerald: 'bg-emerald-150 text-emerald-800 border-emerald-200',
     orange: 'bg-orange-150 text-orange-800 border-orange-200',
     red: 'bg-red-150 text-red-800 border-red-200',
-    slate: 'bg-slate-100 text-slate-500 border-slate-200',
+    slate: 'bg-slate-100 text-slate-500 border-slate-100',
     violet: 'bg-violet-150 text-violet-800 border-violet-200',
   }[tone]
   return (
@@ -107,12 +107,12 @@ export function MigrationToolsPageClient() {
         <p className="mt-0.5 text-xs opacity-90">safe baseline สำหรับตรวจสถานะและแผนกู้คืนข้อมูล</p>
       </div>
 
-      <div className="rounded-md bg-white p-4 shadow border border-slate-200">
+      <div className="rounded-md bg-white p-4 shadow border border-slate-100">
         <h2 className="mb-3 font-bold text-slate-800">📊 สถานะ Storage (browser localStorage)</h2>
         <div className="grid grid-cols-2 gap-3.5 text-sm sm:grid-cols-3 md:grid-cols-5">
           <div className="bg-slate-50 p-2.5 rounded border border-slate-100"><div className="text-xs text-slate-500 font-semibold">ขนาดรวม</div><div className="text-lg font-bold text-emerald-700 mt-0.5">{storageInfo.sizeMB} MB</div></div>
           <div className="bg-slate-50 p-2.5 rounded border border-slate-100"><div className="text-xs text-slate-500 font-semibold">% ใช้งาน (~9MB limit)</div><div className="text-lg font-bold text-emerald-700 mt-0.5">{storageInfo.pctUsed}%</div></div>
-          <div className="bg-slate-50 p-2.5 rounded border border-slate-100"><div className="text-xs text-slate-500 font-semibold font-sans">Database จริง</div><div className="text-base font-bold text-slate-800 mt-0.5">{storageInfo.dbSizeMB} MB</div></div>
+          <div className="bg-slate-50 p-2.5 rounded border border-slate-100"><div className="text-xs text-slate-500 font-semibold">Database จริง</div><div className="text-base font-bold text-slate-800 mt-0.5">{storageInfo.dbSizeMB} MB</div></div>
           <div className="bg-slate-50 p-2.5 rounded border border-slate-100"><div className="text-xs text-slate-500 font-semibold">Snapshots/Backups</div><div className="text-base font-bold text-slate-800 mt-0.5">{storageInfo.snapshotCount} รายการ</div></div>
           <div className="bg-slate-50 p-2.5 rounded border border-slate-100 col-span-2 sm:col-span-1 flex flex-col justify-between">
             <div className="text-xs text-slate-500 font-semibold">Auto-backup รายวัน</div>
@@ -127,11 +127,11 @@ export function MigrationToolsPageClient() {
         </div>
       </div>
 
-      <div className="rounded-md bg-white p-4 shadow border border-slate-200">
+      <div className="rounded-md bg-white p-4 shadow border border-slate-100">
         <h2 className="mb-3 font-bold text-slate-800">📋 จำนวน Records ในระบบ</h2>
         <div className="grid grid-cols-3 gap-2.5 text-sm md:grid-cols-6">
           {recordStats.map(([label, value]) => (
-            <div className="rounded border border-slate-200 bg-slate-50/80 p-2.5 flex flex-col justify-between" key={label}>
+            <div className="rounded border border-slate-100 bg-slate-50/80 p-2.5 flex flex-col justify-between" key={label}>
               <div className="text-xs text-slate-500 font-medium">{label}</div>
               <div className="font-bold text-base text-slate-900 mt-1">{value.toLocaleString('th-TH')}</div>
             </div>
@@ -140,7 +140,7 @@ export function MigrationToolsPageClient() {
         <p className="mt-2.5 text-[11px] text-slate-400">Record count wiring จะทำใน SYS2 hardening หลังออกแบบ source/API ที่ไม่กระทบ performance</p>
       </div>
 
-      <div className="rounded-md border border-slate-200 border-l-4 border-l-emerald-500 bg-white p-4 shadow">
+      <div className="rounded-md border border-slate-100 border-l-4 border-l-emerald-500 bg-white p-4 shadow">
         <h2 className="mb-1 font-bold text-emerald-700">📤 Export Backup (สำคัญที่สุด)</h2>
         <p className="mb-3.5 text-xs text-slate-500">ดาวน์โหลดข้อมูลทั้งหมดเป็น JSON file → เก็บใน Google Drive / OneDrive / USB / Email หาตัวเอง</p>
         <DisabledActionButton tone="emerald">💾 Export Backup ตอนนี้</DisabledActionButton>
@@ -150,7 +150,7 @@ export function MigrationToolsPageClient() {
         </div>
       </div>
 
-      <div className="rounded-md border border-slate-200 border-l-4 border-l-blue-500 bg-white p-4 shadow">
+      <div className="rounded-md border border-slate-100 border-l-4 border-l-blue-500 bg-white p-4 shadow">
         <h2 className="mb-1 font-bold text-blue-700">📥 Restore จากไฟล์ Backup</h2>
         <p className="mb-3 text-xs text-slate-500">ใช้เมื่อต้องการกู้ข้อมูลกลับ หรือย้ายข้อมูลจากเครื่องอื่น</p>
         <input className="mb-3.5 text-sm block" disabled type="file" />
@@ -160,11 +160,11 @@ export function MigrationToolsPageClient() {
         </div>
       </div>
 
-      <div className="rounded-md bg-white p-4 shadow border border-slate-200">
+      <div className="rounded-md bg-white p-4 shadow border border-slate-100">
         <h2 className="mb-2.5 font-bold text-slate-700">🗂 Snapshot อัตโนมัติ (Browser นี้ — เก็บ 7 วันล่าสุด)</h2>
-        <div className="overflow-x-auto rounded border border-slate-200">
+        <div className="overflow-x-auto rounded border border-slate-100">
           <table className="w-full text-sm">
-            <thead className="bg-slate-100 text-slate-700">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
               <tr><th className="p-2 text-left font-semibold text-xs">วันที่</th><th className="p-2 text-right font-semibold text-xs">ขนาด (KB)</th><th className="p-2 text-center font-semibold text-xs">การกระทำ</th></tr>
             </thead>
             <tbody>
@@ -178,9 +178,9 @@ export function MigrationToolsPageClient() {
         <h2 className="mb-1 flex items-center gap-2 font-bold text-cyan-700">☁️ Migrate ไป Supabase Cloud</h2>
         <p className="mb-3 text-xs text-slate-600">Upload ข้อมูลจาก LocalStorage → Supabase Cloud ต้องมี dry-run, audit, rollback, และ environment guard ก่อน</p>
         <div className="mb-3.5 grid grid-cols-1 gap-2.5 text-xs md:grid-cols-3">
-          <div className="rounded border border-slate-200 border-l-4 border-l-emerald-500 bg-white p-2.5 flex flex-col justify-between"><div className="text-slate-500 font-semibold">📊 Records ทั้งหมด</div><div className="text-base font-bold text-slate-800 mt-1">0</div></div>
-          <div className="rounded border border-slate-200 border-l-4 border-l-blue-500 bg-white p-2.5 flex flex-col justify-between"><div className="text-slate-500 font-semibold">🌐 Supabase Status</div><div className="text-sm font-bold text-amber-700 mt-1">design only</div></div>
-          <div className="rounded border border-slate-200 border-l-4 border-l-amber-500 bg-white p-2.5 flex flex-col justify-between"><div className="text-slate-500 font-semibold font-sans">⏱ เวลาประมาณการ</div><div className="text-sm font-bold text-slate-500 mt-1">deferred</div></div>
+          <div className="rounded border border-slate-100 border-l-4 border-l-emerald-500 bg-white p-2.5 flex flex-col justify-between"><div className="text-slate-500 font-semibold">📊 Records ทั้งหมด</div><div className="text-base font-bold text-slate-800 mt-1">0</div></div>
+          <div className="rounded border border-slate-100 border-l-4 border-l-blue-500 bg-white p-2.5 flex flex-col justify-between"><div className="text-slate-500 font-semibold">🌐 Supabase Status</div><div className="text-sm font-bold text-amber-700 mt-1">design only</div></div>
+          <div className="rounded border border-slate-100 border-l-4 border-l-amber-500 bg-white p-2.5 flex flex-col justify-between"><div className="text-slate-500 font-semibold">⏱ เวลาประมาณการ</div><div className="text-sm font-bold text-slate-500 mt-1">deferred</div></div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <DisabledActionButton tone="cyan">☁️ ⬆ Push (LocalStorage → Cloud)</DisabledActionButton>
@@ -192,7 +192,7 @@ export function MigrationToolsPageClient() {
       <div className="rounded-md border-2 border-orange-300 bg-orange-50/50 p-4">
         <h2 className="mb-1 font-bold text-orange-700">🧹 Reset Transactions — เริ่มคีย์ข้อมูลจริง (Go-Live)</h2>
         <p className="mb-3 text-xs text-slate-600">ลบเฉพาะ transaction โดยเก็บ Master Data ทั้งหมด ต้องแยก batch ออกแบบ confirmation, backup, และ rollback ก่อน</p>
-        <div className="mb-3.5 grid grid-cols-1 gap-3 rounded-md bg-white border border-slate-200 p-3.5 text-xs md:grid-cols-2">
+        <div className="mb-3.5 grid grid-cols-1 gap-3 rounded-md bg-white border border-slate-100 p-3.5 text-xs md:grid-cols-2">
           <div><div className="mb-1 font-bold text-red-600">❌ จะถูกลบถ้าอนุมัติในอนาคต:</div><ul className="space-y-0.5 text-red-700"><li>• บิลซื้อ + บิลขาย + ใบสำคัญรับเงิน</li><li>• Payment + Receipt + Transfer</li><li>• ค่าใช้จ่าย + เงินสำรองจ่าย</li><li>• Stock Ledger + Stock Issues</li></ul></div>
           <div><div className="mb-1 font-bold text-emerald-600">✅ จะถูกเก็บไว้:</div><ul className="space-y-0.5 text-emerald-700"><li>• Suppliers ทั้งหมด</li><li>• Customers ทั้งหมด</li><li>• Products ทั้งหมด</li><li>• Users + Roles + Permissions</li></ul></div>
         </div>
@@ -217,10 +217,10 @@ export function MigrationToolsPageClient() {
         </ul>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4 text-sm shadow">
+      <div className="rounded-md border border-slate-100 bg-white p-4 text-sm shadow">
         <h3 className="font-bold text-slate-700 text-xs uppercase tracking-wide">Deferred destructive actions</h3>
         <div className="mt-2.5 flex flex-wrap gap-2">
-          {destructiveActions.map((action) => <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs text-slate-600 font-semibold" key={action}>{action}</span>)}
+          {destructiveActions.map((action) => <span className="rounded-full bg-slate-100 border border-slate-100 px-3 py-1 text-xs text-slate-600 font-semibold" key={action}>{action}</span>)}
         </div>
       </div>
     </section>

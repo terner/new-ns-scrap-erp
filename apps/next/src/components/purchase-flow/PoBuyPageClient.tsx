@@ -411,7 +411,7 @@ function PoBuyStatusTimeline({ row }: { row: PoBuyRow }) {
               <div>{formatDateTime(event.createdAt)}</div>
               <div className="mt-1 truncate text-[11px]">{event.createdBy || '-'}</div>
             </div>
-            <div className="relative border-l border-slate-200 pb-4 pl-4 last:pb-0">
+            <div className="relative border-l border-slate-100 pb-4 pl-4 last:pb-0">
               <span className={`absolute -left-1.5 top-1 h-3 w-3 rounded-full border-2 border-white ${isLatest ? 'bg-slate-700' : 'bg-slate-300'}`} />
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-sm font-medium text-slate-800">{actionLabel}</div>
@@ -876,7 +876,7 @@ export function PoBuyPageClient() {
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการจองซื้อ</h4>
               <button
@@ -966,7 +966,7 @@ export function PoBuyPageClient() {
       {/* Mobile Card List (Hidden on Desktop) */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
         
         {!isLoading && pageRows.map((row) => (
@@ -1017,7 +1017,7 @@ export function PoBuyPageClient() {
         ))}
 
         {!isLoading && totalRows === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-100">
             ยังไม่มี PO Buy
           </div>
         ) : null}
@@ -1029,9 +1029,6 @@ export function PoBuyPageClient() {
           <colgroup>
             {poBuyColumns.map((column) => {
               const style = columnResize.getColumnStyle(column.key)
-              if (column.key === 'action') {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />
-              }
               return <col key={column.key} style={style} />
             })}
           </colgroup>
@@ -1235,7 +1232,7 @@ function SummaryCard({
   const config = configs[tone]
 
   return (
-    <div className={`bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${className}`}>
+    <div className={`bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${className}`}>
       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
         {config.emoji}
       </div>
@@ -1363,7 +1360,7 @@ function PoBuyCancelModal({
           />
           {error ? <div className="text-xs text-red-650">{error}</div> : null}
         </div>
-        <DialogFooter className="bg-slate-50 border-t border-slate-200 px-5 py-3.5 flex justify-end gap-2">
+        <DialogFooter className="bg-slate-50 border-t border-slate-100 px-5 py-3.5 flex justify-end gap-2">
           <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ปิด</UiButton>
           <UiButton className="bg-red-650 font-semibold hover:bg-red-750 text-white h-9 px-4 rounded-xl transition-colors" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}</UiButton>
         </DialogFooter>
@@ -1413,7 +1410,7 @@ function PoBuyShortCloseModal({
           />
           {error ? <div className="text-xs text-red-650">{error}</div> : null}
         </div>
-        <DialogFooter className="bg-slate-50 border-t border-slate-200 px-5 py-3.5 flex justify-end gap-2">
+        <DialogFooter className="bg-slate-50 border-t border-slate-100 px-5 py-3.5 flex justify-end gap-2">
           <UiButton className="font-normal" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ปิด</UiButton>
           <UiButton className="bg-amber-600 font-semibold hover:bg-amber-700 text-white h-9 px-4 rounded-xl transition-colors" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : 'ยืนยันปิดรับไม่ครบ'}</UiButton>
         </DialogFooter>
@@ -1746,7 +1743,7 @@ function PoBuyFormModal({
                     </TableRow>
                   ))}
                 </TableBody>
-                <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                <tfoot className="bg-slate-50 font-bold border-t border-slate-100">
                   <tr><td className="p-2 text-right">รวม {formTotals.lineCount} รายการ</td><td className="p-2 text-right">{formatMoney(formTotals.totalQty)}</td><td /><td className="p-2 text-right text-base text-blue-700">{formatMoney(formTotals.subtotal)}</td><td /></tr>
                 </tfoot>
               </Table>
@@ -1766,7 +1763,7 @@ function PoBuyFormModal({
                 <span className="font-bold text-slate-700">มี VAT</span>
               </label>
             </div>
-            <div className="col-span-2 lg:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="col-span-2 lg:col-span-1 rounded-xl border border-slate-100 bg-slate-50 p-3">
               <SummaryLine label="ยอดก่อน VAT" value={formatMoney(formTotals.subtotal)} />
               <SummaryLine label={`VAT ${formatMoney(formTotals.vatRatePercent)}%`} value={formatMoney(formTotals.vatAmount)} />
               <SummaryLine label="ยอดรวม" strong value={formatMoney(formTotals.totalCost)} />
@@ -1779,7 +1776,7 @@ function PoBuyFormModal({
             {fieldError('notes')}
           </div>
         </div>
-        <DialogFooter className="px-5 border-t border-slate-200 bg-slate-50 py-3 flex justify-end gap-2 rounded-b-2xl">
+        <DialogFooter className="px-5 border-t border-slate-100 bg-slate-50 py-3 flex justify-end gap-2 rounded-b-2xl">
           <UiButton className="font-normal" disabled={isSaving} type="button" variant="outline" onClick={onClose}>ยกเลิก</UiButton>
           <UiButton className="bg-blue-600 font-semibold hover:bg-blue-700 text-white rounded-xl h-9 transition-colors px-4" disabled={isSaving} type="button" variant="default" onClick={onSubmit}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</UiButton>
         </DialogFooter>
@@ -1820,7 +1817,7 @@ function PoBuyDetailModal({
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4 text-sm">
           {/* Card 1: ข้อมูลหลัก */}
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">ข้อมูลหลัก</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <div>
@@ -1842,7 +1839,7 @@ function PoBuyDetailModal({
           </div>
 
           {/* Card 2: ยอดเงินและจำนวน */}
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">ยอดเงินและจำนวน</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <div>
@@ -1911,7 +1908,7 @@ function PoBuyDetailModal({
                 ล่าสุด: {poBuyStatusLabel(row.status)}
               </span>
             </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-md border border-slate-100 bg-slate-50 p-3">
               <PoBuyStatusTimeline row={row} />
             </div>
           </div>
@@ -1975,7 +1972,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function SummaryLine({ label, strong = false, value }: { label: string; strong?: boolean; value: string }) {
   return (
-    <div className={`flex items-center justify-between gap-3 py-1 text-sm ${strong ? 'border-t border-slate-200 pt-2 font-bold text-blue-700' : 'text-slate-700'}`}>
+    <div className={`flex items-center justify-between gap-3 py-1 text-sm ${strong ? 'border-t border-slate-100 pt-2 font-bold text-blue-700' : 'text-slate-700'}`}>
       <span>{label}</span>
       <span className="font-mono">{value}</span>
     </div>

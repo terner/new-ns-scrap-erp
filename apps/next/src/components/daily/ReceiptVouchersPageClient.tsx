@@ -255,6 +255,19 @@ export function ReceiptVouchersPageClient() {
   const [currentActorName, setCurrentActorName] = useState('')
   const columnResize = useResizableColumns('daily.receipt-vouchers', receiptVoucherColumns)
 
+  const [sortKey, setSortKey] = useState<ReceiptVoucherColumnKey>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  const changeSort = useCallback((nextKey: ReceiptVoucherColumnKey) => {
+    if (nextKey === 'action') return
+    if (sortKey === nextKey) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(nextKey)
+      setSortDirection(nextKey === 'date' || nextKey === 'totalQty' || nextKey === 'totalAmount' ? 'desc' : 'asc')
+    }
+  }, [sortKey])
+
   const loadData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -280,17 +293,41 @@ export function ReceiptVouchersPageClient() {
 
   useEffect(() => {
     setPage(1)
-  }, [dateFrom, dateTo, pageSize, search])
+  }, [dateFrom, dateTo, pageSize, search, sortKey, sortDirection])
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return rows.filter((row) => {
-      const inDateRange = (!dateFrom || row.date >= dateFrom) && (!dateTo || row.date <= dateTo)
-      if (!inDateRange) return false
-      if (!query) return true
-      return `${row.docNo} ${row.purchaseBillDocNo} ${row.sellerName} ${row.sellerTaxId} ${row.licensePlate}`.toLowerCase().includes(query)
-    })
-  }, [dateFrom, dateTo, rows, search])
+    return rows
+      .filter((row) => {
+        const inDateRange = (!dateFrom || row.date >= dateFrom) && (!dateTo || row.date <= dateTo)
+        if (!inDateRange) return false
+        if (!query) return true
+        return `${row.docNo} ${row.purchaseBillDocNo} ${row.sellerName} ${row.sellerTaxId} ${row.licensePlate}`.toLowerCase().includes(query)
+      })
+      .sort((left, right) => {
+        let comparison = 0
+        if (sortKey === 'docNo') {
+          comparison = left.docNo.localeCompare(right.docNo)
+        } else if (sortKey === 'date') {
+          comparison = left.date.localeCompare(right.date)
+        } else if (sortKey === 'sellerName') {
+          comparison = (left.sellerName || '').localeCompare(right.sellerName || '')
+        } else if (sortKey === 'sellerTaxId') {
+          comparison = (left.sellerTaxId || '').localeCompare(right.sellerTaxId || '')
+        } else if (sortKey === 'purchaseBillDocNo') {
+          comparison = (left.purchaseBillDocNo || '').localeCompare(right.purchaseBillDocNo || '')
+        } else if (sortKey === 'licensePlate') {
+          comparison = (left.licensePlate || '').localeCompare(right.licensePlate || '')
+        } else if (sortKey === 'status') {
+          comparison = (left.status || '').localeCompare(right.status || '')
+        } else if (sortKey === 'totalQty') {
+          comparison = left.totalQty - right.totalQty
+        } else if (sortKey === 'totalAmount') {
+          comparison = left.totalAmount - right.totalAmount
+        }
+        return sortDirection === 'asc' ? comparison : -comparison
+      })
+  }, [dateFrom, dateTo, rows, search, sortKey, sortDirection])
 
   const supplierSearchOptions = useMemo<SearchComboboxOption[]>(() => supplierOptions.map((supplier) => ({
     description: supplier.taxId ? `เลขประจำตัวผู้เสียภาษี ${supplier.taxId}` : supplier.address,
@@ -633,32 +670,29 @@ export function ReceiptVouchersPageClient() {
           ) : null}
         </div>
 
-        <div className="hidden lg:block overflow-x-auto">
+        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
           <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
-              {receiptVoucherColumns.map((column, index) => {
-              const style = columnResize.getColumnStyle(column.key);
-              if (index === receiptVoucherColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+              {receiptVoucherColumns.map((column) => {
+                const style = columnResize.getColumnStyle(column.key);
+                return <col key={column.key} style={style} />;
+              })}
             </colgroup>
             <TableHeader>
               <tr>
-                <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
-                <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
-                <ResizableTableHead label="ผู้รับเงิน" resizeProps={columnResize.getResizeHandleProps('sellerName', 'ผู้รับเงิน')} />
-                <ResizableTableHead label="เลขประจำตัวผู้เสียภาษี" resizeProps={columnResize.getResizeHandleProps('sellerTaxId', 'เลขประจำตัวผู้เสียภาษี')} />
-                <ResizableTableHead label="บิลซื้อ" resizeProps={columnResize.getResizeHandleProps('purchaseBillDocNo', 'บิลซื้อ')} />
-                <ResizableTableHead label="ทะเบียน" resizeProps={columnResize.getResizeHandleProps('licensePlate', 'ทะเบียน')} />
-                <ResizableTableHead label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
-                <ResizableTableHead align="right" label="น้ำหนัก (กก.)" resizeProps={columnResize.getResizeHandleProps('totalQty', 'น้ำหนัก (กก.)')} />
-                <ResizableTableHead align="right" label="จำนวนเงิน" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'จำนวนเงิน')} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} sortKey="date" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้รับเงิน" resizeProps={columnResize.getResizeHandleProps('sellerName', 'ผู้รับเงิน')} sortKey="sellerName" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขประจำตัวผู้เสียภาษี" resizeProps={columnResize.getResizeHandleProps('sellerTaxId', 'เลขประจำตัวผู้เสียภาษี')} sortKey="sellerTaxId" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บิลซื้อ" resizeProps={columnResize.getResizeHandleProps('purchaseBillDocNo', 'บิลซื้อ')} sortKey="purchaseBillDocNo" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ทะเบียน" resizeProps={columnResize.getResizeHandleProps('licensePlate', 'ทะเบียน')} sortKey="licensePlate" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} align="right" label="น้ำหนัก (กก.)" resizeProps={columnResize.getResizeHandleProps('totalQty', 'น้ำหนัก (กก.)')} sortKey="totalQty" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} align="right" label="จำนวนเงิน" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'จำนวนเงิน')} sortKey="totalAmount" onSort={changeSort} />
                 <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
               </tr>
             </TableHeader>
-            <TableBody>
+            <TableBody className="divide-y divide-slate-100">
               {isLoading ? <TableRow><td className="p-8 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></TableRow> : null}
               {!isLoading && pagedRows.map((row) => (
                 <TableRow key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setDetailRow(row)}>
@@ -845,7 +879,7 @@ function ReceiptVoucherFormModal({
             </div>
             <div className="overflow-x-auto rounded-md border border-slate-200">
               <table className="w-full min-w-[820px] text-xs">
-                <thead className="bg-slate-100 text-slate-700">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                   <tr>
                     <th className="w-10 p-1.5 md:p-2 text-center">#</th>
                     <th className="p-1.5 md:p-2 text-left">รายการ</th>

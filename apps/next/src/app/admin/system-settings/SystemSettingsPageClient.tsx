@@ -166,7 +166,7 @@ export function SystemSettingsPageClient() {
 
   return (
     <section className="space-y-4">
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-md border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">ข้อมูลบริษัทสำหรับใบพิมพ์</h2>
@@ -190,7 +190,7 @@ export function SystemSettingsPageClient() {
         <div className="rounded-md bg-white p-12 text-center text-sm text-slate-500 shadow">กำลังโหลดค่าตั้งค่า...</div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
-          <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm h-fit">
+          <section className="rounded-md border border-slate-100 bg-white p-4 shadow-sm h-fit">
             <div className="mb-4">
               <h2 className="text-base font-bold text-slate-900">{vatSetting.label}</h2>
               <p className="mt-1 text-xs text-slate-500">{vatSetting.helper}</p>
@@ -209,7 +209,7 @@ export function SystemSettingsPageClient() {
                   value={vatValue}
                   onChange={(event) => setVatValue(event.target.value)}
                 />
-                <span className="border-l border-slate-200 px-3 text-sm text-slate-500">%</span>
+                <span className="border-l border-slate-100 px-3 text-sm text-slate-500">%</span>
               </div>
             </label>
 
@@ -227,7 +227,7 @@ export function SystemSettingsPageClient() {
           </section>
 
           <section className="space-y-3">
-            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-md border border-slate-100 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">{whtSetting.label}</h2>
@@ -278,7 +278,7 @@ export function SystemSettingsPageClient() {
                               value={value}
                               onChange={(event) => setWhtValues((current) => ({ ...current, [record.id]: event.target.value }))}
                             />
-                            <span className="border-l border-slate-200 px-2 text-xs text-slate-500">%</span>
+                            <span className="border-l border-slate-100 px-2 text-xs text-slate-500">%</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
@@ -310,7 +310,7 @@ export function SystemSettingsPageClient() {
                 const value = whtValues[record.id] ?? toPercentInput(record.ratePercent)
                 const saveKey = `wht:${record.id}`
                 return (
-                  <div key={record.id} className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm space-y-3 animate-fade-in">
+                  <div key={record.id} className="rounded-lg border border-slate-100 bg-white p-3.5 shadow-sm space-y-3 animate-fade-in">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="font-bold text-slate-900 text-sm leading-snug">{record.name}</div>
@@ -338,7 +338,7 @@ export function SystemSettingsPageClient() {
                             value={value}
                             onChange={(event) => setWhtValues((current) => ({ ...current, [record.id]: event.target.value }))}
                           />
-                          <span className="border-l border-slate-200 px-2 text-xs text-slate-500">%</span>
+                          <span className="border-l border-slate-100 px-2 text-xs text-slate-500">%</span>
                         </div>
                       </div>
                       <div className="self-end pb-0.5 shrink-0">
@@ -357,7 +357,7 @@ export function SystemSettingsPageClient() {
                 )
               })}
               {whtRecords.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-400 shadow-sm">
+                <div className="rounded-lg border border-slate-100 bg-white p-8 text-center text-slate-400 shadow-sm">
                   ไม่พบข้อมูล WHT
                 </div>
               ) : null}
@@ -380,7 +380,7 @@ export function SystemSettingsPageClient() {
             <div className="space-y-4 px-5 py-5 text-sm bg-slate-50 flex-1 overflow-y-auto">
               <div className="font-semibold text-slate-700">{pendingSave.label}</div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ค่าเดิม</div>
                   <div className="mt-1 text-xl font-bold text-slate-700">{pendingSave.currentValue ?? '-'}%</div>
                 </div>
@@ -391,7 +391,7 @@ export function SystemSettingsPageClient() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 bg-white shrink-0">
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4 bg-white shrink-0">
               <Button
                 disabled={savingKey !== null}
                 size="sm"

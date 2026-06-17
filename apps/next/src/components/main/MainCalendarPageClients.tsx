@@ -117,7 +117,7 @@ export function CashFlowCalendarPageClient() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="📈 เงินเข้า-ออกรายวัน">
           <div className="mb-3 flex gap-4 text-xs text-slate-500"><Legend color="bg-emerald-500" text="เงินเข้า" /><Legend color="bg-red-500" text="เงินออก" /></div>
-          <div className="flex h-48 items-end gap-1 border-b border-l border-slate-200 px-2 pb-1 bg-slate-50/20 rounded-b-lg">
+          <div className="flex h-48 items-end gap-1 border-b border-l border-slate-100 px-2 pb-1 bg-slate-50/20 rounded-b-lg">
             {(data?.days ?? []).map((day) => <div key={day.date} className="flex h-full flex-1 items-end justify-center gap-0.5"><span className="w-1.5 rounded-t bg-emerald-500" style={{ height: `${pct(day.cashIn, maxFlow)}%` }} /><span className="w-1.5 rounded-t bg-red-500" style={{ height: `${pct(day.cashOut, maxFlow)}%` }} /></div>)}
           </div>
         </Panel>
@@ -131,7 +131,7 @@ export function CashFlowCalendarPageClient() {
           </div>
         </Panel>
       </div>
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
         <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100 text-center text-xs font-bold text-slate-600">{weekdays.map((day, index) => <div key={day} className={`p-2.5 ${index === 0 || index === 6 ? 'text-red-500' : ''}`}>{day}</div>)}</div>
         {(data?.weeks ?? []).map((week, weekIndex) => <div key={weekIndex} className="grid grid-cols-7 border-t border-slate-100">{week.map((day, dayIndex) => day ? <button key={day.date} aria-label={`ดูรายการวันที่ ${day.date}`} className={`min-h-[110px] border-r border-slate-100 p-2 text-left text-xs transition hover:bg-slate-50/50 outline-none ${day.isNegative ? 'bg-red-50/30' : 'bg-white'} ${day.isToday ? 'ring-2 ring-amber-400 ring-inset' : ''}`} data-cash-day={day.date} type="button" onClick={() => setSelectedDayDate(day.date)} onPointerDown={() => setSelectedDayDate(day.date)}><div className="flex items-start justify-between"><span className={`font-bold ${day.weekday === 0 || day.weekday === 6 ? 'text-red-500' : 'text-slate-600'}`}>{day.day}</span>{day.entryCount ? <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">{day.entryCount}</span> : null}</div><div className="mt-2 space-y-1 font-mono text-[11px]"><div className="text-emerald-700 font-semibold">↑ {money(day.cashIn)}</div><div className="text-red-700 font-semibold">↓ {money(day.cashOut)}</div><div className={`border-t border-slate-100 pt-1 font-bold ${day.ending < 0 ? 'text-red-600' : 'text-slate-700'}`}>{money(day.ending)}</div></div></button> : <div key={`empty-${weekIndex}-${dayIndex}`} className="min-h-[110px] border-r border-slate-100 bg-slate-50/50" />)}</div>)}
       </div>
@@ -163,7 +163,7 @@ export function BusinessCalendarPageClient() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <MonthControls month={month} setMonth={setMonth} />
-        <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 shadow-sm border border-slate-200">{(['combined', 'purchase', 'sales', 'expense'] as Mode[]).map((item) => <ModeButton key={item} active={mode === item} mode={item} onClick={() => setMode(item)} />)}</div>
+        <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 shadow-sm border border-slate-100">{(['combined', 'purchase', 'sales', 'expense'] as Mode[]).map((item) => <ModeButton key={item} active={mode === item} mode={item} onClick={() => setMode(item)} />)}</div>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
         <Metric label="ซื้อ" value={money(summary.purchaseAmount)} tone="blue" />
@@ -177,13 +177,13 @@ export function BusinessCalendarPageClient() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="📈 ซื้อ vs ขาย รายวัน">
           <div className="mb-3 flex gap-4 text-xs text-slate-500"><Legend color="bg-blue-500" text="ซื้อ" /><Legend color="bg-emerald-500" text="ขาย" /></div>
-          <div className="flex h-48 items-end gap-1 border-b border-l border-slate-200 px-2 pb-1 bg-slate-50/20 rounded-b-lg">
+          <div className="flex h-48 items-end gap-1 border-b border-l border-slate-100 px-2 pb-1 bg-slate-50/20 rounded-b-lg">
             {(data?.days ?? []).map((day) => <div key={day.date} className="flex h-full flex-1 items-end justify-center gap-0.5"><span className="w-1.5 rounded-t bg-blue-500" style={{ height: `${pct(day.purchaseAmount, maxBuySell)}%` }} /><span className="w-1.5 rounded-t bg-emerald-500" style={{ height: `${pct(day.saleAmount, maxBuySell)}%` }} /></div>)}
           </div>
         </Panel>
         <Panel title="💰 GP สะสมรายวัน">
           <div className="mb-3 text-xs text-slate-500">เส้นม่วง = GP สะสม · แท่งสีจาง = GP รายวัน</div>
-          <div className="flex h-48 items-end gap-1 border-b border-l border-slate-200 bg-slate-50 px-2 pb-1 bg-slate-50/20 rounded-b-lg">
+          <div className="flex h-48 items-end gap-1 border-b border-l border-slate-100 bg-slate-50 px-2 pb-1 bg-slate-50/20 rounded-b-lg">
             {gpRows.map((row) => <div key={row.date} className="relative flex h-full flex-1 items-end"><span className="w-full rounded-t bg-purple-200/50" style={{ height: `${pct(Math.abs(row.daily), maxRunningGp)}%` }} /><span className="absolute bottom-0 left-1/2 w-1 -translate-x-1/2 rounded-t bg-purple-600" style={{ height: `${pct(Math.abs(row.running), maxRunningGp)}%` }} /></div>)}
           </div>
         </Panel>
@@ -196,7 +196,7 @@ export function BusinessCalendarPageClient() {
 
 function MonthControls({ month, setMonth }: { month: string; setMonth: (month: string) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-100">
       <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 outline-none" type="button" onClick={() => setMonth(shiftMonth(month, -1))}>← เดือนก่อน</button>
       <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
       <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 outline-none" type="button" onClick={() => setMonth(shiftMonth(month, 1))}>เดือนถัดไป →</button>
@@ -208,7 +208,7 @@ function BusinessCombinedTable({ days }: { days: BusinessDay[] }) {
   return (
     <>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
+      <div className="hidden lg:block overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-100">
         <table className="w-full min-w-[1040px] text-xs">
           <thead className="sticky top-0 bg-slate-900 text-white text-xs">
             <tr>
@@ -260,7 +260,7 @@ function BusinessModeTable({ days, mode }: { days: BusinessDay[]; mode: Exclude<
   return (
     <Panel title={config.title}>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full min-w-[720px] text-xs">
           <thead className="bg-slate-50 text-slate-500 text-xs">
             <tr>{config.headers.map((header) => <th key={header} className="p-2 text-left font-semibold">{header}</th>)}</tr>
@@ -372,7 +372,7 @@ function Metric({ label, tone, value }: { label: string; tone: string; value: st
   }
   const style = toneMap[tone] || toneMap.slate
   return (
-    <div className="bg-white p-4 shadow-sm border border-slate-200 rounded-xl flex flex-col justify-center">
+    <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl flex flex-col justify-center">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className={`mt-1 font-mono text-base sm:text-lg font-bold truncate ${style.text}`}>{value}</div>
     </div>
@@ -381,7 +381,7 @@ function Metric({ label, tone, value }: { label: string; tone: string; value: st
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className="border-b border-slate-100 bg-slate-50/50 p-3 text-sm font-bold text-slate-700">{title}</div>
       <div className="p-4">{children}</div>
     </div>
@@ -400,7 +400,7 @@ function ModeButton({ active, mode, onClick }: { active: boolean; mode: Mode; on
     purchase: 'bg-blue-650 border-blue-650 text-white',
     sales: 'bg-emerald-650 border-emerald-650 text-white'
   }
-  return <button className={`rounded-lg border px-3 py-2 text-sm font-bold outline-none ${active ? activeClass[mode] : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`} type="button" onClick={onClick} onPointerDown={onClick}>{label[mode]}</button>
+  return <button className={`rounded-lg border px-3 py-2 text-sm font-bold outline-none ${active ? activeClass[mode] : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50'}`} type="button" onClick={onClick} onPointerDown={onClick}>{label[mode]}</button>
 }
 
 function Amount({ signed = false, value }: { signed?: boolean; value: number }) {

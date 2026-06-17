@@ -353,8 +353,8 @@ export function TradingDashboardPageClient() {
         <AgingPanel aging={data?.aging ?? null} isLoading={isLoading} />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4">
           <div className="flex flex-wrap">
             {tabs.map((item) => (
               <button
@@ -529,7 +529,7 @@ function CostSourceModal({
             </div>
             <div className="overflow-x-auto p-4">
               <table className="w-full min-w-[720px] table-fixed text-sm">
-                <thead className="bg-slate-100 text-xs text-slate-600">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium text-xs">
                   <tr>
                     <th className="w-32 p-2 text-left">Source</th>
                     <th className="w-24 p-2 text-left">Date</th>
@@ -586,8 +586,8 @@ function NumberField({ id, label, onChange, value }: { id: string; label: string
 function ReadinessPanel({ isLoading, rows, summary }: { isLoading: boolean; rows: DashboardPayload['readinessRows']; summary: DashboardPayload['summary'] | null }) {
   const visibleRows = rows.slice(0, 6)
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 bg-slate-50/50">
+    <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 bg-slate-50/50">
         <div>
           <div className="text-sm font-bold text-slate-800">Stock / Cost Source Readiness</div>
           <div className="text-xs text-slate-500">PO Buy + Cost Source เทียบกับ PO Sell commitment</div>

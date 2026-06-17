@@ -297,8 +297,8 @@ export function WeightTicketDetailModal({
                       <SectionTitle subtitle="รองรับเอกสารยาวหลายสิบรายการ" title="รายการสินค้าแยกตาม lot" />
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="hidden lg:table min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-200/80 border-b border-slate-300/80 text-xs font-semibold text-slate-600">
+                      <table className="hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
                           <tr>
                             <th className="px-3 py-3 text-left">ลำดับ</th>
                             <th className="px-3 py-3 text-left">สินค้า</th>
@@ -429,8 +429,8 @@ export function WeightTicketDetailModal({
                       <SectionTitle subtitle="รวมสินค้าชนิดเดียวกันในเอกสารเดียวกันก่อนนำไปใช้ออกบิล" title="สรุปต่อสินค้า" />
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="hidden lg:table min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-200/80 border-b border-slate-300/80 text-xs font-semibold text-slate-600">
+                      <table className="hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
                           <tr>
                             <th className="px-3 py-3 text-left">ลำดับ</th>
                             <th className="px-3 py-3 text-left">สินค้า</th>
@@ -535,8 +535,8 @@ export function WeightTicketDetailModal({
                   <SectionTitle subtitle="บันทึกการนำใบรับของไปออกบิลและการคืนยอด" title="ประวัติการใช้งานใบรับของ" />
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="hidden lg:table min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-200/80 border-b border-slate-300/80 text-xs font-semibold text-slate-600">
+                  <table className="hidden lg:table min-w-full divide-y divide-slate-100 text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
                       <tr>
                         <th className="px-3 py-3 text-left">เวลา</th>
                         <th className="px-3 py-3 text-left">เหตุการณ์</th>

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 const Table = React.forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-x-auto rounded-md bg-white shadow">
+    <div className="relative w-full overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm">
       <table ref={ref} className={cn('w-full text-sm', className)} {...props} />
     </div>
   ),
@@ -12,7 +12,7 @@ const Table = React.forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLT
 Table.displayName = 'Table'
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => <thead ref={ref} className={cn('bg-slate-200/80 border-b border-slate-300/80', className)} {...props} />,
+  ({ className, ...props }, ref) => <thead ref={ref} className={cn('bg-slate-50 border-b border-slate-100 text-slate-500', className)} {...props} />,
 )
 TableHeader.displayName = 'TableHeader'
 
@@ -22,7 +22,7 @@ const TableBody = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes
 TableBody.displayName = 'TableBody'
 
 const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
-  ({ className, ...props }, ref) => <tr ref={ref} className={cn('border-t border-slate-200', className)} {...props} />,
+  ({ className, ...props }, ref) => <tr ref={ref} className={cn('border-t border-slate-100', className)} {...props} />,
 )
 TableRow.displayName = 'TableRow'
 

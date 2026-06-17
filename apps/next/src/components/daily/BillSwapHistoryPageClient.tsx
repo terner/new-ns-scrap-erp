@@ -178,7 +178,7 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi
           icon={<ClipboardList className="size-5" />}
           label="จำนวนรายการเปลี่ยน"
@@ -315,15 +315,12 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
       <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-xs" style={{ minWidth: tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {billSwapColumns.map((column, index) => {
+            {billSwapColumns.map((column) => {
               const style = getColumnStyle(column.key);
-              if (index === billSwapColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
               return <col key={column.key} style={style} />;
             })}
           </colgroup>
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold">
             <tr>
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={getResizeHandleProps('swapDate', 'วันที่')} sortKey="swapDate" onSort={changeSort} />
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บิลซื้อ" resizeProps={getResizeHandleProps('billDocNo', 'บิลซื้อ')} sortKey="billDocNo" onSort={changeSort} />
@@ -360,8 +357,8 @@ export function BillSwapHistoryPageClient({ tableKey = 'daily.bill-swap-history'
             {!isLoading && totalRows === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>ยังไม่มีประวัติการเปลี่ยน Supplier</td></tr> : null}
           </tbody>
           {totalRows > 0 ? (
-            <tfoot>
-              <tr className="bg-slate-100 text-xs font-semibold">
+            <tfoot className="bg-slate-50/50 border-t border-slate-100">
+              <tr className="text-xs font-semibold">
                 <td className="p-2 text-right text-slate-700" colSpan={5}>รวม</td>
                 <td className="p-2 pr-4 text-right text-slate-700 tabular-nums">{formatMoney(totals.weight)}</td>
                 <td className="p-2" colSpan={2} />

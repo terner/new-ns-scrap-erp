@@ -704,106 +704,50 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
       {dashboardOnly ? (
         <>
           {/* 💸 KPI Summary Cards */}
-          {/* Desktop Version (Separated Cards) */}
-          <div className="hidden lg:grid grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">ยอดรวม {periodMonths} เดือน</span>
-              </div>
-              <div className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-                {formatMoney(dashboard.total)}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
-            </div>
-
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">เฉลี่ยรายเดือน</span>
-              </div>
-              <div className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-                {formatMoney(dashboard.avg)}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
-            </div>
-
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">ยอดใช้จ่ายเดือนนี้</span>
-              </div>
-              <div className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-                {formatMoney(dashboard.latest)}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
-            </div>
-
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <ExpenseMetric
+              label={`ยอดรวม ${periodMonths} เดือน`}
+              value={formatMoney(dashboard.total)}
+              unit="บาท"
+              icon="📊"
+              iconBg="bg-indigo-50 text-indigo-600 border border-indigo-100/50"
+            />
+            <ExpenseMetric
+              label="เฉลี่ยรายเดือน"
+              value={formatMoney(dashboard.avg)}
+              unit="บาท"
+              icon="🧮"
+              iconBg="bg-purple-50 text-purple-600 border border-purple-100/50"
+            />
+            <ExpenseMetric
+              label="ยอดใช้จ่ายเดือนนี้"
+              value={formatMoney(dashboard.latest)}
+              unit="บาท"
+              icon="💸"
+              iconBg="bg-blue-50 text-blue-600 border border-blue-100/50"
+            />
             {(() => {
               const isHigh = dashboard.vsAvg > 20;
               const isLow = dashboard.vsAvg < -20;
-              const accentColor = isHigh ? 'text-red-600' : isLow ? 'text-emerald-600' : 'text-slate-700';
+              const icon = isHigh ? '📈' : isLow ? '📉' : '⚖️';
+              const iconBg = isHigh
+                ? 'bg-red-50 text-red-650 border border-red-100/50'
+                : isLow
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100/50'
+                : 'bg-slate-100 text-slate-600 border border-slate-200/50';
+              const valueClass = isHigh ? 'text-red-650' : isLow ? 'text-emerald-650' : 'text-slate-900';
+              const subLabel = isHigh ? 'สูงกว่าปกติ' : isLow ? 'ต่ำกว่าปกติ' : 'ใกล้เคียงปกติ';
+              const subLabelClass = isHigh ? 'text-red-600' : isLow ? 'text-emerald-600' : 'text-slate-500';
               return (
-                <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500">เทียบค่าเฉลี่ย</span>
-                  </div>
-                  <div className={`mt-3 text-2xl font-extrabold tracking-tight ${accentColor} tabular-nums`}>
-                    {dashboard.vsAvg > 0 ? '+' : ''}{dashboard.vsAvg.toFixed(1)}%
-                  </div>
-                  <span className={`text-[10px] font-semibold mt-1 block ${accentColor}`}>
-                    {isHigh ? 'สูงกว่าปกติ' : isLow ? 'ต่ำกว่าปกติ' : 'ใกล้เคียงปกติ'}
-                  </span>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Mobile/Tablet Version (Separated Cards) */}
-          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:hidden">
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">ยอดรวม {periodMonths} เดือน</span>
-              </div>
-              <div className="mt-3 text-xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-                {formatMoney(dashboard.total)}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
-            </div>
-
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">เฉลี่ยรายเดือน</span>
-              </div>
-              <div className="mt-3 text-xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-                {formatMoney(dashboard.avg)}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
-            </div>
-
-            <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">ยอดใช้จ่ายเดือนนี้</span>
-              </div>
-              <div className="mt-3 text-xl font-extrabold tracking-tight text-slate-900 tabular-nums">
-                {formatMoney(dashboard.latest)}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">บาท</span>
-            </div>
-
-            {(() => {
-              const isHigh = dashboard.vsAvg > 20;
-              const isLow = dashboard.vsAvg < -20;
-              const accentColor = isHigh ? 'text-red-600' : isLow ? 'text-emerald-600' : 'text-slate-700';
-              return (
-                <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500">เทียบค่าเฉลี่ย</span>
-                  </div>
-                  <div className={`mt-3 text-xl font-extrabold tracking-tight ${accentColor} tabular-nums`}>
-                    {dashboard.vsAvg > 0 ? '+' : ''}{dashboard.vsAvg.toFixed(1)}%
-                  </div>
-                  <span className={`text-[10px] font-semibold mt-1 block ${accentColor}`}>
-                    {isHigh ? 'สูงกว่าปกติ' : isLow ? 'ต่ำกว่าปกติ' : 'ใกล้เคียงปกติ'}
-                  </span>
-                </div>
+                <ExpenseMetric
+                  label="เทียบค่าเฉลี่ย"
+                  value={`${dashboard.vsAvg > 0 ? '+' : ''}${dashboard.vsAvg.toFixed(1)}%`}
+                  icon={icon}
+                  iconBg={iconBg}
+                  valueClass={valueClass}
+                  subLabel={subLabel}
+                  subLabelClass={subLabelClass}
+                />
               );
             })()}
           </div>
@@ -964,18 +908,15 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* 1. Desktop Layout (Large Heatmap Table) - Visible on lg screens */}
-            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/60 bg-white shadow-sm">
               <table className="w-full text-xs" style={{ minWidth: dashboardColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
-                  {dashboardColumns.map((column, index) => {
-              const style = dashboardColumnResize.getColumnStyle(column.key);
-              if (index === dashboardColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+                  {dashboardColumns.map((column) => {
+                    const style = dashboardColumnResize.getColumnStyle(column.key);
+                    return <col key={column.key} style={style} />;
+                  })}
                 </colgroup>
-                <thead className="bg-slate-50/75 border-b border-slate-100">
+                <thead className="bg-slate-50/75 border-b border-slate-200/60">
                   <tr>
                     <ResizableTableHead label="หมวดค่าใช้จ่าย" resizeProps={dashboardColumnResize.getResizeHandleProps('category', 'หมวดค่าใช้จ่าย')} />
                     {dashboard.monthList.map((month) => (
@@ -999,7 +940,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   ) : null}
                   {!isLoading && dashboard.heatmapRows.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="sticky left-0 bg-white/95 backdrop-blur-sm px-4 py-3 font-semibold text-slate-900 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                      <td className="sticky left-0 bg-white/95 backdrop-blur-sm px-4 py-3 font-semibold text-slate-900 border-r border-slate-200/60 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                         {item.name}
                       </td>
                       {dashboard.monthList.map((month) => {
@@ -1057,9 +998,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   ) : null}
                 </tbody>
                 {dashboard.heatmapRows.length > 0 ? (
-                  <tfoot className="bg-slate-50/50 font-bold border-t border-slate-200">
+                  <tfoot className="bg-slate-50/50 font-bold border-t border-slate-200/60">
                     <tr className="divide-y divide-slate-100">
-                      <td className="sticky left-0 bg-slate-50/90 backdrop-blur-sm px-4 py-3.5 text-slate-900 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                      <td className="sticky left-0 bg-slate-50/90 backdrop-blur-sm px-4 py-3.5 text-slate-900 border-r border-slate-200/60 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                         รวมทุกหมวด
                       </td>
                       {dashboard.monthList.map((month) => (
@@ -1077,9 +1018,9 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* 2. Tablet Layout (Simplified Table) - Visible on md & lg screens */}
-            <div className="hidden lg:block lg:hidden overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="hidden md:block lg:hidden overflow-x-auto rounded-xl border border-slate-200/60 bg-white shadow-sm">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50/75 border-b border-slate-100">
+                <thead className="bg-slate-50/75 border-b border-slate-200/60">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-slate-700 w-1/3">หมวดค่าใช้จ่าย</th>
                     <th className="px-3 py-3 text-right font-semibold text-slate-700">เดือนล่าสุด ({formatMonthLabel(dashboard.monthList[dashboard.monthList.length - 1])})</th>
@@ -1135,7 +1076,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             </div>
 
             {/* 3. Mobile Layout (Expense Analytics Cards) - Visible on mobile < md */}
-            <div className="block lg:hidden space-y-3">
+            <div className="block md:hidden space-y-3">
               {isLoading ? (
                 <div className="py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
@@ -1149,7 +1090,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedCategoryRow(item)}
-                  className="w-full text-left rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-200 active:scale-[0.98] hover:shadow-md space-y-3 block"
+                  className="w-full text-left rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 active:scale-[0.98] hover:shadow-md space-y-3 block"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1194,7 +1135,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 </button>
               ))}
               {!isLoading && dashboard.heatmapRows.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 bg-white border border-slate-100 rounded-xl text-xs">
+                <div className="py-8 text-center text-slate-400 bg-white border border-slate-200/60 rounded-xl text-xs">
                   ยังไม่มีข้อมูลบันทึกค่าใช้จ่ายในช่วงเวลานี้
                 </div>
               ) : null}
@@ -1653,7 +1594,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
             <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
               <form ref={formRef} noValidate className="w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-xl" onSubmit={saveForm}>
                 <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 rounded-t-2xl shrink-0">
-                  <h3 className="font-bold text-white text-base font-sans">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
+                  <h3 className="font-bold text-white text-base">{form.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</h3>
                   <button
                     type="button"
                     onClick={() => setFormOpen(false)}
@@ -1827,7 +1768,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow">
+                  <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow">
                     <div className="border-b border-slate-100 bg-slate-900 px-4 py-3 text-white">
                       <div className="text-sm font-semibold">สรุปก่อนบันทึก</div>
                       <div className="text-xs text-slate-300">{form.paymentAction === 'pay_now' ? 'ตรวจยอดเอกสารและยอดเงินออกจากบัญชี' : 'ตรวจยอด EXP ก่อนส่งอนุมัติจ่ายเงิน'}</div>
@@ -1970,15 +1911,12 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
           <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
             <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {expenseColumns.map((column, index) => {
-              const style = columnResize.getColumnStyle(column.key);
-              if (index === expenseColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+                {expenseColumns.map((column) => {
+                  const style = columnResize.getColumnStyle(column.key);
+                  return <col key={column.key} style={style} />;
+                })}
               </colgroup>
-              <thead className="bg-slate-100">
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                 <tr>
                   <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
                   <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่จ่าย" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่จ่าย')} sortKey="date" onSort={changeSort} />
@@ -2115,7 +2053,7 @@ function ExpenseDetailModal({ onClose, onEdit, row }: { onClose: () => void; onE
           </div>
 
           {/* รายการค่าใช้จ่าย */}
-          <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="rounded-lg border border-slate-100 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 px-4 py-3 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">รายการค่าใช้จ่าย</div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-xs">
@@ -2422,7 +2360,7 @@ function ExpenseLineTable(props: {
       </div>
       <div className="overflow-x-auto rounded-md border border-slate-200">
         <table className="w-full min-w-[940px] text-xs">
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <th className="w-48 p-2 text-left">หมวด</th>
               <th className="p-2 text-left">รายละเอียด</th>
@@ -2560,6 +2498,44 @@ function TextAreaField(props: { error?: string; fieldName?: string; label: strin
       />
       {props.error ? <span className="mt-1 block text-xs text-red-700">{props.error}</span> : null}
     </label>
+  )
+}
+
+function ExpenseMetric({
+  label,
+  value,
+  unit,
+  icon,
+  iconBg,
+  valueClass = 'text-slate-900',
+  subLabel,
+  subLabelClass
+}: {
+  label: string
+  value: string
+  unit?: string
+  icon: string
+  iconBg: string
+  valueClass?: string
+  subLabel?: string
+  subLabelClass?: string
+}) {
+  return (
+    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 sm:p-5 flex items-center gap-3.5 w-full hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold text-slate-500 truncate mb-0.5">{label}</div>
+        <div className="flex items-baseline gap-1">
+          <span className={`text-lg sm:text-xl font-extrabold tracking-tight tabular-nums ${valueClass}`}>{value}</span>
+          {unit && <span className="text-[10px] text-slate-400 font-medium">{unit}</span>}
+        </div>
+        {subLabel && (
+          <div className={`text-[10px] font-bold mt-0.5 ${subLabelClass}`}>{subLabel}</div>
+        )}
+      </div>
+    </div>
   )
 }
 

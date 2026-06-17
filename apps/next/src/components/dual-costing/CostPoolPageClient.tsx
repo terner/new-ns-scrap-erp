@@ -227,7 +227,7 @@ export function CostPoolPageClient() {
             />
             <button
               className={`h-10 rounded-md border px-3 text-sm font-semibold transition-colors flex items-center gap-1 shrink-0 ${
-                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-100'
               }`}
               type="button"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -314,9 +314,9 @@ export function CostPoolPageClient() {
         <span className="text-xs text-slate-500">เรียงตาม {sort}</span>
       </DualCostingCountRow>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
         <Table className="[&_tbody_tr]:border-slate-100 text-xs">
-          <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+          <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
             <tr>
               <TableHead className="p-3 pl-4">Cost Type</TableHead>
               <TableHead className="p-3">Source</TableHead>
@@ -392,7 +392,7 @@ function CostTypeCard({
   }[tone]
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${colors.split(' ')[0]}`}>{icons}</div>
       <div className="min-w-0">
         <div className="text-xs font-semibold text-slate-500">{label}</div>

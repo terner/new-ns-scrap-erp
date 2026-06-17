@@ -249,7 +249,7 @@ function DashboardView(props: {
             <span className="rounded-md bg-white px-2 py-0.5 border border-slate-100 font-semibold text-slate-700">Expenses <b className="text-amber-700">{money(data?.dashboard.historical.expenses)}</b></span>
             <span className="text-slate-500">({data?.dashboard.historical.rows ?? 0} rows)</span>
           </div>
-        ) : <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-500">ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026</div>}
+        ) : <div className="mb-3 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-500">ℹ️ ยังไม่มีข้อมูล Historical — ไปที่เมนู <b>📅 ข้อมูลย้อนหลัง</b> เพื่อคีย์ยอด ม.ค.-เม.ย. 2026</div>}
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <DashboardKpi icon="📈" label="Revenue" sub="ยอดขาย" tone="from-blue-500 to-blue-700" value={money(k.revenue)} />
           <DashboardKpi icon="💸" label="Expenses" sub="ค่าใช้จ่าย + COGS" tone="from-rose-500 to-red-600" value={money(k.expenses)} />
@@ -357,7 +357,7 @@ function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: 
   const style = toneMap[tone] || { bg: 'bg-slate-50', text: 'text-slate-600' }
 
   return (
-    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.text} text-2xl`}>
         {icon}
       </div>
@@ -371,7 +371,7 @@ function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: 
 }
 
 function DashboardChartCard({ children, title }: { children: ReactNode; title: string }) {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
+  return <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><div className="mb-3 text-sm font-bold text-slate-700">{title}</div>{children}</div>
 }
 
 function OwnerDailyView({ data }: { data: MainPayload | null }) {
@@ -399,7 +399,7 @@ function OwnerDailyView({ data }: { data: MainPayload | null }) {
       </div>
       {(pending.tradingPending ?? 0) > 0 ? <PendingBlock color="purple" cta="→ ไป Trading Matching" title="🔄 Trading Pending รับเงิน — จ่ายซื้อ Trading แล้ว แต่ยังไม่เปิดบิลขาย" cards={[['📋 บิลซื้อ Trading', String(pending.tradingPending)], ['💸 จ่ายไปแล้ว', money(pending.tradingPaidTotal)], ['✓ Match แล้ว', money(pending.tradingMatchedTotal)], ['⏳ Pending รับเงิน', money(pending.tradingPendingValue)]]} /> : null}
       {(pending.pendingIssueCount ?? 0) > 0 ? <PendingBlock color="amber" cta="→ ดูทั้งหมด" title="📦 ต้นทุนรอเปิดบิล (Pending Sale) — เงินค้างใน Stock ที่เบิกออกไปแล้ว" cards={[['⏰ จำนวนใบ', `${pending.pendingIssueCount} ใบ`], ['⚖ น้ำหนักรวม', `${money(pending.pendingIssueQty)} กก.`], ['💰 ต้นทุน (เงินที่ค้างอยู่)', money(pending.pendingIssueCost)], ['📈 ยอดขายคาด', money(pending.pendingIssueEst)]]} /> : null}
-      <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+      <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-100">
         <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">📊 ที่เกิดขึ้นจริงวันนี้แล้ว</h3>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Tile tone="emerald" label="📥 รับเงินจริง" value={`+${money(actual?.cashIn)}`} />
@@ -456,7 +456,7 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
   }
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-100">
         <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 outline-none" type="button" onClick={() => shiftDate(-1)}>← วันก่อน</button>
         <DatePickerInput className="w-[140px]" value={date} onChange={setDate} />
         <button className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 outline-none" disabled={isToday} type="button" onClick={() => shiftDate(1)}>วันถัดไป →</button>
@@ -470,7 +470,7 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
       <div className="grid gap-4 lg:grid-cols-2"><DailyBillTable rows={data?.dailyReport.purchaseBills ?? []} title={`📋 บิลรับซื้อประจำวัน (${purchaseCount})`} total={summary.purchaseAmount ?? 0} tone="blue" /><DailyBillTable rows={data?.dailyReport.salesBills ?? []} title={`📋 บิลขายประจำวัน (${salesCount})`} total={summary.salesAmount ?? 0} tone="emerald" /></div>
       <ExpenseSummary rows={data?.dailyReport.expenseByCategory ?? []} total={summary.expenseAmount ?? 0} />
       <CashMovement movement={data?.dailyReport.cashMovement} />
-      <div className="border-t border-slate-200 pt-4">
+      <div className="border-t border-slate-100 pt-4">
         <div className="mb-4 rounded-xl bg-slate-900 p-5 text-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><h2 className="text-xl font-bold">📊 Analytics Dashboard</h2><p className="mt-1 text-xs opacity-85">รายงานสรุปแบบช่วงเวลา + Top 10/5 + Charts</p></div>
@@ -491,7 +491,7 @@ function DailyReportView({ data, date, rangeFrom, rangeMode, rangeTo, setDate, s
           <Metric label="💸 ค่าใช้จ่าย" tone="orange" value={money(analytics?.rangeKpi.expenseAmount)} />
         </div>
         <div className="mb-4 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+          <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-100">
             <h3 className="mb-3 font-bold text-slate-700 text-sm">📈 ยอดซื้อ vs ขาย (รายวัน)</h3>
             {(analytics?.dailyTrend ?? []).map((row) => <div key={row.label} className="mb-2.5 grid grid-cols-12 items-center gap-2 text-xs"><div className="col-span-3 font-mono text-slate-600">{row.label}</div><div className="col-span-4 rounded-full bg-slate-100 h-5 overflow-hidden"><div className="rounded-full bg-blue-500 h-full text-right text-white pr-2 font-bold text-[10px] flex items-center justify-end" style={{ width: `${Math.max(15, row.purchase / trendMax * 100)}%` }}>{money(row.purchase)}</div></div><div className="col-span-5 rounded-full bg-slate-100 h-5 overflow-hidden"><div className="rounded-full bg-emerald-500 h-full text-right text-white pr-2 font-bold text-[10px] flex items-center justify-end" style={{ width: `${Math.max(15, row.sales / trendMax * 100)}%` }}>{money(row.sales)}</div></div></div>)}
           </div>
@@ -521,7 +521,7 @@ function LegacyKpi({ label, sub, tone, value }: { label: string; sub: string; to
   const cleanLabel = label.slice(2).trim()
 
   return (
-    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+    <div className="flex items-center gap-3 bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.text} text-2xl`}>
         {icon}
       </div>
@@ -538,7 +538,7 @@ function PendingBlock({ cards, color, cta, title }: { cards: [string, string][];
   const text = color === 'purple' ? 'text-purple-700' : 'text-amber-700'
   const button = color === 'purple' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
   return (
-    <div className="bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+    <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className={`text-sm font-bold ${text}`}>{title}</h3>
         <button className={`rounded-lg ${button} px-3 py-1.5 text-xs font-bold opacity-80 outline-none`} disabled type="button">{cta}</button>
@@ -583,7 +583,7 @@ function MiniLine({ label, value }: { label: string; value: string }) {
 function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; daysOverdue?: number; docNo: string; due: string; name: string }>; title: string; type: 'ap' | 'ar' }) {
   const header = type === 'ar' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
         <span>{title} ({rows.length})</span>
         <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
@@ -657,7 +657,7 @@ function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; da
 
 function OwnerSmallTable({ rows, title }: { rows: Array<{ amount: number; contractNo?: string; docNo?: string; installmentNo?: number; name?: string }>; title: string }) {
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className="flex justify-between border-b bg-amber-50 text-amber-700 p-3 font-bold border-amber-100 text-sm">
         <span>{title} ({rows.length})</span>
         <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
@@ -706,10 +706,10 @@ function OwnerSmallTable({ rows, title }: { rows: Array<{ amount: number; contra
 
 function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count: number; icon: string; label: string; sub: string; tone: string; value: string; weight: string }) {
   const toneMap: Record<string, { bg: string; text: string; iconBg: string; border: string }> = {
-    'from-blue-600 to-indigo-700': { bg: 'bg-white', text: 'text-blue-700', iconBg: 'bg-blue-50 text-blue-600', border: 'border-slate-200' },
-    'from-emerald-600 to-teal-700': { bg: 'bg-white', text: 'text-emerald-700', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-slate-200' },
+    'from-blue-600 to-indigo-700': { bg: 'bg-white', text: 'text-blue-700', iconBg: 'bg-blue-50 text-blue-600', border: 'border-slate-100' },
+    'from-emerald-600 to-teal-700': { bg: 'bg-white', text: 'text-emerald-700', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-slate-100' },
   }
-  const style = toneMap[tone] || { bg: 'bg-white', text: 'text-slate-700', iconBg: 'bg-slate-50 text-slate-600', border: 'border-slate-200' }
+  const style = toneMap[tone] || { bg: 'bg-white', text: 'text-slate-700', iconBg: 'bg-slate-50 text-slate-600', border: 'border-slate-100' }
   
   return (
     <div className={`relative overflow-hidden rounded-xl bg-white border ${style.border} p-5 shadow-sm flex items-start gap-4`}>
@@ -740,14 +740,14 @@ function DailyBigCard({ count, icon, label, sub, tone, value, weight }: { count:
 function GroupBreakdown({ expandedGroup, groups, setExpandedGroup }: { expandedGroup: string; groups: MainPayload['dailyReport']['groupBreakdown']; setExpandedGroup: (value: string) => void }) {
   const max = Math.max(1, ...groups.map((row) => Math.max(row.buyAmt, row.sellAmt)))
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-200">
+    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-100">
       <h3 className="mb-3 font-bold text-slate-800 text-sm">📊 หมวดสินค้า — ซื้อ vs ขาย <span className="text-xs font-normal text-slate-500">(กดที่หมวด → ดูรายละเอียดสินค้า)</span></h3>
       {groups.length === 0 ? (
         <div className="py-10 text-center text-slate-400 text-xs">ไม่มีรายการในวันนี้</div>
       ) : (
         <div className="space-y-3">
           {groups.map((group) => (
-            <div key={group.group} className="overflow-hidden rounded-xl border border-slate-200">
+            <div key={group.group} className="overflow-hidden rounded-xl border border-slate-100">
               <button className="w-full p-3 text-left hover:bg-slate-50 outline-none" type="button" onClick={() => setExpandedGroup(expandedGroup === group.group ? '' : group.group)}>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="font-bold text-slate-700 text-sm">{expandedGroup === group.group ? '▼' : '▶'} {group.group} <span className="text-xs font-normal text-slate-400">({group.products.length} สินค้า)</span></span>
@@ -839,7 +839,7 @@ function DailyBillTable({ rows, title, tone, total }: { rows: { amount: number; 
   const hover = tone === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
   const amountColor = tone === 'blue' ? 'text-blue-700' : 'text-emerald-700'
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
         <h3 className="font-bold">{title}</h3>
         <span className="text-sm font-bold">{money(total)}</span>
@@ -903,7 +903,7 @@ function DailyBillTable({ rows, title, tone, total }: { rows: { amount: number; 
 function ExpenseSummary({ rows, total }: { rows: { amount: number; count: number; name: string }[]; total: number }) {
   const max = Math.max(1, ...rows.map((row) => row.amount))
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-200">
+    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-100">
       <div className="mb-3 flex justify-between items-center">
         <h3 className="font-bold text-slate-800 text-sm">💸 ค่าใช้จ่ายประจำวัน ({rows.reduce((sum, row) => sum + row.count, 0)} รายการ)</h3>
         <span className="text-base font-bold text-red-600">รวม {money(total)} บาท</span>
@@ -931,7 +931,7 @@ function ExpenseSummary({ rows, total }: { rows: { amount: number; count: number
 
 function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cashMovement'] }) {
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-200">
+    <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-100">
       <h3 className="mb-3 font-bold text-slate-800 text-sm">💰 เงินหมุนประจำวัน</h3>
       <div className="mb-4 grid gap-3 md:grid-cols-3">
         <Tile tone="emerald" label="📥 เงินเข้ารวม" value={money(movement?.cashIn)} />
@@ -981,7 +981,7 @@ function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cas
 
 function TopSimpleTable({ rows, title }: { rows: { amount: number; group: string; qty: number }[]; title: string }) {
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-100">
       <h3 className="mb-2 font-bold text-slate-700 text-sm">{title}</h3>
       <table className="w-full text-xs">
         <thead className="bg-slate-50 text-slate-500">
@@ -1010,7 +1010,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: { 
   const hover = color === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
   const text = color === 'blue' ? 'text-blue-700' : 'text-emerald-700'
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className={`border-b p-3 font-bold text-sm ${header}`}>
         <h3 className="font-bold">{title}</h3>
       </div>
@@ -1075,7 +1075,7 @@ function ProductRank({ rows, title, tone }: { rows: { amount: number; code: stri
   const header = tone === 'indigo' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-teal-50 text-teal-700 border-teal-100'
   const text = tone === 'indigo' ? 'text-indigo-700' : 'text-teal-700'
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className={`border-b p-3 font-bold text-sm ${header}`}>
         <h3 className="font-bold">{title}</h3>
       </div>
@@ -1140,7 +1140,7 @@ function ProductRank({ rows, title, tone }: { rows: { amount: number; code: stri
 
 function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id: string; name: string; qty: number; suppliers: number }[] }) {
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+    <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-100">
       <h3 className="mb-3 font-bold text-slate-700 text-sm">🆕 ยอดซื้อแต่ละ Sale — จำนวน supplier/กก./ยอดซื้อ</h3>
       
       {/* Desktop view */}
@@ -1230,7 +1230,7 @@ function Metric({ label, tone = 'slate', value }: { label: string; tone?: string
   const cleanLabel = isEmoji ? label.slice(2).trim() : label
 
   return (
-    <div className={`rounded-xl border p-4 shadow-sm bg-white border-slate-200 flex items-center gap-3`}>
+    <div className={`rounded-xl border p-4 shadow-sm bg-white border-slate-100 flex items-center gap-3`}>
       {isEmoji && (
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cls.bg} ${cls.text} text-xl`}>
           {icon}
@@ -1246,7 +1246,7 @@ function Metric({ label, tone = 'slate', value }: { label: string; tone?: string
 
 function BigCard({ label, sub, tone, value }: { label: string; sub: string; tone: string; value: string }) {
   return (
-    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-5">
+    <div className="bg-white shadow-sm border border-slate-100 rounded-xl p-5">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className="mt-2 font-mono text-2xl font-bold text-slate-950">{value}</div>
       <div className="mt-1 text-xs text-slate-400">{sub}</div>
@@ -1256,7 +1256,7 @@ function BigCard({ label, sub, tone, value }: { label: string; sub: string; tone
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className="border-b border-slate-100 bg-slate-50/50 p-3 font-bold text-slate-700 text-sm">{title}</div>
       <div className="p-4">{children}</div>
     </div>
@@ -1265,7 +1265,7 @@ function Panel({ children, title }: { children: ReactNode; title: string }) {
 
 function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="bg-white p-4 shadow-sm border border-slate-200 rounded-xl">
+    <div className="bg-white p-4 shadow-sm border border-slate-100 rounded-xl">
       <h2 className="mb-3 font-bold text-slate-800 text-sm">{title}</h2>
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">{children}</div>
     </div>
@@ -1317,7 +1317,7 @@ function DueTable({ rows, title }: { rows: { amount: number; docNo: string; name
 function BillTable({ rows, title, tone }: { rows: { amount: number; docNo: string; name: string; qty: number }[]; title: string; tone: 'amber' | 'blue' | 'emerald' }) {
   const header = tone === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-200">
+    <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className={`border-b p-3 font-bold text-sm ${header}`}>{title}</div>
       <table className="w-full text-xs">
         <thead className="bg-slate-50 text-slate-500">

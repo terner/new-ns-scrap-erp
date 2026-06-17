@@ -484,11 +484,11 @@ export function AccountsPayablePageClient() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 font-mono text-[13px]">
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-sans font-semibold">ยอดค้างจ่ายรวม:</span>
+                    <span className="text-slate-400 block text-[10px] font-semibold">ยอดค้างจ่ายรวม:</span>
                     <span className="text-red-700 font-bold tabular-nums">{formatMoney(row.total)}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-sans font-semibold">Current:</span>
+                    <span className="text-slate-400 block text-[10px] font-semibold">Current:</span>
                     <span className="text-slate-600 tabular-nums">{formatMoney(row.current)}</span>
                   </div>
                 </div>
@@ -541,20 +541,20 @@ export function AccountsPayablePageClient() {
                 </div>
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 font-mono text-[13px]">
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-sans font-semibold">ยอดรวม:</span>
+                    <span className="text-slate-400 block text-[10px] font-semibold">ยอดรวม:</span>
                     <span className="text-slate-800 tabular-nums">{formatMoney(row.totalAmount)}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-sans font-semibold">จ่ายแล้ว:</span>
+                    <span className="text-slate-400 block text-[10px] font-semibold">จ่ายแล้ว:</span>
                     <span className="text-emerald-700 tabular-nums">{formatMoney(row.paidAmount)}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[10px] font-sans font-bold">ค้างจ่าย:</span>
+                    <span className="text-slate-500 block text-[10px] font-bold">ค้างจ่าย:</span>
                     <span className="text-red-700 font-bold tabular-nums">{formatMoney(row.payableBalance)}</span>
                   </div>
                 </div>
                 {row.channelName && (
-                  <div className="text-[10px] text-slate-400 pt-1.5 border-t border-slate-100 mt-1 font-sans">
+                  <div className="text-[10px] text-slate-400 pt-1.5 border-t border-slate-100 mt-1">
                     ช่องทาง: {row.channelName}
                   </div>
                 )}
@@ -649,9 +649,9 @@ function SummaryTable({
   const bucketTotal = (bucket: string) => buckets.find((item) => item.bucket === bucket)?.total ?? 0
 
   return (
-    <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+    <div className="hidden lg:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-100">
+        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
           <tr><th className="p-2 text-left">Supplier</th><th className="p-2 text-right">บิล</th><th className="p-2 text-right">Current</th><th className="p-2 text-right">1-30 วัน</th><th className="p-2 text-right">31-60</th><th className="p-2 text-right">61-90</th><th className="p-2 text-right">&gt;90</th><th className="p-2 text-right">รวมค้างจ่าย</th><th className="p-2 text-right">เกินกำหนดสุด</th></tr>
         </thead>
         <tbody>
@@ -710,9 +710,9 @@ function DetailTable({
 }) {
   const sortLabel = (key: SortKey) => selectedSort === key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''
   return (
-    <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+    <div className="hidden lg:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-100">
+        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
           <tr>
             <th className="p-2 text-left"><button type="button" onClick={() => onSort('supplierName')}>Supplier{sortLabel('supplierName')}</button></th>
             <th className="p-2 text-left"><button type="button" onClick={() => onSort('docNo')}>บิล{sortLabel('docNo')}</button></th>

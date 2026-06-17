@@ -249,7 +249,7 @@ export function TransactionLedgerPageClient() {
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
           {accountBalances.map((account) => (
-            <div key={account.id} className={`rounded-md border-2 p-3 transition ${filterAccount === account.id ? 'border-blue-500 bg-blue-50' : account.hasActual ? (account.match ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50') : 'border-slate-200 bg-slate-50'}`}>
+            <div key={account.id} className={`rounded-md border-2 p-3 transition ${filterAccount === account.id ? 'border-blue-500 bg-blue-50' : account.hasActual ? (account.match ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50') : 'border-slate-100 bg-slate-50'}`}>
               <button className="mb-2 flex w-full cursor-pointer items-center gap-2 text-left" type="button" onClick={() => setFilterAccount(filterAccount === account.id ? '' : account.id)}>
                 <span className="text-lg">{accountIcon(account.type)}</span>
                 <span className="min-w-0 flex-1">
@@ -281,7 +281,7 @@ export function TransactionLedgerPageClient() {
         {/* AcexPOS Style Grand Totals KPI Cards */}
         <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 text-sm">
           {/* 1. ยอดคงเหลือรวม */}
-          <div className="bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-3">
+          <div className="bg-white p-3 sm:p-4 border border-slate-100 rounded-xl shadow-sm flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shrink-0">
               💰
             </div>
@@ -292,7 +292,7 @@ export function TransactionLedgerPageClient() {
           </div>
 
           {/* 2. OD ใช้รวม */}
-          <div className="bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-3">
+          <div className="bg-white p-3 sm:p-4 border border-slate-100 rounded-xl shadow-sm flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xl shrink-0">
               ⚠️
             </div>
@@ -303,7 +303,7 @@ export function TransactionLedgerPageClient() {
           </div>
 
           {/* 3. Net Cash Position */}
-          <div className="bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-3 col-span-2 md:col-span-1">
+          <div className="bg-white p-3 sm:p-4 border border-slate-100 rounded-xl shadow-sm flex items-center gap-3 col-span-2 md:col-span-1">
             <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl shrink-0">
               📊
             </div>
@@ -366,11 +366,11 @@ export function TransactionLedgerPageClient() {
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการ</h4>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold font-sans"
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
                 onClick={() => setShowMobileFilters(false)}
                 type="button"
               >
@@ -390,7 +390,7 @@ export function TransactionLedgerPageClient() {
 
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-slate-600">เลือกบัญชี</span>
-                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800 font-sans" value={filterAccount} onChange={(event) => setFilterAccount(event.target.value)}>
+                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={filterAccount} onChange={(event) => setFilterAccount(event.target.value)}>
                   <option value="">💳 ทุกบัญชี</option>
                   {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
                 </select>
@@ -398,7 +398,7 @@ export function TransactionLedgerPageClient() {
 
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-slate-600">ประเภทรายการ</span>
-                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800 font-sans" value={filterRefType} onChange={(event) => setFilterRefType(event.target.value)}>
+                <select className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm bg-white text-slate-800" value={filterRefType} onChange={(event) => setFilterRefType(event.target.value)}>
                   <option value="">📋 ทุกประเภท</option>
                   {refTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
@@ -408,7 +408,7 @@ export function TransactionLedgerPageClient() {
             <div className="grid grid-cols-2 gap-3 mt-6 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 font-sans"
+                className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => {
                   clearFilters()
                   setShowMobileFilters(false)
@@ -418,7 +418,7 @@ export function TransactionLedgerPageClient() {
               </button>
               <button
                 type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 font-sans"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
                 onClick={() => setShowMobileFilters(false)}
               >
                 ใช้ตัวกรอง
@@ -455,9 +455,9 @@ export function TransactionLedgerPageClient() {
       ) : null}
 
       {/* Desktop Table View (Hidden on Mobile) */}
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm min-w-[1000px]">
-          <thead className="bg-slate-100 text-slate-700">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-left">
             <tr>
               <th className="p-3 text-left font-semibold">วันที่</th>
               <th className="p-3 text-left font-semibold">บัญชี</th>
@@ -504,7 +504,7 @@ export function TransactionLedgerPageClient() {
       {!isLoading && ledger.length > 0 ? (
         <div className="space-y-3 lg:hidden">
           {ledger.map((row) => (
-            <div key={row.id} className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm space-y-2.5 animate-fade-in">
+            <div key={row.id} className="rounded-lg border border-slate-100 bg-white p-3.5 shadow-sm space-y-2.5 animate-fade-in">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">{row.refType}</span>
@@ -553,13 +553,13 @@ export function TransactionLedgerPageClient() {
       ) : null}
 
       {!isLoading && ledger.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm lg:hidden">
+        <div className="rounded-lg border border-slate-100 bg-white p-12 text-center text-slate-400 shadow-sm lg:hidden">
           ไม่มีรายการ
         </div>
       ) : null}
 
       {isLoading ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-slate-400 shadow-sm lg:hidden">
+        <div className="rounded-lg border border-slate-100 bg-white p-12 text-center text-slate-400 shadow-sm lg:hidden">
           กำลังโหลด Transaction Ledger...
         </div>
       ) : null}

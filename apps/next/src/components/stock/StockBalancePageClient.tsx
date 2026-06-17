@@ -756,7 +756,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
           <div className="text-lg font-bold mt-1 text-emerald-700 tabular-nums">{formatMoney(info.ready)} <span className="text-xs font-normal">กก.</span></div>
         </div>
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">📜 รายการสต๊อกของสินค้านี้ ({rows.length} รายการ)</h4>
           <span className="text-[10px] text-slate-400 font-medium">กด Detail เพื่อดูข้อมูลย่อย</span>

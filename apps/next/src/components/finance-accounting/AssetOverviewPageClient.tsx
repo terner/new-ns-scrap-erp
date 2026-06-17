@@ -250,7 +250,7 @@ function Mini({ label, tone, value }: { label: string; tone: string; value: stri
 function DonutPanel({ empty, items, title, total, tone }: { empty?: string; items: Array<{ color: string; name: string; val: number }>; title: string; total: number; tone: string }) {
   const gradient = conic(items, total)
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
       <h3 className={`mb-4 font-bold text-sm ${tone === 'red' ? 'text-red-700' : 'text-emerald-700'}`}>{title}</h3>
       <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full p-9 shadow-inner transition-transform" style={{ background: gradient }}>
         <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-center text-[10px] font-bold text-slate-800 border border-slate-100 shadow-sm leading-tight">
@@ -288,7 +288,7 @@ function conic(items: Array<{ color: string; val: number }>, total: number) {
 function ArAging({ aging, total }: { aging: Record<string, number>; total: number }) {
   const max = Math.max(1, ...Object.values(aging))
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
       <h3 className="mb-4 font-bold text-sm text-blue-700">📥 AR Aging - อายุลูกหนี้</h3>
       <div className="space-y-3">
         {Object.entries(aging).map(([key, amount]) => (
@@ -348,17 +348,17 @@ function CashTable({ rows, total }: { rows: AnyRow[]; total: number }) {
         <table className="w-full text-xs text-slate-700">
           <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
             <tr>
-              {headers.map((header) => <th key={header} className="p-2 text-left last:text-right">{header}</th>)}
+              {headers.map((header) => <th key={header} className="px-4 py-3 text-xs font-semibold text-slate-500 text-left last:text-right">{header}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row, index) => (
               <tr key={`${row.name}-${index}`} className="hover:bg-slate-50/50 transition-colors">
-                <td className="p-2 font-medium">{text(row.name)}</td>
-                <td className="p-2 text-slate-500">{text(row.type)}</td>
-                <td className="p-2 text-slate-500">{text(row.currency)}</td>
-                <td className="p-2 text-right font-mono">{money(row.balance)}</td>
-                <td className="p-2 text-right font-mono font-semibold text-emerald-600">{money(row.thbEquivalent)}</td>
+                <td className="px-4 py-3.5 font-medium">{text(row.name)}</td>
+                <td className="px-4 py-3.5 text-slate-500">{text(row.type)}</td>
+                <td className="px-4 py-3.5 text-slate-500">{text(row.currency)}</td>
+                <td className="px-4 py-3.5 text-right font-mono">{money(row.balance)}</td>
+                <td className="px-4 py-3.5 text-right font-mono font-semibold text-emerald-600">{money(row.thbEquivalent)}</td>
               </tr>
             ))}
           </tbody>
@@ -428,7 +428,7 @@ function Panel({ children, heading, tone, total }: { children: ReactNode; headin
     red: 'bg-red-50/40',
   }
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm flex flex-col justify-between">
       <div className={`flex justify-between border-b border-slate-100 px-4 py-3.5 font-bold text-sm ${bgMap[tone]} ${map[tone]}`}>
         <span>{heading}</span>
         <span className="font-mono font-bold">{money(total as number)}</span>

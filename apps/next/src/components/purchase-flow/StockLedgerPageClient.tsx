@@ -313,9 +313,9 @@ export function StockLedgerPageClient() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden animate-fade-in">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h4 className="font-bold text-slate-800 font-sans">ตัวกรอง Stock Ledger</h4>
+              <h4 className="font-bold text-slate-800">ตัวกรอง Stock Ledger</h4>
               <button
-                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold font-sans"
+                className="p-1 text-slate-400 hover:text-slate-600 text-xl font-bold"
                 onClick={() => setShowMobileFilters(false)}
                 type="button"
               >
@@ -359,11 +359,11 @@ export function StockLedgerPageClient() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="mb-1 block text-xs font-semibold text-slate-600 font-sans">จากวันที่</span>
+                  <span className="mb-1 block text-xs font-semibold text-slate-600">จากวันที่</span>
                   <DatePickerInput className="w-full h-10 text-sm" title="จากวันที่" value={fromDate} onChange={(value) => { setPage(1); setFromDate(value) }} />
                 </div>
                 <div>
-                  <span className="mb-1 block text-xs font-semibold text-slate-600 font-sans">ถึงวันที่</span>
+                  <span className="mb-1 block text-xs font-semibold text-slate-600">ถึงวันที่</span>
                   <DatePickerInput className="w-full h-10 text-sm" title="ถึงวันที่" value={toDate} onChange={(value) => { setPage(1); setToDate(value) }} />
                 </div>
               </div>
@@ -437,12 +437,12 @@ export function StockLedgerPageClient() {
             
             <div className="text-xs text-slate-600 space-y-1">
               <div>
-                <span className="font-semibold text-slate-500 font-sans">สินค้า: </span>
+                <span className="font-semibold text-slate-500">สินค้า: </span>
                 <span className="text-slate-800">{row.productCode ? `${row.productCode} · ` : ''}{row.productName}</span>
                 {row.lotNo && row.lotNo !== 'OPENING' ? <span className="ml-1 text-[11px] font-medium text-slate-400">[{row.lotNo}]</span> : null}
               </div>
               <div>
-                <span className="font-semibold text-slate-500 font-sans">ประเภทการโอน: </span>
+                <span className="font-semibold text-slate-500">ประเภทการโอน: </span>
                 <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${row.qtyIn > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {stockMovementTypeLabel(row.movementType)}
                 </span>
@@ -477,18 +477,15 @@ export function StockLedgerPageClient() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm">
         <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {stockLedgerColumns.map((column) => {
               const style = columnResize.getColumnStyle(column.key);
-              if (column.key === 'productName') {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
               return <col key={column.key} style={style} />;
             })}
           </colgroup>
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
               <StockLedgerSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} sortKey="date" onSort={changeSort} />
               <StockLedgerSortHeader activeKey={sortKey} direction={sortDirection} label="เลขบิล" resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขบิล')} sortKey="refNo" onSort={changeSort} />
@@ -508,7 +505,7 @@ export function StockLedgerPageClient() {
             {!isLoading && rows.map((row) => (
               <tr
                 key={row.id}
-                className={row.runningBalanceByProduct < 0 ? 'cursor-pointer border-t border-red-200 bg-red-50/60 font-sans hover:bg-red-100/70 focus:bg-red-100/70 focus:outline-none' : 'cursor-pointer border-t font-sans hover:bg-slate-50 focus:bg-slate-50 focus:outline-none'}
+                className={row.runningBalanceByProduct < 0 ? 'cursor-pointer border-t border-red-200 bg-red-50/60 hover:bg-red-100/70 focus:bg-red-100/70 focus:outline-none' : 'cursor-pointer border-t hover:bg-slate-50 focus:bg-slate-50 focus:outline-none'}
                 tabIndex={0}
                 onClick={() => setSelectedRow(row)}
                 onKeyDown={(event) => {

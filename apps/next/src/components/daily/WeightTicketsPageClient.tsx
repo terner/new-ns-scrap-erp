@@ -674,7 +674,7 @@ export function WeightTicketsPageClient({
                       <button
                         className={cn(
                           'block w-full rounded-md border px-3 py-3 text-left transition',
-                          active ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
+                          active ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50',
                         )}
                         key={line.id}
                         type="button"
@@ -705,7 +705,7 @@ export function WeightTicketsPageClient({
                 const lineTotals = calculateLineTotals(line)
 
                 return (
-                  <div className="min-w-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-3 sm:p-4 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto">
+                  <div className="min-w-0 overflow-hidden rounded-md border border-slate-100 bg-slate-50 p-3 sm:p-4 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto">
                     <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                       <div className="inline-flex rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">รายการ {index + 1}</div>
                       <Button disabled={form.lines.length === 1} size="xs" type="button" variant="outline" onClick={() => removeLine(line.id)}>
@@ -903,8 +903,8 @@ export function WeightTicketsPageClient({
 
       <div className={cn(
         onClose
-          ? "sticky bottom-0 z-20 border-t border-slate-200 bg-slate-50 px-4 py-3 shrink-0"
-          : "fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-sm lg:left-64"
+          ? "sticky bottom-0 z-20 border-t border-slate-100 bg-slate-50 px-4 py-3 shrink-0"
+          : "fixed inset-x-0 bottom-0 z-20 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm lg:left-64"
       )}>
         <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 w-full sm:w-auto flex justify-center sm:block">
@@ -1117,7 +1117,7 @@ function ProductImagePicker({
       </Button>
 
       {selectedProduct ? (
-        <div className="mt-2 flex items-center gap-3 rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="mt-2 flex items-center gap-3 rounded-md border border-slate-100 bg-white p-2 shadow-sm">
           <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100 border border-slate-100">
             {selectedProduct.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1143,7 +1143,7 @@ function ProductImagePicker({
       ) : null}
 
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel() }}>
-        <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-xl border border-slate-200 shadow-2xl flex flex-col max-h-[90vh]">
+        <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-xl border border-slate-100 shadow-2xl flex flex-col max-h-[90vh]">
           <DialogHeader className="px-5 pt-4 pb-4 rounded-t-xl flex flex-row items-center justify-between bg-slate-900 border-none">
             <div className="flex items-center gap-2">
               <span className="text-lg">📦</span>
@@ -1168,7 +1168,7 @@ function ProductImagePicker({
               <button
                 className={cn(
                   'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
-                  category === 'all' ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+                  category === 'all' ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-100 bg-slate-50 text-slate-700 hover:bg-slate-100',
                 )}
                 type="button"
                 onClick={() => setCategory('all')}
@@ -1179,7 +1179,7 @@ function ProductImagePicker({
                 <button
                   className={cn(
                     'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
-                    category === item ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+                    category === item ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-100 bg-slate-50 text-slate-700 hover:bg-slate-100',
                   )}
                   key={item}
                   type="button"
@@ -1201,7 +1201,7 @@ function ProductImagePicker({
                         'overflow-hidden rounded-xl border bg-white text-left transition duration-150 flex flex-col group relative',
                         selected
                           ? 'border-blue-600 ring-2 ring-blue-100 bg-blue-50/20'
-                          : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
+                          : 'border-slate-100 hover:border-slate-300 hover:shadow-md',
                       )}
                       key={product.id}
                       type="button"
@@ -1276,12 +1276,12 @@ function AttachmentProfileGrid({
   onRemove: (fileId: string) => void
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+    <div className="rounded-md border border-slate-100 bg-slate-50 p-3">
       <div className="flex flex-wrap gap-3">
         {files.map((file) => (
           <div className="w-28 min-w-0" key={file.id}>
             <button
-              className="group relative block h-28 w-28 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm ring-1 ring-slate-100 hover:border-slate-400"
+              className="group relative block h-28 w-28 overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm ring-1 ring-slate-100 hover:border-slate-400"
               disabled={!file.url}
               title={file.fileName}
               type="button"

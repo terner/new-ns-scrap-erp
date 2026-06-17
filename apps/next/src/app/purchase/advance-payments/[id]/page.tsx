@@ -34,7 +34,7 @@ function text(value: string | null | undefined) {
 
 function DetailCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3">
+    <div className="rounded-md border border-slate-100 bg-white p-3">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
     </div>
@@ -137,7 +137,7 @@ export default async function AdvancePaymentDetailPage({ params }: PageProps) {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-100">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
               <tr>
                 <th className="p-2 text-left">วันที่</th>
                 <th className="p-2 text-left">บิลรับซื้อ</th>

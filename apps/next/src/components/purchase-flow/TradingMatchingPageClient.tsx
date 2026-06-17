@@ -167,8 +167,8 @@ export function TradingMatchingPageClient() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex flex-wrap items-center border-b border-slate-200 bg-slate-50/50">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+        <div className="flex flex-wrap items-center border-b border-slate-100 bg-slate-50/50">
           <button className={`border-b-2 px-5 py-3.5 text-sm font-semibold outline-none focus:outline-none focus:ring-0 transition-colors ${tab === 'allocations' ? 'border-purple-600 text-purple-700' : 'border-transparent text-slate-500 hover:text-slate-850'}`} type="button" onClick={() => setTab('allocations')}>Allocation ({filteredDeals.length})</button>
           <button className={`border-b-2 px-5 py-3.5 text-sm font-semibold outline-none focus:outline-none focus:ring-0 transition-colors ${tab === 'remaining' ? 'border-purple-600 text-purple-700' : 'border-transparent text-slate-500 hover:text-slate-850'}`} type="button" onClick={() => setTab('remaining')}>ต้นทุนคงเหลือ ({remainingPurchases.length})</button>
         </div>
@@ -197,7 +197,7 @@ export function TradingMatchingPageClient() {
 
             <div className="hidden overflow-x-auto p-5 lg:block">
               <table className="w-full min-w-[1080px] text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-655 font-semibold">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-655 font-semibold">
                   <tr>
                     <th className="p-2.5 text-left font-semibold">Sales Bill</th>
                     <th className="p-2.5 text-left font-semibold">วันที่</th>
@@ -291,9 +291,9 @@ function RemainingPurchaseTable({ rows }: { rows: TradingPurchaseRow[] }) {
   return (
     <div>
       <div className="mb-3.5 font-bold text-emerald-755 text-sm">Trading Purchases / Cost Source — ยังไม่ได้จับ Matched</div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+      <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-2xs">
         <table className="w-full text-xs">
-          <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-650">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-655">
             <tr>
               <th className="p-2.5 text-left font-semibold">บิลซื้อ</th>
               <th className="p-2.5 text-left font-semibold">วันที่</th>
@@ -362,7 +362,7 @@ function DealDetailModal({ deal, onClose }: { deal: TradingDealRow; onClose: () 
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-5 text-sm">
-          <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-3">
+          <div className="grid gap-3 rounded-xl border border-slate-100 bg-white p-5 shadow-sm md:grid-cols-3">
             <Detail label="วันที่" value={deal.date || '-'} />
             <Detail label="Qty" value={formatMoney(deal.matchedQty)} />
             <Detail label="GP %" value={`${formatMoney(deal.grossProfitPct)}%`} />
@@ -378,8 +378,8 @@ function DealDetailModal({ deal, onClose }: { deal: TradingDealRow; onClose: () 
           </div>
         </div>
 
-        <DialogFooter className="bg-slate-50 border-t border-slate-200 px-6 py-3.5 flex justify-end">
-          <button className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-655 hover:text-slate-800 hover:bg-slate-50 transition-colors h-10 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer flex items-center justify-center" type="button" onClick={onClose}>ปิด</button>
+        <DialogFooter className="bg-slate-50 border-t border-slate-100 px-6 py-3.5 flex justify-end">
+          <button className="text-slate-500 hover:text-slate-700 text-sm font-semibold px-4 py-2 transition-colors focus:outline-none" type="button" onClick={onClose}>ปิด</button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -196,16 +196,16 @@ export function FxRatePageClient() {
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {latestRates.slice(0, 5).map((rate) => (
-            <div key={rate.id} className="bg-white border border-slate-200 rounded-xl p-3.5 text-center shadow-sm hover:shadow-md transition-shadow">
+            <div key={rate.id} className="bg-white border border-slate-100 rounded-xl p-3.5 text-center shadow-sm hover:shadow-md transition-shadow">
               <div className="text-xs font-semibold text-slate-500">{rate.fromCurrency} &rarr; {rate.toCurrency}</div>
               <div className="text-2xl font-bold text-slate-900 mt-1">{formatRate(rate.rate)}</div>
               <div className="mt-1.5 text-[10px] font-medium text-slate-400">{formatDateDisplay(rate.rateDate)}</div>
             </div>
           ))}
-          {!isLoading && (data?.latestRates.length ?? 0) === 0 ? <div className="col-span-full rounded-xl bg-white border border-slate-200 p-6 text-center text-sm text-slate-500 shadow-sm">ยังไม่มี FX Rate</div> : null}
+          {!isLoading && (data?.latestRates.length ?? 0) === 0 ? <div className="col-span-full rounded-xl bg-white border border-slate-100 p-6 text-center text-sm text-slate-500 shadow-sm">ยังไม่มี FX Rate</div> : null}
         </div>
       </div>
 
@@ -242,7 +242,7 @@ export function FxRatePageClient() {
           <div className="flex gap-2">
             <button
               className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-1 ${
-                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-100'
               }`}
               type="button"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -289,33 +289,33 @@ export function FxRatePageClient() {
         </div>
       </div>
 
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">From</th>
-              <th className="p-2 text-left">To</th>
-              <th className="p-2 text-left">Rate Type</th>
-              <th className="p-2 text-right">Rate</th>
-              <th className="p-2 text-left">Source</th>
-              <th className="p-2 text-center">Active</th>
-              <th className="p-2 text-right"></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">วันที่</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">From</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">To</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">Rate Type</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">Rate</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">Source</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-center">Active</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && (data?.rows.length ?? 0) === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>ยังไม่มี FX Rate</td></tr> : null}
             {!isLoading && data?.rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="p-2">{formatDateDisplay(row.rateDate)}</td>
-                <td className="p-2 font-medium">{row.fromCurrency}</td>
-                <td className="p-2 font-medium">{row.toCurrency}</td>
-                <td className="p-2 text-xs">{row.rateType}</td>
-                <td className="p-2 text-right font-bold">{formatRate(row.rate)}</td>
-                <td className="p-2 text-xs">{row.source || '-'}</td>
-                <td className="p-2 text-center text-xs text-slate-500">{row.active ? 'Yes' : 'No'}</td>
-                <td className="p-2 text-right"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={() => openEdit(row)}>จัดการ</button></td>
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                <td className="px-4 py-3.5">{formatDateDisplay(row.rateDate)}</td>
+                <td className="px-4 py-3.5 font-medium">{row.fromCurrency}</td>
+                <td className="px-4 py-3.5 font-medium">{row.toCurrency}</td>
+                <td className="px-4 py-3.5 text-xs">{row.rateType}</td>
+                <td className="px-4 py-3.5 text-right font-bold">{formatRate(row.rate)}</td>
+                <td className="px-4 py-3.5 text-xs">{row.source || '-'}</td>
+                <td className="px-4 py-3.5 text-center text-xs text-slate-500">{row.active ? 'Yes' : 'No'}</td>
+                <td className="px-4 py-3.5 text-right"><button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" onClick={() => openEdit(row)}>จัดการ</button></td>
               </tr>
             ))}
           </tbody>
@@ -325,15 +325,15 @@ export function FxRatePageClient() {
       {/* Mobile Card list */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
         {!isLoading && (data?.rows.length ?? 0) === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มี FX Rate</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มี FX Rate</div>
         ) : null}
         {!isLoading && data?.rows.map((row) => (
           <div
             key={row.id}
-            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm space-y-2 text-sm"
+            className="rounded-md border border-slate-100 bg-white p-4 shadow-sm space-y-2 text-sm"
           >
             <div className="flex justify-between items-start">
               <span className="font-mono text-slate-500 text-xs">{formatDateDisplay(row.rateDate)}</span>
@@ -367,7 +367,7 @@ export function FxRatePageClient() {
       {showForm ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10" onClick={() => setShowForm(false)}>
           <div className="w-full max-w-lg overflow-hidden rounded-md bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-5 py-4">
               <h3 className="font-bold text-white">{form.id ? 'แก้ไข FX Rate' : 'เพิ่ม FX Rate'}</h3>
               <button className="text-2xl text-white/80 hover:text-white" type="button" onClick={() => setShowForm(false)}>&times;</button>
             </div>
@@ -381,7 +381,7 @@ export function FxRatePageClient() {
               <Field label="สถานะ"><select className="w-full rounded-md border px-2 py-1.5 h-9 text-sm outline-none" value={String(form.active)} onChange={(event) => setForm({ ...form, active: event.target.value === 'true' })}><option value="true">Active</option><option value="false">Inactive</option></select></Field>
               <Field label="หมายเหตุ"><input className="w-full rounded-md border px-2 py-1.5 h-9 text-sm outline-none" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
               <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setShowForm(false)}>ยกเลิก</button>
               <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="button" onClick={() => void saveRate()}>{isSaving ? 'กำลังบันทึก' : 'บันทึก'}</button>
             </div>

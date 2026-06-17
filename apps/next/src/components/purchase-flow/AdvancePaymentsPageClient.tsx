@@ -608,7 +608,7 @@ export function AdvancePaymentsPageClient() {
                   </div>
                   <div className="col-span-2 lg:col-span-3">
                     <Field error={fieldErrors.vehiclePhotoNames} label="รูปภาพรถ">
-                      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                         <label className="block bg-white p-6 border-2 border-dashed border-slate-300 rounded-xl text-center hover:border-emerald-400 hover:bg-slate-50 cursor-pointer transition-colors">
                           <div className="text-2xl mb-2">📁</div>
                           <div className="text-sm font-medium text-slate-700">คลิกเพื่ออัปโหลดรูปภาพรถ</div>
@@ -665,7 +665,7 @@ export function AdvancePaymentsPageClient() {
                 </div>
               </FormSection>
             </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-md border border-slate-100 bg-slate-50 p-4">
               <div className="text-sm font-semibold text-slate-800">สรุปก่อนบันทึก</div>
               <SummaryLine label="น้ำหนักสุทธิ x ราคา" value={formatMoney(computedAmount)} />
               <SummaryLine label="ยอดมัดจำ" value={formatMoney(Number(form.amount) || 0)} />
@@ -754,7 +754,7 @@ export function AdvancePaymentsPageClient() {
           {/* Bottom Sheet Filter for Mobile */}
           {showMobileFilters ? (
             <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
-              <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
+              <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 animate-slide-up max-h-[80vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                   <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
                   <button
@@ -852,15 +852,15 @@ export function AdvancePaymentsPageClient() {
           {/* Mobile Card List */}
           <div className="block md:hidden space-y-3">
             {isLoading ? (
-              <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+              <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
             ) : null}
             {!isLoading && (data?.rows ?? []).length === 0 ? (
-              <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มีรายการจ่ายเงินล่วงหน้า</div>
+              <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มีรายการจ่ายเงินล่วงหน้า</div>
             ) : null}
             {!isLoading && (data?.rows ?? []).map((row) => (
               <div
                 key={row.id}
-                className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+                className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
                 onClick={() => void loadDetail(row.id)}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -894,15 +894,12 @@ export function AdvancePaymentsPageClient() {
           <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
             <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {advancePaymentColumns.map((column, index) => {
-              const style = columnResize.getColumnStyle(column.key);
-              if (index === advancePaymentColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
-              return <col key={column.key} style={style} />;
-            })}
+                {advancePaymentColumns.map((column) => {
+                  const style = columnResize.getColumnStyle(column.key);
+                  return <col key={column.key} style={style} />;
+                })}
               </colgroup>
-              <thead className="bg-slate-100">
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
                 <tr>
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
                   <AdvancePaymentSortHeader activeKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('advanceDate', 'วันที่')} sortKey="advanceDate" onSort={changeSort} />
@@ -998,7 +995,7 @@ export function AdvancePaymentsPageClient() {
               </div>
 
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm col-span-2 lg:col-span-1">
+                <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm col-span-2 lg:col-span-1">
                   <div className="mb-3 text-sm font-semibold text-slate-900">ข้อมูลเอกสาร</div>
                   <DetailGrid
                     items={[
@@ -1028,7 +1025,7 @@ export function AdvancePaymentsPageClient() {
                 </div>
 
                 <div className="space-y-4 col-span-2 lg:col-span-1">
-                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
                     <div className="mb-3 text-sm font-semibold text-slate-900">การติดตามสถานะ</div>
                     <DetailGrid
                       items={[
@@ -1042,7 +1039,7 @@ export function AdvancePaymentsPageClient() {
                     />
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
                     <div className="mb-3 text-sm font-semibold text-slate-900">รายการหักบิล</div>
                     {detail.allocations.length === 0 ? <div className="text-sm text-slate-400">ยังไม่มีการใช้ ADV หักบิล</div> : (
                       <div className="space-y-2">
@@ -1068,7 +1065,7 @@ export function AdvancePaymentsPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-lg border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="mb-3 text-sm font-semibold text-slate-900">Timeline</div>
                 {detail.timeline.length === 0 ? <div className="text-sm text-slate-400">ยังไม่มี timeline ของรายการนี้</div> : (
                   <div className="space-y-3">
@@ -1162,7 +1159,7 @@ function productOptionLabel(option: OptionRow) {
 
 function FormSection({ children, description, title }: { children: React.ReactNode; description: string; title: string }) {
   return (
-    <div className="rounded-md border border-slate-200 p-4">
+    <div className="rounded-md border border-slate-100 p-4">
       <div className="mb-4">
         <div className="text-sm font-semibold text-slate-900">{title}</div>
         <div className="mt-1 text-xs text-slate-500">{description}</div>
@@ -1324,7 +1321,7 @@ function KpiCard({ label, tone, value }: { label: string; tone: 'amber' | 'alloc
   const config = configs[tone]
 
   return (
-    <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 flex-1">
+    <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 flex-1">
       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
         {config.emoji}
       </div>

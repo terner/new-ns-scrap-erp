@@ -37,7 +37,7 @@ function expenseStatusLabel(value: string | null | undefined) {
 
 function DetailCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3">
+    <div className="rounded-md border border-slate-100 bg-white p-3">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
     </div>

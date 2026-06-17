@@ -233,18 +233,20 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           </div>
         </div>
 
-        <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow border border-slate-200/60">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100 border-b border-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
-            <tbody>
-              {isLoading ? <tr><td className="py-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
-              {!isLoading && costRows.map((row, index) => {
-                const costs = costBreakdown(row)
-                return <tr key={String(row.id ?? index)} className="border-t border-slate-100 hover:bg-slate-50"><td className="p-2 font-mono text-xs">{String(row.docNo ?? '')}</td><td className="p-2">{formatDateDisplay(String(row.date ?? ''))}</td><td className="p-2 text-right">{formatMoney(Number(row.inputCost ?? 0))}</td><td className="p-2 text-right">{formatMoney(costs.labor)}</td><td className="p-2 text-right">{formatMoney(costs.electricity)}</td><td className="p-2 text-right">{formatMoney(costs.machine)}</td><td className="p-2 text-right">{formatMoney(costs.fuel)}</td><td className="p-2 text-right">{formatMoney(costs.maintenance)}</td><td className="p-2 text-right">{formatMoney(costs.otherProc)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))}</td><td className="p-2 text-right text-slate-700">{formatMoney(Number(row.costPerKg ?? 0))}</td><td className="p-2 text-xs">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</td></tr>
-              })}
-              {!isLoading && costRows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={13}>ไม่มีข้อมูล</td></tr> : null}
-            </tbody>
-          </table>
+        <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm hidden lg:block">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
+              <tbody>
+                {isLoading ? <tr><td className="py-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
+                {!isLoading && costRows.map((row, index) => {
+                  const costs = costBreakdown(row)
+                  return <tr key={String(row.id ?? index)} className="border-t border-slate-100 hover:bg-slate-50"><td className="p-2 font-mono text-xs">{String(row.docNo ?? '')}</td><td className="p-2">{formatDateDisplay(String(row.date ?? ''))}</td><td className="p-2 text-right">{formatMoney(Number(row.inputCost ?? 0))}</td><td className="p-2 text-right">{formatMoney(costs.labor)}</td><td className="p-2 text-right">{formatMoney(costs.electricity)}</td><td className="p-2 text-right">{formatMoney(costs.machine)}</td><td className="p-2 text-right">{formatMoney(costs.fuel)}</td><td className="p-2 text-right">{formatMoney(costs.maintenance)}</td><td className="p-2 text-right">{formatMoney(costs.otherProc)}</td><td className="p-2 text-right font-bold text-blue-700">{formatMoney(Number(row.totalCost ?? 0))}</td><td className="p-2 text-right text-emerald-700">{formatMoney(Number(row.outputQty ?? 0))}</td><td className="p-2 text-right text-slate-700">{formatMoney(Number(row.costPerKg ?? 0))}</td><td className="p-2 text-xs">{String(row.costAllocationMethod ?? row.productionType ?? '-')}</td></tr>
+                })}
+                {!isLoading && costRows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={13}>ไม่มีข้อมูล</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Cost Mobile Card List View */}
@@ -345,14 +347,14 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
             <h3 className="mb-3 font-bold text-slate-700 text-sm">สถานะใบสั่งผลิต</h3>
             <div className="space-y-2">
               {byStatus.map((item) => <StatusBar key={item.status} count={item.count} max={Math.max(1, ...byStatus.map((row) => row.count))} status={item.status} />)}
               {!byStatus.length ? <div className="py-6 text-center text-sm text-slate-400">ยังไม่มีข้อมูล</div> : null}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm lg:col-span-2 flex flex-col overflow-hidden">
+          <div className="rounded-xl border border-slate-100 bg-white shadow-sm lg:col-span-2 flex flex-col overflow-hidden">
             <div className="border-b border-slate-100 bg-emerald-50/50 p-3"><h3 className="font-bold text-emerald-700 text-sm">Top 10 สินค้าที่ผลิตมากสุด</h3></div>
             
             {/* Desktop View */}
@@ -426,7 +428,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           </div>
         </div>
  
-        <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col overflow-hidden">
+        <div className="rounded-xl border border-slate-100 bg-white shadow-sm flex flex-col overflow-hidden">
           <div className="border-b border-slate-100 bg-indigo-50/50 p-3"><h3 className="font-bold text-indigo-700 text-sm">Machine Utilization (ปริมาณผลิตต่อเครื่อง)</h3></div>
           
           {/* Desktop View */}
@@ -480,7 +482,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      <div className="rounded-xl border border-slate-200/60 bg-white p-3 sm:p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <DatePickerInput className="flex-1 sm:flex-none sm:w-[130px]" value={dateFrom} onChange={setDateFrom} />
@@ -530,7 +532,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       {mode === 'report' ? (
         <div className="space-y-4">
           {/* WIP คงเหลือ (Work-in-Progress) */}
-          <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col overflow-hidden">
+          <div className="rounded-xl border border-slate-100 bg-white shadow-sm flex flex-col overflow-hidden">
             <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-lg">🏆</span>
@@ -636,13 +638,13 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           </div>
 
           {/* ผลผลิตแยกตามสินค้า */}
-          <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col overflow-hidden">
+          <div className="rounded-xl border border-slate-100 bg-white shadow-sm flex flex-col overflow-hidden">
             <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-3"><h3 className="font-bold text-slate-700 text-sm">📦 ผลผลิตแยกตามสินค้า</h3></div>
 
             {/* Desktop View */}
             <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-100 border-b border-slate-100">
+                <thead className="bg-slate-50 border-b border-slate-100">
                   <tr className="border-slate-100">
                     <th className="p-2 text-left text-xs font-semibold text-slate-500">สินค้า</th>
                     <th className="p-2 text-right text-xs font-semibold text-slate-500">รอบ</th>
@@ -699,31 +701,33 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       ) : null}
 
       {/* Desktop view for other modes */}
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow border border-slate-200/60">
-        <table className="w-full text-sm table-zebra">
-          <thead className="bg-slate-100 border-b border-slate-100">
-            <tr className="border-slate-100">
-              {config.columns.map((column) => (
-                <th key={column.key} className="whitespace-nowrap p-2 text-left text-xs font-semibold text-slate-500">
-                  {column.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.map((row, index) => (
-              <tr key={String(row.id ?? index)} className={`border-t border-slate-100 hover:bg-slate-50 ${mode === 'wip' ? wipAgeClass(Number(row.ageDays ?? 0)) : ''}`}>
+      <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm hidden lg:block">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm table-zebra">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr className="border-slate-100">
                 {config.columns.map((column) => (
-                  <td key={column.key} className={`whitespace-nowrap p-2 text-xs ${cellTone(row[column.key], column, mode)}`}>
-                    {formatCell(row[column.key], column.type)}
-                  </td>
+                  <th key={column.key} className="whitespace-nowrap p-2 text-left text-xs font-semibold text-slate-500">
+                    {column.label}
+                  </th>
                 ))}
               </tr>
-            ))}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>ไม่มีข้อมูล</td></tr> : null}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
+              {!isLoading && rows.map((row, index) => (
+                <tr key={String(row.id ?? index)} className={`border-t border-slate-100 hover:bg-slate-50 ${mode === 'wip' ? wipAgeClass(Number(row.ageDays ?? 0)) : ''}`}>
+                  {config.columns.map((column) => (
+                    <td key={column.key} className={`whitespace-nowrap p-2 text-xs ${cellTone(row[column.key], column, mode)}`}>
+                      {formatCell(row[column.key], column.type)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>ไม่มีข้อมูล</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Dynamic Mobile Card List View for other modes */}

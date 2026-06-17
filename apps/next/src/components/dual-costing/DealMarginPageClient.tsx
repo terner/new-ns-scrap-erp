@@ -103,7 +103,7 @@ export function DealMarginPageClient() {
           <div className="mt-3 space-y-0.5 text-xs opacity-80 font-mono">
             <div>Revenue: <b>{formatMoney(data?.summary.revenue ?? 0)}</b></div>
             <div>Cost: <b>{formatMoney(data?.summary.cost ?? 0)}</b></div>
-            <div className="font-sans mt-1">{data?.summary.rows ?? 0} Deals · {data?.summary.fullyMatched ?? 0} Fully Matched</div>
+            <div className="mt-1">{data?.summary.rows ?? 0} Deals · {data?.summary.fullyMatched ?? 0} Fully Matched</div>
           </div>
         </div>
 

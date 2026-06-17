@@ -1789,14 +1789,11 @@ export function MoneyMovementPageClient({
           </div>
 
           {/* Desktop Table */}
-          <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
             <Table className="text-xs" style={{ minWidth: paymentQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {paymentQueueColumns.map((column, index) => {
+                {paymentQueueColumns.map((column) => {
                   const style = paymentQueueColumnResize.getColumnStyle(column.key);
-                  if (index === paymentQueueColumns.length - 1) {
-                    return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-                  }
                   return <col key={column.key} style={style} />;
                 })}
               </colgroup>
@@ -1824,7 +1821,7 @@ export function MoneyMovementPageClient({
                       <TableRow key={`${bill.id}:${bill.approvalId ?? 'no-approval'}`} className="cursor-pointer hover:bg-slate-50" onClick={() => openFormForBill(bill)}>
                         <TableCell className="text-xs font-semibold text-slate-700">
                           <div>{bill.docNo}</div>
-                          {bill.sourceDocNo && bill.sourceDocNo !== bill.docNo ? <div className="mt-1 font-sans text-[11px] font-normal text-slate-500">อ้างอิง {bill.sourceDocNo}</div> : null}
+                          {bill.sourceDocNo && bill.sourceDocNo !== bill.docNo ? <div className="mt-1 text-[11px] font-normal text-slate-500">อ้างอิง {bill.sourceDocNo}</div> : null}
                         </TableCell>
                         <TableCell className="text-xs font-semibold text-slate-700">{formatDateDisplay(bill.date)}</TableCell>
                         <TableCell className="max-w-72 truncate text-xs font-semibold text-slate-700">{partyMap.get(bill.supplierId ?? '') ?? bill.supplierId ?? '-'}</TableCell>
@@ -2355,14 +2352,11 @@ export function MoneyMovementPageClient({
             </div>
 
             {/* Desktop Table */}
-            <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm mt-3">
+            <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm mt-3">
               <Table className="text-xs" style={{ minWidth: historyColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
-                  {historyColumns.map((column, index) => {
+                  {historyColumns.map((column) => {
                     const style = historyColumnResize.getColumnStyle(column.key);
-                    if (index === historyColumns.length - 1) {
-                      return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-                    }
                     return <col key={column.key} style={style} />;
                   })}
                 </colgroup>
@@ -2690,7 +2684,7 @@ function PaymentHistoryDetailDialog({
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-100">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                       <tr>
                         <th className="p-2 text-left">{detail.type === 'approval' ? 'PMT' : 'PMA'}</th>
                         <th className="p-2 text-left">เอกสารต้นทาง</th>
@@ -2699,7 +2693,7 @@ function PaymentHistoryDetailDialog({
                     </thead>
                     <tbody>
                       {detail.approvalRows.map((approval) => (
-                        <tr key={`${approval.docNo}-${approval.sourceDocNo}`} className="border-t border-slate-200">
+                        <tr key={`${approval.docNo}-${approval.sourceDocNo}`} className="border-t border-slate-100">
                           <td className="p-2 font-mono text-slate-800">{approval.docNo}</td>
                           <td className="p-2 font-mono">{approval.sourceDocNo}</td>
                           <td className="p-2 text-right font-medium tabular-nums">{formatMoney(approval.amount)}</td>
@@ -2718,7 +2712,7 @@ function PaymentHistoryDetailDialog({
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-100">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                         <tr>
                           <th className="p-2 text-left">บัญชี</th>
                           <th className="p-2 text-left">รายการธนาคาร</th>
@@ -2727,7 +2721,7 @@ function PaymentHistoryDetailDialog({
                       </thead>
                       <tbody>
                         {detail.accountRows.map((account) => (
-                          <tr key={`${account.accountName}-${account.bankStatementDocNo}-${account.amount}`} className="border-t border-slate-200">
+                          <tr key={`${account.accountName}-${account.bankStatementDocNo}-${account.amount}`} className="border-t border-slate-100">
                             <td className="p-2">{account.accountName}</td>
                             <td className="p-2 font-mono">{account.bankStatementDocNo}</td>
                             <td className="p-2 text-right font-medium tabular-nums">{formatMoney(account.amount)}</td>

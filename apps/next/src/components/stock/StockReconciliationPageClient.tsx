@@ -178,7 +178,7 @@ export function StockReconciliationPageClient() {
       {/* Mobile Card list */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังตรวจข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-100">กำลังตรวจข้อมูล</div>
         ) : null}
         
         {!isLoading && rows.map((row, index) => (
@@ -241,16 +241,16 @@ export function StockReconciliationPageClient() {
         ))}
 
         {!isLoading && rows.length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-200">
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow-sm border border-slate-100">
             ไม่พบ issue ตามเงื่อนไข
           </div>
         ) : null}
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full min-w-[1080px] text-xs">
-          <thead className="bg-slate-100 text-left text-slate-600">
+          <thead className="bg-slate-50 border-b border-slate-100 text-left text-slate-500">
             <tr>
               <th className="px-3 py-2 font-semibold">กลุ่ม</th>
               <th className="px-3 py-2 font-semibold">ประเภท issue</th>
@@ -319,7 +319,7 @@ function Metric({
           : 'text-slate-900'
 
   return (
-    <div className={`bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-3 ${className || ''}`}>
+    <div className={`bg-white p-3 sm:p-4 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-3 ${className || ''}`}>
       <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
         {emoji}
       </div>

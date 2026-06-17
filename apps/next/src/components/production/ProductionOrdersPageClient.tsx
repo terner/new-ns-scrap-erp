@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { Plus } from 'lucide-react'
@@ -91,6 +93,23 @@ const sortOptions = [
   { label: 'มูลค่าผลผลิต', value: 'outputValue' },
 ]
 
+type ProductionOrderColumnKey = 'index' | 'date' | 'docNo' | 'branch' | 'productName' | 'machine' | 'warehouseName' | 'inputQty' | 'wipQty' | 'outputQty' | 'yield' | 'status'
+
+const productionOrderColumns: Array<ResizableColumnDefinition<ProductionOrderColumnKey>> = [
+  { key: 'index', defaultWidth: 60, minWidth: 50 },
+  { key: 'date', defaultWidth: 100, minWidth: 80 },
+  { key: 'docNo', defaultWidth: 130, minWidth: 100 },
+  { key: 'branch', defaultWidth: 120, minWidth: 90 },
+  { key: 'productName', defaultWidth: 200, minWidth: 130 },
+  { key: 'machine', defaultWidth: 140, minWidth: 100 },
+  { key: 'warehouseName', defaultWidth: 140, minWidth: 100 },
+  { key: 'inputQty', defaultWidth: 120, minWidth: 95 },
+  { key: 'wipQty', defaultWidth: 110, minWidth: 85 },
+  { key: 'outputQty', defaultWidth: 120, minWidth: 95 },
+  { key: 'yield', defaultWidth: 80, minWidth: 60 },
+  { key: 'status', defaultWidth: 110, minWidth: 90 },
+]
+
 function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
   const activeClass = {
     amber: 'border-amber-600 bg-amber-600 text-white',
@@ -133,6 +152,18 @@ export function ProductionOrdersPageClient() {
   const [selectedRow, setSelectedRow] = useState<ProductionOrderRow | null>(null)
   const [sort, setSort] = useState('date')
   const [status, setStatus] = useState('Open')
+
+  const columnResize = useResizableColumns('production.orders', productionOrderColumns)
+
+  function toggleSort(nextSortBy: string) {
+    setPage(1)
+    if (sort === nextSortBy) {
+      setDirection((current) => current === 'desc' ? 'asc' : 'desc')
+      return
+    }
+    setSort(nextSortBy)
+    setDirection('desc')
+  }
 
   const isAllPeriod = !dateFrom && !dateTo
   const isTodayPeriod = dateFrom === todayDateInput() && dateTo === todayDateInput()
@@ -444,24 +475,52 @@ export function ProductionOrdersPageClient() {
         <>
           {/* Desktop Table View */}
           <div className="hidden lg:block overflow-x-auto rounded-md bg-white border border-slate-200 shadow">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+            <table className="w-full text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+              <colgroup>
+                {productionOrderColumns.map((column) => (
+                  <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+                ))}
+              </colgroup>
+              <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
                 <tr>
-                  <th className="p-3 text-left">วันที่</th>
-                  <th className="p-3 text-left">เลขที่</th>
-                  <th className="p-3 text-left">สาขา</th>
-                  <th className="p-3 text-left">สินค้าที่ผลิต</th>
-                  <th className="p-3 text-left">เครื่องจักร</th>
-                  <th className="p-3 text-left">คลังรับผลผลิต</th>
-                  <th className="p-3 text-right">ปริมาณเบิก (กก.)</th>
-                  <th className="p-3 text-right">WIP คงเหลือ</th>
-                  <th className="p-3 text-right">ปริมาณผลิต (กก.)</th>
-                  <th className="p-3 text-right">Yield</th>
-                  <th className="p-3 text-center">สถานะ</th>
+                  <ResizableTableHead label="ลำดับ" resizeProps={columnResize.getResizeHandleProps('index', 'ลำดับ')} />
+                  <ResizableTableHead
+                    activeSortKey={sort}
+                    direction={direction}
+                    label="วันที่"
+                    sortKey="date"
+                    onSort={toggleSort}
+                    resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')}
+                  />
+                  <ResizableTableHead
+                    activeSortKey={sort}
+                    direction={direction}
+                    label="เลขที่"
+                    sortKey="docNo"
+                    onSort={toggleSort}
+                    resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')}
+                  />
+                  <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} />
+                  <ResizableTableHead label="สินค้าที่ผลิต" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้าที่ผลิต')} />
+                  <ResizableTableHead label="เครื่องจักร" resizeProps={columnResize.getResizeHandleProps('machine', 'เครื่องจักร')} />
+                  <ResizableTableHead label="คลังรับผลผลิต" resizeProps={columnResize.getResizeHandleProps('warehouseName', 'คลังรับผลผลิต')} />
+                  <ResizableTableHead align="right" label="ปริมาณเบิก (กก.)" resizeProps={columnResize.getResizeHandleProps('inputQty', 'ปริมาณเบิก (กก.)')} />
+                  <ResizableTableHead align="right" label="WIP คงเหลือ" resizeProps={columnResize.getResizeHandleProps('wipQty', 'WIP คงเหลือ')} />
+                  <ResizableTableHead align="right" label="ปริมาณผลิต (กก.)" resizeProps={columnResize.getResizeHandleProps('outputQty', 'ปริมาณผลิต (กก.)')} />
+                  <ResizableTableHead align="right" label="Yield" resizeProps={columnResize.getResizeHandleProps('yield', 'Yield')} />
+                  <ResizableTableHead
+                    activeSortKey={sort}
+                    align="center"
+                    direction={direction}
+                    label="สถานะ"
+                    sortKey="status"
+                    onSort={toggleSort}
+                    resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {currentRows.map((row) => {
+                {currentRows.map((row, index) => {
                   const yieldPct = row.inputQty > 0 ? (row.outputQty / row.inputQty) * 100 : 0
                   const wipQty = Math.max(0, row.wipQty ?? 0)
                   return (
@@ -470,22 +529,23 @@ export function ProductionOrdersPageClient() {
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                       onClick={() => { setSelectedRow(row); setModalMode('detail') }}
                     >
+                      <td className="p-3 whitespace-nowrap text-slate-500 font-mono">{(page - 1) * pageSize + index + 1}</td>
                       <td className="p-3 whitespace-nowrap">{formatDateDisplay(row.date)}</td>
-                      <td className="p-3 font-mono font-semibold text-slate-900">{row.docNo}</td>
-                      <td className="p-3">{row.branchName}</td>
-                      <td className="p-3">
-                        <span className="font-semibold text-slate-800">{row.productName || 'ยังไม่ได้กำหนดสินค้า'}</span>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">{row.productCode || row.productId || '-'}</div>
+                      <td className="p-3 font-mono font-semibold text-slate-900 truncate" title={row.docNo}>{row.docNo}</td>
+                      <td className="p-3 truncate" title={row.branchName}>{row.branchName}</td>
+                      <td className="p-3 min-w-0">
+                        <div className="font-semibold text-slate-800 truncate" title={row.productName || 'ยังไม่ได้กำหนดสินค้า'}>{row.productName || 'ยังไม่ได้กำหนดสินค้า'}</div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">{row.productCode || row.productId || '-'}</div>
                       </td>
-                      <td className="p-3 text-slate-600">
+                      <td className="p-3 min-w-0">
                         {row.machineName ? (
-                          <div>
-                            <span className="font-medium text-slate-800">{row.machineName}</span>
-                            <div className="text-[10px] text-slate-400 mt-0.5">{row.machineType || '-'}</div>
+                          <div className="truncate">
+                            <span className="font-medium text-slate-800" title={row.machineName}>{row.machineName}</span>
+                            <div className="text-[10px] text-slate-400 mt-0.5 truncate">{row.machineType || '-'}</div>
                           </div>
                         ) : '-'}
                       </td>
-                      <td className="p-3 text-slate-600">{row.warehouseName || '-'}</td>
+                      <td className="p-3 truncate" title={row.warehouseName}>{row.warehouseName || '-'}</td>
                       <td className="p-3 text-right font-medium tabular-nums text-slate-700">{formatMoney(row.inputQty)}</td>
                       <td className="p-3 text-right font-medium tabular-nums text-slate-600">{formatMoney(wipQty)}</td>
                       <td className="p-3 text-right font-semibold tabular-nums text-slate-800">{formatMoney(row.outputQty)}</td>
@@ -526,7 +586,18 @@ export function ProductionOrdersPageClient() {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <div>รวมทั้งหมด <span className="font-semibold text-slate-900">{data?.summary.total ?? 0}</span> รายการ</div>
+        <div className="flex items-center gap-3">
+          <span>รวมทั้งหมด <span className="font-semibold text-slate-900">{data?.summary.total ?? 0}</span> รายการ</span>
+          {columnResize.hasCustomWidths ? (
+            <button
+              className="rounded-md border border-slate-300 px-2 py-0.5 bg-white text-slate-700 hover:bg-slate-50 text-xs"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              คืนค่าเดิมตาราง
+            </button>
+          ) : null}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <select className="rounded-md border border-slate-300 px-2 py-1 bg-white text-slate-800 text-sm" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
             {pageSizeOptions.map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
@@ -1101,7 +1172,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
                   <div className="grid gap-3 text-sm md:grid-cols-3">
                     <FormField label="Shift">
                       <select
-                        className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white h-9 text-sm outline-none font-sans text-slate-800"
+                        className="w-full rounded-md border px-3 py-2 border-slate-300 bg-white h-9 text-sm outline-none text-slate-800"
                         value={createForm.shift}
                         onChange={(event) => updateCreateForm('shift', event.target.value)}
                       >
@@ -1272,7 +1343,7 @@ function MovementPanel({
 
       <div className="overflow-x-auto rounded-md border border-slate-200">
         <table className="hidden lg:table w-full text-xs">
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
             <tr>
               <th className="p-2 text-left">วันที่</th>
               <th className="p-2 text-left">เลขที่</th>

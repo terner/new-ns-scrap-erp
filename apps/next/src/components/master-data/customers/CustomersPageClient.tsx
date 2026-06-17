@@ -622,7 +622,7 @@ export function CustomersPageClient() {
       {!isLoading ? (
         <>
           {/* Desktop Table View */}
-          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm hidden lg:block">
+          <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm hidden lg:block">
             <div className="overflow-x-auto">
               <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
@@ -645,7 +645,7 @@ export function CustomersPageClient() {
                     <ResizableTableHead align="center" label="แก้ไข" resizeProps={columnResize.getResizeHandleProps('action', 'แก้ไข')} />
                   </tr>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="divide-y divide-slate-100">
                   {paginatedCustomers.map((customer) => (
                     <TableRow
                       key={customer.id}
@@ -961,10 +961,10 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
       </div>
 
       <div className="flex flex-wrap justify-end gap-3.5 border-t border-slate-200 bg-slate-50 px-5 py-4 shrink-0">
-        <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 transition-colors" type="button" onClick={onCancel}>
+        <button className="text-slate-500 hover:text-slate-700 text-sm font-semibold px-4 py-2 transition-colors focus:outline-none" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
-        <button className="rounded-md bg-slate-900 px-5 py-2 text-sm font-normal text-white hover:bg-slate-800 disabled:opacity-60 shadow-sm" disabled={isSaving} type="submit">
+        <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 shadow-sm transition-colors focus:outline-none" disabled={isSaving} type="submit">
           {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>

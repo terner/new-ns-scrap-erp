@@ -300,7 +300,7 @@ export function DailyPettyAdvancePageClient() {
           <div className="mb-2 font-bold text-slate-700">Top 10 ผู้รับเงินที่ค้างคืน</div>
           <div className="grid gap-2 text-sm md:grid-cols-2">
             {topRecipients.map((recipient) => (
-              <div key={recipient.name} className="flex justify-between rounded-md border border-slate-200 bg-slate-50 p-2">
+              <div key={recipient.name} className="flex justify-between rounded-md border border-slate-100 bg-slate-50 p-2">
                 <div><b>{recipient.name}</b> · <span className="text-xs text-slate-500">{recipient.count} ครั้ง</span></div>
                 <div className={recipient.remaining > 0 ? 'font-bold text-red-700' : 'text-emerald-600'}>{formatMoney(recipient.remaining)} ค้าง</div>
               </div>
@@ -363,7 +363,7 @@ export function DailyPettyAdvancePageClient() {
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 animate-slide-up max-h-[80vh] overflow-y-auto">
+          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-100 animate-slide-up max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองเพิ่มเติม</h4>
               <button
@@ -525,7 +525,7 @@ export function DailyPettyAdvancePageClient() {
                 <TextAreaField error={fieldErrors.notes} fieldName="notes" label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
               <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
               <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
             </div>
@@ -555,7 +555,7 @@ export function DailyPettyAdvancePageClient() {
                 <TextAreaField label="หมายเหตุ" value={returnForm.notes} onChange={(value) => setReturnForm({ ...returnForm, notes: value })} />
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
               <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setReturningRow(null)}>ยกเลิก</button>
               <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังส่งอนุมัติ...' : 'ส่งอนุมัติคืนเงิน'}</button>
             </div>
@@ -573,12 +573,12 @@ export function DailyPettyAdvancePageClient() {
       {/* Mobile Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
         {!isLoading && filteredRows.map((row) => (
           <div
             key={row.id}
-            className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+            className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
             onClick={() => setDetailRow(row)}
           >
             <div className="flex justify-between items-start mb-2">
@@ -621,22 +621,19 @@ export function DailyPettyAdvancePageClient() {
           </div>
         ))}
         {!isLoading && filteredRows.length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มีรายการ</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มีรายการ</div>
         ) : null}
       </div>
 
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
-            {pettyAdvanceColumns.map((column, index) => {
+            {pettyAdvanceColumns.map((column) => {
               const style = columnResize.getColumnStyle(column.key);
-              if (index === pettyAdvanceColumns.length - 1) {
-                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
-              }
               return <col key={column.key} style={style} />;
             })}
           </colgroup>
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
               <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
               <ResizableTableHead label="วันที่จ่าย" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่จ่าย')} />
@@ -765,7 +762,7 @@ function DetailModal({ onClose, onReturn, row }: { onClose: () => void; onReturn
             )}
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
           {canReturn ? <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700" type="button" onClick={() => onReturn(row)}>คืนเงิน</button> : null}
           <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={onClose}>ปิด</button>
         </div>
@@ -838,7 +835,7 @@ function SummaryCard({ label, tone, value, className = '' }: { label: string; to
   const config = configs[tone || 'slate']
 
   return (
-    <div className={`bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${className}`}>
+    <div className={`bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${className}`}>
       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
         {config.emoji}
       </div>
@@ -854,7 +851,7 @@ function ReadOnlyField(props: { label: string; value: string }) {
   return (
     <div>
       <span className="mb-1 block text-xs font-medium text-slate-600">{props.label}</span>
-      <div className="min-h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{props.value || '-'}</div>
+      <div className="min-h-9 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">{props.value || '-'}</div>
     </div>
   )
 }

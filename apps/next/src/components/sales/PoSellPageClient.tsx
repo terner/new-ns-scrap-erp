@@ -560,7 +560,7 @@ export function PoSellPageClient() {
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <Table style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
         <colgroup>
           {poSellColumns.map((column) => <col key={column.key} style={columnResize.getColumnStyle(column.key)} />)}

@@ -91,7 +91,7 @@ export function SupplierAdvancePageClient() {
 
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <Metric label="Advance คงเหลือรวม (THB)" value={formatMoney(data?.summary.totalRemainingThb ?? 0)} tone="amber" />
           <Metric label="จำนวนรายการ Active" value={`${data?.summary.activeCount ?? 0}`} />
@@ -102,39 +102,39 @@ export function SupplierAdvancePageClient() {
         </div>
       </div>
 
-      <div className="hidden lg:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-slate-100">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
-              <th className="p-2 text-left">เลขที่</th>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">Supplier</th>
-              <th className="p-2 text-left">สกุล</th>
-              <th className="p-2 text-right">Rate</th>
-              <th className="p-2 text-right">จำนวน</th>
-              <th className="p-2 text-right">มูลค่า THB</th>
-              <th className="p-2 text-right">ใช้แล้ว</th>
-              <th className="p-2 text-right">คงเหลือ</th>
-              <th className="p-2 text-center">สถานะ</th>
-              <th className="p-2 text-right"></th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">เลขที่</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">วันที่</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">Supplier</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">สกุล</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">Rate</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">จำนวน</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">มูลค่า THB</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">ใช้แล้ว</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right">คงเหลือ</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-center">สถานะ</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-right"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && (data?.rows ?? []).length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ยังไม่มี Supplier Advance</td></tr> : null}
             {!isLoading && (data?.rows ?? []).map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="p-2 font-mono text-xs">{row.docNo}</td>
-                <td className="p-2">{row.date}</td>
-                <td className="p-2">{row.supplierName}</td>
-                <td className="p-2">{row.currency}</td>
-                <td className="p-2 text-right">{formatMoney(row.fxRate)}</td>
-                <td className="p-2 text-right">{formatMoney(row.amount)}</td>
-                <td className="p-2 text-right font-medium">{formatMoney(row.amountThb)}</td>
-                <td className="p-2 text-right text-slate-600">{formatMoney(row.usedAmount)}</td>
-                <td className="p-2 text-right font-bold text-amber-700">{formatMoney(row.remainingAmount)}</td>
-                <td className="p-2 text-center"><StatusBadge status={row.status} /></td>
-                <td className="p-2 text-right"><button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button">ยกเลิก</button></td>
+              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                <td className="px-4 py-3.5 font-mono text-xs">{row.docNo}</td>
+                <td className="px-4 py-3.5">{row.date}</td>
+                <td className="px-4 py-3.5">{row.supplierName}</td>
+                <td className="px-4 py-3.5">{row.currency}</td>
+                <td className="px-4 py-3.5 text-right">{formatMoney(row.fxRate)}</td>
+                <td className="px-4 py-3.5 text-right">{formatMoney(row.amount)}</td>
+                <td className="px-4 py-3.5 text-right font-medium">{formatMoney(row.amountThb)}</td>
+                <td className="px-4 py-3.5 text-right text-slate-600">{formatMoney(row.usedAmount)}</td>
+                <td className="px-4 py-3.5 text-right font-bold text-amber-700">{formatMoney(row.remainingAmount)}</td>
+                <td className="px-4 py-3.5 text-center"><StatusBadge status={row.status} /></td>
+                <td className="px-4 py-3.5 text-right"><button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button">ยกเลิก</button></td>
               </tr>
             ))}
           </tbody>
@@ -144,10 +144,10 @@ export function SupplierAdvancePageClient() {
       {/* Mobile Card list */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
         {!isLoading && (data?.rows ?? []).length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">ยังไม่มี Supplier Advance</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มี Supplier Advance</div>
         ) : null}
         {!isLoading && (data?.rows ?? []).map((row) => (
           <div
@@ -204,7 +204,7 @@ function Metric({ label, tone, value }: { label: string; tone?: 'amber'; value: 
     : { bg: 'bg-slate-100 text-slate-600', emoji: '📋', labelColor: 'text-slate-500', valueColor: 'text-slate-900' }
 
   return (
-    <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+    <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
       <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
         {config.emoji}
       </div>

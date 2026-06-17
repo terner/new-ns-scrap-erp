@@ -142,9 +142,9 @@ function WaitingAllocationsView() {
 
       <DualCostingPanel title="สรุปตามหมวด">
         {/* Desktop View */}
-        <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
           <Table className="text-xs">
-            <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+            <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
               <tr>
                 <th className="p-3 pl-4 text-left">หมวด</th>
                 <th className="p-3 text-right">รายการ</th>
@@ -253,9 +253,9 @@ function WaitingAllocationsView() {
       </DualCostingFilterCard>
 
       {/* Desktop View */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs">
-          <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+          <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
             <tr>
               <TableHead className="p-3 pl-4">บิลขาย</TableHead>
               <TableHead className="p-3">วันที่</TableHead>
@@ -497,9 +497,9 @@ function AllocationLedgerView() {
       </DualCostingFilterCard>
 
       {/* Desktop View */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs">
-          <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+          <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
             <tr>
               <TableHead className="p-3 pl-4">Match ID</TableHead>
               <TableHead className="p-3 text-center">Type</TableHead>
@@ -654,9 +654,9 @@ function DualCostingReportView() {
           </div>
           <DualCostingPanel title="สรุปตามหมวดสินค้า">
             {/* Desktop View */}
-            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
               <Table className="text-xs">
-                <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+                <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
                   <tr>
                     <TableHead className="p-3 pl-4">หมวด</TableHead>
                     <TableHead className="p-3 text-right">Allocated Qty</TableHead>

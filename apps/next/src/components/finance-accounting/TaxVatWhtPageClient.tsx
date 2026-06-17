@@ -63,7 +63,7 @@ export function TaxVatWhtPageClient() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* VAT Payable Premium Box */}
-        <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-5 flex flex-col justify-between">
+        <div className="bg-white shadow-sm border border-slate-100 rounded-xl p-5 flex flex-col justify-between">
           <div>
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">🧾 VAT Payable งวด {year}-{month}</div>
             <div className="mt-2 text-3xl font-bold text-slate-900">{money(data?.summary.vatPayable)}</div>
@@ -146,7 +146,7 @@ function BaselineNotice({ sourceState }: { sourceState?: SourceState }) {
 }
 
 function FilterPanel({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-sm">{children}</div>
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">{children}</div>
 }
 
 function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; onChange: (value: string) => void; value: string }) {
@@ -164,9 +164,9 @@ function BranchSelect({ branches, onChange, value }: { branches: BranchRow[]; on
 
 function DisabledButton({ children }: { children: ReactNode }) {
   return (
-    <button 
-      className="rounded-xl bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white opacity-50 outline-none border border-slate-200/80 cursor-not-allowed" 
-      disabled 
+    <button
+      className="rounded-xl bg-slate-900 px-3.5 py-1.5 text-sm font-medium text-white opacity-50 outline-none border border-slate-100 cursor-not-allowed"
+      disabled
       type="button"
     >
       {children}
@@ -176,7 +176,7 @@ function DisabledButton({ children }: { children: ReactNode }) {
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</div>
       {children}
     </div>
@@ -269,7 +269,7 @@ function TaxTable({ hasDoc = false, isLoading, rows, title, tone, valueKey }: { 
   const valueColor = { amber: 'text-amber-700', blue: 'text-blue-700', emerald: 'text-emerald-700', purple: 'text-purple-700' }[tone]
   
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className={`border-b p-3.5 font-semibold text-sm ${heading}`}>{title}</div>
       
       {/* Mobile View */}
@@ -298,9 +298,9 @@ function TaxTable({ hasDoc = false, isLoading, rows, title, tone, valueKey }: { 
       </div>
 
       {/* Desktop View */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-600 font-medium">
+          <thead className="bg-slate-50 border-b border-slate-100 text-slate-600 font-medium">
             <tr>
               <Th>วันที่</Th>
               <Th>เลขที่</Th>
@@ -331,8 +331,8 @@ function TaxTable({ hasDoc = false, isLoading, rows, title, tone, valueKey }: { 
 
 function CalendarTable({ rows }: { rows: TaxPayload['taxCalendar'] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
-      <div className="border-b bg-slate-50/80 px-4 py-3.5 font-semibold text-slate-700 border-slate-200/60 text-sm">📅 Tax Calendar — 6 เดือนล่าสุด</div>
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="border-b bg-slate-50/80 px-4 py-3.5 font-semibold text-slate-700 border-slate-100 text-sm">📅 Tax Calendar — 6 เดือนล่าสุด</div>
       
       {/* Mobile View */}
       <div className="block lg:hidden divide-y divide-slate-100">
@@ -373,9 +373,9 @@ function CalendarTable({ rows }: { rows: TaxPayload['taxCalendar'] }) {
       </div>
 
       {/* Desktop View */}
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600 border-b border-slate-200/60 font-medium">
+          <thead className="bg-slate-50 text-slate-600 border-b border-slate-100 font-medium">
             <tr>
               <Th>งวด</Th>
               <Th align="right">VAT ขาย</Th>

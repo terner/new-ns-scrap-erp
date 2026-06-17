@@ -164,7 +164,7 @@ export function CostAllocatorPageClient() {
                 className={
                   active
                     ? 'rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300'
-                    : 'rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-850 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-100'
+                    : 'rounded-lg border border-slate-100 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-850 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-100'
                 }
                 type="button"
                 onClick={() => {
@@ -235,9 +235,9 @@ export function CostAllocatorPageClient() {
             </div>
           </div>
 
-          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
             <Table className="text-xs">
-              <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+              <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
                 <tr>
                   <TableHead className="p-3 pl-4">เอกสารขาย</TableHead>
                   <TableHead className="p-3">วันที่</TableHead>
@@ -306,9 +306,9 @@ export function CostAllocatorPageClient() {
 
       {hasSelection ? (
         <DualCostingPanel title="③ Cost Pool Lots ของสินค้าที่เลือก">
-          <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
             <Table className="[&_tbody_tr]:border-slate-100 text-xs">
-              <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+              <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
                 <tr>
                   <TableHead className="p-3 pl-4">Source</TableHead>
                   <TableHead className="p-3">เลขที่</TableHead>
@@ -342,9 +342,9 @@ export function CostAllocatorPageClient() {
 
       {showPreview && hasCandidates ? (
         <DualCostingPanel title="④ Preview การ Match">
-          <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
             <Table className="[&_tbody_tr]:border-slate-100 text-xs">
-              <TableHeader className="bg-slate-50 border-b border-slate-200/60 font-semibold text-slate-600">
+              <TableHeader className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-600">
                 <tr>
                   <TableHead className="p-3 pl-4">Source</TableHead>
                   <TableHead className="p-3">เลขที่</TableHead>

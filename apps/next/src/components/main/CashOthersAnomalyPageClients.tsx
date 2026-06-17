@@ -55,11 +55,11 @@ export function CashOthersSummaryPageClient() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
         <label className="text-xs font-bold text-slate-500">As of</label>
         <DatePickerInput className="w-[140px]" value={asOf} onChange={setAsOf} />
         <span className="flex-1" />
-        <button className="rounded-lg bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-400 cursor-not-allowed outline-none focus:outline-none" disabled type="button">
+        <button className="rounded-lg bg-slate-100 border border-slate-100 px-3 py-1.5 text-xs font-bold text-slate-400 cursor-not-allowed outline-none focus:outline-none" disabled type="button">
           ส่งออก (ปิดการใช้งาน)
         </button>
       </div>
@@ -90,7 +90,7 @@ export function CashOthersSummaryPageClient() {
 function Grand({ danger = false, icon, label, value }: { danger?: boolean; icon: string; label: string; value: unknown }) {
   const iconBg = danger ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-600'
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl ${iconBg}`}>
         {icon}
       </div>
@@ -107,7 +107,7 @@ function Grand({ danger = false, icon, label, value }: { danger?: boolean; icon:
 
 function PendingSaleBlock({ summary }: { summary: Record<string, number> }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
+    <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
           <span className="text-xl">📦</span> ต้นทุนรอเปิดบิล (Pending Sale) — เงินค้างใน Stock ที่เบิกออกไปแล้ว
@@ -128,7 +128,7 @@ function PendingSaleBlock({ summary }: { summary: Record<string, number> }) {
 
 function TradingPendingBlock({ summary }: { summary: Record<string, number> }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
+    <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
           <span className="text-xl">🔄</span> Trading Pending รับเงิน — Trading ซื้อจ่ายแล้ว แต่ Sales ยังไม่เปิด
@@ -158,7 +158,7 @@ function Mini({ label, tone, value }: { label: string; tone: string; value: stri
   }
   const color = textToneMap[tone] ?? 'text-slate-700'
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
       <div className="text-xs text-slate-500 font-medium">{label}</div>
       <div className={`mt-0.5 break-words text-lg font-bold ${color}`}>{value}</div>
     </div>
@@ -168,7 +168,7 @@ function Mini({ label, tone, value }: { label: string; tone: string; value: stri
 function DonutPanel({ empty, items, title, total, tone }: { empty?: string; items: Array<{ color: string; name: string; val: number }>; title: string; total: number; tone: string }) {
   const gradient = conic(items, total)
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
       <h3 className={`mb-3 font-bold text-sm ${tone === 'red' ? 'text-red-700' : 'text-emerald-700'}`}>{title}</h3>
       <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full p-9" style={{ background: gradient }}>
         <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-center text-xs font-bold text-slate-700 leading-tight">
@@ -205,7 +205,7 @@ function conic(items: Array<{ color: string; val: number }>, total: number) {
 function ArAging({ aging, total }: { aging: Record<string, number>; total: number }) {
   const max = Math.max(1, ...Object.values(aging))
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
       <h3 className="mb-3 font-bold text-sm text-cyan-700">📥 AR Aging — อายุลูกหนี้</h3>
       <div className="space-y-3">
         {Object.entries(aging).map(([key, amount]) => (
@@ -297,7 +297,7 @@ function DebtTable({ row }: { row: Record<string, number> }) {
 
 function Panel({ children, heading, total }: { children: ReactNode; heading: string; tone?: string; total: unknown }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="flex justify-between items-center border-b border-slate-100 bg-slate-50/80 px-4 py-3 font-bold text-sm text-slate-800">
         <span>{heading}</span>
         <span className="font-mono text-slate-900">{money(total as number)}</span>

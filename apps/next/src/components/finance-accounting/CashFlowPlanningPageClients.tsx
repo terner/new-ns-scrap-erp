@@ -219,7 +219,7 @@ function DetailTable({ isLoading, rows }: { isLoading: boolean; rows: AnalysisPa
           {isLoading ? <tr><td className="py-8 text-center text-slate-400" colSpan={2}>กำลังโหลดข้อมูล</td></tr> : null}
           {rows.map((row) => (
             <tr key={row.label} className={`border-t ${row.tone === 'warn' ? 'bg-amber-50' : row.tone === 'bad' ? 'bg-red-50' : row.label.includes('Projected') ? 'bg-blue-50' : ''}`}>
-              <td className="p-2">{row.label}</td>
+              <td className="px-4 py-3.5">{row.label}</td>
               <td className={`p-2 text-right font-bold ${row.tone === 'bad' ? 'text-red-700' : row.tone === 'good' ? 'text-emerald-700' : ''}`}>
                 {row.suffix === '%' ? row.value.toFixed(2) : money(row.value)}{row.suffix ?? ''}
               </td>
@@ -262,7 +262,7 @@ function Stat({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' 
 
 function CalendarGrid({ days, isLoading, onSelect }: { days: ProjectionDay[]; isLoading: boolean; onSelect: (day: ProjectionDay) => void }) {
   if (isLoading) return <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow">กำลังโหลดข้อมูล</div>
-  return <div className="overflow-x-auto rounded-md bg-white p-3 shadow"><div className="mb-1 grid grid-cols-7 gap-1">{['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((day) => <div className="py-1 text-center text-xs font-bold text-slate-500" key={day}>{day}</div>)}</div><div className="grid grid-cols-7 gap-1" style={{ minWidth: 560 }}>{days.length ? Array.from({ length: days[0].dayOfWeek }, (_, index) => <div key={`pad${index}`} />) : null}{days.map((day) => <button key={day.date} className={`min-h-24 rounded-md border p-2 text-left text-xs transition ${day.closing < 0 ? 'border-red-300 bg-red-50' : day.isToday ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : 'border-slate-200 bg-white'} ${day.dayIn > 0 || day.dayOut > 0 ? 'border-2' : ''}`} type="button" onClick={() => onSelect(day)}><div className="mb-1 flex justify-between"><span className={`font-bold ${day.isToday ? 'text-blue-700' : 'text-slate-700'}`}>{day.dayOfMonth}{day.isToday ? ' (วันนี้)' : ''}</span><span className="text-slate-400">{day.date.slice(5, 7)}</span></div>{day.dayIn > 0 ? <div className="truncate text-emerald-700">+{money(day.dayIn)}</div> : null}{day.dayOut > 0 ? <div className="truncate text-red-600">-{money(day.dayOut)}</div> : null}<div className={`mt-1 truncate font-bold ${day.closing >= 0 ? 'text-slate-700' : 'text-red-700'}`}>{money(day.closing)}</div></button>)}</div></div>
+  return <div className="overflow-x-auto rounded-md bg-white p-3 shadow"><div className="mb-1 grid grid-cols-7 gap-1">{['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((day) => <div className="py-1 text-center text-xs font-bold text-slate-500" key={day}>{day}</div>)}</div><div className="grid grid-cols-7 gap-1" style={{ minWidth: 560 }}>{days.length ? Array.from({ length: days[0].dayOfWeek }, (_, index) => <div key={`pad${index}`} />) : null}{days.map((day) => <button key={day.date} className={`min-h-24 rounded-md border p-2 text-left text-xs transition ${day.closing < 0 ? 'border-red-300 bg-red-50' : day.isToday ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300' : 'border-slate-100 bg-white'} ${day.dayIn > 0 || day.dayOut > 0 ? 'border-2' : ''}`} type="button" onClick={() => onSelect(day)}><div className="mb-1 flex justify-between"><span className={`font-bold ${day.isToday ? 'text-blue-700' : 'text-slate-700'}`}>{day.dayOfMonth}{day.isToday ? ' (วันนี้)' : ''}</span><span className="text-slate-400">{day.date.slice(5, 7)}</span></div>{day.dayIn > 0 ? <div className="truncate text-emerald-700">+{money(day.dayIn)}</div> : null}{day.dayOut > 0 ? <div className="truncate text-red-600">-{money(day.dayOut)}</div> : null}<div className={`mt-1 truncate font-bold ${day.closing >= 0 ? 'text-slate-700' : 'text-red-700'}`}>{money(day.closing)}</div></button>)}</div></div>
 }
 
 function TopAr({ rows }: { rows: ForecastPayload['insights']['topAR'] }) {
@@ -273,14 +273,14 @@ function TopAr({ rows }: { rows: ForecastPayload['insights']['topAR'] }) {
       
       {/* Desktop Table View */}
       <table className="hidden lg:table w-full text-sm">
-        <thead className="bg-slate-100">
+        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
           <tr>
             <Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-t bg-red-50/30">
+            <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors bg-red-50/30">
               <Td>{row.customerName}</Td>
               <Td mono>{row.docNo}</Td>
               <Td align="right" strong>{money(row.receivableBalance)}</Td>
@@ -322,14 +322,14 @@ function TopAp({ rows }: { rows: ForecastPayload['insights']['topAP'] }) {
       
       {/* Desktop Table View */}
       <table className="hidden lg:table w-full text-sm">
-        <thead className="bg-slate-100">
+        <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
           <tr>
             <Th>ชื่อ</Th><Th>บิล</Th><Th align="right">ค้าง</Th><Th align="right">วัน</Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-t">
+            <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
               <Td>{row.supplierName}</Td>
               <Td mono>{row.docNo}</Td>
               <Td align="right" strong>{money(row.payableBalance)}</Td>
@@ -376,7 +376,7 @@ function DayModal({ day, onClose }: { day: ProjectionDay; onClose: () => void })
         <div className="max-h-[60vh] overflow-auto">
           {/* Desktop Table View */}
           <table className="hidden lg:table w-full text-sm">
-            <thead className="bg-slate-100">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
               <tr>
                 <Th>Type</Th><Th>Ref</Th><Th>Label</Th><Th align="right">Amount</Th>
               </tr>

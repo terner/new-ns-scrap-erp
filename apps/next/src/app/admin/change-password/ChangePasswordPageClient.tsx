@@ -156,7 +156,7 @@ export function ChangePasswordPageClient() {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden lg:block rounded-md bg-white p-4 shadow border border-slate-200">
+      <div className="hidden lg:block rounded-md bg-white p-4 shadow border border-slate-100">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
@@ -170,7 +170,7 @@ export function ChangePasswordPageClient() {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 border border-slate-200 animate-fade-in">
+      <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5 border border-slate-100 animate-fade-in">
         <div>
           <h2 className="text-lg font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
           <p className="mt-0.5 text-xs text-slate-500">ยืนยันรหัสผ่านเดิมก่อนตั้งรหัสผ่านใหม่</p>
@@ -182,7 +182,7 @@ export function ChangePasswordPageClient() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] animate-fade-in">
-        <form className="space-y-4 rounded-md bg-white p-5 shadow border border-slate-200" onSubmit={submit}>
+        <form className="space-y-4 rounded-md bg-white p-5 shadow border border-slate-100" onSubmit={submit}>
           {user?.mustChangePassword ? (
             <div className="rounded-md border border-amber-250 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 animate-pulse">
               รหัสผ่านของคุณยังเป็นค่าเริ่มต้น กรุณาเปลี่ยนก่อนใช้งานต่อ
@@ -235,7 +235,7 @@ export function ChangePasswordPageClient() {
           {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 animate-fade-in">{error}</div> : null}
           {message ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 animate-fade-in">{message}</div> : null}
 
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <Button className="w-full sm:w-auto font-semibold" disabled={isLoading || isFetchingUser || !isSupabaseReady} type="submit">
               <KeyRound className="mr-2 size-4" />
               {isLoading ? 'กำลังเปลี่ยนรหัสผ่าน...' : 'บันทึกรหัสผ่านใหม่'}
@@ -244,7 +244,7 @@ export function ChangePasswordPageClient() {
         </form>
 
         <aside className="space-y-3">
-          <div className="rounded-md bg-white p-4 shadow border border-slate-200">
+          <div className="rounded-md bg-white p-4 shadow border border-slate-100">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded bg-slate-900 text-white shrink-0">
                 <UserRound className="size-5" />
@@ -254,10 +254,10 @@ export function ChangePasswordPageClient() {
                 <div className="truncate text-xs text-slate-500 mt-0.5">@{user?.username ?? '-'}</div>
               </div>
             </div>
-            <div className="mt-3 truncate rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 font-medium">{user?.email || '-'}</div>
+            <div className="mt-3 truncate rounded border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600 font-medium">{user?.email || '-'}</div>
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          <div className="rounded-md border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
             <div className="font-bold text-slate-900 text-xs uppercase tracking-wide">คำแนะนำรหัสผ่าน</div>
             <ul className="mt-2.5 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-slate-600">
               <li>ใช้ตัวอักษรใหญ่ ตัวอักษรเล็ก และตัวเลขร่วมกัน</li>

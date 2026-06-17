@@ -66,7 +66,7 @@ function dotClass(tone: TimelineEvent['tone']) {
 
 function DetailCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3">
+    <div className="rounded-md border border-slate-100 bg-white p-3">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
     </div>
@@ -184,7 +184,7 @@ export default async function PaymentApprovalDetailPage({ params }: PageProps) {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-100">
+            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
               <tr>
                 <th className="p-2 text-left">PMT</th>
                 <th className="p-2 text-right">ยอดจัดสรร</th>
@@ -212,7 +212,7 @@ export default async function PaymentApprovalDetailPage({ params }: PageProps) {
                 <span className={`mt-1 h-3 w-3 rounded-full ${dotClass(event.tone)}`} />
                 {index < timeline.length - 1 ? <span className="mt-1 h-full w-px bg-slate-200" /> : null}
               </div>
-              <div className="flex-1 rounded-md border border-slate-200 p-3">
+              <div className="flex-1 rounded-md border border-slate-100 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-semibold text-slate-900">{event.title}</div>
                   <div className="text-xs text-slate-500">{event.date}</div>

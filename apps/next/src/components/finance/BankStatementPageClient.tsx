@@ -195,7 +195,7 @@ export function BankStatementPageClient() {
             </select>
             <button
               className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors flex items-center gap-1 shrink-0 ${
-                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200'
+                showMobileFilters ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-100'
               }`}
               type="button"
               onClick={() => setShowMobileFilters(!showMobileFilters)}
@@ -232,9 +232,9 @@ export function BankStatementPageClient() {
         </div>
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
               🏦
             </div>
@@ -244,7 +244,7 @@ export function BankStatementPageClient() {
               <div className="text-[10px] text-slate-400 font-medium mt-0.5">{selectedAccount?.type ?? '-'}</div>
             </div>
           </div>
-          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
               📥
             </div>
@@ -254,7 +254,7 @@ export function BankStatementPageClient() {
               <div className="text-[10px] text-slate-400 font-medium mt-0.5">บาท</div>
             </div>
           </div>
-          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
               📤
             </div>
@@ -264,7 +264,7 @@ export function BankStatementPageClient() {
               <div className="text-[10px] text-slate-400 font-medium mt-0.5">บาท</div>
             </div>
           </div>
-          <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+          <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg sm:text-xl shrink-0">
               💰
             </div>
@@ -346,14 +346,14 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
       <div className="flex items-center justify-between border-b bg-slate-50 p-3">
         <h3 className="font-bold text-slate-700">📋 รายการเดินบัญชี ({totalRows} รายการ)</h3>
       </div>
-      <div className="hidden lg:block overflow-x-auto">
+      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gradient-to-r from-slate-700 to-slate-900 text-white">
             <tr>
-              <th className="p-2 text-left">วันที่</th>
-              <th className="p-2 text-left">ประเภท</th>
-              <th className="p-2 text-left">รายละเอียด</th>
-              <th className="p-2 text-left">อ้างอิง</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">วันที่</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">ประเภท</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">รายละเอียด</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">อ้างอิง</th>
               <th className="bg-emerald-700/40 p-2 text-right">📥 เข้า</th>
               <th className="bg-rose-700/40 p-2 text-right">📤 ออก</th>
               <th className="bg-blue-700/40 p-2 text-right">💰 คงเหลือ</th>
@@ -366,10 +366,10 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
               const isOpening = row.type === 'ยอดยกมา'
               return (
                 <tr key={row.id} className={`border-t border-slate-100 transition hover:bg-yellow-50 ${isOpening ? 'bg-amber-50 font-bold' : ''}`}>
-                  <td className="p-2 font-mono text-xs">{isOpening ? row.date : formatDateDisplay(row.date)}</td>
-                  <td className="p-2 text-xs"><span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${isOpening ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>{row.type || row.refType || '-'}</span></td>
+                  <td className="px-4 py-3.5 font-mono text-xs">{isOpening ? row.date : formatDateDisplay(row.date)}</td>
+                  <td className="px-4 py-3.5 text-xs"><span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${isOpening ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>{row.type || row.refType || '-'}</span></td>
                   <td className="max-w-96 truncate p-2 text-xs">{row.description || row.note || '-'}</td>
-                  <td className="p-2 font-mono text-xs text-blue-600">
+                  <td className="px-4 py-3.5 font-mono text-xs text-blue-600">
                     {isOpening ? '-' : <button className="underline-offset-2 hover:underline" type="button" onClick={() => onOpen(row)}>{row.refNo || row.refType || '-'}</button>}
                   </td>
                   <td className={`bg-emerald-50/30 p-2 text-right font-mono ${row.amountIn > 0 ? 'font-bold text-emerald-700' : 'text-slate-300'}`}>{row.amountIn ? formatMoney(row.amountIn) : '-'}</td>
@@ -440,7 +440,7 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={onClose}>
       <div className="w-full max-w-2xl overflow-hidden rounded-md bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-5 py-4">
           <div>
             <h2 className="text-lg font-bold text-white">{row.refNo || row.id}</h2>
             <p className="text-xs text-slate-300">{row.accountName}</p>
@@ -449,8 +449,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
         </div>
         <div className="space-y-4 p-5">
           {/* ข้อมูลบัญชีและอ้างอิง */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">ข้อมูลบัญชีและอ้างอิง</div>
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">ข้อมูลบัญชีและอ้างอิง</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="วันที่" value={formatDateDisplay(row.date)} />
               <DetailItem label="บัญชี" value={row.accountName || '-'} />
@@ -463,8 +463,8 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
           </div>
 
           {/* ข้อมูลการเงิน */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">ข้อมูลการเงิน</div>
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">ข้อมูลการเงิน</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="เงินเข้า" value={`${formatMoney(row.amountIn)} บาท`} />
               <DetailItem label="เงินออก" value={`${formatMoney(row.amountOut)} บาท`} />
@@ -473,15 +473,15 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: BankRow }) {
           </div>
 
           {/* รายละเอียดและหมายเหตุ */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-200">รายละเอียดและหมายเหตุ</div>
+          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">รายละเอียดและหมายเหตุ</div>
             <div className="grid grid-cols-1 gap-y-3">
               <DetailItem label="คำอธิบาย" value={row.description || '-'} />
               <DetailItem label="หมายเหตุ" value={row.note || '-'} />
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
           <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
