@@ -87,7 +87,8 @@ async function ensurePendingCustomerReceipts(context: Awaited<ReturnType<typeof 
       })
       if (cancelledPendingAllocation) continue
 
-      const customerCode = requireBusinessCode(bill.customers?.code, `ลูกค้าบิลขาย ${bill.doc_no}`)
+      const customerCode = bill.customers?.code?.trim()
+      if (!customerCode) continue
       const date = toDateOnly(bill.date)
       const docNo = await nextDailyDocNo('customer_receipts', 'RCP', date, tx)
       const receivableBalance = toNumber(bill.receivable_balance as { toNumber: () => number } | number | null | undefined)
@@ -282,7 +283,7 @@ export async function GET() {
           })
           .map((allocation) => allocation.customer_receipts.doc_no))],
         receiptStatus: bill.customer_receipt_allocations.find((allocation) => RECEIPT_QUEUE_STATUSES.includes(allocation.status))?.customer_receipts.status ?? '',
-        customerId: requireBusinessCode(bill.customers?.code, `ลูกค้าบิลขาย ${bill.id}`),
+        customerId: bill.customers?.code?.trim() || stringifyBusinessValue(bill.id),
         date: toDateOnly(bill.date),
         docNo: bill.doc_no,
         id: bill.doc_no,
@@ -292,7 +293,7 @@ export async function GET() {
       })),
       customers: customers.map((customer) => ({
         ...customer,
-        id: requireBusinessCode(customer.code, `ลูกค้า ${customer.id}`),
+        id: customer.code?.trim() || stringifyBusinessValue(customer.id),
       })),
       paymentMethods,
       rows: receipts.map((receipt) => {
@@ -311,7 +312,7 @@ export async function GET() {
               accountId: statement.accounts?.code ?? receipt.account_code_snapshot,
               amount: toNumber(statement.amount_in),
               id: `${receipt.doc_no}-split-${index + 1}`,
-            }))
+            })).filter((split) => split.accountId && split.amount > 0)
             : [{
               accountId: receipt.account_code_snapshot,
               amount: toNumber(receipt.net_cash_in),
