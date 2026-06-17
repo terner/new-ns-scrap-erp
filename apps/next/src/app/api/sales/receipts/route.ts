@@ -78,21 +78,6 @@ async function ensurePendingCustomerReceipts(context: Awaited<ReturnType<typeof 
           },
         })
         if (activeAllocation) continue
-        const cancelledPendingAllocation = await tx.customer_receipt_allocations.findFirst({
-          select: { id: true },
-          where: {
-            allocated_ar_amount: 0,
-            sales_bill_id: bill.id,
-            status: { in: CANCELLED_RECEIPT_STATUSES },
-            customer_receipts: {
-              is: {
-                status: { in: CANCELLED_RECEIPT_STATUSES },
-              },
-            },
-          },
-        })
-        if (cancelledPendingAllocation) continue
-
         const customerCode = bill.customers?.code?.trim() || stringifyBusinessValue(bill.customer_id)
         const date = toDateOnly(bill.date)
         const docNo = await nextDailyDocNo('customer_receipts', 'RCP', date, tx)
