@@ -2836,7 +2836,17 @@ function KpiCard({ label, tone, value }: { label: string; tone: 'amber' | 'blue'
     },
   }
 
-  const config = configs[tone]
+  const numericValue = parseFloat(value.replace(/[^0-9.-]/g, ''))
+  const isZero = isNaN(numericValue) ? false : numericValue === 0
+
+  const config = isZero
+    ? {
+        bg: 'bg-slate-100 text-slate-600',
+        emoji: configs[tone].emoji,
+        labelColor: 'text-slate-500',
+        valueColor: 'text-slate-900',
+      }
+    : configs[tone]
 
   return (
     <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 flex-1 w-full">
