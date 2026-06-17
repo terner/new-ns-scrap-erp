@@ -114,7 +114,7 @@ export type OptionItem = {
   searchText?: string
 }
 
-export type WeightTicketSortBy = 'createdAt' | 'documentNo' | 'partyName' | 'netWeight'
+export type WeightTicketSortBy = 'createdAt' | 'documentNo' | 'partyName' | 'netWeight' | 'branchName' | 'vehicleNo' | 'deductionWeight' | 'impurityDeduction' | 'status' | 'updatedAt'
 export type WeightTicketSortDir = 'asc' | 'desc'
 
 export type StoredImageAsset = {

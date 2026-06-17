@@ -713,164 +713,213 @@ export function WeightTicketsPageClient({
                         ลบ
                       </Button>
                     </div>
-                    <div className={cn(
-                      'grid min-w-0 gap-4',
-	                      line.deductionMode === 'none'
-	                        ? form.type === 'WTO'
-	                          ? 'xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_10rem_10rem_10rem_10rem]'
-	                          : 'xl:grid-cols-[minmax(0,1.4fr)_10rem_10rem_10rem_10rem]'
-	                        : form.type === 'WTO'
-	                          ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_10rem_10rem_10rem_minmax(0,1fr)_10rem]'
-	                          : 'xl:grid-cols-[minmax(0,1.3fr)_10rem_10rem_10rem_minmax(0,1fr)_10rem]',
-                    )}
-                    >
-                      <div className="min-w-0">
-                        <SearchCombobox
-                          disabled={isLoadingProducts}
-                          error={showError(`line-${line.id}-product`)}
-                          inputId={`weight-product-${line.id}`}
-                          label="สินค้า*"
-                          options={products}
-                          placeholder={isLoadingProducts ? 'กำลังโหลดสินค้า...' : 'เลือกสินค้า'}
-                          value={line.productId}
-	                          onChange={(value) => {
-	                            markTouched(`line-${line.id}-product`)
-	                            updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
-	                          }}
-                        />
-	                      </div>
-	                      {form.type === 'WTO' ? (() => {
-	                        const stockKey = `${form.branchId}:${line.productId}`
-	                        const stock = stockOptions[stockKey]
-	                        const selectedWarehouse = line.warehouseId ? stock?.warehousesById[line.warehouseId] : null
-	                        return (
-	                          <div className="min-w-0">
-	                            <SearchCombobox
-	                              disabled={!form.branchId || !line.productId}
-	                              error={showError(`line-${line.id}-warehouse`)}
-	                              inputId={`weight-warehouse-${line.id}`}
-	                              label="คลัง*"
-	                              options={stock?.options ?? []}
-	                              placeholder={!form.branchId ? 'เลือกสาขาก่อน' : !line.productId ? 'เลือกสินค้าก่อน' : 'เลือกคลัง RM/FG'}
-	                              value={line.warehouseId}
-	                              onChange={(value) => {
-	                                markTouched(`line-${line.id}-warehouse`)
-	                                updateLine(line.id, (current) => ({ ...current, warehouseId: value }))
-	                              }}
-	                            />
-	                            {selectedWarehouse ? (
-	                              <div className="mt-1 grid grid-cols-3 gap-1 text-[11px] text-slate-500">
-	                                <span>คงเหลือ {formatWeight(selectedWarehouse.onHandQty)}</span>
-	                                <span>จอง {formatWeight(selectedWarehouse.onHoldQty)}</span>
-	                                <span className="font-medium text-slate-700">พร้อมส่ง {formatWeight(selectedWarehouse.availableQty)}</span>
-	                              </div>
-	                            ) : null}
-	                          </div>
-	                        )
-	                      })() : null}
-	                      <FieldBlock error={showError(`line-${line.id}-gross`)} label="น้ำหนักรวม (กก. / ลัง) *">
-                        <Input
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          value={line.grossWeight}
-                          onBlur={() => markTouched(`line-${line.id}-gross`)}
-                          onChange={(event) => updateLine(line.id, (current) => ({ ...current, grossWeight: normalizeDecimalInput(event.target.value) }))}
-                        />
-                      </FieldBlock>
-                      <FieldBlock error={showError(`line-${line.id}-container`)} label="หักภาชนะ(กก.)">
-                        <Input
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          value={line.containerDeductionWeight}
-                          onBlur={() => markTouched(`line-${line.id}-container`)}
-                          onChange={(event) => {
-                            const containerDeductionWeight = normalizeDecimalInput(event.target.value)
-                            updateLine(line.id, (current) => ({
-                              ...current,
-                              containerDeductionWeight,
-                            }))
-                          }}
-                        />
-                      </FieldBlock>
-                      <FieldBlock label="หักสิ่งเจือปน">
-                        <SimpleDropdown
-                          options={[
-                            { label: 'ไม่หัก', value: 'none' },
-                            { label: 'หัก', value: 'kg' },
-                            { label: 'หัก %', value: 'percent' },
-                          ]}
-                          value={line.deductionMode}
-                          onChange={(value) => {
-                            const deductionMode = value as DeductionMode
-                            updateLine(line.id, (current) => ({
-                              ...current,
-                              deductionMode,
-                              deductionValue: '',
-                              impurityId: deductionMode === 'none' ? '' : getLineImpurityId(current),
-                            }))
-                          }}
-                        />
-                      </FieldBlock>
-                      {line.deductionMode !== 'none' ? (
-                        <SearchCombobox
-                          error={showError(`line-${line.id}-impurity`)}
-                          inputId={`weight-impurity-${line.id}`}
-                          label="สิ่งเจือปน*"
-                          options={impurities}
-                          placeholder={impurities.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งาน'}
-                          value={getLineImpurityId(line)}
-                          onChange={(value) => {
-                            markTouched(`line-${line.id}-impurity`)
-                            updateLine(line.id, (current) => ({ ...current, impurityId: value }))
-                          }}
-                        />
-                      ) : null}
-                      {line.deductionMode !== 'none' ? (
-                        <FieldBlock error={showError(`line-${line.id}-deduction`)} label={line.deductionMode === 'percent' ? 'ค่าหัก %' : 'น้ำหนักหักสิ่งเจือปน(กก.)'}>
+                    {/* ส่วนที่ 1: ข้อมูลสินค้าและน้ำหนัก (หลัก) */}
+                    <div className="space-y-4">
+                      {/* Grid ช่องกรอกข้อมูลหลัก */}
+                      <div className={cn(
+                        'grid gap-4 items-start',
+                        form.type === 'WTO'
+                          ? 'grid-cols-1 sm:grid-cols-[2fr_1.5fr_1fr_1fr_1.2fr]'
+                          : 'grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr]'
+                      )}
+                      >
+                        <div className="min-w-0">
+                          <SearchCombobox
+                            disabled={isLoadingProducts}
+                            error={showError(`line-${line.id}-product`)}
+                            inputId={`weight-product-${line.id}`}
+                            label="สินค้า*"
+                            options={products}
+                            placeholder={isLoadingProducts ? 'กำลังโหลดสินค้า...' : 'เลือกสินค้า'}
+                            value={line.productId}
+                            onChange={(value) => {
+                              markTouched(`line-${line.id}-product`)
+                              updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
+                            }}
+                          />
+                          {/* ปุ่มเพิ่มสินค้า อยู่ใต้ช่องสินค้าตรงล็อกพอดี และใช้สีดั้งเดิมตามธีม */}
+                          <div className="mt-2 w-full">
+                            <ProductImagePicker
+                              key={`${form.branchId}:${form.partyId}:${form.type}`}
+                              disabled={isLoadingProducts}
+                              products={products}
+                              value={line.productId}
+                              onChange={(value) => {
+                                markTouched(`line-${line.id}-product`)
+                                updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
+                              }}
+                              buttonClassName={cn("text-white font-semibold w-full", ticketTheme.button)}
+                            />
+                          </div>
+                        </div>
+                        {form.type === 'WTO' ? (() => {
+                          const stockKey = `${form.branchId}:${line.productId}`
+                          const stock = stockOptions[stockKey]
+                          const selectedWarehouse = line.warehouseId ? stock?.warehousesById[line.warehouseId] : null
+                          return (
+                            <div className="min-w-0">
+                              <SearchCombobox
+                                disabled={!form.branchId || !line.productId}
+                                error={showError(`line-${line.id}-warehouse`)}
+                                inputId={`weight-warehouse-${line.id}`}
+                                label="คลัง*"
+                                options={stock?.options ?? []}
+                                placeholder={!form.branchId ? 'เลือกสาขาก่อน' : !line.productId ? 'เลือกสินค้าก่อน' : 'เลือกคลัง RM/FG'}
+                                value={line.warehouseId}
+                                onChange={(value) => {
+                                  markTouched(`line-${line.id}-warehouse`)
+                                  updateLine(line.id, (current) => ({ ...current, warehouseId: value }))
+                                }}
+                              />
+                              {selectedWarehouse ? (
+                                <div className="mt-1 grid grid-cols-3 gap-1 text-[11px] text-slate-500">
+                                  <span>คงเหลือ {formatWeight(selectedWarehouse.onHandQty)}</span>
+                                  <span>จอง {formatWeight(selectedWarehouse.onHoldQty)}</span>
+                                  <span className="font-medium text-slate-700">พร้อมส่ง {formatWeight(selectedWarehouse.availableQty)}</span>
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        })() : null}
+                        <FieldBlock error={showError(`line-${line.id}-gross`)} label="น้ำหนักรวม (กก. / ลัง) *">
                           <Input
                             inputMode="decimal"
                             placeholder="0.00"
-                            value={line.deductionValue}
-                            onBlur={() => markTouched(`line-${line.id}-deduction`)}
-                            onChange={(event) => updateLine(line.id, (current) => ({ ...current, deductionValue: normalizeDecimalInput(event.target.value) }))}
+                            value={line.grossWeight}
+                            onBlur={() => markTouched(`line-${line.id}-gross`)}
+                            onChange={(event) => updateLine(line.id, (current) => ({ ...current, grossWeight: normalizeDecimalInput(event.target.value) }))}
                           />
                         </FieldBlock>
-                      ) : null}
+                        <div className="min-w-0">
+                          <FieldBlock error={showError(`line-${line.id}-container`)} label="หักภาชนะ(กก.)">
+                            <Input
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={line.containerDeductionWeight}
+                              onBlur={() => markTouched(`line-${line.id}-container`)}
+                              onChange={(event) => {
+                                const containerDeductionWeight = normalizeDecimalInput(event.target.value)
+                                updateLine(line.id, (current) => ({
+                                  ...current,
+                                  containerDeductionWeight,
+                                }))
+                              }}
+                            />
+                          </FieldBlock>
+                        </div>
+                        <div className="min-w-0">
+                          <FieldBlock error={showError(`line-${line.id}-images`)} label="รูปภาพรายการสินค้า*">
+                            <AttachmentProfileGrid
+                              addLabel="เพิ่มรูป"
+                              emptyLabel="ยังไม่มีรูปภาพรายการนี้"
+                              files={getLineImages(line)}
+                              onAppend={(files) => void appendLineImages(line.id, files)}
+                              onPreview={setPreviewImage}
+                              onRemove={(fileId) => updateLine(line.id, (current) => ({
+                                ...current,
+                                imageFiles: getLineImages(current).filter((entry) => entry.id !== fileId),
+                              }))}
+                              noWrapper
+                            />
+                          </FieldBlock>
+                        </div>
+                      </div>
+
+                      {/* ปุ่มเพิ่มสิ่งเจือปน (แสดงเมื่อยังไม่มีการเพิ่มสิ่งเจือปน) จัดชิดขวาตามรูป */}
+                      {line.deductionMode === 'none' && (
+                        <div className="flex justify-end mt-2">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              updateLine(line.id, (current) => ({
+                                ...current,
+                                deductionMode: 'kg',
+                                deductionValue: '',
+                                impurityId: impurities[0]?.id || '',
+                              }))
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 h-10 rounded-md text-xs font-semibold px-4"
+                          >
+                            <Plus className="h-4 w-4" />
+                            เพิ่มสิ่งเจือปน
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
-                    <ProductImagePicker
-                      key={`${form.branchId}:${form.partyId}:${form.type}`}
-                      disabled={isLoadingProducts}
-                      products={products}
-                      value={line.productId}
-                      onChange={(value) => {
-                        markTouched(`line-${line.id}-product`)
-                        updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
-                      }}
-                      buttonClassName={ticketTheme.button}
-                    />
+                    {/* ส่วนที่ 2: บล็อกสิ่งเจือปน (แสดงเฉพาะเมื่อกดเพิ่มสิ่งเจือปน) */}
+                    {line.deductionMode !== 'none' ? (
+                      <div className="mt-4 p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">หักสิ่งเจือปน</span>
+                          <Button
+                            size="xs"
+                            type="button"
+                            variant="outline"
+                            className="text-rose-600 hover:bg-rose-50 border-rose-200 h-8 px-2"
+                            onClick={() => {
+                              updateLine(line.id, (current) => ({
+                                ...current,
+                                deductionMode: 'none',
+                                deductionValue: '',
+                                impurityId: '',
+                              }))
+                            }}
+                          >
+                            <Trash2 className="size-3 mr-1" />
+                            ลบสิ่งเจือปน
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <SearchCombobox
+                            error={showError(`line-${line.id}-impurity`)}
+                            inputId={`weight-impurity-${line.id}`}
+                            label="สิ่งเจือปน*"
+                            options={impurities}
+                            placeholder={impurities.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งาน'}
+                            value={getLineImpurityId(line)}
+                            onChange={(value) => {
+                              markTouched(`line-${line.id}-impurity`)
+                              updateLine(line.id, (current) => ({ ...current, impurityId: value }))
+                            }}
+                          />
+                          <FieldBlock label="ประเภทการหัก*">
+                            <SimpleDropdown
+                              options={[
+                                { label: 'หัก (กก.)', value: 'kg' },
+                                { label: 'หัก %', value: 'percent' },
+                              ]}
+                              value={line.deductionMode}
+                              onChange={(value) => {
+                                const deductionMode = value as DeductionMode
+                                updateLine(line.id, (current) => ({
+                                  ...current,
+                                  deductionMode,
+                                  deductionValue: '',
+                                }))
+                              }}
+                            />
+                          </FieldBlock>
+                          <FieldBlock error={showError(`line-${line.id}-deduction`)} label={line.deductionMode === 'percent' ? 'ค่าหัก % *' : 'น้ำหนักหักสิ่งเจือปน(กก.) *'}>
+                            <Input
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={line.deductionValue}
+                              onBlur={() => markTouched(`line-${line.id}-deduction`)}
+                              onChange={(event) => updateLine(line.id, (current) => ({ ...current, deductionValue: normalizeDecimalInput(event.target.value) }))}
+                            />
+                          </FieldBlock>
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 lg:grid-cols-4">
-                      <MiniMetric label="Gross" value={`${formatWeight(lineTotals.grossWeight)} กก.`} />
+                      <MiniMetric label="GROSS" value={`${formatWeight(lineTotals.grossWeight)} กก.`} />
                       <MiniMetric label="ภาชนะ" value={`${formatWeight(lineTotals.containerDeductionWeight)} กก.`} />
                       <MiniMetric label="สิ่งเจือปน" value={`${formatWeight(lineTotals.deductionWeight)} กก.`} />
-                      <MiniMetric label="Net" value={`${formatWeight(lineTotals.netWeight)} กก.`} />
+                      <MiniMetric label="NET" value={`${formatWeight(lineTotals.netWeight)} กก.`} />
                     </div>
-                    <div className="mt-4">
-                      <FieldBlock error={showError(`line-${line.id}-images`)} label="รูปภาพรายการสินค้า*">
-                        <AttachmentProfileGrid
-                          addLabel="เพิ่มรูป"
-                          emptyLabel="ยังไม่มีรูปภาพรายการนี้"
-                          files={getLineImages(line)}
-                          onAppend={(files) => void appendLineImages(line.id, files)}
-                          onPreview={setPreviewImage}
-                          onRemove={(fileId) => updateLine(line.id, (current) => ({
-                            ...current,
-                            imageFiles: getLineImages(current).filter((entry) => entry.id !== fileId),
-                          }))}
-                        />
-                      </FieldBlock>
-                    </div>
+
                     <div className="mt-4">
                       <FieldBlock label="หมายเหตุรายการ">
                         <textarea
@@ -1267,6 +1316,7 @@ function AttachmentProfileGrid({
   onAppend,
   onPreview,
   onRemove,
+  noWrapper = false,
 }: {
   addLabel: string
   emptyLabel: string
@@ -1274,64 +1324,73 @@ function AttachmentProfileGrid({
   onAppend: (files: FileList | null) => void
   onPreview: (file: AttachmentPreview) => void
   onRemove: (fileId: string) => void
+  noWrapper?: boolean
 }) {
+  const content = (
+    <div className="flex flex-wrap gap-3">
+      {files.map((file) => (
+        <div className="w-28 min-w-0" key={file.id}>
+          <button
+            className="group relative block h-28 w-28 overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm ring-1 ring-slate-100 hover:border-slate-400"
+            disabled={!file.url}
+            title={file.fileName}
+            type="button"
+            onClick={() => file.url ? onPreview(file) : undefined}
+          >
+            {file.url ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt={file.fileName} className="h-full w-full object-cover" src={file.url} />
+                <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-2 py-1.5 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+                  เปิดรูปภาพ
+                </span>
+              </>
+            ) : (
+              <span className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-slate-400">รูปเดิม</span>
+            )}
+          </button>
+          <div className="mt-2 truncate text-xs text-slate-600" title={file.fileName}>{file.fileName}</div>
+          <button className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline" type="button" onClick={() => onRemove(file.id)}>
+            <Trash2 className="h-3 w-3" />
+            ลบ
+          </button>
+        </div>
+      ))}
+      <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white p-3 text-center text-xs font-medium text-slate-500 shadow-sm hover:border-slate-400 hover:bg-slate-50">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+          <ImagePlus className="h-5 w-5" />
+        </span>
+        {files.length === 0 ? emptyLabel : addLabel}
+        <input
+          accept="image/*"
+          className="hidden"
+          multiple
+          type="file"
+          onChange={(event) => {
+            onAppend(event.target.files)
+            event.target.value = ''
+          }}
+        />
+      </label>
+    </div>
+  )
+
+  if (noWrapper) {
+    return content
+  }
+
   return (
     <div className="rounded-md border border-slate-100 bg-slate-50 p-3">
-      <div className="flex flex-wrap gap-3">
-        {files.map((file) => (
-          <div className="w-28 min-w-0" key={file.id}>
-            <button
-              className="group relative block h-28 w-28 overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm ring-1 ring-slate-100 hover:border-slate-400"
-              disabled={!file.url}
-              title={file.fileName}
-              type="button"
-              onClick={() => file.url ? onPreview(file) : undefined}
-            >
-              {file.url ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt={file.fileName} className="h-full w-full object-cover" src={file.url} />
-                  <span className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-2 py-1.5 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
-                    เปิดรูปภาพ
-                  </span>
-                </>
-              ) : (
-                <span className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-slate-400">รูปเดิม</span>
-              )}
-            </button>
-            <div className="mt-2 truncate text-xs text-slate-600" title={file.fileName}>{file.fileName}</div>
-            <button className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline" type="button" onClick={() => onRemove(file.id)}>
-              <Trash2 className="h-3 w-3" />
-              ลบ
-            </button>
-          </div>
-        ))}
-        <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white p-3 text-center text-xs font-medium text-slate-500 shadow-sm hover:border-slate-400 hover:bg-slate-50">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-            <ImagePlus className="h-5 w-5" />
-          </span>
-          {files.length === 0 ? emptyLabel : addLabel}
-          <input
-            accept="image/*"
-            className="hidden"
-            multiple
-            type="file"
-            onChange={(event) => {
-              onAppend(event.target.files)
-              event.target.value = ''
-            }}
-          />
-        </label>
-      </div>
+      {content}
     </div>
   )
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-950 px-3 py-3 text-white">
-      <div className="text-xs uppercase text-slate-300">{label}</div>
-      <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
+    <div className="rounded-md bg-slate-950 px-3.5 py-3.5 text-white shadow-sm">
+      <div className="text-xs uppercase text-slate-400 tracking-wider font-medium">{label}</div>
+      <div className="mt-1.5 text-xl font-bold tabular-nums">{value}</div>
     </div>
   )
 }

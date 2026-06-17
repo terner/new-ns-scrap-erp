@@ -11,7 +11,7 @@ export type WeightTicketQuery = {
   page: number
   pageSize: number
   search?: string
-  sortBy: 'createdAt' | 'documentNo' | 'netWeight' | 'partyName'
+  sortBy: 'createdAt' | 'documentNo' | 'netWeight' | 'partyName' | 'branchName' | 'vehicleNo' | 'deductionWeight' | 'impurityDeduction' | 'status' | 'updatedAt'
   sortDir: 'asc' | 'desc'
   statuses: string[]
   type?: string
@@ -139,6 +139,18 @@ type WeightTicketUsageTimelineRow = {
 export function parseWeightTicketQuery(url: URL): WeightTicketQuery {
   const sortBy = url.searchParams.get('sortBy')
   const sortDir = url.searchParams.get('sortDir')
+  const validSortBys = [
+    'createdAt',
+    'documentNo',
+    'netWeight',
+    'partyName',
+    'branchName',
+    'vehicleNo',
+    'deductionWeight',
+    'impurityDeduction',
+    'status',
+    'updatedAt',
+  ]
   return {
     branchId: url.searchParams.get('branchId') || undefined,
     dateFrom: url.searchParams.get('dateFrom') || undefined,
@@ -146,7 +158,7 @@ export function parseWeightTicketQuery(url: URL): WeightTicketQuery {
     page: Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1),
     pageSize: Math.min(100, Math.max(10, Number(url.searchParams.get('pageSize') ?? 10) || 10)),
     search: url.searchParams.get('search')?.trim() || undefined,
-    sortBy: sortBy === 'documentNo' || sortBy === 'partyName' || sortBy === 'netWeight' ? sortBy : 'createdAt',
+    sortBy: validSortBys.includes(sortBy ?? '') ? (sortBy as WeightTicketQuery['sortBy']) : 'createdAt',
     sortDir: sortDir === 'asc' ? 'asc' : 'desc',
     statuses: (url.searchParams.get('status') ?? '')
       .split(',')
@@ -167,6 +179,24 @@ export function weightTicketOrderBy(query: WeightTicketQuery): Prisma.weight_tic
   }
   if (query.sortBy === 'netWeight') {
     return [{ net_weight: direction }, { created_at: 'desc' }]
+  }
+  if (query.sortBy === 'branchName') {
+    return [{ branches: { name: direction } }, { created_at: 'desc' }]
+  }
+  if (query.sortBy === 'vehicleNo') {
+    return [{ vehicle_no: direction }, { created_at: 'desc' }]
+  }
+  if (query.sortBy === 'deductionWeight') {
+    return [{ container_deduction_weight: direction }, { created_at: 'desc' }]
+  }
+  if (query.sortBy === 'impurityDeduction') {
+    return [{ deduct_weight: direction }, { created_at: 'desc' }]
+  }
+  if (query.sortBy === 'status') {
+    return [{ status: direction }, { created_at: 'desc' }]
+  }
+  if (query.sortBy === 'updatedAt') {
+    return [{ updated_at: direction }, { created_at: 'desc' }]
   }
 
   return [{ created_at: direction }, { doc_no: 'desc' }]

@@ -652,13 +652,13 @@ export function WeightTicketListPageClient() {
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('documentNo', 'เลขที่')} onSort={toggleSort} sortKey="documentNo" />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="วันที่/เวลา" resizeProps={columnResize.getResizeHandleProps('createdAt', 'วันที่/เวลา')} onSort={toggleSort} sortKey="createdAt" />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label={typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า')} onSort={toggleSort} sortKey="partyName" />
-                <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} />
-                <ResizableTableHead label="ทะเบียนรถ" resizeProps={columnResize.getResizeHandleProps('vehicleNo', 'ทะเบียนรถ')} />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} onSort={toggleSort} sortKey="branchName" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="ทะเบียนรถ" resizeProps={columnResize.getResizeHandleProps('vehicleNo', 'ทะเบียนรถ')} onSort={toggleSort} sortKey="vehicleNo" />
                 <SortHeader activeKey={sortBy} align="right" direction={sortDir} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} onSort={toggleSort} sortKey="netWeight" />
-                <ResizableTableHead align="right" label="หักภาชนะ(กก.)" resizeProps={columnResize.getResizeHandleProps('deductionWeight', 'หักภาชนะ(กก.)')} />
-                <ResizableTableHead label="หักสิ่งเจือปน" resizeProps={columnResize.getResizeHandleProps('impurityDeduction', 'หักสิ่งเจือปน')} />
-                <ResizableTableHead label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
-                <ResizableTableHead label="อัปเดตล่าสุด" resizeProps={columnResize.getResizeHandleProps('updatedAt', 'อัปเดตล่าสุด')} />
+                <SortHeader activeKey={sortBy} align="right" direction={sortDir} label="หักภาชนะ(กก.)" resizeProps={columnResize.getResizeHandleProps('deductionWeight', 'หักภาชนะ(กก.)')} onSort={toggleSort} sortKey="deductionWeight" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="หักสิ่งเจือปน" resizeProps={columnResize.getResizeHandleProps('impurityDeduction', 'หักสิ่งเจือปน')} onSort={toggleSort} sortKey="impurityDeduction" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} onSort={toggleSort} sortKey="status" />
+                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="อัปเดตล่าสุด" resizeProps={columnResize.getResizeHandleProps('updatedAt', 'อัปเดตล่าสุด')} onSort={toggleSort} sortKey="updatedAt" />
                 <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
               </tr>
             </thead>
