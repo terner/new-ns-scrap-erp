@@ -48,7 +48,7 @@ const emptyProductForm: ProductFormValues = {
   active: true,
   imageStorageKey: null,
   imageThumbnailStorageKey: null,
-  type: null,
+  type: 'สินค้าสิ่งเจือปน',
   unit: 'กก.',
 }
 
@@ -60,7 +60,7 @@ function productToForm(product: Product): ProductFormValues {
     active: product.active,
     imageStorageKey: product.imageStorageKey,
     imageThumbnailStorageKey: product.imageThumbnailStorageKey,
-    type: product.type,
+    type: product.type || 'สินค้าสิ่งเจือปน',
     unit: product.unit ?? 'กก.',
   }
 }
@@ -104,7 +104,7 @@ type ProductSubmitPayload = {
   values: ProductFormValues
 }
 
-export function ProductsPageClient() {
+export function ImpurityProductsPageClient() {
   const [activeFilter, setActiveFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -160,7 +160,7 @@ export function ProductsPageClient() {
     const query = search.trim().toLowerCase()
     const rows = products.filter((product) => {
       const isImpurity = product.type === 'สินค้าสิ่งเจือปน' || product.type?.toLowerCase().includes('สิ่งเจือปน')
-      if (isImpurity) return false
+      if (!isImpurity) return false
 
       if (activeFilter === 'active' && !product.active) return false
       if (activeFilter === 'inactive' && product.active) return false
@@ -423,27 +423,12 @@ export function ProductsPageClient() {
             </button>
             <button className="inline-flex h-9 items-center gap-1 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 focus:outline-none" type="button" onClick={openCreateForm}>
               <Plus aria-hidden="true" className="h-4 w-4" />
-              เพิ่มสินค้า
+              เพิ่มสินค้าสิ่งเจือปน
             </button>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-50 pt-2 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 font-medium">ประเภทสินค้า:</span>
-            <select
-              aria-label="กรองประเภทสินค้า"
-              className="h-8 rounded-md border border-slate-300 px-2 text-xs bg-white text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              value={productTypeFilter}
-              onChange={(event) => {
-                setPage(1)
-                setProductTypeFilter(event.target.value)
-              }}
-            >
-              <option value="">ทุกประเภท</option>
-              {productTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
-          </div>
           <div className="flex items-center gap-2">
             <span className="text-slate-500 font-medium">สถานะ:</span>
             <MatchButton active={activeFilter === ''} label="ทั้งหมด" onClick={() => { setActiveFilter(''); setPage(1); }} />
@@ -482,7 +467,7 @@ export function ProductsPageClient() {
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform focus:outline-none"
           onClick={openCreateForm}
           type="button"
-          aria-label="เพิ่มสินค้า"
+          aria-label="เพิ่มสินค้าสิ่งเจือปน"
         >
           <Plus className="h-6 w-6" />
         </button>
@@ -504,22 +489,6 @@ export function ProductsPageClient() {
             </div>
 
             <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">ประเภทสินค้า</span>
-                <select
-                  aria-label="กรองประเภทสินค้ามือถือ"
-                  className="h-11 w-full rounded-md border border-slate-300 px-3 text-sm bg-white"
-                  value={productTypeFilter}
-                  onChange={(event) => {
-                    setPage(1)
-                    setProductTypeFilter(event.target.value)
-                  }}
-                >
-                  <option value="">ทุกประเภท</option>
-                  {productTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
-                </select>
-              </label>
-
               <div>
                 <span className="mb-1.5 block text-xs font-semibold text-slate-600">สถานะการใช้งาน</span>
                 <div className="flex flex-wrap gap-2">
@@ -858,7 +827,7 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
   return (
     <form className="overflow-hidden rounded-md bg-slate-900 shadow-xl flex flex-col w-full max-h-[90vh]" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 bg-slate-900 px-5 py-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
-        <h3 className="text-lg font-bold text-slate-100">{form.id ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า'}</h3>
+        <h3 className="text-lg font-bold text-slate-100">{form.id ? 'แก้ไขสินค้าสิ่งเจือปน' : 'เพิ่มสินค้าสิ่งเจือปน'}</h3>
         <ActiveToggle checked={form.active} labelClassName="text-sm font-medium text-slate-200" onChange={(checked) => update('active', checked)} />
       </div>
 
@@ -868,10 +837,12 @@ function ProductForm({ isSaving, product, productTypes, productUnits, onCancel, 
           <div className="grid gap-3 md:grid-cols-4">
             {form.id ? <TextField error={errors.code} label="รหัสสินค้า" readOnly value={form.code ?? ''} onChange={(value) => update('code', value)} /> : null}
             <TextField className={form.id ? 'md:col-span-1' : 'md:col-span-2'} error={errors.name} label="ชื่อสินค้า *" value={form.name} onChange={(value) => update('name', value)} />
-            <SelectField error={errors.type} label="ประเภทสินค้า" value={form.type ?? ''} onChange={(value) => update('type', value || null)}>
-              <option value="">เลือกประเภทสินค้า</option>
-              {productTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-            </SelectField>
+            <TextField
+              label="ประเภทสินค้า"
+              readOnly
+              value="สินค้าสิ่งเจือปน"
+              onChange={() => {}}
+            />
             <SelectField error={errors.unit} label="หน่วย" value={form.unit ?? ''} onChange={(value) => update('unit', value || null)}>
               <option value="">เลือกหน่วย</option>
               {productUnits.map((unit) => {

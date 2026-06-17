@@ -327,7 +327,7 @@ export function DailyPettyAdvancePageClient() {
               ล้าง filter
             </button>
           ) : null}
-          <button className="hidden lg:inline-flex items-center justify-center ml-auto h-9 rounded-md bg-[#0F172A] px-4 text-sm font-semibold text-white hover:bg-[#1E293B]" type="button" onClick={openCreateForm}>+ ยืมเงินใหม่</button>
+          <button className="hidden lg:inline-flex items-center justify-center ml-auto h-9 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700" type="button" onClick={openCreateForm}>+ ยืมเงินใหม่</button>
         </div>
 
         {/* Desktop Filters */}
@@ -527,7 +527,7 @@ export function DailyPettyAdvancePageClient() {
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
               <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setFormOpen(false)}>ยกเลิก</button>
-              <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
             </div>
           </form>
         </div>
@@ -557,7 +557,7 @@ export function DailyPettyAdvancePageClient() {
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
               <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setReturningRow(null)}>ยกเลิก</button>
-              <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังส่งอนุมัติ...' : 'ส่งอนุมัติคืนเงิน'}</button>
+              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังส่งอนุมัติ...' : 'ส่งอนุมัติคืนเงิน'}</button>
             </div>
           </form>
         </div>

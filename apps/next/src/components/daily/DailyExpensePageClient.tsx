@@ -1834,7 +1834,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
                 </div>
                 <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-2xl">
                   <Button className="h-9 font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" type="button" variant="ghost" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
-                  <Button className="h-9 rounded-xl bg-slate-900 hover:bg-slate-850 text-white font-medium transition-colors outline-none focus:ring-0 px-5" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+                  <Button className="h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors outline-none focus:ring-0 px-5" disabled={isSaving} type="submit">{isSaving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
                 </div>
               </form>
             </div>

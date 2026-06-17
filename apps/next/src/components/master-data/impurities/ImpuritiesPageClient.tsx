@@ -528,7 +528,7 @@ function ImpurityForm({ impurity, isSaving, onCancel, onSubmit }: ImpurityFormPr
         <button className="inline-flex h-9 items-center justify-center px-4 text-sm font-normal text-slate-600 hover:text-slate-800" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
-        <button className="inline-flex h-9 items-center justify-center rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-4 text-sm font-normal text-white disabled:opacity-60 shadow-sm" disabled={isSaving} type="submit">
+        <button className="inline-flex h-9 items-center justify-center rounded-md bg-blue-600 hover:bg-blue-700 px-4 text-sm font-normal text-white disabled:opacity-60 shadow-sm" disabled={isSaving} type="submit">
           {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>

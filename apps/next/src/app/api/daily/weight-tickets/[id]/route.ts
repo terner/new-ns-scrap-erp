@@ -193,6 +193,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       deductionMode: line.deductionMode,
       deductionValue: String(line.deductionValue),
       grossWeight: String(line.grossWeight),
+      id: line.id,
+      parentId: line.parentId,
+      impurityId: line.impurityId,
     })))
 
     const updated = await prisma.$transaction(async (tx) => {

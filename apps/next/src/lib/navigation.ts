@@ -67,6 +67,7 @@ const exactPathPermissions: Record<string, string> = {
   '/daily-report': 'reports.reports.view',
   '/master-data/customers': 'master.customers.view',
   '/master-data/products': 'master.products.view',
+  '/master-data/impurity-products': 'master.products.view',
   '/master-data/suppliers': 'master.suppliers.view',
   '/owner-daily': 'reports.reports.view',
   '/pending-sales': 'reports.reports.view',
@@ -255,6 +256,7 @@ export const navigationItems: NavigationItem[] = [
     section: 'master-data',
     children: [
       { href: '/master-data/products', icon: '📋', label: 'รายการสินค้า', section: 'master-data' },
+      { href: '/master-data/impurity-products', icon: '🧪', label: 'รายการสินค้าสิ่งเจือปน', section: 'master-data' },
       { href: '/master-data/product-types', icon: '🏷️', label: 'ประเภทสินค้า', section: 'master-data' },
       { href: '/master-data/product-units', icon: '⚖️', label: 'หน่วยสินค้า', section: 'master-data' },
     ],

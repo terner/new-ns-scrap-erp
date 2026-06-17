@@ -697,7 +697,7 @@ export function StockTransferPageClient() {
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-2xl">
               <Button size="sm" type="button" variant="ghost" className="font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
               <Button disabled={isSaving} size="sm" type="button" variant="outline" className="rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:ring-0 px-4" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
-              <Button disabled={isSaving} size="sm" type="button" className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium transition-colors outline-none focus:ring-0 px-5" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
+              <Button disabled={isSaving} size="sm" type="button" className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors outline-none focus:ring-0 px-5" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
             </div>
           </form>
         </div>

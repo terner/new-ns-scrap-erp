@@ -1174,7 +1174,7 @@ function PoSellFormModal({
  
          <DialogFooter className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 shrink-0 rounded-b-2xl">
            <UiButton className="font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" disabled={isSaving} type="button" variant="ghost" onClick={onClose}>ยกเลิก</UiButton>
-           <UiButton className="rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-medium transition-colors outline-none focus:ring-0 px-6" disabled={isSaving} type="button" variant="default" onClick={() => void onSubmit()}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</UiButton>
+           <UiButton className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors outline-none focus:ring-0 px-6" disabled={isSaving} type="button" variant="default" onClick={() => void onSubmit()}>{isSaving ? 'กำลังบันทึก...' : submitLabel}</UiButton>
          </DialogFooter>
        </DialogContent>
      </Dialog>

@@ -1354,13 +1354,13 @@ function MoneyField({ label, onChange, value }: { label: string; onChange: (valu
 
 function ActionButton({ children, disabled = false, onClick, strong = false }: { children: ReactNode; disabled?: boolean; onClick: () => void; strong?: boolean }) {
   const color = strong 
-    ? 'bg-[#0F172A] text-white hover:bg-slate-800 shadow-sm focus:outline-none focus:ring-0' 
+    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-0' 
     : 'bg-transparent text-slate-500 hover:text-slate-800 border-none shadow-none focus:outline-none focus:ring-0'
   return <button className={`${color} rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 transition`} disabled={disabled} onClick={onClick} type="button">{children}</button>
 }
 
 function DisabledButton({ children, strong = false }: { children: ReactNode; strong?: boolean }) {
-  return <button className={`${strong ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-400'} rounded-md px-4 py-2 text-sm font-medium shadow-sm opacity-65 focus:outline-none focus:ring-0`} disabled type="button">{children}</button>
+  return <button className={`${strong ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'} rounded-md px-4 py-2 text-sm font-medium shadow-sm opacity-65 focus:outline-none focus:ring-0`} disabled type="button">{children}</button>
 }
 
 function LinkButton({ children, href }: { children: ReactNode; href: string }) {

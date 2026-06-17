@@ -1278,7 +1278,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
           </button>
           {isCreate ? (
             <button 
-              className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50" 
+              className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50" 
               disabled={isSaving} 
               type="button" 
               onClick={() => void submitCreate()}

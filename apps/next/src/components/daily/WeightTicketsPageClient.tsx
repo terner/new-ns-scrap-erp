@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, ChevronDown, ImagePlus, Plus, Search, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronDown, ImagePlus, Plus, Search, Trash2, Scale, Box, AlertTriangle, Check, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Card } from '@/components/ui/Card'
@@ -145,10 +145,89 @@ async function createAttachmentPreviewFromFile(file: File): Promise<AttachmentPr
   }
 }
 
-function ticketToFormState(ticket: WeightTicketRecord): FormState {
+function calculateAdjustedLineTotals(line: FormWeightTicketLine, allLines: FormWeightTicketLine[]) {
+  const isImpurity = !!line.parentId && Number(line.grossWeight || 0) === 0 && !!line.impurityId;
+  const isSecondaryLot = !!line.parentId && (Number(line.grossWeight || 0) > 0 || !line.impurityId);
+
+  if (isImpurity) {
+    const parentLine = allLines.find(l => l.id === line.parentId)
+    const parentGross = parentLine ? Math.max(0, Number(parentLine.grossWeight || 0)) : 0
+    const deductionWeight = line.deductionMode === 'percent'
+      ? parentGross * Math.max(0, Number(line.deductionValue || 0)) / 100
+      : line.deductionMode === 'kg'
+        ? Math.max(0, Number(line.deductionValue || 0))
+        : 0
+    return {
+      containerDeductionWeight: 0,
+      deductionWeight,
+      grossWeight: 0,
+      netWeight: 0,
+    }
+  }
+
+  if (isSecondaryLot) {
+    const childTotals = calculateLineTotals(line)
+    return {
+      containerDeductionWeight: childTotals.containerDeductionWeight,
+      deductionWeight: 0,
+      grossWeight: childTotals.grossWeight,
+      netWeight: childTotals.netWeight,
+    }
+  }
+
+  // Parent line: sum up parent totals + secondary lots' totals - impurities
+  const parentTotals = calculateLineTotals(line)
+  const children = allLines.filter(l => l.parentId === line.id)
+  
+  const secondaryLots = children.filter(l => Number(l.grossWeight || 0) > 0 || !l.impurityId)
+  const impurities = children.filter(l => Number(l.grossWeight || 0) === 0 && !!l.impurityId)
+
+  let totalGross = parentTotals.grossWeight
+  let totalContainer = parentTotals.containerDeductionWeight
+  
+  secondaryLots.forEach(lot => {
+    const lotTotals = calculateLineTotals(lot)
+    totalGross += lotTotals.grossWeight
+    totalContainer += lotTotals.containerDeductionWeight
+  })
+
+  let childrenDeduction = 0
+  impurities.forEach(child => {
+    const childDeduction = child.deductionMode === 'percent'
+      ? parentTotals.grossWeight * Math.max(0, Number(child.deductionValue || 0)) / 100
+      : child.deductionMode === 'kg'
+        ? Math.max(0, Number(child.deductionValue || 0))
+        : 0
+    childrenDeduction += childDeduction
+  })
+
   return {
-    branchId: ticket.branchId,
-    lines: ticket.lines.map((line) => ({
+    containerDeductionWeight: totalContainer,
+    deductionWeight: parentTotals.deductionWeight + childrenDeduction,
+    grossWeight: totalGross,
+    netWeight: Math.max(0, totalGross - totalContainer - (parentTotals.deductionWeight + childrenDeduction)),
+  }
+}
+
+function ticketToFormState(ticket: WeightTicketRecord): FormState {
+  const productParentMap = new Map<string, string>()
+  let lastParentId: string | undefined = undefined
+  const lines: FormWeightTicketLine[] = ticket.lines.map((line) => {
+    const isImpurity = Number(line.grossWeight || 0) === 0 && !!line.impurityId
+    let parentId: string | undefined = undefined
+
+    if (isImpurity) {
+      parentId = lastParentId
+    } else {
+      const existingParentId = productParentMap.get(line.productId)
+      if (existingParentId) {
+        parentId = existingParentId
+      } else {
+        productParentMap.set(line.productId, line.id)
+        lastParentId = line.id
+      }
+    }
+    return {
       containerDeductionWeight: line.containerDeductionWeight,
       deductionMode: line.deductionMode,
       deductionValue: line.deductionValue,
@@ -160,7 +239,13 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
       note: line.note,
       productId: line.productId,
       warehouseId: line.warehouseId,
-    })),
+      parentId,
+    }
+  })
+
+  return {
+    branchId: ticket.branchId,
+    lines,
     partyId: ticket.partyId,
     remark: ticket.remark,
     type: ticket.type,
@@ -200,15 +285,36 @@ export function WeightTicketsPageClient({
   const [previewImage, setPreviewImage] = useState<AttachmentPreview | null>(null)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [activeLineId, setActiveLineId] = useState('')
+  const [buyingImpurityLine, setBuyingImpurityLine] = useState<FormWeightTicketLine | null>(null)
+  const [selectedProductForImpurity, setSelectedProductForImpurity] = useState<string>('')
+
+
 
   const partyOptions = form.type === 'WTI' ? suppliers : customers
   const totals = useMemo(() => calculateTicketTotals(form.lines), [form.lines])
+
+  const isImpurityProduct = useCallback((p: OptionItem) => {
+    const cat = p.category?.toLowerCase() || ''
+    return cat.includes('สิ่งเจือปน') || cat.includes('impurity')
+  }, [])
+
+  const normalProducts = useMemo(() => {
+    return products.filter(p => !isImpurityProduct(p))
+  }, [products, isImpurityProduct])
+
+  const impurityProducts = useMemo(() => {
+    return products.filter(p => isImpurityProduct(p))
+  }, [products, isImpurityProduct])
   const wtoProductKeys = useMemo(() => {
     if (form.type !== 'WTO' || !form.branchId) return []
     return [...new Set(form.lines.map((line) => line.productId).filter(Boolean))]
   }, [form.branchId, form.lines, form.type])
   const activeLine = useMemo(
-    () => form.lines.find((line) => line.id === activeLineId) ?? null,
+    () => {
+      const parentLines = form.lines.filter((line) => !line.parentId)
+      const found = parentLines.find((line) => line.id === activeLineId)
+      return found ?? parentLines[0] ?? null
+    },
     [activeLineId, form.lines],
   )
   const loadProducts = useCallback(async (signal?: AbortSignal) => {
@@ -364,12 +470,13 @@ export function WeightTicketsPageClient({
   }, [editingTicketId])
 
   useEffect(() => {
-    if (form.lines.length === 0) {
+    const parentLines = form.lines.filter((line) => !line.parentId)
+    if (parentLines.length === 0) {
       setActiveLineId('')
       return
     }
-    if (activeLineId && !form.lines.some((line) => line.id === activeLineId)) {
-      setActiveLineId('')
+    if (!activeLineId || !parentLines.some((line) => line.id === activeLineId)) {
+      setActiveLineId(parentLines[0].id)
     }
   }, [activeLineId, form.lines])
 
@@ -379,32 +486,70 @@ export function WeightTicketsPageClient({
     if (!form.partyId) next.partyId = form.type === 'WTI' ? 'เลือกผู้ขาย' : 'เลือกลูกค้า'
     if (form.vehicleNo.trim().length < 2) next.vehicleNo = 'กรอกทะเบียนรถ'
 
-    form.lines.forEach((line, index) => {
-      const lineTotals = calculateLineTotals(line)
-      const rawContainerDeduction = Number(line.containerDeductionWeight || 0)
-      const rawImpurityDeduction = line.deductionMode === 'percent'
-        ? lineTotals.grossWeight * Number(line.deductionValue || 0) / 100
-        : line.deductionMode === 'kg'
-          ? Number(line.deductionValue || 0)
-          : 0
-      if (!line.productId) next[`line-${line.id}-product`] = `เลือกสินค้าบรรทัดที่ ${index + 1}`
-      if (form.type === 'WTO' && !line.warehouseId) next[`line-${line.id}-warehouse`] = `เลือกคลังบรรทัดที่ ${index + 1}`
-      if (lineTotals.grossWeight <= 0) next[`line-${line.id}-gross`] = `กรอกน้ำหนักบรรทัดที่ ${index + 1}`
-      if (rawContainerDeduction > lineTotals.grossWeight) {
-        next[`line-${line.id}-container`] = 'หักภาชนะต้องไม่เกินน้ำหนักรวม'
+    const parentLines = form.lines.filter((line) => !line.parentId)
+
+    form.lines.forEach((line) => {
+      const isImpurity = !!line.parentId && Number(line.grossWeight || 0) === 0 && !!line.impurityId;
+      const isSecondaryLot = !!line.parentId && (Number(line.grossWeight || 0) > 0 || !line.impurityId);
+      const isParent = !line.parentId;
+
+      if (!line.productId) {
+        const parentIndex = line.parentId
+          ? parentLines.findIndex((p) => p.id === line.parentId)
+          : parentLines.findIndex((p) => p.id === line.id)
+        next[`line-${line.id}-product`] = `เลือกสินค้าบรรทัดที่ ${parentIndex + 1}`
       }
-      if (getLineImages(line).length === 0) next[`line-${line.id}-images`] = `แนบรูปภาพบรรทัดที่ ${index + 1} อย่างน้อย 1 รูป`
-      if (line.deductionMode !== 'none' && !getLineImpurityId(line)) {
-        next[`line-${line.id}-impurity`] = impurities.length > 0 ? `เลือกสิ่งเจือปนบรรทัดที่ ${index + 1}` : 'ยังไม่มีสิ่งเจือปนที่ใช้งานใน master data'
+
+      if (form.type === 'WTO' && !line.warehouseId) {
+        const parentIndex = line.parentId
+          ? parentLines.findIndex((p) => p.id === line.parentId)
+          : parentLines.findIndex((p) => p.id === line.id)
+        next[`line-${line.id}-warehouse`] = `เลือกคลังบรรทัดที่ ${parentIndex + 1}`
       }
-      if (line.deductionMode === 'percent' && Number(line.deductionValue || 0) > 100) {
-        next[`line-${line.id}-deduction`] = 'หัก % ต้องไม่เกิน 100'
-      }
-      if (line.deductionMode === 'kg' && Number(line.deductionValue || 0) > lineTotals.grossWeight) {
-        next[`line-${line.id}-deduction`] = 'น้ำหนักหักต้องไม่เกินน้ำหนักรวม'
-      }
-      if (rawContainerDeduction + rawImpurityDeduction > lineTotals.grossWeight) {
-        next[`line-${line.id}-deduction`] = 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม'
+
+      if (isParent || isSecondaryLot) {
+        const rawGross = Number(line.grossWeight || 0)
+        const rawContainer = Number(line.containerDeductionWeight || 0)
+        const parentIndex = isParent
+          ? parentLines.findIndex((p) => p.id === line.id)
+          : parentLines.findIndex((p) => p.id === line.parentId)
+
+        if (rawGross <= 0) {
+          next[`line-${line.id}-gross`] = `กรอกน้ำหนักบรรทัดที่ ${parentIndex + 1}`
+        }
+        if (rawContainer > rawGross) {
+          next[`line-${line.id}-container`] = 'หักภาชนะต้องไม่เกินน้ำหนักรวม'
+        }
+        if (getLineImages(line).length === 0) {
+          next[`line-${line.id}-images`] = `แนบรูปภาพบรรทัดที่ ${parentIndex + 1} อย่างน้อย 1 รูป`
+        }
+
+        if (isParent) {
+          const lineTotals = calculateAdjustedLineTotals(line, form.lines)
+          const children = form.lines.filter((l) => l.parentId === line.id)
+          const impurities = children.filter((l) => Number(l.grossWeight || 0) === 0 && !!l.impurityId)
+          if (lineTotals.containerDeductionWeight + lineTotals.deductionWeight > lineTotals.grossWeight) {
+            if (impurities.length > 0) {
+              const lastChild = impurities[impurities.length - 1]
+              next[`line-${lastChild.id}-deduction`] = 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม'
+            } else {
+              next[`line-${line.id}-container`] = 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม'
+            }
+          }
+        }
+      } else if (isImpurity) {
+        if (line.deductionMode === 'none') {
+          next[`line-${line.id}-impurity`] = 'เลือกสิ่งเจือปน'
+        }
+        if (line.deductionMode !== 'none' && !getLineImpurityId(line)) {
+          next[`line-${line.id}-impurity`] = impurities.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งานใน master data'
+        }
+        if (line.deductionMode === 'percent' && Number(line.deductionValue || 0) > 100) {
+          next[`line-${line.id}-deduction`] = 'หัก % ต้องไม่เกิน 100'
+        }
+        if (Number(line.deductionValue || 0) <= 0) {
+          next[`line-${line.id}-deduction`] = 'กรอกน้ำหนักหักสิ่งเจือปน'
+        }
       }
     })
     return next
@@ -440,27 +585,103 @@ export function WeightTicketsPageClient({
   }
 
   function updateLine(lineId: string, updater: (line: FormWeightTicketLine) => FormWeightTicketLine) {
-    setForm((current) => ({
-      ...current,
-      lines: current.lines.map((line) => line.id === lineId ? updater(line) : line),
-    }))
+    setForm((current) => {
+      const updatedLines = current.lines.map((line) => line.id === lineId ? updater(line) : line)
+      const target = updatedLines.find((line) => line.id === lineId)
+      if (target && !target.parentId) {
+        return {
+          ...current,
+          lines: updatedLines.map((line) => {
+            if (line.parentId === target.id) {
+              return {
+                ...line,
+                productId: target.productId,
+                warehouseId: target.warehouseId,
+              }
+            }
+            return line
+          }),
+        }
+      }
+      return {
+        ...current,
+        lines: updatedLines,
+      }
+    })
   }
 
   function addLine() {
     const nextLine = createFormWeightTicketLine()
+    nextLine.productId = form.lines.find(l => !l.parentId)?.productId ?? ''
+    nextLine.warehouseId = form.lines.find(l => !l.parentId)?.warehouseId ?? ''
     setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
     setActiveLineId(nextLine.id)
   }
 
+  function addSameProductLot(sourceLine: FormWeightTicketLine) {
+    const nextLine = createFormWeightTicketLine()
+    nextLine.productId = sourceLine.productId
+    nextLine.warehouseId = sourceLine.warehouseId
+    nextLine.parentId = sourceLine.id
+    setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
+  }
+
   function removeLine(lineId: string) {
     setForm((current) => {
-      if (current.lines.length === 1) return current
-      const nextLines = current.lines.filter((line) => line.id !== lineId)
+      const parentLines = current.lines.filter((line) => !line.parentId)
+      if (parentLines.length === 1) return current
+      const nextLines = current.lines.filter((line) => line.id !== lineId && line.parentId !== lineId)
       return {
         ...current,
         lines: nextLines,
       }
     })
+  }
+
+  function addImpurityLine(sourceLine: FormWeightTicketLine) {
+    const nextLine = createFormWeightTicketLine()
+    nextLine.productId = sourceLine.productId
+    nextLine.warehouseId = sourceLine.warehouseId
+    nextLine.grossWeight = '0'
+    nextLine.containerDeductionWeight = '0'
+    nextLine.deductionMode = 'kg'
+    nextLine.deductionValue = ''
+    nextLine.impurityId = impurities[0]?.id || ''
+    nextLine.note = 'หักสิ่งเจือปนเพิ่มเติม'
+    nextLine.parentId = sourceLine.id
+    setForm((current) => ({ ...current, lines: [...current.lines, nextLine] }))
+  }
+
+  function buyImpurityDirect(sourceLine: FormWeightTicketLine, targetProductId: string) {
+    const lineTotals = calculateAdjustedLineTotals(sourceLine, form.lines)
+    const deductionWeight = String(lineTotals.deductionWeight)
+    const parentLine = form.lines.find(l => l.id === sourceLine.parentId)
+    const parentProduct = parentLine ? products.find(p => p.id === parentLine.productId) : null
+    const parentProductLabel = parentProduct
+      ? (parentProduct.code ? `${parentProduct.code} - ${parentProduct.name || parentProduct.label}` : (parentProduct.name || parentProduct.label))
+      : 'สินค้า'
+    const parentLines = form.lines.filter(l => !l.parentId)
+    const parentIndex = parentLine ? parentLines.findIndex(l => l.id === parentLine.id) + 1 : 1
+    const impurityLabel = impurities.find(i => i.id === sourceLine.impurityId)?.label || 'สิ่งเจือปน'
+
+    const nextLine = createFormWeightTicketLine()
+    nextLine.productId = targetProductId
+    nextLine.warehouseId = parentLine?.warehouseId || ''
+    nextLine.grossWeight = deductionWeight
+    nextLine.containerDeductionWeight = '0'
+    nextLine.note = `มาจากสิ่งเจือปน (${impurityLabel} ${deductionWeight} กก.) ของรายการที่ ${parentIndex}: ${parentProductLabel}`
+
+    setForm((current) => ({
+      ...current,
+      lines: [...current.lines, nextLine],
+    }))
+  }
+
+  function handleConfirmBuyImpurity() {
+    if (!buyingImpurityLine || !selectedProductForImpurity) return
+    buyImpurityDirect(buyingImpurityLine, selectedProductForImpurity)
+    setBuyingImpurityLine(null)
+    setSelectedProductForImpurity('')
   }
 
   async function appendLineImages(lineId: string, files: FileList | null) {
@@ -525,6 +746,7 @@ export function WeightTicketsPageClient({
           note: line.note,
           productId: line.productId,
           warehouseId: line.warehouseId,
+          parentId: line.parentId,
         })),
         partyId: form.partyId,
         remark: form.remark.trim(),
@@ -644,114 +866,176 @@ export function WeightTicketsPageClient({
 
           <Card className={cn(onClose ? "border-0 bg-transparent shadow-none p-0" : "p-5")}>
             <SectionHeader title="สินค้าและน้ำหนัก" subtitle="เลือกสินค้า กรอกน้ำหนัก และเลือกวิธีหักสิ่งเจือปนต่อรายการ" />
+
+
+
+            {/* รายการเต๋า/ล็อต (Lines List) แบบ Split-panel ซ้ายขวา */}
             <div className={cn(
-              "mt-4 grid min-w-0 items-start gap-4",
+              "mt-4 grid min-w-0 items-start gap-4 border-b border-slate-100 pb-6",
               activeLine ? "xl:grid-cols-[18rem_minmax(0,1fr)]" : "grid-cols-1"
             )}>
               <div className="min-w-0 space-y-3 xl:max-h-[calc(100vh-16rem)] xl:overflow-hidden">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium text-slate-700">รายการทั้งหมด {form.lines.length} รายการ</div>
+                  <div className="text-sm font-medium text-slate-700">รายการทั้งหมด {form.lines.filter((l) => !l.parentId).length} รายการ</div>
                   <Button size="xs" type="button" onClick={addLine}>
                     <Plus className="mr-1 size-3" />
                     เพิ่ม
                   </Button>
                 </div>
                 <div className="space-y-2 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-1">
-                  {form.lines.map((line, index) => {
-                    const lineTotals = calculateLineTotals(line)
-                    const hasError = Boolean(
-                      errors[`line-${line.id}-product`]
-                      || errors[`line-${line.id}-gross`]
-                      || errors[`line-${line.id}-container`]
-	                      || errors[`line-${line.id}-images`]
-	                      || errors[`line-${line.id}-impurity`]
-	                      || errors[`line-${line.id}-warehouse`]
-	                      || errors[`line-${line.id}-deduction`],
-                    )
-                    const active = activeLine?.id === line.id
+                  {(() => {
+                    const parentLines = form.lines.filter((l) => !l.parentId)
+                    return parentLines.map((line, index) => {
+                      const lineTotals = calculateAdjustedLineTotals(line, form.lines)
+                      const childIds = form.lines.filter((l) => l.parentId === line.id).map((l) => l.id)
+                      const allRelatedIds = [line.id, ...childIds]
+                      const hasError = allRelatedIds.some((id) =>
+                        errors[`line-${id}-product`]
+                        || errors[`line-${id}-gross`]
+                        || errors[`line-${id}-container`]
+                        || errors[`line-${id}-images`]
+                        || errors[`line-${id}-impurity`]
+                        || errors[`line-${id}-warehouse`]
+                        || errors[`line-${id}-deduction`],
+                      )
+                      const active = activeLine?.id === line.id
 
-                    return (
-                      <button
-                        className={cn(
-                          'block w-full rounded-md border px-3 py-3 text-left transition',
-                          active ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50',
-                        )}
-                        key={line.id}
-                        type="button"
-                        onClick={() => setActiveLineId(line.id)}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="text-xs text-slate-500">รายการ {index + 1}</div>
-                            <div className="mt-1 line-clamp-1 text-sm font-medium text-slate-900">
-                              {products.find((option) => option.id === line.productId)?.label || line.productId || 'ยังไม่ได้เลือกสินค้า'}
+                      return (
+                        <button
+                          className={cn(
+                            'block w-full rounded-md border px-3 py-3 text-left transition outline-none',
+                            active ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50',
+                          )}
+                          key={line.id}
+                          type="button"
+                          onClick={() => setActiveLineId(line.id)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-xs text-slate-500 font-medium">รายการ {index + 1}</div>
+                              <div className="mt-1 line-clamp-1 text-sm font-medium text-slate-900">
+                                {products.find((option) => option.id === line.productId)?.name || 'ยังไม่ได้เลือกสินค้า'}
+                              </div>
                             </div>
+                            {hasError ? <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700">ไม่ครบ</span> : null}
                           </div>
-                          {hasError ? <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700">ไม่ครบ</span> : null}
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500">
-                          <div>สุทธิ {formatWeight(lineTotals.netWeight)} กก.</div>
-                          <div className="text-right">{getLineImages(line).length} รูป</div>
-                        </div>
-                      </button>
-                    )
-                  })}
+                          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500 font-medium">
+                            <div>สุทธิ {formatWeight(lineTotals.netWeight)} กก.</div>
+                            <div className="text-right">{getLineImages(line).length} รูป</div>
+                          </div>
+                        </button>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
 
               {activeLine ? (() => {
                 const line = activeLine
-                const index = form.lines.findIndex((entry) => entry.id === line.id)
-                const lineTotals = calculateLineTotals(line)
+                const parentLines = form.lines.filter((l) => !l.parentId)
+                const index = parentLines.findIndex((entry) => entry.id === line.id)
+                const lineTotals = calculateAdjustedLineTotals(line, form.lines)
+                const isLineProductImpurity = (() => {
+                  if (!line.productId) return false
+                  const p = products.find((prod) => prod.id === line.productId)
+                  return p ? isImpurityProduct(p) : false
+                })()
 
                 return (
                   <div className="min-w-0 overflow-hidden rounded-md border border-slate-100 bg-slate-50 p-3 sm:p-4 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto">
                     <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                       <div className="inline-flex rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">รายการ {index + 1}</div>
-                      <Button disabled={form.lines.length === 1} size="xs" type="button" variant="outline" onClick={() => removeLine(line.id)}>
-                        <Trash2 className="mr-1 size-3" />
-                        ลบ
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="xs"
+                          onClick={() => addSameProductLot(line)}
+                          className="outline-none flex items-center gap-1"
+                        >
+                          <Plus className="size-3" />
+                          เพิ่มล็อต
+                        </Button>
+                        <Button
+                          disabled={parentLines.length === 1}
+                          size="xs"
+                          type="button"
+                          variant="outline"
+                          onClick={() => removeLine(line.id)}
+                          className="outline-none flex items-center gap-1"
+                        >
+                          <Trash2 className="size-3" />
+                          ลบ
+                        </Button>
+                      </div>
                     </div>
-                    {/* ส่วนที่ 1: ข้อมูลสินค้าและน้ำหนัก (หลัก) */}
+
+                    {/* ส่วนที่ 1: ข้อมูลสินค้าและคลังสินค้า */}
                     <div className="space-y-4">
-                      {/* Grid ช่องกรอกข้อมูลหลัก */}
-                      <div className={cn(
-                        'grid gap-4 items-start',
-                        form.type === 'WTO'
-                          ? 'grid-cols-1 sm:grid-cols-[2fr_1.5fr_1fr_1fr_1.2fr]'
-                          : 'grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr]'
-                      )}
-                      >
-                        <div className="min-w-0">
-                          <SearchCombobox
-                            disabled={isLoadingProducts}
-                            error={showError(`line-${line.id}-product`)}
-                            inputId={`weight-product-${line.id}`}
-                            label="สินค้า*"
-                            options={products}
-                            placeholder={isLoadingProducts ? 'กำลังโหลดสินค้า...' : 'เลือกสินค้า'}
-                            value={line.productId}
-                            onChange={(value) => {
-                              markTouched(`line-${line.id}-product`)
-                              updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
-                            }}
-                          />
-                          {/* ปุ่มเพิ่มสินค้า อยู่ใต้ช่องสินค้าตรงล็อกพอดี และใช้สีดั้งเดิมตามธีม */}
-                          <div className="mt-2 w-full">
-                            <ProductImagePicker
-                              key={`${form.branchId}:${form.partyId}:${form.type}`}
-                              disabled={isLoadingProducts}
-                              products={products}
-                              value={line.productId}
-                              onChange={(value) => {
-                                markTouched(`line-${line.id}-product`)
-                                updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
-                              }}
-                              buttonClassName={cn("text-white font-semibold w-full", ticketTheme.button)}
-                            />
+                      <div className={cn("grid gap-4 items-start", form.type === 'WTO' ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+                        <FieldBlock error={showError(`line-${line.id}-product`)} label="สินค้า*">
+                          <div className="flex gap-2 items-center">
+                            <div className="min-w-0 flex-1">
+                              <SearchCombobox
+                                disabled={isLoadingProducts}
+                                hideLabel
+                                inputId={`weight-product-${line.id}`}
+                                label="สินค้า*"
+                                options={isLineProductImpurity ? impurityProducts : normalProducts}
+                                placeholder={isLoadingProducts ? 'กำลังโหลดสินค้า...' : 'เลือกสินค้า'}
+                                value={line.productId}
+                                onChange={(value) => {
+                                  markTouched(`line-${line.id}-product`)
+                                  updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
+                                }}
+                              />
+                            </div>
+                            <div className="shrink-0">
+                              <ProductImagePicker
+                                key={`${form.branchId}:${form.partyId}:${form.type}`}
+                                disabled={isLoadingProducts}
+                                products={isLineProductImpurity ? impurityProducts : normalProducts}
+                                value={line.productId}
+                                onChange={(value) => {
+                                  markTouched(`line-${line.id}-product`)
+                                  updateLine(line.id, (current) => ({ ...current, productId: value, warehouseId: '' }))
+                                }}
+                                hideSelectedCard
+                                buttonClassName={cn("text-white font-semibold h-10 px-3 flex items-center justify-center gap-1.5 outline-none", ticketTheme.button)}
+                              />
+                            </div>
                           </div>
-                        </div>
+                          {(() => {
+                            const selectedProduct = products.find((p) => p.id === line.productId)
+                            if (!selectedProduct) return null
+                            return (
+                              <div className="mt-2 flex items-center gap-3 rounded-md border border-slate-100 bg-white p-2 shadow-sm">
+                                <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100 border border-slate-100">
+                                  {selectedProduct.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={selectedProduct.imageUrl} alt={selectedProduct.name ?? selectedProduct.label} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-slate-400">
+                                      <ImagePlus className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{selectedProduct.category || 'ทั่วไป'}</div>
+                                  <div className="truncate text-xs font-semibold text-slate-800">{selectedProduct.name ?? selectedProduct.label}</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => updateLine(line.id, (current) => ({ ...current, productId: '', warehouseId: '' }))}
+                                  className="text-xs text-rose-600 hover:text-rose-700 font-medium px-2 py-1 transition outline-none"
+                                >
+                                  ล้าง
+                                </button>
+                              </div>
+                            )
+                          })()}
+                        </FieldBlock>
+
                         {form.type === 'WTO' ? (() => {
                           const stockKey = `${form.branchId}:${line.productId}`
                           const stock = stockOptions[stockKey]
@@ -772,164 +1056,230 @@ export function WeightTicketsPageClient({
                                 }}
                               />
                               {selectedWarehouse ? (
-                                <div className="mt-1 grid grid-cols-3 gap-1 text-[11px] text-slate-500">
-                                  <span>คงเหลือ {formatWeight(selectedWarehouse.onHandQty)}</span>
-                                  <span>จอง {formatWeight(selectedWarehouse.onHoldQty)}</span>
-                                  <span className="font-medium text-slate-700">พร้อมส่ง {formatWeight(selectedWarehouse.availableQty)}</span>
+                                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-500">
+                                  <span>คงเหลือ {formatWeight(selectedWarehouse.onHandQty)} กก.</span>
+                                  <span>จอง {formatWeight(selectedWarehouse.onHoldQty)} กก.</span>
+                                  <span>พร้อมส่ง {formatWeight(selectedWarehouse.availableQty)} กก.</span>
                                 </div>
                               ) : null}
                             </div>
                           )
                         })() : null}
-                        <FieldBlock error={showError(`line-${line.id}-gross`)} label="น้ำหนักรวม (กก. / ลัง) *">
-                          <Input
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            value={line.grossWeight}
-                            onBlur={() => markTouched(`line-${line.id}-gross`)}
-                            onChange={(event) => updateLine(line.id, (current) => ({ ...current, grossWeight: normalizeDecimalInput(event.target.value) }))}
-                          />
-                        </FieldBlock>
-                        <div className="min-w-0">
-                          <FieldBlock error={showError(`line-${line.id}-container`)} label="หักภาชนะ(กก.)">
-                            <Input
-                              inputMode="decimal"
-                              placeholder="0.00"
-                              value={line.containerDeductionWeight}
-                              onBlur={() => markTouched(`line-${line.id}-container`)}
-                              onChange={(event) => {
-                                const containerDeductionWeight = normalizeDecimalInput(event.target.value)
-                                updateLine(line.id, (current) => ({
-                                  ...current,
-                                  containerDeductionWeight,
-                                }))
-                              }}
-                            />
-                          </FieldBlock>
-                        </div>
-                        <div className="min-w-0">
-                          <FieldBlock error={showError(`line-${line.id}-images`)} label="รูปภาพรายการสินค้า*">
-                            <AttachmentProfileGrid
-                              addLabel="เพิ่มรูป"
-                              emptyLabel="ยังไม่มีรูปภาพรายการนี้"
-                              files={getLineImages(line)}
-                              onAppend={(files) => void appendLineImages(line.id, files)}
-                              onPreview={setPreviewImage}
-                              onRemove={(fileId) => updateLine(line.id, (current) => ({
-                                ...current,
-                                imageFiles: getLineImages(current).filter((entry) => entry.id !== fileId),
-                              }))}
-                              noWrapper
-                            />
-                          </FieldBlock>
+                      </div>
+
+                      {/* รายการล็อตสินค้า (Lots List) */}
+                      <div className="mt-4 border-t border-slate-200/60 pt-4">
+                        <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">ล็อตสินค้า</div>
+                        <div className="space-y-4">
+                          {(() => {
+                            const secondaryLots = form.lines.filter((l) => l.parentId === line.id && (Number(l.grossWeight || 0) > 0 || !l.impurityId))
+                            const lots = [line, ...secondaryLots]
+                            return lots.map((lot, lotIndex) => {
+                              const isParent = !lot.parentId
+                              return (
+                                <div key={lot.id} className="bg-white p-3 rounded-lg border border-slate-200/60 space-y-3">
+                                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                    <div className="text-xs font-bold text-slate-600">ล็อตที่ {lotIndex + 1}</div>
+                                    {!isParent && (
+                                      <Button
+                                        size="xs"
+                                        type="button"
+                                        variant="ghost"
+                                        className="text-rose-600 hover:bg-rose-50 h-7 px-2 outline-none"
+                                        onClick={() => {
+                                          setForm((current) => ({
+                                            ...current,
+                                            lines: current.lines.filter((l) => l.id !== lot.id),
+                                          }))
+                                        }}
+                                      >
+                                        <Trash2 className="size-3.5 mr-1" />
+                                        ลบล็อค
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                                    <FieldBlock error={showError(`line-${lot.id}-gross`)} label="น้ำหนักรวม (กก. / ลัง) *">
+                                      <Input
+                                        inputMode="decimal"
+                                        placeholder="0.00"
+                                        value={lot.grossWeight}
+                                        onBlur={() => markTouched(`line-${lot.id}-gross`)}
+                                        onChange={(event) => updateLine(lot.id, (current) => ({ ...current, grossWeight: normalizeDecimalInput(event.target.value) }))}
+                                      />
+                                    </FieldBlock>
+                                    <FieldBlock error={showError(`line-${lot.id}-container`)} label="หักภาชนะ(กก.)">
+                                      <Input
+                                        inputMode="decimal"
+                                        placeholder="0.00"
+                                        value={lot.containerDeductionWeight}
+                                        onBlur={() => markTouched(`line-${lot.id}-container`)}
+                                        onChange={(event) => updateLine(lot.id, (current) => ({ ...current, containerDeductionWeight: normalizeDecimalInput(event.target.value) }))}
+                                      />
+                                    </FieldBlock>
+                                  </div>
+                                  <FieldBlock error={showError(`line-${lot.id}-images`)} label="รูปภาพประกอบ*">
+                                    <AttachmentProfileGrid
+                                      addLabel="เพิ่มรูป"
+                                      emptyLabel="ยังไม่มีรูปภาพสำหรับล็อตนี้"
+                                      files={getLineImages(lot)}
+                                      onAppend={(files) => void appendLineImages(lot.id, files)}
+                                      onPreview={setPreviewImage}
+                                      onRemove={(fileId) => updateLine(lot.id, (current) => ({
+                                        ...current,
+                                        imageFiles: getLineImages(current).filter((entry) => entry.id !== fileId),
+                                      }))}
+                                      noWrapper
+                                    />
+                                  </FieldBlock>
+                                </div>
+                              )
+                            })
+                          })()}
                         </div>
                       </div>
 
-                      {/* ปุ่มเพิ่มสิ่งเจือปน (แสดงเมื่อยังไม่มีการเพิ่มสิ่งเจือปน) จัดชิดขวาตามรูป */}
-                      {line.deductionMode === 'none' && (
-                        <div className="flex justify-end mt-2">
+                      {/* ส่วนที่ 2: สิ่งเจือปน (เฉพาะสำหรับสินค้านี้) */}
+                      <div className="mt-4 border-t border-slate-200/60 pt-4">
+                        <div className="flex items-center justify-between gap-4 mb-2">
+                          <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">สิ่งเจือปน</div>
                           <Button
-                            type="button"
-                            onClick={() => {
-                              updateLine(line.id, (current) => ({
-                                ...current,
-                                deductionMode: 'kg',
-                                deductionValue: '',
-                                impurityId: impurities[0]?.id || '',
-                              }))
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 h-10 rounded-md text-xs font-semibold px-4"
-                          >
-                            <Plus className="h-4 w-4" />
-                            เพิ่มสิ่งเจือปน
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ส่วนที่ 2: บล็อกสิ่งเจือปน (แสดงเฉพาะเมื่อกดเพิ่มสิ่งเจือปน) */}
-                    {line.deductionMode !== 'none' ? (
-                      <div className="mt-4 p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">หักสิ่งเจือปน</span>
-                          <Button
-                            size="xs"
                             type="button"
                             variant="outline"
-                            className="text-rose-600 hover:bg-rose-50 border-rose-200 h-8 px-2"
-                            onClick={() => {
-                              updateLine(line.id, (current) => ({
-                                ...current,
-                                deductionMode: 'none',
-                                deductionValue: '',
-                                impurityId: '',
-                              }))
-                            }}
+                            onClick={() => addImpurityLine(line)}
+                            className="flex items-center justify-center gap-1.5 h-8 rounded-md text-xs font-semibold px-3 outline-none border border-slate-300 hover:bg-slate-50 text-slate-700 bg-white"
                           >
-                            <Trash2 className="size-3 mr-1" />
-                            ลบสิ่งเจือปน
+                            <Plus className="h-3.5 w-3.5" />
+                            เพิ่มเต๋าหักสิ่งเจือปน
                           </Button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <SearchCombobox
-                            error={showError(`line-${line.id}-impurity`)}
-                            inputId={`weight-impurity-${line.id}`}
-                            label="สิ่งเจือปน*"
-                            options={impurities}
-                            placeholder={impurities.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งาน'}
-                            value={getLineImpurityId(line)}
-                            onChange={(value) => {
-                              markTouched(`line-${line.id}-impurity`)
-                              updateLine(line.id, (current) => ({ ...current, impurityId: value }))
-                            }}
-                          />
-                          <FieldBlock label="ประเภทการหัก*">
-                            <SimpleDropdown
-                              options={[
-                                { label: 'หัก (กก.)', value: 'kg' },
-                                { label: 'หัก %', value: 'percent' },
-                              ]}
-                              value={line.deductionMode}
-                              onChange={(value) => {
-                                const deductionMode = value as DeductionMode
-                                updateLine(line.id, (current) => ({
-                                  ...current,
-                                  deductionMode,
-                                  deductionValue: '',
-                                }))
-                              }}
-                            />
-                          </FieldBlock>
-                          <FieldBlock error={showError(`line-${line.id}-deduction`)} label={line.deductionMode === 'percent' ? 'ค่าหัก % *' : 'น้ำหนักหักสิ่งเจือปน(กก.) *'}>
-                            <Input
-                              inputMode="decimal"
-                              placeholder="0.00"
-                              value={line.deductionValue}
-                              onBlur={() => markTouched(`line-${line.id}-deduction`)}
-                              onChange={(event) => updateLine(line.id, (current) => ({ ...current, deductionValue: normalizeDecimalInput(event.target.value) }))}
-                            />
-                          </FieldBlock>
-                        </div>
+
+                        {(() => {
+                          const childLines = form.lines.filter((l) => l.parentId === line.id && Number(l.grossWeight || 0) === 0 && !!l.impurityId)
+                          if (childLines.length === 0) {
+                            return (
+                              <div className="text-center py-4 text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200 mt-2">
+                                ไม่มีการหักสิ่งเจือปนสำหรับรายการนี้
+                              </div>
+                            )
+                          }
+                          return (
+                            <div className="space-y-3 mt-2">
+                              {/* แถวหัวตาราง (Table Column Headers) บน Desktop */}
+                              <div className="hidden md:grid grid-cols-[1fr_1fr_1fr_auto] gap-4 px-3 mb-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                <div>สิ่งเจือปน <span className="text-red-600">*</span></div>
+                                <div>ประเภทการหัก <span className="text-red-600">*</span></div>
+                                <div>น้ำหนักหักสิ่งเจือปน (กก.) <span className="text-red-600">*</span></div>
+                                <div className="w-[145px]"></div>
+                              </div>
+                              {childLines.map((child) => (
+                                <div key={child.id} className="bg-white p-3 rounded-lg border border-slate-200/60">
+                                  <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-start">
+                                    <FieldBlock label="สิ่งเจือปน*" labelClassName="md:hidden">
+                                      <SearchCombobox
+                                        error={showError(`line-${child.id}-impurity`)}
+                                        inputId={`weight-impurity-${child.id}`}
+                                        hideLabel
+                                        label="สิ่งเจือปน*"
+                                        options={impurities}
+                                        placeholder={impurities.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งาน'}
+                                        value={getLineImpurityId(child)}
+                                        onChange={(value) => {
+                                          markTouched(`line-${child.id}-impurity`)
+                                          updateLine(child.id, (current) => ({ ...current, impurityId: value }))
+                                        }}
+                                      />
+                                    </FieldBlock>
+                                    <FieldBlock label="ประเภทการหัก*" labelClassName="md:hidden">
+                                      <SimpleDropdown
+                                        options={[
+                                          { label: 'หัก (กก.)', value: 'kg' },
+                                          { label: 'หัก %', value: 'percent' },
+                                        ]}
+                                        value={child.deductionMode}
+                                        onChange={(value) => {
+                                          const deductionMode = value as DeductionMode
+                                          updateLine(child.id, (current) => ({
+                                            ...current,
+                                            deductionMode,
+                                            deductionValue: '',
+                                          }))
+                                        }}
+                                      />
+                                    </FieldBlock>
+                                    <FieldBlock error={showError(`line-${child.id}-deduction`)} label={child.deductionMode === 'percent' ? 'ค่าหัก % *' : 'น้ำหนักหักสิ่งเจือปน(กก.) *'} labelClassName="md:hidden">
+                                      <Input
+                                        inputMode="decimal"
+                                        placeholder="0.00"
+                                        value={child.deductionValue}
+                                        onBlur={() => markTouched(`line-${child.id}-deduction`)}
+                                        onChange={(event) => updateLine(child.id, (current) => ({ ...current, deductionValue: normalizeDecimalInput(event.target.value) }))}
+                                      />
+                                    </FieldBlock>
+                                    <div className="flex justify-end pb-1 gap-2 md:mt-0">
+                                      <Button
+                                        size="sm"
+                                        type="button"
+                                        variant="ghost"
+                                        disabled={!child.deductionValue || Number(child.deductionValue || 0) <= 0 || !getLineImpurityId(child)}
+                                        className="text-blue-600 hover:bg-blue-50 h-10 px-3 outline-none flex items-center gap-1 font-semibold"
+                                        onClick={() => {
+                                          const imp = impurities.find(i => i.id === child.impurityId)
+                                          const isOther = imp?.label === 'อื่นๆ' || imp?.label?.toLowerCase().includes('อื่น')
+                                          const matchedProduct = isOther ? null : impurityProducts.find(p => p.label?.toLowerCase().includes(imp?.label?.toLowerCase() || '') || imp?.label?.toLowerCase().includes(p.label?.toLowerCase() || ''))
+                                          if (matchedProduct) {
+                                            buyImpurityDirect(child, matchedProduct.id)
+                                          } else {
+                                            setBuyingImpurityLine(child)
+                                            setSelectedProductForImpurity('')
+                                          }
+                                        }}
+                                      >
+                                        <ShoppingCart className="size-4" />
+                                        ซื้อ
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        type="button"
+                                        variant="ghost"
+                                        className="text-rose-600 hover:bg-rose-50 h-10 px-3 outline-none flex items-center gap-1 font-semibold"
+                                        onClick={() => {
+                                          setForm((current) => ({
+                                            ...current,
+                                            lines: current.lines.filter((l) => l.id !== child.id),
+                                          }))
+                                        }}
+                                      >
+                                        <Trash2 className="size-4" />
+                                        ลบ
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })()}
                       </div>
-                    ) : null}
 
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 lg:grid-cols-4">
-                      <MiniMetric label="GROSS" value={`${formatWeight(lineTotals.grossWeight)} กก.`} />
-                      <MiniMetric label="ภาชนะ" value={`${formatWeight(lineTotals.containerDeductionWeight)} กก.`} />
-                      <MiniMetric label="สิ่งเจือปน" value={`${formatWeight(lineTotals.deductionWeight)} กก.`} />
-                      <MiniMetric label="NET" value={`${formatWeight(lineTotals.netWeight)} กก.`} />
-                    </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 lg:grid-cols-4">
+                        <MiniMetric label="GROSS" value={`${formatWeight(lineTotals.grossWeight)} กก.`} />
+                        <MiniMetric label="ภาชนะ" value={`${formatWeight(lineTotals.containerDeductionWeight)} กก.`} />
+                        <MiniMetric label="สิ่งเจือปน" value={`${formatWeight(lineTotals.deductionWeight)} กก.`} />
+                        <MiniMetric label="NET" value={`${formatWeight(lineTotals.netWeight)} กก.`} />
+                      </div>
 
-                    <div className="mt-4">
-                      <FieldBlock label="หมายเหตุรายการ">
-                        <textarea
-                          className="min-h-[88px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
-                          placeholder="เช่น ของเปียก มีเศษปน หรือรายละเอียดหน้างาน"
-                          rows={3}
-                          value={line.note}
-                          onChange={(event) => updateLine(line.id, (current) => ({ ...current, note: event.target.value.slice(0, 160) }))}
-                        />
-                      </FieldBlock>
+                      <div className="mt-4">
+                        <FieldBlock label="หมายเหตุรายการ">
+                          <textarea
+                            className="min-h-[88px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                            placeholder="เช่น ของเปียก มีเศษปน หรือรายละเอียดหน้างาน"
+                            rows={3}
+                            value={line.note}
+                            onChange={(event) => updateLine(line.id, (current) => ({ ...current, note: event.target.value.slice(0, 160) }))}
+                          />
+                        </FieldBlock>
+                      </div>
                     </div>
                   </div>
                 )
@@ -977,7 +1327,7 @@ export function WeightTicketsPageClient({
               {!onClose && <ArrowLeft className="mr-1 h-4 w-4" />}
               {onClose ? 'ปิด' : 'กลับไปหน้ารายการ'}
             </Button>
-            <Button className="bg-slate-900 font-normal hover:bg-slate-800 text-white" disabled={isLoadingTicket || isSaving} type="button" onClick={saveTicket}>
+            <Button className="bg-blue-600 font-normal hover:bg-blue-700 text-white" disabled={isLoadingTicket || isSaving} type="button" onClick={saveTicket}>
               {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
             </Button>
           </div>
@@ -1004,6 +1354,63 @@ export function WeightTicketsPageClient({
               </div>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(buyingImpurityLine)} onOpenChange={(open) => { if (!open) setBuyingImpurityLine(null) }}>
+        <DialogContent className="max-w-md bg-white p-0 overflow-hidden rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+          <DialogHeader className="px-5 pt-4 pb-4 rounded-t-xl flex flex-row items-center justify-between bg-slate-900 border-none">
+            <DialogTitle className="text-base font-bold text-white flex items-center gap-2">
+              <ShoppingCart className="size-4" />
+              รับซื้อสิ่งเจือปนเป็นสินค้า
+            </DialogTitle>
+          </DialogHeader>
+          
+          {buyingImpurityLine ? (() => {
+            const imp = impurities.find(i => i.id === buyingImpurityLine.impurityId)
+            const lineTotals = calculateAdjustedLineTotals(buyingImpurityLine, form.lines)
+            const deductionWeight = lineTotals.deductionWeight
+            return (
+              <>
+                <div className="p-5 space-y-4 min-h-[280px]">
+                  <div className="text-sm text-slate-600">
+                    แปลงสิ่งเจือปน <strong className="text-slate-900">{imp?.label}</strong> (น้ำหนักหัก {formatWeight(deductionWeight)} กก.) เป็นรายการรับซื้อใหม่
+                  </div>
+                  
+                  <FieldBlock label="สินค้าที่ต้องการรับซื้อ*">
+                    <SearchCombobox
+                      inputId="buy-impurity-product"
+                      options={impurityProducts}
+                      placeholder="เลือกสินค้าที่ต้องการรับซื้อ"
+                      value={selectedProductForImpurity}
+                      onChange={setSelectedProductForImpurity}
+                      hideLabel
+                      label="สินค้าที่ต้องการรับซื้อ*"
+                    />
+                  </FieldBlock>
+                </div>
+
+                <DialogFooter className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-row justify-end gap-2.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setBuyingImpurityLine(null)}
+                    className="outline-none h-10 text-slate-600 font-medium hover:bg-slate-100"
+                  >
+                    ยกเลิก
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!selectedProductForImpurity}
+                    onClick={handleConfirmBuyImpurity}
+                    className={cn("text-white font-semibold h-10 px-4 outline-none", ticketTheme.button)}
+                  >
+                    ยืนยันการรับซื้อ
+                  </Button>
+                </DialogFooter>
+              </>
+            )
+          })() : null}
         </DialogContent>
       </Dialog>
     </div>
@@ -1078,17 +1485,19 @@ function FieldBlock({
   children,
   error,
   label,
+  labelClassName,
 }: {
   children: ReactNode
   error?: string
   label: string
+  labelClassName?: string
 }) {
   const hasInlineRequired = label.trim().endsWith('*')
   const labelText = hasInlineRequired ? label.trim().slice(0, -1).trimEnd() : label
 
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-600">
+      <label className={cn("mb-1 block text-xs font-medium text-slate-600", labelClassName)}>
         {labelText}
         {hasInlineRequired ? <span className="ml-1 text-red-600">*</span> : null}
       </label>
@@ -1104,12 +1513,14 @@ function ProductImagePicker({
   value,
   onChange,
   buttonClassName,
+  hideSelectedCard = false,
 }: {
   disabled: boolean
   products: OptionItem[]
   value: string
   onChange: (value: string) => void
   buttonClassName?: string
+  hideSelectedCard?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [category, setCategory] = useState('all')
@@ -1149,7 +1560,7 @@ function ProductImagePicker({
   }
 
   return (
-    <div className="mt-2">
+    <div className={cn(!hideSelectedCard && "mt-2")}>
       <Button
         type="button"
         onClick={() => {
@@ -1165,7 +1576,7 @@ function ProductImagePicker({
         เพิ่มสินค้า
       </Button>
 
-      {selectedProduct ? (
+      {!hideSelectedCard && selectedProduct ? (
         <div className="mt-2 flex items-center gap-3 rounded-md border border-slate-100 bg-white p-2 shadow-sm">
           <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100 border border-slate-100">
             {selectedProduct.imageUrl ? (
@@ -1192,7 +1603,7 @@ function ProductImagePicker({
       ) : null}
 
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel() }}>
-        <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-xl border border-slate-100 shadow-2xl flex flex-col max-h-[90vh]">
+        <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
           <DialogHeader className="px-5 pt-4 pb-4 rounded-t-xl flex flex-row items-center justify-between bg-slate-900 border-none">
             <div className="flex items-center gap-2">
               <span className="text-lg">📦</span>
@@ -1400,6 +1811,30 @@ function MetricInline({ emphasis = false, label, value }: { emphasis?: boolean; 
     <div className="min-w-0">
       <div className="text-[11px] font-medium text-slate-500">{label}</div>
       <div className={cn('font-semibold tabular-nums', emphasis ? 'text-emerald-700' : 'text-slate-900')}>{value}</div>
+    </div>
+  )
+}
+
+function SummaryMetricCard({
+  icon: Icon,
+  label,
+  value,
+  colorClass,
+}: {
+  icon: any
+  label: string
+  value: string
+  colorClass: { iconBg: string; iconText: string }
+}) {
+  return (
+    <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-4 flex items-center gap-4">
+      <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full", colorClass.iconBg, colorClass.iconText)}>
+        <Icon className="h-6 w-6" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-medium text-slate-500">{label}</div>
+        <div className="mt-1 text-lg font-bold text-slate-900 tabular-nums truncate">{value}</div>
+      </div>
     </div>
   )
 }

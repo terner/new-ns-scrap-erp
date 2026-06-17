@@ -3548,7 +3548,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             </div>
             <div className="flex justify-end gap-2 rounded-b-md border-t border-slate-100 bg-white p-4">
               <button className="rounded-md px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-50 outline-none" type="button" onClick={() => { setSupplierSwapMode(false); setSupplierSwapSupplierId(''); setLockedReceiptSnapshot(null); setShowForm(false) }}>ยกเลิก</button>
-              <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-bold text-white disabled:opacity-60 outline-none" disabled={isSaving || !stockReceiptSelected} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : supplierSwapMode ? 'บันทึกและสร้าง PB ใหม่' : editingBillId ? 'บันทึกการแก้ไข' : 'บันทึกบิลรับซื้อ'}</button>
+              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white disabled:opacity-60 outline-none" disabled={isSaving || !stockReceiptSelected} type="button" onClick={() => void savePurchaseBill()}>{isSaving ? 'กำลังบันทึก...' : supplierSwapMode ? 'บันทึกและสร้าง PB ใหม่' : editingBillId ? 'บันทึกการแก้ไข' : 'บันทึกบิลรับซื้อ'}</button>
             </div>
           </div>
         </div>
@@ -3656,7 +3656,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             </div>
             <div className="sticky bottom-0 flex justify-end gap-3 bg-white px-6 py-4">
               <Button disabled={isSaving} type="button" variant="secondary" onClick={() => { setEditingStockIssueDocNo(null); setShowStockIssueForm(false) }}>ยกเลิก</Button>
-              <Button className="bg-slate-900 hover:bg-slate-800 text-white" disabled={isSaving || !selectedStockIssueDelivery} type="button" onClick={() => void saveStockIssue()}>{isSaving ? 'กำลังบันทึก...' : editingStockIssueDocNo ? 'บันทึกการแก้ไข' : 'บันทึก + ตัด Stock'}</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isSaving || !selectedStockIssueDelivery} type="button" onClick={() => void saveStockIssue()}>{isSaving ? 'กำลังบันทึก...' : editingStockIssueDocNo ? 'บันทึกการแก้ไข' : 'บันทึก + ตัด Stock'}</Button>
             </div>
           </div>
         </div>
@@ -4153,7 +4153,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             </div>
             <div className="flex justify-end gap-2 rounded-b-md border-t border-slate-100 bg-white p-4">
               <button className="rounded-md px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-50 outline-none" disabled={isSaving} type="button" onClick={() => setShowSalesForm(false)}>ยกเลิก</button>
-              <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-bold text-white disabled:opacity-60 outline-none" disabled={isSaving} type="button" onClick={() => void saveSalesBill()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกบิลขาย'}</button>
+              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white disabled:opacity-60 outline-none" disabled={isSaving} type="button" onClick={() => void saveSalesBill()}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกบิลขาย'}</button>
             </div>
           </div>
         </div>

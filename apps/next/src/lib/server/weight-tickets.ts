@@ -287,13 +287,45 @@ export function buildWeightTicketLineRows(
   impurityById: Map<bigint, { id: bigint; name: string }>,
   warehouseByCode: Map<string, { id: bigint }> = new Map(),
 ) {
+  const lineTotalsList = values.lines.map((line) => calculateLineTotals({
+    deductionMode: line.deductionMode,
+    deductionValue: String(line.deductionValue),
+    grossWeight: String(line.grossWeight),
+    containerDeductionWeight: String(line.containerDeductionWeight),
+  }))
+
+  const totalsById = new Map(values.lines.map((line, i) => [line.id, lineTotalsList[i]!]))
+
+  values.lines.forEach((line) => {
+    if (line.parentId) {
+      const isImpurity = toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
+      if (isImpurity) {
+        const parent = values.lines.find(l => l.id === line.parentId)
+        const parentTotals = totalsById.get(line.parentId)
+        const childTotals = totalsById.get(line.id)
+        if (parent && parentTotals && childTotals) {
+          const parentGross = parentTotals.grossWeight
+          const rawDeduction = line.deductionMode === 'percent'
+            ? parentGross * Math.max(0, toNumber(line.deductionValue)) / 100
+            : line.deductionMode === 'kg'
+              ? Math.max(0, toNumber(line.deductionValue))
+              : 0
+          childTotals.deductionWeight = rawDeduction
+          childTotals.netWeight = 0
+          parentTotals.netWeight = Math.max(0, parentTotals.netWeight - childTotals.deductionWeight)
+        }
+      } else {
+        const childTotals = totalsById.get(line.id)
+        if (childTotals) {
+          childTotals.deductionWeight = 0
+          childTotals.netWeight = Math.max(0, childTotals.grossWeight - childTotals.containerDeductionWeight)
+        }
+      }
+    }
+  })
+
   return values.lines.map((line, index) => {
-    const lineTotals = calculateLineTotals({
-      deductionMode: line.deductionMode,
-      deductionValue: String(line.deductionValue),
-      grossWeight: String(line.grossWeight),
-      containerDeductionWeight: String(line.containerDeductionWeight),
-    })
+    const lineTotals = totalsById.get(line.id)!
     const productCode = line.productId.trim().toUpperCase()
     const product = productByCode.get(productCode)
     const warehouseCode = line.warehouseId.trim().toUpperCase()

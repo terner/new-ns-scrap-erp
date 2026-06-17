@@ -175,6 +175,9 @@ export async function POST(request: Request) {
       deductionMode: line.deductionMode,
       deductionValue: String(line.deductionValue),
       grossWeight: String(line.grossWeight),
+      id: line.id,
+      parentId: line.parentId,
+      impurityId: line.impurityId,
     })))
 
     const created = await prisma.$transaction(async (tx) => {

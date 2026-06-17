@@ -16,6 +16,7 @@ export type WeightTicketLine = {
   note: string
   productId: string
   warehouseId: string
+  parentId?: string
 }
 
 export type WeightTicketRecordLine = WeightTicketLine & {
@@ -167,13 +168,14 @@ const weightTicketLinePayloadSchema = z.object({
   containerDeductionWeight: z.coerce.number().finite().min(0).default(0),
   deductionMode: deductionModeEnum,
   deductionValue: z.coerce.number().finite().min(0).default(0),
-  grossWeight: z.coerce.number().finite().gt(0, 'กรอกน้ำหนักมากกว่า 0'),
+  grossWeight: z.coerce.number().finite().min(0, 'กรอกน้ำหนักอย่างน้อย 0'),
   id: z.string().trim().min(1).max(80),
-  imageNames: z.array(attachmentValueSchema).min(1, 'รูปภาพสินค้าอย่างน้อย 1 รูป'),
+  imageNames: z.array(attachmentValueSchema).default([]),
   impurityId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
   note: z.preprocess(blankToEmpty, z.string().max(160, 'หมายเหตุรายการยาวเกินไป').default('')),
   productId: z.string().trim().min(1, 'เลือกสินค้า'),
   warehouseId: z.preprocess(blankToEmpty, z.string().max(80).default('')),
+  parentId: z.string().trim().optional(),
 }).superRefine((value, ctx) => {
   const containerDeductionWeight = Math.min(value.containerDeductionWeight, value.grossWeight)
   const impurityDeductionWeight = value.deductionMode === 'percent'
@@ -181,13 +183,48 @@ const weightTicketLinePayloadSchema = z.object({
     : value.deductionMode === 'kg'
       ? value.deductionValue
       : 0
-  if (value.containerDeductionWeight > value.grossWeight) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'หักภาชนะต้องไม่เกินน้ำหนักรวม',
-      path: ['containerDeductionWeight'],
-    })
+
+  const isImpurityOnly = value.grossWeight === 0
+
+  if (!isImpurityOnly) {
+    if (value.containerDeductionWeight > value.grossWeight) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'หักภาชนะต้องไม่เกินน้ำหนักรวม',
+        path: ['containerDeductionWeight'],
+      })
+    }
+    if (value.deductionMode === 'kg' && value.deductionValue > value.grossWeight) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'น้ำหนักหักต้องไม่เกินน้ำหนักรวม',
+        path: ['deductionValue'],
+      })
+    }
+    if (containerDeductionWeight + impurityDeductionWeight > value.grossWeight) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม',
+        path: ['deductionValue'],
+      })
+    }
+    if (value.imageNames.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'รูปภาพสินค้าอย่างน้อย 1 รูป',
+        path: ['imageNames'],
+      })
+    }
+  } else {
+    if (value.deductionMode === 'none') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'เลือกสิ่งเจือปน',
+        path: ['impurityId'],
+      })
+    }
   }
+
   if (value.deductionMode !== 'none' && !value.impurityId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -199,20 +236,6 @@ const weightTicketLinePayloadSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'หัก % ต้องไม่เกิน 100',
-      path: ['deductionValue'],
-    })
-  }
-  if (value.deductionMode === 'kg' && value.deductionValue > value.grossWeight) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'น้ำหนักหักต้องไม่เกินน้ำหนักรวม',
-      path: ['deductionValue'],
-    })
-  }
-  if (containerDeductionWeight + impurityDeductionWeight > value.grossWeight) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'ยอดหักรวมต้องไม่เกินน้ำหนักรวม',
       path: ['deductionValue'],
     })
   }
@@ -485,9 +508,44 @@ export function calculateLineTotals(line: Pick<WeightTicketLine, 'containerDeduc
   }
 }
 
-export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'containerDeductionWeight' | 'deductionMode' | 'deductionValue' | 'grossWeight'>>) {
+export function calculateTicketTotals(lines: Array<Pick<WeightTicketLine, 'containerDeductionWeight' | 'deductionMode' | 'deductionValue' | 'grossWeight' | 'id'> & { parentId?: string; impurityId?: string }>) {
+  const totalsMap = new Map(lines.map(line => [line.id, calculateLineTotals(line)]))
+  
+  lines.forEach((line) => {
+    if (line.parentId) {
+      const isImpurity = toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
+      if (isImpurity) {
+        const parent = lines.find(l => l.id === line.parentId)
+        const parentTotals = totalsMap.get(line.parentId)
+        const childTotals = totalsMap.get(line.id)
+        if (parent && parentTotals && childTotals) {
+          const parentGross = parentTotals.grossWeight
+          const rawDeduction = line.deductionMode === 'percent'
+            ? parentGross * Math.max(0, toNumber(line.deductionValue)) / 100
+            : line.deductionMode === 'kg'
+              ? Math.max(0, toNumber(line.deductionValue))
+              : 0
+          childTotals.deductionWeight = rawDeduction
+          childTotals.netWeight = 0
+          parentTotals.netWeight = Math.max(0, parentTotals.netWeight - childTotals.deductionWeight)
+          parentTotals.deductionWeight += childTotals.deductionWeight
+        }
+      } else {
+        // Secondary lot: has its own gross weight and container deduction weight, net weight is computed normally
+        const childTotals = totalsMap.get(line.id)
+        if (childTotals) {
+          childTotals.deductionWeight = 0
+          childTotals.netWeight = Math.max(0, childTotals.grossWeight - childTotals.containerDeductionWeight)
+        }
+      }
+    }
+  })
+
   return lines.reduce((summary, line) => {
-    const totals = calculateLineTotals(line)
+    const isImpurity = !!line.parentId && toNumber(line.grossWeight) === 0 && !!line.impurityId && line.deductionMode !== 'none';
+    if (isImpurity) return summary
+    
+    const totals = totalsMap.get(line.id)!
     summary.containerDeductionWeight += totals.containerDeductionWeight
     summary.grossWeight += totals.grossWeight
     summary.deductionWeight += totals.deductionWeight

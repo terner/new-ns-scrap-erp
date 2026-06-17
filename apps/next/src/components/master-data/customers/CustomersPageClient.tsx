@@ -964,7 +964,7 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
         <button className="text-slate-500 hover:text-slate-700 text-sm font-semibold px-4 py-2 transition-colors focus:outline-none" type="button" onClick={onCancel}>
           ยกเลิก
         </button>
-        <button className="rounded-md bg-[#0F172A] hover:bg-[#1E293B] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 shadow-sm transition-colors focus:outline-none" disabled={isSaving} type="submit">
+        <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 shadow-sm transition-colors focus:outline-none" disabled={isSaving} type="submit">
           {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>

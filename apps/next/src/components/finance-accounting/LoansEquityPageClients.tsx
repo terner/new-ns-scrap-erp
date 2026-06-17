@@ -291,7 +291,7 @@ function useApi<T>(url: string) {
 }
 
 function DisabledButton({ children, strong = false }: { children: ReactNode; strong?: boolean }) {
-  return <button className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${strong ? 'bg-[#0F172A] text-white hover:bg-slate-800' : 'bg-slate-50 border border-slate-100 text-slate-400 opacity-60'} outline-none focus:ring-0`} disabled type="button">{children}</button>
+  return <button className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${strong ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-50 border border-slate-100 text-slate-400 opacity-60'} outline-none focus:ring-0`} disabled type="button">{children}</button>
 }
 
 function InlineDisabledButton({ children }: { children: ReactNode }) {
