@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input as UiInput } from '@/components/ui/Input'
 import { CollapsedList } from '@/components/ui/CollapsedList'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Select as UiSelect } from '@/components/ui/Select'
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/Table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -742,6 +743,13 @@ export function MoneyMovementPageClient({
 
   const activeAccounts = useMemo(() => data.accounts.filter((account) => account.active), [data.accounts])
   const partyMap = useMemo(() => new Map(parties.map((party) => [party.id, party.name])), [parties])
+  const customerSearchOptions = useMemo<SearchComboboxOption[]>(() => (data.customers ?? [])
+    .filter((customer) => customer.active !== false)
+    .map((customer) => ({
+      id: customer.id,
+      label: customer.name,
+      searchText: `${customer.id} ${customer.name}`.toLowerCase(),
+    })), [data.customers])
   const supplierMap = useMemo(() => new Map((data.suppliers ?? []).map((supplier) => [supplier.id, supplier])), [data.suppliers])
   const billMap = useMemo(() => new Map(data.bills.map((bill) => [bill.id, bill])), [data.bills])
   const paymentLines = useMemo(() => (mode === 'payment' ? (form as SupplierPaymentFormValues).lines ?? [] : []), [form, mode])
@@ -2211,7 +2219,16 @@ export function MoneyMovementPageClient({
               <>
                 <div className="grid gap-4 p-5 md:grid-cols-2">
                   <Field label="วันที่" type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
-                  <SelectField label={partyLabel} value={partyValue} onChange={changeReceiptCustomer} options={parties.filter((party) => party.active !== false)} />
+                  <SearchCombobox
+                    inputClassName="!h-9 px-2 py-1.5"
+                    inputId="receipt-customer-search"
+                    label={`${partyLabel} *`}
+                    options={customerSearchOptions}
+                    optionsPanelClassName="max-h-[280px]"
+                    placeholder="พิมพ์ค้นหาลูกค้า..."
+                    value={partyValue}
+                    onChange={changeReceiptCustomer}
+                  />
                   <SelectField label={accountLabel} value={form.accountId} onChange={(value) => setForm({ ...form, accountId: value })} options={activeAccounts} />
                   <Field label="ค่าธรรมเนียม" type="number" value={String(form.fee)} onChange={(value) => setForm({ ...form, fee: Number(value) })} />
                   <label className="block">
