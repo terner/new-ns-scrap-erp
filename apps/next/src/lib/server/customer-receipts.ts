@@ -693,7 +693,7 @@ async function cancelCustomerReceiptInTransaction(
       from_status: CUSTOMER_RECEIPT_STATUS_ACTIVE,
       gross_amount_snapshot: receipt.gross_amount,
       meta: {
-        bankStatementDocNo: reversalBankDocNo,
+        bankStatementDocNos: reversalBankDocNos,
         reason: normalizedReason,
       },
       net_cash_in_snapshot: receipt.net_cash_in,
