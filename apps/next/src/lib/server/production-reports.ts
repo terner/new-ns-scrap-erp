@@ -47,6 +47,7 @@ export type ProductionOrderMetric = {
   wipQty: number
   wipValue: number
   yieldPct: number
+  inputProducts: string
 }
 
 export type ProductionOutputProductMetric = {
@@ -134,6 +135,12 @@ export async function loadProductionMetrics(filters: ProductionReportFilters = {
           id: true,
           qty: true,
           total_cost: true,
+          products: {
+            select: {
+              code: true,
+              name: true,
+            },
+          },
         },
         where: { status: 'active' },
       },
@@ -301,6 +308,7 @@ export async function loadProductionMetrics(filters: ProductionReportFilters = {
       wipQty,
       wipValue,
       yieldPct: inputQty > 0 ? outputQty / inputQty * 100 : 0,
+      inputProducts: Array.from(new Set(order.production_inputs.map(input => input.products?.name).filter(Boolean))).join(', ') || '-',
     }
   })
 }

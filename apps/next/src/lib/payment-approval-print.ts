@@ -43,6 +43,7 @@ type PrintPmaRow = {
   dueDate?: string
   refDocNo?: string
   accountName?: string
+  description?: string | null
 }
 
 function escapeHtml(value: unknown) {
@@ -244,6 +245,8 @@ export function buildPmaSummaryPrintHtml(rows: PrintPmaRow[], profile: CompanyPr
   const currentDate = formatDateDisplay(new Date().toISOString().split('T')[0])
   const totalAmountToPay = rows.reduce((sum, row) => sum + amountToPay(row), 0)
   const sortedRows = sortedRowsForPaymentSummary(rows)
+  const noteHeader = rows.some(r => r.sourceType === 'petty_advance_return') ? 'หมายเหตุ' : 'รายละเอียด'
+  const isApMode = rows.some(r => r.sourceType === 'purchase_bill')
 
   const rowsHtml = buildPaymentSummaryGroups(sortedRows).map(({ group, row, shouldRenderGroupSummary }) => {
     const payee = payeeName(row)
@@ -254,10 +257,17 @@ export function buildPmaSummaryPrintHtml(rows: PrintPmaRow[], profile: CompanyPr
     const rowHtml = `
       <tr>
         <td class="font-medium">${escapeHtml(formatDateDisplay(row.date))}</td>
-        <td class="font-semibold text-slate-700">${escapeHtml(documentNo(row))}</td>
-        <td class="font-semibold text-slate-700">${escapeHtml(referenceDocNo(row))}</td>
-        <td class="font-bold text-slate-800">${escapeHtml(payee)}</td>
-        <td>${bankAccountHtml(row)}</td>
+        ${isApMode ? `
+          <td class="font-semibold text-slate-700">${escapeHtml(documentNo(row))}</td>
+          <td class="font-semibold text-slate-700">${escapeHtml(referenceDocNo(row))}</td>
+          <td class="font-bold text-slate-800">${escapeHtml(payee)}</td>
+          <td>${bankAccountHtml(row)}</td>
+        ` : `
+          <td class="font-semibold text-slate-700">${escapeHtml(referenceDocNo(row))}</td>
+          <td class="font-bold text-slate-800">${escapeHtml(payee)}</td>
+          <td class="text-slate-700">${escapeHtml(row.description || '')}</td>
+          <td>${bankAccountHtml(row)}</td>
+        `}
         <td class="num font-semibold text-slate-700">${money(billTotal)}</td>
         <td class="num text-slate-600">${money(billPaid)}</td>
         <td class="num font-semibold text-slate-700">${money(remaining)}</td>
@@ -268,11 +278,19 @@ export function buildPmaSummaryPrintHtml(rows: PrintPmaRow[], profile: CompanyPr
 
     return `${rowHtml}
       <tr class="group-total">
-        <td></td>
-        <td></td>
-        <td></td>
-        <td class="font-bold text-slate-900">${escapeHtml(group.payeeName)} รวม</td>
-        <td>${group.destinationHtml}</td>
+        ${isApMode ? `
+          <td></td>
+          <td></td>
+          <td></td>
+          <td class="font-bold text-slate-900">${escapeHtml(group.payeeName)} รวม</td>
+          <td>${group.destinationHtml}</td>
+        ` : `
+          <td></td>
+          <td></td>
+          <td class="font-bold text-slate-900">${escapeHtml(group.payeeName)} รวม</td>
+          <td></td>
+          <td>${group.destinationHtml}</td>
+        `}
         <td class="num font-bold">${money(group.totalAmount)}</td>
         <td class="num font-bold">${money(group.paidAmount)}</td>
         <td class="num font-bold">${money(group.payableBalance)}</td>
@@ -340,11 +358,18 @@ export function buildPmaSummaryPrintHtml(rows: PrintPmaRow[], profile: CompanyPr
       <table class="summary-table">
         <thead>
           <tr>
-            <th style="width: 8%;">วันที่ PMA</th>
-            <th style="width: 11%;">เลขที่เอกสาร</th>
-            <th style="width: 12%;">เอกสารอ้างอิง</th>
-            <th style="width: 20%;">Supplier</th>
-            <th style="width: 21%;">เลขบัญชีธนาคาร</th>
+            <th style="width: 8%;">วันที่เอกสาร</th>
+            ${isApMode ? `
+              <th style="width: 11%;">เลขที่เอกสาร</th>
+              <th style="width: 12%;">เอกสารอ้างอิง</th>
+              <th style="width: 20%;">Supplier</th>
+              <th style="width: 21%;">เลขบัญชีธนาคาร</th>
+            ` : `
+              <th style="width: 11%;">เอกสารอ้างอิง</th>
+              <th style="width: 18%;">Supplier</th>
+              <th style="width: 17%;">${escapeHtml(noteHeader)}</th>
+              <th style="width: 18%;">เลขบัญชีธนาคาร</th>
+            `}
             <th class="num" style="width: 10%;">ยอดเต็ม</th>
             <th class="num" style="width: 6%;">ชำระแล้ว</th>
             <th class="num" style="width: 6%;">คงเหลือ</th>

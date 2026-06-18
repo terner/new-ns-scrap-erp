@@ -1012,7 +1012,9 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
               <div>
                 <span className="font-mono text-[10px] text-slate-400 block">{row.productCode}</span>
                 <span className="font-bold text-slate-800 text-xs">{row.productName}</span>
-                <div className="text-[10px] text-slate-400 mt-0.5">Lot: {row.lotNo || '-'}</div>
+                {row.lotNo && row.lotNo !== '-' ? (
+                  <div className="text-[10px] text-slate-400 mt-0.5">Lot: {row.lotNo}</div>
+                ) : null}
               </div>
               <StockStatusCell row={row} />
             </div>
@@ -1085,7 +1087,9 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
               <tr key={row.key} className={`transition-colors ${row.qty < 0 ? 'bg-red-50/30' : 'hover:bg-slate-50/50'}`}>
                 <td className="p-3.5">
                   <span className="font-mono text-xs text-slate-500">{row.productCode}</span> {row.productName}
-                  <div className="text-xs text-slate-400">Lot: {row.lotNo || '-'}</div>
+                  {row.lotNo && row.lotNo !== '-' ? (
+                    <div className="text-xs text-slate-400">Lot: {row.lotNo}</div>
+                  ) : null}
                 </td>
                 <td className="p-3.5">{row.productMetalGroup || 'อื่นๆ'}</td>
                 <td className="p-3.5 text-center"><StockStatusCell row={row} /></td>

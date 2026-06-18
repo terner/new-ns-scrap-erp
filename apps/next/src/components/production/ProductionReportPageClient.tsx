@@ -43,7 +43,7 @@ const configs: Record<string, { apiPath: string; columns: Column[]; metrics: Arr
     title: 'รายงานการผลิต / Yield',
     exportable: true,
     metrics: [{ key: 'count', label: 'ใบสั่งผลิต' }, { key: 'inputQty', label: 'วัตถุดิบรวม', type: 'number' }, { key: 'outputQty', label: 'ผลผลิตรวม', type: 'number' }, { key: 'lossQty', label: 'Loss รวม', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'costPerKg', label: 'ต้นทุน/กก.', type: 'money' }],
-    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'productionType', label: 'ประเภทเครื่องจักร' }, { key: 'machineName', label: 'เครื่องจักร' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }],
+    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'productionType', label: 'ประเภทเครื่องจักร' }, { key: 'inputProducts', label: 'สินค้าที่เบิกผลิต' }, { key: 'machineName', label: 'เครื่องจักร' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }],
   },
   cost: {
     apiPath: '/api/production/production-cost-report',
@@ -72,6 +72,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   const [data, setData] = useState<Payload | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [productSearch, setProductSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const latestLoadRequestRef = useRef(0)
@@ -103,10 +104,50 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   }, [loadData])
 
   const rows = useMemo(() => data?.rows ?? [], [data?.rows])
-  const metricItems = useMemo(() => config.metrics.map((metric) => ({ ...metric, value: data?.summary?.[metric.key] ?? 0 })), [config.metrics, data?.summary])
+  const filteredRows = useMemo(() => {
+    const query = productSearch.trim().toLowerCase()
+    if (!query) return rows
+    return rows.filter((row) => {
+      const outputName = String(row.productName ?? '').toLowerCase()
+      const outputCode = String(row.productCode ?? '').toLowerCase()
+      const inputProducts = String(row.inputProducts ?? '').toLowerCase()
+      return outputName.includes(query) || outputCode.includes(query) || inputProducts.includes(query)
+    })
+  }, [rows, productSearch])
+
+  const localSummary = useMemo(() => {
+    const inputQty = filteredRows.reduce((sum, row) => sum + Number(row.inputQty ?? 0), 0)
+    const outputQty = filteredRows.reduce((sum, row) => sum + Number(row.outputQty ?? 0), 0)
+    const lossQty = filteredRows.reduce((sum, row) => sum + Number(row.lossQty ?? 0), 0)
+    const inputCost = filteredRows.reduce((sum, row) => sum + Number(row.inputCost ?? 0), 0)
+    const lossValue = filteredRows.reduce((sum, row) => sum + Number(row.lossValue ?? 0), 0)
+    const processCost = filteredRows.reduce((sum, row) => sum + Number(row.processCost ?? 0), 0)
+    const totalCost = inputCost + processCost
+    const wipQty = filteredRows.reduce((sum, row) => sum + Number(row.wipQty ?? 0), 0)
+    const wipValue = filteredRows.reduce((sum, row) => sum + Number(row.wipValue ?? 0), 0)
+
+    return {
+      count: filteredRows.length,
+      inputQty,
+      outputQty,
+      lossQty,
+      inputCost,
+      lossValue,
+      processCost,
+      totalCost,
+      wipQty,
+      wipValue,
+      yieldPct: inputQty > 0 ? outputQty / inputQty * 100 : 0,
+      lossPct: inputQty > 0 ? lossQty / inputQty * 100 : 0,
+      costPerKg: outputQty > 0 ? totalCost / outputQty : 0,
+      productionCostPerKg: outputQty > 0 ? totalCost / outputQty : 0,
+    }
+  }, [filteredRows])
+
+  const metricItems = useMemo(() => config.metrics.map((metric) => ({ ...metric, value: localSummary[metric.key as keyof typeof localSummary] ?? 0 })), [config.metrics, localSummary])
   const productSummary = useMemo(() => {
     const byProduct = new Map<string, { cost: number; count: number; name: string; qty: number }>()
-    rows.forEach((row) => {
+    filteredRows.forEach((row) => {
       const name = String(row.productName ?? '-')
       const current = byProduct.get(name) ?? { cost: 0, count: 0, name, qty: 0 }
       current.count += 1
@@ -115,9 +156,9 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       byProduct.set(name, current)
     })
     return Array.from(byProduct.values()).map((item) => ({ ...item, unitCost: item.qty > 0 ? item.cost / item.qty : 0 })).sort((left, right) => right.qty - left.qty)
-  }, [rows])
+  }, [filteredRows])
 
-  const wipRows = useMemo(() => data?.wipRows ?? [], [data?.wipRows])
+  const wipRows = useMemo(() => filteredRows.filter((row) => Number(row.wipQty ?? 0) > 0.000001), [filteredRows])
   const totalWipQty = useMemo(() => wipRows.reduce((sum, r) => sum + Number(r.wipQty ?? 0), 0), [wipRows])
   const totalWipValue = useMemo(() => wipRows.reduce((sum, r) => sum + Number(r.wipValue ?? 0), 0), [wipRows])
 
@@ -140,7 +181,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
 
   function exportCsv() {
     const header = config.columns.map((column) => column.label)
-    const body = rows.map((row) => config.columns.map((column) => String(row[column.key] ?? '')))
+    const body = filteredRows.map((row) => config.columns.map((column) => String(row[column.key] ?? '')))
     const csv = [header, ...body].map((line) => line.map((value) => `"${value.replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -154,7 +195,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   if (mode === 'cost') {
     const breakdown = data?.breakdown ?? {}
     const summary = data?.summary ?? {}
-    const costRows = rows
+    const costRows = filteredRows
     const costTotals = {
       electricity: breakdown['Electricity Cost'] ?? 0,
       fuel: breakdown['Fuel Cost'] ?? 0,
@@ -488,10 +529,28 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             <DatePickerInput className="flex-1 sm:flex-none sm:w-[130px]" value={dateFrom} onChange={setDateFrom} />
             <span className="text-slate-400 text-xs shrink-0">-</span>
             <DatePickerInput className="flex-1 sm:flex-none sm:w-[130px]" value={dateTo} onChange={setDateTo} />
-            <button className="rounded-md border border-slate-200 px-2.5 py-2 text-xs sm:text-sm hover:bg-slate-50 focus:outline-none shrink-0" type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>
+            <button className="rounded-md border border-slate-200 px-2.5 py-2 text-xs sm:text-sm hover:bg-slate-50 focus:outline-none shrink-0" type="button" onClick={() => { setDateFrom(''); setDateTo(''); setProductSearch('') }}>
               <span className="hidden xs:inline">ล้างวันที่</span>
               <span className="xs:hidden">ล้าง</span>
             </button>
+          </div>
+          <div className="w-full sm:w-60 relative shrink-0">
+            <input
+              type="text"
+              placeholder="ค้นหาสินค้า"
+              className="w-full rounded-md border border-slate-200 px-3 py-2 text-xs sm:text-sm outline-none focus:border-slate-350 h-[38px]"
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+            />
+            {productSearch ? (
+              <button
+                type="button"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-base font-bold"
+                onClick={() => setProductSearch('')}
+              >
+                &times;
+              </button>
+            ) : null}
           </div>
           {config.exportable ? (
             <button className="rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs sm:text-sm font-semibold text-white focus:outline-none sm:ml-auto w-full sm:w-auto text-center shrink-0" type="button" onClick={exportCsv}>
@@ -715,7 +774,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             </thead>
             <tbody>
               {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
-              {!isLoading && rows.map((row, index) => (
+              {!isLoading && filteredRows.map((row, index) => (
                 <tr key={String(row.id ?? index)} className={`border-t border-slate-100 hover:bg-slate-50 ${mode === 'wip' ? wipAgeClass(Number(row.ageDays ?? 0)) : ''}`}>
                   {config.columns.map((column) => (
                     <td key={column.key} className={`whitespace-nowrap p-2 text-xs ${cellTone(row[column.key], column, mode)}`}>
@@ -724,7 +783,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                   ))}
                 </tr>
               ))}
-              {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>ไม่มีข้อมูล</td></tr> : null}
+              {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>ไม่มีข้อมูล</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -737,7 +796,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             กำลังโหลดข้อมูล
           </div>
         ) : null}
-        {!isLoading && rows.map((row, index) => {
+        {!isLoading && filteredRows.map((row, index) => {
           const firstCol = config.columns[0]
           const secondCol = config.columns[1]
           const titleValue = String(row[firstCol?.key] ?? '')
@@ -754,22 +813,22 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
               </div>
               <div className="grid grid-cols-2 gap-y-3 gap-x-4">
                 {restColumns.map((col) => {
-                  const val = row[col.key]
-                  const toneClass = cellTone(val, col, mode)
-                  return (
-                    <div key={col.key} className="min-w-0">
-                      <span className="text-slate-500 block text-xs font-semibold">{col.label}</span>
-                      <span className={`text-sm font-semibold text-slate-800 truncate block mt-0.5 ${toneClass}`}>
-                        {formatCell(val, col.type)}
-                      </span>
-                    </div>
-                  )
+                   const val = row[col.key]
+                   const toneClass = cellTone(val, col, mode)
+                   return (
+                     <div key={col.key} className="min-w-0">
+                       <span className="text-slate-500 block text-xs font-semibold">{col.label}</span>
+                       <span className={`text-sm font-semibold text-slate-800 truncate block mt-0.5 ${toneClass}`}>
+                         {formatCell(val, col.type)}
+                       </span>
+                     </div>
+                   )
                 })}
               </div>
             </div>
           )
         })}
-        {!isLoading && rows.length === 0 ? (
+        {!isLoading && filteredRows.length === 0 ? (
           <div className="py-6 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
             ไม่มีข้อมูล
           </div>

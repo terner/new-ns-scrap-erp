@@ -74,8 +74,13 @@ export async function POST(request: Request) {
       }
 
       const allPayments = await tx.payments.findMany({
-        select: { status: true },
-        where: { voucher_id: payload.voucherId },
+        select: { status: true, voucher_id: true },
+        where: {
+          OR: [
+            { voucher_id: payload.voucherId },
+            { doc_no: payload.voucherId },
+          ],
+        },
       })
       if (allPayments.length === 0) {
         throw new Error('ไม่พบรายการจ่ายเงินที่ต้องการยกเลิก')
@@ -83,6 +88,7 @@ export async function POST(request: Request) {
       if (allPayments.every((p) => p.status === 'cancelled')) {
         throw new Error('รายการจ่ายเงินนี้ถูกยกเลิกไปแล้ว')
       }
+      const actualVoucherId = allPayments[0].voucher_id ?? payload.voucherId
 
       const payments = await tx.payments.findMany({
         select: {
@@ -99,7 +105,7 @@ export async function POST(request: Request) {
           withholding_tax: true,
         },
         where: {
-          voucher_id: payload.voucherId,
+          voucher_id: actualVoucherId,
           NOT: { status: 'cancelled' },
         },
       })
@@ -138,7 +144,7 @@ export async function POST(request: Request) {
       const bankStatements = await tx.bank_statement.findMany({
         select: { doc_no: true, id: true },
         where: {
-          ref_id: payload.voucherId,
+          ref_id: actualVoucherId,
           ref_type: 'PMT',
         },
       })
@@ -163,7 +169,7 @@ export async function POST(request: Request) {
           updated_by: actor,
         },
         where: {
-          voucher_id: payload.voucherId,
+          voucher_id: actualVoucherId,
           NOT: { status: 'cancelled' },
         },
       })
@@ -174,7 +180,7 @@ export async function POST(request: Request) {
           updated_by: actor,
         },
         where: {
-          payment_voucher_id: payload.voucherId,
+          payment_voucher_id: actualVoucherId,
           status: 'active',
         },
       })
@@ -185,7 +191,7 @@ export async function POST(request: Request) {
           updated_by: actor,
         },
         where: {
-          payment_voucher_id: payload.voucherId,
+          payment_voucher_id: actualVoucherId,
           status: 'active',
         },
       })
@@ -199,13 +205,13 @@ export async function POST(request: Request) {
           meta: {
             reason: payload.reason,
             reversedLineCount: payments.length,
-            voucherId: payload.voucherId,
+            voucherId: actualVoucherId,
           },
           netAmountSnapshot: voucherNetAmount,
           note: payload.reason,
           paymentDocNo: canonicalPayment.doc_no,
           paymentId: canonicalPayment.id,
-          paymentVoucherId: payload.voucherId,
+          paymentVoucherId: actualVoucherId,
           toStatus: 'cancelled',
         })
         await appendPaymentStatusLog(tx, {
@@ -217,20 +223,20 @@ export async function POST(request: Request) {
           meta: {
             bankStatementDocNos: bankStatements.map((statement) => statement.doc_no),
             reason: payload.reason,
-            voucherId: payload.voucherId,
+            voucherId: actualVoucherId,
           },
           netAmountSnapshot: voucherNetAmount,
           note: payload.reason,
           paymentDocNo: canonicalPayment.doc_no,
           paymentId: canonicalPayment.id,
-          paymentVoucherId: payload.voucherId,
+          paymentVoucherId: actualVoucherId,
           toStatus: 'cancelled',
         })
       }
 
       await tx.bank_statement.deleteMany({
         where: {
-          ref_id: payload.voucherId,
+          ref_id: actualVoucherId,
           ref_type: 'PMT',
         },
       })
@@ -306,7 +312,7 @@ export async function POST(request: Request) {
                 paymentDocNo: cancelledPayment?.doc_no ?? null,
                 reason: payload.reason,
                 reversedAmount: reversedAmountByApprovalId.get(approvalId) ?? null,
-                voucherId: payload.voucherId,
+                voucherId: actualVoucherId,
               },
               note: payload.reason,
               paymentApprovalId: approval.id,
@@ -359,7 +365,7 @@ export async function POST(request: Request) {
           actor,
           fromStatus: currentBill.status,
           meta: {
-            reversedVoucherId: payload.voucherId,
+            reversedVoucherId: actualVoucherId,
           },
           note: payload.reason,
           purchaseBillDocNo: currentBill.doc_no,

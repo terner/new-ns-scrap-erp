@@ -996,50 +996,57 @@ export function PaymentApprovalPageClient() {
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">
                 {isLoading ? <TableRow><TableCell className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
-                {!isLoading && apRows.map((row) => (
-                  <TableRow key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => openDetail({ row, tab: 'ap' })}>
-                    <TableCell className="w-10 text-center py-2 px-1" onClick={(e) => e.stopPropagation()}>
-                      {isPrintable(row) ? (
-                        <input
-                          type="checkbox"
-                          className="rounded border-slate-300 size-3.5 accent-amber-600 cursor-pointer"
-                          checked={selectedRowIds.has(row.id)}
-                          onChange={() => toggleRowSelection(row.id)}
-                        />
-                      ) : (
-                        <input
-                          type="checkbox"
-                          disabled
-                          className="rounded border-slate-200 size-3.5 text-slate-300 opacity-30 cursor-not-allowed"
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-700">
-                      <div className="whitespace-nowrap">{row.docNo}</div>
-                      <div className="text-[11px] text-slate-500">{approvalRowKindLabel(row.approvalStatus)}</div>
-                    </TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-700">
-                      <div className="whitespace-nowrap">{row.sourceDocNo}</div>
-                      <div className="text-[11px] text-slate-500">{row.sourceLabel}</div>
-                    </TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-700">{row.supplierName}</TableCell>
-                    <TableCell className="text-xs font-semibold text-slate-700">
-                      {row.approvalStatus === 'approved'
-                        ? <div className="whitespace-normal text-slate-700">{row.destinationLabel || '-'}</div>
-                        : <div className="whitespace-normal text-slate-500">{destinationSummaryLabel(row)}</div>}
-                    </TableCell>
-                    <TableCell className="text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.totalAmount)}</TableCell>
-                    <TableCell className="text-right pr-4 text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(row.paidAmount)}</TableCell>
-                    <TableCell className="text-right pr-4 text-xs font-semibold text-red-700 tabular-nums">{formatMoney(row.payableBalance)}</TableCell>
-                    <TableCell className="text-center text-xs">
-                      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold ${approvalStatusTone(row.approvalStatus)}`}>
-                        <span className={`size-1.5 rounded-full ${approvalStatusDot(row.approvalStatus)}`} />
-                        {approvalStatusLabel(row.approvalStatus)}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {!isLoading && apRows.map((row) => {
+                  const isVoided = row.approvalStatus === 'voided'
+                  return (
+                    <TableRow
+                      key={row.id}
+                      className={`cursor-pointer ${isVoided ? 'bg-red-100/60 hover:bg-red-200/60 text-slate-400' : 'hover:bg-slate-50'}`}
+                      onClick={() => openDetail({ row, tab: 'ap' })}
+                    >
+                      <TableCell className="w-10 text-center py-2 px-1" onClick={(e) => e.stopPropagation()}>
+                        {isPrintable(row) ? (
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 size-3.5 accent-amber-600 cursor-pointer"
+                            checked={selectedRowIds.has(row.id)}
+                            onChange={() => toggleRowSelection(row.id)}
+                          />
+                        ) : (
+                          <input
+                            type="checkbox"
+                            disabled
+                            className="rounded border-slate-200 size-3.5 text-slate-300 opacity-30 cursor-not-allowed"
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold text-slate-700">
+                        <div className="whitespace-nowrap">{row.docNo}</div>
+                        <div className="text-[11px] text-slate-500">{approvalRowKindLabel(row.approvalStatus)}</div>
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold text-slate-700">
+                        <div className="whitespace-nowrap">{row.sourceDocNo}</div>
+                        <div className="text-[11px] text-slate-500">{row.sourceLabel}</div>
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</TableCell>
+                      <TableCell className="text-xs font-semibold text-slate-700">{row.supplierName}</TableCell>
+                      <TableCell className="text-xs font-semibold text-slate-700">
+                        {row.approvalStatus === 'approved'
+                          ? <div className="whitespace-normal text-slate-700">{row.destinationLabel || '-'}</div>
+                          : <div className="whitespace-normal text-slate-500">{destinationSummaryLabel(row)}</div>}
+                      </TableCell>
+                      <TableCell className="text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.totalAmount)}</TableCell>
+                      <TableCell className="text-right pr-4 text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(row.paidAmount)}</TableCell>
+                      <TableCell className="text-right pr-4 text-xs font-semibold text-red-700 tabular-nums">{formatMoney(row.payableBalance)}</TableCell>
+                      <TableCell className="text-center text-xs">
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold ${approvalStatusTone(row.approvalStatus)}`}>
+                          <span className={`size-1.5 rounded-full ${approvalStatusDot(row.approvalStatus)}`} />
+                          {approvalStatusLabel(row.approvalStatus)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
                 {!isLoading && totalRows === 0 ? (
                   <TableRow>
                     <TableCell className="p-6 text-center text-slate-500" colSpan={10}>
@@ -1084,8 +1091,13 @@ export function PaymentApprovalPageClient() {
                 {!isLoading && expenseRows.map((row) => {
                   const overdue = row.dueDate ? row.dueDate < new Date().toISOString().slice(0, 10) : false
                   const isPettyReturn = row.sourceType === 'petty_advance_return'
+                  const isVoided = row.approvalStatus === 'voided'
                   return (
-                    <TableRow key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => openDetail({ row, tab: isPettyReturn ? 'pettyReturn' : 'expense' })}>
+                    <TableRow
+                      key={row.id}
+                      className={`cursor-pointer ${isVoided ? 'bg-red-100/60 hover:bg-red-200/60 text-slate-400' : 'hover:bg-slate-50'}`}
+                      onClick={() => openDetail({ row, tab: isPettyReturn ? 'pettyReturn' : 'expense' })}
+                    >
                       <TableCell className="w-10 text-center py-2 px-1" onClick={(e) => e.stopPropagation()}>
                         {isPrintable(row) ? (
                           <input

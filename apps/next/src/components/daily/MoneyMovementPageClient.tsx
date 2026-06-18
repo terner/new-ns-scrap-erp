@@ -177,6 +177,7 @@ const paymentHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnK
   { key: 'bankFee', defaultWidth: 100, minWidth: 80 },
   { key: 'netAmount', defaultWidth: 110, minWidth: 90 },
   { key: 'status', defaultWidth: 130, minWidth: 110 },
+  { key: 'action', defaultWidth: 90, minWidth: 85 },
   { key: 'notes', defaultWidth: 180, minWidth: 130 },
 ]
 const receiptHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
@@ -837,6 +838,9 @@ export function MoneyMovementPageClient({
   const [cancelReceiptReason, setCancelReceiptReason] = useState('')
   const [cancelReceiptTarget, setCancelReceiptTarget] = useState<MoneyRow | null>(null)
   const [isCancellingReceipt, setIsCancellingReceipt] = useState(false)
+  const [cancelPaymentReason, setCancelPaymentReason] = useState('')
+  const [cancelPaymentTarget, setCancelPaymentTarget] = useState<MoneyRow | null>(null)
+  const [isCancellingPayment, setIsCancellingPayment] = useState(false)
   const [receiptBillDetailBill, setReceiptBillDetailBill] = useState<Bill | null>(null)
   const [receiptBillDetailOpen, setReceiptBillDetailOpen] = useState(false)
   const [receiptDetailOpen, setReceiptDetailOpen] = useState(false)
@@ -1890,6 +1894,7 @@ export function MoneyMovementPageClient({
       billId: payloadLines[0]?.salesBillDocNo ?? null,
       discount: roundMoney(payloadLines.reduce((sum, line) => sum + line.discountAmount, 0)),
       accountId: normalizedSplits[0]?.accountId ?? receiptForm.accountId,
+      method: normalizedSplits[0]?.method ?? receiptForm.method ?? '',
       lines: payloadLines,
       splits: normalizedSplits,
       withholdingTax: roundMoney(payloadLines.reduce((sum, line) => sum + line.withholdingTaxAmount, 0)),
@@ -1978,6 +1983,35 @@ export function MoneyMovementPageClient({
       setError(caught instanceof Error ? caught.message : 'ยกเลิกรับเงิน Customer ไม่ได้')
     } finally {
       setIsCancellingReceipt(false)
+    }
+  }
+
+  async function cancelPaymentRow() {
+    if (!cancelPaymentTarget) return
+    if (!cancelPaymentReason.trim()) {
+      setError('กรุณาระบุเหตุผลการยกเลิก')
+      return
+    }
+    setIsCancellingPayment(true)
+    setError(null)
+    try {
+      await dailyFetchJson('/api/purchase/payments/cancel', {
+        body: JSON.stringify({
+          voucherId: cancelPaymentTarget.id,
+          reason: cancelPaymentReason.trim(),
+        }),
+        method: 'POST',
+      })
+      setCancelPaymentTarget(null)
+      setCancelPaymentReason('')
+      setPaymentDetailOpen(false)
+      setPaymentDetailRow(null)
+      setPaymentDetail(null)
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ยกเลิกจ่ายเงินไม่ได้')
+    } finally {
+      setIsCancellingPayment(false)
     }
   }
 
@@ -3033,12 +3067,26 @@ export function MoneyMovementPageClient({
                         ) : null}
                       </div>
                       <div className="flex justify-between items-end pt-2 border-t border-slate-100">
-                        <div>
+                        <div className="flex items-center gap-2">
                           {mode === 'payment' ? (
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${paymentHistoryStatusTone(row.status)}`}>
-                              <span className={`size-1.5 rounded-full ${paymentHistoryStatusDot(row.status)}`} />
-                              {paymentHistoryStatusLabel(row.status)}
-                            </span>
+                            <>
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${paymentHistoryStatusTone(row.status)}`}>
+                                <span className={`size-1.5 rounded-full ${paymentHistoryStatusDot(row.status)}`} />
+                                {paymentHistoryStatusLabel(row.status)}
+                              </span>
+                              {row.status !== 'cancelled' ? (
+                                <button
+                                  type="button"
+                                  className="text-[11px] text-red-600 hover:text-red-700 font-semibold px-2 py-0.5 rounded border border-red-200 hover:bg-red-50 bg-white cursor-pointer ml-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setCancelPaymentTarget(row)
+                                  }}
+                                >
+                                  ยกเลิก
+                                </button>
+                              ) : null}
+                            </>
                           ) : (
                             <span className="text-xs text-slate-400">เสร็จสิ้น</span>
                           )}
@@ -3091,13 +3139,14 @@ export function MoneyMovementPageClient({
                     <ResizableTableHead align="right" label="Bank Fee" resizeProps={historyColumnResize.getResizeHandleProps('bankFee', 'Bank Fee')} />
                     <TableSortHeader activeKey={historySortField} align="right" direction={historySortDirection} label="สุทธิ" resizeProps={historyColumnResize.getResizeHandleProps('netAmount', 'สุทธิ')} sortKey="netAmount" onSort={toggleHistorySort} />
                     {mode === 'payment' ? <ResizableTableHead label="สถานะ" resizeProps={historyColumnResize.getResizeHandleProps('status', 'สถานะ')} /> : null}
+                    {mode === 'payment' ? <ResizableTableHead label="จัดการ" resizeProps={historyColumnResize.getResizeHandleProps('action', 'จัดการ')} /> : null}
                     <ResizableTableHead label="หมายเหตุ" resizeProps={historyColumnResize.getResizeHandleProps('notes', 'หมายเหตุ')} />
                   </tr>
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-100">
                   {isLoading ? (
                     <TableRow>
-                      <TableCell className="p-8 text-center text-slate-500" colSpan={(mode === 'payment' ? 11 : 10) + (mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? 1 : 0)}>
+                      <TableCell className="p-8 text-center text-slate-500" colSpan={(mode === 'payment' ? 12 : 10) + (mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? 1 : 0)}>
                         กำลังโหลดข้อมูล
                       </TableCell>
                     </TableRow>
@@ -3161,11 +3210,24 @@ export function MoneyMovementPageClient({
                             </div>
                           </TableCell>
                         ) : null}
+                        {mode === 'payment' ? (
+                          <TableCell className="p-2" onClick={(e) => e.stopPropagation()}>
+                            <UiButton
+                              disabled={row.status === 'cancelled'}
+                              className="text-xs h-7 px-2 font-semibold bg-red-600 hover:bg-red-700 text-white border-0"
+                              size="sm"
+                              type="button"
+                              onClick={() => setCancelPaymentTarget(row)}
+                            >
+                              ยกเลิก
+                            </UiButton>
+                          </TableCell>
+                        ) : null}
                         <TableCell className="max-w-56 truncate text-xs font-semibold text-slate-700">{row.notes || '-'}</TableCell>
                       </TableRow>
                     )
                   })}
-                  {!isLoading && historyPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={(mode === 'payment' ? 11 : 10) + (mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? 1 : 0)}>ยังไม่มีรายการ</TableCell></TableRow> : null}
+                  {!isLoading && historyPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={(mode === 'payment' ? 12 : 10) + (mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? 1 : 0)}>ยังไม่มีรายการ</TableCell></TableRow> : null}
                 </TableBody>
               </Table>
             </div>
@@ -3180,6 +3242,7 @@ export function MoneyMovementPageClient({
           isLoading={isPaymentDetailLoading}
           open={paymentDetailOpen}
           row={paymentDetailRow}
+          onCancel={(row) => setCancelPaymentTarget(row)}
           onOpenChange={(open) => {
             setPaymentDetailOpen(open)
             if (!open) {
@@ -3264,7 +3327,37 @@ export function MoneyMovementPageClient({
             </div>
             <DialogFooter className="border-t border-slate-200 px-5 py-4">
               <UiButton disabled={isCancellingReceipt} type="button" variant="ghost" onClick={() => setCancelReceiptTarget(null)}>ปิด</UiButton>
-              <UiButton className="bg-red-650 text-white hover:bg-red-700 font-semibold px-5" disabled={isCancellingReceipt} type="button" variant="default" onClick={cancelCustomerReceiptRow}>ยืนยันยกเลิก</UiButton>
+              <UiButton className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5" disabled={isCancellingReceipt} type="button" variant="default" onClick={cancelCustomerReceiptRow}>ยืนยันยกเลิก</UiButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {cancelPaymentTarget ? (
+        <Dialog open onOpenChange={(open) => {
+          if (!open && !isCancellingPayment) setCancelPaymentTarget(null)
+        }}>
+          <DialogContent className="max-w-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl">
+            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-2xl">
+              <DialogTitle className="font-bold text-white">ยกเลิกรายการจ่ายเงิน</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm bg-slate-50 p-5">
+              <div className="rounded-md border border-slate-200 bg-white p-3">
+                <div className="font-semibold text-slate-900">{cancelPaymentTarget.docNo}</div>
+                <div className="text-slate-650">{cancelPaymentTarget.partyName} · {formatMoney(cancelPaymentTarget.amount)}</div>
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-600">เหตุผลการยกเลิก</span>
+                <textarea
+                  className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                  value={cancelPaymentReason}
+                  onChange={(event) => setCancelPaymentReason(event.target.value)}
+                />
+              </label>
+            </div>
+            <DialogFooter className="border-t border-slate-200 px-5 py-4">
+              <UiButton disabled={isCancellingPayment} type="button" variant="ghost" onClick={() => setCancelPaymentTarget(null)}>ปิด</UiButton>
+              <UiButton className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5" disabled={isCancellingPayment} type="button" variant="default" onClick={cancelPaymentRow}>ยืนยันยกเลิก</UiButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -3314,7 +3407,7 @@ export function MoneyMovementPageClient({
                 ปิด
               </UiButton>
               <UiButton
-                className="bg-red-650 px-5 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                className="bg-red-600 px-5 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                 disabled={isCancellingApproval || !cancelApprovalReason.trim()}
                 type="button"
                 variant="default"
@@ -3349,6 +3442,7 @@ function PaymentHistoryDetailDialog({
   detail,
   error,
   isLoading,
+  onCancel,
   onOpenChange,
   open,
   row,
@@ -3356,6 +3450,7 @@ function PaymentHistoryDetailDialog({
   detail: PaymentHistoryDetail | null
   error: string | null
   isLoading: boolean
+  onCancel: (row: MoneyRow) => void
   onOpenChange: (open: boolean) => void
   open: boolean
   row: MoneyRow | null
@@ -3525,6 +3620,19 @@ function PaymentHistoryDetailDialog({
             </>
           ) : null}
         </div>
+        <DialogFooter className="border-t border-slate-200 bg-white px-5 py-4">
+          <UiButton
+            className="font-normal border-red-200 text-red-700 hover:bg-red-50"
+            disabled={!row || row.status === 'cancelled'}
+            title={row?.status === 'cancelled' ? 'รายการนี้ถูกยกเลิกแล้ว' : 'ยกเลิกรายการจ่ายเงิน'}
+            type="button"
+            variant="outline"
+            onClick={() => row && onCancel(row)}
+          >
+            ยกเลิก
+          </UiButton>
+          <UiButton className="font-normal text-slate-600" type="button" variant="ghost" onClick={() => onOpenChange(false)}>ปิด</UiButton>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

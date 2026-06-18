@@ -67,6 +67,7 @@ function sampleRow(overrides: Partial<ProductionOrderMetric>): ProductionOrderMe
     wipQty: 0,
     wipValue: 0,
     yieldPct: 0,
+    inputProducts: 'QA Input Product',
     ...overrides,
   }
 }

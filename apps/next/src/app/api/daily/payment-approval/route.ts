@@ -237,6 +237,7 @@ export async function GET() {
         sourceType: 'purchase_bill' as const,
         supplierName: bill.suppliers?.name ?? '-',
         totalAmount,
+        description: bill.notes || bill.note || '',
       }] : []
       const approvedRows = activeApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -249,7 +250,7 @@ export async function GET() {
         approvedAmount: toNumber(approval.approved_amount),
         destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
         bankName: approval.destination_bank_name_snapshot ?? '',
-        date: toDateOnly(approval.approved_at ?? bill.date),
+        date: toDateOnly(bill.date),
         docNo: approvalDocNo,
         id: approvalDocNo,
         paidAmount: 0,
@@ -259,6 +260,7 @@ export async function GET() {
         sourceType: 'purchase_bill' as const,
         supplierName: approval.party_name_snapshot ?? bill.suppliers?.name ?? '-',
         totalAmount: toNumber(approval.approved_amount),
+        description: bill.notes || bill.note || '',
       }})
       const voidedRows = voidedApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -272,7 +274,7 @@ export async function GET() {
         approvedAmount,
         destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
         bankName: approval.destination_bank_name_snapshot ?? '',
-        date: toDateOnly(approval.voided_at ?? approval.approved_at ?? bill.date),
+        date: toDateOnly(bill.date),
         docNo: approvalDocNo,
         id: approvalDocNo,
         paidAmount: 0,
@@ -284,6 +286,7 @@ export async function GET() {
         totalAmount: approvedAmount,
         voidReason: approval.void_reason ?? '',
         voidedAt: toDateOnly(approval.voided_at),
+        description: bill.notes || bill.note || '',
       }})
       return [...pendingRows, ...approvedRows, ...voidedRows]
     })
@@ -320,6 +323,7 @@ export async function GET() {
         sourceType: 'advance_payment' as const,
         supplierName: advance.suppliers?.name ?? '-',
         totalAmount,
+        description: advance.remark || '',
       }] : []
       const approvedRows = activeApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -332,7 +336,7 @@ export async function GET() {
         approvedAmount: toNumber(approval.approved_amount),
         destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
         bankName: approval.destination_bank_name_snapshot ?? '',
-        date: toDateOnly(approval.approved_at ?? advance.advance_date),
+        date: toDateOnly(advance.advance_date),
         docNo: approvalDocNo,
         id: approvalDocNo,
         paidAmount: 0,
@@ -342,6 +346,7 @@ export async function GET() {
         sourceType: 'advance_payment' as const,
         supplierName: approval.party_name_snapshot ?? advance.suppliers?.name ?? '-',
         totalAmount: toNumber(approval.approved_amount),
+        description: advance.remark || '',
       }})
       const voidedRows = voidedApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -355,7 +360,7 @@ export async function GET() {
         approvedAmount,
         destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
         bankName: approval.destination_bank_name_snapshot ?? '',
-        date: toDateOnly(approval.voided_at ?? approval.approved_at ?? advance.advance_date),
+        date: toDateOnly(advance.advance_date),
         docNo: approvalDocNo,
         id: approvalDocNo,
         paidAmount: 0,
@@ -367,6 +372,7 @@ export async function GET() {
         totalAmount: approvedAmount,
         voidReason: approval.void_reason ?? '',
         voidedAt: toDateOnly(approval.voided_at),
+        description: advance.remark || '',
       }})
       return [...pendingRows, ...approvedRows, ...voidedRows]
     })
@@ -402,6 +408,7 @@ export async function GET() {
         sourceDocNo,
         sourceType: 'expense' as const,
         totalAmount: pendingAmount,
+        description: expense.notes || '',
       }] : []
       const approvedRows = activeApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -412,7 +419,7 @@ export async function GET() {
         approvalId: approvalDocNo,
         approvalStatus: 'approved' as const,
         approvedAmount: toNumber(approval.approved_amount),
-        date: toDateOnly(approval.approved_at ?? expense.date),
+        date: toDateOnly(expense.date),
         destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
         destinationOptions: [],
         docNo: approvalDocNo,
@@ -423,6 +430,7 @@ export async function GET() {
         sourceDocNo: expense.doc_no,
         sourceType: 'expense' as const,
         totalAmount: toNumber(approval.approved_amount),
+        description: expense.notes || '',
       }})
       const voidedRows = voidedApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -434,7 +442,7 @@ export async function GET() {
         approvalId: approvalDocNo,
         approvalStatus: 'voided' as const,
         approvedAmount,
-        date: toDateOnly(approval.voided_at ?? approval.approved_at ?? expense.date),
+        date: toDateOnly(expense.date),
         destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
         destinationOptions: [],
         docNo: approvalDocNo,
@@ -447,6 +455,7 @@ export async function GET() {
         totalAmount: approvedAmount,
         voidReason: approval.void_reason ?? '',
         voidedAt: toDateOnly(approval.voided_at),
+        description: expense.notes || '',
       }})
       return [...pendingRows, ...approvedRows, ...voidedRows]
     })
@@ -487,6 +496,7 @@ export async function GET() {
           totalAmount: returnAmount,
           voidReason: entry.void_reason ?? '',
           voidedAt: toDateOnly(entry.voided_at),
+          description: entry.notes || entry.petty_advances.notes || '',
         }
       })
     const approvedPettyReturnRows = approvals
@@ -504,7 +514,7 @@ export async function GET() {
           approvalId: approval.id.toString(),
           approvalStatus: approval.status === 'voided' ? 'voided' as const : 'approved' as const,
           approvedAmount,
-          date: toDateOnly(approval.approved_at ?? approval.source_date_snapshot ?? approval.created_at),
+          date: toDateOnly(entry?.date ?? approval.source_date_snapshot ?? approval.created_at),
           destinationLabel,
           destinationOptions: matchingOption ? [matchingOption] : dailyAccountOptions,
           docNo: pettyReturnDisplayDocNo(entry, approvalDocNo),
@@ -517,6 +527,7 @@ export async function GET() {
           totalAmount: approvedAmount,
           voidReason: approval.void_reason ?? '',
           voidedAt: toDateOnly(approval.voided_at),
+          description: entry?.notes || entry?.petty_advances?.notes || approval.note || '',
         }
       })
     const pettyReturnRows = [...pendingPettyReturnRows, ...approvedPettyReturnRows]
