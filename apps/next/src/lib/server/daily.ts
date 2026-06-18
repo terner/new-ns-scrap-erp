@@ -103,27 +103,36 @@ export async function nextBankStatementDocNos(date: string, count: number, clien
 }
 
 export async function listDailyAccounts() {
-  const accounts = await prisma.accounts.findMany({
-    orderBy: [{ active: 'desc' }, { name: 'asc' }, { account_no: 'asc' }],
-    select: {
-      active: true,
-      account_no: true,
-      bank_statement: {
-        orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
-        select: { balance: true },
-        take: 1,
+  const [accounts, statementTotals] = await Promise.all([
+    prisma.accounts.findMany({
+      orderBy: [{ active: 'desc' }, { name: 'asc' }, { account_no: 'asc' }],
+      select: {
+        active: true,
+        account_no: true,
+        code: true,
+        id: true,
+        name: true,
+        opening_balance: true,
+        type: true,
       },
-      code: true,
-      id: true,
-      name: true,
-      opening_balance: true,
-      type: true,
-    },
-  })
+    }),
+    prisma.bank_statement.groupBy({
+      by: ['account_id'],
+      _sum: {
+        amount_in: true,
+        amount_out: true,
+      },
+      where: { account_id: { not: null } },
+    }),
+  ])
+  const statementTotalByAccountId = new Map(statementTotals.map((total) => [
+    total.account_id?.toString() ?? '',
+    toNumber(total._sum.amount_in) - toNumber(total._sum.amount_out),
+  ] as const))
 
   return accounts.map((account) => ({
     active: account.active ?? true,
-    balance: toNumber(account.bank_statement[0]?.balance ?? account.opening_balance),
+    balance: toNumber(account.opening_balance) + (statementTotalByAccountId.get(account.id.toString()) ?? 0),
     code: account.account_no,
     id: requireBusinessCode(account.code, `บัญชีเงิน ${account.id}`),
     name: account.name,
