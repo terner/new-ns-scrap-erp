@@ -156,6 +156,16 @@ const paymentQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey
   { key: 'age', defaultWidth: 75, minWidth: 60 },
   { key: 'action', defaultWidth: 170, minWidth: 150 },
 ]
+const receiptQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey>> = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
+  { key: 'date', defaultWidth: 140, minWidth: 120 },
+  { key: 'partyName', defaultWidth: 260, minWidth: 160 },
+  { key: 'accountNo', defaultWidth: 170, minWidth: 140 },
+  { key: 'totalAmount', defaultWidth: 120, minWidth: 100 },
+  { key: 'paidAmount', defaultWidth: 110, minWidth: 90 },
+  { key: 'balance', defaultWidth: 110, minWidth: 90 },
+  { key: 'action', defaultWidth: 128, minWidth: 120 },
+]
 const paymentHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
   { key: 'date', defaultWidth: 150, minWidth: 120 },
@@ -726,6 +736,7 @@ export function MoneyMovementPageClient({
   const [isPaymentDetailLoading, setIsPaymentDetailLoading] = useState(false)
   const [paymentDetailError, setPaymentDetailError] = useState<string | null>(null)
   const paymentQueueColumnResize = useResizableColumns(`daily.money-movement.${mode}.queue.v5`, paymentQueueColumns)
+  const receiptQueueColumnResize = useResizableColumns('daily.money-movement.receipt.queue.compact.v1', receiptQueueColumns)
   const historyColumns = useMemo(() => mode === 'payment' ? paymentHistoryColumns : receiptHistoryColumns, [mode])
   const historyColumnResize = useResizableColumns(`daily.money-movement.${mode}.history.v5`, historyColumns)
 
@@ -1972,26 +1983,23 @@ export function MoneyMovementPageClient({
           </div>
 
           <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-            <Table className="text-xs" style={{ minWidth: paymentQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <Table className="text-xs" style={{ minWidth: receiptQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {paymentQueueColumns.filter((column) => column.key !== 'bankName' && column.key !== 'age').map((column, index, columns) => {
-                  const style = paymentQueueColumnResize.getColumnStyle(column.key)
-                  if (index === columns.length - 1) {
-                    return <col key={column.key} style={{ minWidth: column.minWidth }} />
-                  }
+                {receiptQueueColumns.map((column) => {
+                  const style = receiptQueueColumnResize.getColumnStyle(column.key)
                   return <col key={column.key} style={style} />
                 })}
               </colgroup>
               <TableHeader className="text-slate-700">
                 <tr>
-                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="เลขที่ใบรับเงิน" resizeProps={paymentQueueColumnResize.getResizeHandleProps('docNo', 'เลขที่ใบรับเงิน')} sortKey="docNo" onSort={toggleBillSort} />
-                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="วันที่สร้างเอกสาร" resizeProps={paymentQueueColumnResize.getResizeHandleProps('date', 'วันที่สร้างเอกสาร')} sortKey="date" onSort={toggleBillSort} />
-                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="ลูกค้า" resizeProps={paymentQueueColumnResize.getResizeHandleProps('partyName', 'ลูกค้า')} sortKey="supplier" onSort={toggleBillSort} />
-                  <ResizableTableHead label="บิลขายอ้างอิง" resizeProps={paymentQueueColumnResize.getResizeHandleProps('accountNo', 'บิลขายอ้างอิง')} />
-                  <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดรวม" resizeProps={paymentQueueColumnResize.getResizeHandleProps('totalAmount', 'ยอดรวม')} sortKey="totalAmount" onSort={toggleBillSort} />
-                  <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="รับแล้ว" resizeProps={paymentQueueColumnResize.getResizeHandleProps('paidAmount', 'รับแล้ว')} sortKey="paidAmount" onSort={toggleBillSort} />
-                  <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ค้างรับ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('balance', 'ค้างรับ')} sortKey="balance" onSort={toggleBillSort} />
-                  <ResizableTableHead align="center" label="จัดการ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('action', 'Action')} />
+                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="เลขที่ใบรับเงิน" resizeProps={receiptQueueColumnResize.getResizeHandleProps('docNo', 'เลขที่ใบรับเงิน')} sortKey="docNo" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="วันที่สร้างเอกสาร" resizeProps={receiptQueueColumnResize.getResizeHandleProps('date', 'วันที่สร้างเอกสาร')} sortKey="date" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="left" direction={billSortState.direction} label="ลูกค้า" resizeProps={receiptQueueColumnResize.getResizeHandleProps('partyName', 'ลูกค้า')} sortKey="supplier" onSort={toggleBillSort} />
+                  <ResizableTableHead label="บิลขายอ้างอิง" resizeProps={receiptQueueColumnResize.getResizeHandleProps('accountNo', 'บิลขายอ้างอิง')} />
+                  <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดรวม" resizeProps={receiptQueueColumnResize.getResizeHandleProps('totalAmount', 'ยอดรวม')} sortKey="totalAmount" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="รับแล้ว" resizeProps={receiptQueueColumnResize.getResizeHandleProps('paidAmount', 'รับแล้ว')} sortKey="paidAmount" onSort={toggleBillSort} />
+                  <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ค้างรับ" resizeProps={receiptQueueColumnResize.getResizeHandleProps('balance', 'ค้างรับ')} sortKey="balance" onSort={toggleBillSort} />
+                  <ResizableTableHead align="center" label="จัดการ" resizeProps={receiptQueueColumnResize.getResizeHandleProps('action', 'Action')} />
                 </tr>
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">
