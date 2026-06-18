@@ -15,7 +15,7 @@ type Bill = {
   id: string
   payableBalance?: number
   sourceDocNo?: string
-  sourceType?: 'advance_payment' | 'expense' | 'purchase_bill'
+  sourceType?: 'advance_payment' | 'expense' | 'petty_advance_return' | 'purchase_bill'
   supplierId?: string | null
 }
 

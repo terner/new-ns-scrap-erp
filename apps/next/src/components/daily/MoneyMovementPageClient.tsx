@@ -45,7 +45,7 @@ type Bill = {
   receivableBalance?: number
   receiptStatus?: string
   sourceDocNo?: string
-  sourceType?: 'advance_payment' | 'expense' | 'purchase_bill'
+  sourceType?: 'advance_payment' | 'expense' | 'petty_advance_return' | 'purchase_bill'
   status?: string
   supplierId?: string | null
   totalAmount: number
