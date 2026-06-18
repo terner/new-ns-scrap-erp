@@ -1921,7 +1921,6 @@ export function MoneyMovementPageClient({
                       <span className="font-semibold text-slate-500">ลูกค้า: </span>
                       <span className="text-slate-800">{partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500">อายุเอกสาร: {ageInDays(bill.date)} วัน</div>
                     <div className="text-[11px] font-semibold text-amber-700">{receiptQueueStatusLabel(bill)}</div>
                   </div>
                   <div className="flex items-end justify-between border-t border-slate-100 pt-2">
@@ -1975,7 +1974,7 @@ export function MoneyMovementPageClient({
           <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <Table className="text-xs" style={{ minWidth: paymentQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {paymentQueueColumns.filter((column) => column.key !== 'bankName').map((column, index, columns) => {
+                {paymentQueueColumns.filter((column) => column.key !== 'bankName' && column.key !== 'age').map((column, index, columns) => {
                   const style = paymentQueueColumnResize.getColumnStyle(column.key)
                   if (index === columns.length - 1) {
                     return <col key={column.key} style={{ minWidth: column.minWidth }} />
@@ -1992,12 +1991,11 @@ export function MoneyMovementPageClient({
                   <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ยอดรวม" resizeProps={paymentQueueColumnResize.getResizeHandleProps('totalAmount', 'ยอดรวม')} sortKey="totalAmount" onSort={toggleBillSort} />
                   <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="รับแล้ว" resizeProps={paymentQueueColumnResize.getResizeHandleProps('paidAmount', 'รับแล้ว')} sortKey="paidAmount" onSort={toggleBillSort} />
                   <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="ค้างรับ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('balance', 'ค้างรับ')} sortKey="balance" onSort={toggleBillSort} />
-                  <TableSortHeader activeKey={billSortState.field} align="right" direction={billSortState.direction} label="อายุ(วัน)" resizeProps={paymentQueueColumnResize.getResizeHandleProps('age', 'อายุ(วัน)')} sortKey="age" onSort={toggleBillSort} />
                   <ResizableTableHead align="center" label="จัดการ" resizeProps={paymentQueueColumnResize.getResizeHandleProps('action', 'Action')} />
                 </tr>
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">
-                {isLoading ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+                {isLoading ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={8}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
                 {!isLoading && receiptBillPageRows.map((bill) => {
                   const balance = bill.receivableBalance ?? 0
                   const receivedAmount = Math.max(0, (bill.totalAmount ?? 0) - balance)
@@ -2015,7 +2013,6 @@ export function MoneyMovementPageClient({
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(bill.totalAmount)}</TableCell>
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-blue-700 tabular-nums">{formatMoney(receivedAmount)}</TableCell>
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-emerald-700 tabular-nums">{formatMoney(balance)}</TableCell>
-                      <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">{ageInDays(bill.date)}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
                         <UiButton
@@ -2051,7 +2048,7 @@ export function MoneyMovementPageClient({
                     </TableRow>
                   )
                 })}
-                {!isLoading && receiptBillPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={9}>ไม่พบใบรับเงินรอดำเนินการตามเงื่อนไข</TableCell></TableRow> : null}
+                {!isLoading && receiptBillPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={8}>ไม่พบใบรับเงินรอดำเนินการตามเงื่อนไข</TableCell></TableRow> : null}
               </TableBody>
             </Table>
           </div>
