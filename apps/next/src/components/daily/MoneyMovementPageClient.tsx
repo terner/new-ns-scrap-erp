@@ -2379,113 +2379,120 @@ export function MoneyMovementPageClient({
               </div>
             ) : (
               <>
-                <div className="grid gap-4 p-5 md:grid-cols-2">
-                  <Field label="วันที่" type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
-                  <SearchCombobox
-                    disabled={Boolean(form.id || form.billId)}
-                    inputClassName="!h-9 px-2 py-1.5"
-                    inputId="receipt-customer-search"
-                    label={`${partyLabel} *`}
-                    options={customerSearchOptions}
-                    optionsPanelClassName="max-h-[280px]"
-                    placeholder="พิมพ์ค้นหาลูกค้า..."
-                    value={partyValue}
-                    onChange={changeReceiptCustomer}
-                  />
-                  <label className="block">
-                    <span className="mb-1 block text-xs text-slate-600">วิธีจ่าย/รับเงิน</span>
-                    <UiSelect className="h-9 rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
-                      <option value="">ไม่ระบุ</option>
-                      {paymentMethods.map((method) => (
-                        <option key={method.name} value={method.name}>{method.name}</option>
-                      ))}
-                    </UiSelect>
-                  </label>
-                  <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
-                </div>
-                <div className="px-5 pb-5">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-slate-800">บิลขายที่รับชำระ</div>
-                    <UiButton className="h-8 font-normal" size="sm" type="button" variant="outline" onClick={addReceiptLine}>
-                      <Plus aria-hidden="true" className="mr-1 h-4 w-4" />
-                      เพิ่มบิล
-                    </UiButton>
-                  </div>
-                  <div className="overflow-x-auto rounded-md border border-slate-200">
-                    <table className="w-full min-w-[760px] table-fixed text-xs">
-                      <thead className="bg-slate-50 text-slate-600">
-                        <tr>
-                          <th className="w-[260px] p-2 text-left">Sales Bill</th>
-                          <th className="w-[110px] p-2 text-right">ค้างรับ</th>
-                          <th className="w-[120px] p-2 text-right">ยอดรับ</th>
-                          <th className="w-[110px] p-2 text-right">WHT</th>
-                          <th className="w-[110px] p-2 text-right">ส่วนลด</th>
-                          <th className="w-[80px] p-2 text-center">ลบ</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {receiptLines.map((line, index) => {
-                          const selectedLineBill = billMap.get(line.salesBillDocNo)
-                          return (
-                            <tr key={line.id ?? `${index}-${line.salesBillDocNo}`} className="border-t border-slate-100">
-                              <td className="p-2">
-                                <UiSelect
-                                  className="h-9 w-full rounded-md border border-slate-300 px-2 text-xs"
-                                  value={line.salesBillDocNo}
-                                  onChange={(event) => selectReceiptLineBill(index, event.target.value)}
-                                >
-                                  <option value="">เลือกบิลขาย</option>
-                                  {receiptSelectableBillsForLine(index).map((bill) => (
-                                    <option key={bill.docNo} value={bill.docNo}>
-                                      {bill.docNo} - {partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'} - ค้าง {formatMoney(bill.receivableBalance ?? 0)}
-                                    </option>
-                                  ))}
-                                </UiSelect>
-                              </td>
-                              <td className="p-2 text-right font-semibold tabular-nums text-amber-700">{formatMoney(selectedLineBill?.receivableBalance ?? 0)}</td>
-                              <td className="p-2">
-                                <UiInput
-                                  className="h-9 text-right tabular-nums"
-                                  min="0"
-                                  step="0.01"
-                                  type="number"
-                                  value={String(line.receiptAmount)}
-                                  onChange={(event) => updateReceiptLine(index, { receiptAmount: Number(event.target.value) })}
-                                />
-                              </td>
-                              <td className="p-2">
-                                <UiInput
-                                  className="h-9 text-right tabular-nums"
-                                  min="0"
-                                  step="0.01"
-                                  type="number"
-                                  value={String(line.withholdingTaxAmount)}
-                                  onChange={(event) => updateReceiptLine(index, { withholdingTaxAmount: Number(event.target.value) })}
-                                />
-                              </td>
-                              <td className="p-2">
-                                <UiInput
-                                  className="h-9 text-right tabular-nums"
-                                  min="0"
-                                  step="0.01"
-                                  type="number"
-                                  value={String(line.discountAmount)}
-                                  onChange={(event) => updateReceiptLine(index, { discountAmount: Number(event.target.value) })}
-                                />
-                              </td>
-                              <td className="p-2 text-center">
-                                <UiButton className="h-8 w-8 px-0" disabled={receiptLines.length <= 1} size="icon" type="button" variant="ghost" onClick={() => removeReceiptLine(index)}>
-                                  <X aria-hidden="true" className="h-4 w-4" />
-                                </UiButton>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div className="px-5 pb-5">
+                <div className="space-y-4 p-5">
+                  <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+                    <div className="border-b border-slate-100 px-4 py-3">
+                      <h3 className="text-sm font-bold text-slate-900">ข้อมูลใบรับเงิน</h3>
+                    </div>
+                    <div className="grid gap-4 p-4 md:grid-cols-2">
+                      <Field label="วันที่" type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
+                      <SearchCombobox
+                        disabled={Boolean(form.id || form.billId)}
+                        inputClassName="!h-9 px-2 py-1.5"
+                        inputId="receipt-customer-search"
+                        label={`${partyLabel} *`}
+                        options={customerSearchOptions}
+                        optionsPanelClassName="max-h-[280px]"
+                        placeholder="พิมพ์ค้นหาลูกค้า..."
+                        value={partyValue}
+                        onChange={changeReceiptCustomer}
+                      />
+                      <label className="block">
+                        <span className="mb-1 block text-xs text-slate-600">วิธีจ่าย/รับเงิน</span>
+                        <UiSelect className="h-9 rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
+                          <option value="">ไม่ระบุ</option>
+                          {paymentMethods.map((method) => (
+                            <option key={method.name} value={method.name}>{method.name}</option>
+                          ))}
+                        </UiSelect>
+                      </label>
+                      <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+                    </div>
+                  </section>
+
+                  <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                      <h3 className="text-sm font-bold text-slate-900">บิลขายที่รับชำระ</h3>
+                      <UiButton className="h-8 font-normal" size="sm" type="button" variant="outline" onClick={addReceiptLine}>
+                        <Plus aria-hidden="true" className="mr-1 h-4 w-4" />
+                        เพิ่มบิล
+                      </UiButton>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[760px] table-fixed text-xs">
+                        <thead className="bg-slate-50 text-slate-600">
+                          <tr>
+                            <th className="w-[260px] p-2 text-left">Sales Bill</th>
+                            <th className="w-[110px] p-2 text-right">ค้างรับ</th>
+                            <th className="w-[120px] p-2 text-right">ยอดรับ</th>
+                            <th className="w-[110px] p-2 text-right">WHT</th>
+                            <th className="w-[110px] p-2 text-right">ส่วนลด</th>
+                            <th className="w-[80px] p-2 text-center">ลบ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {receiptLines.map((line, index) => {
+                            const selectedLineBill = billMap.get(line.salesBillDocNo)
+                            return (
+                              <tr key={line.id ?? `${index}-${line.salesBillDocNo}`} className="border-t border-slate-100">
+                                <td className="p-2">
+                                  <UiSelect
+                                    className="h-9 w-full rounded-md border border-slate-300 px-2 text-xs"
+                                    value={line.salesBillDocNo}
+                                    onChange={(event) => selectReceiptLineBill(index, event.target.value)}
+                                  >
+                                    <option value="">เลือกบิลขาย</option>
+                                    {receiptSelectableBillsForLine(index).map((bill) => (
+                                      <option key={bill.docNo} value={bill.docNo}>
+                                        {bill.docNo} - {partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'} - ค้าง {formatMoney(bill.receivableBalance ?? 0)}
+                                      </option>
+                                    ))}
+                                  </UiSelect>
+                                </td>
+                                <td className="p-2 text-right font-semibold tabular-nums text-amber-700">{formatMoney(selectedLineBill?.receivableBalance ?? 0)}</td>
+                                <td className="p-2">
+                                  <UiInput
+                                    className="h-9 text-right tabular-nums"
+                                    min="0"
+                                    step="0.01"
+                                    type="number"
+                                    value={String(line.receiptAmount)}
+                                    onChange={(event) => updateReceiptLine(index, { receiptAmount: Number(event.target.value) })}
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <UiInput
+                                    className="h-9 text-right tabular-nums"
+                                    min="0"
+                                    step="0.01"
+                                    type="number"
+                                    value={String(line.withholdingTaxAmount)}
+                                    onChange={(event) => updateReceiptLine(index, { withholdingTaxAmount: Number(event.target.value) })}
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <UiInput
+                                    className="h-9 text-right tabular-nums"
+                                    min="0"
+                                    step="0.01"
+                                    type="number"
+                                    value={String(line.discountAmount)}
+                                    onChange={(event) => updateReceiptLine(index, { discountAmount: Number(event.target.value) })}
+                                  />
+                                </td>
+                                <td className="p-2 text-center">
+                                  <UiButton className="h-8 w-8 px-0" disabled={receiptLines.length <= 1} size="icon" type="button" variant="ghost" onClick={() => removeReceiptLine(index)}>
+                                    <X aria-hidden="true" className="h-4 w-4" />
+                                  </UiButton>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+
                   <PaymentSplitsSection
                     activeAccounts={activeAccounts}
                     addButtonLabel="+ เพิ่มบัญชีรับ"
