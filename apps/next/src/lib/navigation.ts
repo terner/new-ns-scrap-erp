@@ -198,7 +198,7 @@ export const navigationItems: NavigationItem[] = [
   { href: '/dual-costing/compare-margin', icon: '⚖️', label: 'Compare Deal vs Stock', section: 'dual-costing' },
   { href: '/daily/payment-approval', icon: '✅', label: 'อนุมัติจ่ายเงิน (Payment Approval)', pageSubtitle: 'เช็ครายการที่จะจ่าย แล้วพิมพ์ใบอนุมัติส่งให้ cashier', section: 'finance-debt' },
   { href: '/purchase/advance-payments', icon: '⏪', label: 'เงินล่วงหน้า/มัดจำ', pageSubtitle: 'รวม ADV จ่ายล่วงหน้า Supplier และ CADV รับล่วงหน้า Customer แยกเป็น 2 แท็บ', section: 'finance-debt' },
-  { href: '/purchase/payments', icon: '💸', label: 'จ่ายเงิน Supplier', pageSubtitle: 'บันทึกเงินออกจากบัญชีและดูแท็บประวัติการจ่ายเงิน', section: 'finance-debt' },
+  { href: '/purchase/payments', icon: '💸', label: 'จ่ายเงิน', pageSubtitle: 'บันทึกเงินออกจากบัญชีและดูแท็บประวัติการจ่ายเงิน', section: 'finance-debt' },
   { href: '/sales/receipts', icon: '💰', label: 'รับเงิน Customer', pageSubtitle: 'บันทึกเงินเข้าบัญชีและประวัติ voucher รับ Customer', section: 'finance-debt' },
   { href: '/daily/transfer', icon: '🔄', label: 'โอนเงินระหว่างบัญชี', section: 'finance-debt' },
   { href: '/finance/ar', icon: '📈', label: 'ลูกหนี้ (AR)', section: 'finance-debt' },
