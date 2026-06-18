@@ -154,7 +154,7 @@ const paymentQueueColumns: Array<ResizableColumnDefinition<PaymentQueueColumnKey
   { key: 'paidAmount', defaultWidth: 110, minWidth: 90 },
   { key: 'balance', defaultWidth: 110, minWidth: 90 },
   { key: 'age', defaultWidth: 75, minWidth: 60 },
-  { key: 'action', defaultWidth: 240, minWidth: 210 },
+  { key: 'action', defaultWidth: 170, minWidth: 150 },
 ]
 const paymentHistoryColumns: Array<ResizableColumnDefinition<MoneyHistoryColumnKey>> = [
   { key: 'docNo', defaultWidth: 150, minWidth: 120 },
@@ -1936,18 +1936,6 @@ export function MoneyMovementPageClient({
                   </div>
                   <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
                     <UiButton
-                      className="font-normal border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                      size="xs"
-                      type="button"
-                      variant="outline"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        printReceivableBill(bill)
-                      }}
-                    >
-                      พิมพ์
-                    </UiButton>
-                    <UiButton
                       className="font-normal"
                       size="xs"
                       type="button"
@@ -2030,18 +2018,6 @@ export function MoneyMovementPageClient({
                       <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold text-slate-700 tabular-nums">{ageInDays(bill.date)}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
-                        <UiButton
-                          className="font-normal border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                          size="xs"
-                          type="button"
-                          variant="outline"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            printReceivableBill(bill)
-                          }}
-                        >
-                          พิมพ์
-                        </UiButton>
                         <UiButton
                           className="font-normal"
                           size="xs"
