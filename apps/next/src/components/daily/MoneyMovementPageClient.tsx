@@ -337,6 +337,14 @@ function paymentHistoryStatusDot(status: string | undefined) {
     : 'bg-emerald-500'
 }
 
+function moneyHistoryStatusOptions(mode: 'payment' | 'receipt'): Array<{ label: string; value: PaymentHistoryStatusFilter }> {
+  return [
+    { label: 'ทั้งหมด', value: 'all' },
+    { label: mode === 'payment' ? 'จ่ายแล้ว' : 'รับเงินแล้ว', value: 'active' },
+    { label: 'ยกเลิก', value: 'cancelled' },
+  ]
+}
+
 function escapeHtml(value: unknown) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -995,12 +1003,11 @@ export function MoneyMovementPageClient({
       const matchesAccount = !accountFilter || row.accountId === accountFilter || row.accountName === accountFilter
       const matchesFrom = !dateFrom || row.date >= dateFrom
       const matchesTo = !dateTo || row.date <= dateTo
-      const matchesPaymentStatus = mode !== 'payment'
-        || paymentHistoryStatusFilter === 'all'
+      const matchesHistoryStatus = paymentHistoryStatusFilter === 'all'
         || (paymentHistoryStatusFilter === 'active' ? row.status !== 'cancelled' : row.status === 'cancelled')
-      return matchesSearch && matchesAccount && matchesFrom && matchesTo && matchesPaymentStatus
+      return matchesSearch && matchesAccount && matchesFrom && matchesTo && matchesHistoryStatus
     })
-  }, [accountFilter, data.rows, dateFrom, dateTo, mode, paymentHistoryStatusFilter, search])
+  }, [accountFilter, data.rows, dateFrom, dateTo, paymentHistoryStatusFilter, search])
 
   const historyRows = useMemo(() => {
     return [...rows].sort((left, right) => {
@@ -1020,7 +1027,7 @@ export function MoneyMovementPageClient({
   const hasActiveHistoryFilters = search.trim() !== ''
     || (mode === 'payment' ? dateFrom !== todayDateInput() || dateTo !== todayDateInput() : dateFrom !== '' || dateTo !== '')
     || accountFilter !== ''
-    || (mode === 'payment' && paymentHistoryStatusFilter !== 'all')
+    || paymentHistoryStatusFilter !== 'all'
 
   const metrics = useMemo(() => {
     const rowAmount = rows.reduce((sum, row) => sum + row.amount, 0)
@@ -2575,28 +2582,20 @@ export function MoneyMovementPageClient({
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {mode === 'payment' ? (
-                <>
-                  <span className="text-xs text-slate-500">สถานะ:</span>
-                  {([
-                    { label: 'ทั้งหมด', value: 'all' },
-                    { label: 'จ่ายแล้ว', value: 'active' },
-                    { label: 'ยกเลิก', value: 'cancelled' },
-                  ] as Array<{ label: string; value: PaymentHistoryStatusFilter }>).map((option) => {
-                    const active = paymentHistoryStatusFilter === option.value
-                    return (
-                      <button
-                        key={option.value}
-                        className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
-                        type="button"
-                        onClick={() => setPaymentHistoryStatusFilter(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    )
-                  })}
-                </>
-              ) : null}
+              <span className="text-xs text-slate-500">สถานะ:</span>
+              {moneyHistoryStatusOptions(mode).map((option) => {
+                const active = paymentHistoryStatusFilter === option.value
+                return (
+                  <button
+                    key={option.value}
+                    className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    type="button"
+                    onClick={() => setPaymentHistoryStatusFilter(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -2653,30 +2652,24 @@ export function MoneyMovementPageClient({
                     </UiSelect>
                   </div>
 
-                  {mode === 'payment' ? (
-                    <div>
-                      <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะ</span>
-                      <div className="flex flex-wrap gap-2">
-                        {([
-                          { label: 'ทั้งหมด', value: 'all' },
-                          { label: 'จ่ายแล้ว', value: 'active' },
-                          { label: 'ยกเลิก', value: 'cancelled' },
-                        ] as Array<{ label: string; value: PaymentHistoryStatusFilter }>).map((option) => {
-                          const active = paymentHistoryStatusFilter === option.value
-                          return (
-                            <button
-                              key={option.value}
-                              className={`rounded-md border px-3 py-1.5 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
-                              type="button"
-                              onClick={() => setPaymentHistoryStatusFilter(option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          )
-                        })}
-                      </div>
+                  <div>
+                    <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะ</span>
+                    <div className="flex flex-wrap gap-2">
+                      {moneyHistoryStatusOptions(mode).map((option) => {
+                        const active = paymentHistoryStatusFilter === option.value
+                        return (
+                          <button
+                            key={option.value}
+                            className={`rounded-md border px-3 py-1.5 text-xs font-medium ${active ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                            type="button"
+                            onClick={() => setPaymentHistoryStatusFilter(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
                     </div>
-                  ) : null}
+                  </div>
 
                   <div className="pt-2">
                     <UiButton
