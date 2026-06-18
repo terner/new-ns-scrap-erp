@@ -287,7 +287,7 @@ function normalizedPaymentMethod(value: string | null | undefined) {
 }
 
 const paymentTheme = {
-  action: 'bg-rose-600 hover:bg-rose-700',
+  action: 'bg-blue-600 hover:bg-blue-700',
   banner: 'from-rose-600 via-red-600 to-orange-500',
   chip: 'bg-rose-100 text-rose-700',
   muted: 'bg-rose-50 text-rose-700',
@@ -296,7 +296,7 @@ const paymentTheme = {
 }
 
 const receiptTheme = {
-  action: 'bg-emerald-600 hover:bg-emerald-700',
+  action: 'bg-blue-600 hover:bg-blue-700',
   banner: 'from-emerald-600 via-green-600 to-teal-500',
   chip: 'bg-emerald-100 text-emerald-700',
   muted: 'bg-emerald-50 text-emerald-700',
@@ -2334,20 +2334,27 @@ export function MoneyMovementPageClient({
         <Dialog open onOpenChange={(open) => {
           if (!open && !isSaving) setFormOpen(false)
         }}>
-          <DialogContent className={`top-[max(2rem,50%)] max-h-[90vh] overflow-y-auto p-0 ${mode === 'payment' ? 'max-w-5xl' : 'max-w-4xl'}`} hideClose>
-            <form noValidate onSubmit={save}>
-            <DialogHeader className="flex-row items-center justify-between px-5 py-4">
+          <DialogContent className="top-[max(2rem,50%)] max-h-[90vh] overflow-hidden flex flex-col p-0 border-0 shadow-2xl bg-slate-900 max-w-5xl" hideClose>
+            <form noValidate onSubmit={save} className="flex flex-col max-h-[90vh]">
+            <DialogHeader className="flex-row items-center justify-between px-5 py-4 shrink-0 bg-slate-900 text-white rounded-t-2xl">
               <div>
                 <DialogTitle className="font-bold text-white">
                   {mode === 'payment' ? 'สร้าง Payment Voucher' : (form.id ? 'แก้ไข Receipt Voucher' : title)}
                 </DialogTitle>
                 {mode === 'payment' ? null : <p className="text-xs text-slate-300 opacity-80">{subtitle}</p>}
               </div>
-              <UiButton className="h-8 w-8 px-0 text-2xl text-slate-400 hover:text-white hover:bg-slate-800" size="icon" type="button" variant="ghost" onClick={() => setFormOpen(false)}>&times;</UiButton>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1 transition-colors outline-none focus:outline-none focus:ring-0 text-2xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
             </DialogHeader>
-            {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div> : null}
+            {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 shrink-0">{error}</div> : null}
             {mode === 'payment' ? (
-              <div className="flex flex-col gap-4 p-5 text-sm">
+              <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-5 text-sm bg-slate-50">
                 <PaymentSplitsSection
                   activeAccounts={activeAccounts}
                   form={form}
@@ -2385,13 +2392,20 @@ export function MoneyMovementPageClient({
               </div>
             ) : (
               <>
-                <div className="space-y-4 p-5">
+                <div className="flex-1 overflow-y-auto space-y-4 p-5 bg-slate-50">
                   <section className="rounded-md border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-100 px-4 py-3">
                       <h3 className="text-sm font-bold text-slate-900">ข้อมูลใบรับเงิน</h3>
                     </div>
                     <div className="grid gap-4 p-4 md:grid-cols-2">
-                      <Field label="วันที่" type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-slate-600">วันที่</span>
+                        <DatePickerInput
+                          className="w-full h-9 text-sm"
+                          value={form.date}
+                          onChange={(value) => setForm({ ...form, date: value })}
+                        />
+                      </label>
                       <SearchCombobox
                         disabled={Boolean(form.id || form.billId)}
                         inputClassName="!h-9 px-2 py-1.5"
@@ -2404,31 +2418,39 @@ export function MoneyMovementPageClient({
                         onChange={changeReceiptCustomer}
                       />
                       <label className="block">
-                        <span className="mb-1 block text-xs text-slate-600">วิธีจ่าย/รับเงิน</span>
-                        <UiSelect className="h-9 rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
+                        <span className="mb-1 block text-xs font-medium text-slate-600">วิธีจ่าย/รับเงิน</span>
+                        <UiSelect disabled={Boolean(form.id)} className="h-9 w-full rounded-md border border-slate-300 disabled:bg-slate-100 disabled:opacity-80 px-2 py-1.5 text-sm" value={form.method ?? ''} onChange={(event) => setForm({ ...form, method: event.target.value })}>
                           <option value="">ไม่ระบุ</option>
                           {paymentMethods.map((method) => (
                             <option key={method.name} value={method.name}>{method.name}</option>
                           ))}
                         </UiSelect>
                       </label>
-                      <Field label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-slate-600">หมายเหตุ</span>
+                        <UiInput
+                          className="h-9 w-full text-sm border-slate-300"
+                          value={form.notes ?? ''}
+                          onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                        />
+                      </label>
                     </div>
                   </section>
 
                   <section className="rounded-md border border-slate-200 bg-white shadow-sm">
                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-                      <h3 className="text-sm font-bold text-slate-900">บิลขายที่รับชำระ</h3>
+                      <h3 className="text-sm font-bold text-slate-900">บิลขายที่ทำจ่าย</h3>
                       <UiButton className="h-8 font-normal" size="sm" type="button" variant="outline" onClick={addReceiptLine}>
                         <Plus aria-hidden="true" className="mr-1 h-4 w-4" />
                         เพิ่มบิล
                       </UiButton>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[760px] table-fixed text-xs">
+                    {/* Desktop Table view (Visible on large screens) */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full min-w-[910px] table-fixed text-xs">
                         <thead className="bg-slate-50 text-slate-600">
                           <tr>
-                            <th className="w-[260px] p-2 text-left">Sales Bill</th>
+                            <th className="w-[380px] p-2 text-left">Sales Bill</th>
                             <th className="w-[110px] p-2 text-right">ค้างรับ</th>
                             <th className="w-[120px] p-2 text-right">ยอดรับ</th>
                             <th className="w-[110px] p-2 text-right">WHT</th>
@@ -2458,7 +2480,7 @@ export function MoneyMovementPageClient({
                                 <td className="p-2 text-right font-semibold tabular-nums text-amber-700">{formatMoney(selectedLineBill?.receivableBalance ?? 0)}</td>
                                 <td className="p-2">
                                   <UiInput
-                                    className="h-9 text-right tabular-nums"
+                                    className="h-9 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                     min="0"
                                     step="0.01"
                                     type="number"
@@ -2468,7 +2490,7 @@ export function MoneyMovementPageClient({
                                 </td>
                                 <td className="p-2">
                                   <UiInput
-                                    className="h-9 text-right tabular-nums"
+                                    className="h-9 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                     min="0"
                                     step="0.01"
                                     type="number"
@@ -2478,7 +2500,7 @@ export function MoneyMovementPageClient({
                                 </td>
                                 <td className="p-2">
                                   <UiInput
-                                    className="h-9 text-right tabular-nums"
+                                    className="h-9 text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                     min="0"
                                     step="0.01"
                                     type="number"
@@ -2497,7 +2519,102 @@ export function MoneyMovementPageClient({
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Mobile Card-based view (Visible on mobile and tablet) */}
+                    <div className="block lg:hidden p-4 space-y-4 border-t border-slate-100">
+                      {receiptLines.map((line, index) => {
+                        const selectedLineBill = billMap.get(line.salesBillDocNo)
+                        return (
+                          <div key={line.id ?? `${index}-${line.salesBillDocNo}`} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-xs text-slate-500">บิลรายการที่ #{index + 1}</span>
+                              <UiButton
+                                className="h-8 w-8 px-0 text-red-500 hover:text-red-700 disabled:text-slate-300"
+                                disabled={receiptLines.length <= 1}
+                                size="icon"
+                                type="button"
+                                variant="ghost"
+                                onClick={() => removeReceiptLine(index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </UiButton>
+                            </div>
+
+                            <div>
+                              <span className="mb-1 block text-xs font-medium text-slate-600">Sales Bill</span>
+                              <UiSelect
+                                className="h-9 w-full rounded-md border border-slate-300 px-2 text-xs"
+                                value={line.salesBillDocNo}
+                                onChange={(event) => selectReceiptLineBill(index, event.target.value)}
+                              >
+                                <option value="">เลือกบิลขาย</option>
+                                {receiptSelectableBillsForLine(index).map((bill) => (
+                                  <option key={bill.docNo} value={bill.docNo}>
+                                    {bill.docNo} - {partyMap.get(bill.customerId ?? '') ?? bill.customerId ?? '-'} - ค้าง {formatMoney(bill.receivableBalance ?? 0)}
+                                  </option>
+                                ))}
+                              </UiSelect>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <span className="mb-1 block text-xs font-medium text-slate-600">ค้างรับ</span>
+                                <div className="h-9 flex items-center px-3 rounded-md border border-slate-300 bg-slate-100 text-xs font-semibold text-amber-700 tabular-nums">
+                                  {formatMoney(selectedLineBill?.receivableBalance ?? 0)}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="mb-1 block text-xs font-medium text-slate-600">ยอดรับ</span>
+                                <UiInput
+                                  className="h-9 w-full text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-xs"
+                                  min="0"
+                                  step="0.01"
+                                  type="number"
+                                  value={String(line.receiptAmount)}
+                                  onChange={(event) => updateReceiptLine(index, { receiptAmount: Number(event.target.value) })}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <span className="mb-1 block text-xs font-medium text-slate-600">WHT</span>
+                                <UiInput
+                                  className="h-9 w-full text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-xs"
+                                  min="0"
+                                  step="0.01"
+                                  type="number"
+                                  value={String(line.withholdingTaxAmount)}
+                                  onChange={(event) => updateReceiptLine(index, { withholdingTaxAmount: Number(event.target.value) })}
+                                />
+                              </div>
+                              <div>
+                                <span className="mb-1 block text-xs font-medium text-slate-600">ส่วนลด</span>
+                                <UiInput
+                                  className="h-9 w-full text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-xs"
+                                  min="0"
+                                  step="0.01"
+                                  type="number"
+                                  value={String(line.discountAmount)}
+                                  onChange={(event) => updateReceiptLine(index, { discountAmount: Number(event.target.value) })}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </section>
+
+                  <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+                    <SummaryPill label={amountLabel} value={formatMoney(form.amount)} />
+                    <SummaryPill label="WHT" value={formatMoney(form.withholdingTax)} />
+                    <SummaryPill label="ตัดหนี้ AR" value={formatMoney(form.amount + form.withholdingTax + form.discount)} />
+                    <SummaryPill label="Fee / Discount" value={`${formatMoney(form.fee)} / ${formatMoney(form.discount)}`} />
+                    <div className="col-span-2 md:col-span-1">
+                      <SummaryPill label="Net" value={formatMoney(formNetAmount)} />
+                    </div>
+                  </div>
 
                   <PaymentSplitsSection
                     activeAccounts={activeAccounts}
@@ -2522,13 +2639,6 @@ export function MoneyMovementPageClient({
                     onUpdatePaymentForm={updateReceiptForm}
                     onUpdatePaymentSplit={updateReceiptSplit}
                   />
-                </div>
-                <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:grid-cols-5">
-                  <SummaryPill label={amountLabel} value={formatMoney(form.amount)} />
-                  <SummaryPill label="WHT" value={formatMoney(form.withholdingTax)} />
-                  <SummaryPill label="ตัดหนี้ AR" value={formatMoney(form.amount + form.withholdingTax + form.discount)} />
-                  <SummaryPill label="Fee / Discount" value={`${formatMoney(form.fee)} / ${formatMoney(form.discount)}`} />
-                  <SummaryPill label="Net" value={formatMoney(formNetAmount)} />
                 </div>
               </>
             )}
@@ -2951,27 +3061,27 @@ export function MoneyMovementPageClient({
         <Dialog open onOpenChange={(open) => {
           if (!open && !isCancellingReceipt) setCancelReceiptTarget(null)
         }}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>ยกเลิก Receipt Voucher</DialogTitle>
+          <DialogContent className="max-w-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl">
+            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-2xl">
+              <DialogTitle className="font-bold text-white">ยกเลิก Receipt Voucher</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 text-sm">
-              <div className="rounded-md bg-slate-50 p-3">
+            <div className="space-y-3 text-sm bg-slate-50 p-5">
+              <div className="rounded-md border border-slate-200 bg-white p-3">
                 <div className="font-semibold text-slate-900">{cancelReceiptTarget.docNo}</div>
-                <div className="text-slate-600">{cancelReceiptTarget.partyName} · {formatMoney(cancelReceiptTarget.amount)}</div>
+                <div className="text-slate-650">{cancelReceiptTarget.partyName} · {formatMoney(cancelReceiptTarget.amount)}</div>
               </div>
               <label className="block">
                 <span className="mb-1 block text-xs text-slate-600">เหตุผลการยกเลิก</span>
                 <textarea
-                  className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2"
+                  className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400"
                   value={cancelReceiptReason}
                   onChange={(event) => setCancelReceiptReason(event.target.value)}
                 />
               </label>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-slate-200 px-5 py-4">
               <UiButton disabled={isCancellingReceipt} type="button" variant="ghost" onClick={() => setCancelReceiptTarget(null)}>ปิด</UiButton>
-              <UiButton className="bg-red-600 text-white hover:bg-red-700" disabled={isCancellingReceipt} type="button" variant="default" onClick={cancelCustomerReceiptRow}>ยืนยันยกเลิก</UiButton>
+              <UiButton className="bg-red-650 text-white hover:bg-red-700 font-semibold px-5" disabled={isCancellingReceipt} type="button" variant="default" onClick={cancelCustomerReceiptRow}>ยืนยันยกเลิก</UiButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2984,12 +3094,12 @@ export function MoneyMovementPageClient({
             setCancelApprovalReason('')
           }
         }}>
-          <DialogContent className="max-w-lg p-0" hideClose>
-            <DialogHeader className="px-5 py-4">
+          <DialogContent className="max-w-lg !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl" hideClose>
+            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-2xl">
               <DialogTitle className="font-bold text-white">ยกเลิกรายการรอจ่าย</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 px-5 py-4 text-sm">
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-slate-700">
+            <div className="space-y-4 px-5 py-4 text-sm bg-slate-50">
+              <div className="rounded-md border border-slate-200 bg-white p-3 text-slate-755">
                 <div><span className="font-semibold">เลขที่รายการ:</span> {cancelApprovalTarget.docNo}</div>
                 {cancelApprovalTarget.sourceDocNo && cancelApprovalTarget.sourceDocNo !== cancelApprovalTarget.docNo ? (
                   <div><span className="font-semibold">เอกสารต้นทาง:</span> {cancelApprovalTarget.sourceDocNo}</div>
@@ -3000,7 +3110,7 @@ export function MoneyMovementPageClient({
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-slate-600">เหตุผลการยกเลิก</span>
                 <textarea
-                  className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-0 transition focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                  className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400"
                   placeholder="ระบุเหตุผลการยกเลิกรายการรอจ่าย"
                   value={cancelApprovalReason}
                   onChange={(event) => setCancelApprovalReason(event.target.value)}
@@ -3021,7 +3131,7 @@ export function MoneyMovementPageClient({
                 ปิด
               </UiButton>
               <UiButton
-                className="bg-rose-600 px-5 font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                className="bg-red-650 px-5 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                 disabled={isCancellingApproval || !cancelApprovalReason.trim()}
                 type="button"
                 variant="default"
@@ -3038,7 +3148,7 @@ export function MoneyMovementPageClient({
       {mode === 'receipt' && showEntrySection ? (
         <div className="fixed bottom-6 right-6 z-40 lg:hidden">
           <button
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg active:scale-95 transition-transform"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg active:scale-95 transition-transform"
             onClick={openForm}
             type="button"
             aria-label="รับเงิน Customer ใหม่"
@@ -3070,22 +3180,19 @@ function PaymentHistoryDetailDialog({
   const summary = detail?.summary
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
+      <DialogContent className="max-h-[90vh] max-w-6xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
         <DialogHeader className="flex-row items-center justify-between gap-3 px-5 py-4 bg-slate-900 text-white">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-white">{detail?.heading ?? 'รายละเอียดการจ่ายเงิน'}</DialogTitle>
             <div className="mt-1 truncate font-mono text-xs text-slate-300">{detail?.docNo ?? row?.docNo ?? '-'}</div>
           </div>
-          <UiButton
+          <button
             aria-label="ปิดรายละเอียด"
-            className="h-9 w-9 shrink-0 px-0 text-slate-400 hover:text-white hover:bg-slate-800"
-            size="icon"
-            type="button"
-            variant="ghost"
+            className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-2xl leading-none"
             onClick={() => onOpenChange(false)}
           >
-            <X aria-hidden="true" className="h-4 w-4" />
-          </UiButton>
+            &times;
+          </button>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 p-5 text-sm bg-slate-50">
@@ -3268,22 +3375,20 @@ function ReceivableBillDetailDialog({
   const receiptDocNo = bill ? receiptQueueDocNo(bill) : '-'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden rounded-md !p-0 flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียดใบรับเงิน Customer" hideClose>
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden rounded-2xl !p-0 flex flex-col bg-slate-900 border-0 shadow-2xl" fallbackTitle="รายละเอียดใบรับเงิน Customer" hideClose>
         <DialogHeader className="flex-row items-center justify-between gap-3 bg-slate-900 px-5 py-4 text-white">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-white">รายละเอียดใบรับเงิน Customer</DialogTitle>
             <div className="mt-1 truncate font-mono text-xs text-slate-300">{receiptDocNo}</div>
           </div>
-          <UiButton
-            aria-label="ปิดรายละเอียด"
-            className="h-9 w-9 shrink-0 px-0 text-slate-400 hover:bg-slate-800 hover:text-white"
-            size="icon"
+          <button
             type="button"
-            variant="ghost"
             onClick={() => onOpenChange(false)}
+            className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-2xl leading-none"
+            aria-label="Close"
           >
-            <X aria-hidden="true" className="h-4 w-4" />
-          </UiButton>
+            &times;
+          </button>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-5 text-sm">
           {!bill ? <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow">ไม่พบข้อมูล</div> : (
@@ -3372,22 +3477,20 @@ function ReceiptDetailDialog({
   const isCancelled = row?.status === 'cancelled'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden rounded-md !p-0 flex flex-col bg-slate-900 border-0" fallbackTitle="รายละเอียดรับเงิน Customer" hideClose>
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden rounded-2xl !p-0 flex flex-col bg-slate-900 border-0 shadow-2xl" fallbackTitle="รายละเอียดรับเงิน Customer" hideClose>
         <DialogHeader className="flex-row items-center justify-between gap-3 bg-slate-900 px-5 py-4 text-white">
           <div className="min-w-0">
             <DialogTitle className="truncate text-base font-bold text-white">รายละเอียดรับเงิน Customer</DialogTitle>
             <div className="mt-1 truncate font-mono text-xs text-slate-300">{row?.docNo ?? '-'}</div>
           </div>
-          <UiButton
-            aria-label="ปิดรายละเอียด"
-            className="h-9 w-9 shrink-0 px-0 text-slate-400 hover:bg-slate-800 hover:text-white"
-            size="icon"
+          <button
             type="button"
-            variant="ghost"
             onClick={() => onOpenChange(false)}
+            className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-2xl leading-none"
+            aria-label="Close"
           >
-            <X aria-hidden="true" className="h-4 w-4" />
-          </UiButton>
+            &times;
+          </button>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-5 text-sm">
           {!row ? <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow">ไม่พบข้อมูล</div> : (
@@ -3422,7 +3525,7 @@ function ReceiptDetailDialog({
 
               <div className="overflow-hidden rounded-md bg-white shadow">
                 <div className="border-b border-slate-200 px-4 py-3">
-                  <h2 className="font-semibold text-slate-900">บิลขายที่รับชำระ</h2>
+                  <h2 className="font-semibold text-slate-900">บิลขายที่ทำจ่าย</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
