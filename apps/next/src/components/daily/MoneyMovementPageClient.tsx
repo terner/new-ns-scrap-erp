@@ -3293,31 +3293,36 @@ function ReceivableBillDetailDialog({
         <div className="flex-1 overflow-y-auto space-y-4 bg-slate-50 p-5 text-sm">
           {!bill ? <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow">ไม่พบข้อมูล</div> : (
             <>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-md bg-white p-3 shadow">
-                  <div className="text-xs text-slate-500">ยอดรวม</div>
-                  <div className="text-lg font-bold text-slate-900">{formatMoney(bill.totalAmount)}</div>
-                </div>
-                <div className="rounded-md bg-white p-3 shadow">
-                  <div className="text-xs text-slate-500">รับแล้ว</div>
-                  <div className="text-lg font-bold text-blue-700">{formatMoney(receivedAmount)}</div>
-                </div>
-                <div className="rounded-md bg-white p-3 shadow">
-                  <div className="text-xs text-slate-500">ค้างรับ</div>
-                  <div className="text-lg font-bold text-emerald-700">{formatMoney(balance)}</div>
-                </div>
-              </div>
+              <DetailSection
+                title="ข้อมูลใบรับเงิน"
+                rows={[
+                  ['เลขที่ใบรับเงิน', receiptDocNo],
+                  ['วันที่สร้างเอกสาร', formatDateDisplay(bill.date)],
+                  ['สถานะใบรับเงิน', receiptQueueStatusLabel(bill)],
+                  ['อายุเอกสาร', `${ageInDays(bill.date)} วัน`],
+                ]}
+              />
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <DetailCard label="เลขที่ใบรับเงิน" value={receiptDocNo} />
-                <DetailCard label="วันที่" value={formatDateDisplay(bill.date)} />
-                <DetailCard label="ลูกค้า" value={customerName || '-'} />
-                <DetailCard label="บิลขายอ้างอิง" value={bill.docNo} />
-                <DetailCard label="เอกสารอ้างอิง" value={bill.sourceDocNo || bill.docNo} />
-                <DetailCard label="สถานะใบรับเงิน" value={receiptQueueStatusLabel(bill)} />
-                <DetailCard label="สถานะบิลขาย" value={paymentBillStatus(bill)} />
-                <DetailCard label="อายุเอกสาร" value={`${ageInDays(bill.date)} วัน`} />
-              </div>
+              <DetailSection
+                title="ลูกค้าและเอกสารอ้างอิง"
+                rows={[
+                  ['ลูกค้า', customerName || '-'],
+                  ['บิลขายอ้างอิง', bill.docNo],
+                  ['เอกสารอ้างอิง', bill.sourceDocNo || bill.docNo],
+                  ['สถานะบิลขาย', paymentBillStatus(bill)],
+                ]}
+              />
+
+              <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <h3 className="text-sm font-bold text-slate-900">ยอดเงิน</h3>
+                </div>
+                <div className="grid divide-y divide-slate-100 md:grid-cols-3 md:divide-x md:divide-y-0">
+                  <MoneySummaryItem label="ยอดรวม" tone="slate" value={formatMoney(bill.totalAmount)} />
+                  <MoneySummaryItem label="รับแล้ว" tone="blue" value={formatMoney(receivedAmount)} />
+                  <MoneySummaryItem label="ค้างรับ" tone="emerald" value={formatMoney(balance)} />
+                </div>
+              </section>
             </>
           )}
         </div>
@@ -3470,6 +3475,34 @@ function DetailCard({ label, multiline, value }: { label: string; multiline?: bo
     <div className="rounded-md border border-slate-200 bg-white p-3">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 text-sm font-medium text-slate-900 ${multiline ? 'whitespace-pre-line' : ''}`}>{value}</div>
+    </div>
+  )
+}
+
+function DetailSection({ rows, title }: { rows: Array<[string, string]>; title: string }) {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-3">
+        <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+      </div>
+      <dl className="grid md:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="border-b border-slate-100 px-4 py-3 last:border-b-0 md:[&:nth-last-child(-n+2)]:border-b-0">
+            <dt className="text-xs font-medium text-slate-500">{label}</dt>
+            <dd className="mt-1 break-words text-sm font-semibold text-slate-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+function MoneySummaryItem({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' | 'slate'; value: string }) {
+  const toneClass = tone === 'blue' ? 'text-blue-700' : tone === 'emerald' ? 'text-emerald-700' : 'text-slate-900'
+  return (
+    <div className="px-4 py-3">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className={`mt-1 text-lg font-bold tabular-nums ${toneClass}`}>{value}</div>
     </div>
   )
 }
