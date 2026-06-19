@@ -65,26 +65,61 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     .filter(Boolean)
     .join('')
 
+  // Find parent line for each line (only relevant for WTI where deductions/impurities exist)
+  const parentMap = new Map<string, typeof ticket.lines[number]>()
+  let currentParent: typeof ticket.lines[number] | null = null
+  ticket.lines.forEach((line) => {
+    if (line.grossWeightValue > 0) {
+      currentParent = line
+    } else if (line.grossWeightValue === 0 && line.impurityId && currentParent) {
+      parentMap.set(line.id, currentParent)
+    }
+  })
+
   function rowHtml(line: WeightTicketRecord['lines'][number], index: number) {
+    const parent = parentMap.get(line.id)
+    if (isReceipt && parent) {
+      const netWeight = parent.grossWeightValue - parent.containerDeductionWeightValue - line.deductionWeight
+      return `
+        <tr class="item-row">
+          <td class="c rank-cell"></td>
+          <td>
+            <div class="item-name">${escapeHtml(line.productName)}</div>
+            <div class="muted">${escapeHtml(line.impurityName || 'หักสิ่งเจือปน')}</div>
+            <div class="muted">${escapeHtml(line.note || '-')}</div>
+          </td>
+          <td class="r">${formatPrintableNumber(parent.grossWeightValue)}</td>
+          <td class="r">- ${formatPrintableNumber(parent.containerDeductionWeightValue)}</td>
+          <td class="r">- ${formatPrintableNumber(line.deductionWeight)}</td>
+          <td class="r strong">= ${formatPrintableNumber(netWeight)}</td>
+        </tr>
+      `
+    }
+
     return `
       <tr class="item-row">
         <td class="c rank-cell">${index + 1}</td>
-	        <td>
-	          <div class="item-name">${escapeHtml(line.productName)}</div>
-	          ${!isReceipt && line.warehouseName ? `<div class="muted">คลัง: ${escapeHtml(line.warehouseName)}${line.warehouseId ? ` · ${escapeHtml(line.warehouseId)}` : ''}${line.warehouseType ? ` · ${escapeHtml(line.warehouseType)}` : ''}</div>` : ''}
-	          <div class="muted">${escapeHtml(line.note || '-')}</div>
-	        </td>
+        <td>
+          <div class="item-name">${escapeHtml(line.productName)}</div>
+          ${!isReceipt && line.warehouseName ? `<div class="muted">คลัง: ${escapeHtml(line.warehouseName)}${line.warehouseId ? ` · ${escapeHtml(line.warehouseId)}` : ''}${line.warehouseType ? ` · ${escapeHtml(line.warehouseType)}` : ''}</div>` : ''}
+          <div class="muted">${escapeHtml(line.note || '-')}</div>
+        </td>
         <td class="r">${formatPrintableNumber(line.grossWeightValue)}</td>
+        ${isReceipt ? `
         <td class="r">${formatPrintableNumber(line.containerDeductionWeightValue)}</td>
-        <td class="r">${escapeHtml(line.impurityName || '-')} ${line.deductionWeight > 0 ? `(${formatPrintableNumber(line.deductionWeight)} kg${line.deductionMode === 'percent' ? ` / ${escapeHtml(line.deductionValue)}%` : ''})` : ''}</td>
+        <td class="r">${escapeHtml(line.impurityName || '-')}</td>
+        ` : ''}
         <td class="r strong">${formatPrintableNumber(line.netWeight)}</td>
       </tr>
     `
   }
 
   function emptyRows(count: number) {
+    const tds = isReceipt
+      ? '<td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td>'
+      : '<td>&nbsp;</td><td></td><td></td><td></td>'
     return Array.from({ length: Math.max(0, count) }, () => (
-      '<tr class="empty"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>'
+      `<tr class="empty">${tds}</tr>`
     )).join('')
   }
 
@@ -150,8 +185,10 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
               <th class="c rank-cell" style="width:7mm">#</th>
               <th>รายการสินค้า</th>
               <th class="r" style="width:24mm">รวม (kg)</th>
+              ${isReceipt ? `
               <th class="r" style="width:25mm">หักภาชนะ</th>
               <th class="r" style="width:34mm">หักสิ่งเจือปน</th>
+              ` : ''}
               <th class="r" style="width:24mm">สุทธิ</th>
             </tr>
           </thead>
@@ -164,8 +201,10 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
               <tr>
                 <td colspan="2" class="r">รวมทั้งสิ้น</td>
                 <td class="r">${formatPrintableNumber(ticket.totals.grossWeight)}</td>
+                ${isReceipt ? `
                 <td class="r">${formatPrintableNumber(ticket.totals.containerDeductionWeight)} kg</td>
                 <td class="r">${formatPrintableNumber(ticket.totals.deductionWeight)} kg</td>
+                ` : ''}
                 <td class="r final-weight">${formatPrintableNumber(ticket.totals.netWeight)}</td>
               </tr>
             </tfoot>
