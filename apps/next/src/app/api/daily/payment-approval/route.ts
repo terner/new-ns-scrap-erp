@@ -408,7 +408,7 @@ export async function GET() {
         sourceDocNo,
         sourceType: 'expense' as const,
         totalAmount: pendingAmount,
-        description: expense.notes || '',
+        description: expense.description || '',
       }] : []
       const approvedRows = activeApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -430,7 +430,7 @@ export async function GET() {
         sourceDocNo: expense.doc_no,
         sourceType: 'expense' as const,
         totalAmount: toNumber(approval.approved_amount),
-        description: expense.notes || '',
+        description: expense.description || '',
       }})
       const voidedRows = voidedApprovals.map((approval) => {
         const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติจ่าย ${approval.id}`)
@@ -455,7 +455,7 @@ export async function GET() {
         totalAmount: approvedAmount,
         voidReason: approval.void_reason ?? '',
         voidedAt: toDateOnly(approval.voided_at),
-        description: expense.notes || '',
+        description: expense.description || '',
       }})
       return [...pendingRows, ...approvedRows, ...voidedRows]
     })
