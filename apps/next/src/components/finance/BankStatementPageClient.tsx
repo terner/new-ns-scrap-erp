@@ -312,34 +312,34 @@ export function BankStatementPageClient() {
               <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">สรุปวงเงิน OD</div>
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
                 {/* 1. ยอดตั้งต้นบัญชี */}
-                <div className="bg-emerald-50/40 border border-emerald-100/60 rounded-lg p-3 text-right">
-                  <div className="text-[10px] text-emerald-800 font-bold text-left">ยอดตั้งต้นบัญชี</div>
-                  <div className="font-mono text-base font-bold text-emerald-700 mt-1">{formatMoney(selectedAccount.odLimit || 0)}</div>
+                <div className="bg-emerald-50/40 border border-emerald-100/60 rounded-lg p-4 sm:p-5 text-right flex flex-col justify-between min-h-[95px]">
+                  <div className="text-xs sm:text-sm text-emerald-800 font-bold text-left">ยอดตั้งต้นบัญชี</div>
+                  <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold text-emerald-700 mt-2">{formatMoney(selectedAccount.odLimit || 0)}</div>
                 </div>
                 {/* 2. ยอดคงเหลือจริง */}
-                <div className="bg-rose-50/40 border border-rose-100/60 rounded-lg p-3 text-right">
-                  <div className="text-[10px] text-rose-800 font-bold text-left">ยอดคงเหลือจริง</div>
-                  <div className={`font-mono text-base font-bold mt-1 ${closingBalance >= 0 ? 'text-slate-800' : 'text-rose-700'}`}>
+                <div className="bg-rose-50/40 border border-rose-100/60 rounded-lg p-4 sm:p-5 text-right flex flex-col justify-between min-h-[95px]">
+                  <div className="text-xs sm:text-sm text-rose-800 font-bold text-left">ยอดคงเหลือจริง</div>
+                  <div className={`font-mono text-lg sm:text-xl md:text-2xl font-bold mt-2 ${closingBalance >= 0 ? 'text-slate-800' : 'text-rose-700'}`}>
                     {formatMoney(closingBalance)}
                   </div>
                 </div>
                 {/* 3. OD ใช้ไป */}
-                <div className="bg-amber-50/40 border border-amber-100/60 rounded-lg p-3 text-right">
-                  <div className="text-[10px] text-amber-800 font-bold text-left">OD ใช้ไป</div>
-                  <div className="font-mono text-base font-bold text-amber-700 mt-1">
+                <div className="bg-amber-50/40 border border-amber-100/60 rounded-lg p-4 sm:p-5 text-right flex flex-col justify-between min-h-[95px]">
+                  <div className="text-xs sm:text-sm text-amber-800 font-bold text-left">OD ใช้ไป</div>
+                  <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold text-amber-700 mt-2">
                     {formatMoney(Math.max(0, -closingBalance))}
                   </div>
                 </div>
                 {/* 4. OD คงเหลือ */}
-                <div className="bg-emerald-50/40 border border-emerald-100/60 rounded-lg p-3 text-right">
-                  <div className="text-[10px] text-emerald-800 font-bold text-left">OD คงเหลือ</div>
-                  <div className="font-mono text-base font-bold text-emerald-700 mt-1">
+                <div className="bg-emerald-50/40 border border-emerald-100/60 rounded-lg p-4 sm:p-5 text-right flex flex-col justify-between min-h-[95px]">
+                  <div className="text-xs sm:text-sm text-emerald-800 font-bold text-left">OD คงเหลือ</div>
+                  <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold text-emerald-700 mt-2">
                     {formatMoney(Math.max(0, (selectedAccount.odLimit || 0) - Math.max(0, -closingBalance)))}
                   </div>
                 </div>
               </div>
             </div>
-            <div className="mt-4 text-[10px] text-slate-400 leading-normal border-t border-slate-100 pt-3">
+            <div className="mt-4 text-xs text-slate-400 leading-normal border-t border-slate-100 pt-3">
               สูตร: OD ใช้ไป = max(0, -ยอดคงเหลือจริง), OD คงเหลือ = วงเงิน OD - OD ใช้ไป
             </div>
           </div>
