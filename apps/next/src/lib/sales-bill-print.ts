@@ -238,9 +238,8 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
           <div class="panel-body two-col">
             <div><div class="field-label">เลขที่เอกสาร</div><div class="field-value">${escapeHtml(bill.docNo)}</div></div>
             <div><div class="field-label">วันที่เอกสาร</div><div class="field-value">${escapeHtml(plain(bill.billDate || bill.date))}</div></div>
-            <div><div class="field-label">วันที่กำหนดส่ง</div><div class="field-value">${escapeHtml(plain(bill.dueDate || bill.date))}</div></div>
+            <div><div class="field-label">ประเภทบิล</div><div class="field-value">${escapeHtml(plain(bill.transactionMode))}</div></div>
             <div><div class="field-label">ผู้จัดทำ</div><div class="field-value">${escapeHtml(plain(bill.createdBy))}</div></div>
-            <div><div class="field-label">สาขา / คลัง</div><div class="field-value">${escapeHtml([bill.branchName, bill.warehouseName].filter(Boolean).join(' / '))}</div></div>
             <div><div class="field-label">ใบส่งของ WTO</div><div class="field-value">${escapeHtml(bill.deliveryDocNos.join(', ') || '-')}</div></div>
           </div>
         </div>
