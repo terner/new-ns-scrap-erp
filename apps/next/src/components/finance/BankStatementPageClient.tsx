@@ -16,6 +16,8 @@ type AccountOption = {
   name: string
   openingBalance: number
   type: string
+  subtype?: string | null
+  odLimit?: number | null
 }
 
 type BankRow = {
@@ -274,6 +276,76 @@ export function BankStatementPageClient() {
           </div>
         </div>
       </div>
+
+      {/* ข้อมูลบัญชีและวงเงิน OD */}
+      {selectedAccount ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* ข้อมูลบัญชีที่เลือก */}
+          <div className="lg:col-span-1 bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">ข้อมูลบัญชีที่เลือก</div>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                  ประเภทบัญชี: {selectedAccount.subtype === 'current' ? 'กระแสรายวัน' : selectedAccount.subtype === 'savings' ? 'ออมทรัพย์' : selectedAccount.subtype === 'fcd' ? 'FCD' : selectedAccount.type}
+                </span>
+                {selectedAccount.subtype === 'current' && (selectedAccount.odLimit || 0) > 0 && (
+                  <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
+                    OD Enabled
+                  </span>
+                )}
+              </div>
+              <h4 className="text-lg font-bold text-slate-800">{selectedAccount.name}</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                เลขที่บัญชี {selectedAccount.accountNo || '-'} · สาขา {selectedAccount.branchName || '-'}
+              </p>
+            </div>
+            {selectedAccount.subtype === 'current' && (selectedAccount.odLimit || 0) > 0 && (
+              <div className="mt-4 text-[11px] text-slate-400 leading-normal border-t border-slate-100 pt-3">
+                * OD ไม่ใช่เงินสดจริง แต่เป็นวงเงินเสริมที่ใช้ได้เมื่อยอดบัญชีจริงติดลบ
+              </div>
+            )}
+          </div>
+
+          {/* สรุปวงเงิน OD */}
+          <div className="lg:col-span-2 bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">สรุปวงเงิน OD</div>
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
+                {/* 1. ยอดตั้งต้นบัญชี */}
+                <div className="bg-emerald-50/40 border border-emerald-100/60 rounded-lg p-3 text-right">
+                  <div className="text-[10px] text-emerald-800 font-bold text-left">ยอดตั้งต้นบัญชี</div>
+                  <div className="font-mono text-base font-bold text-emerald-700 mt-1">{formatMoney(selectedAccount.odLimit || 0)}</div>
+                </div>
+                {/* 2. ยอดคงเหลือจริง */}
+                <div className="bg-rose-50/40 border border-rose-100/60 rounded-lg p-3 text-right">
+                  <div className="text-[10px] text-rose-800 font-bold text-left">ยอดคงเหลือจริง</div>
+                  <div className={`font-mono text-base font-bold mt-1 ${closingBalance >= 0 ? 'text-slate-800' : 'text-rose-700'}`}>
+                    {formatMoney(closingBalance)}
+                  </div>
+                </div>
+                {/* 3. OD ใช้ไป */}
+                <div className="bg-amber-50/40 border border-amber-100/60 rounded-lg p-3 text-right">
+                  <div className="text-[10px] text-amber-800 font-bold text-left">OD ใช้ไป</div>
+                  <div className="font-mono text-base font-bold text-amber-700 mt-1">
+                    {formatMoney(Math.max(0, -closingBalance))}
+                  </div>
+                </div>
+                {/* 4. OD คงเหลือ */}
+                <div className="bg-emerald-50/40 border border-emerald-100/60 rounded-lg p-3 text-right">
+                  <div className="text-[10px] text-emerald-800 font-bold text-left">OD คงเหลือ</div>
+                  <div className="font-mono text-base font-bold text-emerald-700 mt-1">
+                    {formatMoney(Math.max(0, (selectedAccount.odLimit || 0) - Math.max(0, -closingBalance)))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 text-[10px] text-slate-400 leading-normal border-t border-slate-100 pt-3">
+              สูตร: OD ใช้ไป = max(0, -ยอดคงเหลือจริง), OD คงเหลือ = วงเงิน OD - OD ใช้ไป
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartPanel rows={displayRows} title="📈 ยอดคงเหลือสะสม" variant="balance" />
         <ChartPanel rows={displayRows} title="📊 กระแสเงิน (เข้า/ออก)" variant="flow" />
@@ -297,7 +369,7 @@ export function BankStatementPageClient() {
           <span className="ml-auto text-xs text-slate-500">พบ {data?.pagination.totalRows ?? 0} รายการ</span>
         </div>
       </div>
-      <DetailTable rows={displayRows} isLoading={isLoading} onOpen={setSelectedRow} totalRows={displayRows.length} />
+      <DetailTable rows={displayRows} isLoading={isLoading} onOpen={setSelectedRow} totalRows={displayRows.length} selectedAccount={selectedAccount} />
       <div className="flex items-center justify-end gap-2">
         <button className="rounded-md bg-slate-100 px-3 py-2 text-sm disabled:opacity-50" disabled={page <= 1 || isLoading} type="button" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</button>
         <span className="text-sm text-slate-600">หน้า {page} / {totalPages}</span>
@@ -338,7 +410,22 @@ function ChartPanel({ rows, title, variant }: { rows: BankRow[]; title: string; 
   )
 }
 
-function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolean; onOpen: (row: BankRow) => void; rows: BankRow[]; totalRows: number }) {
+function DetailTable({
+  isLoading,
+  onOpen,
+  rows,
+  totalRows,
+  selectedAccount,
+}: {
+  isLoading: boolean
+  onOpen: (row: BankRow) => void
+  rows: BankRow[]
+  totalRows: number
+  selectedAccount: AccountOption | null
+}) {
+  const odLimit = selectedAccount?.odLimit || 0
+  const hasOd = selectedAccount?.subtype === 'current' && odLimit > 0
+
   return (
     <div className="overflow-hidden rounded-md bg-white shadow-lg">
       <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-3">
@@ -352,16 +439,25 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">ประเภท</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">รายละเอียด</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 text-left">อ้างอิง</th>
-              <th className="bg-emerald-700/40 p-2 text-right">📥 เข้า</th>
-              <th className="bg-rose-700/40 p-2 text-right">📤 ออก</th>
-              <th className="bg-blue-700/40 p-2 text-right">💰 คงเหลือ</th>
+              <th className="bg-emerald-700/40 p-2 text-right" style={{ width: '10%' }}>📥 เข้า</th>
+              <th className="bg-rose-700/40 p-2 text-right" style={{ width: '10%' }}>📤 ออก</th>
+              <th className="bg-blue-700/40 p-2 text-right" style={{ width: hasOd ? '12%' : '15%' }}>💰 ยอดคงเหลือจริง</th>
+              {hasOd && (
+                <>
+                  <th className="bg-amber-700/40 p-2 text-right" style={{ width: '10%' }}>OD ใช้ไป</th>
+                  <th className="bg-emerald-700/40 p-2 text-right" style={{ width: '10%' }}>OD คงเหลือ</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={7}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={7}>ไม่มีรายการ</td></tr> : null}
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={hasOd ? 9 : 7}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={hasOd ? 9 : 7}>ไม่มีรายการ</td></tr> : null}
             {!isLoading && rows.map((row) => {
               const isOpening = row.type === 'ยอดยกมา'
+              const runningBalance = row.runningBalance
+              const odUsed = Math.max(0, -runningBalance)
+              const odRemaining = Math.max(0, odLimit - odUsed)
               return (
                 <tr key={row.id} className={`border-t border-slate-100 transition hover:bg-yellow-50 ${isOpening ? 'bg-amber-50 font-bold' : ''}`}>
                   <td className="px-4 py-3.5 font-mono text-xs">{isOpening ? row.date : formatDateDisplay(row.date)}</td>
@@ -372,7 +468,13 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
                   </td>
                   <td className={`bg-emerald-50/30 p-2 text-right font-mono ${row.amountIn > 0 ? 'font-bold text-emerald-700' : 'text-slate-300'}`}>{row.amountIn ? formatMoney(row.amountIn) : '-'}</td>
                   <td className={`bg-rose-50/30 p-2 text-right font-mono ${row.amountOut > 0 ? 'font-bold text-rose-700' : 'text-slate-300'}`}>{row.amountOut ? formatMoney(row.amountOut) : '-'}</td>
-                  <td className={`bg-blue-50/30 p-2 text-right font-mono font-bold ${row.runningBalance >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatMoney(row.runningBalance)}</td>
+                  <td className={`bg-blue-50/30 p-2 text-right font-mono font-bold ${runningBalance >= 0 ? 'text-blue-700' : 'text-red-650'}`}>{formatMoney(runningBalance)}</td>
+                  {hasOd && (
+                    <>
+                      <td className="bg-amber-50/30 p-2 text-right font-mono text-amber-700 font-semibold">{formatMoney(odUsed)}</td>
+                      <td className="bg-emerald-50/30 p-2 text-right font-mono text-emerald-700 font-semibold">{formatMoney(odRemaining)}</td>
+                    </>
+                  )}
                 </tr>
               )
             })}
@@ -390,6 +492,9 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
         ) : null}
         {!isLoading && rows.map((row) => {
           const isOpening = row.type === 'ยอดยกมา'
+          const runningBalance = row.runningBalance
+          const odUsed = Math.max(0, -runningBalance)
+          const odRemaining = Math.max(0, odLimit - odUsed)
           return (
             <div
               key={row.id}
@@ -410,21 +515,33 @@ function DetailTable({ isLoading, onOpen, rows, totalRows }: { isLoading: boolea
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100/60 mt-1 text-right text-xs">
+              <div className={`grid ${hasOd ? 'grid-cols-5' : 'grid-cols-3'} gap-2 pt-2 border-t border-slate-100/60 mt-1 text-right text-[11px]`}>
                 <div>
-                  <span className="block text-[11px] text-slate-400">เข้า:</span>
-                  <span className="text-emerald-700 font-bold tabular-nums text-sm">{row.amountIn ? formatMoney(row.amountIn) : '-'}</span>
+                  <span className="block text-[10px] text-slate-400">เข้า:</span>
+                  <span className="text-emerald-700 font-bold tabular-nums">{row.amountIn ? formatMoney(row.amountIn) : '-'}</span>
                 </div>
                 <div>
-                  <span className="block text-[11px] text-slate-400">ออก:</span>
-                  <span className="text-rose-700 font-bold tabular-nums text-sm">{row.amountOut ? formatMoney(row.amountOut) : '-'}</span>
+                  <span className="block text-[10px] text-slate-400">ออก:</span>
+                  <span className="text-rose-700 font-bold tabular-nums">{row.amountOut ? formatMoney(row.amountOut) : '-'}</span>
                 </div>
                 <div>
-                  <span className="block text-[11px] text-slate-500">คงเหลือ:</span>
-                  <span className={`font-bold tabular-nums text-sm ${row.runningBalance >= 0 ? 'text-blue-700' : 'text-red-600'}`}>
-                    {formatMoney(row.runningBalance)}
+                  <span className="block text-[10px] text-slate-500">คงเหลือ:</span>
+                  <span className={`font-bold tabular-nums ${runningBalance >= 0 ? 'text-blue-700' : 'text-red-600'}`}>
+                    {formatMoney(runningBalance)}
                   </span>
                 </div>
+                {hasOd && (
+                  <>
+                    <div>
+                      <span className="block text-[10px] text-amber-600">OD ใช้:</span>
+                      <span className="text-amber-700 font-bold tabular-nums">{formatMoney(odUsed)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-emerald-600">OD เหลือ:</span>
+                      <span className="text-emerald-700 font-bold tabular-nums">{formatMoney(odRemaining)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )
