@@ -654,7 +654,7 @@ export function ReceiptVouchersPageClient() {
           {!isLoading && pagedRows.map((row) => (
             <div
               key={row.id}
-              className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+              className={`rounded-md border border-slate-200 p-4 shadow-sm transition-colors ${row.status === 'cancelled' ? 'bg-red-100/60 active:bg-red-200/60 text-slate-400' : 'bg-white active:bg-slate-50'} cursor-pointer`}
               onClick={() => setDetailRow(row)}
             >
               <div className="flex justify-between items-start mb-2">
@@ -711,7 +711,7 @@ export function ReceiptVouchersPageClient() {
             <TableBody className="divide-y divide-slate-100">
               {isLoading ? <TableRow><td className="p-8 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></TableRow> : null}
               {!isLoading && pagedRows.map((row) => (
-                <TableRow key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setDetailRow(row)}>
+                <TableRow key={row.id} className={`cursor-pointer ${row.status === 'cancelled' ? 'bg-red-100/60 hover:bg-red-200/60 text-slate-400' : 'hover:bg-slate-50'}`} onClick={() => setDetailRow(row)}>
                   <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.docNo}</td>
                   <td className="whitespace-nowrap p-2">{formatDateDisplay(row.date)}</td>
                   <td className="p-2 font-medium text-slate-800">{row.sellerName || '-'}</td>

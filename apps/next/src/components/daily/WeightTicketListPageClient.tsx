@@ -537,12 +537,17 @@ export function WeightTicketListPageClient() {
         ) : tickets.length === 0 ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">ยังไม่มีรายการตามเงื่อนไข</div>
         ) : (
-          tickets.map((ticket) => (
-            <div
-              key={ticket.id}
-              className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
-              onClick={() => setActiveDetailId(ticket.id)}
-            >
+          tickets.map((ticket) => {
+            const isCancelled = ticket.status === 'cancelled'
+            return (
+              <div
+                key={ticket.id}
+                className={cn(
+                  "rounded-md border border-slate-200 p-4 shadow-sm cursor-pointer transition-colors",
+                  isCancelled ? "bg-red-100/60 active:bg-red-200/60 text-slate-400" : "bg-white active:bg-slate-50"
+                )}
+                onClick={() => setActiveDetailId(ticket.id)}
+              >
               <div className="flex justify-between items-start mb-2">
                 <span className="font-bold text-slate-800 text-sm">{ticket.documentNo}</span>
                 <span className="text-xs text-slate-500">{formatDateTime(ticket.createdAt)}</span>
@@ -632,8 +637,9 @@ export function WeightTicketListPageClient() {
                 ) : null}
               </div>
             </div>
-          ))
-        )}
+          )
+        })
+      )}
       </div>
 
       {/* Desktop Tables (Hidden on Mobile) */}
@@ -675,12 +681,17 @@ export function WeightTicketListPageClient() {
                 <tr>
                   <td className="px-3 py-10 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการตามเงื่อนไข</td>
                 </tr>
-              ) : tickets.map((ticket, index) => (
-                <tr
-                  className="cursor-pointer hover:bg-slate-50"
-                  key={ticket.id}
-                  onClick={() => setActiveDetailId(ticket.id)}
-                >
+              ) : tickets.map((ticket, index) => {
+                const isCancelled = ticket.status === 'cancelled'
+                return (
+                  <tr
+                    className={cn(
+                      "cursor-pointer",
+                      isCancelled ? "bg-red-100/60 hover:bg-red-200/60 text-slate-400" : "hover:bg-slate-50"
+                    )}
+                    key={ticket.id}
+                    onClick={() => setActiveDetailId(ticket.id)}
+                  >
                   <td className="whitespace-nowrap px-3 py-3 text-slate-500 font-mono text-xs text-left">{(page - 1) * pageSize + index + 1}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-900">{ticket.documentNo}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDateTime(ticket.createdAt)}</td>
@@ -763,7 +774,8 @@ export function WeightTicketListPageClient() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

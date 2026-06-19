@@ -1272,6 +1272,61 @@ export function MoneyMovementPageClient({
     setIsBillLocked(false)
     setError(null)
     setFormOpen(true)
+    setMoneyTab('entry')
+  }
+
+  function openFormForPayment(row: MoneyRow) {
+    if (mode !== 'payment' || row.status === 'cancelled') return
+    const siblingRows = historyRows.filter((r) => r.docNo === row.docNo)
+    const lines = siblingRows.map((sibling) => ({
+      ...newPaymentLine(),
+      amount: sibling.amount,
+      approvalId: sibling.approvalId ?? null,
+      billText: `${sibling.approvalId || ''} | ${sibling.partyName || ''}`,
+      billId: sibling.approvalId || '',
+      discount: sibling.discount ?? 0,
+      fee: sibling.fee ?? 0,
+      supplierId: sibling.supplierId ?? '',
+      withholdingTax: sibling.withholdingTax ?? 0,
+    }))
+    const totalAmount = roundMoney(siblingRows.reduce((sum, r) => sum + r.amount, 0))
+    const totalDiscount = roundMoney(siblingRows.reduce((sum, r) => sum + (r.discount ?? 0), 0))
+    const totalFee = roundMoney(siblingRows.reduce((sum, r) => sum + (r.fee ?? 0), 0))
+    const totalWht = roundMoney(siblingRows.reduce((sum, r) => sum + (r.withholdingTax ?? 0), 0))
+
+    const primaryRowWithSplits = siblingRows.find((r) => r.accountSplits && r.accountSplits.length > 0) || row
+
+    setForm({
+      ...initialForm(mode),
+      accountId: row.accountId ?? '',
+      amount: totalAmount,
+      billId: lines[0]?.approvalId || '',
+      supplierId: row.supplierId ?? '',
+      date: row.date,
+      discount: totalDiscount,
+      fee: totalFee,
+      id: row.docNo,
+      lines,
+      method: row.method ?? '',
+      notes: row.notes ?? null,
+      splits: primaryRowWithSplits.accountSplits?.length
+        ? primaryRowWithSplits.accountSplits.map((split) => {
+            const nextSplit = newPaymentSplit()
+            return {
+              ...nextSplit,
+              accountId: split.accountId,
+              amount: split.amount,
+              id: split.id ?? nextSplit.id,
+            }
+          })
+        : [{ ...newPaymentSplit(), accountId: row.accountId ?? '', amount: row.netAmount }],
+      withholdingTax: totalWht,
+    } as MoneyForm)
+    setMoneyDrafts({})
+    setIsBillLocked(true)
+    setError(null)
+    setFormOpen(true)
+    setMoneyTab('entry')
   }
 
   function clearFilters() {
@@ -3045,7 +3100,7 @@ export function MoneyMovementPageClient({
                 return (
                   <div
                     key={row.id}
-                    className={`rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 transition-colors flex gap-3 items-start ${clickable ? 'cursor-pointer' : ''}`}
+                    className={`rounded-md border border-slate-200 p-4 shadow-sm transition-colors flex gap-3 items-start ${clickable ? 'cursor-pointer' : ''} ${row.status === 'cancelled' ? 'bg-red-100/60 active:bg-red-200/60 text-slate-400' : 'bg-white active:bg-slate-50'}`}
                     onClick={clickable ? () => {
                       if (mode === 'payment') void openPaymentHistoryRow(row)
                       else openReceiptDetail(row)
@@ -3112,13 +3167,22 @@ export function MoneyMovementPageClient({
                                   </button>
                                 </>
                               ) : (
-                                <button
-                                  type="button"
-                                  className="text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold px-2 py-0.5 rounded border border-red-200 bg-white cursor-pointer"
-                                  onClick={() => setCancelPaymentTarget(row)}
-                                >
-                                  ยกเลิก
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    className="text-[11px] text-slate-700 hover:text-slate-900 hover:bg-slate-50 font-semibold px-2 py-0.5 rounded border border-slate-200 bg-white cursor-pointer"
+                                    onClick={() => openFormForPayment(row)}
+                                  >
+                                    แก้ไข
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="text-[11px] text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold px-2 py-0.5 rounded border border-red-200 bg-white cursor-pointer"
+                                    onClick={() => setCancelPaymentTarget(row)}
+                                  >
+                                    ยกเลิก
+                                  </button>
+                                </>
                               )}
                             </div>
                           )}
@@ -3191,7 +3255,7 @@ export function MoneyMovementPageClient({
                     return (
                       <TableRow
                         key={row.id}
-                        className={`hover:bg-slate-50 ${clickable ? 'cursor-pointer' : ''}`}
+                        className={`${row.status === 'cancelled' ? 'bg-red-100/60 hover:bg-red-200/60 text-slate-400' : 'hover:bg-slate-50'} ${clickable ? 'cursor-pointer' : ''}`}
                         onClick={clickable ? () => {
                           if (mode === 'payment') void openPaymentHistoryRow(row)
                           else openReceiptDetail(row)
@@ -3267,15 +3331,26 @@ export function MoneyMovementPageClient({
                                 </UiButton>
                               </>
                             ) : (
-                              <UiButton
-                                disabled={row.status === 'cancelled'}
-                                className="text-xs h-7 px-2 font-semibold bg-red-600 hover:bg-red-700 text-white border-0"
-                                size="sm"
-                                type="button"
-                                onClick={() => setCancelPaymentTarget(row)}
-                              >
-                                ยกเลิก
-                              </UiButton>
+                              <>
+                                <UiButton
+                                  disabled={row.status === 'cancelled'}
+                                  className="text-xs h-7 px-2 font-semibold bg-slate-900 hover:bg-slate-800 text-white border-0"
+                                  size="sm"
+                                  type="button"
+                                  onClick={() => openFormForPayment(row)}
+                                >
+                                  แก้ไข
+                                </UiButton>
+                                <UiButton
+                                  disabled={row.status === 'cancelled'}
+                                  className="text-xs h-7 px-2 font-semibold bg-red-600 hover:bg-red-700 text-white border-0"
+                                  size="sm"
+                                  type="button"
+                                  onClick={() => setCancelPaymentTarget(row)}
+                                >
+                                  ยกเลิก
+                                </UiButton>
+                              </>
                             )}
                           </div>
                         </TableCell>

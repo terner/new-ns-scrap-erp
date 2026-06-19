@@ -2753,7 +2753,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           return (
             <div
               key={row.id}
-              className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+              className={`rounded-md border border-slate-100 p-4 shadow-sm transition-colors ${row.status === 'cancelled' ? 'bg-red-100/60 active:bg-red-200/60 text-slate-400' : 'bg-white active:bg-slate-50'} cursor-pointer`}
               onClick={() => !isStockIssue && openRow(row)}
             >
               <div className="flex justify-between items-start mb-2">
@@ -2971,7 +2971,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           <TableBody className="divide-y divide-slate-100">
             {isLoading ? <TableRow><td className="p-6 text-center text-slate-500" colSpan={tableColSpan}>กำลังโหลดข้อมูล</td></TableRow> : null}
             {!isLoading && pageRows.map((row) => (
-              <TableRow key={row.id} className={`hover:bg-slate-50 ${(mode === 'purchase' || mode === 'sales') && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
+              <TableRow key={row.id} className={`${row.status === 'cancelled' ? 'bg-red-100/60 hover:bg-red-200/60 text-slate-400' : 'hover:bg-slate-50'} ${(mode === 'purchase' || mode === 'sales') && !isStockIssueRow(row) ? 'cursor-pointer' : ''}`} onClick={() => openRow(row)}>
                 <td className="whitespace-nowrap p-2 text-xs font-semibold text-slate-700">{row.docNo}</td>
                 {mode === 'purchase' && !isStockIssueRow(row) ? (
                   <td className="p-2 text-xs font-semibold text-slate-700">

@@ -164,7 +164,14 @@ export async function GET() {
         where: {
           ...(allowedBranchIds ? { branch_id: { in: allowedBranchIds } } : {}),
         },
-        include: { accounts: true, payment_approvals: true, suppliers: true },
+        include: {
+          accounts: true,
+          payment_approvals: true,
+          suppliers: true,
+          payment_account_splits: {
+            include: { accounts: true },
+          },
+        },
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 5000,
       }),
@@ -408,26 +415,48 @@ export async function GET() {
           }
         })
         .filter((bill): bill is NonNullable<typeof bill> => Boolean(bill)),
-      rows: payments.map((payment) => ({
-        accountId: payment.accounts?.code ?? '',
-        accountName: payment.accounts?.name ?? '-',
-        approvalId: payment.payment_approval_id ? (approvalDocNoByInternalId.get(stringifyBusinessValue(payment.payment_approval_id)) ?? '') : '',
-        amount: toNumber(payment.amount),
-        billId: '',
-        date: toDateOnly(payment.date),
-        docNo: payment.doc_no,
-        fee: toNumber(payment.fee ?? payment.bank_fee),
-        id: payment.doc_no,
-        method: payment.method ?? '',
-        netAmount: toNumber(payment.net_amount),
-        notes: payment.notes ?? '',
-        partyName: payment.suppliers?.name ?? payment.payment_approvals?.party_name_snapshot ?? '-',
-        supplierId: payment.supplier_id ? (supplierCodeById.get(payment.supplier_id) ?? '') : '',
-        supplierName: payment.suppliers?.name ?? payment.payment_approvals?.party_name_snapshot ?? '-',
-        voucherId: payment.voucher_id ?? payment.doc_no,
-        status: payment.status ?? 'active',
-        withholdingTax: toNumber(payment.withholding_tax),
-      })),
+      rows: payments.map((payment) => {
+        const splits = payment.payment_account_splits ?? []
+        const accountSummaries = splits.length > 0
+          ? splits.map((split) => `${split.accounts?.name ?? '-'} - ${toNumber(split.amount).toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`)
+          : [`${payment.accounts?.name ?? '-'} - ${toNumber(payment.amount).toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`]
+        const accountSplits = splits.length > 0
+          ? splits.map((split) => ({
+              accountId: split.accounts?.code ? requireBusinessCode(split.accounts.code, `บัญชีเงิน ${split.accounts.id}`) : '',
+              amount: toNumber(split.amount),
+              id: split.id.toString(),
+            }))
+          : [{
+              accountId: payment.accounts?.code ? requireBusinessCode(payment.accounts.code, `บัญชีเงิน ${payment.accounts.id}`) : '',
+              amount: toNumber(payment.amount),
+              id: `${payment.doc_no}-split-1`,
+            }]
+        return {
+          accountId: payment.accounts?.code ?? '',
+          accountName: payment.accounts?.name ?? '-',
+          accountSummaries,
+          accountSplits,
+          approvalId: payment.payment_approval_id ? (approvalDocNoByInternalId.get(stringifyBusinessValue(payment.payment_approval_id)) ?? '') : '',
+          amount: toNumber(payment.amount),
+          billId: payment.payment_approvals?.source_doc_no_snapshot ?? '',
+          billDocNo: payment.payment_approvals?.source_doc_no_snapshot ?? '',
+          billDocNos: payment.payment_approvals?.source_doc_no_snapshot ? [payment.payment_approvals.source_doc_no_snapshot] : [],
+          date: toDateOnly(payment.date),
+          docNo: payment.doc_no,
+          fee: toNumber(payment.fee ?? payment.bank_fee),
+          id: payment.doc_no,
+          method: payment.method ?? '',
+          netAmount: toNumber(payment.net_amount),
+          notes: payment.notes ?? '',
+          partyName: payment.suppliers?.name ?? payment.payment_approvals?.party_name_snapshot ?? '-',
+          supplierId: payment.supplier_id ? (supplierCodeById.get(payment.supplier_id) ?? '') : '',
+          supplierName: payment.suppliers?.name ?? payment.payment_approvals?.party_name_snapshot ?? '-',
+          voucherId: payment.voucher_id ?? payment.doc_no,
+          status: payment.status ?? 'active',
+          withholdingTax: toNumber(payment.withholding_tax),
+          sourceType: payment.payment_approvals?.source_type ?? '',
+        }
+      }),
       paymentMethods,
       settings: { whtRatePercent },
       suppliers: [...suppliers.map((supplier: typeof suppliers[number]) => ({
