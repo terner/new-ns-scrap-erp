@@ -129,8 +129,6 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
           <td class="c rank-cell"></td>
           <td>
             <div class="item-name">${escapeHtml(line.productName)}</div>
-            <div class="muted">${escapeHtml(cleanImpurityName(line.impurityName) || 'หักสิ่งเจือปน')}</div>
-            <div class="muted">${escapeHtml(cleanNote(line.note))}</div>
           </td>
           <td class="r">${formatPrintableWeight(sums.gross)}</td>
           <td class="r">- ${formatPrintableWeight(sums.container)}</td>
@@ -140,12 +138,13 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       `
     }
 
+    const displayNote = line.note && line.note !== '-' && !line.note.startsWith('มาจากสิ่งเจือปน') ? line.note : ''
     return `
       <tr class="item-row">
         <td class="c rank-cell">${rankMap.get(line.id) ?? ''}</td>
         <td>
           <div class="item-name">${escapeHtml(line.productName)}</div>
-          <div class="muted">${escapeHtml(line.note || '-')}</div>
+          ${displayNote ? `<div class="muted">${escapeHtml(displayNote)}</div>` : ''}
         </td>
         <td class="r">${formatPrintableNumber(line.grossWeightValue)}</td>
         ${isReceipt ? `
@@ -207,8 +206,6 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
             <div class="panel-body two-col">
               <div><div class="field-label">ชื่อ</div><div class="field-value">${escapeHtml(ticket.partyName || '-')}</div></div>
               <div><div class="field-label">ทะเบียนรถ</div><div class="field-value">${escapeHtml(ticket.vehicleNo || '-')}</div></div>
-              <div><div class="field-label">สาขา</div><div class="field-value">${escapeHtml(ticket.branchName || '-')}</div></div>
-              <div><div class="field-label">โกดัง</div><div class="field-value">${escapeHtml(ticket.warehouseName || '-')}</div></div>
               <div><div class="field-label">พนักงานชั่ง</div><div class="field-value">${escapeHtml(ticket.enteredBy || '-')}</div></div>
             </div>
           </div>
@@ -218,7 +215,8 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
               <div><div class="field-label">เลขที่เอกสาร</div><div class="field-value">${escapeHtml(ticket.documentNo)}</div></div>
               <div><div class="field-label">วันที่เอกสาร</div><div class="field-value">${escapeHtml(ticket.documentDate || '-')}</div></div>
               <div><div class="field-label">เวลาสร้าง</div><div class="field-value">${escapeHtml(formatDateTime(ticket.createdAt))}</div></div>
-              <div><div class="field-label">สถานะ</div><div class="field-value">${escapeHtml(displayWeightTicketStatus(ticket.type, ticket.status))}</div></div>
+              <div><div class="field-label">สาขา</div><div class="field-value">${escapeHtml(ticket.branchName || '-')}</div></div>
+              <div><div class="field-label">โกดัง</div><div class="field-value">${escapeHtml(ticket.warehouseName || '-')}</div></div>
             </div>
           </div>
         </section>

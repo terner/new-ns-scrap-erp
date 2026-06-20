@@ -186,7 +186,6 @@ export function BankStatementPageClient() {
           <span className="text-xs text-slate-400">→</span>
           <DatePickerInput className="w-[130px]" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
           <button className="ml-auto rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 hover:bg-emerald-700 transition-colors flex items-center justify-center" disabled={isExporting} type="button" onClick={() => void exportXlsx()}>{isExporting ? 'กำลัง Export...' : 'ส่งออก Excel'}</button>
-          <button className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-60 disabled:cursor-not-allowed opacity-75" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ลบ Duplicate</button>
         </div>
 
         {/* Mobile View (Collapsible Filters) */}
@@ -225,9 +224,6 @@ export function BankStatementPageClient() {
                   ถึงวันที่
                   <DatePickerInput className="mt-1 w-full" value={to} onChange={(value) => { setPage(1); setTo(value) }} />
                 </label>
-              </div>
-              <div className="flex justify-end pt-1">
-                <button className="w-full rounded-md bg-red-100 px-3 py-2 text-xs font-bold text-red-700 opacity-70" disabled title="ต้องออกแบบ audit/backup/rollback ก่อนเปิดใช้งาน" type="button">🧹 ลบ Duplicate</button>
               </div>
             </div>
           )}
