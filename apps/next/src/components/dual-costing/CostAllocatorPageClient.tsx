@@ -378,7 +378,7 @@ export function CostAllocatorPageClient() {
                 {!isLoading && (data?.pool.length ?? 0) === 0 ? <TableRow><TableCell className="py-6 text-center text-amber-700" colSpan={7}>ยังไม่มี Cost Pool lot สำหรับสินค้านี้</TableCell></TableRow> : null}
                 {(data?.pool ?? []).slice(0, 12).map((row) => (
                   <TableRow key={row.costPoolId} className="hover:bg-slate-50/30 transition-colors border-t border-slate-100">
-                    <TableCell className="p-3 pl-4"><span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">{row.sourceType}</span></TableCell>
+                    <TableCell className="p-3 pl-4"><span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${sourceBadgeClass(row.sourceType)}`}>{row.sourceType}</span></TableCell>
                     <TableCell className="p-3 font-mono text-xs text-slate-700">{row.sourceNo}</TableCell>
                     <TableCell className="p-3 whitespace-nowrap text-xs text-slate-600">{row.date}</TableCell>
                     <TableCell className="p-3 text-xs text-slate-800 font-medium">{row.counterparty}</TableCell>
@@ -412,7 +412,7 @@ export function CostAllocatorPageClient() {
               <TableBody>
                 {(data?.candidates ?? []).map((row) => (
                   <TableRow key={row.costPoolId} className="hover:bg-slate-50/30 transition-colors border-t border-slate-100">
-                    <TableCell className="p-3 pl-4"><span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">{row.sourceType}</span></TableCell>
+                    <TableCell className="p-3 pl-4"><span className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${sourceBadgeClass(row.sourceType)}`}>{row.sourceType}</span></TableCell>
                     <TableCell className="p-3 font-mono text-xs text-slate-700">{row.sourceNo}</TableCell>
                     <TableCell className="p-3 text-slate-800 font-medium">{row.counterparty}</TableCell>
                     <TableCell className="p-3 text-right font-mono text-slate-600">{formatMoney(row.availableQty)}</TableCell>
@@ -447,4 +447,11 @@ function allocationModeLabel(mode: string) {
   if (mode === 'Expensive') return 'Expensive First - ต้นทุนแพงก่อน'
   if (mode === 'Manual') return 'Manual - เลือกเอง'
   return 'FIFO - ต้นทุนเก่าก่อน'
+}
+
+function sourceBadgeClass(type: string) {
+  if (type === 'Production') return 'bg-orange-50 text-orange-700 border border-orange-200/50'
+  if (type === 'Regrade' || type === 'Grade Adjustment') return 'bg-purple-50 text-purple-700 border border-purple-200/50'
+  if (type === 'PO_Buy') return 'bg-cyan-50 text-cyan-700 border border-cyan-200/50'
+  return 'bg-blue-50 text-blue-700 border border-blue-200/50'
 }
