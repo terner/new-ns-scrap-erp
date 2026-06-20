@@ -26,6 +26,10 @@ const ledgerQuerySchema = stockQuerySchema.extend({
     z.string().trim().max(80).nullable().default(null),
   ),
   negativeOnly: z.coerce.boolean().default(false),
+  warehouseType: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? null : value),
+    z.enum(['RM', 'WIP', 'FG']).nullable().default(null),
+  ),
 })
 
 function sourcePathFor(row: { refNo: string; refType: string }) {
@@ -53,6 +57,7 @@ function sqlWhereForStockLedger(input: {
   status?: string | null
   to?: string | null
   warehouseId: bigint | null
+  warehouseType?: string | null
 }) {
   const clauses: Prisma.Sql[] = [Prisma.sql`true`]
   if (input.productId) clauses.push(Prisma.sql`product_id = ${input.productId}`)
@@ -62,6 +67,7 @@ function sqlWhereForStockLedger(input: {
   if (input.refType) clauses.push(Prisma.sql`ref_type = ${input.refType}`)
   if (input.lotNo) clauses.push(Prisma.sql`lot_no ilike ${`%${input.lotNo}%`}`)
   if (input.status) clauses.push(Prisma.sql`output_category = ${input.status}`)
+  if (input.warehouseType) clauses.push(Prisma.sql`exists (select 1 from public.warehouses wtype where wtype.id = stock_ledger.warehouse_id and wtype.type = ${input.warehouseType})`)
   if (input.q) {
     clauses.push(Prisma.sql`(
       ref_no ilike ${`%${input.q}%`}
@@ -94,6 +100,8 @@ function stockLedgerOrderBy(sort: string, direction: 'asc' | 'desc') {
       return [{ value_in: direction }, { date: direction }, { created_at: direction }, { id: direction }]
     case 'valueOut':
       return [{ value_out: direction }, { date: direction }, { created_at: direction }, { id: direction }]
+    case 'warehouseName':
+      return [{ warehouses: { name: direction } }, { date: direction }, { created_at: direction }, { id: direction }]
     case 'date':
     default:
       return [{ date: direction }, { created_at: direction }, { id: direction }]
@@ -112,6 +120,7 @@ export async function GET(request: Request) {
     const baseWhere = stockWhere({ ...normalizedQuery, from: query.from, lotNo: query.lotNo, movementType: query.movementType, refType: query.refType, status: query.status, to: query.to })
     const where: Prisma.stock_ledgerWhereInput = {
       ...baseWhere,
+      ...(query.warehouseType ? { warehouses: { type: query.warehouseType } } : {}),
       ...(query.q
         ? {
             OR: [
@@ -140,6 +149,7 @@ export async function GET(request: Request) {
       status: query.status,
       to: query.to,
       warehouseId: normalizedQuery.warehouseId,
+      warehouseType: query.warehouseType,
     })
     const [pageRowsRaw, reference, total, aggregate, movementTypeRows] = await Promise.all([
       prisma.stock_ledger.findMany({

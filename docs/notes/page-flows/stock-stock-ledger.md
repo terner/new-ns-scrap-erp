@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-21
 route: /stock/ledger
 ---
 
@@ -83,6 +83,8 @@ movement history ของ stock_ledger เท่านั้น
 
 - source links สำหรับ ref type หลักเพิ่มแล้วใน detail modal
 - API query/pagination/running balance ปรับเป็น server-side แล้ว
+- UI design alignment 2026-06-21: list toolbar ของ `/stock/ledger` ไม่แสดงปุ่ม `Refresh`, filter/action shell ใช้ `rounded-md bg-white p-3 shadow`, export Excel เป็นปุ่มเขียวขนาด `h-9`, running-balance mode (`คงเหลือสะสมต่อสินค้า` / `คงเหลือสะสมต่อคลัง`) แยกเป็น tab เหนือ filter เพราะเป็นคนละมุมมอง ไม่ใช่เงื่อนไขค้นหา, filter `ประเภทคลัง` กรองจาก `warehouses.type` แยกจากประเภท movement, table header ใช้ `bg-slate-100`, column labels แยก `วันที่เอกสาร` / `เลขที่เอกสาร`, table หลักต้องแสดงคอลัมน์ `คลัง/สาขา` เพราะ movement แต่ละรายการผูกกับสินค้าในคลังและสาขา, detail modal ใช้ dark header `rounded-md` และไม่แสดงปุ่ม X ใน header โดยใช้ปุ่ม `ปิด` ที่ footer
+- Detail modal layout alignment 2026-06-21: modal ขยายเป็น `max-w-5xl` และแยก section เป็น summary metrics ด้านบน (`เข้า`, `ออก`, `สุทธิ`, `คงเหลือสะสม`), `เอกสารและที่มา`, `สินค้าและคลัง`, `มูลค่าและต้นทุน`, และ `หมายเหตุ` เพื่อให้ trace movement ได้ชัดโดยไม่ต้องอ่านการ์ดกระจายหลายชุด
 - remaining: cleanup/admin tooling ยังเป็น policy แยก ไม่ใช่หน้าปกติของ ledger
 
 ## Implementation Checklist
