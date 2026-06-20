@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-06-13
+updated: 2026-06-21
 route: /stock/convert
 ---
 
@@ -106,6 +106,8 @@ Reference update 2026-06-13: target-complete flow ต้องผูกกับ
 - PATCH reverse เป็น append-only และ block เมื่อ target pool ถูกใช้ต่อหรือ stock ปลายทางไม่พอ
 - GET detail/export เพิ่มแล้ว: `GET /api/stock/convert?detail=<docNo>` ส่ง allocation drilldown และ `format=csv` ดาวน์โหลด allocation CSV ต่อเอกสาร
 - List UI มีปุ่ม Detail เปิด modal ดู source/target cost pool lines, status, qty, unit cost, total cost และ export CSV ได้
+- List toolbar ไม่แสดงปุ่ม `โหลดใหม่`; ใช้ filter/search และ action `+ ปรับเกรดใหม่` เป็นหลัก โดย runtime ยัง reload หลัง save/reverse/detail ตาม flow เดิม
+- UI checkpoint 2026-06-21: list/table/form/detail modal ปรับตาม `docs/design.md` โดยใช้ modal `rounded-md`, desktop breakpoint `lg`, table header `bg-slate-100`, table body `text-xs font-semibold`, action เป็น outline button, และ detail modal ไม่มีปุ่ม X บน header
 - Pending/partial policy เพิ่มแล้ว: runtime POST reject เมื่อ Cost Pool ไม่พอ, `pending_cost` สงวนไว้ให้ legacy/import, และ `partial` หมายถึง fully costed GA ที่ทำให้ source pool lot เหลือ `Partially Used`
 - Target custom cost override เพิ่มแล้วสำหรับ admin/owner เท่านั้น พร้อมบันทึก source unit cost, target unit cost, variance, และ reason
 - Authenticated local QA ผ่าน: page/API/modal smoke และ API create+reverse `GA-000002` ยืนยัน allocation/ledger/pool state หลัง reverse

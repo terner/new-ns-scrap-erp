@@ -42,7 +42,7 @@ type StatusConvertSortKey =
   | 'unitCost'
   | 'value'
 
-const STATUS_CONVERT_PAGE_SIZES = [10, 20, 50, 100]
+const OPERATION_PAGE_SIZES = [10, 20, 50, 100]
 
 type StockAdjustSnapshot = {
   adjustType: 'NONE' | 'LOSS' | 'GAIN'
@@ -131,6 +131,8 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
   const [toDateFilter, setToDateFilter] = useState('')
   const [statusConvertPage, setStatusConvertPage] = useState(1)
   const [statusConvertPageSize, setStatusConvertPageSize] = useState(20)
+  const [adjustPage, setAdjustPage] = useState(1)
+  const [adjustPageSize, setAdjustPageSize] = useState(20)
   const [statusConvertSortDirection, setStatusConvertSortDirection] = useState<SortDirection>('desc')
   const [statusConvertSortKey, setStatusConvertSortKey] = useState<StatusConvertSortKey>('date')
   const [convertDetail, setConvertDetail] = useState<StockConvertDetail | null>(null)
@@ -170,7 +172,8 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
 
   useEffect(() => {
     if (mode === 'status-convert') setStatusConvertPage(1)
-  }, [mode, rows.length, search])
+    if (mode === 'adjust') setAdjustPage(1)
+  }, [mode, rows.length, search, adjustBranchFilter, adjustTypeFilter, fromDateFilter, toDateFilter])
 
   const statusConvertSortedRows = useMemo(() => {
     if (mode !== 'status-convert') return rows
@@ -182,16 +185,30 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
     return Math.max(1, Math.ceil(statusConvertSortedRows.length / statusConvertPageSize))
   }, [mode, statusConvertPageSize, statusConvertSortedRows.length])
 
+  const adjustTotalPages = useMemo(() => {
+    if (mode !== 'adjust') return 1
+    return Math.max(1, Math.ceil(rows.length / adjustPageSize))
+  }, [adjustPageSize, mode, rows.length])
+
   useEffect(() => {
     if (mode !== 'status-convert') return
     setStatusConvertPage((currentPage) => Math.min(currentPage, statusConvertTotalPages))
   }, [mode, statusConvertTotalPages])
 
+  useEffect(() => {
+    if (mode !== 'adjust') return
+    setAdjustPage((currentPage) => Math.min(currentPage, adjustTotalPages))
+  }, [adjustTotalPages, mode])
+
   const visibleRows = useMemo(() => {
+    if (mode === 'adjust') {
+      const startIndex = (adjustPage - 1) * adjustPageSize
+      return rows.slice(startIndex, startIndex + adjustPageSize)
+    }
     if (mode !== 'status-convert') return rows
     const startIndex = (statusConvertPage - 1) * statusConvertPageSize
     return statusConvertSortedRows.slice(startIndex, startIndex + statusConvertPageSize)
-  }, [mode, rows, statusConvertPage, statusConvertPageSize, statusConvertSortedRows])
+  }, [adjustPage, adjustPageSize, mode, rows, statusConvertPage, statusConvertPageSize, statusConvertSortedRows])
 
   const hasFilters = useMemo(() => {
     if (mode === 'convert') return Boolean(search.trim() || sourceTypeFilter || costStatusFilter)
@@ -335,10 +352,9 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
-      {mode === 'adjust' ? <AdjustPrincipleBox /> : null}
       <SummaryCards mode={mode} rows={rows} />
       {/* Desktop Toolbar (Hidden on Mobile) */}
-      <div className="hidden md:block mb-4 space-y-2 rounded-md bg-white p-3 shadow">
+      <div className="hidden lg:block mb-4 space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <input
             className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -383,11 +399,6 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             </button>
           ) : null}
 
-          {mode !== 'status-convert' ? (
-            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors" type="button" onClick={() => void loadData()}>
-              โหลดใหม่
-            </button>
-          ) : null}
           <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors ml-auto" href={`${pathname}?new=1`}>
             {mode === 'adjust' ? '+ ปรับสต๊อกใหม่' : mode === 'convert' ? '+ ปรับเกรดใหม่' : '+ ปรับสถานะใหม่'}
           </a>
@@ -403,7 +414,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
-      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow md:hidden">
+      <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
         <div className="flex gap-2 items-center">
           <input
             className="min-w-[150px] flex-1 rounded-md border border-slate-300 px-3 h-9 text-sm"
@@ -412,11 +423,6 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          {mode !== 'status-convert' ? (
-            <button className="h-9 rounded-md bg-slate-100 px-2.5 text-xs text-slate-700 border border-slate-200" type="button" onClick={() => void loadData()}>
-              โหลดใหม่
-            </button>
-          ) : null}
           <button
             type="button"
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -437,8 +443,8 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 md:hidden">
-          <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto animate-slide-up">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 lg:hidden">
+          <div className="w-full rounded-t-md bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto animate-slide-up">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองรายการ</h4>
               <button
@@ -509,7 +515,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
               </button>
               <button
                 type="button"
-                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-850"
+                className="h-11 rounded-md bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
                 onClick={() => setShowMobileFilters(false)}
               >
                 ใช้ตัวกรอง
@@ -522,7 +528,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       {/* FAB for Mobile Creation */}
       <a
         aria-label="สร้างรายการใหม่"
-        className="h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg fixed bottom-6 right-6 z-40 md:hidden flex items-center justify-center hover:bg-blue-700"
+        className="h-14 w-14 rounded-full bg-slate-900 text-white shadow-lg fixed bottom-6 right-6 z-40 lg:hidden flex items-center justify-center hover:bg-slate-800"
         href={`${pathname}?new=1`}
       >
         <Plus className="h-6 w-6" />
@@ -539,7 +545,7 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
                 setStatusConvertPage(1)
               }}
             >
-              {STATUS_CONVERT_PAGE_SIZES.map((pageSize) => (
+              {OPERATION_PAGE_SIZES.map((pageSize) => (
                 <option key={pageSize} value={pageSize}>
                   {pageSize} / หน้า
                 </option>
@@ -565,10 +571,51 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
           </div>
         </div>
       ) : null}
+      {mode === 'adjust' ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-normal text-slate-600">
+          <span>
+            พบทั้งหมด {rows.length} รายการ
+            {rows.length > 0 ? `  แสดง ${(adjustPage - 1) * adjustPageSize + 1}-${Math.min(adjustPage * adjustPageSize, rows.length)}` : ''}
+          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <select
+              className="h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-normal text-slate-700"
+              value={String(adjustPageSize)}
+              onChange={(event) => {
+                setAdjustPageSize(Number(event.target.value))
+                setAdjustPage(1)
+              }}
+            >
+              {OPERATION_PAGE_SIZES.map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize} / หน้า
+                </option>
+              ))}
+            </select>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={adjustPage <= 1}
+              type="button"
+              onClick={() => setAdjustPage((currentPage) => Math.max(1, currentPage - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1 text-sm font-normal text-slate-600">หน้า {adjustPage} / {adjustTotalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={adjustPage >= adjustTotalPages}
+              type="button"
+              onClick={() => setAdjustPage((currentPage) => Math.min(adjustTotalPages, currentPage + 1))}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+      ) : null}
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
-          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-md bg-white shadow-xl">
-            <div className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+          <div className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-md bg-white shadow-xl ${mode === 'convert' || mode === 'adjust' ? 'max-w-5xl' : 'max-w-3xl'}`}>
+            <div className="shrink-0 bg-slate-900 px-5 py-4 text-white">
               <h3 className="font-bold text-slate-100">{meta.title}</h3>
               <p className="mt-1 text-xs text-slate-300">{descriptionFor(mode)}</p>
             </div>
@@ -598,7 +645,6 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
           onExport={() => exportConvertDetail(convertDetail.refNo)}
         />
       ) : null}
-      {mode === 'adjust' ? <AdjustUsageBox /> : null}
     </section>
   )
 }
@@ -658,34 +704,6 @@ function SummaryCards({ mode, rows }: { mode: Mode; rows: Payload['rows'] }) {
   )
 }
 
-function AdjustPrincipleBox() {
-  return (
-    <div className="rounded-md border-l-4 border-amber-500 bg-amber-50 p-3 text-xs text-slate-700">
-      <div className="mb-1 font-bold">📒 หลักการทำงาน — Stock correction value</div>
-      <ul className="ml-5 list-disc space-y-0.5">
-        <li>ปรับสต๊อกจริง (qty) ตาม &quot;นับจริง&quot; ของคุณ — ตัดออกหรือเพิ่มเข้า stock_ledger</li>
-        <li><strong>มูลค่ารวม</strong> คำนวณจากราคาต่อกก. ณ วันที่นับ — LOSS ติดลบ, GAIN เป็นบวก</li>
-        <li>รายการ correction อาจกระทบ WAC และ margin จึงต้องตรวจเหตุผลและราคาให้ครบก่อนบันทึก</li>
-        <li>ใช้เมื่อ &quot;หาของไม่เจอ&quot; / &quot;นับจริง 0 แต่ระบบมี&quot; / &quot;นับเกินระบบ&quot;</li>
-      </ul>
-    </div>
-  )
-}
-
-function AdjustUsageBox() {
-  return (
-    <div className="rounded-md border-l-4 border-blue-500 bg-blue-50 p-4 text-sm">
-      <h3 className="mb-1 font-bold">💡 ใช้เมื่อไหร่</h3>
-      <ul className="ml-5 list-disc space-y-1 text-slate-700">
-        <li><strong>หาของไม่เจอ</strong> — ระบบมี 100 กก. แต่นับจริงเหลือ 80 → ใส่ &quot;นับจริง&quot; 80 → ขาด 20 กก. (Note)</li>
-        <li><strong>สต๊อกตัด 0 แต่ในระบบยังมี</strong> — ระบบมี 50 กก. แต่นับจริง 0 → ใส่ &quot;นับจริง&quot; 0 → ขาด 50 กก. (Note)</li>
-        <li><strong>นับเกินระบบ</strong> — ระบบมี 10 กก. แต่นับจริงได้ 25 → ใส่ &quot;นับจริง&quot; 25 → เกิน 15 กก. (Note)</li>
-        <li>เคลื่อนไหวจะเข้า Stock Ledger เป็น <code>STOCK_COUNT_LOSS</code> หรือ <code>STOCK_COUNT_GAIN</code> · qty จริง · value ตาม correction policy</li>
-      </ul>
-    </div>
-  )
-}
-
 function OperationTable({
   isLoading,
   mode,
@@ -713,7 +731,7 @@ function OperationTable({
   return (
     <>
       {/* Mobile Card List (Hidden on Desktop) */}
-      <div className="block space-y-3 md:hidden">
+      <div className="block space-y-3 lg:hidden">
         {isLoading ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-500 shadow">กำลังโหลดข้อมูล</div> : null}
         {!isLoading && rows.map((row, index) => {
           const id = String(row.id ?? index)
@@ -731,8 +749,9 @@ function OperationTable({
               <div key={id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50">
                 <div className="mb-2 flex items-start justify-between">
                   <span className="font-bold text-slate-800">{refNo}</span>
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${adjustType === 'LOSS' ? 'bg-red-100 text-red-700' : adjustType === 'GAIN' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {adjustType === 'LOSS' ? '📉 นับขาด' : adjustType === 'GAIN' ? '📈 นับเกิน' : '-'}
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${adjustType === 'LOSS' ? 'bg-red-100 text-red-700' : adjustType === 'GAIN' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`size-1.5 rounded-full ${adjustType === 'LOSS' ? 'bg-red-500' : adjustType === 'GAIN' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                    {adjustType === 'LOSS' ? 'นับขาด' : adjustType === 'GAIN' ? 'นับเกิน' : '-'}
                   </span>
                 </div>
                 <div className="text-xs text-slate-500">{formatDateTime(row.createdAt)}</div>
@@ -748,7 +767,7 @@ function OperationTable({
                     <div className="font-semibold text-slate-800">{formatMoney(systemQty)} / {formatMoney(countedQty)} กก.</div>
                   </div>
                   <div>
-                    <div className="text-slate-400">Diff น้ำหนัก</div>
+                    <div className="text-slate-400">ส่วนต่าง</div>
                     <div className={`font-semibold ${diffQty < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatMoney(diffQty)} กก.</div>
                   </div>
                   <div>
@@ -892,12 +911,12 @@ function OperationTable({
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
+      <div className="hidden overflow-x-auto rounded-md bg-white shadow lg:block">
         <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1280px] text-sm' : 'w-full min-w-[1500px] text-xs'}>
-          <thead className="border-b border-slate-100 bg-slate-100 text-slate-600">
+          <thead className="border-b border-slate-100 bg-slate-100 text-slate-700">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className={`p-2 ${column.headerClassName?.includes('text-') ? '' : 'text-left'} ${column.headerClassName ?? ''}`}>
+                <th key={column.key} className={`p-2 text-xs font-semibold ${column.headerClassName?.includes('text-') ? '' : 'text-left'} ${column.headerClassName ?? ''}`}>
                   {mode === 'status-convert' && column.sortable && onSortChange ? (
                     <button
                       className={`inline-flex w-full items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 ${column.headerClassName?.includes('text-right') ? 'justify-end' : ''}`}
@@ -915,8 +934,8 @@ function OperationTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 align-top ${mode === 'status-convert' ? 'text-xs font-semibold text-slate-700' : mode === 'adjust' ? 'font-semibold text-slate-700' : ''} ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse, onAdjustCorrect)}</td>)}</tr>)}
+            {isLoading ? <tr><td className="p-8 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 align-top text-xs font-semibold text-slate-700 ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse, onAdjustCorrect)}</td>)}</tr>)}
             {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
           </tbody>
         </table>
@@ -973,38 +992,38 @@ function columnsFor(mode: Mode): OperationColumn[] {
   if (mode === 'convert') return [
     { key: 'sourceType', label: 'Source Type' },
     { key: 'refNo', label: 'เลขที่ / Ref' },
-    { key: 'date', label: 'วันที่' },
+    { key: 'date', label: 'วันที่เอกสาร' },
     { key: 'branchWarehouse', label: 'สาขา / คลัง' },
-    { key: 'sourceProduct', label: 'Source (ออก)', headerClassName: 'bg-red-50' },
-    { key: 'sourceQty', label: 'Qty', cellClassName: 'text-right font-mono text-red-700', headerClassName: 'bg-red-50 text-right' },
-    { key: 'unitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'bg-red-50 text-right' },
-    { key: 'targetProduct', label: 'Target (เข้า)', headerClassName: 'bg-emerald-50' },
-    { key: 'targetQty', label: 'Qty', cellClassName: 'text-right font-mono text-emerald-700', headerClassName: 'bg-emerald-50 text-right' },
-    { key: 'targetUnitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'bg-emerald-50 text-right' },
+    { key: 'sourceProduct', label: 'Source (ออก)' },
+    { key: 'sourceQty', label: 'Qty', cellClassName: 'text-right font-mono text-red-700', headerClassName: 'text-right' },
+    { key: 'unitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
+    { key: 'targetProduct', label: 'Target (เข้า)' },
+    { key: 'targetQty', label: 'Qty', cellClassName: 'text-right font-mono text-emerald-700', headerClassName: 'text-right' },
+    { key: 'targetUnitCost', label: '฿/กก.', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
     { key: 'lossQty', label: 'Loss', cellClassName: 'text-right font-mono' },
     { key: 'costStatus', label: 'Cost Status', cellClassName: 'text-center' },
     { key: 'status', label: 'สถานะ', cellClassName: 'text-center' },
     { key: 'action', label: '' },
   ]
   if (mode === 'adjust') return [
-    { key: 'docNo', label: 'Doc No' },
-    { key: 'date', label: 'วันที่' },
+    { key: 'docNo', label: 'เลขที่เอกสาร' },
+    { key: 'date', label: 'วันที่เอกสาร' },
     { key: 'branchWarehouse', label: 'สาขา/คลัง' },
     { key: 'productName', label: 'สินค้า' },
     { key: 'lotNo', label: 'Lot' },
-    { key: 'outputCategory', label: 'คลัง' },
-    { key: 'systemQty', label: 'ระบบ', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
+    { key: 'outputCategory', label: 'ประเภทคลัง' },
+    { key: 'systemQty', label: 'ยอดในระบบ', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
     { key: 'onHoldQty', label: 'จองไว้', cellClassName: 'text-right font-mono text-amber-700', headerClassName: 'text-right' },
     { key: 'readyQty', label: 'พร้อมใช้', cellClassName: 'text-right font-mono text-emerald-700', headerClassName: 'text-right' },
     { key: 'countedQty', label: 'นับจริง', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
-    { key: 'diffQty', label: 'Diff', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
+    { key: 'diffQty', label: 'ส่วนต่าง', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
     { key: 'adjustType', label: 'ประเภท' },
     { key: 'unitPricePerKg', label: 'ราคา/กก.', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
-    { key: 'totalValue', label: 'มูลค่ารวม', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
+    { key: 'totalValue', label: 'มูลค่ารวม (บาท)', cellClassName: 'text-right font-mono', headerClassName: 'text-right' },
     { key: 'reason', label: 'เหตุผล' },
     { key: 'createdAt', label: 'วันที่สร้างรายการ' },
     { key: 'updatedBy', label: 'แก้ไขโดย' },
-    { key: 'action', label: 'การกระทำ', cellClassName: 'text-center', headerClassName: 'text-center' },
+    { key: 'action', label: 'แก้ไข', cellClassName: 'text-center', headerClassName: 'text-center' },
   ]
   return []
 }
@@ -1088,16 +1107,15 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
       return (
         <div className="flex items-center justify-center gap-1">
           <button
-            className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             disabled={!onConvertDetail}
             type="button"
             onClick={() => onConvertDetail?.(refNo)}
           >
             รายละเอียด
           </button>
-          <button className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 opacity-60" disabled title="Cost allocation ถูกทำตอน Post แล้ว" type="button">ยืนยันต้นทุน</button>
           <button
-            className="rounded-md bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
+            className="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
             disabled={status === 'reversed' || !onConvertReverse}
             type="button"
             onClick={() => onConvertReverse?.(refNo)}
@@ -1126,21 +1144,22 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
   }
   if (mode === 'adjust') {
     if (key === 'action') {
-      return <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60" disabled={!row.canEdit || !onAdjustCorrect} title={row.canEdit ? 'แก้ไขได้ภายใน 7 วัน' : 'หมดช่วงแก้ไข 7 วันแล้ว'} type="button" onClick={() => onAdjustCorrect?.(row)}>แก้ไข</button>
+      return <button className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60" disabled={!row.canEdit || !onAdjustCorrect} title={row.canEdit ? 'แก้ไขได้ภายใน 7 วัน' : 'หมดช่วงแก้ไข 7 วันแล้ว'} type="button" onClick={() => onAdjustCorrect?.(row)}>แก้ไข</button>
     }
     if (key === 'createdAt') return formatDateTime(row.createdAt)
     if (key === 'adjustType') {
       const value = String(row[key] ?? '')
       const color = value === 'LOSS' ? 'bg-red-100 text-red-700' : value === 'GAIN' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-      const label = value === 'LOSS' ? '📉 นับขาด' : value === 'GAIN' ? '📈 นับเกิน' : '-'
-      return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{label}</span>
+      const dotColor = value === 'LOSS' ? 'bg-red-500' : value === 'GAIN' ? 'bg-emerald-500' : 'bg-slate-400'
+      const label = value === 'LOSS' ? 'นับขาด' : value === 'GAIN' ? 'นับเกิน' : '-'
+      return <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}><span className={`size-1.5 rounded-full ${dotColor}`} />{label}</span>
     }
     if (key === 'status') {
       const value = String(row[key] ?? '')
       return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">{value || 'posted'}</span>
     }
     if (key === 'outputCategory') {
-      return <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{formatCell(row[key])}</span>
+      return formatCell(row[key])
     }
     if (key === 'diffQty') {
       const value = Number(row[key] ?? 0)
@@ -1165,70 +1184,74 @@ function ConvertDetailModal({ detail, isLoading, onClose, onExport }: { detail: 
   const totalCost = detail.lines.reduce((sum, line) => sum + line.totalCost, 0)
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-10">
-      <div className="w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl border-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 text-white px-5 py-4 rounded-t-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-white shadow-2xl">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 px-5 py-4 text-white">
           <div>
             <h3 className="font-bold text-white text-base">Cost Allocation Detail · {detail.refNo}</h3>
             <div className="mt-1 text-xs text-slate-400">{detail.date} · {detail.branchWarehouse || '-'} · {detail.status}</div>
           </div>
-          <div className="flex items-center gap-2.5">
-            <button className="rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-medium text-sm px-4 py-2 border-0 outline-none focus:ring-0 transition-colors" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
-            <button className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-xl leading-none" type="button" onClick={onClose}>&times;</button>
+          <button className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100 disabled:opacity-50" disabled={isLoading} type="button" onClick={onExport}>ส่งออก CSV</button>
+        </div>
+        <div className="overflow-y-auto bg-slate-50">
+          <div className="grid grid-cols-2 gap-3 border-b border-slate-100 p-4 md:grid-cols-4 lg:grid-cols-5">
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Source Qty" value={`${formatMoney(detail.sourceQty)} กก.`} />
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Qty" value={`${formatMoney(detail.targetQty)} กก.`} />
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Loss" value={`${formatMoney(detail.lossQty)} กก.`} />
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Qty" value={`${formatMoney(totalQty)} กก.`} />
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Cost" value={formatMoney(totalCost)} />
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Policy" value={detail.targetCostPolicy} />
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Target ฿/กก." value={formatMoney(detail.targetUnitCost)} />
+            <Metric cardClassName="rounded-md bg-white border border-slate-200/60 p-3 shadow-sm" label="Variance" value={formatMoney(detail.targetCostVariance)} />
+          </div>
+          <div className="p-4">
+            <div className="overflow-auto rounded-md bg-white shadow">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead className="border-b border-slate-100 bg-slate-100 text-slate-700">
+                  <tr>
+                    <th className="p-2 text-left text-xs font-semibold">Line</th>
+                    <th className="p-2 text-left text-xs font-semibold">Source Pool</th>
+                    <th className="p-2 text-left text-xs font-semibold">Source Product</th>
+                    <th className="p-2 text-left text-xs font-semibold">Target Pool</th>
+                    <th className="p-2 text-left text-xs font-semibold">Target Product</th>
+                    <th className="p-2 text-right text-xs font-semibold">Qty</th>
+                    <th className="p-2 text-right text-xs font-semibold">฿/กก.</th>
+                    <th className="p-2 text-right text-xs font-semibold">Cost</th>
+                    <th className="p-2 text-center text-xs font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {detail.lines.map((line) => (
+                    <tr key={`${line.lineNo}-${line.sourcePoolId ?? 'source'}`} className="hover:bg-slate-50">
+                      <td className="p-2 align-top font-mono text-xs font-semibold text-slate-700">{line.lineNo}</td>
+                      <td className="p-2 align-top text-xs font-semibold text-slate-700">
+                        <div>{line.sourceRefNo ?? line.sourceType ?? '-'}</div>
+                        <div className="text-xs text-slate-500">Pool {line.sourcePoolId ?? '-'}{line.sourceLotNo ? ` · Lot ${line.sourceLotNo}` : ''}</div>
+                      </td>
+                      <td className="p-2 align-top text-xs font-semibold text-slate-700">{line.sourceProduct}</td>
+                      <td className="p-2 align-top text-xs font-semibold text-slate-700">
+                        <div>Pool {line.targetPoolId ?? '-'}</div>
+                        <div className="text-xs text-slate-500">{line.targetPoolStatus ?? '-'}{line.targetLotNo ? ` · Lot ${line.targetLotNo}` : ''}</div>
+                      </td>
+                      <td className="p-2 align-top text-xs font-semibold text-slate-700">{line.targetProduct}</td>
+                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700">{formatMoney(line.qty)}</td>
+                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700">{formatMoney(line.unitCost)}</td>
+                      <td className="p-2 align-top text-right font-mono text-xs font-semibold text-slate-700">{formatMoney(line.totalCost)}</td>
+                      <td className="p-2 align-top text-center">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${line.allocationStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{line.allocationStatus}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {!detail.lines.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่พบ allocation lines สำหรับเอกสารนี้</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 border-b border-slate-100 p-5 bg-slate-50/30">
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Source Qty" value={`${formatMoney(detail.sourceQty)} กก.`} />
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Qty" value={`${formatMoney(detail.targetQty)} กก.`} />
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Loss" value={`${formatMoney(detail.lossQty)} กก.`} />
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Qty" value={`${formatMoney(totalQty)} กก.`} />
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Allocated Cost" value={formatMoney(totalCost)} />
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Target Policy" value={detail.targetCostPolicy} />
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Target ฿/กก." value={formatMoney(detail.targetUnitCost)} />
-          <Metric cardClassName="rounded-xl bg-white border border-slate-200/60 p-3 shadow-sm" label="Variance" value={formatMoney(detail.targetCostVariance)} />
-        </div>
-        <div className="max-h-[55vh] overflow-auto p-5">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100">
-              <tr>
-                <th className="p-2 text-left">Line</th>
-                <th className="p-2 text-left">Source Pool</th>
-                <th className="p-2 text-left">Source Product</th>
-                <th className="p-2 text-left">Target Pool</th>
-                <th className="p-2 text-left">Target Product</th>
-                <th className="p-2 text-right">Qty</th>
-                <th className="p-2 text-right">฿/กก.</th>
-                <th className="p-2 text-right">Cost</th>
-                <th className="p-2 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.lines.map((line) => (
-                <tr key={`${line.lineNo}-${line.sourcePoolId ?? 'source'}`} className="border-t border-slate-100">
-                  <td className="p-2 font-mono">{line.lineNo}</td>
-                  <td className="p-2">
-                    <div className="font-semibold text-slate-700">{line.sourceRefNo ?? line.sourceType ?? '-'}</div>
-                    <div className="text-xs text-slate-500">Pool {line.sourcePoolId ?? '-'}{line.sourceLotNo ? ` · Lot ${line.sourceLotNo}` : ''}</div>
-                  </td>
-                  <td className="p-2">{line.sourceProduct}</td>
-                  <td className="p-2">
-                    <div className="font-semibold text-slate-700">Pool {line.targetPoolId ?? '-'}</div>
-                    <div className="text-xs text-slate-500">{line.targetPoolStatus ?? '-'}{line.targetLotNo ? ` · Lot ${line.targetLotNo}` : ''}</div>
-                  </td>
-                  <td className="p-2">{line.targetProduct}</td>
-                  <td className="p-2 text-right font-mono">{formatMoney(line.qty)}</td>
-                  <td className="p-2 text-right font-mono">{formatMoney(line.unitCost)}</td>
-                  <td className="p-2 text-right font-mono">{formatMoney(line.totalCost)}</td>
-                  <td className="p-2 text-center">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${line.allocationStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{line.allocationStatus}</span>
-                  </td>
-                </tr>
-              ))}
-              {!detail.lines.length ? <tr><td className="p-6 text-center text-slate-400" colSpan={9}>ไม่พบ allocation lines สำหรับเอกสารนี้</td></tr> : null}
-            </tbody>
-          </table>
-        </div>
-        <div className="border-t border-slate-100 bg-slate-50 px-5 py-4 text-xs text-slate-500 rounded-b-2xl">
-          เหตุผล: {detail.reason || '-'} · หมายเหตุ: {detail.notes || '-'} · เหตุผล override: {detail.targetCostReason || '-'}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4">
+          <div className="text-xs text-slate-500">
+            เหตุผล: {detail.reason || '-'} · หมายเหตุ: {detail.notes || '-'} · เหตุผล override: {detail.targetCostReason || '-'}
+          </div>
+          <button className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
     </div>
@@ -1259,8 +1282,8 @@ function Metric({
   }
 
   return (
-    <div className={`bg-white p-3 sm:p-4 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-3 ${className}`}>
-      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
+    <div className={`bg-white p-3 sm:p-4 border border-slate-200 rounded-md shadow-sm flex items-center gap-2.5 sm:gap-3 ${className}`}>
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-md ${iconBg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
         {emoji ?? '•'}
       </div>
       <div className="flex-1 min-w-0">
@@ -1658,11 +1681,11 @@ function ConvertForm(props: { cancelHref: string; isSaving: boolean; error?: str
   }, [props.reference.products])
 
   return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} error={props.error} onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2 animate-fade-in">
+    <div className="md:col-span-2 rounded-md border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2 animate-fade-in">
       <BaseDateDoc values={values} setValues={setValues} />
       <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
     </div>
-    <div className="rounded-xl border border-red-200 bg-red-50/40 p-5 shadow-sm md:col-span-2">
+    <div className="rounded-md border border-red-200 bg-red-50/40 p-5 shadow-sm md:col-span-2">
       <div className="mb-3 text-sm font-bold text-red-700">Source (ออก)</div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="w-full">
@@ -1704,7 +1727,7 @@ function ConvertForm(props: { cancelHref: string; isSaving: boolean; error?: str
         </div>
       </div>
     </div>
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm md:col-span-2">
+    <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm md:col-span-2">
       <div className="mb-3 text-sm font-bold text-emerald-700">Target (เข้า)</div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="w-full">
@@ -1738,7 +1761,7 @@ function ConvertForm(props: { cancelHref: string; isSaving: boolean; error?: str
         ) : null}
       </div>
     </div>
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
+    <div className="rounded-md border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
       <div className="mb-3 text-sm font-bold text-slate-700">Loss / Yield / Cost Flow</div>
       <div className="grid gap-4 md:grid-cols-3">
         <ReadOnlyBox label="Loss" value={`${formatMoney(lossQty)} กก.`} />
@@ -1810,7 +1833,7 @@ function AdjustForm(props: { cancelHref: string; isSaving: boolean; error?: stri
   }, [props.reference.products])
 
   return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} error={props.error} onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+    <div className="md:col-span-2 rounded-md border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
       <BaseDateDoc values={values} setValues={setValues} />
       <div className="w-full">
         <SearchCombobox
@@ -1825,13 +1848,13 @@ function AdjustForm(props: { cancelHref: string; isSaving: boolean; error?: stri
       <BranchWarehouseFields branchId={values.branchId} reference={props.reference} setBranchId={(branchId) => setValues({ ...values, branchId, warehouseId: '' })} setWarehouseId={(warehouseId) => setValues({ ...values, warehouseId })} warehouseId={values.warehouseId} />
       <Field label="นับจริง" type="number" value={String(values.countedQty)} onChange={(countedQty) => setValues({ ...values, countedQty: Number(countedQty) })} />
       <div className="md:col-span-2 grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs md:grid-cols-5">
-        <ReadOnlyBox label="ระบบมี" value={isSnapshotLoading ? 'กำลังโหลด' : `${formatMoney(snapshot?.systemQty ?? values.systemQty)} กก.`} />
+        <ReadOnlyBox label="ยอดในระบบ" value={isSnapshotLoading ? 'กำลังโหลด' : `${formatMoney(snapshot?.systemQty ?? values.systemQty)} กก.`} />
         <ReadOnlyBox label="จองไว้" value={`${formatMoney(snapshot?.onHoldQty ?? 0)} กก.`} />
         <ReadOnlyBox label="พร้อมใช้" value={`${formatMoney(snapshot?.readyQty ?? 0)} กก.`} />
         <ReadOnlyBox label="ราคา/กก." value={formatMoney(snapshot?.unitPricePerKg ?? values.unitPricePerKg ?? 0)} />
         <ReadOnlyBox label="มูลค่ารวม" value={formatMoney(snapshot?.totalValue ?? values.totalValue ?? 0)} valueClassName={(snapshot?.totalValue ?? values.totalValue ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'} />
         <div className="md:col-span-5 text-slate-600">
-          {snapshotError ? <span className="text-red-700">{snapshotError}</span> : <>Diff: <b className={(snapshot?.diffQty ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}>{formatMoney(snapshot?.diffQty ?? 0)} กก.</b> · Price source: {snapshot?.priceSource ?? '-'}</>}
+          {snapshotError ? <span className="text-red-700">{snapshotError}</span> : <>ส่วนต่าง: <b className={(snapshot?.diffQty ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'}>{formatMoney(snapshot?.diffQty ?? 0)} กก.</b> · แหล่งราคา: {snapshot?.priceSource ?? '-'}</>}
         </div>
       </div>
       <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
