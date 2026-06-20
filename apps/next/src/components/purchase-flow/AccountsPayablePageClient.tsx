@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
@@ -118,6 +119,18 @@ export function AccountsPayablePageClient() {
   const [to, setTo] = useState(todayDateInput())
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const hasFilters = Boolean(branchId || bucket || channelId || from || q.trim() || status || supplierId || to)
+
+  const supplierOptions = useMemo(() => {
+    const list = data?.filters.suppliers ?? []
+    return [
+      { id: '', label: 'ผู้ขายทั้งหมด' },
+      ...list.map((s) => ({
+        id: s.id,
+        label: s.code ? `${s.code} - ${s.name}` : s.name,
+        searchText: `${s.code ?? ''} ${s.name}`,
+      })),
+    ]
+  }, [data?.filters.suppliers])
 
 
   const query = useMemo(() => {
@@ -317,10 +330,21 @@ export function AccountsPayablePageClient() {
             
             <input className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" placeholder="ค้นหาเลขบิล / ผู้ขาย / ช่องทาง / สาขา" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
             
-            <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={supplierId} onChange={(event) => { setPage(1); setSupplierId(event.target.value) }}>
-              <option value="">ผู้ขายทั้งหมด</option>
-              {(data?.filters.suppliers ?? []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.code ? `${supplier.code} - ${supplier.name}` : supplier.name}</option>)}
-            </select>
+            <div className="min-w-[260px]">
+              <SearchCombobox
+                hideLabel
+                inputClassName="h-9 text-sm rounded-lg border-slate-300 focus:border-slate-400 focus:ring-0 outline-none"
+                inputId="ap-supplier-filter"
+                label="Supplier"
+                options={supplierOptions}
+                placeholder="ผู้ขายทั้งหมด"
+                value={supplierId}
+                onChange={(value) => {
+                  setPage(1)
+                  setSupplierId(value)
+                }}
+              />
+            </div>
             
             <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" value={channelId} onChange={(event) => { setPage(1); setChannelId(event.target.value) }}>
               <option value="">ทุกช่องทาง</option>
@@ -418,10 +442,19 @@ export function AccountsPayablePageClient() {
 
           {showMobileFilters && (
             <div className="grid grid-cols-1 gap-2.5 pt-2 border-t border-slate-100 animate-in slide-in-from-top-2 duration-100">
-              <select className="w-full rounded-md border px-3 py-2 text-sm" value={supplierId} onChange={(event) => { setPage(1); setSupplierId(event.target.value) }}>
-                <option value="">ผู้ขายทั้งหมด</option>
-                {(data?.filters.suppliers ?? []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.code ? `${supplier.code} - ${supplier.name}` : supplier.name}</option>)}
-              </select>
+              <SearchCombobox
+                hideLabel
+                inputClassName="h-9 text-sm rounded-lg border-slate-300 focus:border-slate-400 focus:ring-0 outline-none w-full"
+                inputId="ap-supplier-filter-mobile"
+                label="Supplier"
+                options={supplierOptions}
+                placeholder="ผู้ขายทั้งหมด"
+                value={supplierId}
+                onChange={(value) => {
+                  setPage(1)
+                  setSupplierId(value)
+                }}
+              />
               <select className="w-full rounded-md border px-3 py-2 text-sm" value={channelId} onChange={(event) => { setPage(1); setChannelId(event.target.value) }}>
                 <option value="">ทุกช่องทาง</option>
                 {(data?.filters.channels ?? []).map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}

@@ -113,7 +113,7 @@ export async function GET(request: Request) {
       prisma.sales_bills.findMany({
         include: {
           branches: { select: { code: true, id: true, name: true } },
-          customers: { select: { code: true, credit_term: true, id: true, name: true } },
+          customers: { select: { code: true, credit_term: true, id: true, name: true, market_scope: true } },
           sales_channels: { select: { code: true, id: true, name: true } },
         },
         orderBy: [{ date: 'asc' }, { doc_no: 'asc' }],
@@ -189,6 +189,7 @@ export async function GET(request: Request) {
           docNo: bill.doc_no,
           dueDate: toDateOnly(due),
           id: bill.doc_no,
+          marketScope: bill.customers?.market_scope ?? 'ในประเทศ',
           receivableBalance,
           receivedAmount,
           status: bill.status ?? 'open',
@@ -308,6 +309,8 @@ export async function GET(request: Request) {
           est: pendingIssues.reduce((sum, row) => sum + toNumber(row.total_est_amount), 0),
         },
         total: allRows.reduce((sum, row) => sum + row.receivableBalance, 0),
+        domestic: allRows.filter((row) => row.marketScope === 'ในประเทศ').reduce((sum, row) => sum + row.receivableBalance, 0),
+        overseas: allRows.filter((row) => row.marketScope === 'ต่างประเทศ').reduce((sum, row) => sum + row.receivableBalance, 0),
       },
     })
   } catch (caught) {

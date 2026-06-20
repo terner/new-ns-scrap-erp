@@ -48,9 +48,26 @@ function missing(value: string | null | undefined) {
   return value?.trim() || 'ไม่มีข้อมูล'
 }
 
+function cleanNote(note: string | null | undefined): string {
+  if (!note) return '-'
+  return note
+    .replace(/\s*\(\s*([^)]+?)\s+\d+(?:\.\d+)?\s*kg\s*\)/gi, ' ($1)')
+    .replace(/\s*\([\d.]+\s*kg\)/gi, '')
+    .replace(/\s*[\d.]+\s*kg/gi, '')
+    .trim()
+}
+
+function cleanImpurityName(name: string | null | undefined): string {
+  if (!name) return ''
+  return name
+    .replace(/\s*\([\d.]+\s*kg\)/gi, '')
+    .replace(/\s*[\d.]+\s*kg/gi, '')
+    .trim()
+}
+
 export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: CompanyProfilePrintValues) {
   const isReceipt = ticket.type === 'WTI'
-  const docTitle = isReceipt ? 'ใบชั่งน้ำหนัก/ใบรับสินค้า' : 'ใบชั่งน้ำหนัก/ใบส่งของ'
+  const docTitle = isReceipt ? 'ใบชั่งน้ำหนัก / ใบรับสินค้า' : 'ใบชั่งน้ำหนัก / ใบส่งของ'
   const partyLabel = isReceipt ? 'ผู้ขาย/ผู้ส่งของ' : 'ลูกค้า/ผู้รับสินค้า'
   const signatureLeft = isReceipt ? 'ผู้ส่งสินค้า' : 'ผู้ส่งของ'
   const signatureMiddle = isReceipt ? 'ผู้รับเข้าคลัง' : 'ผู้รับของ'
@@ -72,31 +89,51 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     .filter(Boolean)
     .join('')
 
-  // Find parent line for each line (only relevant for WTI where deductions/impurities exist)
+  // Find parent line and cumulative preceding values for each child line
   const parentMap = new Map<string, typeof ticket.lines[number]>()
+  const childPrecedingSums = new Map<string, { gross: number; container: number }>()
   let currentParent: typeof ticket.lines[number] | null = null
+  let runningGrossSum = 0
+  let runningContainerSum = 0
   ticket.lines.forEach((line) => {
     if (line.grossWeightValue > 0) {
       currentParent = line
-    } else if (line.grossWeightValue === 0 && line.impurityId && currentParent) {
+      runningGrossSum += line.grossWeightValue
+      runningContainerSum += line.containerDeductionWeightValue
+    } else if (line.grossWeightValue === 0 && (line.impurityId || line.deductionWeight > 0) && currentParent) {
       parentMap.set(line.id, currentParent)
+      childPrecedingSums.set(line.id, { gross: runningGrossSum, container: runningContainerSum })
+    }
+  })
+
+  // Precalculate rank indices for non-child rows
+  const rankMap = new Map<string, number>()
+  let currentRank = 0
+  ticket.lines.forEach((line) => {
+    const parent = parentMap.get(line.id)
+    if (isReceipt && parent) {
+      // Child row, does not get a rank index
+    } else {
+      currentRank++
+      rankMap.set(line.id, currentRank)
     }
   })
 
   function rowHtml(line: WeightTicketRecord['lines'][number], index: number) {
     const parent = parentMap.get(line.id)
     if (isReceipt && parent) {
-      const netWeight = parent.grossWeightValue - parent.containerDeductionWeightValue - line.deductionWeight
+      const sums = childPrecedingSums.get(line.id) || { gross: parent.grossWeightValue, container: parent.containerDeductionWeightValue }
+      const netWeight = sums.gross - sums.container - line.deductionWeight
       return `
         <tr class="item-row">
           <td class="c rank-cell"></td>
           <td>
             <div class="item-name">${escapeHtml(line.productName)}</div>
-            <div class="muted">${escapeHtml(line.impurityName || 'หักสิ่งเจือปน')}</div>
-            <div class="muted">${escapeHtml(line.note || '-')}</div>
+            <div class="muted">${escapeHtml(cleanImpurityName(line.impurityName) || 'หักสิ่งเจือปน')}</div>
+            <div class="muted">${escapeHtml(cleanNote(line.note))}</div>
           </td>
-          <td class="r">${formatPrintableWeight(parent.grossWeightValue)}</td>
-          <td class="r">- ${formatPrintableWeight(parent.containerDeductionWeightValue)}</td>
+          <td class="r">${formatPrintableWeight(sums.gross)}</td>
+          <td class="r">- ${formatPrintableWeight(sums.container)}</td>
           <td class="r">- ${formatPrintableWeight(line.deductionWeight)}</td>
           <td class="r strong">= ${formatPrintableWeight(netWeight)}</td>
         </tr>
@@ -105,7 +142,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
 
     return `
       <tr class="item-row">
-        <td class="c rank-cell">${index + 1}</td>
+        <td class="c rank-cell">${rankMap.get(line.id) ?? ''}</td>
         <td>
           <div class="item-name">${escapeHtml(line.productName)}</div>
           <div class="muted">${escapeHtml(line.note || '-')}</div>
@@ -113,9 +150,9 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
         <td class="r">${formatPrintableNumber(line.grossWeightValue)}</td>
         ${isReceipt ? `
         <td class="r">${formatPrintableNumber(line.containerDeductionWeightValue)}</td>
-        <td class="r">${escapeHtml(line.impurityName || '-')}</td>
+        <td class="r">${escapeHtml(cleanImpurityName(line.impurityName) || '-')}</td>
         ` : ''}
-        <td class="r strong">${formatPrintableNumber(line.netWeight)}</td>
+        <td class="r strong">${formatPrintableNumber(isReceipt ? (line.grossWeightValue - line.containerDeductionWeightValue) : line.netWeight)}</td>
       </tr>
     `
   }

@@ -47,7 +47,7 @@ updated: 2026-06-12
 |---|---|---|---|
 | `PMT` status `จ่ายแล้ว` | Payment Voucher / ใบสำคัญจ่าย | ได้ | มีการจ่ายจริงแล้ว มี `PMT`, bank/payment split, และ payment timeline |
 | `PMT` status `ยกเลิก` | Payment Voucher ฉบับยกเลิก / สำเนาการยกเลิกการจ่าย | ได้ | ต้องใช้เป็นหลักฐาน audit ว่าเคยจ่ายแล้วถูก cancel/reverse; เอกสารต้องมีลายน้ำ/สถานะ `ยกเลิก` |
-| `PMA` voided ที่ยังไม่มี `PMT` | ใบยกเลิกรายการอนุมัติจ่าย / PMA void snapshot | ได้ แต่ไม่ใช่ Payment Voucher | ยังไม่เกิดการจ่ายจริง จึงห้ามพิมพ์เป็น PMT; ใช้แสดงว่า approval item ถูกยกเลิกก่อนจ่าย |
+| `PMA` voided ที่ยังไม่มี `PMT` | ห้ามพิมพ์ | ไม่ได้ | อัปเดตการตัดสินใจ (2026-06-20): รายการอนุมัติที่ถูกยกเลิกแล้ว (voided) ในหน้าอนุมัติจ่ายเงิน ทั้ง 4 หมวด จะต้องไม่สามารถสั่งพิมพ์ได้ในทุกกรณีเพื่อป้องกันความเสี่ยงทางการเงิน |
 | `PMA` status `รอจ่าย` ใน queue | ไม่มีเอกสาร PMT | ไม่ได้จาก history | ยังอยู่ในแท็บ `จ่ายเงิน Supplier`; ถ้าต้องพิมพ์ให้ใช้เอกสาร PMA approval sheet ไม่ใช่ PMT |
 | `PB/ADV/EXP` pending source | ไม่มีเอกสารจ่าย | ไม่ได้ | ยังไม่อนุมัติและยังไม่เกิด snapshot PMA/PMT |
 
@@ -58,10 +58,10 @@ updated: 2026-06-12
 - เอกสารพิมพ์ประจำวันต้องใช้ date filter ของ history เป็น source หลัก; แท็บประวัติการจ่ายเงินต้อง default filter วันที่เป็นวันที่ปัจจุบันของ timezone ระบบ/ผู้ใช้ตอนเปิดหน้า/เข้าแท็บ แต่ปุ่มล้าง filter ต้องล้างเป็นทุกวัน
 - Per user clarification on 2026-06-09, daily print ข้าม `PMA` ไปก่อนและรวมเฉพาะ PMT ในช่วงวันที่นั้น ได้แก่ `PMT จ่ายแล้ว` และ `PMT ยกเลิก`
 - เอกสารพิมพ์ประจำวันต้องมีหัวบริษัท, วันที่รายงาน, เวลาพิมพ์, summary จำนวน `PMT ทั้งหมด`, จำนวน `จ่ายแล้ว`, จำนวน `ยกเลิก`, ยอดเงินออกสุทธิ, และตารางรายการ PMT/source/ผู้รับเงิน/บัญชี/ยอดเงิน/สถานะ
-- ยอดรวมสำหรับ downstream cash-out ต้องนับเฉพาะ `PMT จ่ายแล้ว`; `PMT ยกเลิก` แสดงเพื่อ audit แต่ไม่รวมเป็นยอดเงินออกสุทธิ
+- ยอดรวมสำหรับ downstream cash-out must count only `PMT จ่ายแล้ว`; `PMT ยกเลิก` แสดงเพื่อ audit แต่ไม่รวมเป็นยอดเงินออกสุทธิ
 - row click ยังคงเปิด detail modal ได้; ปุ่มพิมพ์ต้องไม่เปิด route แยก `/purchase/payments/{id}`
 - ถ้า row เป็น direct `EXP -> PMT` ที่ไม่มี `PMA`, เอกสาร PMT ต้องแสดง source เป็น `EXP...` จาก `payments.lines.sourceDocNo`
-- ถ้า row เป็น `PMA voided` ที่ไม่มี PMT, modal/print ต้องใช้ heading ว่า `รายละเอียดอนุมัติจ่าย / PMA` หรือ `ใบยกเลิกรายการอนุมัติจ่าย` ไม่ใช้คำว่า Payment Voucher
+- ถ้า row เป็น `PMA voided` ที่ไม่มี PMT: อัปเดตการตัดสินใจ (2026-06-20) ไม่อนุญาตให้สั่งพิมพ์ใบอนุมัติสำหรับรายการที่ยกเลิกแล้ว (voided) ในหน้าอนุมัติจ่ายเงิน
 - downstream accounting/report/bank posting ต้องใช้เฉพาะ `PMT จ่ายแล้ว`; print ของ `ยกเลิก` เป็น audit copy ไม่ใช่ posted cash-out
 
 ## Implementation Order

@@ -65,7 +65,7 @@ export function CostPoolPageClient() {
   const [error, setError] = useState<string | null>(null)
   const [fromDate, setFromDate] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const [productId, setProductId] = useState('all')
+  const [productId, setProductId] = useState('')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('FIFO')
   const [sourceType, setSourceType] = useState('all')
@@ -78,7 +78,7 @@ export function CostPoolPageClient() {
     params.set('availableOnly', String(availableOnly))
     if (costType !== 'all') params.set('costType', costType)
     if (fromDate) params.set('from', fromDate)
-    if (productId !== 'all') params.set('productId', productId)
+    if (productId) params.set('productId', productId)
     if (search.trim()) params.set('q', search.trim())
     if (sort !== 'FIFO') params.set('sort', sort)
     if (sourceType !== 'all') params.set('sourceType', sourceType)
@@ -104,22 +104,21 @@ export function CostPoolPageClient() {
   }, [loadData])
 
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
-    const list = (data?.filters.products ?? []).map((product) => ({
+    return (data?.filters.products ?? []).map((product) => ({
       id: product.id,
       label: product.name,
       searchText: product.name.toLowerCase(),
     }))
-    return [{ id: 'all', label: 'ทุกสินค้า', searchText: 'ทุกสินค้า all' }, ...list]
   }, [data?.filters.products])
 
   const exportHref = `/api/dual-costing/cost-pool?${queryString ? `${queryString}&` : ''}format=xlsx`
-  const hasActiveFilters = Boolean(search || fromDate || toDate || productId !== 'all' || costType !== 'all' || sourceType !== 'all' || status !== 'all' || !availableOnly || sort !== 'FIFO')
+  const hasActiveFilters = Boolean(search || fromDate || toDate || productId !== '' || costType !== 'all' || sourceType !== 'all' || status !== 'all' || !availableOnly || sort !== 'FIFO')
 
   function resetFilters() {
     setAvailableOnly(true)
     setCostType('all')
     setFromDate('')
-    setProductId('all')
+    setProductId('')
     setSearch('')
     setSort('FIFO')
     setSourceType('all')
@@ -181,9 +180,9 @@ export function CostPoolPageClient() {
                 inputId="cost-pool-product-filter"
                 label="สินค้า"
                 options={productSearchOptions}
-                placeholder="ค้นหาสินค้า"
+                placeholder="ทุกสินค้า"
                 value={productId}
-                onChange={(value) => setProductId(value || 'all')}
+                onChange={(value) => setProductId(value || '')}
               />
             </div>
             <Select aria-label="Cost Type" className="w-auto min-w-[140px] h-9 border-slate-300 focus-visible:ring-emerald-100" value={costType} onChange={(event) => setCostType(event.target.value)}>
@@ -259,9 +258,9 @@ export function CostPoolPageClient() {
                   inputId="cost-pool-product-filter-mobile"
                   label="สินค้า"
                   options={productSearchOptions}
-                  placeholder="ค้นหาสินค้า"
+                  placeholder="ทุกสินค้า"
                   value={productId}
-                  onChange={(value) => setProductId(value || 'all')}
+                  onChange={(value) => setProductId(value || '')}
                 />
               </label>
               <div className="grid grid-cols-2 gap-2">

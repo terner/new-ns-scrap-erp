@@ -348,7 +348,7 @@ export function PaymentApprovalPageClient() {
   }, [tab])
 
   const isPrintable = useCallback((row: ApprovalApRow | ApprovalExpenseRow) => {
-    return row.approvalStatus === 'approved' || row.approvalStatus === 'voided'
+    return row.approvalStatus === 'approved'
   }, [])
 
   const printablePageRows = useMemo(() => {
@@ -1231,7 +1231,7 @@ export function PaymentApprovalPageClient() {
           </div>
 
           <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50 shrink-0">
-            {detail && (detail.row.approvalStatus === 'approved' || detail.row.approvalStatus === 'voided') ? (
+            {detail && isPrintable(detail.row) ? (
               <Button
                 className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1"
                 type="button"

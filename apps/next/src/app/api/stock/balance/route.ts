@@ -42,6 +42,7 @@ export async function GET(request: Request) {
         คลังจัดเก็บ: row.warehouseName,
         Lot: row.lotNo,
         คงเหลือ: row.qty,
+        ซื้อรอรับ: row.awaitingBillQty,
         จองไว้: row.onHoldQty,
         พร้อมส่ง: row.readyQty,
         มูลค่า: row.value,

@@ -235,7 +235,32 @@ export async function stockBalanceSnapshot(input: {
     ...(normalizedInput.warehouseId ? { warehouse_id: normalizedInput.warehouseId } : {}),
   } satisfies Prisma.stock_holdsWhereInput
   const q = input.q?.trim() || null
-  const [ledgerRows, holdSums] = await Promise.all([
+
+  // Build unbilled weight query clauses
+  const awaitingBillWhere: Prisma.Sql[] = [
+    Prisma.sql`wt.doc_type = 'WTI'`,
+    Prisma.sql`wt.status in ('received', 'partially_billed')`,
+    Prisma.sql`wt.cancelled_at is null`
+  ]
+  if (normalizedInput.branchId) {
+    awaitingBillWhere.push(Prisma.sql`wt.branch_id = ${normalizedInput.branchId}`)
+  }
+  if (normalizedInput.productId) {
+    awaitingBillWhere.push(Prisma.sql`wtl.product_id = ${normalizedInput.productId}`)
+  }
+  if (normalizedInput.warehouseId) {
+    awaitingBillWhere.push(Prisma.sql`wtl.warehouse_id = ${normalizedInput.warehouseId}`)
+  }
+  if (input.status) {
+    awaitingBillWhere.push(Prisma.sql`coalesce(w.type, 'RM') = ${input.status}`)
+  }
+
+  const awaitingBillWhereSql = Prisma.join(awaitingBillWhere, ' and ')
+  const qSql = q
+    ? Prisma.sql`and concat_ws(' ', p.code, p.name, p.metal_group, b.name, w.name, coalesce(w.type, 'RM')) ilike ${`%${q}%`}`
+    : Prisma.sql``
+
+  const [ledgerRows, holdSums, awaitingBills] = await Promise.all([
     prisma.$queryRaw<StockBalanceAggregateRow[]>`
       with ledger_balance as (
         select
@@ -291,6 +316,64 @@ export async function stockBalanceSnapshot(input: {
       by: ['branch_id', 'product_id', 'warehouse_id', 'output_category', 'lot_no', 'not_available_for_sale'],
       where: holdWhere,
     }),
+    prisma.$queryRaw<Array<{
+      branch_id: bigint | null
+      product_id: bigint | null
+      warehouse_id: bigint | null
+      status: string | null
+      awaiting_bill_qty: Prisma.Decimal | number | string | null
+      product_code: string | null
+      product_name: string | null
+      product_metal_group: string | null
+      branch_code: string | null
+      branch_name: string | null
+      warehouse_code: string | null
+      warehouse_name: string | null
+    }>>`
+      select
+        wt.branch_id,
+        wtl.product_id,
+        wtl.warehouse_id,
+        coalesce(w.type, 'RM') as status,
+        sum(
+          case
+            when wps.net_weight = 0 then 0
+            else wps.remaining_weight * wtl.net_weight / wps.net_weight
+          end
+        ) as awaiting_bill_qty,
+        p.code as product_code,
+        p.name as product_name,
+        p.metal_group as product_metal_group,
+        b.code as branch_code,
+        b.name as branch_name,
+        w.code as warehouse_code,
+        w.name as warehouse_name
+      from public.weight_tickets wt
+      join public.weight_ticket_product_summaries wps on wps.weight_ticket_id = wt.id
+      join public.weight_ticket_lines wtl on wtl.weight_ticket_id = wt.id and wtl.product_id = wps.product_id
+      left join public.products p on p.id = wtl.product_id
+      left join public.branches b on b.id = wt.branch_id
+      left join public.warehouses w on w.id = wtl.warehouse_id
+      where ${awaitingBillWhereSql} ${qSql}
+      group by
+        wt.branch_id,
+        wtl.product_id,
+        wtl.warehouse_id,
+        coalesce(w.type, 'RM'),
+        p.code,
+        p.name,
+        p.metal_group,
+        b.code,
+        b.name,
+        w.code,
+        w.name
+      having sum(
+        case
+          when wps.net_weight = 0 then 0
+          else wps.remaining_weight * wtl.net_weight / wps.net_weight
+        end
+      ) > 0.000001
+    `
   ])
   const holdQtyByStockKey = new Map(
     holdSums.map((row) => [
@@ -339,11 +422,75 @@ export async function stockBalanceSnapshot(input: {
       warehouseInternalId: row.warehouse_id ?? null,
       warehouseId: row.warehouse_code ?? '',
       warehouseName: row.warehouse_name ?? '-',
+      awaitingBillQty: 0,
     }
     return publicRow
   })
 
+  // Merge unbilled weights
+  const rowsByKey = new Map<string, typeof rows[number]>()
   for (const row of rows) {
+    rowsByKey.set(row.key, row)
+  }
+
+  for (const rawAwaiting of awaitingBills) {
+    const awaitingQty = rawNumeric(rawAwaiting.awaiting_bill_qty)
+    const productStatus = rawAwaiting.status ?? 'RM'
+
+    const key = stockKey({
+      branchId: rawAwaiting.branch_code ?? null,
+      lotNo: null,
+      notAvailable: false,
+      productId: rawAwaiting.product_code ?? null,
+      status: productStatus,
+      warehouseId: rawAwaiting.warehouse_code ?? null,
+    })
+
+    const existing = rowsByKey.get(key)
+    if (existing) {
+      existing.awaitingBillQty = awaitingQty
+    } else {
+      const newRow = {
+        avgCost: 0,
+        branchInternalId: rawAwaiting.branch_id ?? null,
+        branchId: rawAwaiting.branch_code ?? '',
+        branchName: rawAwaiting.branch_name ?? '-',
+        key,
+        lastDate: '',
+        lotNo: '',
+        notAvailable: false,
+        onHoldQty: 0,
+        productInternalId: rawAwaiting.product_id ?? null,
+        productCode: rawAwaiting.product_code ?? '',
+        productId: rawAwaiting.product_code ?? '',
+        productMetalGroup: rawAwaiting.product_metal_group ?? 'อื่นๆ',
+        productName: rawAwaiting.product_name ?? '-',
+        qty: 0,
+        readyQty: 0,
+        status: productStatus,
+        value: 0,
+        warehouseInternalId: rawAwaiting.warehouse_id ?? null,
+        warehouseId: rawAwaiting.warehouse_code ?? '',
+        warehouseName: rawAwaiting.warehouse_name ?? '-',
+        awaitingBillQty: awaitingQty,
+      }
+      rowsByKey.set(key, newRow)
+    }
+  }
+
+  const mergedRows = Array.from(rowsByKey.values())
+  // Re-sort the merged rows to maintain consistency
+  mergedRows.sort((a, b) => {
+    if (a.productMetalGroup !== b.productMetalGroup) {
+      return a.productMetalGroup.localeCompare(b.productMetalGroup, 'th')
+    }
+    if (a.productCode !== b.productCode) {
+      return a.productCode.localeCompare(b.productCode)
+    }
+    return a.branchName.localeCompare(b.branchName, 'th')
+  })
+
+  for (const row of mergedRows) {
     if (row.notAvailable || row.qty <= 0) {
       row.readyQty = 0
       continue
@@ -362,7 +509,7 @@ export async function stockBalanceSnapshot(input: {
     holdQtyByStockKey.set(holdKey, Math.max(0, remainingHold - row.onHoldQty))
   }
 
-  const filteredRows = input.onHold ? rows.filter((row) => row.onHoldQty > 0) : rows
+  const filteredRows = input.onHold ? mergedRows.filter((row) => row.onHoldQty > 0) : mergedRows
 
   const summary = filteredRows.reduce((acc, row) => {
     acc.onHoldQty += row.onHoldQty

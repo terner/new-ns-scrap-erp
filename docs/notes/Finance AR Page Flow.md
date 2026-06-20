@@ -157,6 +157,11 @@ Response ควรรวม:
 - ต้องเพิ่ม created-date display ใน list/detail/export
 - customer advance allocation ยังต้องย้ายจาก interim snapshot ไป dedicated allocation facts
 - ต้องเพิ่ม source links ไป SB/RCP ให้ครบใน detail
+- [x] **การปรับปรุงตามภารกิจ NSERP-27 (2026-06-20):**
+  - เพิ่ม Tab switcher สลับหน้าสรุปตาม Customer (Summary) และหน้ารายบิล (Detail) ทั้งบน Desktop และ Mobile Card view
+  - เพิ่มตัวชี้วัดสรุปประเภทลูกหนี้ค้างรับสะสมแยกเป็น "ในประเทศ" และ "ต่างประเทศ" บนหน้าการ์ด KPI ด้านบน
+  - เปลี่ยนตัวกรองค้นหาลูกค้าเป็น `SearchCombobox` เพื่อให้ค้นหาตามชื่อ/รหัสลูกค้าได้สะดวกแบบ Autocomplete ทั้ง Desktop และลิ้นชักตัวกรอง Mobile
+  - เพิ่มตารางสรุป `SummaryTable` แสดงข้อมูลรายยอดค้างรับของลูกค้าแต่ละรายแยกตามบิลและช่วงอายุหนี้ (Current, 1-30, 31-60, 61-90, >90 วัน) พร้อมยอดรวมทั้งหมดท้ายตาราง
 
 ## Related Notes
 

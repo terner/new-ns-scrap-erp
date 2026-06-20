@@ -25,6 +25,7 @@ type BalanceRow = {
   value: number
   warehouseId: string
   warehouseName: string
+  awaitingBillQty: number
 }
 
 type BalancePayload = {
@@ -74,6 +75,13 @@ export function StockBalancePageClient() {
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [group, setGroup] = useState('')
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([])
+
+  const toggleGroup = useCallback((cat: string) => {
+    setSelectedGroups((prev) =>
+      prev.includes(cat) ? prev.filter((g) => g !== cat) : [...prev, cat]
+    )
+  }, [])
   const [isLoading, setIsLoading] = useState(true)
   const [productId, setProductId] = useState('')
   const [q, setQ] = useState('')
@@ -144,8 +152,9 @@ export function StockBalancePageClient() {
   const filteredRows = useMemo(() => {
     return (data?.rows ?? [])
       .filter((row) => !group || row.productMetalGroup === group)
+      .filter((row) => selectedGroups.length === 0 || selectedGroups.includes(row.productMetalGroup))
       .filter((row) => status !== ON_HOLD_STATUS || row.onHoldQty > 0)
-  }, [data?.rows, group, status])
+  }, [data?.rows, group, selectedGroups, status])
 
   const summary = useMemo(() => filteredRows.reduce((acc, row) => {
     acc.qty += row.qty
@@ -254,11 +263,12 @@ export function StockBalancePageClient() {
     setWarehouseId('')
     setStatus('')
     setGroup('')
+    setSelectedGroups([])
   }, [])
 
   const hasFilters = useMemo(() => {
-    return Boolean(q.trim() || branchId || productId || warehouseId || status || group)
-  }, [q, branchId, productId, warehouseId, status, group])
+    return Boolean(q.trim() || branchId || productId || warehouseId || status || group || selectedGroups.length > 0)
+  }, [q, branchId, productId, warehouseId, status, group, selectedGroups])
 
   return (
     <section className="space-y-4">
@@ -359,6 +369,19 @@ export function StockBalancePageClient() {
             {data?.reference.warehouses.filter((item) => !branchId || item.branchId === branchId).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+          <span className="text-xs text-slate-500 font-medium">หมวดหมู่ด่วน:</span>
+          {['ทองแดง', 'ทองเหลือง', 'อลูมิเนียม', 'กระดาษ', 'พลาสติก'].map((cat) => (
+            <MatchButton
+              key={cat}
+              active={selectedGroups.includes(cat)}
+              label={cat}
+              onClick={() => toggleGroup(cat)}
+              tone="dark"
+            />
+          ))}
+        </div>
       </div>
 
       {/* Mobile Toolbar (Hidden on Desktop) */}
@@ -396,6 +419,24 @@ export function StockBalancePageClient() {
           >
              รายสินค้า
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5">
+          <span className="text-xs text-slate-500 font-medium mr-1">หมวดหมู่ด่วน:</span>
+          {['ทองแดง', 'ทองเหลือง', 'อลูมิเนียม', 'กระดาษ', 'พลาสติก'].map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition outline-none focus:ring-0 ${
+                selectedGroups.includes(cat)
+                  ? 'border-slate-850 bg-slate-900 text-white shadow-sm'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+              onClick={() => toggleGroup(cat)}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -526,6 +567,7 @@ export function StockBalancePageClient() {
               <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm space-y-3">
                 <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-2">จำนวนและมูลค่าสต๊อก</h4>
                 <Info label="คงเหลือสุทธิ" value={`${formatMoney(detailRow.qty)} กก.`} tone={detailRow.qty < 0 ? 'red' : 'emerald'} />
+                <Info label="ซื้อรอรับ (WTI)" value={`${formatMoney(detailRow.awaitingBillQty)} กก.`} />
                 <Info label="จองไว้ (WTO)" value={`${formatMoney(detailRow.onHoldQty)} กก.`} tone="amber" />
                 <Info label="พร้อมส่ง / พร้อมขาย" value={`${formatMoney(detailRow.readyQty)} กก.`} tone="emerald" />
                 <Info label="ต้นทุนเฉลี่ย (WAC)" value={`${formatMoney(detailRow.avgCost)} บาท`} />
@@ -770,6 +812,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                 <th className="p-3 text-left">สาขา/คลัง</th>
                 <th className="p-3 text-left">Lot</th>
                 <th className="p-3 text-right">คงเหลือ</th>
+                <th className="p-3 text-right">ซื้อรอรับ</th>
                 <th className="p-3 text-right">จองไว้</th>
                 <th className="p-3 text-right">พร้อมส่ง</th>
                 <th className="p-3 text-right">มูลค่า</th>
@@ -784,6 +827,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                   <td className="p-3 text-slate-500">{row.branchName} / {row.warehouseName}</td>
                   <td className="p-3 font-mono text-slate-600">{row.lotNo || '-'}</td>
                   <td className={`p-3 text-right font-semibold tabular-nums ${row.qty < 0 ? 'text-red-650' : 'text-slate-800'}`}>{formatMoney(row.qty)}</td>
+                  <td className="p-3 text-right font-semibold text-slate-800 tabular-nums">{row.awaitingBillQty ? formatMoney(row.awaitingBillQty) : '-'}</td>
                   <td className="p-3 text-right text-amber-700 font-medium tabular-nums">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
                   <td className="p-3 text-right text-emerald-700 font-medium tabular-nums">{formatMoney(row.readyQty)}</td>
                   <td className="p-3 text-right font-mono text-slate-600">{formatMoney(row.value)}</td>
@@ -798,7 +842,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={9}>ยังไม่มีรายการ</td></tr> : null}
+              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={10}>ยังไม่มีรายการ</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -1033,6 +1077,10 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
                 <span className={`font-semibold tabular-nums ${row.qty < 0 ? 'text-red-650' : 'text-slate-800'}`}>{formatMoney(row.qty)} กก.</span>
               </div>
               <div className="flex justify-between">
+                <span>ซื้อรอรับ:</span>
+                <span className="font-semibold text-slate-800 tabular-nums">{row.awaitingBillQty ? `${formatMoney(row.awaitingBillQty)} กก.` : '-'}</span>
+              </div>
+              <div className="flex justify-between">
                 <span>จองไว้:</span>
                 <span className="font-semibold text-amber-700 tabular-nums">{row.onHoldQty ? `${formatMoney(row.onHoldQty)} กก.` : '-'}</span>
               </div>
@@ -1065,15 +1113,16 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
 
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/85 bg-white shadow-sm">
-        <table className="w-full min-w-[1260px] text-sm text-slate-700">
+        <table className="w-full min-w-[1300px] text-sm text-slate-700">
           <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-650 font-medium">
             <tr>
               <th className="p-3.5 text-left">สินค้า</th>
               <th className="p-3.5 text-left">หมวด</th>
               <th className="p-3.5 text-center">คลัง</th>
-              <th className="p-3.5 text-left">สาขา</th>
+              <th className="p-3.5 text-left">สาขา / คลัง</th>
               <th className="p-3.5 text-right">คงเหลือ (กก.)</th>
-              <th className="bg-amber-50/40 p-3.5 text-right text-amber-805 border-x border-slate-100">จองไว้</th>
+              <th className="p-3.5 text-right border-r border-slate-100">ซื้อรอรับ</th>
+              <th className="bg-amber-50/40 p-3.5 text-right text-amber-805 border-r border-slate-100">จองไว้</th>
               <th className="bg-emerald-50/40 p-3.5 text-right text-emerald-805 border-r border-slate-100">พร้อมส่ง</th>
               <th className="p-3.5 text-right">ต้นทุน/กก.</th>
               <th className="p-3.5 text-right">มูลค่า</th>
@@ -1082,7 +1131,7 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
+            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && rows.map((row) => (
               <tr key={row.key} className={`transition-colors ${row.qty < 0 ? 'bg-red-50/30' : 'hover:bg-slate-50/50'}`}>
                 <td className="p-3.5">
@@ -1093,12 +1142,12 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
                 </td>
                 <td className="p-3.5">{row.productMetalGroup || 'อื่นๆ'}</td>
                 <td className="p-3.5 text-center"><StockStatusCell row={row} /></td>
-                <td className="p-3.5">
-                  {row.branchName}
-                  <div className="text-xs text-slate-500">{row.warehouseName}</div>
+                <td className="p-3.5 text-xs text-slate-650 max-w-[160px] truncate" title={`${row.branchName} / ${row.warehouseName}`}>
+                  {row.branchName} / {row.warehouseName}
                 </td>
                 <td className={`p-3.5 text-right font-semibold ${row.qty < 0 ? 'text-red-650' : ''}`}>{formatMoney(row.qty)}</td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-x border-slate-100 font-semibold">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
+                <td className="p-3.5 text-right border-r border-slate-100 font-semibold text-slate-800">{row.awaitingBillQty ? formatMoney(row.awaitingBillQty) : '-'}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 font-semibold">{row.onHoldQty ? formatMoney(row.onHoldQty) : '-'}</td>
                 <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 font-semibold">{formatMoney(row.readyQty)}</td>
                 <td className="p-3.5 text-right text-slate-500 font-mono">{formatMoney(row.avgCost)}</td>
                 <td className="p-3.5 text-right font-bold text-emerald-700 font-mono">{formatMoney(row.value)}</td>
@@ -1114,14 +1163,15 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
                 </td>
               </tr>
             ))}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ไม่มีสต๊อก</td></tr> : null}
+            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={12}>ไม่มีสต๊อก</td></tr> : null}
           </tbody>
           {rows.length ? (
             <tfoot className="bg-slate-50 border-t border-slate-200/80 font-bold text-slate-800">
               <tr>
                 <td className="p-3.5" colSpan={4}>รวม ({rows.length} รายการ)</td>
                 <td className="p-3.5 text-right font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))}</td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-x border-slate-100 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td>
+                <td className="p-3.5 text-right border-r border-slate-100 font-mono text-slate-800">{formatMoney(rows.reduce((sum, row) => sum + row.awaitingBillQty, 0))}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td>
                 <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.readyQty, 0))}</td>
                 <td />
                 <td className="p-3.5 text-right text-emerald-700 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td>

@@ -41,18 +41,18 @@ isDualCostingProduct(productId) => products.metalGroup อยู่ใน DUAL_C
 
 Legacy ย้ำหลายหน้าว่า `P&L / งบกำไรขาดทุน ใช้ WAC เสมอ` ส่วน Dual Costing เป็น management view สำหรับดูต้นทุนดีล
 
-## Menu Scope ใน Next
+## Menu Scope in Next
 
-| Route | Menu | Detailed file |
-|---|---|---|
-| `/dual-costing/cost-pool` | Cost Pool | [[page-flows/dual-costing-dual-costing-cost-pool|Cost Pool Page Flow]] |
-| `/dual-costing/cost-allocator` | Cost Allocator (ทอง/เหลือง) | [[page-flows/dual-costing-dual-costing-cost-allocator|Cost Allocator Page Flow]] |
-| `/dual-costing/waiting-allocations` | Waiting Allocations | [[page-flows/dual-costing-dual-costing-waiting-allocations|Waiting Allocations Page Flow]] |
-| `/dual-costing/cost-allocation-ledger` | Allocation Ledger | [[page-flows/dual-costing-dual-costing-cost-allocation-ledger|Allocation Ledger Page Flow]] |
-| `/dual-costing/report` | Dual Costing Report | [[page-flows/dual-costing-dual-costing-report|Dual Costing Report Page Flow]] |
-| `/dual-costing/match-log` | Match Log | [[page-flows/dual-costing-dual-costing-match-log|Match Log Page Flow]] |
-| `/dual-costing/deal-margin` | Deal Margin Report | [[page-flows/dual-costing-dual-costing-deal-margin|Deal Margin Page Flow]] |
-| `/dual-costing/compare-margin` | Compare Deal vs Stock | [[page-flows/dual-costing-dual-costing-compare-margin|Compare Margin Page Flow]] |
+| Route | Menu | Detailed file | Status |
+|---|---|---|---|
+| `/dual-costing/cost-pool` | Cost Pool | [[page-flows/dual-costing-dual-costing-cost-pool|Cost Pool Page Flow]] | Active |
+| `/dual-costing/cost-allocator` | Cost Allocator (ทอง/เหลือง) | [[page-flows/dual-costing-dual-costing-cost-allocator|Cost Allocator Page Flow]] | Active |
+| `/dual-costing/waiting-allocations` | Waiting Allocations | [[page-flows/dual-costing-dual-costing-waiting-allocations|Waiting Allocations Page Flow]] | Active |
+| `/dual-costing/cost-allocation-ledger` | Allocation Ledger | [[page-flows/dual-costing-dual-costing-cost-allocation-ledger|Allocation Ledger Page Flow]] | Active |
+| `/dual-costing/report` | Dual Costing Report | [[page-flows/dual-costing-dual-costing-report|Dual Costing Report Page Flow]] | Active |
+| `/dual-costing/deal-margin` | Deal Margin Report | [[page-flows/dual-costing-dual-costing-deal-margin|Deal Margin Page Flow]] | Active |
+| `/dual-costing/match-log` | Match Log | [[page-flows/dual-costing-dual-costing-match-log|Match Log Page Flow]] | Removed from sidebar |
+| `/dual-costing/compare-margin` | Compare Deal vs Stock | [[page-flows/dual-costing-dual-costing-compare-margin|Compare Margin Page Flow]] | Removed from sidebar |
 
 Legacy มี `PO Buy` และ `PO Sell` อยู่ในหมวด Dual Costing ด้วย แต่ Next ย้ายไปอยู่หมวด `รายการประจำวัน`; flow รายหน้าถูกแยกไว้ที่ [[PO Buy Page Flow]] และ [[PO Sell Flow]]
 
