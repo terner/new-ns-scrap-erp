@@ -4,7 +4,7 @@ tags:
   - page-flow
   - menu
 status: accepted-baseline
-updated: 2026-06-13
+updated: 2026-06-21
 route: /stock/status-convert
 ---
 
@@ -92,6 +92,7 @@ SC ย้าย qty ระหว่าง stock status/output category โดย
 - Runtime จำกัด normal flow เป็น `RM <-> FG` แล้ว
 - hold-aware available, source-status WAC, server pagination/filter/index ทำแล้ว
 - reversal/reconciliation ทำแล้วด้วย append-only `SC-REV` และ reconciliation pair checks
+- UI design alignment 2026-06-21: list toolbar ของ `/stock/status-convert` ไม่แสดงปุ่ม `โหลดใหม่`, modal create ใช้ dark header `rounded-md` ตาม `docs/design.md` และไม่ใช้ปุ่ม X ใน header, table header ใช้ `bg-slate-100`, body ใช้ `text-xs font-semibold`, status ใช้ dot + text, action ใช้ destructive outline, และ wording วันที่แยก `วันที่เอกสาร` / `วันที่สร้างรายการ`
 - remaining: logged-in browser QA สำหรับ create/reverse
 
 ## Implementation Checklist

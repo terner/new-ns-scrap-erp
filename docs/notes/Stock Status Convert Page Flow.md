@@ -12,7 +12,7 @@ tags:
   - stock-status-convert
 status: draft
 created: 2026-06-11
-updated: 2026-06-13
+updated: 2026-06-21
 ---
 
 # Stock Status Convert Page Flow / Flow หน้าปรับสถานะสินค้า
@@ -64,6 +64,21 @@ updated: 2026-06-13
 - เหตุผล/หมายเหตุ
 - สร้างโดย
 
+Design baseline ล่าสุด 2026-06-21:
+
+- Toolbar ของหน้า list ไม่แสดงปุ่ม `โหลดใหม่`; ให้ใช้ search/filter และ action `+ ปรับสถานะใหม่` เป็นหลัก
+- Table header ใช้ `bg-slate-100` ตาม `docs/design.md`
+- Table body ใช้ `text-xs font-semibold` ให้ทุกคอลัมน์อ่านเป็นชุดเดียวกัน
+- Status cell ใช้ dot + text ไม่ใช้ badge background
+- Row action `ย้อนกลับ` ใช้ destructive outline (`border-red-200 text-red-700 hover:bg-red-50`) ไม่ใช้ปุ่มแดงทึบ
+- Wording วันที่ต้องแยก `วันที่เอกสาร` กับ `วันที่สร้างรายการ`
+
+### Create Modal
+
+- Modal ใช้ `rounded-md` และ dark header `bg-slate-900 text-white`
+- Header ไม่แสดงปุ่ม X; ใช้ปุ่ม `ยกเลิก` ใน footer เป็นทางปิดหลัก
+- ปุ่มบันทึกใช้ primary slate (`bg-slate-900 hover:bg-slate-800 text-white font-normal`) และข้อความ `บันทึก`
+
 ### Filters
 
 ควรรองรับ:
@@ -75,7 +90,7 @@ updated: 2026-06-13
 - วันที่เอกสาร และวันที่สร้างรายการ
 - สินค้า
 
-## Create Modal Contract
+## Create Modal Data Contract
 
 ต้องมี field:
 

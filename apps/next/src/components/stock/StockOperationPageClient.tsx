@@ -383,9 +383,11 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             </button>
           ) : null}
 
-          <button className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors" type="button" onClick={() => void loadData()}>
-            โหลดใหม่
-          </button>
+          {mode !== 'status-convert' ? (
+            <button className="h-9 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors" type="button" onClick={() => void loadData()}>
+              โหลดใหม่
+            </button>
+          ) : null}
           <a className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors ml-auto" href={`${pathname}?new=1`}>
             {mode === 'adjust' ? '+ ปรับสต๊อกใหม่' : mode === 'convert' ? '+ ปรับเกรดใหม่' : '+ ปรับสถานะใหม่'}
           </a>
@@ -410,9 +412,11 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <button className="h-9 rounded-md bg-slate-100 px-2.5 text-xs text-slate-700 border border-slate-200" type="button" onClick={() => void loadData()}>
-            โหลดใหม่
-          </button>
+          {mode !== 'status-convert' ? (
+            <button className="h-9 rounded-md bg-slate-100 px-2.5 text-xs text-slate-700 border border-slate-200" type="button" onClick={() => void loadData()}>
+              โหลดใหม่
+            </button>
+          ) : null}
           <button
             type="button"
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -564,9 +568,9 @@ export function StockOperationPageClient({ mode }: { mode: Mode }) {
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-md bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 shrink-0">
-              <h3 className="font-bold text-slate-900">{meta.title}</h3>
-              <a className="text-2xl text-slate-400 hover:text-slate-700" href={pathname}>&times;</a>
+            <div className="shrink-0 rounded-t-md bg-slate-900 px-5 py-4 text-white">
+              <h3 className="font-bold text-slate-100">{meta.title}</h3>
+              <p className="mt-1 text-xs text-slate-300">{descriptionFor(mode)}</p>
             </div>
             {mode === 'status-convert' ? <StatusConvertForm cancelHref={pathname} isSaving={isSaving} error={error} reference={data.reference} onSubmit={submit} /> : null}
             {mode === 'convert' ? <ConvertForm cancelHref={pathname} isSaving={isSaving} error={error} reference={data.reference} onSubmit={submit} /> : null}
@@ -834,13 +838,12 @@ function OperationTable({
 
           if (mode === 'status-convert') {
             const status = String(row.status ?? 'posted')
-            const statusColor = status === 'reversed' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'
 
             return (
               <div key={id} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50">
                 <div className="mb-2 flex items-start justify-between">
                   <span className="font-bold text-slate-800">{refNo}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor}`}>{status}</span>
+                  <StatusText status={status} />
                 </div>
                 <div className="text-xs text-slate-500">{formatDateDisplay(date)}</div>
                 <div className="my-3 space-y-1 text-xs text-slate-600">
@@ -865,13 +868,13 @@ function OperationTable({
                     <div className="font-semibold text-slate-800">{formatMoney(Number(row.value ?? 0))} บาท</div>
                   </div>
                   <div>
-                    <div className="text-slate-400">ผู้ทำ / วันที่ทำ</div>
+                    <div className="text-slate-400">ผู้ทำ / วันที่สร้างรายการ</div>
                     <div className="font-semibold text-slate-600">{formatCell(row.createdBy)} ({formatDateTime(row.createdAt)})</div>
                   </div>
                 </div>
                 <div className="mt-3 flex justify-end gap-2">
                   <button
-                    className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                     disabled={status === 'reversed' || !onStatusConvertReverse}
                     type="button"
                     onClick={() => onStatusConvertReverse?.(refNo)}
@@ -889,15 +892,15 @@ function OperationTable({
       </div>
 
       {/* Desktop Table (Hidden on Mobile) */}
-      <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm">
+      <div className="hidden md:block overflow-x-auto rounded-md bg-white shadow">
         <table className={mode === 'convert' ? 'w-full min-w-[1300px] text-sm' : mode === 'status-convert' ? 'w-full min-w-[1280px] text-sm' : 'w-full min-w-[1500px] text-xs'}>
-          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+          <thead className="border-b border-slate-100 bg-slate-100 text-slate-600">
             <tr>
               {columns.map((column) => (
                 <th key={column.key} className={`p-2 ${column.headerClassName?.includes('text-') ? '' : 'text-left'} ${column.headerClassName ?? ''}`}>
                   {mode === 'status-convert' && column.sortable && onSortChange ? (
                     <button
-                      className={`inline-flex items-center gap-1 font-medium text-slate-700 hover:text-slate-900 ${column.headerClassName?.includes('text-right') ? 'justify-end w-full' : ''}`}
+                      className={`inline-flex w-full items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 ${column.headerClassName?.includes('text-right') ? 'justify-end' : ''}`}
                       type="button"
                       onClick={() => onSortChange(column.key as StatusConvertSortKey)}
                     >
@@ -913,7 +916,7 @@ function OperationTable({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="border-t border-slate-200 hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 align-top ${mode === 'adjust' ? 'font-semibold text-slate-700' : ''} ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse, onAdjustCorrect)}</td>)}</tr>)}
+            {!isLoading && rows.map((row, index) => <tr key={String(row.id ?? index)} className="hover:bg-slate-50">{columns.map((column) => <td key={column.key} className={`p-2 align-top ${mode === 'status-convert' ? 'text-xs font-semibold text-slate-700' : mode === 'adjust' ? 'font-semibold text-slate-700' : ''} ${column.cellClassName ?? ''}`}>{formatOperationCell(mode, row, column.key, onConvertReverse, onConvertDetail, onStatusConvertReverse, onAdjustCorrect)}</td>)}</tr>)}
             {!isLoading && !rows.length ? <tr><td className="p-8 text-center text-slate-400" colSpan={columns.length}>{emptyTextFor(mode)}</td></tr> : null}
           </tbody>
         </table>
@@ -940,22 +943,32 @@ function SegmentedButton({ active, label, onClick }: { active: boolean; label: s
   )
 }
 
+function StatusText({ status }: { status: string }) {
+  const isReversed = status === 'reversed'
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${isReversed ? 'text-slate-500' : 'text-emerald-700'}`}>
+      <span className={`size-1.5 rounded-full ${isReversed ? 'bg-slate-400' : 'bg-emerald-500'}`} />
+      {status || 'posted'}
+    </span>
+  )
+}
+
 function columnsFor(mode: Mode): OperationColumn[] {
   if (mode === 'status-convert') return [
-    { key: 'date', label: 'วันที่', sortable: true },
+    { key: 'date', label: 'วันที่เอกสาร', sortable: true },
     { key: 'refNo', label: 'เลขที่', sortable: true },
     { key: 'productDisplay', label: 'สินค้า', sortable: true },
     { key: 'lotNo', label: 'Lot', sortable: true },
     { key: 'locationDisplay', label: 'สาขา/คลัง', sortable: true },
-    { key: 'qty', label: 'จำนวน (กก.)', cellClassName: 'text-right font-bold text-purple-700', headerClassName: 'text-right', sortable: true },
-    { key: 'unitCost', label: 'ต้นทุน (บาท/กก.)', cellClassName: 'text-right text-slate-600', headerClassName: 'text-right', sortable: true },
-    { key: 'value', label: 'มูลค่า', cellClassName: 'text-right text-slate-600', headerClassName: 'text-right', sortable: true },
+    { key: 'qty', label: 'จำนวน (กก.)', cellClassName: 'text-right font-semibold text-purple-700 tabular-nums', headerClassName: 'text-right', sortable: true },
+    { key: 'unitCost', label: 'ต้นทุน (บาท/กก.)', cellClassName: 'text-right text-slate-600 tabular-nums', headerClassName: 'text-right', sortable: true },
+    { key: 'value', label: 'มูลค่า', cellClassName: 'text-right text-slate-600 tabular-nums', headerClassName: 'text-right', sortable: true },
     { key: 'statusFlow', label: 'เปลี่ยนสถานะ', cellClassName: 'text-center', headerClassName: 'text-center', sortable: true },
     { key: 'note', label: 'เหตุผล', sortable: true },
     { key: 'status', label: 'สถานะ', cellClassName: 'text-center', headerClassName: 'text-center', sortable: true },
-    { key: 'createdBy', label: 'ผู้ทำ', sortable: true },
-    { key: 'createdAt', label: 'วันที่ทำ', sortable: true },
-    { key: 'action', label: 'การกระทำ', cellClassName: 'text-center', headerClassName: 'text-center' },
+    { key: 'createdBy', label: 'ผู้ทำรายการ', sortable: true },
+    { key: 'createdAt', label: 'วันที่สร้างรายการ', sortable: true },
+    { key: 'action', label: 'จัดการ', cellClassName: 'text-center', headerClassName: 'text-center' },
   ]
   if (mode === 'convert') return [
     { key: 'sourceType', label: 'Source Type' },
@@ -1051,15 +1064,14 @@ function formatOperationCell(mode: Mode, row: Record<string, string | number | b
     if (key === 'createdAt') return formatDateTime(row.createdAt)
     if (key === 'status') {
       const status = String(row.status ?? 'posted')
-      const color = status === 'reversed' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'
-      return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{status}</span>
+      return <StatusText status={status} />
     }
     if (key === 'action') {
       const status = String(row.status ?? 'posted')
       const refNo = String(row.refNo ?? row.id ?? '')
       return (
         <button
-          className="rounded-md bg-red-100 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
+          className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
           disabled={status === 'reversed' || !onStatusConvertReverse}
           type="button"
           onClick={() => onStatusConvertReverse?.(refNo)}
@@ -1390,7 +1402,7 @@ function StatusConvertForm(props: { cancelHref: string; isSaving: boolean; error
   }, [props.reference.products])
 
   return <FormShell cancelHref={props.cancelHref} isSaving={props.isSaving} error={props.error} onSubmit={() => props.onSubmit(values)}>
-    <div className="md:col-span-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm grid gap-4 md:grid-cols-2">
+    <div className="md:col-span-2 grid gap-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:grid-cols-2">
       <div className="w-full">
         <SearchCombobox
           inputId="status-convert-product-search"
