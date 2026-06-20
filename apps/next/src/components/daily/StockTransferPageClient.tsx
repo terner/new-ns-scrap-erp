@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Edit3, Plus, Send, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
@@ -299,6 +298,12 @@ export function StockTransferPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3 text-sm">
+        <MetricCard emoji="📄" label="รายการทั้งหมด" tone="blue" value={`${data.summary.totalRows.toLocaleString('th-TH')} รายการ`} />
+        <MetricCard emoji="⚖️" label="น้ำหนักรวม" tone="blue" value={`${formatMoney(data.summary.totalQty)} กก.`} />
+        <MetricCard className="col-span-2 lg:col-span-1" emoji="💰" label="มูลค่ารวม" tone="emerald" value={`${formatMoney(data.summary.totalValue)} บาท`} />
+      </div>
+
       {/* Desktop Toolbar (Hidden on Mobile) */}
       <div className="hidden md:block rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
@@ -332,7 +337,7 @@ export function StockTransferPageClient() {
           {hasFilters ? (
             <Button size="sm" type="button" variant="secondary" className="h-9" onClick={clearFilters}>✕ ล้าง</Button>
           ) : null}
-          <Button size="sm" type="button" className="h-9 ml-auto bg-blue-600 text-white hover:bg-blue-700" onClick={openCreateForm}>
+          <Button size="sm" type="button" className="h-9 ml-auto bg-slate-900 font-normal text-white hover:bg-slate-800" onClick={openCreateForm}>
             <Plus className="mr-1 h-4 w-4" />โอนใหม่
           </Button>
         </div>
@@ -417,11 +422,7 @@ export function StockTransferPageClient() {
               >
                 ล้างตัวกรอง
               </Button>
-              <Button
-                type="button"
-                className="h-11 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
-                onClick={() => setShowMobileFilters(false)}
-              >
+              <Button type="button" className="h-11 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700" onClick={() => setShowMobileFilters(false)}>
                 ใช้ตัวกรอง
               </Button>
             </div>
@@ -441,12 +442,10 @@ export function StockTransferPageClient() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
         <div>
-          พบทั้งหมด <span className="font-semibold text-slate-900">{data.summary.totalRows}</span> รายการ
-          <span className="ml-2 text-slate-500">· น้ำหนักรวม <span className="font-semibold text-blue-700">{formatMoney(data.summary.totalQty)}</span> กก.</span>
-          <span className="ml-2 text-slate-500">· มูลค่ารวม <span className="font-semibold text-emerald-700">{formatMoney(data.summary.totalValue)}</span> บาท</span>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{data.summary.totalRows.toLocaleString('th-TH')}</span> รายการ
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
+          {columnResize.hasCustomWidths ? <Button className="h-9" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
           <select
             aria-label="จำนวนรายการต่อหน้า"
             className="h-9 w-auto rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -466,20 +465,12 @@ export function StockTransferPageClient() {
 
       {formOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8 animate-fade-in">
-          <form noValidate data-combobox-portal-root="true" className="w-full max-w-5xl overflow-hidden rounded-2xl bg-slate-900 shadow-xl flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
-            <div className="flex items-center justify-between bg-slate-900 text-white px-5 py-4 shrink-0">
+          <form noValidate data-combobox-portal-root="true" className="relative w-full max-w-5xl overflow-hidden rounded-md border-0 bg-slate-900 shadow-xl outline-none focus:outline-none flex flex-col max-h-[90vh]" onSubmit={(event) => event.preventDefault()}>
+            <div className="flex items-center justify-between rounded-t-md bg-slate-900 text-white px-5 py-4 shrink-0">
               <div>
                 <h3 className="font-bold text-slate-100 text-lg">{editingDocNo ? 'แก้ไขรายการโอนสินค้า' : 'โอนสินค้าระหว่างสาขา'}</h3>
                 <p className="mt-1 text-xs text-slate-400">ระบบจะตัด stock ต้นทางและรับเข้าปลายทางเมื่อส่งเข้าสต๊อกเท่านั้น</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setFormOpen(false)}
-                className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-xl leading-none"
-                aria-label="Close"
-              >
-                &times;
-              </button>
             </div>
 
             <div className="max-h-[76vh] overflow-y-auto bg-slate-50 p-4 sm:p-5 space-y-4 text-sm flex-1">
@@ -533,7 +524,7 @@ export function StockTransferPageClient() {
                 {/* Desktop View (Table) */}
                 <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200/60 bg-white shadow-sm overflow-hidden">
                   <table className="w-full min-w-[920px] text-sm">
-                    <thead className="border-b border-slate-105 bg-slate-50 text-slate-500">
+                    <thead className="border-b border-slate-100 bg-slate-100 text-slate-600">
                       <tr>
                         <th className="p-2 text-left">สินค้า</th>
                         <th className="p-2 text-right">คงเหลือต้นทาง</th>
@@ -694,10 +685,10 @@ export function StockTransferPageClient() {
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-2xl">
-              <Button size="sm" type="button" variant="ghost" className="font-normal border-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors outline-none focus:ring-0" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
-              <Button disabled={isSaving} size="sm" type="button" variant="outline" className="rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors outline-none focus:ring-0 px-4" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
-              <Button disabled={isSaving} size="sm" type="button" className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors outline-none focus:ring-0 px-5" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 shrink-0 rounded-b-md">
+              <Button size="sm" type="button" variant="outline" className="font-normal" onClick={() => setFormOpen(false)}>ยกเลิก</Button>
+              <Button disabled={isSaving} size="sm" type="button" variant="outline" className="font-normal" onClick={() => submitForm('draft')}>{isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}</Button>
+              <Button disabled={isSaving} size="sm" type="button" className="bg-slate-900 hover:bg-slate-800 text-white font-normal px-5" onClick={() => submitForm('post')}><Send className="mr-1 h-4 w-4" />{isSaving ? 'กำลังส่ง...' : 'ส่งเข้าสต๊อก'}</Button>
             </div>
           </form>
         </div>
@@ -721,7 +712,7 @@ export function StockTransferPageClient() {
               <SummaryCell label="น้ำหนักรวม" value={`${formatMoney(row.totalQty)} กก.`} />
               <SummaryCell label="มูลค่ารวม" value={`${formatMoney(row.totalValue)} บาท`} />
               <SummaryCell label="รายการ" value={`${row.itemCount.toLocaleString('th-TH')} รายการ`} />
-              <SummaryCell label="แก้ไขล่าสุด" value={row.updatedBy ? `${row.updatedBy} · ${formatDateTime(row.updatedAt)}` : formatDateTime(row.updatedAt)} />
+              <SummaryCell label="วันที่สร้างรายการ" value={row.updatedBy ? `${row.updatedBy} · ${formatDateTime(row.updatedAt)}` : formatDateTime(row.updatedAt)} />
             </div>
             <div className="mt-3 flex justify-end gap-2">
               <Button disabled={!row.canEdit || isSaving} size="xs" type="button" variant="outline" onClick={() => openEditForm(row)}><Edit3 className="mr-1 h-3.5 w-3.5" />แก้ไข</Button>
@@ -744,13 +735,13 @@ export function StockTransferPageClient() {
           <TableHeader>
             <tr>
               <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
-              <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+              <ResizableTableHead label="วันที่เอกสาร" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่เอกสาร')} />
               <ResizableTableHead label="จาก" resizeProps={columnResize.getResizeHandleProps('from', 'จาก')} />
               <ResizableTableHead label="ไป" resizeProps={columnResize.getResizeHandleProps('to', 'ไป')} />
               <ResizableTableHead align="right" label="รายการ" resizeProps={columnResize.getResizeHandleProps('itemCount', 'รายการ')} />
               <ResizableTableHead align="right" label="น้ำหนักรวม" resizeProps={columnResize.getResizeHandleProps('totalQty', 'น้ำหนักรวม')} />
               <ResizableTableHead align="right" label="มูลค่ารวม" resizeProps={columnResize.getResizeHandleProps('totalValue', 'มูลค่ารวม')} />
-              <ResizableTableHead label="แก้ไขล่าสุด" resizeProps={columnResize.getResizeHandleProps('updated', 'แก้ไขล่าสุด')} />
+              <ResizableTableHead label="วันที่สร้างรายการ" resizeProps={columnResize.getResizeHandleProps('updated', 'วันที่สร้างรายการ')} />
               <ResizableTableHead label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
               <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
             </tr>
@@ -759,23 +750,23 @@ export function StockTransferPageClient() {
             {isLoading ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
             {!isLoading && data.rows.map((row) => (
               <TableRow key={row.id} className="hover:bg-slate-50">
-                <TableCell className="font-mono text-xs">{row.docNo}</TableCell>
-                <TableCell className="whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
-                <TableCell className="text-red-600">{row.from}</TableCell>
-                <TableCell className="text-emerald-700">{row.to}</TableCell>
-                <TableCell className="whitespace-nowrap pr-4 text-right tabular-nums">{row.itemCount.toLocaleString('th-TH')}</TableCell>
-                <TableCell className="whitespace-nowrap pr-4 text-right font-medium tabular-nums">{formatMoney(row.totalQty)} กก.</TableCell>
-                <TableCell className="whitespace-nowrap pr-4 text-right font-medium tabular-nums text-emerald-700">{formatMoney(row.totalValue)}</TableCell>
+                <TableCell className="font-mono text-xs font-semibold text-slate-700">{row.docNo}</TableCell>
+                <TableCell className="whitespace-nowrap text-xs font-semibold text-slate-700">{formatDateDisplay(row.date)}</TableCell>
+                <TableCell className="text-xs font-semibold text-red-600">{row.from}</TableCell>
+                <TableCell className="text-xs font-semibold text-emerald-700">{row.to}</TableCell>
+                <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold tabular-nums text-slate-700">{row.itemCount.toLocaleString('th-TH')}</TableCell>
+                <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold tabular-nums text-slate-700">{formatMoney(row.totalQty)} กก.</TableCell>
+                <TableCell className="whitespace-nowrap pr-4 text-right text-xs font-semibold tabular-nums text-emerald-700">{formatMoney(row.totalValue)}</TableCell>
                 <TableCell className="text-xs text-slate-600">
-                  <div className="truncate">{row.updatedBy || '-'}</div>
+                  <div className="truncate font-semibold text-slate-700">{row.updatedBy || '-'}</div>
                   <div className="text-slate-400">{formatDateTime(row.updatedAt)}</div>
                 </TableCell>
                 <TableCell><StatusBadge status={row.status} /></TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
-                    <IconButton disabled={!row.canEdit || isSaving} label="แก้ไข" onClick={() => openEditForm(row)}><Edit3 className="h-3.5 w-3.5" /></IconButton>
-                    <IconButton disabled={!row.canPost || isSaving} label="ส่งเข้าสต๊อก" onClick={() => postDraft(row)}><Send className="h-3.5 w-3.5" /></IconButton>
-                    <IconButton disabled={!row.canCancel || isSaving} label="ยกเลิก" onClick={() => cancelDraft(row)}><XCircle className="h-3.5 w-3.5" /></IconButton>
+                    <RowActionButton disabled={!row.canEdit || isSaving} label="แก้ไข" onClick={() => openEditForm(row)} />
+                    <RowActionButton disabled={!row.canPost || isSaving} label="ส่ง" onClick={() => postDraft(row)} />
+                    <RowActionButton destructive disabled={!row.canCancel || isSaving} label="ยกเลิก" onClick={() => cancelDraft(row)} />
                   </div>
                 </TableCell>
               </TableRow>
@@ -795,6 +786,23 @@ function formatDateTime(value: string) {
   return date.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function MetricCard(props: { className?: string; emoji: string; label: string; tone: 'blue' | 'emerald'; value: string }) {
+  const toneClass = props.tone === 'emerald'
+    ? { icon: 'bg-emerald-100 text-emerald-700', label: 'text-emerald-600' }
+    : { icon: 'bg-blue-100 text-blue-700', label: 'text-blue-600' }
+  return (
+    <div className={`bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 ${props.className ?? ''}`}>
+      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl shrink-0 ${toneClass.icon}`}>
+        {props.emoji}
+      </div>
+      <div className="min-w-0">
+        <div className={`text-xs ${toneClass.label}`}>{props.label}</div>
+        <div className="truncate font-bold text-slate-900">{props.value}</div>
+      </div>
+    </div>
+  )
+}
+
 function statusLabel(status: Row['status']) {
   if (status === 'draft') return 'แบบร่าง'
   if (status === 'posted') return 'ส่งแล้ว'
@@ -803,11 +811,21 @@ function statusLabel(status: Row['status']) {
 
 function StatusBadge(props: { status: Row['status'] }) {
   const className = props.status === 'posted'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    ? 'text-emerald-700'
     : props.status === 'draft'
-      ? 'border-amber-200 bg-amber-50 text-amber-700'
-      : 'border-slate-200 bg-slate-50 text-slate-500'
-  return <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${className}`}>{statusLabel(props.status)}</span>
+      ? 'text-amber-700'
+      : 'text-slate-500'
+  const dotClassName = props.status === 'posted'
+    ? 'bg-emerald-500'
+    : props.status === 'draft'
+      ? 'bg-amber-500'
+      : 'bg-slate-400'
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${className}`}>
+      <span className={`size-1.5 rounded-full ${dotClassName}`} />
+      {statusLabel(props.status)}
+    </span>
+  )
 }
 
 function SummaryCell(props: { label: string; value: string }) {
@@ -819,17 +837,19 @@ function SummaryCell(props: { label: string; value: string }) {
   )
 }
 
-function IconButton(props: { children: React.ReactNode; disabled?: boolean; label: string; onClick: () => void }) {
+function RowActionButton(props: { destructive?: boolean; disabled?: boolean; label: string; onClick: () => void }) {
   return (
     <button
       aria-label={props.label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+      className={props.destructive
+        ? 'rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40'
+        : 'rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'}
       disabled={props.disabled}
       title={props.label}
       type="button"
       onClick={props.onClick}
     >
-      {props.children}
+      {props.label}
     </button>
   )
 }
@@ -882,7 +902,7 @@ function SelectField(props: {
     <FormField error={props.error} errorKey={props.errorKey} label={props.label}>
       <select
         data-error-key={props.errorKey}
-        className={`h-9 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : `border-slate-300 bg-white ${props.value ? 'text-slate-900' : 'text-slate-400'}`}`}
+        className={`h-9 w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 transition-colors disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${props.error ? 'border-red-400 bg-red-50 text-red-700' : `border-slate-300 bg-white ${props.value ? 'text-slate-900' : 'text-slate-400'}`}`}
         disabled={props.disabled}
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
