@@ -11,6 +11,18 @@ const companyProfilePayloadSchema = z.object({
 const FIRST_PAGE_ITEM_ROWS = 12
 const CONTINUATION_PAGE_ITEM_ROWS = 17
 
+type PrintWeightRow = {
+  className?: string
+  containerDeductionWeight: number
+  detail: string
+  deductionWeight: number
+  grossWeight: number
+  label: string
+  netWeight: number
+  productName: string
+  rank?: string
+}
+
 function escapeHtml(value: unknown) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -65,6 +77,177 @@ function cleanImpurityName(name: string | null | undefined): string {
     .trim()
 }
 
+function detailHtml(value: string) {
+  return value
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => `<div class="detail-line">${escapeHtml(line)}</div>`)
+    .join('')
+}
+
+function isImpurityLine(line: WeightTicketRecord['lines'][number]) {
+  return line.grossWeightValue === 0 && Boolean(line.impurityName || line.impurityId)
+}
+
+function isPurchaseFromImpurityLine(line: WeightTicketRecord['lines'][number]) {
+  return line.grossWeightValue > 0 && line.note.includes('มาจากสิ่งเจือปน')
+}
+
+function formatImpurityPurchaseSourceDetail(line: WeightTicketRecord['lines'][number]) {
+  const match = /^มาจากสิ่งเจือปน \(([^)]+)\) ของรายการที่ ([^:]+):\s*(.+)$/.exec(line.note.trim())
+  if (!match) return line.note || 'ซื้อเพิ่มจากสิ่งเจือปนที่เป็นสินค้า'
+
+  const [, impurityInfo, sourceIndex, sourceProduct] = match
+  const sourceLines = [
+    `มาจาก: ${sourceProduct}`,
+    `สิ่งเจือปน: ${impurityInfo}`,
+  ]
+  if (sourceIndex !== '0') sourceLines.push(`เต๋า/รายการที่: ${sourceIndex}`)
+  return sourceLines.join('\n')
+}
+
+function findPurchaseLineForImpurity(
+  impurityLine: WeightTicketRecord['lines'][number],
+  sourceProductName: string,
+  purchaseLines: WeightTicketRecord['lines'],
+) {
+  return purchaseLines.find((purchaseLine) => {
+    if (!purchaseLine.note.includes(sourceProductName) && !purchaseLine.note.includes(impurityLine.productId)) return false
+    return Math.abs(purchaseLine.grossWeightValue - impurityLine.deductionWeight) < 0.001
+  })
+}
+
+function formatImpuritySummaryDetail(
+  impurityLines: WeightTicketRecord['lines'],
+  sourceProductName: string,
+  purchaseLines: WeightTicketRecord['lines'],
+) {
+  if (impurityLines.length === 0) return 'ไม่มีหักสิ่งเจือปน'
+
+  const details = impurityLines.map((line, index) => {
+    const purchaseLine = findPurchaseLineForImpurity(line, sourceProductName, purchaseLines)
+    const impurityName = cleanImpurityName(line.impurityName) || 'สิ่งเจือปน'
+    const deductionText = `${formatPrintableWeight(line.deductionWeight)} กก.`
+    const prefix = `- ${index + 1}. ${impurityName} ${deductionText}`
+    if (purchaseLine) {
+      return `${prefix} ซื้อเป็น ${purchaseLine.productName}`
+    }
+
+    const isOtherProductImpurity = impurityName === 'สินค้าอื่น' || impurityName === 'อื่นๆ' || impurityName === 'อย่างอื่น'
+    if (isOtherProductImpurity) return `${prefix} ไม่ซื้อ`
+    return prefix
+  })
+
+  return ['หักสิ่งเจือปน:', ...details].join('\n')
+}
+
+function sumPrintLines(lines: WeightTicketRecord['lines']) {
+  return lines.reduce(
+    (summary, line) => ({
+      containerDeductionWeight: summary.containerDeductionWeight + line.containerDeductionWeightValue,
+      deductionWeight: summary.deductionWeight + line.deductionWeight,
+      grossWeight: summary.grossWeight + line.grossWeightValue,
+      netBeforeImpurityWeight: summary.netBeforeImpurityWeight + Math.max(0, line.grossWeightValue - line.containerDeductionWeightValue),
+      netWeight: summary.netWeight + line.netWeight,
+    }),
+    { containerDeductionWeight: 0, deductionWeight: 0, grossWeight: 0, netBeforeImpurityWeight: 0, netWeight: 0 },
+  )
+}
+
+function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: boolean): PrintWeightRow[] {
+  if (!isReceipt) {
+    return ticket.lines.map((line, index) => ({
+      containerDeductionWeight: line.containerDeductionWeightValue,
+      deductionWeight: line.deductionWeight,
+      detail: line.note || '-',
+      grossWeight: line.grossWeightValue,
+      label: 'จากสินค้า',
+      netWeight: line.netWeight,
+      productName: line.productName,
+      rank: String(index + 1),
+    }))
+  }
+
+  const rows: PrintWeightRow[] = []
+  const allPurchaseLines = ticket.lines.filter(isPurchaseFromImpurityLine)
+  ticket.productSummaries.forEach((summary, groupIndex) => {
+    const productLines = ticket.lines.filter((line) => line.productId === summary.productId)
+    const realLotLines = productLines.filter((line) => !isImpurityLine(line) && !isPurchaseFromImpurityLine(line))
+    const impurityLines = productLines.filter(isImpurityLine)
+    const purchaseLines = productLines.filter(isPurchaseFromImpurityLine)
+    const realLotTotals = sumPrintLines(realLotLines)
+    const impurityTotals = sumPrintLines(impurityLines)
+    const realLotNetAfterImpurity = Math.max(0, realLotTotals.netBeforeImpurityWeight - impurityTotals.deductionWeight)
+
+    rows.push({
+      className: 'product-heading',
+      containerDeductionWeight: 0,
+      deductionWeight: 0,
+      detail: `${realLotLines.length.toLocaleString('th-TH')} เต๋า · หักสิ่งเจือปน ${impurityLines.length.toLocaleString('th-TH')} รายการ · ซื้อเพิ่ม ${purchaseLines.length.toLocaleString('th-TH')} รายการ`,
+      grossWeight: 0,
+      label: 'กลุ่มสินค้า',
+      netWeight: 0,
+      productName: summary.productName,
+      rank: String(groupIndex + 1),
+    })
+
+    if (realLotLines.length > 0) {
+      realLotLines.forEach((line, lotIndex) => {
+        rows.push({
+          className: 'lot-row',
+          containerDeductionWeight: line.containerDeductionWeightValue,
+          deductionWeight: line.deductionWeight,
+          detail: cleanNote(line.note),
+          grossWeight: line.grossWeightValue,
+          label: `เต๋าที่ ${lotIndex + 1}`,
+          netWeight: Math.max(0, line.grossWeightValue - line.containerDeductionWeightValue - line.deductionWeight),
+          productName: summary.productName,
+        })
+      })
+
+      rows.push({
+        className: 'source-row',
+        containerDeductionWeight: realLotTotals.containerDeductionWeight,
+        deductionWeight: impurityTotals.deductionWeight,
+        detail: [
+          `${realLotLines.length.toLocaleString('th-TH')} เต๋า`,
+          formatImpuritySummaryDetail(impurityLines, summary.productName, allPurchaseLines),
+        ].join('\n'),
+        grossWeight: realLotTotals.grossWeight,
+        label: '',
+        netWeight: realLotNetAfterImpurity,
+        productName: 'สรุปรวมจากเต๋า',
+      })
+    }
+
+    purchaseLines.forEach((line) => {
+      rows.push({
+        className: 'purchase-row',
+        containerDeductionWeight: line.containerDeductionWeightValue,
+        deductionWeight: 0,
+        detail: formatImpurityPurchaseSourceDetail(line),
+        grossWeight: line.grossWeightValue,
+        label: 'ซื้อเพิ่มจากสิ่งเจือปน',
+        netWeight: Math.max(0, line.grossWeightValue - line.containerDeductionWeightValue),
+        productName: summary.productName,
+      })
+    })
+
+    rows.push({
+      className: 'product-total',
+      containerDeductionWeight: summary.containerDeductionWeight,
+      deductionWeight: summary.deductWeight,
+      detail: `รวมจากเต๋าหลังหักสิ่งเจือปน${purchaseLines.length > 0 ? ' และรายการซื้อเพิ่มจากสิ่งเจือปน' : ''}`,
+      grossWeight: summary.grossWeight,
+      label: 'รวมสินค้า',
+      netWeight: summary.netWeight,
+      productName: summary.productName,
+    })
+  })
+
+  return rows
+}
+
 export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: CompanyProfilePrintValues) {
   const isReceipt = ticket.type === 'WTI'
   const docTitle = isReceipt ? 'ใบชั่งน้ำหนัก / ใบรับสินค้า' : 'ใบชั่งน้ำหนัก / ใบส่งของ'
@@ -89,69 +272,34 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     .filter(Boolean)
     .join('')
 
-  // Find parent line and cumulative preceding values for each child line
-  const parentMap = new Map<string, typeof ticket.lines[number]>()
-  const childPrecedingSums = new Map<string, { gross: number; container: number }>()
-  let currentParent: typeof ticket.lines[number] | null = null
-  let runningGrossSum = 0
-  let runningContainerSum = 0
-  ticket.lines.forEach((line) => {
-    if (line.grossWeightValue > 0) {
-      currentParent = line
-      runningGrossSum += line.grossWeightValue
-      runningContainerSum += line.containerDeductionWeightValue
-    } else if (line.grossWeightValue === 0 && (line.impurityId || line.deductionWeight > 0) && currentParent) {
-      parentMap.set(line.id, currentParent)
-      childPrecedingSums.set(line.id, { gross: runningGrossSum, container: runningContainerSum })
-    }
-  })
-
-  // Precalculate rank indices for non-child rows
-  const rankMap = new Map<string, number>()
-  let currentRank = 0
-  ticket.lines.forEach((line) => {
-    const parent = parentMap.get(line.id)
-    if (isReceipt && parent) {
-      // Child row, does not get a rank index
-    } else {
-      currentRank++
-      rankMap.set(line.id, currentRank)
-    }
-  })
-
-  function rowHtml(line: WeightTicketRecord['lines'][number], index: number) {
-    const parent = parentMap.get(line.id)
-    if (isReceipt && parent) {
-      const sums = childPrecedingSums.get(line.id) || { gross: parent.grossWeightValue, container: parent.containerDeductionWeightValue }
-      const netWeight = sums.gross - sums.container - line.deductionWeight
+  function rowHtml(row: PrintWeightRow) {
+    if (row.className === 'product-heading') {
+      const colSpan = isReceipt ? 6 : 4
       return `
-        <tr class="item-row">
-          <td class="c rank-cell"></td>
-          <td>
-            <div class="item-name">${escapeHtml(line.productName)}</div>
+        <tr class="item-row product-heading">
+          <td class="c rank-cell">${escapeHtml(row.rank || '')}</td>
+          <td colspan="${colSpan - 1}">
+            <div class="item-name">${escapeHtml(row.productName)}</div>
+            <div class="muted">${detailHtml(row.detail)}</div>
           </td>
-          <td class="r">${formatPrintableWeight(sums.gross)}</td>
-          <td class="r">- ${formatPrintableWeight(sums.container)}</td>
-          <td class="r">- ${formatPrintableWeight(line.deductionWeight)}</td>
-          <td class="r strong">= ${formatPrintableWeight(netWeight)}</td>
         </tr>
       `
     }
 
-    const displayNote = line.note && line.note !== '-' && !line.note.startsWith('มาจากสิ่งเจือปน') ? line.note : ''
     return `
-      <tr class="item-row">
-        <td class="c rank-cell">${rankMap.get(line.id) ?? ''}</td>
+      <tr class="item-row ${escapeHtml(row.className || '')}">
+        <td class="c rank-cell">${escapeHtml(row.rank || '')}</td>
         <td>
-          <div class="item-name">${escapeHtml(line.productName)}</div>
-          ${displayNote ? `<div class="muted">${escapeHtml(displayNote)}</div>` : ''}
+          <div class="item-name">${escapeHtml(row.productName)}</div>
+          ${row.label ? `<div class="muted">${escapeHtml(row.label)}</div>` : ''}
+          <div class="muted">${detailHtml(row.detail)}</div>
         </td>
-        <td class="r">${formatPrintableNumber(line.grossWeightValue)}</td>
+        <td class="r">${formatPrintableWeight(row.grossWeight)}</td>
         ${isReceipt ? `
-        <td class="r">${formatPrintableNumber(line.containerDeductionWeightValue)}</td>
-        <td class="r">${escapeHtml(cleanImpurityName(line.impurityName) || '-')}</td>
+        <td class="r">${formatPrintableWeight(row.containerDeductionWeight)}</td>
+        <td class="r">${formatPrintableWeight(row.deductionWeight)}</td>
         ` : ''}
-        <td class="r strong">${formatPrintableNumber(isReceipt ? (line.grossWeightValue - line.containerDeductionWeightValue) : line.netWeight)}</td>
+        <td class="r strong">${formatPrintableWeight(row.netWeight)}</td>
       </tr>
     `
   }
@@ -165,14 +313,14 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
     )).join('')
   }
 
-  const pages: Array<{ capacity: number; items: WeightTicketRecord['lines']; startIndex: number }> = []
+  const printRows = buildPrintWeightRows(ticket, isReceipt)
+  const pages: Array<{ capacity: number; items: PrintWeightRow[] }> = []
   let cursor = 0
-  while (cursor < ticket.lines.length || pages.length === 0) {
+  while (cursor < printRows.length || pages.length === 0) {
     const capacity = pages.length === 0 ? FIRST_PAGE_ITEM_ROWS : CONTINUATION_PAGE_ITEM_ROWS
     pages.push({
       capacity,
-      items: ticket.lines.slice(cursor, cursor + capacity),
-      startIndex: cursor,
+      items: printRows.slice(cursor, cursor + capacity),
     })
     cursor += capacity
   }
@@ -180,7 +328,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
   const totalPages = pages.length
   const pageHtml = pages.map((page, pageIndex) => {
     const isLastPage = pageIndex === totalPages - 1
-    const rows = page.items.map((line, index) => rowHtml(line, page.startIndex + index)).join('')
+    const rows = page.items.map((row) => rowHtml(row)).join('')
     const fillerRows = emptyRows(page.capacity - page.items.length)
 
     return `
@@ -226,12 +374,12 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
             <tr>
               <th class="c rank-cell" style="width:7mm">#</th>
               <th>รายการสินค้า</th>
-              <th class="r" style="width:24mm">รวม (kg)</th>
+              <th class="r" style="width:24mm">น้ำหนักรวม</th>
               ${isReceipt ? `
               <th class="r" style="width:25mm">หักภาชนะ</th>
               <th class="r" style="width:34mm">หักสิ่งเจือปน</th>
               ` : ''}
-              <th class="r" style="width:24mm">สุทธิ</th>
+              <th class="r" style="width:24mm">น้ำหนักสุทธิ</th>
             </tr>
           </thead>
           <tbody>
@@ -323,8 +471,16 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 900; }
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items .empty td { height: 24px; color: transparent; }
+      .items .product-heading td { background: #f1f5f9; }
+      .items .lot-row td { background: #ffffff; }
+      .items .source-row td { background: #f8fafc; }
+      .items .purchase-row td { background: #eff6ff; }
+      .items .product-total td { background: #ecfdf5; font-weight: 900; }
       .item-name { font-weight: 850; color: #0f172a; }
       .muted { color: #64748b; font-size: 9px; margin-top: 1px; }
+      .detail-line { margin-top: 1px; overflow-wrap: anywhere; }
+      .source-row .detail-line:first-child,
+      .purchase-row .detail-line:first-child { color: #334155; font-weight: 800; }
       .rank-cell { padding-left: 2px !important; padding-right: 2px !important; }
       .final-weight { color: #059669; font-size: 12px; font-weight: 900; }
       .r { text-align: right; }
@@ -365,6 +521,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
         .items th, .items td { padding: 3px; }
         .items .empty td { height: 18px; }
         .muted { font-size: 8px; }
+        .detail-line { margin-top: 0; line-height: 1.25; }
         .bottom-grid { gap: 8px; margin-top: 7px; }
         .note { min-height: 24px; }
         .summary-card { padding: 5px; }

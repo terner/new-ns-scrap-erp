@@ -176,6 +176,7 @@ export async function POST(request: Request) {
       deductionValue: String(line.deductionValue),
       grossWeight: String(line.grossWeight),
       id: line.id,
+      impuritySourceLineId: line.impuritySourceLineId,
       parentId: line.parentId,
       impurityId: line.impurityId,
     })))

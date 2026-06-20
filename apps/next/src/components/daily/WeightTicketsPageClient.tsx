@@ -307,22 +307,27 @@ function calculateRealLotSummary(line: FormWeightTicketLine, allLines: FormWeigh
   )
 }
 
+function isStoredPurchaseFromImpurityLine(line: WeightTicketRecord['lines'][number]) {
+  return line.grossWeightValue > 0 && line.note.includes('มาจากสิ่งเจือปน')
+}
+
 function ticketToFormState(ticket: WeightTicketRecord): FormState {
   const productParentMap = new Map<string, string>()
   let lastParentId: string | undefined = undefined
   const lines: FormWeightTicketLine[] = ticket.lines.map((line) => {
     const isImpurity = Number(line.grossWeight || 0) === 0 && !!line.impurityId
+    const isPurchaseFromImpurity = isStoredPurchaseFromImpurityLine(line)
     let parentId: string | undefined = undefined
 
     if (isImpurity) {
       parentId = lastParentId
     } else {
-      const existingParentId = productParentMap.get(line.productId)
+      const existingParentId = !isPurchaseFromImpurity ? productParentMap.get(line.productId) : undefined
       if (existingParentId) {
         parentId = existingParentId
       } else {
-        productParentMap.set(line.productId, line.id)
-        lastParentId = line.id
+        if (!isPurchaseFromImpurity) productParentMap.set(line.productId, line.id)
+        if (!isPurchaseFromImpurity) lastParentId = line.id
       }
     }
     return {
@@ -334,12 +339,59 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
       imageNames: line.imageNames,
       imageFiles: line.imageNames.map(createAttachmentPreview),
       impurityId: line.impurityId,
+      impuritySourceLineId: isPurchaseFromImpurity ? '' : undefined,
       impurityPurchaseAction: 'none',
       impurityProductId: '',
       note: line.note,
       productId: line.productId,
       warehouseId: line.warehouseId,
       parentId,
+    }
+  })
+
+  const assignedSourceIds = new Set<string>()
+  const purchaseLineIds = new Set(
+    ticket.lines
+      .filter(isStoredPurchaseFromImpurityLine)
+      .map((line) => line.id),
+  )
+
+  purchaseLineIds.forEach((purchaseLineId) => {
+    const purchaseLine = lines.find((line) => line.id === purchaseLineId)
+    const purchaseSource = ticket.lines.find((line) => line.id === purchaseLineId)
+    if (!purchaseLine || !purchaseSource) return
+
+    const purchaseWeight = Number(purchaseLine.grossWeight || 0)
+    const sourceLine = lines.find((candidate) => {
+      if (assignedSourceIds.has(candidate.id)) return false
+      if (!(Number(candidate.grossWeight || 0) === 0 && candidate.impurityId)) return false
+      if (candidate.productId === purchaseLine.productId) return false
+
+      const deductionMatches = Math.abs(Number(candidate.deductionValue || 0) - purchaseWeight) < 0.001
+        || Math.abs((ticket.lines.find((line) => line.id === candidate.id)?.deductionWeight ?? 0) - purchaseWeight) < 0.001
+      if (!deductionMatches) return false
+
+      const sourceProductName = ticket.lines.find((line) => line.id === candidate.id)?.productName ?? ''
+      return !sourceProductName || purchaseSource.note.includes(sourceProductName) || purchaseSource.note.includes(candidate.productId)
+    })
+
+    if (!sourceLine) return
+
+    assignedSourceIds.add(sourceLine.id)
+    sourceLine.impurityPurchaseAction = 'buy'
+    sourceLine.impurityProductId = purchaseLine.productId
+    purchaseLine.impuritySourceLineId = sourceLine.id
+
+    const existingTargetParentLine = lines.find((line) =>
+      line.id !== purchaseLine.id
+      && !line.parentId
+      && !line.impuritySourceLineId
+      && line.productId === purchaseLine.productId
+    )
+    purchaseLine.parentId = existingTargetParentLine?.id
+    if (purchaseLine.imageFiles.length === 0) {
+      purchaseLine.imageFiles = sourceLine.imageFiles
+      purchaseLine.imageNames = sourceLine.imageNames
     }
   })
 
