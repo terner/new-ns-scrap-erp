@@ -37,17 +37,25 @@ export async function GET(request: Request) {
     if (query.format === 'xlsx') {
       const body = buildStockWorkbook('Stock Balance', snapshot.rows.map((row) => ({
         สินค้า: `${row.productCode} ${row.productName}`.trim(),
-        คลัง: row.onHoldQty > 0 ? `${row.status} / On Hold` : row.status,
+        ประเภทคลัง: row.status,
+        สถานะสินค้า: row.onHoldQty > 0
+          ? 'รอออก'
+          : row.awaitingBillQty > 0 && row.qty <= 0
+            ? 'รอเข้า'
+            : row.qty > 0
+              ? 'คงเหลือ'
+              : row.awaitingBillQty > 0
+                ? 'รอเข้า'
+                : '-',
         สาขา: row.branchName,
         คลังจัดเก็บ: row.warehouseName,
         Lot: row.lotNo,
         คงเหลือ: row.qty,
-        ซื้อรอรับ: row.awaitingBillQty,
-        จองไว้: row.onHoldQty,
+        รอเข้า: row.awaitingBillQty,
+        รอออก: row.onHoldQty,
         พร้อมส่ง: row.readyQty,
         มูลค่า: row.value,
         ต้นทุนเฉลี่ย: row.avgCost,
-        พร้อมขาย: row.notAvailable ? 'No' : 'Yes',
         ล่าสุด: row.lastDate,
       })))
       return xlsxResponse(body, `stock_balance_${new Date().toISOString().slice(0, 10)}.xlsx`)

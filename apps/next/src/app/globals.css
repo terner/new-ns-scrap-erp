@@ -8,7 +8,8 @@
   --color-scrap-line: #d9e2ec;
   --color-scrap-panel: #f8fafc;
   --color-scrap-accent: #0f766e;
-  --font-mono: "Noto Sans Thai", sans-serif;
+  --font-sans: "Noto Sans Thai", "Noto Sans", sans-serif;
+  --font-mono: "Noto Sans Thai", "Noto Sans", sans-serif;
 }
 
 :root {
@@ -208,6 +209,7 @@ body {
   min-height: 100vh;
 }
 
+html,
 body,
 table,
 th,
@@ -216,13 +218,15 @@ button,
 input,
 select,
 textarea {
-  font-family: "Noto Sans Thai", sans-serif;
+  font-family: "Noto Sans Thai", "Noto Sans", sans-serif;
 }
 
+.font-sans,
 .font-mono,
+.font-noto-thai,
 pre,
 code {
-  font-family: "Noto Sans Thai", sans-serif !important;
+  font-family: "Noto Sans Thai", "Noto Sans", sans-serif !important;
 }
 
 /* Legacy form baseline: plain Tailwind `border` controls should render light slate, and text color should match theme. */
@@ -355,4 +359,3 @@ a:active,
 aside a:visited {
   color: inherit;
 }
-

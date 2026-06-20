@@ -217,6 +217,7 @@ export async function stockBalanceSnapshot(input: {
   productId?: string | bigint | null
   q?: string | null
   status?: string | null
+  stockState?: 'on_hand' | 'pending_in' | 'pending_out' | null
   warehouseId?: string | bigint | null
 }) {
   const normalizedInput = await normalizeStockReferenceInput(input)
@@ -509,7 +510,14 @@ export async function stockBalanceSnapshot(input: {
     holdQtyByStockKey.set(holdKey, Math.max(0, remainingHold - row.onHoldQty))
   }
 
-  const filteredRows = input.onHold ? mergedRows.filter((row) => row.onHoldQty > 0) : mergedRows
+  const stockState = input.onHold ? 'pending_out' : input.stockState ?? null
+  const filteredRows = stockState === 'on_hand'
+    ? mergedRows.filter((row) => row.qty > 0)
+    : stockState === 'pending_in'
+      ? mergedRows.filter((row) => row.awaitingBillQty > 0)
+      : stockState === 'pending_out'
+        ? mergedRows.filter((row) => row.onHoldQty > 0)
+        : mergedRows
 
   const summary = filteredRows.reduce((acc, row) => {
     acc.onHoldQty += row.onHoldQty

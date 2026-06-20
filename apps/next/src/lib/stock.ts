@@ -19,6 +19,7 @@ const stockConvertAllocationMethodSchema = z.enum(['FIFO', 'LIFO', 'HIGHEST_COST
 const stockConvertTargetCostPolicySchema = z.enum(['SOURCE_MATCHED', 'CUSTOM_UNIT_COST'])
 
 export const stockStatusSchema = z.enum(['RM', 'WIP', 'FG'])
+export const stockStateSchema = z.enum(['on_hand', 'pending_in', 'pending_out'])
 export const statusConvertStatusSchema = z.enum(['RM', 'FG'])
 
 export const stockQuerySchema = z.object({
@@ -34,6 +35,7 @@ export const stockQuerySchema = z.object({
   refType: z.preprocess(blankToNull, z.string().trim().max(20).nullable().default(null)),
   sort: z.string().trim().max(40).default('date'),
   status: z.preprocess(blankToNull, stockStatusSchema.nullable().default(null)),
+  stockState: z.preprocess(blankToNull, stockStateSchema.nullable().default(null)),
   warehouseId: z.preprocess(blankToNull, z.string().trim().nullable().default(null)),
   from: z.preprocess(blankToNull, requiredDate.nullable().default(null)),
   to: z.preprocess(blankToNull, requiredDate.nullable().default(null)),
