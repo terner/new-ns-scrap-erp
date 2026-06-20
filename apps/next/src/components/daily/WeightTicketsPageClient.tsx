@@ -53,6 +53,7 @@ type FormState = {
   type: WeightTicketType
   vehicleImageFiles: AttachmentPreview[]
   vehicleNo: string
+  warehouseName: string
 }
 
 type WeightTicketOptionsPayload = {
@@ -101,6 +102,7 @@ function initialForm(type: WeightTicketType = 'WTI'): FormState {
     type,
     vehicleImageFiles: [],
     vehicleNo: '',
+    warehouseName: '',
   }
 }
 
@@ -251,6 +253,7 @@ function ticketToFormState(ticket: WeightTicketRecord): FormState {
     type: ticket.type,
     vehicleImageFiles: ticket.vehicleImageNames.map(createAttachmentPreview),
     vehicleNo: ticket.vehicleNo,
+    warehouseName: ticket.warehouseName ?? '',
   }
 }
 
@@ -669,7 +672,7 @@ export function WeightTicketsPageClient({
     nextLine.warehouseId = parentLine?.warehouseId || ''
     nextLine.grossWeight = deductionWeight
     nextLine.containerDeductionWeight = '0'
-    nextLine.note = `มาจากสิ่งเจือปน (${impurityLabel} ${deductionWeight} กก.) ของรายการที่ ${parentIndex}: ${parentProductLabel}`
+    nextLine.note = `มาจากสิ่งเจือปน (${impurityLabel}) ของรายการที่ ${parentIndex}: ${parentProductLabel}`
 
     setForm((current) => ({
       ...current,
@@ -753,6 +756,7 @@ export function WeightTicketsPageClient({
         type: form.type,
         vehicleImageNames: form.vehicleImageFiles.map((file) => file.rawValue),
         vehicleNo: form.vehicleNo.trim(),
+        warehouseName: form.warehouseName.trim() || null,
       })
       setLoadError('')
       setLoadedTicket(ticket)
@@ -849,6 +853,14 @@ export function WeightTicketsPageClient({
                   value={form.vehicleNo}
                   onBlur={() => markTouched('vehicleNo')}
                   onChange={(event) => updateForm('vehicleNo', normalizeVehicleNo(event.target.value))}
+                />
+              </FieldBlock>
+              <FieldBlock error={showError('warehouseName')} label="โกดัง">
+                <Input
+                  placeholder="เช่น โกดัง A"
+                  value={form.warehouseName}
+                  onBlur={() => markTouched('warehouseName')}
+                  onChange={(event) => updateForm('warehouseName', event.target.value)}
                 />
               </FieldBlock>
               <FieldBlock label="รูปภาพรถส่งของ">
