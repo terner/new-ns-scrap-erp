@@ -1085,7 +1085,7 @@ export function WeightTicketsPageClient({
                   <div className="text-sm font-medium text-slate-700">รายการทั้งหมด {getMainParentLines(form.lines).length} รายการ</div>
                   <Button size="xs" type="button" onClick={addLine}>
                     <Plus className="mr-1 size-3" />
-                    เพิ่ม
+                    เพิ่มสินค้า
                   </Button>
                 </div>
                 <div className="space-y-2 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-1">
@@ -1278,21 +1278,10 @@ export function WeightTicketsPageClient({
                       <div className="mt-4 border-t border-slate-200/60 pt-4">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">เต๋าสินค้า</div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            disabled={!hasSelectedProduct}
-                            onClick={() => addSameProductLot(line)}
-                            className="outline-none flex items-center gap-1"
-                          >
-                            <Plus className="size-3" />
-                            เพิ่มเต๋า
-                          </Button>
                         </div>
                         {!hasSelectedProduct ? (
                           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                            เลือกสินค้าก่อน จึงจะกรอกน้ำหนัก เพิ่มเต๋า และแนบรูปได้
+                            เลือกสินค้าก่อน จึงจะกรอกน้ำหนัก เพิ่มล็อต และแนบรูปได้
                           </div>
                         ) : null}
                         <div className="space-y-4">
@@ -1412,6 +1401,20 @@ export function WeightTicketsPageClient({
                               )
                             })
                           })()}
+                        </div>
+
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            disabled={!hasSelectedProduct}
+                            onClick={() => addSameProductLot(line)}
+                            className="outline-none flex items-center gap-1"
+                          >
+                            <Plus className="size-3" />
+                            เพิ่มล็อต
+                          </Button>
                         </div>
                         {(() => {
                           const lotSummary = calculateRealLotSummary(line, form.lines)
@@ -1957,7 +1960,7 @@ function ProductImagePicker({
         )}
       >
         <Plus className="h-4 w-4" />
-        เลือกจากรูป
+        {value ? 'เปลี่ยนสินค้า' : 'เลือกจากรูป'}
       </Button>
 
       {!hideSelectedCard && selectedProduct ? (
