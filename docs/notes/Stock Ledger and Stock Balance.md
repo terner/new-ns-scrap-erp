@@ -174,7 +174,7 @@ API read contract ปัจจุบัน:
 - `SB Stock` เป็น owner ของ stock-out
 - `WTI/WTO` เป็น source evidence และ usage control ไม่ใช่ movement owner
 - `WTO` ต้องสร้าง stock hold/reservation เพื่อกันยอดสินค้าก่อนออก `SB`
-- implementation gap หลักที่เหลือหลัง PB/SB/PSALE hardening รอบ 2026-06-12 คือ durable allocation tables บางชนิด, PB edit/cancel browser QA, PSALE/SB-from-PSALE browser QA, และ browser QA ของ reconciliation report UI
+- implementation gap หลักที่เหลือหลัง PB/SB/PSALE hardening รอบ 2026-06-12 คือ durable allocation tables บางชนิด, PB edit/cancel browser QA และ PSALE/SB-from-PSALE browser QA; หน้า stock reconciliation ถูกถอดออกจาก active surface แล้ว
 
 ## Business Keys For Balance
 

@@ -19,7 +19,6 @@
     "verify:sales-bill-psale-cancel": "npx tsx scripts/verify-sales-bill-psale-cancel-contract.ts",
     "verify:trading-allocation-correction": "npx tsx scripts/verify-trading-allocation-correction-contract.ts",
     "verify:stock-transfer": "npx tsx scripts/verify-stock-transfer-contract.ts",
-    "verify:stock-ledger": "npx tsx scripts/verify-stock-ledger-contract.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

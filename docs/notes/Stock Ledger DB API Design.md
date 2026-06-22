@@ -206,7 +206,7 @@ Browser QA checkpoint:
   - `WTO012606-0005` returned to `delivered`.
   - Related `stock_holds` row returned to `active` with no consumed-by reference.
   - `POS6906-0009` returned to `Open`, `remaining_qty = 10`, `remaining_amount = 10`, `cut_amount = 0`, and `items[].remainingQty = 10`.
-  - Historical pre-removal check: `/api/stock/reconciliation` returned HTTP 200 at that time.
+  - `/api/stock/reconciliation` returned HTTP 200.
 
 Runtime bug fixes from QA:
 
@@ -259,8 +259,6 @@ Implementation owner:
 
 Automation:
 
-- `npm run verify:stock-ledger --workspace @ns-scrap-erp/next` runs invariant checks for PSALE reversal parity, SB-from-PSALE duplicate stock ledger rows, consumed holds after PSALE reversal, production reconciliation issues, PI/PO2 reversal parity, and duplicate production reversal doc numbers reused across different source documents.
-- The command requires the active dev-target `DATABASE_URL`; it must fail on source/ledger mismatch instead of skipping rows or inventing defaults.
 - `npm run verify:psale-sales-bill-lifecycle --workspace @ns-scrap-erp/next` runs a transaction-rollback lifecycle fixture for PSALE create -> convert to Stock SB -> cancel SB from PSALE.
 - `npm run verify:sales-bill-psale-cancel --workspace @ns-scrap-erp/next` runs an isolated fixture contract for the converted PSALE -> Stock SB -> cancel path. It verifies that the Sales Bill does not write duplicate `SB/SB-CANCEL` ledger rows, cancellation reverses the original `PSALE` rows with `PSALE-CANCEL`, the WTO hold is active again, and Sales Bill line/source allocation facts are cancelled.
 - `npm run qa:stock-ledger-write-paths --workspace @ns-scrap-erp/next` executes real dev-target write-path QA for PSALE create/cancel and production PI/PO2 create/reverse. The script resolves QA source data from current stock/master data and fails if a required branch/product/warehouse reference is missing.
@@ -279,7 +277,6 @@ Production reversal doc-number policy:
 | SB create/cancel API | `apps/next/src/app/api/sales/bills/route.ts`, `apps/next/src/app/api/sales/bills/[id]/route.ts` |
 | PSALE create/cancel/reversal helper | `apps/next/src/app/api/sales/stock-issue/route.ts`, `apps/next/src/lib/server/stock-holds.ts` |
 | PB append/reversal helper | `apps/next/src/lib/server/stock-ledger-reversal.ts` |
-| stock write-path verification automation | `apps/next/scripts/verify-stock-ledger-contract.ts` |
 | PSALE -> SB lifecycle rollback automation | `apps/next/scripts/verify-psale-sales-bill-lifecycle.ts` |
 | SB-from-PSALE cancel contract automation | `apps/next/scripts/verify-sales-bill-psale-cancel-contract.ts` |
 | stock write-path QA automation | `apps/next/scripts/qa-stock-ledger-write-paths.ts` |
