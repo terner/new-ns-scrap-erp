@@ -915,7 +915,6 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
               <tr>
                 <th className="p-3 text-left">วันที่ล่าสุด</th>
                 <th className="p-3 text-center">ประเภทคลัง</th>
-                <th className="p-3 text-left">สถานะสินค้า</th>
                 <th className="p-3 text-left">สาขา</th>
                 <th className="p-3 text-left">Lot</th>
                 <th className="p-3 text-right">คงเหลือ</th>
@@ -942,7 +941,6 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                 >
                   <td className="p-3 text-slate-500">{row.lastDate}</td>
                   <td className="p-3 text-center"><StockStatusCell row={row} /></td>
-                  <td className="p-3"><StockStateCell row={row} /></td>
                   <td className="p-3 text-slate-500">{row.branchName}</td>
                   <td className="p-3 font-mono text-slate-600">{row.lotNo || '-'}</td>
                   <td className={`p-3 text-right tabular-nums ${row.qty < 0 ? 'text-red-650' : 'text-slate-800'}`}>{formatMoney(row.qty)}</td>
@@ -952,7 +950,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                   <td className="p-3 text-right font-mono text-slate-600">{formatMoney(row.value)}</td>
                 </tr>
               ))}
-              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={10}>ยังไม่มีรายการ</td></tr> : null}
+              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={9}>ยังไม่มีรายการ</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -1181,11 +1179,6 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
               </div>
               <StockStatusCell row={row} />
             </div>
-            <div className="flex items-center justify-between gap-3 text-[11px] text-slate-650">
-              <span>สถานะสินค้า:</span>
-              <StockStateCell className="justify-end" row={row} />
-            </div>
-            
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-slate-650">
               <div className="flex justify-between">
                 <span>หมวด:</span>
@@ -1236,7 +1229,6 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
               <th className="p-3.5 text-left">สินค้า</th>
               <th className="p-3.5 text-left">หมวด</th>
               <th className="p-3.5 text-center">ประเภทคลัง</th>
-              <th className="p-3.5 text-left">สถานะสินค้า</th>
               <th className="p-3.5 text-left">สาขา</th>
               <th className="p-3.5 text-right">คงเหลือ (กก.)</th>
               <th className="p-3.5 text-right border-r border-slate-100">รอเข้า</th>
@@ -1247,7 +1239,7 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-semibold">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
+            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && rows.map((row) => (
               <tr
                 key={row.key}
@@ -1270,7 +1262,6 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
                 </td>
                 <td className="p-3.5 text-slate-800">{row.productMetalGroup || 'อื่นๆ'}</td>
                 <td className="p-3.5 text-center"><StockStatusCell row={row} /></td>
-                <td className="p-3.5"><StockStateCell row={row} /></td>
                 <td className="p-3.5 text-slate-650 max-w-[160px] truncate" title={row.branchName}>
                   {row.branchName}
                 </td>
@@ -1282,12 +1273,12 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
                 <td className="p-3.5 text-right text-emerald-700 font-mono">{formatMoney(row.value)}</td>
               </tr>
             ))}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ไม่มีสต๊อก</td></tr> : null}
+            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>ไม่มีสต๊อก</td></tr> : null}
           </tbody>
           {rows.length ? (
             <tfoot className="bg-slate-50 border-t border-slate-200/80 font-bold text-slate-800">
               <tr>
-                <td className="p-3.5" colSpan={5}>รวมหน้านี้ ({rows.length} รายการ)</td>
+                <td className="p-3.5" colSpan={4}>รวมหน้านี้ ({rows.length} รายการ)</td>
                 <td className="p-3.5 text-right font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))}</td>
                 <td className="p-3.5 text-right border-r border-slate-100 font-mono text-slate-800">{formatMoney(rows.reduce((sum, row) => sum + row.awaitingBillQty, 0))}</td>
                 <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 font-mono">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td>
@@ -1363,34 +1354,10 @@ function StockTypeText({ status }: { status: string }) {
   return <span className="text-xs font-semibold text-slate-700">{status || '-'}</span>
 }
 
-function StockStateIndicator({ state }: { state: 'on_hand' | 'pending_in' | 'pending_out' }) {
-  const meta = state === 'on_hand'
-    ? { className: 'text-emerald-700', label: 'คงเหลือ' }
-    : state === 'pending_in'
-      ? { className: 'text-sky-700', label: 'รอเข้า' }
-      : { className: 'text-amber-700', label: 'รอออก' }
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${meta.className}`}>
-      <span className="size-1.5 rounded-full bg-current" />
-      {meta.label}
-    </span>
-  )
-}
-
 function StockStatusCell({ row }: { row: BalanceRow }) {
   return (
     <div className="flex flex-wrap justify-center gap-1 shrink-0">
       <StockTypeText status={row.status} />
-    </div>
-  )
-}
-
-function StockStateCell({ className = '', row }: { className?: string; row: BalanceRow }) {
-  const states = stockStatesForRow(row)
-  if (!states.length) return <span className="text-xs text-slate-400">-</span>
-  return (
-    <div className={`flex flex-wrap gap-x-2 gap-y-1 ${className}`}>
-      {states.map((state) => <StockStateIndicator key={state} state={state} />)}
     </div>
   )
 }
