@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Dialog, DialogContent } from '@/components/ui/Dialog'
@@ -221,23 +221,49 @@ export function StockBalancePageClient() {
   }), [filteredRows])
 
   const matrixRows = useMemo(() => {
-    const groups = new Map<string, { fgQty: number; fgVal: number; group: string; rmQty: number; rmVal: number; wipQty: number; wipVal: number }>()
+    const groups = new Map<string, MatrixRow>()
     for (const row of filteredRows) {
       const key = row.productMetalGroup || 'อื่นๆ'
-      const current = groups.get(key) ?? { fgQty: 0, fgVal: 0, group: key, rmQty: 0, rmVal: 0, wipQty: 0, wipVal: 0 }
+      const current = groups.get(key) ?? { fgQty: 0, fgVal: 0, group: key, products: [], rmQty: 0, rmVal: 0, wipQty: 0, wipVal: 0 }
+      let product = current.products.find((item) => item.productId === row.productId)
+      if (!product) {
+        product = {
+          fgQty: 0,
+          fgVal: 0,
+          productCode: row.productCode,
+          productId: row.productId,
+          productName: row.productName,
+          rmQty: 0,
+          rmVal: 0,
+          wipQty: 0,
+          wipVal: 0,
+        }
+        current.products.push(product)
+      }
       if (row.status === 'FG') {
         current.fgQty += row.qty
         current.fgVal += row.value
+        product.fgQty += row.qty
+        product.fgVal += row.value
       } else if (row.status === 'WIP') {
         current.wipQty += row.qty
         current.wipVal += row.value
+        product.wipQty += row.qty
+        product.wipVal += row.value
       } else {
         current.rmQty += row.qty
         current.rmVal += row.value
+        product.rmQty += row.qty
+        product.rmVal += row.value
       }
       groups.set(key, current)
     }
-    return Array.from(groups.values()).sort((a, b) => (b.rmVal + b.wipVal + b.fgVal) - (a.rmVal + a.wipVal + a.fgVal))
+    return Array.from(groups.values())
+      .map((row) => ({
+        ...row,
+        products: row.products.sort((a, b) => matrixProductValue(b) - matrixProductValue(a)),
+      }))
+      .sort((a, b) => matrixRowValue(b) - matrixRowValue(a))
   }, [filteredRows])
 
   const detailTotalPages = Math.max(1, Math.ceil(displayRows.length / detailPageSize))
@@ -697,7 +723,25 @@ function primarySourceRow(row: DisplayBalanceRow) {
 
 type StatusSummary = { count: number; qty: number; status: string; value: number }
 
-type MatrixRow = { fgQty: number; fgVal: number; group: string; rmQty: number; rmVal: number; wipQty: number; wipVal: number }
+type MatrixProductRow = { fgQty: number; fgVal: number; productCode: string; productId: string; productName: string; rmQty: number; rmVal: number; wipQty: number; wipVal: number }
+
+type MatrixRow = { fgQty: number; fgVal: number; group: string; products: MatrixProductRow[]; rmQty: number; rmVal: number; wipQty: number; wipVal: number }
+
+function matrixProductQty(row: MatrixProductRow) {
+  return row.rmQty + row.wipQty + row.fgQty
+}
+
+function matrixProductValue(row: MatrixProductRow) {
+  return row.rmVal + row.wipVal + row.fgVal
+}
+
+function matrixRowQty(row: MatrixRow) {
+  return row.rmQty + row.wipQty + row.fgQty
+}
+
+function matrixRowValue(row: MatrixRow) {
+  return row.rmVal + row.wipVal + row.fgVal
+}
 
 function StockDetailField({ className = '', label, mono, value }: { className?: string; label: string; mono?: boolean; value: string }) {
   return (
@@ -1006,17 +1050,43 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
           <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
             {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && matrixRows.map((row) => (
-              <tr key={row.group} className="hover:bg-slate-50/50 transition-colors">
-                <td className="p-3.5 text-slate-800">{row.group}</td>
-                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
-                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{row.rmVal ? formatMoney(row.rmVal) : '-'}</td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipVal ? formatMoney(row.wipVal) : '-'}</td>
-                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
-                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgVal ? formatMoney(row.fgVal) : '-'}</td>
-                <td className="p-3.5 text-right">{formatMoney(row.rmQty + row.wipQty + row.fgQty)}</td>
-                <td className="p-3.5 text-right text-emerald-700">{formatMoney(row.rmVal + row.wipVal + row.fgVal)}</td>
-              </tr>
+              <Fragment key={row.group}>
+                <tr className="bg-slate-50/70 transition-colors hover:bg-slate-100/70">
+                  <td className="p-3.5 text-slate-850">
+                    <div className="font-bold">{row.group}</div>
+                    <div className="mt-0.5 text-[11px] font-medium text-slate-500">{row.products.length.toLocaleString('th-TH')} รายการสินค้า</div>
+                  </td>
+                  <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
+                  <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{row.rmVal ? formatMoney(row.rmVal) : '-'}</td>
+                  <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
+                  <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipVal ? formatMoney(row.wipVal) : '-'}</td>
+                  <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
+                  <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgVal ? formatMoney(row.fgVal) : '-'}</td>
+                  <td className="p-3.5 text-right">{formatMoney(matrixRowQty(row))}</td>
+                  <td className="p-3.5 text-right text-emerald-700">{formatMoney(matrixRowValue(row))}</td>
+                </tr>
+                {row.products.map((product) => (
+                  <tr key={`${row.group}-${product.productId}`} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-3.5 pl-8 text-slate-700">
+                      <div className="flex min-w-[240px] items-start gap-2">
+                        <span className="mt-1.5 h-px w-4 shrink-0 bg-slate-300" />
+                        <div>
+                          <div className="font-semibold text-slate-800">{product.productCode} {product.productName}</div>
+                          <div className="mt-0.5 text-[11px] font-medium text-slate-400">สินค้าในหมวด {row.group}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{product.rmQty ? formatMoney(product.rmQty) : '-'}</td>
+                    <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{product.rmVal ? formatMoney(product.rmVal) : '-'}</td>
+                    <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{product.wipQty ? formatMoney(product.wipQty) : '-'}</td>
+                    <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{product.wipVal ? formatMoney(product.wipVal) : '-'}</td>
+                    <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{product.fgQty ? formatMoney(product.fgQty) : '-'}</td>
+                    <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{product.fgVal ? formatMoney(product.fgVal) : '-'}</td>
+                    <td className="p-3.5 text-right">{formatMoney(matrixProductQty(product))}</td>
+                    <td className="p-3.5 text-right text-emerald-700">{formatMoney(matrixProductValue(product))}</td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
             {!isLoading && matrixRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่มีสต๊อก</td></tr> : null}
           </tbody>
@@ -1050,6 +1120,7 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
             <div key={row.group} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
               <div className="border-b border-slate-100 pb-2">
                 <span className="font-semibold text-slate-800 text-sm">{row.group}</span>
+                <span className="ml-2 text-[11px] font-medium text-slate-400">{row.products.length.toLocaleString('th-TH')} รายการสินค้า</span>
               </div>
               <div className="space-y-2 text-xs text-slate-600">
                 <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-lg">
@@ -1076,6 +1147,21 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
                 <span className="tabular-nums">
                   {formatMoney(totalRowQty)} กก. | <span className="text-emerald-700">{formatMoney(totalRowVal)} บาท</span>
                 </span>
+              </div>
+              <div className="space-y-2 border-t border-slate-100 pt-2">
+                {row.products.map((product) => (
+                  <div key={`${row.group}-${product.productId}`} className="rounded-lg bg-slate-50/80 p-2.5 text-xs">
+                    <div className="font-semibold text-slate-800">{product.productCode} {product.productName}</div>
+                    <div className="mt-1 grid grid-cols-3 gap-1.5 text-[11px] font-semibold tabular-nums">
+                      <div className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">RM {product.rmQty ? formatMoney(product.rmQty) : '-'}</div>
+                      <div className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">WIP {product.wipQty ? formatMoney(product.wipQty) : '-'}</div>
+                      <div className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">FG {product.fgQty ? formatMoney(product.fgQty) : '-'}</div>
+                    </div>
+                    <div className="mt-1 text-right text-[11px] font-bold text-emerald-700 tabular-nums">
+                      รวม {formatMoney(matrixProductQty(product))} กก. | {formatMoney(matrixProductValue(product))} บ.
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )
