@@ -905,7 +905,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       return {
         docNo,
         id: `PB:${docNo}`,
-        label: `${docNo} · ${lineCount.toLocaleString('th-TH')} รายการ · คงเหลือ ${formatMoney(remainingQty)}${unit ? ` ${unit}` : ''} · ${formatMoney(remainingAmount)} บาท`,
+        label: `${docNo} · ${supplierName ?? 'ไม่ระบุ Supplier'} · ${lineCount.toLocaleString('th-TH')} รายการ · คงเหลือ ${formatMoney(remainingQty)}${unit ? ` ${unit}` : ''} · ${formatMoney(remainingAmount)} บาท`,
         lineCount,
         lines: sortedLines,
         remainingAmount,
