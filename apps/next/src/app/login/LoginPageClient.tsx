@@ -13,6 +13,12 @@ type LoginPageClientProps = {
   }
 }
 
+type AuthMeResponse = {
+  roles?: Array<{
+    code?: string | null
+  }>
+}
+
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
 
@@ -21,6 +27,32 @@ function safeRedirectPath(value: string | null) {
     if (parsed.origin !== window.location.origin) return '/'
     if (['/login', '/forgot-password', '/reset-password'].includes(parsed.pathname)) return '/'
     return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return '/'
+  }
+}
+
+function landingPathForRoleCodes(roleCodes: string[]) {
+  if (roleCodes.includes('production_department')) return '/production/orders'
+  if (roleCodes.includes('sorting_department')) return '/daily/weight-ticket-list'
+  return '/'
+}
+
+async function resolveDefaultLandingPath() {
+  try {
+    const response = await fetch('/api/auth/me', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    })
+
+    if (!response.ok) return '/'
+
+    const payload = await response.json() as AuthMeResponse
+    const roleCodes = (payload.roles ?? [])
+      .map((role) => String(role.code ?? '').toLowerCase())
+      .filter(Boolean)
+
+    return landingPathForRoleCodes(roleCodes)
   } catch {
     return '/'
   }
@@ -98,7 +130,9 @@ export function LoginPageClient({ devLogin }: LoginPageClientProps) {
     }
 
     setPassword('')
-    window.location.assign(safeRedirectPath(searchParams.get('redirect')))
+    const redirectParam = searchParams.get('redirect')
+    const redirectPath = redirectParam ? safeRedirectPath(redirectParam) : await resolveDefaultLandingPath()
+    window.location.assign(redirectPath)
   }
 
   function submitOnPasswordEnter(event: KeyboardEvent<HTMLInputElement>) {
