@@ -110,13 +110,21 @@ type PurchaseBillDetailRow = Prisma.purchase_billsGetPayload<{
             weight_ticket_product_summaries: {
               select: {
                 line_count: true
+                container_deduction_weight: true
+                net_weight: true
                 product_name: true
                 weight_ticket_product_summary_lines: {
                   include: {
                     weight_ticket_lines: {
                       select: {
+                        deduct_weight: true,
+                        gross_weight: true,
+                        impurity_id: true,
+                        impurity_name: true,
                         line_no: true,
                         note: true,
+                        product_id: true,
+                        product_name: true,
                       },
                     },
                   },
@@ -132,6 +140,18 @@ type PurchaseBillDetailRow = Prisma.purchase_billsGetPayload<{
               select: {
                 doc_no: true
                 document_date: true
+                weight_ticket_lines: {
+                  select: {
+                    deduct_weight: true
+                    gross_weight: true
+                    impurity_id: true
+                    impurity_name: true
+                    line_no: true
+                    note: true
+                    product_id: true
+                    product_name: true
+                  }
+                }
                 vehicle_no: true
               }
             }
@@ -209,6 +229,22 @@ function money(value: number | null | undefined) {
   return (value ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
 }
 
+function weight(value: number | null | undefined) {
+  const numericValue = value ?? 0
+  if (numericValue % 1 === 0) {
+    return numericValue.toLocaleString('th-TH', { maximumFractionDigits: 0, minimumFractionDigits: 0 })
+  }
+  return numericValue.toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+}
+
+function cleanImpurityName(name: string | null | undefined) {
+  if (!name) return ''
+  return name
+    .replace(/\s*\([\d.]+\s*kg\)/gi, '')
+    .replace(/\s*[\d.]+\s*kg/gi, '')
+    .trim()
+}
+
 function historyMetaValue(meta: unknown, key: string) {
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null
   return (meta as Record<string, unknown>)[key]
@@ -220,12 +256,56 @@ function sourceSnapshotValue(snapshot: unknown, key: string) {
   return typeof value === 'string' ? value : null
 }
 
+type PurchaseBillReceiptAllocation = PurchaseBillDetailRow['purchase_bill_items'][number]['purchase_bill_receipt_allocations']
+
+type PurchaseBillReceiptLine = NonNullable<PurchaseBillReceiptAllocation>['weight_tickets']['weight_ticket_lines'][number]
+
+function isImpurityLine(line: PurchaseBillReceiptLine) {
+  return toNumber(line.gross_weight) === 0 && Boolean(line.impurity_name || line.impurity_id)
+}
+
+function isPurchaseFromImpurityLine(line: PurchaseBillReceiptLine) {
+  return toNumber(line.gross_weight) > 0 && (line.note ?? '').includes('มาจากสิ่งเจือปน')
+}
+
+function findPurchaseLineForImpurity(
+  impurityLine: PurchaseBillReceiptLine,
+  sourceProductName: string,
+  purchaseLines: PurchaseBillReceiptLine[],
+) {
+  return purchaseLines.find((purchaseLine) => {
+    const note = purchaseLine.note ?? ''
+    if (!note.includes(sourceProductName) && !note.includes(String(impurityLine.product_id))) return false
+    return Math.abs(toNumber(purchaseLine.gross_weight) - toNumber(impurityLine.deduct_weight)) < 0.001
+  })
+}
+
 function receiptLineRemark(receiptAllocation: PurchaseBillDetailRow['purchase_bill_items'][number]['purchase_bill_receipt_allocations']) {
   if (!receiptAllocation) return null
-  const notes = receiptAllocation.weight_ticket_product_summaries.weight_ticket_product_summary_lines
-    .map((bridge) => bridge.weight_ticket_lines.note?.trim() ?? '')
-    .filter((note): note is string => Boolean(note))
-  return Array.from(new Set(notes)).join(' / ')
+  const summary = receiptAllocation.weight_ticket_product_summaries
+  const allReceiptLines = receiptAllocation.weight_tickets.weight_ticket_lines
+  const purchaseLines = allReceiptLines.filter(isPurchaseFromImpurityLine)
+  const summaryLines = summary.weight_ticket_product_summary_lines.map((bridge) => bridge.weight_ticket_lines)
+  const impurityLines = summary.weight_ticket_product_summary_lines
+    .map((bridge) => bridge.weight_ticket_lines)
+    .filter(isImpurityLine)
+  const lotNotes = Array.from(new Set(summaryLines
+    .filter((line) => !isImpurityLine(line) && !isPurchaseFromImpurityLine(line))
+    .map((line) => line.note?.trim() ?? '')
+    .filter((note): note is string => Boolean(note))))
+
+  if (impurityLines.length > 0) {
+    const impurityRemarks = impurityLines.map((line, index) => {
+      const purchaseLine = findPurchaseLineForImpurity(line, summary.product_name, purchaseLines)
+      const impurityName = cleanImpurityName(line.impurity_name) || 'สิ่งเจือปน'
+      const prefix = `- ${index + 1}. ${impurityName} ${weight(toNumber(line.deduct_weight))} กก.`
+      return purchaseLine ? `${prefix} ซื้อเป็น ${purchaseLine.product_name}` : prefix
+    })
+    const noteRemarks = lotNotes.map((note, index) => `- ${impurityRemarks.length + index + 1}. ${note}`)
+    return [...impurityRemarks, ...noteRemarks].join('\n')
+  }
+
+  return lotNotes.join(' / ')
 }
 
 export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBillDetail | null> {
@@ -256,13 +336,21 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
               weight_ticket_product_summaries: {
                 select: {
                   line_count: true,
+                  container_deduction_weight: true,
+                  net_weight: true,
                   product_name: true,
                   weight_ticket_product_summary_lines: {
                     include: {
                       weight_ticket_lines: {
                         select: {
+                          deduct_weight: true,
+                          gross_weight: true,
+                          impurity_id: true,
+                          impurity_name: true,
                           line_no: true,
                           note: true,
+                          product_id: true,
+                          product_name: true,
                         },
                       },
                     },
@@ -277,6 +365,19 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
               weight_tickets: {
                 select: {
                   doc_no: true,
+                  weight_ticket_lines: {
+                    orderBy: { line_no: 'asc' },
+                    select: {
+                      deduct_weight: true,
+                      gross_weight: true,
+                      impurity_id: true,
+                      impurity_name: true,
+                      line_no: true,
+                      note: true,
+                      product_id: true,
+                      product_name: true,
+                    },
+                  },
                   vehicle_no: true,
                 },
               },
@@ -311,6 +412,13 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
     const allocatedGrossWeight = receiptAllocation ? toNumber(receiptAllocation.allocated_gross_weight) : toNumber(item.gross_weight)
     const allocatedDeductWeight = receiptAllocation ? toNumber(receiptAllocation.allocated_deduct_weight) : toNumber(item.deduct_weight)
     const allocatedQty = receiptAllocation ? toNumber(receiptAllocation.allocated_qty) : toNumber(item.qty)
+    const receiptSummary = receiptAllocation?.weight_ticket_product_summaries ?? null
+    const receiptSummaryNetWeight = toNumber(receiptSummary?.net_weight)
+    const allocationRatio = receiptSummary && receiptSummaryNetWeight > 0 ? allocatedQty / receiptSummaryNetWeight : 0
+    const allocatedContainerDeductionWeight = receiptSummary && allocationRatio > 0
+      ? toNumber(receiptSummary.container_deduction_weight) * allocationRatio
+      : 0
+    const billGrossWeight = Math.max(0, allocatedGrossWeight - allocatedContainerDeductionWeight)
     const receiptTicketDocNo = receiptAllocation?.weight_tickets.doc_no
       ?? sourceSnapshotValue(item.source_snapshot, 'receiptTicketDocNo')
       ?? '-'
@@ -328,7 +436,7 @@ export async function getPurchaseBillDetail(docNo: string): Promise<PurchaseBill
     return {
       amount: toNumber(item.amount),
       deductWeight: allocatedDeductWeight,
-      grossWeight: allocatedGrossWeight,
+      grossWeight: billGrossWeight,
       lineId: `${bill.doc_no}:${lineNo}`,
       lineNo,
       note: receiptAllocation ? remark ?? '' : item.note ?? '',

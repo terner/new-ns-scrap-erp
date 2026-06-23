@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { Dialog, DialogContent } from '@/components/ui/Dialog'
@@ -29,6 +29,10 @@ type BalanceRow = {
   warehouseId: string
   warehouseName: string
   awaitingBillQty: number
+}
+
+type DisplayBalanceRow = BalanceRow & {
+  sourceRows?: BalanceRow[]
 }
 
 type BalancePayload = {
@@ -67,15 +71,6 @@ type BalanceDetail = {
   }>
 }
 
-type StockStateFilter = '' | 'on_hand' | 'pending_in' | 'pending_out'
-
-const STOCK_STATE_OPTIONS: Array<{ label: string; value: StockStateFilter }> = [
-  { label: 'ทุกสถานะ', value: '' },
-  { label: 'คงเหลือ', value: 'on_hand' },
-  { label: 'รอเข้า', value: 'pending_in' },
-  { label: 'รอออก', value: 'pending_out' },
-]
-
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 export function StockBalancePageClient() {
@@ -89,7 +84,6 @@ export function StockBalancePageClient() {
   const [group, setGroup] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [productId, setProductId] = useState('')
-  const [stockState, setStockState] = useState<StockStateFilter>('')
   const [stockType, setStockType] = useState('')
   const [viewMode, setViewMode] = useState<'detail' | 'summary'>('summary')
   const [detailPage, setDetailPage] = useState(1)
@@ -106,14 +100,13 @@ export function StockBalancePageClient() {
       if (branchId) params.set('branchId', branchId)
       if (productId) params.set('productId', productId)
       if (stockType) params.set('status', stockType)
-      if (stockState) params.set('stockState', stockState)
       setData(await dailyFetchJson<BalancePayload>(`/api/stock/balance?${params.toString()}`))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดสต๊อกคงเหลือไม่ได้')
     } finally {
       setIsLoading(false)
     }
-  }, [branchId, productId, stockState, stockType])
+  }, [branchId, productId, stockType])
 
   useEffect(() => {
     void loadData()
@@ -158,11 +151,41 @@ export function StockBalancePageClient() {
   const filteredRows = useMemo(() => {
     return (data?.rows ?? [])
       .filter((row) => !group || row.productMetalGroup === group)
-      .filter((row) => stockState !== 'on_hand' || row.qty > 0)
-      .filter((row) => stockState !== 'pending_in' || row.awaitingBillQty > 0)
-      .filter((row) => stockState !== 'pending_out' || row.onHoldQty > 0)
-  }, [data?.rows, group, stockState])
+  const filteredRows = useMemo(() => {
+    return (data?.rows ?? [])
+      .filter((row) => !group || row.productMetalGroup === group)
+  }, [data?.rows, group])
 
+  const displayRows = useMemo<DisplayBalanceRow[]>(() => {
+    const grouped = new Map<string, DisplayBalanceRow>()
+
+    for (const row of filteredRows) {
+      const groupKey = [
+        row.productId,
+        row.branchId,
+        row.status,
+        row.notAvailable ? 'not-available' : 'available',
+      ].join('|')
+      const existing = grouped.get(groupKey)
+
+      if (!existing) {
+        grouped.set(groupKey, { ...row, sourceRows: [row] })
+        continue
+      }
+
+      existing.qty += row.qty
+      existing.value += row.value
+      existing.awaitingBillQty += row.awaitingBillQty
+      existing.onHoldQty += row.onHoldQty
+      existing.readyQty += row.readyQty
+      existing.avgCost = existing.qty > 0 ? existing.value / existing.qty : 0
+      existing.lastDate = latestDateOnly(existing.lastDate, row.lastDate)
+      existing.lotNo = existing.lotNo && row.lotNo && existing.lotNo === row.lotNo ? existing.lotNo : ''
+      existing.sourceRows?.push(row)
+    }
+
+    return Array.from(grouped.values())
+  }, [filteredRows])
   const summary = useMemo(() => filteredRows.reduce((acc, row) => {
     acc.qty += row.qty
     acc.value += row.value
@@ -194,31 +217,56 @@ export function StockBalancePageClient() {
   }), [filteredRows])
 
   const matrixRows = useMemo(() => {
-    const groups = new Map<string, { fgQty: number; fgVal: number; group: string; rmQty: number; rmVal: number; wipQty: number; wipVal: number }>()
+    const groups = new Map<string, MatrixRow>()
     for (const row of filteredRows) {
-      const key = row.productName || 'อื่นๆ'
-      const current = groups.get(key) ?? { fgQty: 0, fgVal: 0, group: key, rmQty: 0, rmVal: 0, wipQty: 0, wipVal: 0 }
-      if (row.status === 'FG') {
+      const key = row.productMetalGroup || 'อื่นๆ'
+      const current = groups.get(key) ?? { fgQty: 0, fgVal: 0, group: key, products: [], rmQty: 0, rmVal: 0, wipQty: 0, wipVal: 0 }
+      let product = current.products.find((item) => item.productId === row.productId)
+      if (!product) {
+        product = {
+          fgQty: 0,
+          fgVal: 0,
+          productCode: row.productCode,
+          productId: row.productId,
+          productName: row.productName,
+          rmQty: 0,
+          rmVal: 0,
+          wipQty: 0,
+          wipVal: 0,
+        }
+        current.products.push(product)
+      }      if (row.status === 'FG') {
         current.fgQty += row.qty
         current.fgVal += row.value
+        product.fgQty += row.qty
+        product.fgVal += row.value
       } else if (row.status === 'WIP') {
         current.wipQty += row.qty
         current.wipVal += row.value
+        product.wipQty += row.qty
+        product.wipVal += row.value
       } else {
         current.rmQty += row.qty
         current.rmVal += row.value
+        product.rmQty += row.qty
+        product.rmVal += row.value
       }
       groups.set(key, current)
     }
-    return Array.from(groups.values()).sort((a, b) => (b.rmVal + b.wipVal + b.fgVal) - (a.rmVal + a.wipVal + a.fgVal))
+    return Array.from(groups.values())
+      .map((row) => ({
+        ...row,
+        products: row.products.sort((a, b) => matrixProductValue(b) - matrixProductValue(a)),
+      }))
+      .sort((a, b) => matrixRowValue(b) - matrixRowValue(a))
   }, [filteredRows])
 
-  const detailTotalPages = Math.max(1, Math.ceil(filteredRows.length / detailPageSize))
+  const detailTotalPages = Math.max(1, Math.ceil(displayRows.length / detailPageSize))
   const detailCurrentPage = Math.min(detailPage, detailTotalPages)
   const pagedDetailRows = useMemo(() => {
     const start = (detailCurrentPage - 1) * detailPageSize
-    return filteredRows.slice(start, start + detailPageSize)
-  }, [detailCurrentPage, detailPageSize, filteredRows])
+    return displayRows.slice(start, start + detailPageSize)
+  }, [detailCurrentPage, detailPageSize, displayRows])
 
   const matrixTotalPages = Math.max(1, Math.ceil(matrixRows.length / matrixPageSize))
   const matrixCurrentPage = Math.min(matrixPage, matrixTotalPages)
@@ -230,8 +278,7 @@ export function StockBalancePageClient() {
   useEffect(() => {
     setDetailPage(1)
     setMatrixPage(1)
-  }, [branchId, group, productId, stockState, stockType])
-
+  }, [branchId, group, productId, stockType])
   useEffect(() => {
     if (detailPage > detailTotalPages) setDetailPage(detailTotalPages)
   }, [detailPage, detailTotalPages])
@@ -258,8 +305,8 @@ export function StockBalancePageClient() {
 
   const selectedProductRows = useMemo(() => {
     if (!productId) return []
-    return filteredRows.filter((row) => row.productId === productId)
-  }, [filteredRows, productId])
+    return displayRows.filter((row) => row.productId === productId)
+  }, [displayRows, productId])
 
   const selectedProduct = data?.reference.products.find((item) => item.id === productId) ?? null
   const selectedProductInfo = selectedProduct && selectedProductRows.length
@@ -279,7 +326,6 @@ export function StockBalancePageClient() {
     if (branchId) params.set('branchId', branchId)
     if (productId) params.set('productId', productId)
     if (stockType) params.set('status', stockType)
-    if (stockState) params.set('stockState', stockState)
     window.location.href = `/api/stock/balance?${params.toString()}`
   }
 
@@ -298,15 +344,13 @@ export function StockBalancePageClient() {
   const resetFilters = useCallback(() => {
     setBranchId('')
     setProductId('')
-    setStockState('')
     setStockType('')
     setGroup('')
   }, [])
 
   const hasFilters = useMemo(() => {
-    return Boolean(branchId || productId || stockState || stockType || group)
-  }, [branchId, productId, stockState, stockType, group])
-
+    return Boolean(branchId || productId || stockType || group)
+  }, [branchId, productId, stockType, group])
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
@@ -331,7 +375,7 @@ export function StockBalancePageClient() {
 
       <div className="overflow-hidden rounded-md bg-white shadow">
         <StockViewTabs
-          detailCount={filteredRows.length}
+          detailCount={displayRows.length}
           matrixCount={matrixRows.length}
           value={viewMode}
           onChange={setViewMode}
@@ -382,6 +426,27 @@ export function StockBalancePageClient() {
                 value={group}
                 onChange={setGroup}
               />
+            </div>
+            {group ? (
+              <button className="flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 outline-none transition-colors hover:bg-slate-50 focus:ring-0" type="button" onClick={() => setGroup('')}>
+                ✕
+              </button>
+            ) : null}
+
+            <span className="ml-4 text-xs text-slate-500">ประเภทคลัง:</span>
+            <select className="h-9 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400 focus:ring-0" value={stockType} onChange={(event) => setStockType(event.target.value)}>
+              <option value="">ทุกประเภท</option>
+              <option value="RM">📦 RM</option>
+              <option value="WIP">⚙️ WIP</option>
+              <option value="FG">✅ FG</option>
+            </select>
+
+            <span className="ml-4 text-xs text-slate-500">สาขา:</span>
+            <select className="h-9 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400 focus:ring-0" value={branchId} onChange={(event) => setBranchId(event.target.value)}>
+              <option value="">ทุกสาขา</option>
+              {data?.reference.branches.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </div>              />
             </div>
             {group ? (
               <button className="flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 outline-none transition-colors hover:bg-slate-50 focus:ring-0" type="button" onClick={() => setGroup('')}>
@@ -446,15 +511,6 @@ export function StockBalancePageClient() {
                   onChange={setGroup}
                 />
               </div>
-
-              <label className="block">
-                <span className="mb-1 block text-xs text-slate-500">สถานะสินค้า</span>
-                <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800" value={stockState} onChange={(event) => setStockState(event.target.value as StockStateFilter)}>
-                  {STOCK_STATE_OPTIONS.map((option) => (
-                    <option key={option.value || 'all'} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
 
               <label className="block">
                 <span className="mb-1 block text-xs text-slate-500">ประเภทคลัง</span>
@@ -525,7 +581,7 @@ export function StockBalancePageClient() {
             currentPage={detailCurrentPage}
             label="รายการ"
             pageSize={detailPageSize}
-            totalItems={filteredRows.length}
+            totalItems={displayRows.length}
             totalPages={detailTotalPages}
             onPageChange={setDetailPage}
             onPageSizeChange={(size) => {
@@ -647,9 +703,37 @@ function formatDateTime(value: string) {
   return date.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function latestDateOnly(current: string, next: string) {
+  if (!current) return next
+  if (!next) return current
+  return next > current ? next : current
+}
+
+function primarySourceRow(row: DisplayBalanceRow) {
+  return row.sourceRows?.[0] ?? row
+}
+
 type StatusSummary = { count: number; qty: number; status: string; value: number }
 
-type MatrixRow = { fgQty: number; fgVal: number; group: string; rmQty: number; rmVal: number; wipQty: number; wipVal: number }
+type MatrixProductRow = { fgQty: number; fgVal: number; productCode: string; productId: string; productName: string; rmQty: number; rmVal: number; wipQty: number; wipVal: number }
+
+type MatrixRow = { fgQty: number; fgVal: number; group: string; products: MatrixProductRow[]; rmQty: number; rmVal: number; wipQty: number; wipVal: number }
+
+function matrixProductQty(row: MatrixProductRow) {
+  return row.rmQty + row.wipQty + row.fgQty
+}
+
+function matrixProductValue(row: MatrixProductRow) {
+  return row.rmVal + row.wipVal + row.fgVal
+}
+
+function matrixRowQty(row: MatrixRow) {
+  return row.rmQty + row.wipQty + row.fgQty
+}
+
+function matrixRowValue(row: MatrixRow) {
+  return row.rmVal + row.wipVal + row.fgVal
+}
 
 function StockDetailField({ className = '', label, mono, value }: { className?: string; label: string; mono?: boolean; value: string }) {
   return (
@@ -787,7 +871,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
   info: { available: number; onHold: number; product: StockOption; qty: number; ready: number; value: number }
   onClose: () => void
   onOpen: (row: BalanceRow) => void
-  rows: BalanceRow[]
+  rows: DisplayBalanceRow[]
 }) {
   return (
     <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/10 p-5 shadow-sm space-y-4">
@@ -837,7 +921,6 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
               <tr>
                 <th className="p-3 text-left">วันที่ล่าสุด</th>
                 <th className="p-3 text-center">ประเภทคลัง</th>
-                <th className="p-3 text-left">สถานะสินค้า</th>
                 <th className="p-3 text-left">สาขา</th>
                 <th className="p-3 text-left">Lot</th>
                 <th className="p-3 text-right">คงเหลือ</th>
@@ -854,17 +937,16 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                   className="cursor-pointer transition-colors hover:bg-slate-50/50 focus-visible:bg-slate-50 focus-visible:outline-none"
                   role="button"
                   tabIndex={0}
-                  onClick={() => onOpen(row)}
+                  onClick={() => onOpen(primarySourceRow(row))}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
-                      onOpen(row)
+                      onOpen(primarySourceRow(row))
                     }
                   }}
                 >
                   <td className="p-3 text-slate-500">{row.lastDate}</td>
                   <td className="p-3 text-center"><StockStatusCell row={row} /></td>
-                  <td className="p-3"><StockStateCell row={row} /></td>
                   <td className="p-3 text-slate-500">{row.branchName}</td>
                   <td className="p-3 font-mono text-slate-600">{row.lotNo || '-'}</td>
                   <td className={`p-3 text-right tabular-nums ${row.qty < 0 ? 'text-red-650' : 'text-slate-800'}`}>{formatMoney(row.qty)}</td>
@@ -874,7 +956,7 @@ function ProductPanel({ averageCost, info, onClose, onOpen, rows }: {
                   <td className="p-3 text-right font-mono text-slate-600">{formatMoney(row.value)}</td>
                 </tr>
               ))}
-              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={10}>ยังไม่มีรายการ</td></tr> : null}
+              {rows.length === 0 ? <tr><td className="py-6 text-center text-slate-400" colSpan={9}>ยังไม่มีรายการ</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -1021,46 +1103,101 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
           <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
             {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && matrixRows.map((row) => (
-              <tr key={row.group} className="hover:bg-slate-50/50 transition-colors">
-                <td className="p-3.5 text-slate-800 overflow-hidden truncate">{row.group}</td>
-                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100 overflow-hidden truncate">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
-                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100 overflow-hidden truncate">
-                  <div>{row.rmVal ? formatMoney(row.rmVal) : '-'}</div>
-                  {row.rmQty !== 0 ? (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney(row.rmVal / row.rmQty)} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 overflow-hidden truncate">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 overflow-hidden truncate">
-                  <div>{row.wipVal ? formatMoney(row.wipVal) : '-'}</div>
-                  {row.wipQty !== 0 ? (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney(row.wipVal / row.wipQty)} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
-                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 overflow-hidden truncate">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
-                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 overflow-hidden truncate">
-                  <div>{row.fgVal ? formatMoney(row.fgVal) : '-'}</div>
-                  {row.fgQty !== 0 ? (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney(row.fgVal / row.fgQty)} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
-                <td className="p-3.5 text-right overflow-hidden truncate">{formatMoney(row.rmQty + row.wipQty + row.fgQty)}</td>
-                <td className="p-3.5 text-right text-emerald-700 overflow-hidden truncate">
-                  <div>{formatMoney(row.rmVal + row.wipVal + row.fgVal)}</div>
-                  {(row.rmQty + row.wipQty + row.fgQty) !== 0 ? (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney((row.rmVal + row.wipVal + row.fgVal) / (row.rmQty + row.wipQty + row.fgQty))} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
+            {!isLoading && matrixRows.map((row) => (
+              <Fragment key={row.group}>
+                <tr className="bg-slate-50/70 transition-colors hover:bg-slate-100/70">
+                  <td className="p-3.5 text-slate-850">
+                    <div className="font-bold">{row.group}</div>
+                    <div className="mt-0.5 text-[11px] font-medium text-slate-500">{row.products.length.toLocaleString('th-TH')} รายการสินค้า</div>
+                  </td>
+                  <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
+                  <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">
+                    <div>{row.rmVal ? formatMoney(row.rmVal) : '-'}</div>
+                    {row.rmQty !== 0 ? (
+                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                        เฉลี่ย {formatMoney(row.rmVal / row.rmQty)} บ./กก.
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
+                  <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">
+                    <div>{row.wipVal ? formatMoney(row.wipVal) : '-'}</div>
+                    {row.wipQty !== 0 ? (
+                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                        เฉลี่ย {formatMoney(row.wipVal / row.wipQty)} บ./กก.
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
+                  <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">
+                    <div>{row.fgVal ? formatMoney(row.fgVal) : '-'}</div>
+                    {row.fgQty !== 0 ? (
+                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                        เฉลี่ย {formatMoney(row.fgVal / row.fgQty)} บ./กก.
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="p-3.5 text-right">{formatMoney(matrixRowQty(row))}</td>
+                  <td className="p-3.5 text-right text-emerald-700">
+                    <div>{formatMoney(matrixRowValue(row))}</div>
+                    {matrixRowQty(row) !== 0 ? (
+                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                        เฉลี่ย {formatMoney(matrixRowValue(row) / matrixRowQty(row))} บ./กก.
+                      </div>
+                    ) : null}
+                  </td>
+                </tr>
+                {row.products.map((product) => (
+                  <tr key={`${row.group}-${product.productId}`} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-3.5 pl-8 text-slate-700">
+                      <div className="flex min-w-[240px] items-start gap-2">
+                        <span className="mt-1.5 h-px w-4 shrink-0 bg-slate-300" />
+                        <div>
+                          <div className="font-semibold text-slate-800">{product.productCode} {product.productName}</div>
+                          <div className="mt-0.5 text-[11px] font-medium text-slate-400">สินค้าในหมวด {row.group}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{product.rmQty ? formatMoney(product.rmQty) : '-'}</td>
+                    <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">
+                      <div>{product.rmVal ? formatMoney(product.rmVal) : '-'}</div>
+                      {product.rmQty !== 0 ? (
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          เฉลี่ย {formatMoney(product.rmVal / product.rmQty)} บ./กก.
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{product.wipQty ? formatMoney(product.wipQty) : '-'}</td>
+                    <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">
+                      <div>{product.wipVal ? formatMoney(product.wipVal) : '-'}</div>
+                      {product.wipQty !== 0 ? (
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          เฉลี่ย {formatMoney(product.wipVal / product.wipQty)} บ./กก.
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{product.fgQty ? formatMoney(product.fgQty) : '-'}</td>
+                    <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">
+                      <div>{product.fgVal ? formatMoney(product.fgVal) : '-'}</div>
+                      {product.fgQty !== 0 ? (
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          เฉลี่ย {formatMoney(product.fgVal / product.fgQty)} บ./กก.
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="p-3.5 text-right">{formatMoney(matrixProductQty(product))}</td>
+                    <td className="p-3.5 text-right text-emerald-700">
+                      <div>{formatMoney(matrixProductValue(product))}</div>
+                      {matrixProductQty(product) !== 0 ? (
+                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                          เฉลี่ย {formatMoney(matrixProductValue(product) / matrixProductQty(product))} บ./กก.
+                        </div>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </Fragment>
+            ))            ))}
             {!isLoading && matrixRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่มีสต๊อก</td></tr> : null}
           </tbody>
           {matrixRows.length ? (
@@ -1121,6 +1258,7 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
             <div key={row.group} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
               <div className="border-b border-slate-100 pb-2">
                 <span className="font-semibold text-slate-800 text-sm">{row.group}</span>
+                <span className="ml-2 text-[11px] font-medium text-slate-400">{row.products.length.toLocaleString('th-TH')} รายการสินค้า</span>
               </div>
               <div className="space-y-2 text-xs text-slate-600">
                 <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-lg">
@@ -1159,6 +1297,21 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
                     <span className="text-[10px] text-slate-400 font-normal mt-0.5">เฉลี่ย {formatMoney(totalRowVal / totalRowQty)} บ./กก.</span>
                   ) : null}
                 </span>
+              </div>
+              <div className="space-y-2 border-t border-slate-100 pt-2">
+                {row.products.map((product) => (
+                  <div key={`${row.group}-${product.productId}`} className="rounded-lg bg-slate-50/80 p-2.5 text-xs">
+                    <div className="font-semibold text-slate-800">{product.productCode} {product.productName}</div>
+                    <div className="mt-1 grid grid-cols-3 gap-1.5 text-[11px] font-semibold tabular-nums">
+                      <div className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">RM {product.rmQty ? formatMoney(product.rmQty) : '-'}</div>
+                      <div className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">WIP {product.wipQty ? formatMoney(product.wipQty) : '-'}</div>
+                      <div className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">FG {product.fgQty ? formatMoney(product.fgQty) : '-'}</div>
+                    </div>
+                    <div className="mt-1 text-right text-[11px] font-bold text-emerald-700 tabular-nums">
+                      รวม {formatMoney(matrixProductQty(product))} กก. | {formatMoney(matrixProductValue(product))} บ.
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )
@@ -1222,7 +1375,6 @@ const detailColumns: Array<ResizableColumnDefinition<string>> = [
   { key: 'product', defaultWidth: 200 },
   { key: 'group', defaultWidth: 100 },
   { key: 'warehouse', defaultWidth: 110 },
-  { key: 'state', defaultWidth: 110 },
   { key: 'branch', defaultWidth: 120 },
   { key: 'qty', defaultWidth: 110 },
   { key: 'awaitingBill', defaultWidth: 90 },
@@ -1232,9 +1384,8 @@ const detailColumns: Array<ResizableColumnDefinition<string>> = [
   { key: 'value', defaultWidth: 120 },
 ]
 
-function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: (row: BalanceRow) => void; rows: BalanceRow[] }) {
-  const columnResize = useResizableColumns('stock.balance.detail.v5', detailColumns)
-  return (
+function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: (row: BalanceRow) => void; rows: DisplayBalanceRow[] }) {
+  const columnResize = useResizableColumns('stock.balance.detail.v5', detailColumns)  return (
     <>
       {/* Mobile View */}
       <div className="block lg:hidden space-y-3">
@@ -1247,11 +1398,11 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
             className={`space-y-3 rounded-xl border p-4 shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${row.qty < 0 ? 'border-red-200 bg-red-50/10' : 'border-slate-200 bg-white'}`}
             role="button"
             tabIndex={0}
-            onClick={() => onOpen(row)}
+            onClick={() => onOpen(primarySourceRow(row))}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
-                onOpen(row)
+                onOpen(primarySourceRow(row))
               }
             }}
           >
@@ -1265,11 +1416,6 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
               </div>
               <StockStatusCell row={row} />
             </div>
-            <div className="flex items-center justify-between gap-3 text-[11px] text-slate-650">
-              <span>สถานะสินค้า:</span>
-              <StockStateCell className="justify-end" row={row} />
-            </div>
-            
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-slate-650">
               <div className="flex justify-between">
                 <span>หมวด:</span>
@@ -1332,7 +1478,6 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
               <ResizableTableHead label="สินค้า" resizeProps={columnResize.getResizeHandleProps('product', 'สินค้า')} />
               <ResizableTableHead label="หมวด" resizeProps={columnResize.getResizeHandleProps('group', 'หมวด')} />
               <ResizableTableHead align="center" label="ประเภทคลัง" resizeProps={columnResize.getResizeHandleProps('warehouse', 'ประเภทคลัง')} />
-              <ResizableTableHead label="สถานะสินค้า" resizeProps={columnResize.getResizeHandleProps('state', 'สถานะสินค้า')} />
               <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} />
               <ResizableTableHead align="right" label="คงเหลือ (กก.)" resizeProps={columnResize.getResizeHandleProps('qty', 'คงเหลือ (กก.)')} />
               <ResizableTableHead align="right" label="รอเข้า" resizeProps={columnResize.getResizeHandleProps('awaitingBill', 'รอเข้า')} />
@@ -1343,18 +1488,17 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-semibold">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
-            {rows.map((row) => (
-              <tr
+            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && rows.map((row) => (              <tr
                 key={row.key}
                 className={`cursor-pointer transition-colors focus-visible:outline-none ${row.qty < 0 ? 'bg-red-50/30 hover:bg-red-50/60 focus-visible:bg-red-50/60' : 'hover:bg-slate-50/50 focus-visible:bg-slate-50'}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => onOpen(row)}
+                onClick={() => onOpen(primarySourceRow(row))}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
-                    onOpen(row)
+                    onOpen(primarySourceRow(row))
                   }
                 }}
               >
@@ -1366,9 +1510,7 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
                 </td>
                 <td className="p-3.5 text-slate-800 overflow-hidden truncate">{row.productMetalGroup || 'อื่นๆ'}</td>
                 <td className="p-3.5 text-center overflow-hidden truncate"><StockStatusCell row={row} /></td>
-                <td className="p-3.5 overflow-hidden truncate"><StockStateCell row={row} /></td>
-                <td className="p-3.5 text-slate-655 overflow-hidden truncate" title={row.branchName}>
-                  {row.branchName}
+                <td className="p-3.5 text-slate-655 overflow-hidden truncate" title={row.branchName}>                  {row.branchName}
                 </td>
                 <td className={`p-3.5 text-right overflow-hidden truncate ${row.qty < 0 ? 'text-red-655' : ''}`}>{formatMoney(row.qty)}</td>
                 <td className="p-3.5 text-right border-r border-slate-105 text-slate-800 overflow-hidden truncate">{row.awaitingBillQty ? formatMoney(row.awaitingBillQty) : '-'}</td>
@@ -1378,19 +1520,17 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
                 <td className="p-3.5 text-right text-emerald-700 font-mono overflow-hidden truncate">{formatMoney(row.value)}</td>
               </tr>
             ))}
-            {rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={11}>ไม่มีสต๊อก</td></tr> : null}
-          </tbody>
+            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>ไม่มีสต๊อก</td></tr> : null}          </tbody>
           {rows.length ? (
             <tfoot className="bg-slate-50 border-t border-slate-200/80 font-bold text-slate-800">
               <tr>
-                <td className="p-3.5 overflow-hidden truncate" colSpan={5}>รวมหน้านี้ (${rows.length} รายการ)</td>
+                <td className="p-3.5 overflow-hidden truncate" colSpan={4}>รวมหน้านี้ ({rows.length} รายการ)</td>
                 <td className="p-3.5 text-right font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.qty, 0))}</td>
-                <td className="p-3.5 text-right border-r border-slate-105 font-mono text-slate-800 overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.awaitingBillQty, 0))}</td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-105 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td>
-                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-105 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.readyQty, 0))}</td>
+                <td className="p-3.5 text-right border-r border-slate-100 font-mono text-slate-800 overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.awaitingBillQty, 0))}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.readyQty, 0))}</td>
                 <td className="overflow-hidden truncate" />
-                <td className="p-3.5 text-right text-emerald-700 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td>
-              </tr>
+                <td className="p-3.5 text-right text-emerald-700 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td>              </tr>
             </tfoot>
           ) : null}
         </table>
@@ -1459,34 +1599,10 @@ function StockTypeText({ status }: { status: string }) {
   return <span className="text-xs font-semibold text-slate-700">{status || '-'}</span>
 }
 
-function StockStateIndicator({ state }: { state: 'on_hand' | 'pending_in' | 'pending_out' }) {
-  const meta = state === 'on_hand'
-    ? { className: 'text-emerald-700', label: 'คงเหลือ' }
-    : state === 'pending_in'
-      ? { className: 'text-sky-700', label: 'รอเข้า' }
-      : { className: 'text-amber-700', label: 'รอออก' }
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${meta.className}`}>
-      <span className="size-1.5 rounded-full bg-current" />
-      {meta.label}
-    </span>
-  )
-}
-
 function StockStatusCell({ row }: { row: BalanceRow }) {
   return (
     <div className="flex flex-wrap justify-center gap-1 shrink-0">
       <StockTypeText status={row.status} />
-    </div>
-  )
-}
-
-function StockStateCell({ className = '', row }: { className?: string; row: BalanceRow }) {
-  const state = stockStateForRow(row)
-  if (!state) return <span className="text-xs text-slate-400">-</span>
-  return (
-    <div className={`flex flex-wrap gap-1 ${className}`}>
-      <StockStateIndicator state={state} />
     </div>
   )
 }
@@ -1496,15 +1612,15 @@ function stockStatusText(row: BalanceRow) {
 }
 
 function stockStateText(row: BalanceRow) {
-  const state = stockStateForRow(row)
-  if (!state) return '-'
-  return state === 'pending_out' ? 'รอออก' : state === 'pending_in' ? 'รอเข้า' : 'คงเหลือ'
+  const states = stockStatesForRow(row)
+  if (!states.length) return '-'
+  return states.map((state) => state === 'pending_out' ? 'รอออก' : state === 'pending_in' ? 'รอเข้า' : 'คงเหลือ').join(' / ')
 }
 
-function stockStateForRow(row: BalanceRow): 'on_hand' | 'pending_in' | 'pending_out' | null {
-  if (row.onHoldQty > 0) return 'pending_out'
-  if (row.awaitingBillQty > 0 && row.qty <= 0) return 'pending_in'
-  if (row.qty > 0) return 'on_hand'
-  if (row.awaitingBillQty > 0) return 'pending_in'
-  return null
+function stockStatesForRow(row: BalanceRow): Array<'on_hand' | 'pending_in' | 'pending_out'> {
+  const states: Array<'on_hand' | 'pending_in' | 'pending_out'> = []
+  if (row.qty > 0) states.push('on_hand')
+  if (row.onHoldQty > 0) states.push('pending_out')
+  if (row.awaitingBillQty > 0) states.push('pending_in')
+  return states
 }
