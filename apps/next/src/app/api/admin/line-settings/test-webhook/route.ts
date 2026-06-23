@@ -115,9 +115,19 @@ export async function POST(request: Request) {
         response: text,
       })
     } else {
+      let debugText = ''
+      try {
+        const json = JSON.parse(text)
+        if (json.debug) {
+          debugText = `\n\n[ข้อมูล Debug ฝั่งขารับ]\n- URL ที่ใช้เรียก: ${webhookUrl}\n- Secret ในฐานข้อมูลยาว: ${json.debug.secretLength} ตัว (ขึ้นต้นด้วย: ${json.debug.secretPrefix})\n- Signature ที่ส่งไป: ${json.debug.signature}\n- ลายเซ็นต์ที่บอทคำนวณได้: ${json.debug.computedDigest}\n- ขนาด Body ที่รับได้: ${json.debug.rawBodyLength} bytes`
+        }
+      } catch {
+        // Fallback if not JSON
+      }
+
       return NextResponse.json({
         ok: false,
-        message: `ระบบตรวจสอบลายเซ็นล้มเหลว (ตอบกลับเป็น HTTP ${status} จาก URL: ${webhookUrl}) - ลายเซ็นไม่ถูกต้องหรือ Secret ผิดพลาด`,
+        message: `ระบบตรวจสอบลายเซ็นล้มเหลว (ตอบกลับเป็น HTTP ${status} จาก URL: ${webhookUrl})${debugText}`,
         webhookUrl,
         status,
         response: text,

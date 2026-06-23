@@ -77,7 +77,23 @@ export async function POST(request: Request) {
   const rawBody = await request.text()
   const signature = request.headers.get('x-line-signature')
   if (!(await verifyLineSignature(rawBody, signature))) {
-    return NextResponse.json({ code: 'INVALID_SIGNATURE', error: 'LINE signature ไม่ถูกต้อง' }, { status: 401 })
+    const config = await prisma.system_settings.findUnique({
+      where: { key: 'LINE_CHANNEL_SECRET' },
+    })
+    const secret = config?.value || process.env.LINE_CHANNEL_SECRET || ''
+    const digest = createHmac('sha256', secret).update(rawBody).digest('base64')
+    return NextResponse.json({ 
+      code: 'INVALID_SIGNATURE', 
+      error: 'LINE signature ไม่ถูกต้อง',
+      debug: {
+        secretLength: secret.length,
+        secretPrefix: secret.slice(0, 4),
+        rawBodyLength: rawBody.length,
+        rawBodyPreview: rawBody.slice(0, 100),
+        signature: signature || 'null',
+        computedDigest: digest,
+      }
+    }, { status: 401 })
   }
 
   try {
