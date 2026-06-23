@@ -9,11 +9,32 @@ async function verifyLineSignature(rawBody: string, signature: string | null) {
     where: { key: 'LINE_CHANNEL_SECRET' },
   })
   const secret = config?.value || process.env.LINE_CHANNEL_SECRET || ''
-  if (!secret || !signature) return false
+  if (!secret || !signature) {
+    console.error('[line-webhook] verify failed: secret or signature is missing', {
+      hasSecret: !!secret,
+      hasSignature: !!signature,
+    })
+    return false
+  }
   const digest = createHmac('sha256', secret).update(rawBody).digest('base64')
   const expected = Buffer.from(digest)
   const received = Buffer.from(signature)
-  return expected.length === received.length && timingSafeEqual(expected, received)
+  const matched = expected.length === received.length && timingSafeEqual(expected, received)
+  
+  if (!matched) {
+    console.error('[line-webhook] verify failed: signature mismatch', {
+      secretLength: secret.length,
+      secretPrefix: secret.slice(0, 4),
+      rawBodyLength: rawBody.length,
+      rawBodyPreview: rawBody.slice(0, 100),
+      signature,
+      digest,
+    })
+  } else {
+    console.info('[line-webhook] verify success!')
+  }
+  
+  return matched
 }
 
 async function upsertLineGroup(groupId: string, token: string) {
