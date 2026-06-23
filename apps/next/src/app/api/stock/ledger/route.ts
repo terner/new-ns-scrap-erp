@@ -219,19 +219,35 @@ export async function GET(request: Request) {
       : Prisma.sql`product_id`
     const [runningRows, negativeRows] = await Promise.all([
       pageRowIds.length
-        ? prisma.$queryRaw<Array<{ id: bigint; running_balance: Prisma.Decimal | number | string }>>`
-          with running as (
+        ? prisma.$queryRaw<Array<{ id: bigint; running_balance: Prisma.Decimal | number | string; running_unit_cost: Prisma.Decimal | number | string }>>`
+          with running_source as (
             select
               id,
               sum(coalesce(qty_in, 0) - coalesce(qty_out, 0)) over (
                 partition by ${partitionSql}
                 order by date asc, created_at asc, id asc
                 rows between unbounded preceding and current row
-              ) as running_balance
+              ) as running_balance,
+              sum(coalesce(value_in, 0) - coalesce(value_out, 0)) over (
+                partition by ${partitionSql}
+                order by date asc, created_at asc, id asc
+                rows between unbounded preceding and current row
+              ) as running_value
             from public.stock_ledger
             where ${sqlWhere}
+          ),
+          running as (
+            select
+              id,
+              running_balance,
+              case
+                when abs(coalesce(running_balance, 0)) > 0.000001
+                  then running_value / running_balance
+                else 0
+              end as running_unit_cost
+            from running_source
           )
-          select id, running_balance
+          select id, running_balance, running_unit_cost
           from running
           where id in (${Prisma.join(pageRowIds)})
         `
@@ -252,6 +268,7 @@ export async function GET(request: Request) {
       `,
     ])
     const runningByRowId = new Map(runningRows.map((row) => [String(row.id), Number(row.running_balance)]))
+    const runningUnitCostByRowId = new Map(runningRows.map((row) => [String(row.id), Number(row.running_unit_cost)]))
 
     let payloadRows = pageRows.map((row) => {
       const purchaseBillId = row.ref_type && purchaseRefTypes.has(row.ref_type) && row.ref_id ? parseInternalBigIntId(row.ref_id) : null
@@ -287,7 +304,7 @@ export async function GET(request: Request) {
         refType: row.ref_type ?? '',
         runningBalanceByProduct: runningByRowId.get(String(row.id)) ?? 0,
         sourcePath: sourcePathFor({ refNo: outwardRefNo, refType: row.ref_type ?? '' }),
-        unitCost: toNumber(row.unit_cost),
+        unitCost: runningUnitCostByRowId.get(String(row.id)) ?? toNumber(row.unit_cost),
         valueIn: toNumber(row.value_in),
         valueOut: toNumber(row.value_out),
         warehouseName: row.warehouses?.name ?? '-',
