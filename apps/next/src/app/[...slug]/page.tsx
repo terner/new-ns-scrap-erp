@@ -15,13 +15,13 @@ export default async function PlaceholderPage({ params }: PlaceholderPageProps) 
   const pathname = `/${slug.join('/')}`
   if (retiredRoutes.has(pathname)) notFound()
   const item = navigationItems.find((entry) => entry.href === pathname)
-  const title = item?.label ?? 'ยังไม่ได้ย้ายหน้า'
+  if (!item) notFound()
 
   return (
     <section className="space-y-4">
       <div className="rounded-md bg-white p-5 shadow">
         <div className="text-sm text-slate-500">Next.js route scaffold</div>
-        <h2 className="mt-1 text-xl font-bold text-slate-900">{title}</h2>
+        <h2 className="mt-1 text-xl font-bold text-slate-900">{item.label}</h2>
         <p className="mt-2 text-sm text-slate-600">หน้านี้มี route และ sidebar แล้ว แต่เนื้อหาด้านในยังรอ port จาก Vue/legacy เป็น batch ถัดไป</p>
       </div>
 
