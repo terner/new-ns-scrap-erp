@@ -178,7 +178,7 @@ export async function GET(request: Request) {
     const sourceType = url.searchParams.get('sourceType') ?? 'spot-sell'
     const targetCost = Number(url.searchParams.get('targetCost')) || 0
 
-    const [costPool, poSells, salesBills, spotSalesBills, tradingDeals, products, productionOrders] = await Promise.all([
+    const [costPool, poSells, salesBills, spotSalesBills, tradingDeals, products, productionOrders, tradingAllocationFacts] = await Promise.all([
       getCostPoolRowsData({ showAvailableOnly: true }),
       prisma.po_sells.findMany({
         include: { customers: true },
@@ -187,7 +187,7 @@ export async function GET(request: Request) {
         where: { NOT: { status: { in: ['Cancelled', 'cancelled', 'Canceled', 'canceled', 'Closed', 'closed', 'Completed', 'completed', 'Fully Matched', 'fully matched', 'Received', 'received'] } } },
       }),
       prisma.sales_bills.findMany({
-        select: { id: true, po_sell_id: true },
+        select: { id: true, po_sell_id: true, doc_no: true },
         take: 10000,
         where: { NOT: { status: 'cancelled' }, po_sell_id: { not: null } },
       }),
@@ -229,43 +229,111 @@ export async function GET(request: Request) {
         where: {
           NOT: { status: 'Cancelled' }
         }
+      }),
+      prisma.trading_allocation_facts.findMany({
+        where: { status: 'active' },
+        take: 10000,
       })
     ])
 
     const productById = new Map(products.map((product) => [product.id, { ...product, code: requireBusinessCode(product.code, `สินค้า ${product.id}`) }]))
     const productByCode = new Map(Array.from(productById.values()).map((product) => [product.code, product]))
-    const salesBillIdsByPoSellId = new Map<bigint, Set<bigint>>()
+    const salesBillIdToPoSellId = new Map<bigint, bigint>()
+    const salesBillDocNoToSalesBillId = new Map<string, bigint>()
     salesBills.forEach((bill) => {
-      if (!bill.po_sell_id) return
-      const current = salesBillIdsByPoSellId.get(bill.po_sell_id) ?? new Set<bigint>()
-      current.add(bill.id)
-      salesBillIdsByPoSellId.set(bill.po_sell_id, current)
+      salesBillDocNoToSalesBillId.set(bill.doc_no, bill.id)
+      if (bill.po_sell_id) {
+        salesBillIdToPoSellId.set(bill.id, bill.po_sell_id)
+      }
     })
 
-    const matchedQtyByPoSellId = new Map<bigint, number>()
+    const poSellDocNoToPoSellId = new Map<string, bigint>()
     poSells.forEach((po) => {
-      const billIds = salesBillIdsByPoSellId.get(po.id) ?? new Set<bigint>()
-      let matchedQty = 0
-      tradingDeals.forEach((deal) => {
-        if (deal.sales_bill_id && billIds.has(deal.sales_bill_id) && !isCancelled(deal.status)) matchedQty += toNumber(deal.matched_qty)
-      })
-      matchedQtyByPoSellId.set(po.id, matchedQty)
+      poSellDocNoToPoSellId.set(po.doc_no, po.id)
     })
 
-    const matchedQtyBySpotProduct = new Map<string, number>()
+    const matchedQtyByPoSellProduct = new Map<string, number>() // key: `${po_sell_id}|${product_id}`
+    const matchedQtyBySpotProduct = new Map<string, number>() // key: `${sales_bill_id}:${product_id}`
+
+    const accountedDealIds = new Set<bigint>()
+    tradingAllocationFacts.forEach((fact) => {
+      if (fact.status === 'active' && fact.trading_deal_id) {
+        accountedDealIds.add(fact.trading_deal_id)
+      }
+    })
+
+    // Process facts
+    tradingAllocationFacts.forEach((fact) => {
+      if (fact.status !== 'active') return
+      if (!fact.product_id) return
+
+      let resolvedSalesBillId = fact.sales_bill_id ?? null
+      if (!resolvedSalesBillId && fact.sales_doc_no) {
+        resolvedSalesBillId = salesBillDocNoToSalesBillId.get(fact.sales_doc_no) ?? null
+      }
+
+      let resolvedPoSellId: bigint | null = null
+      if (resolvedSalesBillId) {
+        resolvedPoSellId = salesBillIdToPoSellId.get(resolvedSalesBillId) ?? null
+      }
+      if (!resolvedPoSellId && fact.sales_doc_no) {
+        resolvedPoSellId = poSellDocNoToPoSellId.get(fact.sales_doc_no) ?? null
+      }
+
+      if (resolvedSalesBillId) {
+        const key = `${resolvedSalesBillId.toString()}:${fact.product_id.toString()}`
+        matchedQtyBySpotProduct.set(key, (matchedQtyBySpotProduct.get(key) ?? 0) + toNumber(fact.qty))
+      }
+
+      if (resolvedPoSellId) {
+        const key = `${resolvedPoSellId.toString()}|${fact.product_id.toString()}`
+        matchedQtyByPoSellProduct.set(key, (matchedQtyByPoSellProduct.get(key) ?? 0) + toNumber(fact.qty))
+      }
+    })
+
+    // Process deals not covered by facts
     tradingDeals.forEach((deal) => {
-      if (!deal.sales_bill_id || !deal.product_id || isCancelled(deal.status)) return
-      const key = `${deal.sales_bill_id.toString()}:${deal.product_id.toString()}`
-      matchedQtyBySpotProduct.set(key, (matchedQtyBySpotProduct.get(key) ?? 0) + toNumber(deal.matched_qty))
+      if (isCancelled(deal.status)) return
+      if (accountedDealIds.has(deal.id)) return
+      if (!deal.product_id) return
+
+      let resolvedSalesBillId = deal.sales_bill_id ?? null
+      if (!resolvedSalesBillId && deal.sales_bill_no) {
+        resolvedSalesBillId = salesBillDocNoToSalesBillId.get(deal.sales_bill_no) ?? null
+      }
+
+      let resolvedPoSellId: bigint | null = null
+      if (resolvedSalesBillId) {
+        resolvedPoSellId = salesBillIdToPoSellId.get(resolvedSalesBillId) ?? null
+      }
+      if (!resolvedPoSellId && deal.sales_bill_no) {
+        resolvedPoSellId = poSellDocNoToPoSellId.get(deal.sales_bill_no) ?? null
+      }
+
+      if (resolvedSalesBillId) {
+        const key = `${resolvedSalesBillId.toString()}:${deal.product_id.toString()}`
+        matchedQtyBySpotProduct.set(key, (matchedQtyBySpotProduct.get(key) ?? 0) + toNumber(deal.matched_qty))
+      }
+
+      if (resolvedPoSellId) {
+        const key = `${resolvedPoSellId.toString()}|${deal.product_id.toString()}`
+        matchedQtyByPoSellProduct.set(key, (matchedQtyByPoSellProduct.get(key) ?? 0) + toNumber(deal.matched_qty))
+      }
     })
 
     const salesRows: SaleRow[] = poSells.flatMap((po) => {
       const fallbackProduct = po.product_id ? productById.get(po.product_id) ?? null : null
       const items = itemRows(po, fallbackProduct, productById)
-      const matchedQty = matchedQtyByPoSellId.get(po.id) ?? 0
       return items.map((item) => {
         const qty = item.qty || jsonNumber(po.qty)
         const itemRemainingQty = item.remainingQty || jsonNumber(po.remaining_qty ?? po.qty)
+
+        const productObj = productByCode.get(item.productId)
+        let matchedQty = 0
+        if (productObj) {
+          matchedQty = matchedQtyByPoSellProduct.get(`${po.id.toString()}|${productObj.id.toString()}`) ?? 0
+        }
+
         const remainingQty = Math.max(0, itemRemainingQty - matchedQty)
         const unitPrice = item.unitPrice || (qty > 0 ? (item.totalAmount || toNumber(po.total_amount)) / qty : 0)
         return {

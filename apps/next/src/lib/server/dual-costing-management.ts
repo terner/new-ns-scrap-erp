@@ -180,18 +180,57 @@ export async function buildDualCostingManagement() {
 
   const productById = new Map(products.map((product) => [String(product.id), { ...product, code: product.code }]))
   const productByCode = new Map(Array.from(productById.values()).map((product) => [product.code, product]))
+  const salesBillDocNoToSalesBillId = new Map<string, bigint>()
+  salesBills.forEach((bill) => {
+    salesBillDocNoToSalesBillId.set(bill.doc_no, bill.id)
+  })
+
+  const poSellDocNoToPoSellId = new Map<string, bigint>()
+  poSells.forEach((po) => {
+    poSellDocNoToPoSellId.set(po.doc_no, po.id)
+  })
+
+  const salesBillIdToPoSellId = new Map<bigint, bigint>()
+  salesBills.forEach((bill) => {
+    if (bill.po_sell_id) {
+      salesBillIdToPoSellId.set(bill.id, bill.po_sell_id)
+    }
+  })
+
   const matchedBySaleProduct = new Map<string, { cost: number; qty: number; revenue: number }>()
+  const matchedQtyByPoSellProduct = new Map<string, number>() // key: `${po_sell_id}|${product_id}`
 
   // Process active allocation facts first
   tradingAllocationFacts.forEach((fact) => {
     if (fact.status !== 'active') return
-    if (!fact.sales_bill_id || !fact.product_id) return
-    const key = `${fact.sales_bill_id}|${fact.product_id}`
-    const current = matchedBySaleProduct.get(key) ?? { cost: 0, qty: 0, revenue: 0 }
-    current.cost += toNumber(fact.matched_cogs)
-    current.qty += toNumber(fact.qty)
-    current.revenue += toNumber(fact.sales_amount)
-    matchedBySaleProduct.set(key, current)
+    if (!fact.product_id) return
+
+    let resolvedSalesBillId = fact.sales_bill_id ?? null
+    if (!resolvedSalesBillId && fact.sales_doc_no) {
+      resolvedSalesBillId = salesBillDocNoToSalesBillId.get(fact.sales_doc_no) ?? null
+    }
+
+    let resolvedPoSellId: bigint | null = null
+    if (resolvedSalesBillId) {
+      resolvedPoSellId = salesBillIdToPoSellId.get(resolvedSalesBillId) ?? null
+    }
+    if (!resolvedPoSellId && fact.sales_doc_no) {
+      resolvedPoSellId = poSellDocNoToPoSellId.get(fact.sales_doc_no) ?? null
+    }
+
+    if (resolvedSalesBillId) {
+      const key = `${resolvedSalesBillId}|${fact.product_id}`
+      const current = matchedBySaleProduct.get(key) ?? { cost: 0, qty: 0, revenue: 0 }
+      current.cost += toNumber(fact.matched_cogs)
+      current.qty += toNumber(fact.qty)
+      current.revenue += toNumber(fact.sales_amount)
+      matchedBySaleProduct.set(key, current)
+    }
+
+    if (resolvedPoSellId) {
+      const key = `${resolvedPoSellId}|${fact.product_id}`
+      matchedQtyByPoSellProduct.set(key, (matchedQtyByPoSellProduct.get(key) ?? 0) + toNumber(fact.qty))
+    }
   })
 
   // Track deal IDs covered by active facts
@@ -206,14 +245,36 @@ export async function buildDualCostingManagement() {
   tradingDeals.forEach((deal) => {
     if (isCancelled(deal.status)) return
     if (accountedDealIds.has(deal.id)) return
-    if (!deal.sales_bill_id || !deal.product_id) return
-    const key = `${deal.sales_bill_id}|${deal.product_id}`
-    const current = matchedBySaleProduct.get(key) ?? { cost: 0, qty: 0, revenue: 0 }
-    current.cost += toNumber(deal.matched_purchase_amount)
-    current.qty += toNumber(deal.matched_qty)
-    current.revenue += toNumber(deal.matched_sales_amount)
-    matchedBySaleProduct.set(key, current)
+    if (!deal.product_id) return
+
+    let resolvedSalesBillId = deal.sales_bill_id ?? null
+    if (!resolvedSalesBillId && deal.sales_bill_no) {
+      resolvedSalesBillId = salesBillDocNoToSalesBillId.get(deal.sales_bill_no) ?? null
+    }
+
+    let resolvedPoSellId: bigint | null = null
+    if (resolvedSalesBillId) {
+      resolvedPoSellId = salesBillIdToPoSellId.get(resolvedSalesBillId) ?? null
+    }
+    if (!resolvedPoSellId && deal.sales_bill_no) {
+      resolvedPoSellId = poSellDocNoToPoSellId.get(deal.sales_bill_no) ?? null
+    }
+
+    if (resolvedSalesBillId) {
+      const key = `${resolvedSalesBillId}|${deal.product_id}`
+      const current = matchedBySaleProduct.get(key) ?? { cost: 0, qty: 0, revenue: 0 }
+      current.cost += toNumber(deal.matched_purchase_amount)
+      current.qty += toNumber(deal.matched_qty)
+      current.revenue += toNumber(deal.matched_sales_amount)
+      matchedBySaleProduct.set(key, current)
+    }
+
+    if (resolvedPoSellId) {
+      const key = `${resolvedPoSellId}|${deal.product_id}`
+      matchedQtyByPoSellProduct.set(key, (matchedQtyByPoSellProduct.get(key) ?? 0) + toNumber(deal.matched_qty))
+    }
   })
+
 
   const waitingRows: WaitingAllocationRow[] = []
   salesBills.forEach((bill) => {
@@ -301,25 +362,8 @@ export async function buildDualCostingManagement() {
     })
   })
 
-  // Map PO Sells to waitingPoSellRows
-  const salesBillIdToPoSellId = new Map<bigint, bigint>()
-  salesBills.forEach((bill) => {
-    if (bill.po_sell_id) {
-      salesBillIdToPoSellId.set(bill.id, bill.po_sell_id)
-    }
-  })
+  // Map PO Sells to waitingPoSellRows (already built above)
 
-  // Group matched quantities by po_sell_id AND product_id
-  const matchedQtyByPoSellProduct = new Map<string, number>() // key: `${po_sell_id}|${product_id}`
-  for (const [saleProductKey, val] of matchedBySaleProduct.entries()) {
-    const [salesBillIdStr, productIdStr] = saleProductKey.split('|')
-    const salesBillId = BigInt(salesBillIdStr)
-    const poSellId = salesBillIdToPoSellId.get(salesBillId)
-    if (poSellId) {
-      const key = `${poSellId}|${productIdStr}`
-      matchedQtyByPoSellProduct.set(key, (matchedQtyByPoSellProduct.get(key) ?? 0) + val.qty)
-    }
-  }
 
   const waitingPoSellRows: WaitingAllocationRow[] = []
   poSells.forEach((po) => {

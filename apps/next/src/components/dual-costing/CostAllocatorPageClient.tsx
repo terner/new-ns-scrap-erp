@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -90,6 +90,7 @@ type Payload = {
 
 export function CostAllocatorPageClient() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [allocationMode, setAllocationMode] = useState('FIFO')
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -185,6 +186,7 @@ export function CostAllocatorPageClient() {
         setSelectedPoSellId('')
         setShowPreview(false)
         setReloadTrigger((prev) => prev + 1)
+        router.push('/dual-costing/waiting-allocations')
       } else {
         setError(response.message || 'เกิดข้อผิดพลาดในการบันทึก')
       }

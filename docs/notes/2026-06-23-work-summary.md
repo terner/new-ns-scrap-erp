@@ -32,6 +32,15 @@
   - เปลี่ยนจากการยิงคำขอ HTTP `fetch` ย้อนกลับไปเรียก API `/api/dual-costing/cost-pool` ของตนเองผ่าน Domain Name (`ns-dev.devkub.com`) ซึ่งมักล้มเหลวในสภาพแวดล้อมจริงเนื่องจาก Loopback restrictions, Cloudflare/Firewall blocks หรือ Cookie forwarding issues
   - ทำการแยกตรรกะการเรียกฐานข้อมูลออกมาเป็นฟังก์ชันตรง `getCostPoolRowsData` ใน `cost-pool/route.ts` และให้ `cost-allocator/route.ts` นำเข้ามาคิวรี่ข้อมูลโดยตรงแบบฝั่งเซิร์ฟเวอร์ (Server-Side Direct Invocation) แทน ทำให้ระบบทำงานได้รวดเร็วขึ้นและปราศจากปัญหาการล้มเหลวของเครือข่าย
 
+### 5. แก้ไขบั๊กคำนวณน้ำหนักจัดสรรของ PO ขาย (Deduct / Update Quantity on Waiting Allocations)
+* **สาเหตุของปัญหา**:
+  - เมื่อทำการจัดสรรต้นทุนให้กับ PO ขาย (PO Sell) ในหน้า Cost Allocator และบันทึกการจับคู่ (Match) ระบบจะทำการบันทึกข้อมูลธุรกรรมลงในตาราง `trading_deals` และ `trading_allocation_facts` โดยระบุ `sales_bill_id = null` และใช้เลขเอกสาร PO ขายในช่อง `sales_doc_no` (เนื่องจากยังไม่มีการออกบิลขายจริงในขั้นตอนนั้น)
+  - ตรรกะเดิมในการคำนวณน้ำหนักที่จัดสรรไปแล้ว (`allocatedQty`) ในตัวประมวลผล Waiting Allocations (`dual-costing-management.ts`) และตัวพรีวิวจัดสรร (`cost-allocator/route.ts`) จะยอมรับและรวมยอดน้ำหนักที่จัดสรรก็ต่อเมื่อ `sales_bill_id` ไม่เป็น `null` เท่านั้น ทำให้ข้อมูลการจัดสรรดีลที่เกิดโดยตรงกับ PO ขายถูกข้ามไป ส่งผลให้น้ำหนักรอจัดสรรของคิวไม่ลดลง และรายการยังคงค้างอยู่ในระบบ
+* **แนวทางการแก้ไข**:
+  - ปรับปรุงตัวประมวลผลข้อมูลใน `apps/next/src/lib/server/dual-costing-management.ts` และ `apps/next/src/app/api/dual-costing/cost-allocator/route.ts` ให้รองรับระบบเชื่อมโยงด้วยเลขที่เอกสารอ้างอิงเป็นทางเลือกสำรอง (Fallback Document-Number-Based Resolution)
+  - หาก `sales_bill_id` เป็น `null` ระบบจะจับคู่ยอดปริมาณการ match จากตารางธุรกรรมโดยอ้างอิงฟิลด์เลขที่เอกสาร (`sales_doc_no` หรือ `sales_bill_no`) กับเลขใบจองขาย (`po_sells.doc_no`) แทน ทำให้ค่า `allocatedQty` อัปเดตได้อย่างเที่ยงตรง และหักลบออกจากยอดคงเหลือ `remainingQty = qty - allocatedQty` ส่งผลให้รายการจองขายที่จัดสรรเสร็จสมบูรณ์แล้วหายไปจากหน้า Waiting Queue หรือแสดงยอดคงเหลือที่ถูกต้องโดยอัตโนมัติ
+
+
 ---
 
 ## ผลการตรวจสอบคุณภาพ (Verification Results)
