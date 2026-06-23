@@ -5,13 +5,10 @@ import { prisma } from '@/lib/server/prisma'
 export const runtime = 'nodejs'
 
 async function verifyLineSignature(rawBody: string, signature: string | null) {
-  let secret = process.env.LINE_CHANNEL_SECRET
-  if (!secret) {
-    const config = await prisma.system_settings.findUnique({
-      where: { key: 'LINE_CHANNEL_SECRET' },
-    })
-    secret = config?.value || ''
-  }
+  const config = await prisma.system_settings.findUnique({
+    where: { key: 'LINE_CHANNEL_SECRET' },
+  })
+  const secret = config?.value || process.env.LINE_CHANNEL_SECRET || ''
   if (!secret || !signature) return false
   const digest = createHmac('sha256', secret).update(rawBody).digest('base64')
   const expected = Buffer.from(digest)
