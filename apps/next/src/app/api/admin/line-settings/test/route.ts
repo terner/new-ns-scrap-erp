@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
+import { prisma } from '@/lib/server/prisma'
 
 export const runtime = 'nodejs'
 
 const testSchema = z.object({
   token: z.string().trim().min(1, 'กรุณาระบุ Channel Access Token'),
-  targetId: z.string().trim().min(1, 'กรุณาระบุ Target ID ปลายทาง'),
+  targetId: z.string().trim().optional().nullable().or(z.literal('')),
 })
 
 export async function POST(request: Request) {
@@ -18,6 +19,27 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { token, targetId } = testSchema.parse(body)
 
+    let finalTargetId = targetId
+    if (!finalTargetId) {
+      // Fallback to the latest registered group
+      const latestGroup = await prisma.line_groups.findFirst({
+        orderBy: { updated_at: 'desc' },
+      })
+      if (latestGroup) {
+        finalTargetId = latestGroup.group_id
+      } else {
+        // Fallback to default target settings in DB
+        const config = await prisma.system_settings.findUnique({
+          where: { key: 'LINE_DEFAULT_TARGET_ID' },
+        })
+        finalTargetId = config?.value || ''
+      }
+    }
+
+    if (!finalTargetId) {
+      throw new Error('ไม่พบข้อมูลกลุ่มไลน์ปลายทาง กรุณาเชิญบอทเข้ากลุ่มก่อนทดสอบ หรือตั้งค่า Target ID ด้วยตนเอง')
+    }
+
     const response = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: {
@@ -25,7 +47,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        to: targetId,
+        to: finalTargetId,
         messages: [
           {
             type: 'text',

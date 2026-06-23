@@ -147,10 +147,7 @@ export function LineSettingsPageClient() {
       setError('กรุณากรอก LINE Channel Access Token ก่อนทดสอบ')
       return
     }
-    if (!form.lineDefaultTargetId) {
-      setError('กรุณาเลือกกลุ่มไลน์หรือระบุ Target ID ปลายทางก่อนทดสอบ')
-      return
-    }
+
 
     setIsTesting(true)
     try {

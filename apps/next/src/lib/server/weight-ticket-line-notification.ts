@@ -377,9 +377,15 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
   }
 
   const configs = await resolveNotificationConfigs()
-  const targetId = options.targetId || configs.lineDefaultTargetId
+  let targetId = options.targetId || configs.lineDefaultTargetId
   if (!targetId) {
-    return { code: 'LINE_NOT_CONFIGURED' as const, status: 400, error: 'ยังไม่ได้ตั้งค่า LINE_DEFAULT_TARGET_ID หรือ targetId สำหรับส่งข้อความ' }
+    const latestGroup = await prisma.line_groups.findFirst({
+      orderBy: { updated_at: 'desc' },
+    })
+    targetId = latestGroup?.group_id || ''
+  }
+  if (!targetId) {
+    return { code: 'LINE_NOT_CONFIGURED' as const, status: 400, error: 'ยังไม่ได้ตั้งค่ากลุ่มไลน์ปลายทางและไม่พบกลุ่มไลน์ที่ลงทะเบียนไว้' }
   }
 
   try {
