@@ -243,7 +243,7 @@ export function ChangePasswordPageClient() {
           </div>
         </form>
 
-        <aside className="space-y-3">
+        <div className="space-y-3">
           <div className="rounded-md bg-white p-4 shadow border border-slate-100">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded bg-slate-900 text-white shrink-0">
@@ -254,18 +254,18 @@ export function ChangePasswordPageClient() {
                 <div className="truncate text-xs text-slate-500 mt-0.5">@{user?.username ?? '-'}</div>
               </div>
             </div>
-            <div className="mt-3 truncate rounded border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600 font-medium">{user?.email || '-'}</div>
+            <div className="mt-3 truncate rounded border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-650 font-medium">{user?.email || '-'}</div>
           </div>
 
           <div className="rounded-md border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
             <div className="font-bold text-slate-900 text-xs uppercase tracking-wide">คำแนะนำรหัสผ่าน</div>
-            <ul className="mt-2.5 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-slate-600">
+            <ul className="mt-2.5 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-slate-650">
               <li>ใช้ตัวอักษรใหญ่ ตัวอักษรเล็ก และตัวเลขร่วมกัน</li>
               <li>หลีกเลี่ยงรหัสผ่านเดียวกับระบบอื่น</li>
               <li>ระบบใช้ Supabase Auth เป็นแหล่งข้อมูลรหัสผ่าน ไม่บันทึกในตารางของแอป</li>
             </ul>
           </div>
-        </aside>
+        </div>
       </div>
     </div>
   )

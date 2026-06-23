@@ -342,7 +342,7 @@ export function ProfilePageClient() {
         </div>
 
         {/* Sidebar Info Card */}
-        <aside className="space-y-3">
+        <div className="space-y-3">
           <div className="rounded-md bg-white p-4 shadow border border-slate-200/60">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded bg-slate-900 text-white shrink-0">
@@ -370,7 +370,7 @@ export function ProfilePageClient() {
             <div className="font-bold text-slate-900 uppercase tracking-wider">ระบบความปลอดภัย</div>
             <p>ระบบนี้ใช้ระบบการยืนยันตัวตนและการเข้าถึงที่มีมาตรฐานความปลอดภัยระดับสูง ข้อมูลรหัสผ่านของคุณจะถูกจัดเก็บและดูแลโดยตรงผ่านระบบ Supabase Auth</p>
           </div>
-        </aside>
+        </div>
       </div>
     </div>
   )
