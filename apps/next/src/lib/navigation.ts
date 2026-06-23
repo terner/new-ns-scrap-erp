@@ -31,11 +31,13 @@ export type BreadcrumbItem = {
 const exactPathPermissions: Record<string, string> = {
   '/admin/audit': 'system.audit.view',
   '/admin/company-profile': 'system.settings.manage',
+  '/admin/line-settings': 'system.settings.manage',
   '/admin/migration-tools': 'system.backup.manage',
   '/admin/system-settings': 'system.settings.manage',
   '/admin/transaction-ledger': 'finance.cash.view',
   '/admin/users-permissions': 'system.users.manage',
   '/api/admin/company-profile': 'system.settings.manage',
+  '/api/admin/line-settings': 'system.settings.manage',
   '/api/admin/auth-events': 'system.audit.view',
   '/api/admin/transaction-ledger': 'finance.cash.view',
   '/api/admin/users': 'system.users.manage',
@@ -77,6 +79,7 @@ const exactPathPermissions: Record<string, string> = {
 }
 
 const prefixPathPermissions: Array<[string, string]> = [
+  ['/api/admin/line-settings/', 'system.settings.manage'],
   ['/api/master-data/customers/', 'master.customers.update'],
   ['/api/master-data/products/', 'master.products.update'],
   ['/api/master-data/suppliers/', 'master.suppliers.update'],
@@ -325,6 +328,7 @@ export const navigationItems: NavigationItem[] = [
     children: [
       { href: '/admin/system-settings', icon: '🧾', label: 'VAT / WHT', pageTitle: 'ตั้งค่าระบบ', section: 'admin' },
       { href: '/admin/company-profile', icon: '🏢', label: 'ข้อมูลบริษัท (สำหรับใบพิมพ์)', section: 'admin' },
+      { href: '/admin/line-settings', icon: '💬', label: 'LINE แจ้งเตือน', pageTitle: 'ตั้งค่า LINE', section: 'admin' },
     ],
   },
   { href: '/admin/transaction-ledger', icon: '📒', label: 'Transaction Ledger (เช็คเงินเข้า-ออก)', section: 'admin' },

@@ -5,10 +5,12 @@ import { apiErrorResponse } from '@/lib/server/api-error'
 import { recordAuditLog } from '@/lib/server/app-logging'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor } from '@/lib/server/daily'
+import { shouldAutoNotifyWeightTicket } from '@/lib/server/line-settings'
 import { findActiveBranchReferenceByCodeOrId, findActiveBranchReferencesByCodes } from '@/lib/server/branch-reference'
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { prisma } from '@/lib/server/prisma'
 import { findActiveSupplierReferenceByCodeOrId } from '@/lib/server/supplier-reference'
+import { notifyWeightTicketLine } from '@/lib/server/weight-ticket-line-notification'
 import {
   createActiveWtoStockHolds,
   resolveWtoWarehousesForLines,
@@ -295,8 +297,25 @@ export async function POST(request: Request) {
       targetType: 'weight_ticket',
     })
     const timeline = await getWeightTicketTimeline(prisma, created.id)
+    let lineNotification = null
+    try {
+      lineNotification = await shouldAutoNotifyWeightTicket(mapped.type)
+        ? await notifyWeightTicketLine(mapped.documentNo, {
+          origin: new URL(request.url).origin,
+          requestedBy: actor,
+          scopedBranchIds,
+        })
+        : null
+    } catch (caught) {
+      lineNotification = {
+        code: 'SEND_FAILED',
+        error: caught instanceof Error ? caught.message : 'ส่ง LINE ไม่สำเร็จ',
+        status: 500,
+      }
+    }
     return NextResponse.json({
       ...mapped,
+      lineNotification,
       timeline,
     })
   } catch (caught) {

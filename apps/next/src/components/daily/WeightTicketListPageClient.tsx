@@ -24,6 +24,7 @@ import {
   displayWeightTicketStatus,
   formatWeight,
   listWeightTickets,
+  notifyWeightTicketLine,
   type OptionItem,
   type WeightTicketRecord,
   type WeightTicketStatus,
@@ -167,6 +168,10 @@ export function WeightTicketListPageClient() {
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
   const [printingTicketId, setPrintingTicketId] = useState<string | null>(null)
+  const [shareTicket, setShareTicket] = useState<WeightTicketRecord | null>(null)
+  const [shareNote, setShareNote] = useState('')
+  const [shareError, setShareError] = useState('')
+  const [isSendingLine, setIsSendingLine] = useState(false)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
@@ -303,6 +308,36 @@ export function WeightTicketListPageClient() {
     } finally {
       setPrintingTicketId(null)
     }
+  }
+
+  function openShareDialog(ticket: WeightTicketRecord) {
+    setShareTicket(ticket)
+    setShareNote('')
+    setShareError('')
+  }
+
+  async function handleSendLineNotification() {
+    if (!shareTicket) return
+    setIsSendingLine(true)
+    setShareError('')
+    try {
+      await notifyWeightTicketLine(shareTicket.id, { customMessage: shareNote.trim() || undefined })
+      setShareTicket(null)
+      setShareNote('')
+      window.alert('ส่ง LINE พร้อม PDF เรียบร้อยแล้ว')
+    } catch (caught) {
+      setShareError(getErrorMessage(caught, 'ส่ง LINE ใบรับ-ส่งของไม่สำเร็จ'))
+    } finally {
+      setIsSendingLine(false)
+    }
+  }
+
+  function handleManualLineShare() {
+    if (!shareTicket) return
+    openWeightTicketLineShare(shareTicket)
+    setShareTicket(null)
+    setShareNote('')
+    setShareError('')
   }
 
   const summaryText = useMemo(() => `พบทั้งหมด ${totalRows.toLocaleString('th-TH')} รายการ`, [totalRows])
@@ -581,7 +616,7 @@ export function WeightTicketListPageClient() {
                 <button
                   className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
                   type="button"
-                  onClick={() => openWeightTicketLineShare(ticket)}
+                  onClick={() => openShareDialog(ticket)}
                 >
                   <Share2 className="size-3" />
                   แชร์
@@ -701,7 +736,7 @@ export function WeightTicketListPageClient() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
-                          openWeightTicketLineShare(ticket)
+                          openShareDialog(ticket)
                         }}
                       >
                         <Share2 className="size-3" />
@@ -743,6 +778,51 @@ export function WeightTicketListPageClient() {
           </table>
         </div>
       </div>
+
+      <Dialog open={Boolean(shareTicket)} onOpenChange={(open) => {
+        if (!open) {
+          setShareTicket(null)
+          setShareNote('')
+          setShareError('')
+        }
+      }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>แชร์ใบรับ-ส่งของ</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 px-4 pb-4">
+            <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <div className="font-semibold text-slate-900">{shareTicket?.documentNo}</div>
+              <div className="mt-1 text-xs text-slate-500">{shareTicket?.partyName} · {shareTicket ? `${formatWeight(shareTicket.totals.netWeight)} กก.` : ''}</div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                ข้อความเสริมใน LINE
+              </label>
+              <textarea
+                className="block min-h-[88px] w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 sm:text-sm"
+                maxLength={500}
+                placeholder="เช่น ส่งเข้ากลุ่มคลัง / แจ้งบัญชีตรวจเอกสาร"
+                value={shareNote}
+                onChange={(event) => setShareNote(event.target.value)}
+              />
+              {shareError ? <div className="mt-1 text-xs text-red-600">{shareError}</div> : null}
+            </div>
+          </div>
+          <DialogFooter className="flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => setShareTicket(null)}>ปิด</Button>
+            <Button disabled={isSendingLine} type="button" variant="outline" onClick={handleManualLineShare}>
+              <Share2 className="mr-2 size-4" />
+              แชร์เองผ่าน LINE
+            </Button>
+            <Button disabled={isSendingLine} type="button" onClick={handleSendLineNotification}>
+              <Share2 className="mr-2 size-4" />
+              {isSendingLine ? 'กำลังส่ง...' : 'ส่งเข้ากลุ่มหลัก'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(cancelTicket)} onOpenChange={(open) => {
         if (!open) {

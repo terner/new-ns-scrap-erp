@@ -346,6 +346,14 @@ const weightTicketListResultSchema = z.object({
   totalRows: z.number().int().nonnegative(),
 })
 
+const weightTicketLineNotifyResultSchema = z.object({
+  code: z.string(),
+  detailUrl: z.string().optional(),
+  lineRequestId: z.string().nullable().optional(),
+  pdfUrl: z.string().optional(),
+  status: z.number().optional(),
+})
+
 export const weightTicketCancelSchema = z.object({
   note: z
     .string()
@@ -575,4 +583,12 @@ export async function cancelWeightTicket(id: string, note: string) {
     body: JSON.stringify(values),
   })
   return readJsonResponse(response, weightTicketRecordSchema, 'ยกเลิกใบรับ-ส่งของไม่ได้')
+}
+export async function notifyWeightTicketLine(id: string, values: { customMessage?: string; targetId?: string } = {}) {
+  const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(id)}/notify-line`, {
+    body: JSON.stringify(values),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+  return readJsonResponse(response, weightTicketLineNotifyResultSchema, 'ส่ง LINE ใบรับ-ส่งของไม่สำเร็จ')
 }
