@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -88,17 +89,27 @@ type Payload = {
 }
 
 export function CostAllocatorPageClient() {
-  const initialParams = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
+  const searchParams = useSearchParams()
   const [allocationMode, setAllocationMode] = useState('FIFO')
   const [data, setData] = useState<Payload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedPoSellId, setSelectedPoSellId] = useState(initialParams.get('poSellId') ?? '')
-  const [selectedProductId, setSelectedProductId] = useState(initialParams.get('productId') ?? '')
+  const [selectedPoSellId, setSelectedPoSellId] = useState(searchParams.get('poSellId') ?? '')
+  const [selectedProductId, setSelectedProductId] = useState(searchParams.get('productId') ?? '')
   const [showPreview, setShowPreview] = useState(false)
-  const [sourceType, setSourceType] = useState(initialParams.get('sourceType') ?? 'spot-sell')
+  const [sourceType, setSourceType] = useState(searchParams.get('sourceType') ?? 'spot-sell')
   const [targetCost, setTargetCost] = useState(0)
   const [targetCostInput, setTargetCostInput] = useState('0')
+
+  useEffect(() => {
+    const poSellIdParam = searchParams.get('poSellId')
+    const productIdParam = searchParams.get('productId')
+    const sourceTypeParam = searchParams.get('sourceType')
+
+    if (poSellIdParam !== null) setSelectedPoSellId(poSellIdParam)
+    if (productIdParam !== null) setSelectedProductId(productIdParam)
+    if (sourceTypeParam !== null) setSourceType(sourceTypeParam)
+  }, [searchParams])
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()

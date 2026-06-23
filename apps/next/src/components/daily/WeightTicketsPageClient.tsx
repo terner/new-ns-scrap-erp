@@ -1509,7 +1509,7 @@ export function WeightTicketsPageClient({
                                   </div>
                                   {!isCollapsed ? (
                                     <>
-                                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+                                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 items-start">
                                         <FieldBlock error={showError(`line-${lot.id}-gross`)} label="น้ำหนักรวม (กก. / ลัง) *">
                                           <Input
                                             id={`weight-gross-${lot.id}`}
@@ -1532,12 +1532,14 @@ export function WeightTicketsPageClient({
                                             onChange={(event) => updateLine(lot.id, (current) => ({ ...current, containerDeductionWeight: normalizeDecimalInput(event.target.value) }))}
                                           />
                                         </FieldBlock>
-                                        <FieldBlock label="น้ำหนักหลังหักภาชนะ">
-                                          <Input
-                                            disabled
-                                            value={formatWeight(lotNetBeforeImpurityWeight)}
-                                          />
-                                        </FieldBlock>
+                                        <div className="col-span-2 sm:col-span-1">
+                                          <FieldBlock label="น้ำหนักหลังหักภาชนะ">
+                                            <Input
+                                              disabled
+                                              value={formatWeight(lotNetBeforeImpurityWeight)}
+                                            />
+                                          </FieldBlock>
+                                        </div>
                                       </div>
                                       <FieldBlock error={showError(`line-${lot.id}-images`)} label="รูปภาพประกอบ*">
                                         <AttachmentProfileGrid
@@ -1566,11 +1568,11 @@ export function WeightTicketsPageClient({
                         <div className="mt-3 flex justify-end">
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="default"
                             size="xs"
                             disabled={!hasSelectedProduct}
                             onClick={() => addSameProductLot(line)}
-                            className="outline-none flex items-center gap-1"
+                            className="outline-none flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white disabled:bg-slate-100 disabled:text-slate-400"
                           >
                             <Plus className="size-3" />
                             เพิ่มล็อต
@@ -1652,10 +1654,10 @@ export function WeightTicketsPageClient({
                           <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">สิ่งเจือปน</div>
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="default"
                             disabled={!canAddImpurityLine}
                             onClick={() => addImpurityLine(line)}
-                            className="flex items-center justify-center gap-1.5 h-8 rounded-md text-xs font-semibold px-3 outline-none border border-slate-300 hover:bg-slate-50 text-slate-700 bg-white"
+                            className="flex items-center justify-center gap-1.5 h-8 rounded-md text-xs font-semibold px-3 outline-none text-white bg-red-600 hover:bg-red-700 disabled:bg-slate-100 disabled:text-slate-400"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             เพิ่มรายการหักสิ่งเจือปน

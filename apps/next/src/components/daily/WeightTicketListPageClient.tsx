@@ -550,11 +550,11 @@ export function WeightTicketListPageClient() {
                 onClick={() => setActiveDetailId(ticket.id)}
               >
               <div className="flex justify-between items-start mb-2">
-                <span className="font-bold text-slate-800 text-sm">{ticket.documentNo}</span>
+                <span className="font-bold text-slate-800 text-base">{ticket.documentNo}</span>
                 <span className="text-xs text-slate-500">{formatDateTime(ticket.createdAt)}</span>
               </div>
 
-              <div className="text-xs text-slate-600 mb-3 space-y-1">
+              <div className="text-sm text-slate-600 mb-3 space-y-1">
                 <div>
                   <span className="font-semibold text-slate-500">{typeFilter === 'WTI' ? 'ผู้ขาย: ' : 'ลูกค้า: '}</span>
                   <span className="text-slate-800">{ticket.partyName}</span>
@@ -592,9 +592,9 @@ export function WeightTicketListPageClient() {
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block">น้ำหนักสุทธิ</span>
-                  <span className="font-bold text-slate-900 text-sm tabular-nums">{formatWeight(ticket.totals.netWeight)} กก.</span>
-                  <span className="mt-0.5 block text-[10px] text-amber-700 tabular-nums">หักรวม {formatWeight(ticket.totals.containerDeductionWeight + ticket.totals.deductionWeight)} กก.</span>
+                  <span className="text-xs text-slate-400 block">น้ำหนักสุทธิ</span>
+                  <span className="font-bold text-slate-900 text-base tabular-nums">{formatWeight(ticket.totals.netWeight)} กก.</span>
+                  <span className="mt-0.5 block text-xs text-amber-700 tabular-nums">หักรวม {formatWeight(ticket.totals.containerDeductionWeight + ticket.totals.deductionWeight)} กก.</span>
                 </div>
               </div>
 

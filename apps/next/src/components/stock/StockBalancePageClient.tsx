@@ -91,6 +91,28 @@ export function StockBalancePageClient() {
   const [matrixPage, setMatrixPage] = useState(1)
   const [matrixPageSize, setMatrixPageSize] = useState(25)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [detailSortKey, setDetailSortKey] = useState<string>('')
+  const [detailSortDirection, setDetailSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [matrixSortKey, setMatrixSortKey] = useState<string>('')
+  const [matrixSortDirection, setMatrixSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  const handleDetailSort = useCallback((key: string) => {
+    if (detailSortKey === key) {
+      setDetailSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setDetailSortKey(key)
+      setDetailSortDirection('desc')
+    }
+  }, [detailSortKey])
+
+  const handleMatrixSort = useCallback((key: string) => {
+    if (matrixSortKey === key) {
+      setMatrixSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setMatrixSortKey(key)
+      setMatrixSortDirection('desc')
+    }
+  }, [matrixSortKey])
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -258,19 +280,160 @@ export function StockBalancePageClient() {
       .sort((a, b) => matrixRowValue(b) - matrixRowValue(a))
   }, [filteredRows])
 
+  const sortedDisplayRows = useMemo(() => {
+    if (!detailSortKey) return displayRows
+
+    return [...displayRows].sort((a, b) => {
+      let valA: any
+      let valB: any
+
+      switch (detailSortKey) {
+        case 'product':
+          valA = `${a.productCode ?? ''} ${a.productName ?? ''}`
+          valB = `${b.productCode ?? ''} ${b.productName ?? ''}`
+          break
+        case 'group':
+          valA = a.productMetalGroup ?? ''
+          valB = b.productMetalGroup ?? ''
+          break
+        case 'warehouse':
+          valA = a.status ?? ''
+          valB = b.status ?? ''
+          break
+        case 'branch':
+          valA = a.branchName ?? ''
+          valB = b.branchName ?? ''
+          break
+        case 'qty':
+          valA = a.qty
+          valB = b.qty
+          break
+        case 'awaitingBill':
+          valA = a.awaitingBillQty
+          valB = b.awaitingBillQty
+          break
+        case 'onHold':
+          valA = a.onHoldQty
+          valB = b.onHoldQty
+          break
+        case 'ready':
+          valA = a.readyQty
+          valB = b.readyQty
+          break
+        case 'avgCost':
+          valA = a.avgCost
+          valB = b.avgCost
+          break
+        case 'value':
+          valA = a.value
+          valB = b.value
+          break
+        default:
+          return 0
+      }
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return detailSortDirection === 'asc'
+          ? valA.localeCompare(valB, 'th')
+          : valB.localeCompare(valA, 'th')
+      } else {
+        const numA = Number(valA) || 0
+        const numB = Number(valB) || 0
+        return detailSortDirection === 'asc' ? numA - numB : numB - numA
+      }
+    })
+  }, [displayRows, detailSortKey, detailSortDirection])
+
+  const sortedMatrixRows = useMemo(() => {
+    const rows = [...matrixRows]
+    if (!matrixSortKey) return rows
+
+    return rows.sort((a, b) => {
+      let valA: any
+      let valB: any
+
+      switch (matrixSortKey) {
+        case 'group':
+          valA = a.group
+          valB = b.group
+          break
+        case 'rmQty':
+          valA = a.rmQty
+          valB = b.rmQty
+          break
+        case 'rmVal':
+          valA = a.rmVal
+          valB = b.rmVal
+          break
+        case 'rmAvgCost':
+          valA = a.rmQty !== 0 ? a.rmVal / a.rmQty : 0
+          valB = b.rmQty !== 0 ? b.rmVal / b.rmQty : 0
+          break
+        case 'wipQty':
+          valA = a.wipQty
+          valB = b.wipQty
+          break
+        case 'wipVal':
+          valA = a.wipVal
+          valB = b.wipVal
+          break
+        case 'wipAvgCost':
+          valA = a.wipQty !== 0 ? a.wipVal / a.wipQty : 0
+          valB = b.wipQty !== 0 ? b.wipVal / b.wipQty : 0
+          break
+        case 'fgQty':
+          valA = a.fgQty
+          valB = b.fgQty
+          break
+        case 'fgVal':
+          valA = a.fgVal
+          valB = b.fgVal
+          break
+        case 'fgAvgCost':
+          valA = a.fgQty !== 0 ? a.fgVal / a.fgQty : 0
+          valB = b.fgQty !== 0 ? b.fgVal / b.fgQty : 0
+          break
+        case 'totalQty':
+          valA = matrixRowQty(a)
+          valB = matrixRowQty(b)
+          break
+        case 'totalValue':
+          valA = matrixRowValue(a)
+          valB = matrixRowValue(b)
+          break
+        case 'totalAvgCost':
+          valA = matrixRowQty(a) !== 0 ? matrixRowValue(a) / matrixRowQty(a) : 0
+          valB = matrixRowQty(b) !== 0 ? matrixRowValue(b) / matrixRowQty(b) : 0
+          break
+        default:
+          return 0
+      }
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return matrixSortDirection === 'asc'
+          ? valA.localeCompare(valB, 'th')
+          : valB.localeCompare(valA, 'th')
+      } else {
+        const numA = Number(valA) || 0
+        const numB = Number(valB) || 0
+        return matrixSortDirection === 'asc' ? numA - numB : numB - numA
+      }
+    })
+  }, [matrixRows, matrixSortKey, matrixSortDirection])
+
   const detailTotalPages = Math.max(1, Math.ceil(displayRows.length / detailPageSize))
   const detailCurrentPage = Math.min(detailPage, detailTotalPages)
   const pagedDetailRows = useMemo(() => {
     const start = (detailCurrentPage - 1) * detailPageSize
-    return displayRows.slice(start, start + detailPageSize)
-  }, [detailCurrentPage, detailPageSize, displayRows])
+    return sortedDisplayRows.slice(start, start + detailPageSize)
+  }, [detailCurrentPage, detailPageSize, sortedDisplayRows])
 
   const matrixTotalPages = Math.max(1, Math.ceil(matrixRows.length / matrixPageSize))
   const matrixCurrentPage = Math.min(matrixPage, matrixTotalPages)
   const pagedMatrixRows = useMemo(() => {
     const start = (matrixCurrentPage - 1) * matrixPageSize
-    return matrixRows.slice(start, start + matrixPageSize)
-  }, [matrixCurrentPage, matrixPageSize, matrixRows])
+    return sortedMatrixRows.slice(start, start + matrixPageSize)
+  }, [matrixCurrentPage, matrixPageSize, sortedMatrixRows])
 
   useEffect(() => {
     setDetailPage(1)
@@ -563,7 +726,7 @@ export function StockBalancePageClient() {
               setMatrixPage(1)
             }}
           />
-          <MatrixTable byStatus={byStatus} isLoading={isLoading} matrixRows={pagedMatrixRows} totalMatrixRows={matrixRows.length} totalQty={summary.qty} totalValue={summary.value} />
+          <MatrixTable byStatus={byStatus} isLoading={isLoading} matrixRows={pagedMatrixRows} sortDirection={matrixSortDirection} sortKey={matrixSortKey} totalMatrixRows={matrixRows.length} totalQty={summary.qty} totalValue={summary.value} onSort={handleMatrixSort} />
         </>
       ) : (
         <>
@@ -579,7 +742,7 @@ export function StockBalancePageClient() {
               setDetailPage(1)
             }}
           />
-          <DetailTable isLoading={isLoading} onOpen={setDetailRow} rows={pagedDetailRows} />
+          <DetailTable isLoading={isLoading} rows={pagedDetailRows} sortDirection={detailSortDirection} sortKey={detailSortKey} onOpen={setDetailRow} onSort={handleDetailSort} />
         </>
       )}
 
@@ -1048,18 +1211,42 @@ function LegendRow({ color, label, value, qty }: { color: string; label: string;
 const matrixColumns: Array<ResizableColumnDefinition<string>> = [
   { key: 'group', defaultWidth: 150 },
   { key: 'rmQty', defaultWidth: 100 },
-  { key: 'rmVal', defaultWidth: 120 },
+  { key: 'rmVal', defaultWidth: 110 },
+  { key: 'rmAvgCost', defaultWidth: 110 },
   { key: 'wipQty', defaultWidth: 100 },
-  { key: 'wipVal', defaultWidth: 120 },
+  { key: 'wipVal', defaultWidth: 110 },
+  { key: 'wipAvgCost', defaultWidth: 110 },
   { key: 'fgQty', defaultWidth: 100 },
-  { key: 'fgVal', defaultWidth: 120 },
+  { key: 'fgVal', defaultWidth: 110 },
+  { key: 'fgAvgCost', defaultWidth: 110 },
   { key: 'totalQty', defaultWidth: 100 },
-  { key: 'totalValue', defaultWidth: 140 },
+  { key: 'totalValue', defaultWidth: 110 },
+  { key: 'totalAvgCost', defaultWidth: 120 },
 ]
 
-function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQty, totalValue }: { byStatus: StatusSummary[]; isLoading: boolean; matrixRows: MatrixRow[]; totalMatrixRows: number; totalQty: number; totalValue: number }) {
+function MatrixTable({
+  byStatus,
+  isLoading,
+  matrixRows,
+  sortDirection,
+  sortKey,
+  totalMatrixRows,
+  totalQty,
+  totalValue,
+  onSort,
+}: {
+  byStatus: StatusSummary[]
+  isLoading: boolean
+  matrixRows: MatrixRow[]
+  sortDirection?: 'asc' | 'desc'
+  sortKey?: string
+  totalMatrixRows: number
+  totalQty: number
+  totalValue: number
+  onSort?: (key: string) => void
+}) {
   const valueFor = (status: string) => byStatus.find((item) => item.status === status) ?? { count: 0, qty: 0, status, value: 0 }
-  const columnResize = useResizableColumns('stock.balance.matrix.v5', matrixColumns)
+  const columnResize = useResizableColumns('stock.balance.matrix.v7', matrixColumns)
   return (
     <>
       {/* Desktop View (Table) */}
@@ -1079,62 +1266,42 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
           </colgroup>
           <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-600 font-medium">
             <tr>
-              <ResizableTableHead label="หมวดสินค้า" resizeProps={columnResize.getResizeHandleProps('group', 'หมวดสินค้า')} />
-              <ResizableTableHead align="right" label="📦 RM (กก.)" resizeProps={columnResize.getResizeHandleProps('rmQty', '📦 RM (กก.)')} />
-              <ResizableTableHead align="right" label="RM มูลค่า" resizeProps={columnResize.getResizeHandleProps('rmVal', 'RM มูลค่า')} />
-              <ResizableTableHead align="right" label="⚙️ WIP (กก.)" resizeProps={columnResize.getResizeHandleProps('wipQty', '⚙️ WIP (กก.)')} />
-              <ResizableTableHead align="right" label="WIP มูลค่า" resizeProps={columnResize.getResizeHandleProps('wipVal', 'WIP มูลค่า')} />
-              <ResizableTableHead align="right" label="✅ FG (กก.)" resizeProps={columnResize.getResizeHandleProps('fgQty', '✅ FG (กก.)')} />
-              <ResizableTableHead align="right" label="FG มูลค่า" resizeProps={columnResize.getResizeHandleProps('fgVal', 'FG มูลค่า')} />
-              <ResizableTableHead align="right" label="รวม กก." resizeProps={columnResize.getResizeHandleProps('totalQty', 'รวม กก.')} />
-              <ResizableTableHead align="right" label="รวมมูลค่า" resizeProps={columnResize.getResizeHandleProps('totalValue', 'รวมมูลค่า')} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="หมวดสินค้า" resizeProps={columnResize.getResizeHandleProps('group', 'หมวดสินค้า')} sortKey="group" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="📦 RM (กก.)" resizeProps={columnResize.getResizeHandleProps('rmQty', '📦 RM (กก.)')} sortKey="rmQty" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="RM มูลค่า" resizeProps={columnResize.getResizeHandleProps('rmVal', 'RM มูลค่า')} sortKey="rmVal" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ต้นทุน RM เฉลี่ย" resizeProps={columnResize.getResizeHandleProps('rmAvgCost', 'ต้นทุน RM เฉลี่ย')} sortKey="rmAvgCost" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="⚙️ WIP (กก.)" resizeProps={columnResize.getResizeHandleProps('wipQty', '⚙️ WIP (กก.)')} sortKey="wipQty" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="WIP มูลค่า" resizeProps={columnResize.getResizeHandleProps('wipVal', 'WIP มูลค่า')} sortKey="wipVal" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ต้นทุน WIP เฉลี่ย" resizeProps={columnResize.getResizeHandleProps('wipAvgCost', 'ต้นทุน WIP เฉลี่ย')} sortKey="wipAvgCost" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="✅ FG (กก.)" resizeProps={columnResize.getResizeHandleProps('fgQty', '✅ FG (กก.)')} sortKey="fgQty" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="FG มูลค่า" resizeProps={columnResize.getResizeHandleProps('fgVal', 'FG มูลค่า')} sortKey="fgVal" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ต้นทุน FG เฉลี่ย" resizeProps={columnResize.getResizeHandleProps('fgAvgCost', 'ต้นทุน FG เฉลี่ย')} sortKey="fgAvgCost" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="รวม กก." resizeProps={columnResize.getResizeHandleProps('totalQty', 'รวม กก.')} sortKey="totalQty" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="รวมมูลค่า" resizeProps={columnResize.getResizeHandleProps('totalValue', 'รวมมูลค่า')} sortKey="totalValue" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ต้นทุนเฉลี่ยรวม" resizeProps={columnResize.getResizeHandleProps('totalAvgCost', 'ต้นทุนเฉลี่ยรวม')} sortKey="totalAvgCost" onSort={onSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
+            {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
             {!isLoading && matrixRows.map((row) => (
               <Fragment key={row.group}>
                 <tr className="bg-slate-50/70 transition-colors hover:bg-slate-100/70">
-                  <td className="p-3.5 text-slate-850">
+                  <td className="p-3.5 text-slate-855">
                     <div className="font-bold">{row.group}</div>
                     <div className="mt-0.5 text-[11px] font-medium text-slate-500">{row.products.length.toLocaleString('th-TH')} รายการสินค้า</div>
                   </td>
                   <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{row.rmQty ? formatMoney(row.rmQty) : '-'}</td>
-                  <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">
-                    <div>{row.rmVal ? formatMoney(row.rmVal) : '-'}</div>
-                    {row.rmQty !== 0 ? (
-                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                        เฉลี่ย {formatMoney(row.rmVal / row.rmQty)} บ./กก.
-                      </div>
-                    ) : null}
-                  </td>
+                  <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{row.rmVal ? formatMoney(row.rmVal) : '-'}</td>
+                  <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{row.rmQty !== 0 ? `${formatMoney(row.rmVal / row.rmQty)} บ.` : '-'}</td>
                   <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipQty ? formatMoney(row.wipQty) : '-'}</td>
-                  <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">
-                    <div>{row.wipVal ? formatMoney(row.wipVal) : '-'}</div>
-                    {row.wipQty !== 0 ? (
-                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                        เฉลี่ย {formatMoney(row.wipVal / row.wipQty)} บ./กก.
-                      </div>
-                    ) : null}
-                  </td>
+                  <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipVal ? formatMoney(row.wipVal) : '-'}</td>
+                  <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{row.wipQty !== 0 ? `${formatMoney(row.wipVal / row.wipQty)} บ.` : '-'}</td>
                   <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgQty ? formatMoney(row.fgQty) : '-'}</td>
-                  <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">
-                    <div>{row.fgVal ? formatMoney(row.fgVal) : '-'}</div>
-                    {row.fgQty !== 0 ? (
-                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                        เฉลี่ย {formatMoney(row.fgVal / row.fgQty)} บ./กก.
-                      </div>
-                    ) : null}
-                  </td>
+                  <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgVal ? formatMoney(row.fgVal) : '-'}</td>
+                  <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{row.fgQty !== 0 ? `${formatMoney(row.fgVal / row.fgQty)} บ.` : '-'}</td>
                   <td className="p-3.5 text-right">{formatMoney(matrixRowQty(row))}</td>
-                  <td className="p-3.5 text-right text-emerald-700">
-                    <div>{formatMoney(matrixRowValue(row))}</div>
-                    {matrixRowQty(row) !== 0 ? (
-                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                        เฉลี่ย {formatMoney(matrixRowValue(row) / matrixRowQty(row))} บ./กก.
-                      </div>
-                    ) : null}
-                  </td>
+                  <td className="p-3.5 text-right text-emerald-700">{formatMoney(matrixRowValue(row))}</td>
+                  <td className="p-3.5 text-right text-emerald-700">{matrixRowQty(row) !== 0 ? `${formatMoney(matrixRowValue(row) / matrixRowQty(row))} บ.` : '-'}</td>
                 </tr>
                 {row.products.map((product) => (
                   <tr key={`${row.group}-${product.productId}`} className="hover:bg-slate-50/50 transition-colors">
@@ -1148,87 +1315,39 @@ function MatrixTable({ byStatus, isLoading, matrixRows, totalMatrixRows, totalQt
                       </div>
                     </td>
                     <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100">{product.rmQty ? formatMoney(product.rmQty) : '-'}</td>
-                    <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">
-                      <div>{product.rmVal ? formatMoney(product.rmVal) : '-'}</div>
-                      {product.rmQty !== 0 ? (
-                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                          เฉลี่ย {formatMoney(product.rmVal / product.rmQty)} บ./กก.
-                        </div>
-                      ) : null}
-                    </td>
+                    <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{product.rmVal ? formatMoney(product.rmVal) : '-'}</td>
+                    <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100">{product.rmQty !== 0 ? `${formatMoney(product.rmVal / product.rmQty)} บ.` : '-'}</td>
                     <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{product.wipQty ? formatMoney(product.wipQty) : '-'}</td>
-                    <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">
-                      <div>{product.wipVal ? formatMoney(product.wipVal) : '-'}</div>
-                      {product.wipQty !== 0 ? (
-                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                          เฉลี่ย {formatMoney(product.wipVal / product.wipQty)} บ./กก.
-                        </div>
-                      ) : null}
-                    </td>
+                    <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{product.wipVal ? formatMoney(product.wipVal) : '-'}</td>
+                    <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100">{product.wipQty !== 0 ? `${formatMoney(product.wipVal / product.wipQty)} บ.` : '-'}</td>
                     <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{product.fgQty ? formatMoney(product.fgQty) : '-'}</td>
-                    <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">
-                      <div>{product.fgVal ? formatMoney(product.fgVal) : '-'}</div>
-                      {product.fgQty !== 0 ? (
-                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                          เฉลี่ย {formatMoney(product.fgVal / product.fgQty)} บ./กก.
-                        </div>
-                      ) : null}
-                    </td>
+                    <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{product.fgVal ? formatMoney(product.fgVal) : '-'}</td>
+                    <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100">{product.fgQty !== 0 ? `${formatMoney(product.fgVal / product.fgQty)} บ.` : '-'}</td>
                     <td className="p-3.5 text-right">{formatMoney(matrixProductQty(product))}</td>
-                    <td className="p-3.5 text-right text-emerald-700">
-                      <div>{formatMoney(matrixProductValue(product))}</div>
-                      {matrixProductQty(product) !== 0 ? (
-                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                          เฉลี่ย {formatMoney(matrixProductValue(product) / matrixProductQty(product))} บ./กก.
-                        </div>
-                      ) : null}
-                    </td>
+                    <td className="p-3.5 text-right text-emerald-700">{formatMoney(matrixProductValue(product))}</td>
+                    <td className="p-3.5 text-right text-emerald-700">{matrixProductQty(product) !== 0 ? `${formatMoney(matrixProductValue(product) / matrixProductQty(product))} บ.` : '-'}</td>
                   </tr>
                 ))}
               </Fragment>
             ))}
-            {!isLoading && matrixRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={9}>ไม่มีสต๊อก</td></tr> : null}
+            {!isLoading && matrixRows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={13}>ไม่มีสต๊อก</td></tr> : null}
           </tbody>
           {matrixRows.length ? (
             <tfoot className="bg-slate-50 border-t border-slate-200/80 font-bold text-slate-800">
               <tr>
                 <td className="p-3.5 overflow-hidden truncate">รวมทั้งหมด ({totalMatrixRows} หมวด)</td>
                 <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-x border-slate-100 overflow-hidden truncate">{formatMoney(valueFor('RM').qty)}</td>
-                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100 overflow-hidden truncate">
-                  <div>{formatMoney(valueFor('RM').value)}</div>
-                  {valueFor('RM').qty !== 0 ? (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney(valueFor('RM').value / valueFor('RM').qty)} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
+                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100 overflow-hidden truncate">{formatMoney(valueFor('RM').value)}</td>
+                <td className="p-3.5 text-right text-blue-700 bg-blue-50/10 border-r border-slate-100 overflow-hidden truncate">{valueFor('RM').qty !== 0 ? `${formatMoney(valueFor('RM').value / valueFor('RM').qty)} บ.` : '-'}</td>
                 <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 overflow-hidden truncate">{formatMoney(valueFor('WIP').qty)}</td>
-                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 overflow-hidden truncate">
-                  <div>{formatMoney(valueFor('WIP').value)}</div>
-                  {valueFor('WIP').qty !== 0 ? (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney(valueFor('WIP').value / valueFor('WIP').qty)} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 overflow-hidden truncate">{formatMoney(valueFor('WIP').value)}</td>
+                <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 overflow-hidden truncate">{valueFor('WIP').qty !== 0 ? `${formatMoney(valueFor('WIP').value / valueFor('WIP').qty)} บ.` : '-'}</td>
                 <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 overflow-hidden truncate">{formatMoney(valueFor('FG').qty)}</td>
-                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 overflow-hidden truncate">
-                  <div>{formatMoney(valueFor('FG').value)}</div>
-                  {valueFor('FG').qty !== 0 ? (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney(valueFor('FG').value / valueFor('FG').qty)} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 overflow-hidden truncate">{formatMoney(valueFor('FG').value)}</td>
+                <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 overflow-hidden truncate">{valueFor('FG').qty !== 0 ? `${formatMoney(valueFor('FG').value / valueFor('FG').qty)} บ.` : '-'}</td>
                 <td className="p-3.5 text-right overflow-hidden truncate">{formatMoney(totalQty)}</td>
-                <td className="p-3.5 text-right text-base text-emerald-700 font-mono overflow-hidden truncate">
-                  <div>{formatMoney(totalValue)}</div>
-                  {totalQty !== 0 ? (
-                    <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                      เฉลี่ย {formatMoney(totalValue / totalQty)} บ./กก.
-                    </div>
-                  ) : null}
-                </td>
+                <td className="p-3.5 text-right text-emerald-700 overflow-hidden truncate">{formatMoney(totalValue)}</td>
+                <td className="p-3.5 text-right text-emerald-700 overflow-hidden truncate">{totalQty !== 0 ? `${formatMoney(totalValue / totalQty)} บ.` : '-'}</td>
               </tr>
             </tfoot>
           ) : null}
@@ -1373,7 +1492,21 @@ const detailColumns: Array<ResizableColumnDefinition<string>> = [
   { key: 'value', defaultWidth: 120 },
 ]
 
-function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: (row: BalanceRow) => void; rows: DisplayBalanceRow[] }) {
+function DetailTable({
+  isLoading,
+  rows,
+  sortDirection,
+  sortKey,
+  onOpen,
+  onSort,
+}: {
+  isLoading: boolean
+  rows: DisplayBalanceRow[]
+  sortDirection?: 'asc' | 'desc'
+  sortKey?: string
+  onOpen: (row: BalanceRow) => void
+  onSort?: (key: string) => void
+}) {
   const columnResize = useResizableColumns('stock.balance.detail.v5', detailColumns)
   return (
     <>
@@ -1465,16 +1598,16 @@ function DetailTable({ isLoading, onOpen, rows }: { isLoading: boolean; onOpen: 
           </colgroup>
           <thead className="bg-slate-50 border-b border-slate-200/60 text-slate-655 font-medium">
             <tr>
-              <ResizableTableHead label="สินค้า" resizeProps={columnResize.getResizeHandleProps('product', 'สินค้า')} />
-              <ResizableTableHead label="หมวด" resizeProps={columnResize.getResizeHandleProps('group', 'หมวด')} />
-              <ResizableTableHead align="center" label="ประเภทคลัง" resizeProps={columnResize.getResizeHandleProps('warehouse', 'ประเภทคลัง')} />
-              <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} />
-              <ResizableTableHead align="right" label="คงเหลือ (กก.)" resizeProps={columnResize.getResizeHandleProps('qty', 'คงเหลือ (กก.)')} />
-              <ResizableTableHead align="right" label="รอเข้า" resizeProps={columnResize.getResizeHandleProps('awaitingBill', 'รอเข้า')} />
-              <ResizableTableHead align="right" label="รอออก" resizeProps={columnResize.getResizeHandleProps('onHold', 'รอออก')} />
-              <ResizableTableHead align="right" label="พร้อมส่ง" resizeProps={columnResize.getResizeHandleProps('ready', 'พร้อมส่ง')} />
-              <ResizableTableHead align="right" label="ต้นทุน/กก." resizeProps={columnResize.getResizeHandleProps('avgCost', 'ต้นทุน/กก.')} />
-              <ResizableTableHead align="right" label="มูลค่า" resizeProps={columnResize.getResizeHandleProps('value', 'มูลค่า')} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('product', 'สินค้า')} sortKey="product" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="หมวด" resizeProps={columnResize.getResizeHandleProps('group', 'หมวด')} sortKey="group" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="center" direction={sortDirection} label="ประเภทคลัง" resizeProps={columnResize.getResizeHandleProps('warehouse', 'ประเภทคลัง')} sortKey="warehouse" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} sortKey="branch" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="คงเหลือ (กก.)" resizeProps={columnResize.getResizeHandleProps('qty', 'คงเหลือ (กก.)')} sortKey="qty" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="รอเข้า" resizeProps={columnResize.getResizeHandleProps('awaitingBill', 'รอเข้า')} sortKey="awaitingBill" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="รอออก" resizeProps={columnResize.getResizeHandleProps('onHold', 'รอออก')} sortKey="onHold" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="พร้อมส่ง" resizeProps={columnResize.getResizeHandleProps('ready', 'พร้อมส่ง')} sortKey="ready" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ต้นทุน/กก." resizeProps={columnResize.getResizeHandleProps('avgCost', 'ต้นทุน/กก.')} sortKey="avgCost" onSort={onSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="มูลค่า" resizeProps={columnResize.getResizeHandleProps('value', 'มูลค่า')} sortKey="value" onSort={onSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-semibold">
