@@ -27,6 +27,11 @@
   - ทำการปรับปรุงโดยใช้ `useSearchParams()` ของ Next.js ในการดึงค่าแทน พร้อมจัดกลุ่ม component client-side ไว้ภายใต้ `<Suspense>` boundary ในไฟล์ `apps/next/src/app/dual-costing/cost-allocator/page.tsx`
   - ใส่ `useEffect` สำหรับดึงและเฝ้าติดตาม Query Parameters จาก Search Params เพื่อให้ฟอร์มดึงข้อมูลประเภทต้นทุน (Source Type) สินค้า (Product) และเลขบิลไปจัดสรรมาแสดงผลอัตโนมัติอย่างถูกต้องเมื่อคลิกปุ่ม "จัดสรร" มาจากหน้า Waiting Allocations
 
+### 4. แก้ไขปัญหาโหลด Cost Allocator ล้มเหลวบนเซิร์ฟเวอร์จริง (HTTP Loopback Fetch Fix)
+* **การเปลี่ยนระบบดึงข้อมูล Cost Pool**:
+  - เปลี่ยนจากการยิงคำขอ HTTP `fetch` ย้อนกลับไปเรียก API `/api/dual-costing/cost-pool` ของตนเองผ่าน Domain Name (`ns-dev.devkub.com`) ซึ่งมักล้มเหลวในสภาพแวดล้อมจริงเนื่องจาก Loopback restrictions, Cloudflare/Firewall blocks หรือ Cookie forwarding issues
+  - ทำการแยกตรรกะการเรียกฐานข้อมูลออกมาเป็นฟังก์ชันตรง `getCostPoolRowsData` ใน `cost-pool/route.ts` และให้ `cost-allocator/route.ts` นำเข้ามาคิวรี่ข้อมูลโดยตรงแบบฝั่งเซิร์ฟเวอร์ (Server-Side Direct Invocation) แทน ทำให้ระบบทำงานได้รวดเร็วขึ้นและปราศจากปัญหาการล้มเหลวของเครือข่าย
+
 ---
 
 ## ผลการตรวจสอบคุณภาพ (Verification Results)
@@ -37,4 +42,7 @@
 ---
 
 ## สรุปข้อมูลการทำ Git Branch และ Commit
-* รันการตรวจสอบ Workspace และเตรียมความพร้อมในการ Push ไปยังสาขา `dev` และ `peach` ของ `new-origin`
+* **Commit Hash ล่าสุด (งานแรก):** `ed173657` (Merged into dev at `2b0de012`)
+* **Commit Hash สำหรับแก้ไข Loopback Fetch:** `c4d979a8`
+* **สาขาที่ทำการ Push สำเร็จ:** `dev` และ `peach` ของ `new-origin`
+
