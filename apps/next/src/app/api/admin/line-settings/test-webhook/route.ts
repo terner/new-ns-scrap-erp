@@ -49,26 +49,44 @@ export async function POST(request: Request) {
     const hostConfig = await prisma.system_settings.findUnique({
       where: { key: 'NEXT_PUBLIC_APP_URL' },
     })
-    let appUrl = hostConfig?.value || process.env.NEXT_PUBLIC_APP_URL || ''
-    if (!appUrl) {
-      // Fallback to current request headers
-      const host = request.headers.get('host')
-      const protocol = request.headers.get('x-forwarded-proto') || 'http'
-      appUrl = `${protocol}://${host}`
+    
+    // Attempt local direct connection first to bypass external proxies/WAFs
+    const localPort = process.env.PORT || '3000'
+    let webhookUrl = `http://127.0.0.1:${localPort}/api/line/webhook`
+    
+    console.info('[test-webhook] Attempting local test request to:', webhookUrl)
+    
+    let response: Response
+    try {
+      response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-line-signature': signature,
+        },
+        body: rawBody,
+      })
+    } catch (localErr) {
+      console.warn('[test-webhook] Local test failed, falling back to public URL:', localErr)
+      // Fallback to public URL
+      let appUrl = hostConfig?.value || process.env.NEXT_PUBLIC_APP_URL || ''
+      if (!appUrl) {
+        const host = request.headers.get('host')
+        const protocol = request.headers.get('x-forwarded-proto') || 'http'
+        appUrl = `${protocol}://${host}`
+      }
+      webhookUrl = `${appUrl.replace(/\/$/, '')}/api/line/webhook`
+      
+      console.info('[test-webhook] Sending fallback test request to:', webhookUrl)
+      response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-line-signature': signature,
+        },
+        body: rawBody,
+      })
     }
-
-    const webhookUrl = `${appUrl.replace(/\/$/, '')}/api/line/webhook`
-
-    console.info('[test-webhook] Sending test request to:', webhookUrl)
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-line-signature': signature,
-      },
-      body: rawBody,
-    })
 
     const status = response.status
     const text = await response.text()
