@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { ActiveToggle } from '@/components/ui/ActiveToggle'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog'
@@ -36,11 +37,18 @@ type AdminUsersPayload = {
       name: string
     }>
     createdAt: string | null
+    contactLineId: string | null
+    contactNote: string | null
+    contactPhone: string | null
     displayName: string | null
     email: string | null
+    firstName: string | null
     id: string
     lastLoginAt: string | null
+    lastName: string | null
     mustChangePassword: boolean
+    namePrefix: string | null
+    profileImageUrl: string | null
     roles: Array<{
       branchScope: string
       code: string
@@ -82,11 +90,18 @@ const adminUsersPayloadSchema = z.object({
       name: z.string(),
     })),
     createdAt: z.string().nullable(),
+    contactLineId: z.string().nullable(),
+    contactNote: z.string().nullable(),
+    contactPhone: z.string().nullable(),
     displayName: z.string().nullable(),
     email: z.string().nullable(),
+    firstName: z.string().nullable(),
     id: z.string(),
     lastLoginAt: z.string().nullable(),
+    lastName: z.string().nullable(),
     mustChangePassword: z.boolean(),
+    namePrefix: z.string().nullable(),
+    profileImageUrl: z.string().nullable(),
     roles: z.array(z.object({
       branchScope: z.string(),
       code: z.string(),
@@ -114,12 +129,23 @@ const saveUserResultSchema = z.object({
 type TabKey = 'users' | 'roles'
 type AdminUser = AdminUsersPayload['users'][number]
 
+type AdminUsersPageClientProps = {
+  mode?: TabKey
+}
+
 type UserFormState = {
   active: boolean
   branchIds: string[]
+  contactLineId: string
+  contactNote: string
+  contactPhone: string
   displayName: string
   email: string
+  firstName: string
+  lastName: string
   mustChangePassword: boolean
+  namePrefix: string
+  profileImageUrl: string
   roleIds: string[]
   username: string
 }
@@ -127,9 +153,16 @@ type UserFormState = {
 const emptyUserForm: UserFormState = {
   active: true,
   branchIds: [],
+  contactLineId: '',
+  contactNote: '',
+  contactPhone: '',
   displayName: '',
   email: '',
+  firstName: '',
+  lastName: '',
   mustChangePassword: false,
+  namePrefix: '',
+  profileImageUrl: '',
   roleIds: [],
   username: '',
 }
@@ -150,7 +183,20 @@ function branchScopeText(value: string) {
   return value || '-'
 }
 
-export function AdminUsersPageClient() {
+function fullName(user: Pick<AdminUser, 'namePrefix' | 'firstName' | 'lastName' | 'displayName'>) {
+  const structuredName = [user.namePrefix, user.firstName, user.lastName]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(' ')
+  return structuredName || user.displayName || '-'
+}
+
+function userInitials(user: Pick<AdminUser, 'displayName' | 'firstName' | 'username'>) {
+  const label = user.firstName || user.displayName || user.username
+  return label.trim().slice(0, 2).toUpperCase()
+}
+
+export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
   const [data, setData] = useState<AdminUsersPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -158,7 +204,7 @@ export function AdminUsersPageClient() {
   const [notice, setNotice] = useState<string | null>(null)
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<TabKey>('users')
+  const [tab, setTab] = useState<TabKey>(mode ?? 'users')
   const [formOpen, setFormOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [form, setForm] = useState<UserFormState>(emptyUserForm)
@@ -185,6 +231,17 @@ export function AdminUsersPageClient() {
     void loadData()
   }, [])
 
+  useEffect(() => {
+    if (mode) setTab(mode)
+  }, [mode])
+
+  const currentTab = mode ?? tab
+  const isUsersPage = currentTab === 'users'
+  const pageTitle = isUsersPage ? 'รายชื่อพนักงาน / Users' : 'Roles & Permissions'
+  const pageDescription = isUsersPage
+    ? `ผู้ใช้ ${data?.users.length ?? 0} รายการ · จัดการ profile, contact, role และสาขา`
+    : `Roles ${data?.roles.length ?? 0} รายการ · ตรวจชุดสิทธิ์และผู้ใช้ที่ผูกอยู่`
+
   const filteredUsers = useMemo(() => {
     const rows = data?.users ?? []
     const query = search.trim().toLowerCase()
@@ -195,6 +252,11 @@ export function AdminUsersPageClient() {
       user.username,
       user.displayName,
       user.email,
+      user.firstName,
+      user.lastName,
+      user.contactPhone,
+      user.contactLineId,
+      user.contactNote,
       user.roles.map((role) => role.name).join(' '),
       user.branches.map((branch) => branch.name).join(' '),
     ].some((value) => String(value ?? '').toLowerCase().includes(query)))
@@ -312,9 +374,16 @@ export function AdminUsersPageClient() {
     setForm({
       active: user.active,
       branchIds: user.branchIds,
+      contactLineId: user.contactLineId ?? '',
+      contactNote: user.contactNote ?? '',
+      contactPhone: user.contactPhone ?? '',
       displayName: user.displayName ?? '',
       email: user.email ?? '',
+      firstName: user.firstName ?? '',
+      lastName: user.lastName ?? '',
       mustChangePassword: user.mustChangePassword,
+      namePrefix: user.namePrefix ?? '',
+      profileImageUrl: user.profileImageUrl ?? '',
       roleIds: user.roles.map((role) => role.id),
       username: user.username,
     })
@@ -377,8 +446,8 @@ export function AdminUsersPageClient() {
       <div className="hidden lg:block rounded-md bg-white p-4 shadow">
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Users & Permissions</h2>
-            <p className="text-sm text-slate-500">ผู้ใช้ {data?.users.length ?? 0} รายการ · Roles {data?.roles.length ?? 0} รายการ</p>
+            <h2 className="text-xl font-bold text-slate-900">{pageTitle}</h2>
+            <p className="text-sm text-slate-500">{pageDescription}</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <input
@@ -388,9 +457,11 @@ export function AdminUsersPageClient() {
               type="search"
               value={search}
             />
-            <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 h-9 flex items-center" disabled={!data} type="button" onClick={openAddUser}>
-              + เพิ่มผู้ใช้
-            </button>
+            {isUsersPage ? (
+              <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 h-9 flex items-center" disabled={!data} type="button" onClick={openAddUser}>
+                + เพิ่มผู้ใช้
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -398,8 +469,8 @@ export function AdminUsersPageClient() {
       {/* Mobile Toolbar (Hidden on Desktop) */}
       <div className="lg:hidden rounded-md bg-white p-3.5 shadow space-y-2.5">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Users & Permissions</h2>
-          <p className="text-xs text-slate-500">ผู้ใช้ {data?.users.length ?? 0} รายการ · Roles {data?.roles.length ?? 0} รายการ</p>
+          <h2 className="text-lg font-bold text-slate-900">{pageTitle}</h2>
+          <p className="text-xs text-slate-500">{pageDescription}</p>
         </div>
         <div className="flex gap-2">
           <input
@@ -409,13 +480,16 @@ export function AdminUsersPageClient() {
             type="search"
             value={search}
           />
-          <button className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 h-9 shrink-0 flex items-center" disabled={!data} type="button" onClick={openAddUser}>
-            + เพิ่มผู้ใช้
-          </button>
+          {isUsersPage ? (
+            <button className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 h-9 shrink-0 flex items-center" disabled={!data} type="button" onClick={openAddUser}>
+              + เพิ่มผู้ใช้
+            </button>
+          ) : null}
         </div>
       </div>
 
       {/* AcexPOS Style KPI / Summary Cards */}
+      {isUsersPage ? (
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm animate-fade-in">
         {/* 1. ผู้ใช้ Active */}
         <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
@@ -458,6 +532,7 @@ export function AdminUsersPageClient() {
           </div>
         </div>
       </div>
+      ) : null}
 
       {formOpen ? (
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
@@ -485,6 +560,44 @@ export function AdminUsersPageClient() {
                     ชื่อผู้ใช้ *
                     <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} />
                   </label>
+                  <div className="md:col-span-2 rounded-lg border border-slate-100 bg-white p-4">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">ข้อมูล Profile</div>
+                    <div className="grid gap-3 md:grid-cols-[120px_1fr_1fr]">
+                      <label className="text-sm font-medium text-slate-700">
+                        คำนำหน้า
+                        <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.namePrefix} onChange={(event) => setForm((current) => ({ ...current, namePrefix: event.target.value }))} />
+                      </label>
+                      <label className="text-sm font-medium text-slate-700">
+                        ชื่อจริง
+                        <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.firstName} onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))} />
+                      </label>
+                      <label className="text-sm font-medium text-slate-700">
+                        นามสกุล
+                        <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.lastName} onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))} />
+                      </label>
+                    </div>
+                    <label className="mt-3 block text-sm font-medium text-slate-700">
+                      URL รูป Profile
+                      <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" placeholder="https://..." value={form.profileImageUrl} onChange={(event) => setForm((current) => ({ ...current, profileImageUrl: event.target.value }))} />
+                    </label>
+                  </div>
+                  <div className="md:col-span-2 rounded-lg border border-slate-100 bg-white p-4">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Contact</div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm font-medium text-slate-700">
+                        เบอร์ติดต่อ
+                        <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.contactPhone} onChange={(event) => setForm((current) => ({ ...current, contactPhone: event.target.value }))} />
+                      </label>
+                      <label className="text-sm font-medium text-slate-700">
+                        LINE ID
+                        <input className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.contactLineId} onChange={(event) => setForm((current) => ({ ...current, contactLineId: event.target.value }))} />
+                      </label>
+                    </div>
+                    <label className="mt-3 block text-sm font-medium text-slate-700">
+                      หมายเหตุ Contact
+                      <textarea className="mt-1 min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition-colors focus:border-slate-400" value={form.contactNote} onChange={(event) => setForm((current) => ({ ...current, contactNote: event.target.value }))} />
+                    </label>
+                  </div>
 
                   <div className="rounded-lg border border-slate-100 bg-white p-4">
                     <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Roles *</div>
@@ -534,29 +647,31 @@ export function AdminUsersPageClient() {
       ) : null}
 
       <div className="rounded-md bg-white shadow overflow-hidden border border-slate-100">
+        {!mode ? (
         <div className="flex border-b border-slate-100 bg-slate-50">
           <button
-            className={`border-b-2 px-5 py-3 text-sm font-bold transition-all outline-none ${tab === 'users' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+            className={`border-b-2 px-5 py-3 text-sm font-bold transition-all outline-none ${currentTab === 'users' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
             type="button"
             onClick={() => setTab('users')}
           >
             Users
           </button>
           <button
-            className={`border-b-2 px-5 py-3 text-sm font-bold transition-all outline-none ${tab === 'roles' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+            className={`border-b-2 px-5 py-3 text-sm font-bold transition-all outline-none ${currentTab === 'roles' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
             type="button"
             onClick={() => setTab('roles')}
           >
             Roles
           </button>
         </div>
+        ) : null}
 
         {error ? <div className="m-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
         {notice ? <div className="m-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</div> : null}
         {isLoading ? <div className="p-12 text-center text-sm text-slate-500">กำลังโหลดข้อมูล...</div> : null}
 
         {/* Tab 1: Users */}
-        {!isLoading && tab === 'users' ? (
+        {!isLoading && currentTab === 'users' ? (
           <>
             {/* Desktop Table View (Hidden on Mobile) */}
             <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
@@ -565,6 +680,7 @@ export function AdminUsersPageClient() {
                   <tr>
                     <th className="p-3 text-left font-semibold">Username</th>
                     <th className="p-3 text-left font-semibold">ชื่อ</th>
+                    <th className="p-3 text-left font-semibold">Contact</th>
                     <th className="p-3 text-left font-semibold">Email</th>
                     <th className="p-3 text-left font-semibold">Role</th>
                     <th className="p-3 text-left font-semibold">สาขา</th>
@@ -578,7 +694,23 @@ export function AdminUsersPageClient() {
                   {filteredUsers.map((user) => (
                     <tr key={user.id} className="border-t border-slate-100 hover:bg-slate-50">
                       <td className="p-3 font-mono text-xs">{user.username}</td>
-                      <td className="p-3 font-medium text-slate-900">{user.displayName || '-'}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          {user.profileImageUrl ? (
+                            <Image alt="" className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200" height={36} src={user.profileImageUrl} unoptimized width={36} />
+                          ) : (
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{userInitials(user)}</span>
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-medium text-slate-900">{fullName(user)}</div>
+                            <div className="text-xs text-slate-500">{user.displayName || '-'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-slate-600">
+                        <div>{user.contactPhone || '-'}</div>
+                        {user.contactLineId ? <div className="text-xs text-slate-500">LINE: {user.contactLineId}</div> : null}
+                      </td>
                       <td className="p-3 text-slate-600">{user.email || '-'}</td>
                       <td className="p-3 text-slate-700">{user.roles.map((role) => role.name).join(', ') || '-'}</td>
                       <td className="p-3 text-slate-700">{user.branches.length ? user.branches.map((branch) => branch.name).join(', ') : 'ทุกสาขา'}</td>
@@ -605,7 +737,7 @@ export function AdminUsersPageClient() {
                   ))}
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td className="p-8 text-center text-sm text-slate-500" colSpan={9}>ไม่พบผู้ใช้</td>
+                      <td className="p-8 text-center text-sm text-slate-500" colSpan={10}>ไม่พบผู้ใช้</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -619,6 +751,7 @@ export function AdminUsersPageClient() {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="font-bold text-slate-900 text-sm leading-snug">{user.displayName || '-'}</div>
+                      <div className="text-xs text-slate-600 mt-0.5">{fullName(user)}</div>
                       <div className="font-mono text-xs text-slate-500 mt-0.5">{user.username}</div>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -630,6 +763,10 @@ export function AdminUsersPageClient() {
                     <div className="col-span-2">
                       <span className="text-slate-400 block text-[9px] uppercase font-semibold">Email</span>
                       <span className="text-slate-700 break-all">{user.email || '-'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-slate-400 block text-[9px] uppercase font-semibold">Contact</span>
+                      <span className="text-slate-700">{[user.contactPhone, user.contactLineId ? `LINE: ${user.contactLineId}` : null].filter(Boolean).join(' · ') || '-'}</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[9px] uppercase font-semibold">Role</span>
@@ -669,7 +806,7 @@ export function AdminUsersPageClient() {
         ) : null}
 
         {/* Tab 2: Roles */}
-        {!isLoading && tab === 'roles' ? (
+        {!isLoading && currentTab === 'roles' ? (
           <>
             {/* Desktop Table View (Hidden on Mobile) */}
             <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
@@ -797,4 +934,3 @@ function Badge({ active, label }: { active: boolean; label: string }) {
     </span>
   )
 }
-

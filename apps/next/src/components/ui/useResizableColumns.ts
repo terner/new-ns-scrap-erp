@@ -15,6 +15,12 @@ function clamp(value: number, min: number, max?: number) {
   return Math.min(Math.max(value, min), max ?? Number.POSITIVE_INFINITY)
 }
 
+function widthsEqual<TKey extends string>(left: Record<TKey, number>, right: Record<TKey, number>) {
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+  return leftKeys.length === rightKeys.length && leftKeys.every((key) => left[key as TKey] === right[key as TKey])
+}
+
 export function useResizableColumns<TKey extends string>(
   tableKey: string,
   columns: Array<ResizableColumnDefinition<TKey>>,
@@ -35,19 +41,20 @@ export function useResizableColumns<TKey extends string>(
     try {
       const saved = window.localStorage.getItem(storageKey)
       if (!saved) {
-        setWidths(defaultWidths)
+        setWidths((current) => widthsEqual(current, defaultWidths) ? current : defaultWidths)
         return
       }
       const parsed = JSON.parse(saved) as Partial<Record<TKey, number>>
-      setWidths(Object.fromEntries(columns.map((column) => {
+      const nextWidths = Object.fromEntries(columns.map((column) => {
         const savedWidth = parsed[column.key]
         const nextWidth = typeof savedWidth === 'number'
           ? clamp(savedWidth, column.minWidth ?? 80, column.maxWidth)
           : column.defaultWidth
         return [column.key, nextWidth]
-      })) as Record<TKey, number>)
+      })) as Record<TKey, number>
+      setWidths((current) => widthsEqual(current, nextWidths) ? current : nextWidths)
     } catch {
-      setWidths(defaultWidths)
+      setWidths((current) => widthsEqual(current, defaultWidths) ? current : defaultWidths)
     } finally {
       setIsLoaded(true)
     }

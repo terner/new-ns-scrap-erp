@@ -3797,6 +3797,13 @@ model app_users {
   username                                                      String
   display_name                                                  String?
   email                                                         String?
+  name_prefix                                                   String?
+  first_name                                                    String?
+  last_name                                                     String?
+  profile_image_url                                             String?
+  contact_phone                                                 String?
+  contact_line_id                                               String?
+  contact_note                                                  String?
   active                                                        Boolean                  @default(true)
   must_change_password                                          Boolean                  @default(false)
   last_login_at                                                 DateTime?                @db.Timestamptz(6)

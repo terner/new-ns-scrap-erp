@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import { AdminUsersPageClient } from '@/app/admin/users-permissions/AdminUsersPageClient'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: 'Users & Permissions | NS Scrap ERP',
 }
 
 export default function AdminUsersPermissionsPage() {
-  return <AdminUsersPageClient />
+  redirect('/admin/users')
 }

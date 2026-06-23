@@ -35,6 +35,8 @@ const exactPathPermissions: Record<string, string> = {
   '/admin/migration-tools': 'system.backup.manage',
   '/admin/system-settings': 'system.settings.manage',
   '/admin/transaction-ledger': 'finance.cash.view',
+  '/admin/roles-permissions': 'system.users.manage',
+  '/admin/users': 'system.users.manage',
   '/admin/users-permissions': 'system.users.manage',
   '/api/admin/company-profile': 'system.settings.manage',
   '/api/admin/line-settings': 'system.settings.manage',
@@ -357,7 +359,16 @@ export const navigationItems: NavigationItem[] = [
   { href: '/admin/transaction-ledger', icon: '📒', label: 'Transaction Ledger (เช็คเงินเข้า-ออก)', section: 'admin' },
   { href: '/admin/migration-tools', icon: '💾', label: 'Backup / Restore (สำคัญ)', section: 'admin' },
   { href: '/admin/audit', icon: '🔍', label: 'Audit & Activity Log', section: 'admin' },
-  { href: '/admin/users-permissions', icon: '🛡️', label: 'Users & Permissions', section: 'admin' },
+  {
+    href: '/admin/users',
+    icon: '👤',
+    label: 'ผู้ใช้และสิทธิ์',
+    section: 'admin',
+    children: [
+      { href: '/admin/users', icon: '👥', label: 'รายชื่อพนักงาน / Users', section: 'admin' },
+      { href: '/admin/roles-permissions', icon: '🛡️', label: 'Roles & Permissions', section: 'admin' },
+    ],
+  },
 ]
 
 const sidebarParentPathByDetailPrefix: Array<[string, string]> = [

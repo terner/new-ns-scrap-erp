@@ -15,9 +15,17 @@ const routeParamsSchema = z.object({
 const adminUserFormSchema = z.object({
   active: z.boolean().default(true),
   branchIds: z.array(z.string().min(1)).default([]),
+  contactLineId: z.string().trim().max(120, 'LINE ID ยาวเกินไป').optional().default(''),
+  contactNote: z.string().trim().max(500, 'หมายเหตุ contact ยาวเกินไป').optional().default(''),
+  contactPhone: z.string().trim().max(80, 'เบอร์ติดต่อยาวเกินไป').optional().default(''),
   displayName: z.string().trim().min(1, 'กรอกชื่อผู้ใช้').max(160, 'ชื่อผู้ใช้ยาวเกินไป'),
   email: z.string().trim().email('รูปแบบอีเมลไม่ถูกต้อง'),
+  firstName: z.string().trim().max(120, 'ชื่อจริงยาวเกินไป').optional().default(''),
+  lastName: z.string().trim().max(120, 'นามสกุลยาวเกินไป').optional().default(''),
   mustChangePassword: z.boolean().default(false),
+  namePrefix: z.string().trim().max(40, 'คำนำหน้าชื่อยาวเกินไป').optional().default(''),
+  profileImageUrl: z.string().trim().max(500, 'URL รูป profile ยาวเกินไป').optional().default('')
+    .refine((value) => !value || /^https?:\/\//i.test(value), 'URL รูป profile ต้องขึ้นต้นด้วย http:// หรือ https://'),
   roleIds: z.array(z.string().trim().regex(/^\d+$/, 'Role ไม่ถูกต้อง')).min(1, 'เลือก role อย่างน้อย 1 รายการ'),
   username: z.string().trim()
     .min(3, 'Username ต้องมีอย่างน้อย 3 ตัวอักษร')
@@ -35,6 +43,11 @@ function parseAppUserId(value: string) {
     throw new Error('รหัสผู้ใช้ไม่ถูกต้อง')
   }
   return parsed
+}
+
+function optionalText(value: string | undefined) {
+  const trimmed = value?.trim() ?? ''
+  return trimmed || null
 }
 
 function parseRoleIds(roleIds: string[]) {
@@ -105,9 +118,16 @@ export async function PATCH(request: Request, { params }: AdminUserRouteProps) {
       await tx.app_users.update({
         data: {
           active: values.active,
+          contact_line_id: optionalText(values.contactLineId),
+          contact_note: optionalText(values.contactNote),
+          contact_phone: optionalText(values.contactPhone),
           display_name: values.displayName,
           email: values.email,
+          first_name: optionalText(values.firstName),
+          last_name: optionalText(values.lastName),
           must_change_password: values.mustChangePassword,
+          name_prefix: optionalText(values.namePrefix),
+          profile_image_url: optionalText(values.profileImageUrl),
           updated_by: actor,
           username: values.username,
         },
