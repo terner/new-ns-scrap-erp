@@ -137,17 +137,14 @@ Target future confirm:
 
 ## Current Gap
 
-- No durable allocation write API yet.
-- No append-only allocation ledger table yet.
-- Current API does not support legacy manual target-cost mode.
-- Spot Sell write confirmation still needs durable allocation ledger design before enabling the confirm button.
+- None. Match Confirmation and stable FIFO sorting tie-breakers have been successfully implemented and validated via browser UAT.
 
 ## Implementation Checklist
 
 - [x] Legacy allocator flow inspected
 - [x] Current simulation API identified
 - [x] Open Spot Sell/no-PO target read path
-- [ ] Implement durable allocation table/log
-- [ ] Add confirm allocation endpoint
-- [ ] Add reverse/recreate edit policy
-- [ ] Revisit manual target-cost mode after write model exists
+- [x] Implement durable allocation table/log (using `trading_deals` and `trading_allocation_facts`)
+- [x] Add confirm allocation endpoint (`POST /api/dual-costing/cost-allocator`)
+- [x] Add reverse/recreate edit policy
+- [x] Revisit manual target-cost mode and sort pool lots correctly when mode is selected

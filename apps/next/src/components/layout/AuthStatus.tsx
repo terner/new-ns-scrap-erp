@@ -178,9 +178,9 @@ export function AuthStatus({ compact = false, onMenuOpenChange, variant = 'defau
       </DropdownMenuTrigger>
       <DropdownMenuContent align={isSidebar ? 'start' : 'end'} className="w-64" side={isSidebar ? 'right' : 'bottom'} sideOffset={8}>
         <DropdownMenuItem asChild>
-          <Link className="flex items-center gap-2" href="/admin/change-password">
-            <KeyRound className="size-4 text-slate-500" />
-            <span>เปลี่ยนรหัสผ่าน</span>
+          <Link className="flex items-center gap-2" href="/profile">
+            <UserRound className="size-4 text-slate-500" />
+            <span>ตั้งค่าโปรไฟล์ & บัญชี</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

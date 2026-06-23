@@ -46,3 +46,10 @@ export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>
 export function isEmailIdentifier(identifier: string) {
   return z.string().email().safeParse(identifier).success
 }
+
+export const userProfileSchema = z.object({
+  displayName: z.string().trim().min(1, 'กรุณากรอกชื่อแสดงผล (Display Name)'),
+})
+
+export type UserProfileFormData = z.infer<typeof userProfileSchema>
+

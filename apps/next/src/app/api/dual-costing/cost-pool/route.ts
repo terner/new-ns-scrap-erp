@@ -168,10 +168,31 @@ function stockPoolCostType(sourceType: string | null | undefined, sourceRefType:
 
 function sortRows(rows: CostPoolRow[], sort: string | null) {
   const nextRows = [...rows]
-  if (sort === 'LIFO') return nextRows.sort((left, right) => right.date.localeCompare(left.date))
-  if (sort === 'Cheap') return nextRows.sort((left, right) => left.unitCost - right.unitCost)
-  if (sort === 'Expensive') return nextRows.sort((left, right) => right.unitCost - left.unitCost)
-  return nextRows.sort((left, right) => left.date.localeCompare(right.date))
+  if (sort === 'LIFO') {
+    return nextRows.sort((left, right) => 
+      right.date.localeCompare(left.date) || 
+      left.costPoolId.localeCompare(right.costPoolId)
+    )
+  }
+  if (sort === 'Cheap') {
+    return nextRows.sort((left, right) => 
+      (left.unitCost - right.unitCost) || 
+      left.date.localeCompare(right.date) || 
+      left.costPoolId.localeCompare(right.costPoolId)
+    )
+  }
+  if (sort === 'Expensive') {
+    return nextRows.sort((left, right) => 
+      (right.unitCost - left.unitCost) || 
+      left.date.localeCompare(right.date) || 
+      left.costPoolId.localeCompare(right.costPoolId)
+    )
+  }
+  // FIFO
+  return nextRows.sort((left, right) => 
+    left.date.localeCompare(right.date) || 
+    left.costPoolId.localeCompare(right.costPoolId)
+  )
 }
 
 function buildWorkbook(rows: CostPoolRow[]) {

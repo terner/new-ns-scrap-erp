@@ -132,11 +132,38 @@ function isDualCostingGroup(group?: string | null) {
 
 function sortPool(rows: CostPoolRow[], mode: string, targetCost: number) {
   const nextRows = [...rows]
-  if (mode === 'Cheap') return nextRows.sort((left, right) => left.unitCost - right.unitCost)
-  if (mode === 'Expensive') return nextRows.sort((left, right) => right.unitCost - left.unitCost)
-  if (mode === 'LIFO') return nextRows.sort((left, right) => right.date.localeCompare(left.date))
-  if (mode === 'Manual') return nextRows.sort((left, right) => Math.abs(left.unitCost - targetCost) - Math.abs(right.unitCost - targetCost))
-  return nextRows.sort((left, right) => left.date.localeCompare(right.date))
+  if (mode === 'Cheap') {
+    return nextRows.sort((left, right) => 
+      (left.unitCost - right.unitCost) || 
+      left.date.localeCompare(right.date) || 
+      left.costPoolId.localeCompare(right.costPoolId)
+    )
+  }
+  if (mode === 'Expensive') {
+    return nextRows.sort((left, right) => 
+      (right.unitCost - left.unitCost) || 
+      left.date.localeCompare(right.date) || 
+      left.costPoolId.localeCompare(right.costPoolId)
+    )
+  }
+  if (mode === 'LIFO') {
+    return nextRows.sort((left, right) => 
+      right.date.localeCompare(left.date) || 
+      left.costPoolId.localeCompare(right.costPoolId)
+    )
+  }
+  if (mode === 'Manual') {
+    return nextRows.sort((left, right) => 
+      (Math.abs(left.unitCost - targetCost) - Math.abs(right.unitCost - targetCost)) || 
+      left.date.localeCompare(right.date) || 
+      left.costPoolId.localeCompare(right.costPoolId)
+    )
+  }
+  // FIFO
+  return nextRows.sort((left, right) => 
+    left.date.localeCompare(right.date) || 
+    left.costPoolId.localeCompare(right.costPoolId)
+  )
 }
 
 export async function GET(request: Request) {
@@ -364,7 +391,7 @@ export async function GET(request: Request) {
         products: productOptions,
         sourceTypes: ['po-sell', 'spot-sell', 'production'],
       },
-      pool: filteredPool,
+      pool: selectedPool,
       poSells: filteredSales,
       selectedPoSell: selectedSale,
       summary: {
@@ -385,3 +412,226 @@ export async function GET(request: Request) {
     return apiErrorResponse(caught, 'โหลด Cost Allocator ไม่ได้', 500)
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const context = await getCurrentAuthContext()
+    requirePermission(context, 'finance.cash.view')
+
+    const body = await request.json()
+    const { productId, poSellId, sourceType, candidates, notes } = body
+
+    if (!productId || !poSellId || !sourceType || !Array.isArray(candidates) || candidates.length === 0) {
+      return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 })
+    }
+
+    const actor = context.appUser?.username || context.authUser.email || 'system'
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Find product
+      const product = await tx.products.findFirst({
+        where: { code: productId }
+      })
+      if (!product) throw new Error(`ไม่พบรหัสสินค้า: ${productId}`)
+
+      // 2. Resolve target document
+      let customerId: bigint | null = null
+      let salesBillId: bigint | null = null
+      let salesDocNo: string | null = null
+      let salesLineNo: number | null = null
+      let customerNameSnapshot: string | null = null
+      let unitPrice = 0
+
+      if (sourceType === 'spot-sell') {
+        const [docNo, lineNoStr] = poSellId.split(':')
+        const lineNo = parseInt(lineNoStr)
+        const salesBill = await tx.sales_bills.findFirst({
+          where: { doc_no: docNo, NOT: { status: 'cancelled' } },
+          include: {
+            customers: true,
+            sales_bill_lines: {
+              where: { line_no: lineNo }
+            }
+          }
+        })
+        if (!salesBill) throw new Error(`ไม่พบเอกสารขาย: ${docNo}`)
+        const line = salesBill.sales_bill_lines[0]
+        if (!line) throw new Error(`ไม่พบไลน์ที่: ${lineNo} ในบิลขาย: ${docNo}`)
+        
+        salesBillId = salesBill.id
+        salesDocNo = salesBill.doc_no
+        customerId = salesBill.customer_id
+        customerNameSnapshot = salesBill.customers?.name || null
+        salesLineNo = line.line_no
+        unitPrice = toNumber(line.unit_price)
+      } else if (sourceType === 'po-sell') {
+        const poId = BigInt(poSellId.split('-')[0])
+        const poSell = await tx.po_sells.findUnique({
+          where: { id: poId },
+          include: { customers: true }
+        })
+        if (!poSell) throw new Error(`ไม่พบ PO Sell ID: ${poId}`)
+
+        const salesBill = await tx.sales_bills.findFirst({
+          where: { po_sell_id: poId, NOT: { status: 'cancelled' } }
+        })
+
+        salesBillId = salesBill?.id || null
+        salesDocNo = salesBill?.doc_no || poSell.doc_no
+        customerId = poSell.customer_id
+        customerNameSnapshot = poSell.customers?.name || null
+        unitPrice = toNumber(poSell.unit_price)
+      } else if (sourceType === 'production') {
+        const prodOrder = await tx.production_orders.findFirst({
+          where: { doc_no: poSellId },
+          include: { products: true }
+        })
+        if (!prodOrder) throw new Error(`ไม่พบใบสั่งผลิต: ${poSellId}`)
+        salesDocNo = prodOrder.doc_no
+        unitPrice = 0
+      } else {
+        throw new Error(`ไม่รองรับประเภทเป้าหมาย: ${sourceType}`)
+      }
+
+      // Generate a base deal number
+      const timestamp = Date.now()
+      const rand = Math.floor(Math.random() * 1000)
+      const dealNoBase = `TD-${timestamp}-${rand}`
+
+      const createdDeals = []
+      const createdFacts = []
+
+      // 3. Process candidates
+      for (let i = 0; i < candidates.length; i++) {
+        const cand = candidates[i]
+        const qtyToUse = cand.qtyToUse
+        if (qtyToUse <= 0) continue
+
+        let purchaseBillId: bigint | null = null
+        let supplierId: bigint | null = null
+        let supplierNameSnapshot: string | null = null
+        let pb = null
+        let poBuy = null
+
+        // If candidate is a purchase document (PO Buy or Spot Buy)
+        if (cand.sourceType === 'PO_Buy' || cand.sourceType === 'Spot_Buy') {
+          pb = await tx.purchase_bills.findFirst({
+            where: { doc_no: cand.sourceNo, NOT: { status: { in: ['cancelled', 'Cancelled'] } } },
+            include: { suppliers: true }
+          })
+          if (pb) {
+            purchaseBillId = pb.id
+            supplierId = pb.supplier_id
+            supplierNameSnapshot = pb.suppliers?.name || null
+          } else {
+            // Check if PO Buy exists
+            poBuy = await tx.po_buys.findFirst({
+              where: { doc_no: cand.sourceNo, NOT: { status: { in: ['cancelled', 'Cancelled'] } } },
+              include: { suppliers: true }
+            })
+            if (poBuy) {
+              supplierId = poBuy.supplier_id
+              supplierNameSnapshot = poBuy.suppliers?.name || null
+            }
+          }
+        }
+
+        // If candidate is from Production or Regrade stock cost pool entries
+        if (cand.sourceType === 'Production' || cand.sourceType === 'Grade Adjustment') {
+          const poolEntry = await tx.stock_cost_pool_entries.findUnique({
+            where: { pool_key: cand.costPoolId }
+          })
+          if (!poolEntry) {
+            throw new Error(`ไม่พบ Cost Pool Entry สำหรับ key: ${cand.costPoolId}`)
+          }
+          const nextAllocatedQty = toNumber(poolEntry.allocated_qty) + qtyToUse
+          const nextStatus = nextAllocatedQty >= toNumber(poolEntry.original_qty) - 0.001 ? 'Fully' : 'Partial'
+          await tx.stock_cost_pool_entries.update({
+            where: { id: poolEntry.id },
+            data: {
+              allocated_qty: nextAllocatedQty,
+              status: nextStatus,
+              updated_at: new Date(),
+              updated_by: actor
+            }
+          })
+        }
+
+        // Create trading deal
+        const candDealNo = `${dealNoBase}-${i}`
+        const deal = await tx.trading_deals.create({
+          data: {
+            deal_no: candDealNo,
+            date: new Date(),
+            purchase_bill_id: purchaseBillId,
+            purchase_bill_no: pb?.doc_no || cand.sourceNo,
+            sales_bill_id: salesBillId,
+            sales_bill_no: salesDocNo,
+            product_id: product.id,
+            supplier_id: supplierId,
+            customer_id: customerId,
+            matched_qty: qtyToUse,
+            matched_purchase_amount: qtyToUse * cand.unitCost,
+            matched_sales_amount: qtyToUse * unitPrice,
+            ex_vat: true,
+            status: 'Matched',
+            notes: notes || 'Matched via Cost Allocator',
+            created_by: actor,
+            created_at: new Date(),
+            updated_at: new Date(),
+            updated_by: actor
+          }
+        })
+        createdDeals.push(deal)
+
+        // Create trading allocation fact
+        const fact = await tx.trading_allocation_facts.create({
+          data: {
+            allocation_no: `TAF-${candDealNo}`,
+            date: new Date(),
+            trading_deal_id: deal.id,
+            purchase_bill_id: purchaseBillId,
+            sales_bill_id: salesBillId,
+            supplier_id: supplierId,
+            customer_id: customerId,
+            product_id: product.id,
+            source_type: cand.sourceType === 'Production' ? 'PRODUCTION' : cand.sourceType === 'Grade Adjustment' ? 'REGRADE' : 'TRADING_PURCHASE_BILL',
+            source_doc_no: cand.sourceNo,
+            source_line_no: cand.sourceLineId ? parseInt(cand.sourceLineId) : null,
+            sales_doc_no: salesDocNo,
+            sales_line_no: salesLineNo,
+            product_code_snapshot: product.code,
+            product_name_snapshot: product.name,
+            supplier_name_snapshot: supplierNameSnapshot || cand.counterparty,
+            customer_name_snapshot: customerNameSnapshot || (sourceType === 'production' ? 'ภายในโรงงาน' : '-'),
+            qty: qtyToUse,
+            sales_amount: qtyToUse * unitPrice,
+            matched_cogs: qtyToUse * cand.unitCost,
+            allocation_method: 'RECORDED_LINE',
+            status: 'active',
+            notes: notes || 'Matched via Cost Allocator',
+            created_by: actor,
+            created_at: new Date(),
+            updated_at: new Date(),
+            updated_by: actor
+          }
+        })
+        createdFacts.push(fact)
+      }
+
+      return {
+        dealsCount: createdDeals.length,
+        factsCount: createdFacts.length
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'ยืนยันการจัดสรรต้นทุนสำเร็จ',
+      result
+    })
+  } catch (caught) {
+    if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    return apiErrorResponse(caught, 'ยืนยันการจัดสรรต้นทุนไม่สำเร็จ', 500)
+  }
+}
+

@@ -100,6 +100,8 @@ export function CostAllocatorPageClient() {
   const [sourceType, setSourceType] = useState(searchParams.get('sourceType') ?? 'spot-sell')
   const [targetCost, setTargetCost] = useState(0)
   const [targetCostInput, setTargetCostInput] = useState('0')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [reloadTrigger, setReloadTrigger] = useState(0)
 
   useEffect(() => {
     const poSellIdParam = searchParams.get('poSellId')
@@ -137,7 +139,7 @@ export function CostAllocatorPageClient() {
     }
     void loadData()
     return () => { mounted = false }
-  }, [queryString])
+  }, [queryString, reloadTrigger])
 
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     return (data?.filters.products ?? []).map((product) => ({
@@ -158,6 +160,39 @@ export function CostAllocatorPageClient() {
   function resetSale() {
     setSelectedPoSellId('')
     setShowPreview(false)
+  }
+
+  const handleConfirmMatch = async () => {
+    if (!selectedProductId || !selectedPoSellId || !data?.candidates.length) return
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const response = await dailyFetchJson<{ success: boolean; message: string }>(
+        '/api/dual-costing/cost-allocator',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            productId: selectedProductId,
+            poSellId: selectedPoSellId,
+            sourceType,
+            candidates: data.candidates,
+            notes: `Matched via Cost Allocator (${allocationMode})`
+          })
+        }
+      )
+      if (response.success) {
+        alert(response.message || 'จัดสรรต้นทุนสำเร็จ')
+        setSelectedPoSellId('')
+        setShowPreview(false)
+        setReloadTrigger((prev) => prev + 1)
+      } else {
+        setError(response.message || 'เกิดข้อผิดพลาดในการบันทึก')
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ยืนยันการจัดสรรต้นทุนไม่สำเร็จ')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const minUnitCost = data?.pool && data.pool.length > 0 ? Math.min(...data.pool.map((row) => row.unitCost)) : 0
@@ -443,8 +478,15 @@ export function CostAllocatorPageClient() {
             <DualCostingStatCard icon="📈" label="Expected Margin" tone={(data?.summary.expectedMargin ?? 0) >= 0 ? 'purple' : 'red'} value={formatMoney(data?.summary.expectedMargin ?? 0)} />
           </div>
           <div className="mt-4 flex justify-end gap-2">
-            <Button className="rounded-lg h-10 px-4 text-sm font-semibold focus-visible:ring-slate-100" type="button" variant="secondary" onClick={() => setShowPreview(false)}>ปิด Preview</Button>
-            <Button disabled className="rounded-lg h-10 px-4 text-sm font-semibold" type="button">ยืนยัน Match</Button>
+            <Button className="rounded-lg h-10 px-4 text-sm font-semibold focus-visible:ring-slate-100" type="button" variant="secondary" onClick={() => setShowPreview(false)} disabled={isSubmitting}>ปิด Preview</Button>
+            <Button
+              className="rounded-lg h-10 px-4 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors focus-visible:outline-none"
+              type="button"
+              onClick={handleConfirmMatch}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'กำลังบันทึก...' : 'ยืนยัน Match'}
+            </Button>
           </div>
         </DualCostingPanel>
       ) : null}
