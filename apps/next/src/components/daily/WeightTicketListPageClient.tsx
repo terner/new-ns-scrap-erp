@@ -24,6 +24,7 @@ import {
   displayWeightTicketStatus,
   formatWeight,
   listWeightTickets,
+  notifyWeightTicketLine,
   type OptionItem,
   type WeightTicketRecord,
   type WeightTicketStatus,
@@ -35,23 +36,19 @@ import {
 
 type TypeFilter = WeightTicketType
 type StatusFilter = WeightTicketStatus
-type WeightTicketColumnKey = 'index' | 'action' | 'branch' | 'createdAt' | 'deductionWeight' | 'documentNo' | 'impurityDeduction' | 'netWeight' | 'partyName' | 'status' | 'updatedAt' | 'vehicleNo' | 'warehouseName'
+type WeightTicketColumnKey = 'action' | 'branch' | 'createdAt' | 'documentNo' | 'netWeight' | 'partyName' | 'status' | 'updatedAt' | 'vehicleNo'
 
 const pageSize = 10
 const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey>> = [
-  { key: 'index', defaultWidth: 70, minWidth: 50 },
   { key: 'documentNo', defaultWidth: 150, minWidth: 120 },
   { key: 'createdAt', defaultWidth: 170, minWidth: 130 },
-  { key: 'partyName', defaultWidth: 200, minWidth: 150 },
+  { key: 'partyName', defaultWidth: 210, minWidth: 150 },
   { key: 'branch', defaultWidth: 140, minWidth: 110 },
   { key: 'vehicleNo', defaultWidth: 130, minWidth: 110 },
-  { key: 'warehouseName', defaultWidth: 150, minWidth: 110 },
-  { key: 'netWeight', defaultWidth: 130, minWidth: 100 },
-  { key: 'deductionWeight', defaultWidth: 130, minWidth: 100 },
-  { key: 'impurityDeduction', defaultWidth: 140, minWidth: 110 },
+  { key: 'netWeight', defaultWidth: 150, minWidth: 120 },
   { key: 'status', defaultWidth: 160, minWidth: 130 },
   { key: 'updatedAt', defaultWidth: 170, minWidth: 130 },
-  { key: 'action', defaultWidth: 320, minWidth: 260 },
+  { key: 'action', defaultWidth: 300, minWidth: 240 },
 ]
 
 const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; values: StatusFilter[] }>> = {
@@ -83,14 +80,6 @@ function formatDateTime(value?: string | null) {
     month: '2-digit',
     year: 'numeric',
   })
-}
-
-function formatImpurityDeduction(ticket: WeightTicketRecord) {
-  return `${formatWeight(ticket.totals.deductionWeight)} กก.`
-}
-
-function formatContainerDeduction(ticket: WeightTicketRecord) {
-  return `${formatWeight(ticket.totals.containerDeductionWeight)} กก.`
 }
 
 function SortHeader({
@@ -165,8 +154,8 @@ export function WeightTicketListPageClient() {
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('WTI')
   const [statusFilter, setStatusFilter] = useState<StatusFilter[]>([])
-  const [sortBy, setSortBy] = useState<WeightTicketSortBy>('documentNo')
-  const [sortDir, setSortDir] = useState<WeightTicketSortDir>('asc')
+  const [sortBy, setSortBy] = useState<WeightTicketSortBy>('createdAt')
+  const [sortDir, setSortDir] = useState<WeightTicketSortDir>('desc')
   const [branchFilter, setBranchFilter] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -174,13 +163,16 @@ export function WeightTicketListPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [cancelTicket, setCancelTicket] = useState<WeightTicketRecord | null>(null)
-  const columnResize = useResizableColumns('daily.weight-ticket-list.v5', weightTicketColumns)
+  const columnResize = useResizableColumns('daily.weight-ticket-list', weightTicketColumns)
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
   const [printingTicketId, setPrintingTicketId] = useState<string | null>(null)
+  const [shareTicket, setShareTicket] = useState<WeightTicketRecord | null>(null)
+  const [shareNote, setShareNote] = useState('')
+  const [shareError, setShareError] = useState('')
+  const [isSendingLine, setIsSendingLine] = useState(false)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
-  const [activeActionsTicket, setActiveActionsTicket] = useState<WeightTicketRecord | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -192,7 +184,7 @@ export function WeightTicketListPageClient() {
 
     async function loadBranches() {
       try {
-        const response = await fetch('/api/daily/weight-tickets/options', { cache: 'no-store' })
+        const response = await fetch('/api/branches', { cache: 'no-store' })
         if (!response.ok) return
         const data = await response.json() as { branches?: Array<{ code?: string | null; id: string; name: string }> }
         const nextBranches = (data.branches ?? []).map((branch) => ({
@@ -270,8 +262,8 @@ export function WeightTicketListPageClient() {
   function clearFilters() {
     setQuery('')
     setStatusFilter([])
-    setSortBy('documentNo')
-    setSortDir('asc')
+    setSortBy('createdAt')
+    setSortDir('desc')
     setBranchFilter('all')
     setDateFrom('')
     setDateTo('')
@@ -318,12 +310,42 @@ export function WeightTicketListPageClient() {
     }
   }
 
+  function openShareDialog(ticket: WeightTicketRecord) {
+    setShareTicket(ticket)
+    setShareNote('')
+    setShareError('')
+  }
+
+  async function handleSendLineNotification() {
+    if (!shareTicket) return
+    setIsSendingLine(true)
+    setShareError('')
+    try {
+      await notifyWeightTicketLine(shareTicket.id, { customMessage: shareNote.trim() || undefined })
+      setShareTicket(null)
+      setShareNote('')
+      window.alert('ส่ง LINE พร้อม PDF เรียบร้อยแล้ว')
+    } catch (caught) {
+      setShareError(getErrorMessage(caught, 'ส่ง LINE ใบรับ-ส่งของไม่สำเร็จ'))
+    } finally {
+      setIsSendingLine(false)
+    }
+  }
+
+  function handleManualLineShare() {
+    if (!shareTicket) return
+    openWeightTicketLineShare(shareTicket)
+    setShareTicket(null)
+    setShareNote('')
+    setShareError('')
+  }
+
   const summaryText = useMemo(() => `พบทั้งหมด ${totalRows.toLocaleString('th-TH')} รายการ`, [totalRows])
 
   return (
     <div className="space-y-5">
       {/* Floating Action Button (Mobile Only) */}
-      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
+      <div className="fixed bottom-6 right-6 z-40 md:hidden">
         <button
           className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg active:scale-95 transition-transform"
           onClick={() => setActiveForm({ type: typeFilter })}
@@ -351,7 +373,7 @@ export function WeightTicketListPageClient() {
       </Tabs>
 
       {/* Desktop Filters (Hidden on Mobile) */}
-      <Card className="hidden lg:block p-4">
+      <Card className="hidden md:block p-4">
         <div className="space-y-3">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -411,7 +433,7 @@ export function WeightTicketListPageClient() {
       </Card>
 
       {/* Mobile Filters Toolbar (Hidden on Desktop) */}
-      <div className="space-y-2 p-3 border border-slate-200 bg-white rounded-md lg:hidden">
+      <div className="space-y-2 p-3 border border-slate-200 bg-white rounded-md md:hidden">
         <div className="flex gap-2 items-center">
           <label className="relative block flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -437,7 +459,7 @@ export function WeightTicketListPageClient() {
 
       {/* Bottom Sheet Filter for Mobile */}
       {showMobileFilters ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-955/40 lg:hidden">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-955/40 md:hidden">
           <div className="w-full rounded-t-2xl bg-white p-4 shadow-xl border-t border-slate-200 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h4 className="font-bold text-slate-800">ตัวกรองใบรับ-ส่งของ</h4>
@@ -520,150 +542,166 @@ export function WeightTicketListPageClient() {
         </div>
       ) : null}
 
-           {/* Mobile Card List (Hidden on Desktop) */}
-      <div className="block lg:hidden space-y-3">
+      <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+        <div>{summaryText}</div>
+        <div className="flex items-center gap-2">
+          {columnResize.hasCustomWidths ? <Button size="xs" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>Set col to default</Button> : null}
+          <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
+          <span>หน้า {safePage} / {totalPages}</span>
+          <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
+        </div>
+      </div>
+
+      {/* Mobile Card List (Hidden on Desktop) */}
+      <div className="block md:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-base font-semibold text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">กำลังโหลดข้อมูล</div>
         ) : loadError ? (
-          <div className="rounded-md bg-white p-8 text-center text-base font-semibold text-red-600 shadow-sm border border-slate-200">{loadError}</div>
+          <div className="rounded-md bg-white p-8 text-center text-red-600 shadow-sm border border-slate-200">{loadError}</div>
         ) : tickets.length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-base font-semibold text-slate-500 shadow-sm border border-slate-200">ยังไม่มีรายการตามเงื่อนไข</div>
+          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200">ยังไม่มีรายการตามเงื่อนไข</div>
         ) : (
-          tickets.map((ticket) => {
-            const isCancelled = ticket.status === 'cancelled'
-            return (
-              <div
-                key={ticket.id}
-                className={cn(
-                  "rounded-md border border-slate-200 p-4 shadow-sm cursor-pointer transition-colors",
-                  isCancelled ? "bg-red-100/60 active:bg-red-200/60 text-slate-400" : "bg-white active:bg-slate-50"
-                )}
-                onClick={() => setActiveDetailId(ticket.id)}
-              >
+          tickets.map((ticket) => (
+            <div
+              key={ticket.id}
+              className="rounded-md border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+              onClick={() => setActiveDetailId(ticket.id)}
+            >
               <div className="flex justify-between items-start mb-2">
-                <span className="font-bold text-slate-800 text-base">{ticket.documentNo}</span>
-                <span className="text-sm text-slate-600 font-medium">{formatDateTime(ticket.createdAt)}</span>
+                <span className="font-bold text-slate-800 text-sm">{ticket.documentNo}</span>
+                <span className="text-xs text-slate-500">{formatDateTime(ticket.createdAt)}</span>
               </div>
 
-              <div className="text-sm text-slate-700 mb-3 space-y-1.5">
+              <div className="text-xs text-slate-600 mb-3 space-y-1">
                 <div>
-                  <span className="font-semibold text-slate-600">{typeFilter === 'WTI' ? 'ผู้ขาย: ' : 'ลูกค้า: '}</span>
-                  <span className="text-slate-900">{ticket.partyName}</span>
+                  <span className="font-semibold text-slate-500">{typeFilter === 'WTI' ? 'ผู้ขาย: ' : 'ลูกค้า: '}</span>
+                  <span className="text-slate-800">{ticket.partyName}</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-slate-600">ทะเบียนรถ: </span>
-                  <span className="text-slate-900">{ticket.vehicleNo}{ticket.type === 'WTO' && ticket.warehouseName ? ` (${ticket.warehouseName})` : ''}</span>
+                  <span className="font-semibold text-slate-500">ทะเบียนรถ: </span>
+                  <span className="text-slate-800">{ticket.vehicleNo}</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-slate-600">สาขา: </span>
-                  <span className="text-slate-900">{ticket.branchName}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-slate-600">หักสิ่งเจือปน: </span>
-                  <span className="text-slate-900">{formatImpurityDeduction(ticket)}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-slate-600">หักภาชนะ: </span>
-                  <span className="text-slate-900">{formatContainerDeduction(ticket)}</span>
+                  <span className="font-semibold text-slate-500">สาขา: </span>
+                  <span className="text-slate-800">{ticket.branchName}</span>
                 </div>
               </div>
 
               <div className="flex justify-between items-center pt-2 border-t border-slate-100">
                 <div>
                   <span className={cn(
-                    'inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-full',
+                    'inline-flex items-center gap-1.5 text-xs font-semibold',
                     weightTicketStatusBadgeClass(ticket.type, ticket.status),
                   )}
                   >
-                    <span className="size-2 rounded-full bg-current" />
+                    <span className="size-1.5 rounded-full bg-current" />
                     {displayWeightTicketStatus(ticket.type, ticket.status)}
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm text-slate-500 font-medium block">น้ำหนักสุทธิ</span>
-                  <span className="font-bold text-slate-900 text-lg tabular-nums">{formatWeight(ticket.totals.netWeight)} กก.</span>
-                  <span className="mt-0.5 block text-sm text-amber-800 font-medium tabular-nums">หักรวม {formatWeight(ticket.totals.containerDeductionWeight + ticket.totals.deductionWeight)} กก.</span>
+                  <span className="text-[10px] text-slate-400 block">น้ำหนักสุทธิ</span>
+                  <span className="font-bold text-slate-900 text-sm tabular-nums">{formatWeight(ticket.totals.netWeight)} กก.</span>
                 </div>
               </div>
 
-              <div className="mt-3 pt-2 border-t border-slate-100/50" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-end items-center gap-1.5 mt-3 pt-2 border-t border-slate-100/50" onClick={(e) => e.stopPropagation()}>
                 <button
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white h-10 px-4 text-sm font-semibold text-slate-700 active:bg-slate-50 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
                   type="button"
-                  onClick={() => setActiveActionsTicket(ticket)}
+                  onClick={() => void handlePrintTicket(ticket)}
                 >
-                  จัดการรายการ
+                  <Printer className="size-3" />
+                  {printingTicketId === ticket.id ? 'เตรียม...' : 'พิมพ์'}
                 </button>
+                <button
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+                  type="button"
+                  onClick={() => openShareDialog(ticket)}
+                >
+                  <Share2 className="size-3" />
+                  แชร์
+                </button>
+                {ticket.canEdit ? (
+                  <button
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+                    onClick={() => setActiveForm({ id: ticket.id, type: ticket.type })}
+                    type="button"
+                  >
+                    <SquarePen className="size-3" />
+                    แก้ไข
+                  </button>
+                ) : null}
+                {ticket.canCancel ? (
+                  <button
+                    className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                    type="button"
+                    onClick={() => {
+                      setCancelTicket(ticket)
+                      setCancelError('')
+                      setCancelNote(ticket.cancelNote ?? '')
+                    }}
+                  >
+                    <XCircle className="size-3" />
+                    ยกเลิก
+                  </button>
+                ) : null}
               </div>
             </div>
-            )
-          })
+          ))
         )}
       </div>
 
       {/* Desktop Tables (Hidden on Mobile) */}
-      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="hidden md:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
-              {weightTicketColumns.map((column) => {
-                const style = columnResize.getColumnStyle(column.key);
-                return <col key={column.key} style={style} />;
-              })}
+              {weightTicketColumns.map((column, index) => {
+              const style = columnResize.getColumnStyle(column.key);
+              if (index === weightTicketColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />;
+              }
+              return <col key={column.key} style={style} />;
+            })}
             </colgroup>
-            <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500">
+            <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
               <tr>
-                <ResizableTableHead label="ลำดับ" resizeProps={columnResize.getResizeHandleProps('index', 'ลำดับ')} />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('documentNo', 'เลขที่')} onSort={toggleSort} sortKey="documentNo" />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="วันที่/เวลา" resizeProps={columnResize.getResizeHandleProps('createdAt', 'วันที่/เวลา')} onSort={toggleSort} sortKey="createdAt" />
                 <SortHeader activeKey={sortBy} align="left" direction={sortDir} label={typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', typeFilter === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า')} onSort={toggleSort} sortKey="partyName" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} onSort={toggleSort} sortKey="branchName" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="ทะเบียนรถ" resizeProps={columnResize.getResizeHandleProps('vehicleNo', 'ทะเบียนรถ')} onSort={toggleSort} sortKey="vehicleNo" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="คลังสินค้า" resizeProps={columnResize.getResizeHandleProps('warehouseName', 'คลังสินค้า')} onSort={toggleSort} sortKey="warehouseName" />
+                <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branch', 'สาขา')} />
+                <ResizableTableHead label="ทะเบียนรถ" resizeProps={columnResize.getResizeHandleProps('vehicleNo', 'ทะเบียนรถ')} />
                 <SortHeader activeKey={sortBy} align="right" direction={sortDir} label="น้ำหนักสุทธิ" resizeProps={columnResize.getResizeHandleProps('netWeight', 'น้ำหนักสุทธิ')} onSort={toggleSort} sortKey="netWeight" />
-                <SortHeader activeKey={sortBy} align="right" direction={sortDir} label="หักภาชนะ(กก.)" resizeProps={columnResize.getResizeHandleProps('deductionWeight', 'หักภาชนะ(กก.)')} onSort={toggleSort} sortKey="deductionWeight" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="หักสิ่งเจือปน" resizeProps={columnResize.getResizeHandleProps('impurityDeduction', 'หักสิ่งเจือปน')} onSort={toggleSort} sortKey="impurityDeduction" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} onSort={toggleSort} sortKey="status" />
-                <SortHeader activeKey={sortBy} align="left" direction={sortDir} label="อัปเดตล่าสุด" resizeProps={columnResize.getResizeHandleProps('updatedAt', 'อัปเดตล่าสุด')} onSort={toggleSort} sortKey="updatedAt" />
+                <ResizableTableHead label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+                <ResizableTableHead label="อัปเดตล่าสุด" resizeProps={columnResize.getResizeHandleProps('updatedAt', 'อัปเดตล่าสุด')} />
                 <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'จัดการ')} />
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-3 py-10 text-center text-slate-500" colSpan={weightTicketColumns.length}>กำลังโหลดข้อมูล</td>
+                  <td className="px-3 py-10 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td className="px-3 py-10 text-center text-red-600" colSpan={weightTicketColumns.length}>{loadError}</td>
+                  <td className="px-3 py-10 text-center text-red-600" colSpan={10}>{loadError}</td>
                 </tr>
               ) : tickets.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-10 text-center text-slate-500" colSpan={weightTicketColumns.length}>ยังไม่มีรายการตามเงื่อนไข</td>
+                  <td className="px-3 py-10 text-center text-slate-500" colSpan={10}>ยังไม่มีรายการตามเงื่อนไข</td>
                 </tr>
-              ) : tickets.map((ticket, index) => {
-                const isCancelled = ticket.status === 'cancelled'
-                return (
-                  <tr
-                    className={cn(
-                      "cursor-pointer",
-                      isCancelled ? "bg-red-100/60 hover:bg-red-200/60 text-slate-400" : "hover:bg-slate-50"
-                    )}
-                    key={ticket.id}
-                    onClick={() => setActiveDetailId(ticket.id)}
-                  >
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-500 font-mono text-xs text-left">{(page - 1) * pageSize + index + 1}</td>
+              ) : tickets.map((ticket) => (
+                <tr
+                  className="cursor-pointer hover:bg-slate-50"
+                  key={ticket.id}
+                  onClick={() => setActiveDetailId(ticket.id)}
+                >
                   <td className="whitespace-nowrap px-3 py-3 text-slate-900">{ticket.documentNo}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDateTime(ticket.createdAt)}</td>
                   <td className="px-3 py-3 text-slate-900">{ticket.partyName}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.branchName}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.vehicleNo}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{ticket.warehouseName || '-'}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-slate-900">{formatWeight(ticket.totals.netWeight)} กก.</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-amber-700">{formatContainerDeduction(ticket)}</td>
-                  <td className="px-3 py-3 text-slate-600">
-                    <div className="truncate">{formatImpurityDeduction(ticket)}</div>
-                  </td>
                   <td className="box-border h-[39px] w-[140px] px-3 py-2">
                     <div className="flex min-h-[23px] flex-col items-start justify-center">
                       <span className={cn(
@@ -698,7 +736,7 @@ export function WeightTicketListPageClient() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation()
-                          openWeightTicketLineShare(ticket)
+                          openShareDialog(ticket)
                         }}
                       >
                         <Share2 className="size-3" />
@@ -735,12 +773,56 @@ export function WeightTicketListPageClient() {
                     </div>
                   </td>
                 </tr>
-                )
-              })}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      <Dialog open={Boolean(shareTicket)} onOpenChange={(open) => {
+        if (!open) {
+          setShareTicket(null)
+          setShareNote('')
+          setShareError('')
+        }
+      }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>แชร์ใบรับ-ส่งของ</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 px-4 pb-4">
+            <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <div className="font-semibold text-slate-900">{shareTicket?.documentNo}</div>
+              <div className="mt-1 text-xs text-slate-500">{shareTicket?.partyName} · {shareTicket ? `${formatWeight(shareTicket.totals.netWeight)} กก.` : ''}</div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                ข้อความเสริมใน LINE
+              </label>
+              <textarea
+                className="block min-h-[88px] w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 sm:text-sm"
+                maxLength={500}
+                placeholder="เช่น ส่งเข้ากลุ่มคลัง / แจ้งบัญชีตรวจเอกสาร"
+                value={shareNote}
+                onChange={(event) => setShareNote(event.target.value)}
+              />
+              {shareError ? <div className="mt-1 text-xs text-red-600">{shareError}</div> : null}
+            </div>
+          </div>
+          <DialogFooter className="flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => setShareTicket(null)}>ปิด</Button>
+            <Button disabled={isSendingLine} type="button" variant="outline" onClick={handleManualLineShare}>
+              <Share2 className="mr-2 size-4" />
+              แชร์เองผ่าน LINE
+            </Button>
+            <Button disabled={isSendingLine} type="button" onClick={handleSendLineNotification}>
+              <Share2 className="mr-2 size-4" />
+              {isSendingLine ? 'กำลังส่ง...' : 'ส่งเข้ากลุ่มหลัก'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(cancelTicket)} onOpenChange={(open) => {
         if (!open) {
@@ -750,8 +832,8 @@ export function WeightTicketListPageClient() {
         }
       }}
       >
-        <DialogContent className="max-w-lg rounded-md">
-          <DialogHeader className="rounded-t-md">
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
             <DialogTitle>ยกเลิกใบรับ-ส่งของ</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 px-4 pb-4">
@@ -790,85 +872,6 @@ export function WeightTicketListPageClient() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(activeActionsTicket)} onOpenChange={(open) => {
-        if (!open) setActiveActionsTicket(null)
-      }}
-      >
-        <DialogContent className="max-w-md rounded-md">
-          <DialogHeader className="rounded-t-md">
-            <DialogTitle>จัดการรายการ: {activeActionsTicket?.documentNo}</DialogTitle>
-          </DialogHeader>
-          <div className="p-4 space-y-3">
-            <button
-              className="w-full h-12 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-base font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-              onClick={() => {
-                if (activeActionsTicket) {
-                  void handlePrintTicket(activeActionsTicket)
-                  setActiveActionsTicket(null)
-                }
-              }}
-            >
-              <Printer className="size-5 text-slate-500" />
-              พิมพ์ใบรับ-ส่งของ
-            </button>
-            
-            <button
-              className="w-full h-12 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-base font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-              onClick={() => {
-                if (activeActionsTicket) {
-                  openWeightTicketLineShare(activeActionsTicket)
-                  setActiveActionsTicket(null)
-                }
-              }}
-            >
-              <Share2 className="size-5 text-slate-500" />
-              แชร์รายการ (Line)
-            </button>
-
-            {activeActionsTicket?.canEdit && (
-              <button
-                className="w-full h-12 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-base font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-                onClick={() => {
-                  if (activeActionsTicket) {
-                    setActiveForm({ id: activeActionsTicket.id, type: activeActionsTicket.type })
-                    setActiveActionsTicket(null)
-                  }
-                }}
-              >
-                <SquarePen className="size-5 text-slate-500" />
-                แก้ไขรายการ
-              </button>
-            )}
-
-            {activeActionsTicket?.canCancel && (
-              <button
-                className="w-full h-12 flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 text-base font-semibold text-red-700 hover:bg-red-100 active:bg-red-200 transition-colors"
-                onClick={() => {
-                  if (activeActionsTicket) {
-                    setCancelTicket(activeActionsTicket)
-                    setCancelError('')
-                    setCancelNote(activeActionsTicket.cancelNote ?? '')
-                    setActiveActionsTicket(null)
-                  }
-                }}
-              >
-                <XCircle className="size-5 text-red-500" />
-                ยกเลิกรายการ
-              </button>
-            )}
-          </div>
-          <DialogFooter className="border-t border-slate-100 pt-2 shrink-0">
-            <Button
-              className="w-full h-11 text-base"
-              variant="secondary"
-              onClick={() => setActiveActionsTicket(null)}
-            >
-              ปิดหน้าต่าง
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {activeDetailId && (
         <WeightTicketDetailModal
           ticketId={activeDetailId}
@@ -887,8 +890,8 @@ export function WeightTicketListPageClient() {
         <Dialog open onOpenChange={(open) => {
           if (!open) setActiveForm(null)
         }}>
-          <DialogContent aria-labelledby="weight-ticket-form-title" className="max-h-[95vh] max-w-7xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" data-combobox-portal-root="true" hideClose>
-            <DialogHeader className="px-5 py-3 bg-slate-900 text-white shrink-0 rounded-t-md">
+          <DialogContent aria-labelledby="weight-ticket-form-title" className="max-h-[95vh] max-w-7xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0" data-combobox-portal-root="true" hideClose>
+            <DialogHeader className="px-5 py-3 bg-slate-900 text-white shrink-0">
               <DialogTitle id="weight-ticket-form-title">
                 {activeForm.id ? 'แก้ไขใบรับ-ส่งของ' : activeForm.type === 'WTI' ? 'สร้างใบรับของ WTI' : 'สร้างใบส่งของ WTO'}
               </DialogTitle>
@@ -896,7 +899,7 @@ export function WeightTicketListPageClient() {
             <div className="flex-1 overflow-y-auto bg-slate-50 p-0">
               <WeightTicketsPageClient
                 initialType={activeForm.type}
-                lockType
+                lockType={Boolean(activeForm.id)}
                 ticketId={activeForm.id}
                 onClose={() => setActiveForm(null)}
                 onSaveSuccess={() => {
@@ -911,3 +914,4 @@ export function WeightTicketListPageClient() {
     </div>
   )
 }
+

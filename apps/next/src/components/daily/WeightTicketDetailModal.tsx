@@ -4,15 +4,16 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, Scale, SquarePen, XCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ClipboardList, Package2, Printer, Scale, Share2, SquarePen, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { WeightTicketProductBreakdownTable } from '@/components/daily/WeightTicketProductBreakdownTable'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
 import { cn } from '@/lib/utils'
-import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, type WeightTicketRecord, type WeightTicketStatus, type WeightTicketType, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
+import { cancelWeightTicket, decodeStoredImageAsset, displayWeightTicketStatus, formatWeight, getWeightTicket, notifyWeightTicketLine, type WeightTicketRecord, type WeightTicketStatus, type WeightTicketType, weightTicketStatusBadgeClass } from '@/lib/weight-tickets'
 import { getErrorMessage } from '@/lib/api-client'
+import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'
@@ -105,6 +106,10 @@ export function WeightTicketDetailModal({
     images: Array<{ fileName: string; url: string }>
     title: string
   } | null>(null)
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [shareNote, setShareNote] = useState('')
+  const [shareError, setShareError] = useState('')
+  const [isSendingLine, setIsSendingLine] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -162,6 +167,30 @@ export function WeightTicketDetailModal({
     } finally {
       setIsPrinting(false)
     }
+  }
+
+  async function handleSendLineNotification() {
+    if (!ticket) return
+    setIsSendingLine(true)
+    setShareError('')
+    try {
+      await notifyWeightTicketLine(ticket.id, { customMessage: shareNote.trim() || undefined })
+      setShowShareDialog(false)
+      setShareNote('')
+      window.alert('ส่ง LINE พร้อม PDF เรียบร้อยแล้ว')
+    } catch (caught) {
+      setShareError(getErrorMessage(caught, 'ส่ง LINE ใบรับ-ส่งของไม่สำเร็จ'))
+    } finally {
+      setIsSendingLine(false)
+    }
+  }
+
+  function handleManualLineShare() {
+    if (!ticket) return
+    openWeightTicketLineShare(ticket)
+    setShowShareDialog(false)
+    setShareNote('')
+    setShareError('')
   }
 
   const activeGalleryImage = lineGallery?.images[lineGallery.activeIndex] ?? null
@@ -545,10 +574,16 @@ export function WeightTicketDetailModal({
 
         <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50 shrink-0">
           {ticket ? (
-            <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
-              <Printer className="size-4" />
-              {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
-            </Button>
+            <>
+              <Button className="gap-2 font-normal" disabled={isPrinting} type="button" variant="outline" onClick={() => void handlePrintReceipt()}>
+                <Printer className="size-4" />
+                {isPrinting ? 'กำลังเตรียม...' : 'พิมพ์'}
+              </Button>
+              <Button className="gap-2 font-normal" type="button" variant="outline" onClick={() => setShowShareDialog(true)}>
+                <Share2 className="size-4" />
+                แชร์
+              </Button>
+            </>
           ) : null}
           <Button className="font-normal" type="button" variant="outline" onClick={onClose}>ปิด</Button>
         </DialogFooter>
@@ -645,6 +680,51 @@ export function WeightTicketDetailModal({
             </DialogContent>
           </Dialog>
         )}
+
+        <Dialog open={showShareDialog} onOpenChange={(open) => {
+          if (!open) {
+            setShowShareDialog(false)
+            setShareNote('')
+            setShareError('')
+          }
+        }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>แชร์ใบรับ-ส่งของ</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 px-4 pb-4">
+              <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <div className="font-semibold text-slate-900">{ticket?.documentNo}</div>
+                <div className="mt-1 text-xs text-slate-500">{ticket?.partyName} · {ticket ? `${formatWeight(ticket.totals.netWeight)} กก.` : ''}</div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  ข้อความเสริมใน LINE
+                </label>
+                <textarea
+                  className="block min-h-[88px] w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 sm:text-sm"
+                  maxLength={500}
+                  placeholder="เช่น ส่งเข้ากลุ่มคลัง / แจ้งบัญชีตรวจเอกสาร"
+                  value={shareNote}
+                  onChange={(event) => setShareNote(event.target.value)}
+                />
+                {shareError ? <div className="mt-1 text-xs text-red-600">{shareError}</div> : null}
+              </div>
+            </div>
+            <DialogFooter className="flex-wrap gap-2">
+              <Button type="button" variant="secondary" onClick={() => setShowShareDialog(false)}>ปิด</Button>
+              <Button disabled={isSendingLine} type="button" variant="outline" onClick={handleManualLineShare}>
+                <Share2 className="mr-2 size-4" />
+                แชร์เองผ่าน LINE
+              </Button>
+              <Button disabled={isSendingLine} type="button" onClick={handleSendLineNotification}>
+                <Share2 className="mr-2 size-4" />
+                {isSendingLine ? 'กำลังส่ง...' : 'ส่งเข้ากลุ่มหลัก'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   )

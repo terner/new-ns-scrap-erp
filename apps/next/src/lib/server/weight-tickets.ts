@@ -3,6 +3,7 @@ import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import { calculateLineTotals, type WeightTicketFormValues, type WeightTicketStatus, type WeightTicketType } from '@/lib/weight-tickets'
 import type { AppAuthContext } from '@/lib/server/auth-context'
 import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { prisma } from '@/lib/server/prisma'
 
 export type WeightTicketQuery = {
   branchId?: string
@@ -813,4 +814,54 @@ export function mutableTicketErrorMessage(action: 'cancel' | 'edit') {
   return action === 'cancel'
     ? 'ยกเลิกไม่ได้ เพราะเอกสารถูกนำไปใช้กับบิลรับซื้อหรือบิลขายแล้ว'
     : 'แก้ไขไม่ได้ เพราะเอกสารถูกนำไปใช้กับบิลรับซื้อหรือบิลขายแล้ว'
+}
+
+export const weightTicketInclude = {
+  branches: true,
+  customers: true,
+  suppliers: true,
+  weight_ticket_product_summaries: {
+    include: {
+      products: {
+        select: {
+          code: true,
+          id: true,
+        },
+      },
+    },
+    orderBy: {
+      product_name: 'asc',
+    },
+  },
+  weight_ticket_lines: {
+    include: {
+      products: {
+        select: {
+          code: true,
+          id: true,
+        },
+      },
+      warehouses: {
+        select: {
+          code: true,
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+    },
+    orderBy: {
+      line_no: 'asc',
+    },
+  },
+} as const
+
+export async function findScopedWeightTicket(documentNo: string, scopedBranchIds: string[]) {
+  return prisma.weight_tickets.findFirst({
+    include: weightTicketInclude,
+    where: {
+      doc_no: documentNo,
+      ...(scopedBranchIds.length ? { branches: { code: { in: scopedBranchIds } } } : {}),
+    },
+  })
 }
