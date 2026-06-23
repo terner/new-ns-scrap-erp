@@ -40,6 +40,7 @@ export function LineSettingsPageClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
+  const [isTestingOA, setIsTestingOA] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [message, setMessage] = useState<string | null>(null)
@@ -173,6 +174,39 @@ export function LineSettingsPageClient() {
     }
   }
 
+  async function testOAConnection() {
+    setError(null)
+    setMessage(null)
+    
+    if (!form.lineChannelAccessToken) {
+      setError('กรุณากรอก LINE Channel Access Token ก่อนทดสอบ')
+      return
+    }
+
+    setIsTestingOA(true)
+    try {
+      const res = await fetch('/api/admin/line-settings/test-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: form.lineChannelAccessToken,
+        }),
+      })
+
+      const body = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(body.error || body.message || 'การตอบสนองจากเซิร์ฟเวอร์ผิดพลาด')
+      }
+
+      setMessage(`🔌 เชื่อมต่อ LINE OA สำเร็จ! บอทของคุณชื่อ "${body.botName}" (${body.basicId})`)
+    } catch (caught) {
+      setError(getErrorMessage(caught, 'ตรวจสอบการเชื่อมต่อ LINE OA ล้มเหลว'))
+    } finally {
+      setIsTestingOA(false)
+    }
+  }
+
   const handleGroupSelect = (val: string) => {
     setMessage(null)
     if (val === 'manual') {
@@ -252,6 +286,26 @@ export function LineSettingsPageClient() {
                       {showToken ? '🐵' : '🙈'}
                     </button>
                   </div>
+                  
+                  {/* ปุ่มทดสอบเชื่อมต่อ LINE OA */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 text-xs font-semibold text-[#0284c7] border border-[#bae6fd] hover:bg-[#f0f9ff] rounded-lg transition focus:outline-none h-8 flex items-center gap-1 disabled:opacity-60"
+                      onClick={() => void testOAConnection()}
+                      disabled={isLoading || isSaving || isTesting || isTestingOA}
+                    >
+                      {isTestingOA ? (
+                        <>
+                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-[#7dd3fc] border-t-[#0284c7]" />
+                          <span>กำลังตรวจสอบ...</span>
+                        </>
+                      ) : (
+                        <span>🔌 ทดสอบเชื่อมต่อ LINE OA</span>
+                      )}
+                    </button>
+                  </div>
+
                   {fieldErrors.lineChannelAccessToken ? (
                     <p className="text-xs text-red-600">{fieldErrors.lineChannelAccessToken}</p>
                   ) : null}
@@ -442,7 +496,7 @@ export function LineSettingsPageClient() {
                 type="button"
                 className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition focus:outline-none h-10"
                 onClick={() => void loadData()}
-                disabled={isLoading || isSaving || isTesting}
+                disabled={isLoading || isSaving || isTesting || isTestingOA}
               >
                 โหลดใหม่
               </button>
@@ -451,7 +505,7 @@ export function LineSettingsPageClient() {
                 type="button"
                 className="px-4 py-2 text-sm font-semibold text-emerald-600 border border-emerald-600 hover:bg-emerald-50 rounded-lg transition focus:outline-none h-10 flex items-center justify-center disabled:opacity-60"
                 onClick={() => void handleTestSend()}
-                disabled={isLoading || isSaving || isTesting}
+                disabled={isLoading || isSaving || isTesting || isTestingOA}
               >
                 {isTesting ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-300 border-t-emerald-600" />
@@ -464,7 +518,7 @@ export function LineSettingsPageClient() {
                 type="button"
                 className="px-6 py-2 text-sm font-bold text-white bg-[#0F172A] hover:bg-[#1E293B] rounded-lg transition disabled:opacity-60 focus:outline-none h-10 flex items-center justify-center min-w-[100px]"
                 onClick={() => void save()}
-                disabled={isLoading || isSaving || isTesting}
+                disabled={isLoading || isSaving || isTesting || isTestingOA}
               >
                 {isSaving ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-white" />
