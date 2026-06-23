@@ -67,6 +67,7 @@ movement history ของ stock_ledger เท่านั้น
 - ทุก row ต้องมี source ref/movement type/product/warehouse/qty direction
 - reversal ต้องแสดงเป็น movement/audit ไม่ลบประวัติแบบเงียบ
 - hold/reservation ไม่ใช่ movement
+- list/export `ต้นทุน/น.` แสดง running WAC หลังแต่ละ movement โดยคำนวณจากยอดสะสม `sum(value_in - value_out) / sum(qty_in - qty_out)` ตามมุมมองคงเหลือสะสมที่เลือก ส่วน `stock_ledger.unit_cost` ในฐานข้อมูลยังเป็นต้นทุน audit ของ movement จากเอกสารต้นทาง
 
 ## Side Effects
 
