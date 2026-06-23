@@ -28,16 +28,16 @@ type MenuSearchResult = {
 
 const PAGE_TITLE_EVENT = 'ns-scrap-erp-page-title'
 
-function flattenSearchItems(items: NavigationItem[], authContext: AuthContextSummary | null): MenuSearchResult[] {
+function flattenSearchItems(items: NavigationItem[], authContext: AuthContextSummary): MenuSearchResult[] {
   const sectionLabelByKey = new Map(navigationSections.map((section) => [section.key, section.label]))
 
   return items.flatMap((item) => {
-    const visibleChildren = item.children?.filter((child) => !authContext || canAccessPath(child.href, authContext)) ?? []
-    const parentVisible = !authContext || canAccessPath(item.href, authContext) || visibleChildren.length > 0
+    const visibleChildren = item.children?.filter((child) => canAccessPath(child.href, authContext)) ?? []
+    const parentVisible = canAccessPath(item.href, authContext) || visibleChildren.length > 0
     if (!parentVisible) return []
 
     const sectionLabel = sectionLabelByKey.get(item.section) ?? item.section
-    const parentResult: MenuSearchResult[] = !item.children?.length || (!authContext || canAccessPath(item.href, authContext))
+    const parentResult: MenuSearchResult[] = !item.children?.length || canAccessPath(item.href, authContext)
       ? [{
           href: item.href,
           icon: item.icon,
@@ -101,7 +101,7 @@ export function AppShell({ children }: AppShellProps) {
   const isAuthPage = pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password'
   const menuSearchResults = useMemo(() => {
     const query = menuSearch.trim().toLowerCase()
-    if (!query) return []
+    if (!query || !authContext) return []
 
     return flattenSearchItems(navigationItems, authContext)
       .filter((item) => `${item.label} ${item.href} ${item.parentLabel ?? ''} ${item.sectionLabel}`.toLowerCase().includes(query))
@@ -165,6 +165,8 @@ export function AppShell({ children }: AppShellProps) {
             isAdmin: payload?.isAdmin === true,
             permissions: Array.isArray(payload?.permissions) ? payload.permissions : [],
           })
+        } else if (mounted) {
+          setAuthContext({ isAdmin: false, permissions: [] })
         }
       } catch {
         if (mounted) {
@@ -279,8 +281,9 @@ export function AppShell({ children }: AppShellProps) {
                 <span className="sr-only">ค้นหาเมนู</span>
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                  placeholder="ค้นหาเมนู..."
+                  className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/15 disabled:cursor-wait disabled:text-slate-400"
+                  disabled={!authContext}
+                  placeholder={authContext ? 'ค้นหาเมนู...' : 'กำลังโหลดเมนู...'}
                   type="search"
                   value={menuSearch}
                   onChange={(event) => {
@@ -292,7 +295,9 @@ export function AppShell({ children }: AppShellProps) {
               </label>
               {menuSearchFocused && menuSearch.trim() ? (
                 <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
-                  {menuSearchResults.length ? menuSearchResults.map((item) => (
+                  {!authContext ? (
+                    <div className="px-3 py-4 text-center text-sm text-slate-500">กำลังโหลดเมนู</div>
+                  ) : menuSearchResults.length ? menuSearchResults.map((item) => (
                     <Link
                       className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none"
                       href={item.href}

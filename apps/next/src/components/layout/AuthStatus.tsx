@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { ChevronDown, KeyRound, LogOut, UserRound } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import {
   DropdownMenu,
@@ -31,7 +30,6 @@ type AuthStatusProps = {
 }
 
 export function AuthStatus({ compact = false, onMenuOpenChange, variant = 'default' }: AuthStatusProps) {
-  const router = useRouter()
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<AuthStatusProfile>({ roles: [], userEmail: '' })
   const [isLoading, setIsLoading] = useState(true)
@@ -119,10 +117,13 @@ export function AuthStatus({ compact = false, onMenuOpenChange, variant = 'defau
 
   async function logout() {
     if (!supabase) return
-    await supabase.auth.signOut()
-    setSession(null)
-    setProfile({ roles: [], userEmail: '' })
-    router.push('/login')
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      setSession(null)
+      setProfile({ roles: [], userEmail: '' })
+      window.location.replace('/login')
+    }
   }
 
   const userEmail = profile.userEmail || session?.user.email || ''

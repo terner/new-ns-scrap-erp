@@ -45,6 +45,8 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
             isAdmin: payload?.isAdmin === true,
             permissions: Array.isArray(payload?.permissions) ? payload.permissions : [],
           })
+        } else if (mounted) {
+          setAuthContext({ isAdmin: false, permissions: [] })
         }
       } catch {
         if (mounted) {
@@ -61,7 +63,7 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
   }, [])
 
   const visibleItems = useMemo(() => {
-    if (!authContext) return navigationItems
+    if (!authContext) return []
     return navigationItems
       .map((item) => ({
         ...item,
@@ -148,6 +150,14 @@ export function AppNavigation({ compact = false, onNavigate }: AppNavigationProp
 
   return (
     <nav ref={navRef} className="flex-1 overflow-y-auto py-3 text-sm custom-scrollbar-dark" aria-label="Main navigation" onScroll={rememberSidebarScroll}>
+      {!authContext ? (
+        <div className={`space-y-3 px-4 py-4 text-slate-400 ${compact ? 'lg:px-2' : ''}`} aria-live="polite">
+          <div className={`h-3 rounded-md bg-slate-700/70 ${compact ? 'lg:mx-auto lg:w-5' : 'w-24'}`} />
+          <div className={`h-8 rounded-md bg-slate-800/80 ${compact ? 'lg:mx-auto lg:w-8' : 'w-full'}`} />
+          <div className={`h-8 rounded-md bg-slate-800/60 ${compact ? 'lg:mx-auto lg:w-8' : 'w-10/12'}`} />
+          <span className="sr-only">กำลังโหลดเมนู</span>
+        </div>
+      ) : null}
       {navigationSections.map((section) => {
         const items = visibleItems.filter((item) => item.section === section.key)
         if (!items.length) return null
