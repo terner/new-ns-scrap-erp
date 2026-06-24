@@ -60,12 +60,11 @@ Status terms:
 | `/daily-report` | Daily Report | read baseline | `GET /api/daily-report` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments`, `bank_statement`, `products` | `reports.reports.view` |
 | `/dashboard` | Dashboard | read baseline | `GET /api/dashboard` | `purchase_bills`, `sales_bills`, `expenses`, `accounts`, `bank_statement`, `stock_ledger`, `production_orders`, `trading_deals` | `reports.reports.view` |
 | `/profit-cost-analysis` | Profit & Cost Analysis | read baseline | `GET /api/profit-cost-analysis` | `purchase_bills`, `sales_bills`, `stock_ledger`, `products`, `suppliers`, `customers`, `branches`, `purchase_channels`, `sales_channels` | `reports.reports.view` |
-| `/pending-sales` | รายการรอขาย | read/design baseline | `GET /api/pending-sales` | `po_sells`, `po_buys`, `purchase_bills`, `trading_deals`, `stock_ledger`, `products`, `customers` | `reports.reports.view` |
-| `/sales-plan` | วางแผนการขาย (LME) | read/design baseline | `GET /api/sales-plan` | `stock_ledger`, `products`, derived pending sales/LME reference | `reports.reports.view` |
+| `/sales-plan` | วางแผนการขาย (LME) | read/design baseline | `GET /api/sales-plan` | `stock_ledger`, `products`, WTO pending_out, LME reference | `reports.reports.view` |
 | `/sales-commission` | Sales Tracking Dashboard | read/design baseline | `GET /api/sales-commission` | `purchase_bills`, `suppliers`, `salespersons` | `reports.reports.view` |
 | `/cash-flow-calendar` | Cash Flow Calendar | read/design baseline | `GET /api/cash-flow-calendar` | `accounts`, `bank_statement` | `reports.reports.view` |
 | `/business-calendar` | Business Calendar | read/design baseline | `GET /api/business-calendar` | `purchase_bills`, `sales_bills`, `expenses`, `receipts`, `payments` | `reports.reports.view` |
-| `/cash-others-summary` | Cash & Others Summary | read/design baseline | `GET /api/cash-others-summary` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `stock_issues`, `trading_deals`, `expenses` | `reports.reports.view` |
+| `/cash-others-summary` | Cash & Others Summary | read/design baseline | `GET /api/cash-others-summary` | `accounts`, `bank_statement`, `sales_bills`, `purchase_bills`, `stock_ledger`, `trading_deals`, `expenses` | `reports.reports.view` |
 
 ### Tracking
 
@@ -83,7 +82,6 @@ Status terms:
 | `/purchase/bills/[id]` | Purchase bill detail/edit | partial write | `PATCH /api/purchase/bills` | `purchase_bills`, `stock_ledger` | `finance.cash.view` |
 | `/purchase/advance-payments` | เงินล่วงหน้า/มัดจำ | partial write baseline + customer advance tab | `GET/POST /api/purchase/advance-payments`, `GET /api/finance/customer-advance` | `supplier_advance_payments`, `supplier_advance_allocations`, `bank_statement` (`CADV`), `suppliers`, `customers`, `branches`, `accounts` | `finance.cash.view` |
 | `/sales/bills` | บิลขาย | read baseline | `GET /api/sales/bills` | `sales_bills`, `customers` | `finance.cash.view` |
-| `/sales/stock-issue` | เบิกออกรอบิล | read baseline / write pending | `GET /api/sales/stock-issue` | `stock_issues`, target `stock_ledger` for `PSALE` | `finance.cash.view` |
 | `/daily/payment-approval` | อนุมัติจ่ายเงิน | partial write | `GET/POST /api/daily/payment-approval` | `payment_approvals`, `purchase_bills`, `supplier_advance_payments`, `expenses` | `finance.cash.view` |
 UI note: compact summary tables; row click opens approval detail modal, and AP approval amount entry now lives in the modal instead of the list grid.
 | `/purchase/payments` | จ่ายเงิน Supplier | partial write | `GET/POST /api/purchase/payments` | `payments`, `purchase_bills`, `accounts` | `finance.cash.view` |

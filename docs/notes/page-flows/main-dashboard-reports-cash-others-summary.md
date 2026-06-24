@@ -25,12 +25,12 @@ route: /cash-others-summary
 
 ## Flow Baseline
 
-Cash & Others Summary เป็น owner/management view ของ cash, AR, AP, stock, pending sale, trading pending และ asset/debt composition ณ as-of date
+Cash & Others Summary เป็น owner/management view ของ cash, AR, AP, stock, trading pending และ asset/debt composition ณ as-of date
 
 ## Page Responsibilities
 
 - สรุป cash accounts และ THB-equivalent baseline
-- สรุป AR/AP aging, stock qty/value, pending stock issue, trading pending
+- สรุป AR/AP aging, stock qty/value และ trading pending
 - แสดง asset/debt composition และ cash needed today
 - รองรับ query `asOf=YYYY-MM-DD`
 

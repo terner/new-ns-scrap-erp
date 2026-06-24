@@ -37,7 +37,7 @@ Legacy `view-ar`:
 - หักยอดรับจาก `receipts`.
 - คำนวณ due date จาก `bill.date + creditTerm`.
 - สร้าง aging bucket `Current`, `1-30`, `31-60`, `61-90`, `>90`.
-- มี pending sale banner สำหรับ stock issue ที่ยังไม่เปิดบิลขาย.
+- ไม่มี pending sale / stock issue banner ใน target runtime; ของออกจาก WTO จะเป็น AR ก็ต่อเมื่อเปิด `SB` แล้วเท่านั้น.
 - แสดง total AR, overdue, bucket chart, top 5 customers, filter customer/channel/aging, export CSV.
 
 ## Page Responsibilities
@@ -47,7 +47,7 @@ Legacy `view-ar`:
 - คำนวณ `receivableBalance = totalAmount - receivedAmount`.
 - คำนวณ aging/due date ตาม `due_date` หรือ credit term.
 - สรุปตาม customer, branch, channel, bucket.
-- แสดง pending stock issue summary เพื่อเตือนยอดขายที่ยังไม่เป็น AR.
+- แสดงเฉพาะ AR จาก `sales_bills` และ `receipts`; WTO pending_out ที่ยังไม่เปิดบิลไม่เป็น AR และไม่ถูกสรุปเป็น pending sale.
 - export `.xlsx` ตาม filter ปัจจุบัน.
 
 ## Non-Responsibilities

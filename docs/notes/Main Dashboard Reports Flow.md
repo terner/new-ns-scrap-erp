@@ -24,7 +24,7 @@ updated: 2026-06-11
 | `/sales-commission` | Sales Tracking Dashboard | `GET /api/sales-commission` | `reports.reports.view` | salesperson/supplier/sales control read model |
 | `/cash-flow-calendar` | Cash Flow Calendar | `GET /api/cash-flow-calendar` | `reports.reports.view` | accounts + bank statement by month |
 | `/business-calendar` | Business Calendar | `GET /api/business-calendar` | `reports.reports.view` | PB, SB, expenses, receipts, payments by month |
-| `/cash-others-summary` | Cash & Others Summary | `GET /api/cash-others-summary` | `reports.reports.view` | accounts, bank statement, AR/AP from bills, stock ledger, pending stock issue, trading deals |
+| `/cash-others-summary` | Cash & Others Summary | `GET /api/cash-others-summary` | `reports.reports.view` | accounts, bank statement, AR/AP from bills, stock ledger, trading deals |
 | `/anomaly-detector` | ตรวจจับความผิดปกติ | `GET /api/anomaly-detector` | `reports.reports.view` | derived anomaly rules from cash, stock, PB/SB, masters, bank statement, trading deals |
 | `/reports` | รายงานทั้งหมด | `GET /api/reports/aggregate` | `reports.reports.view` | PB/SB aggregate plus static active-report catalog |
 
