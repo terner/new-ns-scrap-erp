@@ -553,7 +553,7 @@ Reporting rule:
   - [x] Customer advance/deposit selector and interim snapshot allocation marker
   - [x] per-document SB print with branch-specific Company Profile, A4 portrait, multi-page header/footer, Customer/document panels, VAT/totals, deposit, and receivable balance
   - [x] SB print item table no longer repeats WTO document number or vehicle registration
-- [x] Design and implement durable `WTO/PSALE -> Sales Bill` allocation tables/write rules for new create/cancel, including `sales bill -> source`, `sales bill -> PO Sell`, `sales bill -> Spot Sale`, and Customer advance allocation/release
+- [x] Design and implement durable `WTO -> Sales Bill` allocation tables/write rules for new create/cancel, including `sales bill -> source`, `sales bill -> PO Sell`, `sales bill -> Spot Sale`, and Customer advance allocation/release. Legacy `PSALE` / `/sales/stock-issue` is removed from target runtime and must not be treated as a current source.
   - [x] Batch WTO-A schema/API foundation
     - [x] add `weight_ticket_lines.warehouse_id` for WTO intended stock location
     - [x] add durable `stock_holds` table with `active/consumed/released/cancelled` status
@@ -570,7 +570,7 @@ Reporting rule:
     - [x] show stock balance as `คงเหลือจริง / จองไว้ / พร้อมส่ง` in `/stock/balance`
     - [x] show hold/consume context in SB create from WTO at baseline level
     - [x] transaction-safe release/cancel on `SB`; full edit/rebuild remains disabled until read-model normalization is complete
-  - [x] current allocation table for `WTO/PSALE -> SB`
+  - [x] current allocation table for `WTO -> SB`; legacy `PSALE` columns/indexes are migration/data-repair residue only, not target write path
   - [x] current allocation table for `SB -> PO Sell`
   - [x] current allocation table for `SB -> Spot Sale`
   - [x] current allocation table for `Customer advance -> SB`
@@ -584,11 +584,11 @@ Reporting rule:
   - [ ] reconciliation report flags legacy partial-billed/status mismatch rows instead of hiding them
 - [ ] Add sales-bill timeline/log coverage
   - [x] `weight_ticket_usage_logs` for `WTO -> SB` allocate on create
-  - [ ] `weight_ticket_usage_logs` for `WTO -> SB` release/reverse on edit/cancel
+  - [x] `weight_ticket_usage_logs` for `WTO -> SB` release/reverse on cancel
   - [x] `sales_bill_status_logs` for create/cancel and Trading allocation correction
-  - [ ] dedicated allocation timeline logs beyond current allocation facts
-  - [ ] `PO Sell` allocation logs for billed/released quantity from `SB`
-  - [ ] detail/timeline reads dedicated logs for `WTO`, `PO Sell`, and `SB`
+  - [x] dedicated `po_sell_allocation_logs` for billed/released quantity from `SB`
+  - [x] detail/timeline reads dedicated logs for `WTO`, `PO Sell`, and `SB`
+  - [ ] dedicated allocation timeline logs for Customer Advance allocation/release beyond current allocation facts
 - [ ] Harden SB detail/print after allocation facts exist
   - [x] detail source labels read line allocation facts instead of snapshot/header fallback
   - [x] print source labels read line allocation facts via shared Sales Bill detail read model
@@ -604,20 +604,17 @@ Reporting rule:
   - [x] Add rollback-based automated verification for Trading SB allocation correction success, capacity guard, product mismatch guard, corrected COGS/GP, and no stock ledger side effect
   - [x] Add dashboard UI to create/list manual non-PB Trading Cost Source
   - [x] Logged-in browser QA Trading SB allocation correction: open `แก้ต้นทุน`, change multiple line sources, save, verify revised Matched COGS/GP, and confirm no stock ledger side effect
-- [x] Define sales bill allocation tables/rules for `sales bill -> WTO/PSALE/direct stock`, `sales bill -> PO Sell/Spot Sale`, and `Customer advance -> sales bill`; Trading cost continues through `trading_allocation_facts`
+- [x] Define sales bill allocation tables/rules for `sales bill -> WTO`, `sales bill -> PO Sell/Spot Sale`, and `Customer advance -> sales bill`; Trading cost continues through `trading_allocation_facts`. `PSALE/direct stock` are not target runtime sources.
 - [x] Implement the durable Sales Bill allocation tables/write path after the design above: `sales_bill_lines`, `sales_bill_source_allocations`, `sales_bill_po_sell_allocations`, and `sales_bill_customer_advance_allocations`
 - [x] Switch Stock SB detail/print/list item-count read models from `sales_bills.items` snapshots to durable Sales Bill allocation facts, with no-fallback warning for legacy rows without facts
 - [ ] Decide legacy SB reconciliation/backfill policy before removing the legacy snapshot display path entirely
-- [x] Implement `/sales/stock-issue` pending sale write flow from `docs/notes/Pending Sale Page Flow.md`
-  - [x] create pending sale validates active WTO hold availability and writes `PSALE` stock-out ledger because goods physically leave before billing
-  - [x] direct edit is intentionally disabled; pending PSALE corrections use cancel-and-recreate
-  - [x] cancel pending sale appends `PSALE-CANCEL` reversal ledger and reopens the WTO hold only if not converted to Sales Bill
-  - [x] convert `PSALE -> Sales Bill` links the source pending-sale lines and creates AR only; it does not write duplicate SB stock-out ledger rows
-  - [x] preserve `PSALE` ledger audit during conversion instead of deleting/replacing it with `SB`
-  - [x] optimize API/DB lookups with `20260612123936_optimize_pending_sale_api_indexes.sql` and narrow list/reversal query payloads
-  - [x] add isolated and rollback automated contract verification for SB-from-PSALE cancel: no duplicate `SB/SB-CANCEL` stock ledger, original `PSALE` reverses through `PSALE-CANCEL`, WTO hold reopens, and Sales Bill allocation facts cancel
-  - [ ] logged-in browser QA for create/cancel/convert and SB-from-PSALE cancel click-path
-- [ ] define COGS/FIFO rule
+- [x] Remove/supersede `/sales/stock-issue` pending sale write flow from target runtime
+  - [x] active route/API `/sales/stock-issue` and `/api/sales/stock-issue` removed
+  - [x] active report/API `/pending-sales` and `/api/pending-sales` removed
+  - [x] Sales Bill new write path uses `WTO -> SB` only and does not create/convert/cancel `PSALE`
+  - [x] dashboards/reports/AR no longer read `stock_issues` as pending-sale fallback
+  - [x] legacy PSALE behavior remains historical/data-repair context only and must not be listed as target-complete runtime work
+- [x] define sales COGS rule: Stock SB uses weighted average cost at the time of sale, captured into `stock_ledger.value_out`/`unit_cost` when `SB` consumes WTO pending_out; downstream COGS reads that posted SB ledger cost, not current/recomputed WAC
 - [ ] define receipt relation
 
 ### 6.3 Payment and Receipt Prep

@@ -47,8 +47,9 @@ updated: 2026-06-23
 
 - `GET /api/sales/bills` โหลด list/source options และส่ง `WTO` source เฉพาะสถานะ `delivered` สำหรับบิลขาย STOCK ใหม่
 - `POST /api/sales/bills` create path ทำงานครบสำหรับ `STOCK` baseline: สร้าง `SB`, consume active `WTO` hold, เขียน `stock_ledger.ref_type = SB`, append `weight_ticket_usage_logs`, update `WTO` เป็น `billed`, และ update `PO Sell` remaining/status
+- Stock SB COGS ใช้ต้นทุนเฉลี่ย ณ เวลาขาย: ตอน consume WTO pending_out ระบบ snapshot ต้นทุนลง `stock_ledger.unit_cost/value_out` ของ `SB`; detail/report ต้องอ่าน COGS จาก SB ledger ที่ posted แล้ว ไม่คำนวณใหม่จาก WAC ปัจจุบัน
 - `GET /api/sales/bills/[id]` เป็น detail/read model เท่านั้น
-- `PATCH /api/sales/bills/[id]` action `cancel` สำหรับ `STOCK` SB ที่ยังไม่มี active receipt: block active `RCP`, reopen consumed `WTO` hold, append `stock_ledger.ref_type = SB-CANCEL` โดยไม่ลบ `SB`, append `released_from_sales_bill`, คืน `WTO` เป็น `delivered`, reverse `PO Sell` usage, mark `SB` เป็น `cancelled`, และ append `sales_bill_status_logs`
+- `PATCH /api/sales/bills/[id]` action `cancel` สำหรับ `STOCK` SB ที่ยังไม่มี active receipt: block active `RCP`, reopen consumed `WTO` hold, append `stock_ledger.ref_type = SB-CANCEL` โดยไม่ลบ `SB`, append `released_from_sales_bill`, คืน `WTO` เป็น `delivered`, append `po_sell_allocation_logs.released_from_sales_bill`, reverse `PO Sell` usage, mark `SB` เป็น `cancelled`, และ append `sales_bill_status_logs`
 - UI ปุ่มยกเลิกของบิลขายเปิดใช้แล้วสำหรับ row ที่ server ส่ง `canCancel = true`; browser QA ผ่านสำหรับ WTO-backed Stock SB cancel และ PO Sell outstanding reversal
 - `TRADING` SB มี row-level Trading Cost Source, `trading_allocation_facts`, allocation-only correction API/UI, และ browser QA ผ่านแล้วสำหรับ multi-line source correction โดยไม่เขียน stock ledger
 - new SB create/cancel write-path now records dedicated allocation facts for `SB line`, `WTO -> SB`, `SB -> PO Sell/Spot Sale`, and `Customer advance -> SB`; Stock SB detail/print/list item-count reads durable line/source/PO facts first, while legacy SBs without facts show a reconciliation warning instead of inventing allocation data from JSON
@@ -66,7 +67,7 @@ updated: 2026-06-23
 | SB line snapshot | `sales_bill_lines` target | 1 row ต่อ business line; เก็บ product, gross/deduct/net/billed qty, unit price, discount, VAT basis, line total |
 | Physical stock-out | `stock_ledger` + `stock_holds` | `WTO` สร้าง pending_out โดยไม่เข้า ledger; `SB` เป็น movement owner ที่ consume pending_out และเขียน `stock_ledger.ref_type = SB` |
 | WTO source usage | `sales_bill_source_allocations` target + `weight_ticket_usage_logs` audit | ระบุว่า SB line ใช้ WTO summary/line ไหน จำนวนเท่าไร และ reversal status |
-| PO Sell commitment | `sales_bill_po_sell_allocations` target | ระบุ SB line -> PO Sell line หรือ `SPOT_SALE`; ใช้คืน remaining ตอน cancel |
+| PO Sell commitment | `sales_bill_po_sell_allocations` target + `po_sell_allocation_logs` audit | ระบุ SB line -> PO Sell line หรือ `SPOT_SALE`; ใช้คืน remaining ตอน cancel และ log allocate/release สำหรับ timeline |
 | Customer advance | `sales_bill_customer_advance_allocations` target | ระบุ SB -> customer advance fact; ใช้ release/recalculate ตอน cancel/correction |
 | Trading cost | `trading_allocation_facts` | มีแล้วสำหรับ Trading PB/manual Cost Source; ใช้แทน Stock allocation tables |
 
@@ -77,6 +78,7 @@ updated: 2026-06-23
 | `sales_bill_lines` | `sales_bill_id`, `line_no`, `product_id`, `qty`, `gross_weight`, `deduct_weight`, `net_weight`, `unit_price`, `discount_amount`, `line_amount`, `vat_amount`, `status` | เป็น source หลักของ detail/print/export; `sales_bills.items` คงได้เฉพาะ compatibility snapshot ระหว่าง migration |
 | `sales_bill_source_allocations` | `sales_bill_id`, `sales_line_no`, `source_type`, `source_doc_no`, `source_line_no`, `product_id`, `allocated_qty`, `movement_owner`, `stock_ledger_ref_type`, `status` | target source type สำหรับ stock sale คือ `WTO`; `movement_owner` = `SALES_BILL`; cancel ต้อง mark `cancelled/reversed` ไม่ลบ |
 | `sales_bill_po_sell_allocations` | `sales_bill_id`, `sales_line_no`, `po_sell_id`, `po_sell_line_no`, `allocation_type`, `product_id`, `allocated_qty`, `unit_price`, `allocated_amount`, `status` | `allocation_type` = `PO_SELL` หรือ `SPOT_SALE`; `PO_SELL` ต้อง validate customer/branch/product/remaining ใน transaction |
+| `po_sell_allocation_logs` | `po_sell_id`, `sales_bill_id`, `sales_bill_line_no`, `action`, `allocated_qty`, `allocated_amount`, `from_remaining_qty`, `to_remaining_qty` | append-only audit สำหรับ `allocated_to_sales_bill` และ `released_from_sales_bill`; detail/timeline อ่าน log นี้ก่อน allocation fact |
 | `sales_bill_customer_advance_allocations` | `sales_bill_id`, `customer_advance_doc_no`, `customer_id`, `allocated_amount`, `outstanding_before`, `outstanding_after`, `status` | ต้อง block over-allocation จาก active allocation facts และ release แบบ append/update status ใน transaction เดียวกับ SB cancel/correction |
 
 Index minimum:
@@ -86,6 +88,8 @@ Index minimum:
 - `sales_bill_source_allocations(source_type, source_doc_no, status)`
 - `sales_bill_po_sell_allocations(po_sell_id, status)`
 - `sales_bill_po_sell_allocations(sales_bill_id, sales_line_no, status)`
+- `po_sell_allocation_logs(po_sell_id, created_at desc)`
+- `po_sell_allocation_logs(sales_bill_id)`
 - `sales_bill_customer_advance_allocations(customer_advance_doc_no, status)`
 - `sales_bill_customer_advance_allocations(sales_bill_id, customer_advance_doc_no) where status = active` unique
 
@@ -101,6 +105,7 @@ Index minimum:
 `GET /api/sales/bills` and `GET /api/sales/bills/{docNo}`:
 
 - Detail and print read normalized line/allocation facts for new SBs; list export currently remains list-level but counts durable line facts first. Any future line-level export, dashboard, and tracking must use the same normalized facts.
+- Detail/timeline reads `sales_bill_status_logs`, `weight_ticket_usage_logs`, and `po_sell_allocation_logs` directly; it must not infer usage history from status strings alone.
 - If a legacy SB has no normalized facts, show a migration/reconciliation signal; do not invent source labels, COGS, PO Sell usage, or customer advance from stale JSON.
 
 `PATCH /api/sales/bills/{docNo}`:

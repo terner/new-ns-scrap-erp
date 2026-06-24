@@ -12,6 +12,7 @@ import { prisma } from '@/lib/server/prisma'
 import { findActiveSalesChannelReferenceByCode } from '@/lib/server/sales-channel-reference'
 import { activeSalesReceiptCountByBillId, salesBillCancelState } from '@/lib/server/sales-bill-cancel-policy'
 import { appendSalesBillStatusLog, SALES_BILL_STATUS_ACTION } from '@/lib/server/sales-bill-history'
+import { appendPoSellAllocationLogs, PO_SELL_ALLOCATION_ACTION } from '@/lib/server/po-sell-allocation-history'
 import { salesBillLineFactsForBills, type SalesBillLineFactRow } from '@/lib/server/sales-bill-line-facts'
 import { consumeActiveWtoStockHolds, reopenConsumedWtoStockHoldsForSalesBill, WtoStockHoldError } from '@/lib/server/stock-holds'
 import { activeVatRatePercent } from '@/lib/server/tax-settings'
@@ -1613,6 +1614,27 @@ export async function POST(request: Request) {
       })
       if (poSellRows.length) {
         await tx.sales_bill_po_sell_allocations.createMany({ data: poSellRows })
+        await appendPoSellAllocationLogs(tx, poSellRows
+          .filter((row) => row.allocation_type === 'PO_SELL' && row.po_sell_id != null)
+          .map((row) => ({
+            action: PO_SELL_ALLOCATION_ACTION.ALLOCATED_TO_SALES_BILL,
+            actor,
+            allocatedAmount: toNumber(row.allocated_amount),
+            allocatedQty: toNumber(row.allocated_qty),
+            createdAt,
+            meta: {
+              source: 'sales_bill_create',
+            },
+            poSellId: row.po_sell_id!,
+            productCodeSnapshot: row.product_code_snapshot,
+            productId: row.product_id,
+            productNameSnapshot: row.product_name_snapshot,
+            salesBillDocNo: createdBill.doc_no,
+            salesBillId: createdBill.id,
+            salesBillLineId: row.sales_bill_line_id,
+            salesBillLineNo: row.sales_line_no,
+            unitPriceSnapshot: toNumber(row.unit_price),
+          })))
       }
 
       if (selectedCustomerAdvance && customerAdvanceApplied > 0) {
@@ -1934,6 +1956,35 @@ export async function PATCH(request: Request) {
       })
 
       // 2. Revert PO Sell allocation
+      const activePoSellAllocations = await tx.sales_bill_po_sell_allocations.findMany({
+        where: {
+          allocation_type: 'PO_SELL',
+          sales_bill_id: bill.id,
+          status: 'active',
+        },
+      })
+      await appendPoSellAllocationLogs(tx, activePoSellAllocations
+        .filter((allocation) => allocation.po_sell_id != null)
+        .map((allocation) => ({
+          action: PO_SELL_ALLOCATION_ACTION.RELEASED_FROM_SALES_BILL,
+          actor,
+          allocatedAmount: toNumber(allocation.allocated_amount),
+          allocatedQty: toNumber(allocation.allocated_qty),
+          createdAt,
+          meta: {
+            reason: 'sales_bill_cancel',
+          },
+          note: reason,
+          poSellId: allocation.po_sell_id!,
+          productCodeSnapshot: allocation.product_code_snapshot,
+          productId: allocation.product_id,
+          productNameSnapshot: allocation.product_name_snapshot,
+          salesBillDocNo: bill.doc_no,
+          salesBillId: bill.id,
+          salesBillLineId: allocation.sales_bill_line_id,
+          salesBillLineNo: allocation.sales_line_no,
+          unitPriceSnapshot: toNumber(allocation.unit_price),
+        })))
       for (const poSellDocNo of poSellDocNos) {
         const poSell = poSellByDocNo.get(poSellDocNo)
         if (!poSell) continue

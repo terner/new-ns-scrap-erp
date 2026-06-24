@@ -1791,6 +1791,7 @@ model po_sells {
   vat_rate_percent  Decimal    @default(7.00) @db.Decimal(5, 2)
   vat_amount        Decimal?   @default(0) @db.Decimal
   customers         customers? @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  po_sell_allocation_logs po_sell_allocation_logs[]
   sales_bill_po_sell_allocations sales_bill_po_sell_allocations[]
 
   @@index([doc_no], map: "idx_po_sells_doc_no")
@@ -2014,6 +2015,7 @@ model products {
   grade_adjustments_grade_adjustments_source_product_idToproducts grade_adjustments[]               @relation("grade_adjustments_source_product_idToproducts")
   grade_adjustments_grade_adjustments_target_product_idToproducts grade_adjustments[]               @relation("grade_adjustments_target_product_idToproducts")
   po_buy_allocation_logs                                          po_buy_allocation_logs[]
+  po_sell_allocation_logs                                         po_sell_allocation_logs[]
   production_inputs                                               production_inputs[]
   production_orders                                               production_orders[]
   production_outputs                                              production_outputs[]
@@ -2564,6 +2566,7 @@ model sales_bills {
   customer_receipt_allocations customer_receipt_allocations[]
   sales_bill_customer_advance_allocations sales_bill_customer_advance_allocations[]
   sales_bill_lines             sales_bill_lines[]
+  po_sell_allocation_logs      po_sell_allocation_logs[]
   sales_bill_po_sell_allocations sales_bill_po_sell_allocations[]
   sales_bill_source_allocations sales_bill_source_allocations[]
   sales_bill_status_logs       sales_bill_status_logs[]
@@ -2634,6 +2637,7 @@ model sales_bill_lines {
   version                           Int                               @default(1)
   products                          products?                         @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   sales_bills                       sales_bills                       @relation(fields: [sales_bill_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  po_sell_allocation_logs           po_sell_allocation_logs[]
   sales_bill_po_sell_allocations    sales_bill_po_sell_allocations[]
   sales_bill_source_allocations     sales_bill_source_allocations[]
 
@@ -2717,6 +2721,39 @@ model sales_bill_po_sell_allocations {
   @@index([sales_bill_id, sales_line_no, status], map: "idx_sales_bill_po_sell_allocations_bill_line_status")
   @@index([po_sell_id, status], map: "idx_sales_bill_po_sell_allocations_po_status", where: raw("(po_sell_id IS NOT NULL)"))
   @@index([allocation_type, status], map: "idx_sales_bill_po_sell_allocations_type_status")
+  @@schema("public")
+}
+
+model po_sell_allocation_logs {
+  event_key              String            @unique(map: "idx_po_sell_allocation_logs_event_key") @default(dbgenerated("('POSALLOC-'::text || (gen_random_uuid())::text)"))
+  action                 String
+  po_sell_doc_no         String
+  sales_bill_doc_no      String?
+  sales_bill_line_no     Int?
+  product_code_snapshot  String?
+  product_name_snapshot  String?
+  allocated_qty          Decimal           @default(0) @db.Decimal
+  allocated_amount       Decimal           @default(0) @db.Decimal
+  unit_price_snapshot    Decimal           @default(0) @db.Decimal
+  from_remaining_qty     Decimal?          @db.Decimal
+  to_remaining_qty       Decimal?          @db.Decimal
+  note                   String?
+  meta                   Json?
+  created_at             DateTime          @default(now()) @db.Timestamptz(6)
+  created_by             String?
+  id                     BigInt            @id @default(autoincrement())
+  po_sell_id             BigInt
+  sales_bill_id          BigInt?
+  sales_bill_line_id     BigInt?
+  product_id             BigInt?
+  po_sells               po_sells          @relation(fields: [po_sell_id], references: [id], onUpdate: NoAction)
+  products               products?         @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  sales_bills            sales_bills?      @relation(fields: [sales_bill_id], references: [id], onUpdate: NoAction)
+  sales_bill_lines       sales_bill_lines? @relation(fields: [sales_bill_line_id], references: [id], onUpdate: NoAction)
+
+  @@index([po_sell_id, created_at(sort: Desc)], map: "idx_po_sell_allocation_logs_po_created")
+  @@index([product_id], map: "idx_po_sell_allocation_logs_product")
+  @@index([sales_bill_id], map: "idx_po_sell_allocation_logs_sales_bill")
   @@schema("public")
 }
 

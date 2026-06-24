@@ -21,6 +21,7 @@ updated: 2026-06-23
 - เมื่อกดบันทึก ให้ถือว่าออกเอกสารและมีผลทันที
 - ถ้าสินค้าออกจากคลังก่อนเปิดบิล ให้สร้าง `WTO` และให้ระบบมองเป็น `pending_out / รอออก`; ขั้นนี้ยังไม่เขียน `stock_ledger`
 - ตัด stock จริงและเขียน `stock_ledger.ref_type = SB` เมื่อสร้าง `Sales Bill` ที่ดึง `WTO` ไปใช้เท่านั้น
+- ต้นทุนขายของ Stock SB ใช้ `ต้นทุนเฉลี่ย ณ เวลาขาย` ตอน `SB` consume `WTO pending_out`; ค่า cost ต้องถูก snapshot ลง `stock_ledger.unit_cost/value_out` ของ `SB` แล้วรายงาน COGS อ่านจาก ledger ที่ posted แล้ว ไม่คำนวณย้อนหลังจาก WAC ปัจจุบัน
 - flow `Pending Sale / PSALE / เบิกออกรอบิล` ถูกถอดจาก target runtime แล้ว ไม่ใช้เป็นเอกสารคั่นกลางระหว่าง WTO กับ SB
 - ถ้าต้องออกเอกสารส่งของ/น้ำหนักขาออก ให้ใช้ `ใบส่งของ / Weight Ticket Out` เลขเอกสาร `WTO{branchCode}{YYMM}-NNNN`; ไม่มีเลข `WT` เดี่ยวใน target
 - flow หลักของการสร้างบิลขายต้องเป็น `PO Sell -> WTO -> Sales Bill`; หน้า `/sales/bills` เลือก `WTO` แล้วแสดงรายการสินค้าจากใบส่งของเพื่อ allocate เข้า `PO Sell`
@@ -101,6 +102,7 @@ updated: 2026-06-23
 - ถ้าแก้ไขก่อนถูกใช้ ต้อง rebuild `pending_out`
 - ถ้ายกเลิกก่อนถูกใช้ ต้อง release `pending_out`
 - ไม่ต้อง reverse stock ledger เพราะ `WTO` ไม่ใช่ movement owner แต่ต้องบันทึก status/timeline ไม่ลบเอกสารเงียบ ๆ
+- เมื่อ `SB` ยกเลิก ต้อง append `released_from_sales_bill` ใน `weight_ticket_usage_logs`, คืนสถานะ WTO เป็น `ส่งของแล้ว`, append `SB-CANCEL`, และบันทึก log คืน PO Sell ผ่าน `po_sell_allocation_logs`
 
 ## Flow ขายแบบมี PO Sell ผ่าน WTO
 
@@ -159,6 +161,7 @@ Target rule สำคัญสำหรับ Trading sale:
 - บิลรับซื้อ Trading ที่นำมา match จะผูกหรือไม่ผูก PO Buy ก็ได้
 - บิลขาย Trading สามารถผูกหรือไม่ผูก PO Sell ได้
 - ถ้าผูก PO Sell ต้องตัดยอด PO Sell remaining/commitment ระดับ line item
+- การตัด/คืน PO Sell จาก `SB` ต้องมี `po_sell_allocation_logs` แยกจาก allocation fact เพื่อให้ timeline/audit อ่านย้อนหลังได้ ไม่เดาจาก status string
 - รายการสินค้าในบิลขาย Trading ไม่ต้องตัด stock และต้องไม่เขียน stock ledger แม้สินค้าเป็นทองเหลือง/ทองแดงหรือมี PO Sell
 - ทองเหลือง/ทองแดงที่เป็น Trading ให้ไป Trading Matching เพื่อจับคู่ขาย/ตัดขายนอกระบบ ไม่ตัด Stock ตัวเอง
 - ถ้าเลือก PO Sell แล้ว จำนวน/น้ำหนักที่ตัดต้องไม่เกินยอด PO Sell ที่ยังไม่ออกบิล/ยังไม่ถูกตัด

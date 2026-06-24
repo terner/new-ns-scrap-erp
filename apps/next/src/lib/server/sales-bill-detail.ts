@@ -397,7 +397,7 @@ export async function getSalesBillDetail(
 
   const factStatuses = ['active', 'cancelled']
   const snapshots = itemSnapshots(bill.items)
-  const [lineFacts, salesperson, customerAdvanceAllocations, tradingAllocationFacts, statusLogs, weightTicketUsageLogs] = await Promise.all([
+  const [lineFacts, salesperson, customerAdvanceAllocations, tradingAllocationFacts, statusLogs, weightTicketUsageLogs, poSellAllocationLogs] = await Promise.all([
     prisma.sales_bill_lines.findMany({
       include: {
         sales_bill_po_sell_allocations: {
@@ -466,6 +466,12 @@ export async function getSalesBillDetail(
       where: {
         target_doc_no: bill.doc_no,
         target_type: 'SALES_BILL',
+      },
+    }),
+    prisma.po_sell_allocation_logs.findMany({
+      orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+      where: {
+        sales_bill_id: bill.id,
       },
     }),
   ])
@@ -560,7 +566,20 @@ export async function getSalesBillDetail(
       type: 'WTO usage log',
       unit: 'กก.',
     })),
-    ...lineFacts.flatMap((line) => line.sales_bill_po_sell_allocations.map((allocation) => ({
+    ...poSellAllocationLogs.map((log) => ({
+      amount: toNumber(log.allocated_amount),
+      createdAt: log.created_at.toISOString(),
+      docNo: log.po_sell_doc_no,
+      id: log.event_key ?? `po-sell-log:${String(log.id)}`,
+      lineNo: log.sales_bill_line_no,
+      productName: log.product_name_snapshot ?? '-',
+      qty: toNumber(log.allocated_qty),
+      status: log.action === 'released_from_sales_bill' ? 'cancelled' : 'active',
+      title: log.action === 'released_from_sales_bill' ? 'คืน PO Sell จากบิลขาย' : 'ตัด PO Sell',
+      type: 'PO Sell usage log',
+      unit: 'กก.',
+    })),
+    ...(!poSellAllocationLogs.length ? lineFacts.flatMap((line) => line.sales_bill_po_sell_allocations.map((allocation) => ({
       amount: toNumber(allocation.allocated_amount),
       createdAt: allocation.created_at.toISOString(),
       docNo: allocation.po_sell_doc_no ?? allocation.po_sells?.doc_no ?? 'Spot Sale',
@@ -572,7 +591,7 @@ export async function getSalesBillDetail(
       title: allocation.allocation_type === 'PO_SELL' ? 'ตัด PO Sell' : 'Spot Sale',
       type: 'Sales allocation fact',
       unit: line.unit_snapshot || 'กก.',
-    }))),
+    }))) : []),
     ...tradingAllocationFacts.map((fact) => ({
       amount: toNumber(fact.matched_cogs),
       createdAt: fact.created_at.toISOString(),
