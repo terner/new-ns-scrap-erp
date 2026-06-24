@@ -55,6 +55,77 @@
 - Daily Expense currently has no visible branch selector in the form even though the API schema keeps optional `branchId`; no new branch-party behavior was added there to avoid changing the expense flow outside this batch.
 - Initial operational data task completed on dev-target: `51` active Customers and `1871` active Suppliers were assigned to branch `01` / `สมุทรสาคร` as active primary mappings. Users can correct branch ownership later in Customer/Supplier master data.
 
+## Active Follow-up: AR/AP Balance Source Of Truth
+
+เป้าหมาย: ให้หน้า AR/AP และ report อ่านยอดค้างจาก snapshot ของเอกสารต้นทาง (`sales_bills`, `purchase_bills`) เป็นหลัก และใช้ receipt/payment/allocation logs เป็น drilldown/audit เท่านั้น เพื่อไม่ให้ยอดค้างคลาดเมื่อมี Customer/Supplier Advance หรือ cancellation/reversal
+
+### Contract
+
+- AR เกิดตอนบันทึก `Sales Bill (SB)`; `PO Sell` และ `WTO` ไม่สร้าง AR
+- AR ลดจาก `RCP` และ Customer Advance allocation ที่ active
+- AR read model ใช้ `sales_bills.receivable_balance` และ `sales_bills.received_amount` เป็น source หลัก
+- AP เกิดตอนบันทึก `Purchase Bill (PB)`; `POB`, `WTI`, และ `PMA` ไม่สร้างหรือลด AP
+- AP ลดจาก `PMT` และ Supplier Advance allocation ที่ active
+- AP read model ใช้ `purchase_bills.payable_balance` และ `purchase_bills.paid_amount` เป็น source หลัก
+- cancelled/reversed receipt/payment/allocation facts ต้องไม่ลด AR/AP
+- drilldown/detail ต้องแสดงที่มาของการตัดยอดจาก allocation facts โดยไม่ derive balance ทับจาก log ก่อน snapshot
+- AP ไม่มี channel filter จนกว่าจะมี purchase channel จริงในเอกสารซื้อ
+- AP credit term / due date schema ไม่อยู่ใน implementation รอบนี้; policy ปัจจุบันใช้ `purchase_bills.date` เป็นฐานนับอายุหนี้
+
+### Task Breakdown
+
+- [x] Update AR/AP page flow docs and Purchase/Sales flow docs with source-of-truth and calculation impact matrix
+- [x] Update AR/AP docs before implementation: remove Pending Sale summary from AR, document snapshot-first rows, document AP no-channel-filter policy, document no-credit-term implementation scope, and document detail drilldown targets
+- [ ] Fix `/api/finance/ar` source-of-truth: use `sales_bills.receivable_balance` and `sales_bills.received_amount` as primary balance/read fields; use `customer_receipt_allocations`, `customer_receipts`, and legacy `receipts` mirror only for RCP/Customer Advance drilldown/audit
+- [ ] Fix `/api/finance/ap` source-of-truth: use `purchase_bills.payable_balance` and `purchase_bills.paid_amount` as primary balance/read fields; use `payments`, `payment_allocations`, `payment_approvals`, and `supplier_advance_allocations` only for PMT/ADV drilldown/audit
+- [ ] Add AR detail drilldown from `/finance/ar` to SB/RCP and Customer Advance allocation facts, including cancelled receipt exclusion and created-date display in list/export
+- [ ] Add AP detail drilldown from `/finance/ap` to PB/PMA/PMT and Supplier Advance allocation facts, including cancelled/reversed payment exclusion and created-date display in list/export
+- [ ] Remove/hide AP channel filter and any `channelId` query/UI state from `/finance/ap` until purchase channel exists as a real source
+- [ ] Align `/finance/ar` and `/finance/ap` UI with `docs/design.md` / Peach: metric cards on plain grid, desktop lined/resizable/sort table, mobile dense cards, read-only dark-header detail modal
+- [ ] Add focused API/service checks for mixed cases:
+  - SB with Customer Advance + RCP returns `receivable_balance` from `sales_bills`, not derived from legacy receipt sum
+  - PB with Supplier Advance + PMT returns `payable_balance` from `purchase_bills`, not derived from payment sum
+  - cancelled RCP/PMT restores AR/AP balance
+
+## Active Follow-up: Finance / Accounting Menu And Period Close
+
+เป้าหมาย: ให้ทีมเห็นชัดว่าแต่ละหน้าใน `การเงิน & หนี้` และ `Finance / Accounting` คืออะไร ใช้ source ไหน และเมื่อมี month/year close ต้อง freeze อะไรบ้าง
+
+### Task Breakdown
+
+- [x] Add per-menu summary doc for `การเงิน & หนี้` and `Finance / Accounting`: [[Finance And Accounting Menu Summary]]
+- [x] Update [[Finance Accounting Flow]] to include active `Accounting Periods` and `Posting Rules` policy pages
+- [ ] Define accounting period state model: open, soft-closed, locked, reopened, year-closed
+- [ ] Define runtime closed-period enforcement matrix for Sales, Purchase, Payment, Stock, Bank, Asset, Loan, and Tax write APIs
+- [ ] Define reopen/rebuild snapshot audit flow before enabling period lock in production
+- [ ] Define GL/statutory posting scope separately from current management report pages
+
+## Active Follow-up: Historical Dashboard / Reporting Snapshots
+
+เป้าหมาย: ให้ Dashboard, Report, Tracking 360, AR/AP, PO/Bill history, Stock และ Finance ย้อนหลังอ่านข้อมูลจาก fact/snapshot ที่มี cutoff ชัดเจน แทนการเอายอด current-state ปัจจุบันไปคำนวณอดีต
+
+### Contract
+
+- ใช้ [[Reporting History Snapshot Policy]] เป็นกฎกลาง
+- Bill ย้อนหลังต้องอ่าน bill header/line snapshots + status/allocation facts ตาม document date และ as-of date
+- PO ย้อนหลังต้องอ่าน PO allocation/release logs หรือ daily PO outstanding snapshot; ห้ามใช้ remaining ปัจจุบันตอบอดีต
+- Finance ย้อนหลังต้องมี AR/AP/cash/bank/advance as-of snapshots; AR/AP current ใช้ bill balance snapshot แต่ historical aging ต้องใช้ allocation facts หรือ daily snapshot ตามวันที่
+- Stock ย้อนหลังต้อง derive จาก `stock_ledger` append-only ถึง as-of date; pending_out/hold ต้องมี usage/hold snapshot ถ้าจะแสดงย้อนหลัง
+- Stock real-time และ historical as-of ต้องตอบได้ทั้งจำนวน, มูลค่า, WAC/ต้นทุนเฉลี่ย, pending_out และ available ด้วย cutoff เดียวกัน; ห้ามใช้ WAC ปัจจุบันแทน WAC ย้อนหลัง
+- รายเดือน/รายปีต้อง roll up จาก daily snapshot ที่ตรวจแล้ว: movement metric = sum รายวัน, balance metric = ending balance วันสุดท้ายของช่วง
+- ถ้าขาด snapshot/fact ต้องแสดง data incomplete/reconciliation gap; ห้าม fallback ไปใช้ current balance แบบเงียบ
+
+### Task Breakdown
+
+- [x] Add cross-domain reporting history snapshot policy doc
+- [ ] Define daily snapshot schema/view plan for Bill, PO, Finance, and Stock domains
+- [ ] Define Stock real-time/as-of API contract for quantity, stock value, WAC, pending_out, and available by bucket
+- [ ] Add source coverage matrix for each Dashboard/Tracking/Report card
+- [ ] Add `asOf` contract and stale/incomplete snapshot warning for dashboard APIs that support historical view
+- [ ] Add backfill/rebuild scripts from transaction facts for selected date ranges
+- [ ] Add reconciliation checks comparing daily snapshots against source facts
+- [ ] Update monthly/yearly report APIs to use daily snapshots once the snapshot layer exists
+
 ## Phase 0: Baseline and Safety
 
 ### 0.1 Freeze Baseline
@@ -383,7 +454,7 @@ Reporting rule:
   - [x] ให้ `/purchase/bills/[id]` ใช้ event log เป็น timeline หลัก และไม่ใช้ raw internal payment ids เป็น outward history keys
 - [x] ออกแบบ target document history table model แบบแยก table ตามเอกสาร/flow ไม่ใช้ generic `document_events` เป็น source of truth
   - [x] บันทึก design ที่ `docs/notes/Document History Table Design.md`
-  - [x] ระบุว่า `WTI/WTO`, `POB`, `PB`, `ADV`, `PMA`, `PMT`, `POS`, `PSALE`, `SB`, `RCP` ต้องมี status/usage/allocation logs เฉพาะตามข้อมูลของแต่ละ flow
+  - [x] ระบุว่า `WTI/WTO`, `POB`, `PB`, `ADV`, `PMA`, `PMT`, `POS`, `SB`, `RCP` ต้องมี status/usage/allocation logs เฉพาะตามข้อมูลของแต่ละ flow; `PSALE` เหลือเฉพาะ legacy/data-repair reference หลังตัด `/sales/stock-issue`
   - [x] ระบุว่า active allocation/detail tables เป็น fact/current tables ไม่ใช่ timeline replacement
   - [x] เพิ่ม `weight_ticket_usage_logs` สำหรับ `WTI -> PB` allocation/release พร้อม backfill active allocations และตาราง `ประวัติการใช้งานใบรับของ` ใน WTI detail
   - [x] เพิ่ม `weight_ticket_status_logs` สำหรับ create/edit/cancel/status transition ของ `WTI/WTO` และให้ WTI detail timeline อ่านจาก dedicated document logs แทน `app_audit_logs`
@@ -392,7 +463,7 @@ Reporting rule:
   - [x] เพิ่ม `supplier_advance_status_logs` และ `supplier_advance_allocation_logs` สำหรับ lifecycle/status และ ADV -> PB allocation/release timeline
   - [x] เพิ่ม `customer_receipts`, `customer_receipt_allocations`, และ `customer_receipt_status_logs` สำหรับ `RCP` lifecycle/allocation พร้อม cancel-and-reissue edit policy
   - [ ] เพิ่ม `payment_approval_status_logs`, `payment_status_logs`, `payment_allocations`, และ `payment_account_splits`
-  - [ ] เพิ่ม sales-side status/allocation logs สำหรับ `POS`, `PSALE`, `WTO`, และ `SB` ส่วน `RCP` done ผ่าน Customer Receipt contract แล้ว
+  - [ ] เพิ่ม sales-side status/allocation logs สำหรับ `POS`, `WTO`, และ `SB` ส่วน `RCP` done ผ่าน Customer Receipt contract แล้ว; `PSALE` เป็น legacy-only/data-repair reference ไม่ใช่ target runtime log ใหม่
 - [x] Optimize Customer Receipt API/DB contract
   - [x] แยก `/api/sales/receipts` queue query เป็น outstanding SB และ active-allocation SB เพื่อลด OR-heavy query
   - [x] ลด broad ORM relation payload ด้วย `select` เฉพาะ field ที่ response ใช้จริง
@@ -585,10 +656,10 @@ Reporting rule:
   - [x] remove free-text reference and vehicle registration display from SB form/detail/print
   - [x] keep `+ เพิ่มรายการ` only for Trading/manual flow; STOCK uses WTO lines only
 - [x] `/sales/bills` STOCK allocation UX slice
-  - [x] PB-style columns: product, Gross, deduct, net weight, bill qty, PO Sell/Spot Sale source, unit price, discount, amount
+  - [x] target columns: product, น้ำหนักสุทธิที่ส่ง, จำนวนที่ขายได้, หักสิ่งเจือปน, น้ำหนักขายสุทธิ, PO Sell/Spot Sale source, unit price, discount, amount
   - [x] line-level `PO Sell / Spot Sale` selector with `Spot Sale` as default
   - [x] PB-style split rows under the same WTO product with `+ เพิ่มแถว` / `ลบ`
-  - [x] block incomplete WTO allocation and cap selected PO Sell rows by remaining quantity
+  - [x] allow partial WTO allocation when Customer buys less than sent quantity; cap selected PO Sell rows by remaining quantity and keep the unsold source qty as active `pending_out` for return
   - [x] lock `ราคา/หน่วย` when a row selects `PO Sell`; keep Spot Sale price editable
 - [x] `/sales/bills` totals/deposit/print runtime slice
   - [x] PB-style VAT/totals section and money-input behavior
@@ -609,6 +680,9 @@ Reporting rule:
     - [x] show hold state in WTO detail where relevant at baseline level
   - [ ] Batch WTO-C downstream stock-out
     - [x] add `SB Stock` create flow consume-hold + stock-out ledger write by referencing WTO intended warehouse; WTI/WTO must not write stock ledger rows
+    - [x] split Sales Bill stock quantity from commercial sales quantity: `จำนวนที่ขายได้ - หักสิ่งเจือปน = น้ำหนักขายสุทธิ`, while stock consume is capped by WTO pending_out source quantity
+    - [x] support partial consume of active `stock_holds` so remaining `pending_out` stays active after a partial Sales Bill
+    - [ ] add explicit `รับของคืน` UI/API action for remaining WTO pending_out after a partial Sales Bill; user must enter actual returned weight and the action must release/close hold with audit log
     - [x] show stock balance as `คงเหลือจริง / จองไว้ / พร้อมส่ง` in `/stock/balance`
     - [x] show hold/consume context in SB create from WTO at baseline level
     - [x] transaction-safe release/cancel on `SB`; full edit/rebuild remains disabled until read-model normalization is complete
@@ -671,6 +745,11 @@ Reporting rule:
 - [ ] design customer receipt allocations
 - [ ] define bank statement relation
 - [ ] sync `/finance/ap` and `/finance/ar` with created-date display, source document links, and final allocation facts
+- [ ] Fix `/api/finance/ar` AR source-of-truth: use `sales_bills.receivable_balance` and `sales_bills.received_amount` as the primary balance/read fields; use `customer_receipt_allocations`, `customer_receipts`, and legacy `receipts` only for RCP drilldown/audit. This prevents Customer Advance allocations from being missed when legacy receipt rows are used to derive received amounts.
+- [ ] Add AR detail drilldown from `/finance/ar` to SB and RCP allocation facts, including Customer Advance allocation facts, cancelled receipt exclusion, and created-date display in list/export.
+- [ ] Fix `/api/finance/ap` AP source-of-truth: use `purchase_bills.payable_balance` and `purchase_bills.paid_amount` as the primary balance/read fields; use `payments`, `payment_allocations`, `payment_approvals`, and `supplier_advance_allocations` only for PMT/PMA/ADV drilldown/audit.
+- [ ] Remove `/finance/ap` channel filter until purchase channel exists as a real document source; do not keep an empty dropdown or fallback query.
+- [ ] Keep AP aging on current policy: `purchase_bills.date` is the aging base date. Do not add credit term/due-date schema in this batch.
 - [ ] design dedicated `customer_advances` and `customer_advance_allocations` tables so `/finance/customer-advance` no longer depends on `bank_statement.ref_type = CADV` only
 - [ ] harden `/daily/petty-advance` with expense allocation, status logs, cancel/reverse policy, and server-side return-over-remaining guard
 - [ ] sync `/finance/bank` and `/finance/cash-position` with complete source links, as-of/currency policy, and read-only/admin-cleanup boundary

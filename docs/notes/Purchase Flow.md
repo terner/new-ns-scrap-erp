@@ -13,7 +13,7 @@ tags:
   - decision
 status: draft
 created: 2026-05-24
-updated: 2026-06-11
+updated: 2026-06-24
 ---
 
 # Purchase Flow / Flow ซื้อ
@@ -25,6 +25,9 @@ updated: 2026-06-11
 - `ใบรับของ / Weight Ticket In` ใช้เลขเอกสาร `WTI{branchCode}{YYMM}-NNNN` และเป็นเอกสารรับของจริงสำหรับกรณีซื้อเข้า stock
 - ฝั่งส่งของต้องแยกเป็น `ใบส่งของ / Weight Ticket Out` ใช้เลขเอกสาร `WTO{branchCode}{YYMM}-NNNN` ใน Sales/Delivery flow ไม่ปนกับใบรับของ
 - ซื้อเข้า stock ต้องมี `ใบรับของ` และระบบต้อง auto-select `คลัง RM` ที่ active ของสาขาบิลก่อนออกบิลรับซื้อ ไม่ว่าจะอ้าง PO หรือเป็น Spot Buy / No PO
+- เมื่อบันทึก `PB Stock` จำนวน stock และ stock value เพิ่มทันที และ WAC ปัจจุบันเปลี่ยนตามราคาซื้อของบิลนั้น
+- เมื่อยกเลิก `PB Stock` ต้อง reverse ด้วย `PB-CANCEL` โดยเอาจำนวนและมูลค่าของ PB เดิมออกด้วย unit cost/value เดิม แล้วให้ WAC ปัจจุบันคำนวณใหม่จาก stock ledger ที่เหลือ
+- ถ้า stock จาก PB เดิมถูกขาย/โอน/ผลิต/ปรับออกจนยอดพร้อมใช้ไม่พอสำหรับ reverse ต้อง block cancel หรือใช้ correction/approval flow แยก ห้ามลบหรือแก้ ledger เดิมเงียบ ๆ
 - คลังของบิลรับซื้อ Stock ไม่ใช่ field ที่ผู้ใช้เลือกเองแล้ว; หน้า `/purchase/bills` แสดงคลังเป็น read-only จาก active RM warehouse ของสาขา และ API ต้อง reject payload ที่ไม่ใช่ RM หรืออยู่นอกสาขา
 - Trading ไม่เข้า stock และไม่ใช้ใบรับของเป็นแหล่งน้ำหนักหลัก ผู้ใช้ต้องกรอกจำนวน/น้ำหนักในหน้าบิลรับซื้อ
 - PO กับใบรับของเป็นความสัมพันธ์ที่ต้องแยกให้ชัด: `PO` 1 ใบยังรับของได้หลายครั้ง/หลายเอกสาร แต่ target ใหม่คือ `WTI 1 ใบ -> PB 1 ใบ`; `WTI` ต้องถูกตัดครบใน `Purchase Bill` เดียว ห้าม split ไปหลาย `PB` และ `PB` แบบ Stock ต้องเลือก `WTI` ได้ 1 ใบเป็น source หลัก; ภายใน `PB` เดียวยัง allocate ระดับรายการสินค้า/น้ำหนักและผสม `PO` + `Spot Buy` ได้
@@ -61,6 +64,19 @@ Purchase Flow จบเมื่อ `PB` ถูกบันทึกและผ
 Payment Flow เริ่มจาก source payable ที่ต้องจ่าย เช่น `PB`, `ADV`, หรือ `EXP` แล้วค่อยทำ `approve/split -> PMA -> PMT -> payment history`
 
 Purchase Flow รู้สถานะการจ่ายเพื่อ lock/edit/cancel ให้ถูก แต่รายละเอียด `PMA`, `PMT`, void PMA, cancel PMT และ payment history เป็นขอบเขตของ [[Payment Flow]]
+
+## AP Contract / กติกาเจ้าหนี้
+
+- `AP / เจ้าหนี้` เกิดตอนบันทึก `Purchase Bill (PB)` ไม่ใช่ตอน `WTI`, `POB`, `PMA`, หรือ `PMT`
+- `WTI` เป็นหลักฐานรับของ/ชั่งเข้า ยังไม่ตั้งเจ้าหนี้
+- `POB` เป็น commitment สั่งซื้อ ยังไม่ตั้งเจ้าหนี้
+- `PB` ตั้งเจ้าหนี้จาก `purchase_bills.total_amount` และเก็บยอดค้างหลักที่ `purchase_bills.payable_balance`
+- Supplier Advance ที่จ่ายจริงแล้วและ allocate เข้า `PB` ต้องลด AP ผ่าน `purchase_bills.paid_amount` / `purchase_bills.payable_balance` และ `supplier_advance_allocations`
+- `PMA` เป็น approval/queue เพื่อทำจ่าย ยังไม่ลด AP
+- `PMT` ลด AP หลังบันทึกจ่ายจริง โดยยอดที่ตัด AP รวม payment amount, withholding tax, และ discount ตาม payment allocation ที่ active
+- `/finance/ap` และ report ที่เป็น AP balance ต้องอ่าน `purchase_bills.payable_balance` และ `purchase_bills.paid_amount` เป็น source หลัก
+- `payments`, `payment_allocations`, `payment_approvals`, และ `supplier_advance_allocations` ใช้เป็น drilldown/audit ว่าเอกสารใดตัดยอด ไม่ใช้ derive balance ทับจาก log ก่อน snapshot ของ `purchase_bills`
+- AP read model ต้องไม่ derive ยอดค้างจ่ายจาก `payments` ก่อน เพราะอาจไม่รวม Supplier Advance allocation; ให้ใช้ `purchase_bills.payable_balance` เป็น source หลัก
 
 ## Mermaid Flow ถึง Payment Handoff
 

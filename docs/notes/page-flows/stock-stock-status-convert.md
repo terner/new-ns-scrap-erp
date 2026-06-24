@@ -25,22 +25,24 @@ route: /stock/status-convert
 
 ## Flow Baseline
 
-SC ย้าย qty ระหว่าง stock status/output category โดย product เดิม. Requirement ล่าสุดจำกัด normal flow เป็น `RM -> FG` และ `FG -> RM`.
+SC ย้าย qty ระหว่าง stock status/output category โดย product เดิม. Requirement ล่าสุดจำกัด normal flow เป็น `RM -> FG` และ `FG -> RM` สำหรับ `Stock Reclassification / แก้ classification ผิด` เช่น รับซื้อเข้าเป็น `RM` แต่จริง ๆ ควรเป็น `FG`.
 
 ## Page Responsibilities
 
-- ปรับสถานะสินค้าเฉพาะ `RM <-> FG` ตาม requirement ล่าสุด
+- ปรับสถานะสินค้าเฉพาะ `RM <-> FG` ตาม requirement ล่าสุด โดยใช้กับการจัดประเภทผิดตั้งแต่ต้น ไม่ใช่ production
 - เลือก product/warehouse/source status/target status/qty/reason
 - เขียน paired ledger ออกจาก status เดิมและเข้า status ใหม่
-- ใช้สำหรับ stock status correction และ RM/FG bucket conversion ไม่ใช่ grade/product conversion
-- ส่งผลต่อ Stock Ledger, stock balance, WAC และ production/reporting read model ที่อ่าน ledger fact
+- ใช้สำหรับ stock status correction และ RM/FG bucket conversion ไม่ใช่ grade/product conversion และไม่ใช่การแปรรูปจริง
+- ส่งผลต่อ Stock Ledger และ stock balance ในฐานะ quantity reclassification; ไม่ใช่ event สำหรับตั้งต้นทุนหรือ reprice WAC
 
 ## Non-Responsibilities
 
 - ไม่เปลี่ยน product code/grade
 - ไม่ตั้งต้นทุนใหม่เกิน policy
+- ไม่ให้ user override cost ใน normal flow
 - ไม่รับ/ขาย/โอนข้าม warehouse ถ้าไม่ระบุใน rule
 - ไม่สร้าง production order และไม่ควรถูกรวมเป็น `PO2` output โดยไม่มี source label แยก
+- ไม่ใช้สำหรับเคสที่มี yield/loss/process cost; เคสนั้นต้องไป Production flow
 - ไม่แก้ WIP ใน normal user flow; WIP correction ต้องเป็น admin/production reversal policy แยก
 
 ## Lifecycle / Operation Flow
@@ -77,7 +79,9 @@ SC ย้าย qty ระหว่าง stock status/output category โดย
 
 - เขียน stock ledger out/in ด้วย ref_type SC
 - balance เปลี่ยน status bucket แต่ total product warehouse อาจเท่าเดิม
-- WAC target bucket รับ source unit cost; `value = qty * source unit cost`
+- SC ไม่เปลี่ยนต้นทุนเฉลี่ยจาก action นี้; RM->FG หรือ FG->RM เป็นการลด/เพิ่มจำนวนใน bucket เท่านั้น
+- ถ้า ledger เก็บ unit_cost/value เพื่อ audit ต้อง carry ค่าเดิมตาม source และไม่ถือว่าเป็น cost override
+- มูลค่ารวมของ stock ไม่ควรเปลี่ยนจาก SC ถ้าไม่มี loss/gain
 - production dashboard/report ต้องอ่าน `SC` เป็น source แยกจาก production order output ถ้าต้องนำไปแสดง
 
 ## Current Code Baseline
@@ -90,7 +94,7 @@ SC ย้าย qty ระหว่าง stock status/output category โดย
 ## Current Gap
 
 - Runtime จำกัด normal flow เป็น `RM <-> FG` แล้ว
-- hold-aware available, source-status WAC, server pagination/filter/index ทำแล้ว
+- hold-aware available, source-status bucket validation, server pagination/filter/index ทำแล้ว; target wording ล่าสุดถือว่า SC ไม่ใช่ WAC-changing event
 - reversal/reconciliation ทำแล้วด้วย append-only `SC-REV` และ reconciliation pair checks
 - UI design alignment 2026-06-21: list toolbar ของ `/stock/status-convert` ไม่แสดงปุ่ม `โหลดใหม่`, modal create ใช้ dark header `rounded-md` ตาม `docs/design.md` และไม่ใช้ปุ่ม X ใน header, table header ใช้ `bg-slate-100`, body ใช้ `text-xs font-semibold`, status ใช้ dot + text, action ใช้ destructive outline, และ wording วันที่แยก `วันที่เอกสาร` / `วันที่สร้างรายการ`
 - remaining: logged-in browser QA สำหรับ create/reverse

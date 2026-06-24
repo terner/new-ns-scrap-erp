@@ -6,12 +6,12 @@ tags:
   - read-model
   - flow
 status: accepted-baseline
-updated: 2026-06-16
+updated: 2026-06-24
 ---
 
 # Finance Accounting Flow
 
-เอกสารนี้เป็น source หลักของหมวด `Finance / Accounting` ใน active Next app. สถานะปัจจุบันของหมวดนี้เป็น management/report baseline พร้อม controlled write flow สำหรับ asset lifecycle เบื้องต้น ได้แก่ ทะเบียนทรัพย์สิน, ค่าเสื่อมราคา, และจำหน่ายทรัพย์สิน. หมวดนี้ยังไม่ใช่ GL/statutory accounting close system
+เอกสารนี้เป็น source หลักของหมวด `Finance / Accounting` ใน active Next app. สถานะปัจจุบันของหมวดนี้เป็น management/report baseline พร้อม controlled write flow สำหรับ asset lifecycle เบื้องต้น ได้แก่ ทะเบียนทรัพย์สิน, ค่าเสื่อมราคา, และจำหน่ายทรัพย์สิน. หมวดนี้ยังไม่ใช่ GL/statutory accounting close system. สำหรับสรุปแบบรายเมนูทั้ง `การเงิน & หนี้` และ `Finance / Accounting` ให้ดู [[Finance And Accounting Menu Summary]]
 
 ## Shared Boundary
 
@@ -42,6 +42,8 @@ updated: 2026-06-16
 | `/finance-accounting/asset-overview` | `GET /api/finance-accounting/asset-overview` | `asOf`, `branchId` | `buildCashOthersSummary()` + `buildFinancialDashboard()` | read-only |
 | `/finance-accounting/equity-maint` | `GET /api/finance-accounting/equity-maint` | none | latest `equity` row | write disabled |
 | `/finance-accounting/opening-balance` | `GET /api/finance-accounting/opening-balance` | none | `opening_balance`, `accounts` | save/apply disabled |
+| `/finance-accounting/accounting-periods` | page/policy UI | none | accounting period policy/readiness state | policy UI; runtime write enforcement deferred |
+| `/finance-accounting/posting-rules` | page/policy UI | none | source-to-account mapping readiness | policy UI; GL posting deferred |
 | `/finance-accounting/historical-data` | `GET /api/finance-accounting/historical-data` | none | `historical_monthly` | save/clear disabled |
 
 ## Page Semantics
@@ -53,6 +55,7 @@ updated: 2026-06-16
 | Tax baseline | Tax / VAT / WHT reads transaction tax fields and tax calendar assumptions. It is not a filing ledger and has no filing lock/status today. |
 | Asset baseline | Asset Register creates/maintains asset master, Depreciation posts/reverses monthly depreciation rows, Asset Disposal closes/reverses asset lifecycle using latest NBV, and Asset Overview remains read-only. |
 | Loan/equity/opening/historical | Loan Contracts/Dashboard, Equity, Opening Balance, Historical Data read setup/support tables. Write paths need approval/audit/cutover design before enabling. |
+| Period and posting policy | Accounting Periods is the target owner for month/year close states, soft close, lock, and reopen. Posting Rules is the readiness surface for source-to-account mapping before any GL/statutory posting is enabled. |
 
 ## Validation Rules
 
@@ -71,3 +74,5 @@ updated: 2026-06-16
 - asset acquisition/disposal/depreciation GL posting remains deferred in this dev-scope batch; source lifecycle rows and reversals are enabled
 - loan payment posting to bank statement/interest/principal split remains design-only
 - opening balance and historical-data writes are disabled until cutover approval policy is defined
+- Accounting Periods and Posting Rules are visible policy surfaces but do not yet enforce closed-period locks across all transaction write APIs
+- monthly/yearly close needs the snapshot layer from [[Reporting History Snapshot Policy]] before dashboards/statements can be frozen reliably

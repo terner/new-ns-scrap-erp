@@ -13,7 +13,7 @@ tags:
   - decision
 status: draft
 created: 2026-06-11
-updated: 2026-06-23
+updated: 2026-06-24
 ---
 
 # Stock Ledger and Stock Balance
@@ -94,6 +94,7 @@ updated: 2026-06-23
 ```text
 stock balance = sum(qty_in) - sum(qty_out)
 stock value   = sum(value_in) - sum(value_out)
+WAC / avg cost = stock value / stock balance
 ```
 
 สำหรับ stock ที่พร้อมใช้/พร้อมส่ง ต้องแยก reservation layer เพิ่ม:
@@ -149,6 +150,33 @@ API read contract ปัจจุบัน:
 - `GET /api/stock/ledger` = movement history
 - `GET /api/stock/balance` = aggregated stock balance from ledger
 
+## Real-time And Historical Stock Rule
+
+Stock read model ต้องตอบได้ 2 แบบด้วยหลักเดียวกัน:
+
+| Mode | Cutoff | ใช้ทำอะไร | Source |
+|---|---|---|---|
+| Real-time / ปัจจุบัน | เวลาปัจจุบันของ DB/server | หน้า stock balance, stock option ตอนสร้าง WTO/SB, dashboard ปัจจุบัน | `stock_ledger` ทั้งหมดที่ active/post แล้ว + active `stock_holds` |
+| Historical as-of / ย้อนหลัง | `asOf` หรือสิ้นวันที่ report เลือก | Dashboard ย้อนหลัง, รายงานรายวัน/เดือน/ปี, audit ยอด ณ วันเก่า | `stock_ledger` ถึง cutoff นั้น + hold/usage facts ถึง cutoff นั้น |
+
+ทั้งสอง mode ต้องคำนวณจำนวนและต้นทุนเฉลี่ยด้วย cutoff เดียวกัน:
+
+```text
+qty_as_of   = sum(qty_in - qty_out where ledger_date <= cutoff)
+value_as_of = sum(value_in - value_out where ledger_date <= cutoff)
+WAC_as_of   = value_as_of / qty_as_of
+```
+
+ถ้า `qty_as_of = 0` ให้ `WAC_as_of` เป็น 0 หรือ null ตาม contract ของ API แต่ห้ามใช้ WAC ปัจจุบันแทน WAC ย้อนหลัง
+
+`pending_out` จาก `WTO` ไม่เปลี่ยน `qty_as_of`, `value_as_of`, หรือ `WAC_as_of` เพราะยังไม่ใช่ stock ledger movement. แต่ถ้า dashboard ต้องแสดง `รอออก` ย้อนหลัง ต้อง reconstruct จาก `stock_holds` lifecycle/usage facts ถึง cutoff เดียวกัน แล้วคำนวณ:
+
+```text
+available_as_of = qty_as_of - pending_out_as_of
+```
+
+ถ้ามีการบันทึกย้อนหลัง, cancel, reverse, หรือรับของคืนที่มีผลกับวันเก่า ต้อง rebuild stock daily snapshot ตั้งแต่วันที่ได้รับผลกระทบถึงวันปัจจุบัน เพราะ WAC ของวันถัดไปอาจเปลี่ยนต่อเนื่อง
+
 ## API Alignment Snapshot
 
 ตรวจ ณ 2026-06-11 เทียบกับ target docs:
@@ -165,7 +193,7 @@ API read contract ปัจจุบัน:
 | `PATCH /api/daily/weight-tickets/{id}` | ตรง target สำหรับ hold | cancel/status action; WTO mark active hold เป็น `cancelled` |
 | `POST/PATCH /api/purchase/bills` | ตรง target หลักสำหรับ PB Stock ledger | create เขียน `PB`; cancel/supplier swap append `PB-CANCEL`; edit append `PB-EDIT-REV` แล้ว append `PB` state ใหม่ โดยไม่ delete/rebuild ledger เดิม |
 | `POST /api/sales/bills` | ตรง target create flow | validate ให้ WTO ที่เลือก allocate ครบใน SB เดียว, consume active hold, เขียน `stock_ledger.ref_type = SB`, update WTO usage/status log และ status เป็น `billed` |
-| `PATCH /api/sales/bills/{docNo}` | เพิ่มแล้วและ browser QA แล้วสำหรับ cancel | action `cancel` block เมื่อมี active RCP, เขียน `stock_ledger.ref_type = SB-CANCEL`, reopen consumed WTO hold, append `released_from_sales_bill`, คืน WTO เป็น `delivered`, reverse PO Sell header + item outstanding, และ append `sales_bill_status_logs` |
+| `PATCH /api/sales/bills/{docNo}` | เพิ่มแล้วและ browser QA แล้วสำหรับ cancel | action `cancel` block เมื่อมี active RCP, เขียน `stock_ledger.ref_type = SB-CANCEL`, append `released_from_sales_bill`, reverse PO Sell header + item outstanding, และ append `sales_bill_status_logs`; reopen consumed WTO hold เฉพาะกรณียังไม่มี return-from-WTO/SB ถ้าเคยรับคืนแล้วให้คืน stock ตรงด้วย `SB-CANCEL` และคง return/diff audit |
 | `GET /api/stock/reconciliation` | ถอดออกแล้ว | ไม่เป็น active API/page แล้ว; การตรวจ stock ใช้ cross-check ใน flow ยกเลิก/แก้ไขของแต่ละเอกสารและ contract automation เฉพาะ flow |
 
 สรุป: read API ของ stock ตรง target แล้ว และ target write model กลับมาเป็น bill-driven ตาม legacy:
@@ -233,6 +261,8 @@ stock balance key  = branch + warehouse + product + lot/status flags
 - `WTO edit` ที่ยังไม่ถูกใช้ ต้อง rebuild `pending_out` ให้ตรงข้อมูลใหม่
 - `WTO cancel` ที่ยังไม่ถูกใช้ ต้อง release `pending_out`
 - `SB save from WTO` ต้อง consume `pending_out` แล้วสร้าง `stock_ledger.ref_type = SB`
+- `SB save from WTO` แบบขายไม่ครบต้อง consume เฉพาะส่วนที่ออกบิลและคง remaining `pending_out` สำหรับรับของคืน
+- `WTO return from SB` ต้องเขียน stock ledger ขาเข้าโดยอ้าง `WTO`/`SB`, ใช้น้ำหนักชั่งกลับจริง และใช้ unit cost ที่ snapshot ณ ตอนออกบิลขาย
 - `SB cancel` ต้อง reverse `SB` ledger และ reopen/recreate `pending_out` ของ WTO ที่กลับไปรอออกบิล ถ้า WTO ยัง active
 
 สถานะ pending_out target:
@@ -241,6 +271,7 @@ stock balance key  = branch + warehouse + product + lot/status flags
 |---|---|
 | `active` | รอออกไว้แล้ว ยังไม่ออก SB |
 | `consumed` | ถูกใช้ตอนบันทึก SB แล้ว |
+| `returned` | คืน stock กลับจาก remaining pending_out ด้วยน้ำหนักชั่งจริงแล้ว |
 | `released` | ปล่อยคืนเพราะ WTO ถูกยกเลิกหรือแก้ไข |
 | `cancelled` | ปิด hold จากการยกเลิก/reversal ที่ไม่ควรนำกลับมาใช้ |
 
@@ -306,15 +337,53 @@ user-facing label:
 - `PB/SB` เป็นจุด post stock movement เพราะเป็นเอกสารที่ล็อก billing, ราคา, costing, และ AP/AR พร้อมกันตาม legacy
 - `Pending Sale / PSALE` เป็น legacy flow ที่ถอดออกจาก target runtime แล้ว; flow ใหม่ต้องใช้ `WTO -> pending_out -> SB` เท่านั้น
 
+## WAC Movement Policy
+
+กติกากลางของต้นทุนเฉลี่ย:
+
+- `PB Stock save` เป็น stock-in และเป็นจุดที่ทำให้จำนวน, stock value, และ WAC ปัจจุบันเปลี่ยนตามราคาซื้อของบิลนั้น
+- `PB cancel` ต้อง append `PB-CANCEL` เป็น stock-out ด้วย unit cost/value เดิมของ `PB` ที่ถูกยกเลิก แล้วให้ WAC ปัจจุบันคำนวณใหม่จาก ledger ที่เหลือ
+- `SB Stock save` เป็น stock-out และใช้ WAC ณ ตอนออกบิลขายเป็น COGS snapshot ใน `stock_ledger.unit_cost/value_out`
+- `SB cancel` หรือ `รับของคืน` ต้องคืน stock ด้วย unit cost/value เดิมที่ snapshot จาก `SB` แล้วให้ WAC ปัจจุบันคำนวณใหม่จาก stock ปัจจุบันบวก value ที่คืนเข้า
+- `WTO/pending_out` ไม่เปลี่ยน WAC เพราะยังไม่ใช่ stock ledger movement
+- `SC RM<->FG` ไม่เป็น cost event และไม่ reprice WAC; เป็น quantity reclassification เพื่อแก้ classification ผิดเท่านั้น
+
+ตัวอย่าง PB cancel:
+
+```text
+ก่อนซื้อ: 100 kg @ 40 = 4,000
+PB ซื้อเข้า: 50 kg @ 60 = 3,000
+หลังซื้อ: 150 kg value 7,000, WAC = 46.67
+
+ยกเลิก PB: เอา 50 kg @ 60 ออกด้วย PB-CANCEL
+หลังยกเลิก: 100 kg value 4,000, WAC = 40
+```
+
+ตัวอย่าง SB cancel หลังมีซื้อเข้าใหม่:
+
+```text
+ก่อนขาย: 100 kg @ 40 = 4,000
+SB ขายออก: 50 kg @ 40, เหลือ 50 kg @ 40
+PB ซื้อเข้าใหม่ก่อน cancel: 50 kg @ 60
+ก่อน cancel: 100 kg value 5,000, WAC = 50
+
+SB-CANCEL คืน 50 kg @ 40
+หลัง cancel: 150 kg value 7,000, WAC = 46.67
+```
+
 ## WTI / WTO Contract
 
 ### Target state
 
 - `WTI save` = บันทึกหลักฐานรับของจริง แต่ยังไม่เขียน stock ledger
-- `PB Stock save` = รับ stock เข้า โดยอ้าง `WTI`
+- `PB Stock save` = รับ stock เข้า โดยอ้าง `WTI`; qty/value เข้าและ WAC ปัจจุบันเปลี่ยนตามราคาซื้อของบิล
+- `PB Stock cancel` = reverse stock-in เดิมด้วย `PB-CANCEL` โดยใช้ unit cost/value เดิมของ PB แล้วให้ WAC คำนวณใหม่จาก stock ที่เหลือ
 - `WTO save` = บันทึกหลักฐานส่งของจริง / intended warehouse และสร้าง active `pending_out` แต่ยังไม่เขียน stock ledger
-- `SB Stock save` = consume `pending_out` แล้วตัด stock ออกโดยอ้าง `WTO`
-- `WTI/WTO` ต้องถูกใช้ครบทั้งใบใน `PB/SB` เดียว และถูก lock หลังถูกใช้
+- `SB Stock save` = consume `pending_out` แล้วตัด stock ออกโดยอ้าง `WTO`; ยอดขายคิดจากน้ำหนักขายสุทธิใน SB แต่ stock/COGS consume ต้องอิงน้ำหนัก source จาก WTO ที่ถูกนำไปออกบิล
+- ถ้า `SB` ขายไม่ครบตาม WTO ต้องเหลือ `pending_out` สำหรับ action `รับของคืน`; ห้ามนำ remaining นี้ไปเปิด SB ใบอื่นแบบเงียบ ๆ
+- `รับของคืน` ต้องให้ผู้ใช้กรอกน้ำหนักที่ชั่งกลับมาจริงและกดยืนยันก่อนคืน stock เข้า available
+- มูลค่ารับคืนจาก `pending_out` ต้องใช้ WAC/cost per unit ณ ตอนออกบิลขายที่ snapshot ไว้บน `SB`/`stock_ledger` ไม่ใช้ WAC ปัจจุบันหรือราคาขาย
+- `WTI/WTO` ถูก lock หลังถูกใช้กับ `PB/SB`; กรณี `WTO` ออกบิลบางส่วนจะยังมี action เฉพาะ `รับของคืน` สำหรับ remaining pending_out
 
 ### Current state ณ 2026-06-11
 
@@ -344,6 +413,7 @@ user-facing label:
 - `POST /api/sales/bills` ต้อง reject `pendingStockIssueId/fromPsale...`
 - ถ้าของออกก่อนเปิดบิล ให้สร้าง `WTO` ซึ่งทำให้ stock balance แสดง `รอออก`
 - เมื่อนำ WTO ไปออก Sales Bill แล้วจึงเขียน `SB` stock-out และตอนยกเลิกเขียน `SB-CANCEL`
+- ถ้า Sales Bill ถูกยกเลิกก่อนรับของคืน ให้ reopen `WTO pending_out`; ถ้ามีการรับของคืนแล้ว ห้าม reopen/recreate `pending_out` ซ้ำ และให้ `SB-CANCEL` คืน stock ตรงด้วย unit cost/value เดิมของ `SB`
 
 ดูรายละเอียด legacy ที่ [[Pending Sale Page Flow]]
 
@@ -367,7 +437,7 @@ user-facing label:
 
 - ถ้า `WTI` ถูกใช้ใน active `PB` แล้ว ต้อง lock edit/cancel ของ `WTI`
 - ถ้า `WTO` ถูกใช้ใน active `SB` แล้ว ต้อง lock edit/cancel ของ `WTO`
-- ถ้า `PB/SB` ถูกแก้หรือยกเลิก ต้อง reverse/rebuild movement ของ `PB/SB` และ release/recalc usage ของ `WTI/WTO`
+- ถ้า `PB/SB` ถูกแก้หรือยกเลิก ต้อง reverse/rebuild movement ของ `PB/SB` และ release/recalc usage ของ `WTI/WTO`; สำหรับ `SB` ที่มี return-from-WTO/SB แล้ว ต้องไม่ reopen pending_out ซ้ำ
 - การแก้หรือยกเลิก `WTI/WTO` ที่ยังไม่ถูกใช้ ไม่ต้อง reverse stock เพราะยังไม่มี stock movement ที่เอกสารนั้นสร้าง
 - PSALE legacy rows ที่ยังมีในฐานข้อมูลต้องถูกจัดการเป็น data repair/legacy migration แยก ไม่ใช่ runtime flow ปกติ
 

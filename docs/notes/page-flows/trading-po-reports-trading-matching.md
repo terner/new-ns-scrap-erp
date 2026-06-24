@@ -37,7 +37,7 @@ Update 2026-06-13: Trading Matching is not a standalone matching workbench anymo
 Source flow:
 
 - Buy side: `PO Buy` / Trading purchase bill / cost source.
-- Sell side: `PO Sell` -> Pending Sale -> Trading Sales Bill.
+- Sell side: `PO Sell` -> `WTO pending_out` -> Trading Sales Bill, or direct Trading Sales Bill from approved Trading cost source where the sales flow allows it.
 - User decision point: choose which cost lot/source is applied to which Trading sales bill before the sales bill reaches this page.
 - System dimensions produced from that decision: allocation, expected GP, remaining quantity/cost, and exposure tracking.
 - Downstream views: Allocation Ledger, Deal Margin, Waiting Allocation.

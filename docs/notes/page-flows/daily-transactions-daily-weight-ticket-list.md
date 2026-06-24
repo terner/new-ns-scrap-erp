@@ -54,7 +54,7 @@ list/detail/create link สำหรับ WTI/WTO; WTI/WTO เป็น evidenc
 - ปุ่มสร้างจาก tab `WTO` ต้องส่ง `?type=WTO` ไปหน้า create เพื่อเปิดฟอร์มใบส่งของ ไม่ default กลับเป็น `WTI`
 - เมื่อเข้าหน้า create จาก tab `WTI` หรือ `WTO` ต้องล็อกประเภทเอกสารและซ่อน tab ของอีกประเภท; edit เอกสารเดิมก็ต้องล็อกประเภทเช่นกัน
 - WTI ใช้เป็น source PB: 1 WTI ต่อ 1 PB และต้องถูกใช้ครบใน PB เดียว
-- WTO ใช้เป็น source SB: 1 WTO ต่อ 1 SB และต้องถูกใช้ครบใน SB เดียว
+- WTO ใช้เป็น source SB: 1 WTO ต่อ 1 SB; SB สามารถออกบิลบางส่วนได้เมื่อ Customer ซื้อไม่ครบ โดย remaining ต้องคงเป็น `pending_out` และปิดด้วย action `รับของคืน` ไม่ใช่นำไปเปิด SB ใบอื่น
 - WTI/WTO create/edit ต้องบังคับเลือก `สาขา` ก่อน `ผู้ขาย/ลูกค้า`; party selector ต้อง disabled จนกว่าจะเลือกสาขา
 - WTI supplier selector ต้องกรองจาก active `supplier_branches` ของสาขาเอกสาร และ WTO customer selector ต้องกรองจาก active `customer_branches` ของสาขาเอกสาร; เปลี่ยนสาขาแล้วคู่ค้าที่ไม่ตรง mapping ต้องถูก clear
 - WTO เป็น `pending_out` source โดยตรง: เมื่อสร้าง WTO ต้องกัน stock เป็น `pending_out` และแสดงใน Stock Balance เป็น `รอออก`

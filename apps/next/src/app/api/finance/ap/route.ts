@@ -160,8 +160,8 @@ export async function GET(request: Request) {
         const paidAmount = paidMap.get(bill.id) ?? toNumber(bill.paid_amount)
         const payableBalance = Math.max(0, totalAmount - paidAmount)
         const creditTerm = 0
+        // Current AP policy has no supplier credit term: aging starts from the PB date.
         const due = new Date(bill.date)
-        due.setDate(due.getDate() + creditTerm)
         const aging = Math.floor((today.getTime() - due.getTime()) / 86400000)
 
         return {
@@ -247,7 +247,7 @@ export async function GET(request: Request) {
         Bucket: row.bucket,
         Date: row.date,
         DocNo: row.docNo,
-        DueDate: row.dueDate,
+        AgingBaseDate: row.dueDate,
         Paid: row.paidAmount,
         Payable: row.payableBalance,
         Status: row.status,
@@ -291,7 +291,7 @@ export async function GET(request: Request) {
       rows,
       summary: {
         bills: allRows.length,
-        dueIn7: allRows.filter((row) => row.aging >= -7 && row.aging <= 0).reduce((sum, row) => sum + row.payableBalance, 0),
+        dueIn7: allRows.filter((row) => row.aging >= 0 && row.aging <= 7).reduce((sum, row) => sum + row.payableBalance, 0),
         overdue: allRows.filter((row) => row.aging > 0).reduce((sum, row) => sum + row.payableBalance, 0),
         suppliers: bySupplier.length,
         total: allRows.reduce((sum, row) => sum + row.payableBalance, 0),

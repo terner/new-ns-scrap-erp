@@ -12,7 +12,7 @@ tags:
   - stock-balance
 status: draft
 created: 2026-06-11
-updated: 2026-06-11
+updated: 2026-06-24
 ---
 
 # Stock Balance Page Flow / Flow หน้าสต๊อกคงเหลือ
@@ -39,6 +39,12 @@ updated: 2026-06-11
 | มูลค่าสต๊อก | `stock_ledger` | คำนวณจาก ledger value/cost policy เท่านั้น ไม่รวม pending_out |
 
 ถ้ามี summary/cache/materialized view ในอนาคต ต้อง rebuild ได้จาก `stock_ledger` และ pending_out facts เสมอ
+
+หน้า Stock Balance ต้องรองรับแนวคิด real-time และ historical as-of ตาม [[Stock Ledger and Stock Balance]]:
+
+- ไม่ส่ง `asOf` = แสดงยอดปัจจุบันจาก ledger ล่าสุดและ active holds ล่าสุด
+- ส่ง `asOf` = แสดงยอด ณ cutoff นั้น โดยจำนวน, มูลค่า, ต้นทุนเฉลี่ย, pending_out และ available ต้องใช้ cutoff เดียวกัน
+- ห้ามเอา WAC ปัจจุบันไปแสดงใน report ย้อนหลัง
 
 ## Page Meaning
 
@@ -145,6 +151,7 @@ Response ควรรวม:
 - `summary`
 - `reference` หรือ option lists ที่จำเป็นต่อ filter
 - ค่า hold-aware: `onHandQty`, `onHoldQty`, `availableQty`
+- ค่า valuation-aware: `stockValue`, `avgCost` หรือ `WAC` ที่คำนวณ ณ cutoff เดียวกับยอดจำนวน
 
 Export `.xlsx` ต้องใช้ filter เดียวกับหน้าจอ
 
@@ -155,6 +162,7 @@ Export `.xlsx` ต้องใช้ filter เดียวกับหน้า
 - Negative stock ต้องแสดงเพื่อ reconciliation แต่ไม่ควร silently hide
 - Hold จาก `WTO` ลด `พร้อมใช้` แต่ไม่สร้าง stock movement ใน ledger
 - `PB` เป็น stock-in owner และ `SB` เป็น stock-out owner ตาม [[Stock Ledger and Stock Balance]]
+- Historical view ต้องแสดงจำนวนและต้นทุนเฉลี่ยตาม `asOf` เดียวกัน ถ้า snapshot/fact ไม่พอ ต้องแจ้ง incomplete/reconciliation gap ไม่ fallback ไปใช้ยอดปัจจุบัน
 
 ## Current Implementation / Gap
 

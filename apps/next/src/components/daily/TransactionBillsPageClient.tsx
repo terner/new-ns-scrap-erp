@@ -419,6 +419,13 @@ function summaryQtyVariance(expectedQty: number, allocatedQty: number) {
   return { className: 'text-red-700', text: `จัดสรรในบิลนี้เกิน ${formatMoney(Math.abs(diff))} กก.` }
 }
 
+function salesStockQtyVariance(sentQty: number, acceptedQty: number) {
+  const diff = sentQty - acceptedQty
+  if (Math.abs(diff) < 0.001) return { className: 'text-emerald-700', text: 'ขายครบตามใบส่งของ' }
+  if (diff > 0) return { className: 'text-amber-700', text: `เหลือรอรับคืน ${formatMoney(diff)} กก.` }
+  return { className: 'text-sky-700', text: `ลูกค้าชั่งเกิน ${formatMoney(Math.abs(diff))} กก. ตัด stock เท่าใบส่งของ` }
+}
+
 function salesItemSourceGroupKey(item: SalesBillFormValues['items'][number]) {
   if (item.deliveryTicketId) return `WTO:${item.deliveryTicketId}:${item.deliverySummaryId ?? item.deliveryLineId ?? ''}`
   if (!item.tradingCostSourceId) return `MANUAL:${item.productId}`
@@ -1023,12 +1030,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       const current = map.get(summaryId)
       const summary = deliverySummaryById.get(summaryId) ?? null
       if (current) {
-        current.allocatedQty += item.qty
+        current.allocatedQty += item.netWeight
         current.rowIndices.push(index)
         return
       }
       map.set(summaryId, {
-        allocatedQty: item.qty,
+        allocatedQty: item.netWeight,
         expectedQty: summary?.remainingWeight ?? item.netWeight ?? item.qty,
         rowIndices: [index],
         summary,
@@ -1129,17 +1136,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     })
   })()
 
-  function salesSummaryAvailableForRow(summaryId: string | null, index: number) {
-    if (!summaryId) return 0
-    const summary = deliverySummaryById.get(summaryId)
-    if (!summary) return 0
-    const allocatedOtherRows = salesForm.items.reduce((sum, item, itemIndex) => {
-      if (itemIndex === index) return sum
-      return (item.deliverySummaryId ?? item.deliveryLineId) === summaryId ? sum + item.qty : sum
-    }, 0)
-    return Math.max(0, summary.remainingWeight - allocatedOtherRows)
-  }
-
   function poSellOptionForProduct(poSellId: string | null | undefined, productId: string | null | undefined) {
     if (!poSellId) return null
     const productMatched = productId
@@ -1196,9 +1192,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     if (!salesForm.items.some((item) => item.deliveryTicketId)) return []
     return selectedDelivery.productSummaries.flatMap((summary) => {
       const state = salesStockSummaryDraft.get(summary.id)
-      const allocatedQty = state?.allocatedQty ?? 0
-      const variance = summaryQtyVariance(summary.remainingWeight, allocatedQty)
-      if (Math.abs(summary.remainingWeight - allocatedQty) < 0.001) return []
+      const acceptedQty = state?.allocatedQty ?? 0
+      const variance = salesStockQtyVariance(summary.remainingWeight, acceptedQty)
+      if (Math.abs(summary.remainingWeight - acceptedQty) < 0.001) return []
       return [{
         className: variance.className,
         message: `${summary.productName}: ${variance.text}`,
@@ -1235,9 +1231,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       deliverySummaryId: summary.id,
       deliveryTicketDocNo: delivery.documentNo,
       deliveryTicketId: delivery.id,
-      deductWeight: summary.deductWeight,
+      deductWeight: 0,
       discount: 0,
-      grossWeight: summary.grossWeight,
+      grossWeight: summary.remainingWeight,
       netWeight: summary.remainingWeight,
       note: null,
       poSellId: null,
@@ -1906,6 +1902,19 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     setSalesFieldErrors({})
   }
 
+  function updateSalesStockSaleWeight(index: number, key: 'deductWeight' | 'netWeight', value: number) {
+    setSalesForm((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+        const next = { ...item, [key]: value }
+        const qty = Number(Math.max(0, next.netWeight - next.deductWeight).toFixed(2))
+        return { ...next, qty }
+      }),
+    }))
+    setSalesFieldErrors({})
+  }
+
   function updateSalesItemPoSell(index: number, poSellId: string | null) {
     setSalesForm((current) => {
       const items: SalesBillFormValues['items'] = []
@@ -2086,7 +2095,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       const summary = deliverySummaryById.get(summaryId)
       if (!summary) return current
       const allocatedQty = current.items.reduce((sum, item) => (
-        (item.deliverySummaryId ?? item.deliveryLineId) === summaryId ? sum + item.qty : sum
+        (item.deliverySummaryId ?? item.deliveryLineId) === summaryId ? sum + item.netWeight : sum
       ), 0)
       const remainingQty = Math.max(0, summary.remainingWeight - allocatedQty)
       if (remainingQty <= 0.0001) return current
@@ -2099,6 +2108,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         note: null,
         poSellId: null,
         price: 0,
+        deductWeight: 0,
+        grossWeight: 0,
+        netWeight: source.poSellId ? remainingQty : 0,
         qty: source.poSellId ? remainingQty : 0,
       }
       const items = [...current.items]
@@ -3381,14 +3393,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                        </div>
 	                      ) : null}
 	                      <div className="overflow-x-auto rounded-md border border-slate-200/60">
-	                      <table className="w-full min-w-[1260px] text-sm">
+	                      <table className="w-full min-w-[1180px] text-sm">
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                           <tr>
                             <th className="p-2 text-left">สินค้า</th>
-                            <th className="p-2 text-right">Gross</th>
-                            <th className="p-2 text-right">หัก</th>
-                            <th className="p-2 text-right">น้ำหนักสุทธิ</th>
-                            <th className="p-2 text-right">จำนวนตัดบิล</th>
+                            <th className="p-2 text-right">น้ำหนักสุทธิที่ส่ง</th>
+                            <th className="p-2 text-right">จำนวนที่ขายได้</th>
+                            <th className="p-2 text-right">หักสิ่งเจือปน</th>
+                            <th className="p-2 text-right">น้ำหนักขายสุทธิ</th>
                             <th className="p-2 text-left">อ้างอิง</th>
 	                            <th className="p-2 text-right">ราคา/หน่วย</th>
 	                            <th className="p-2 text-right">ส่วนลด</th>
@@ -3401,7 +3413,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                            const summaryId = item.deliverySummaryId ?? item.deliveryLineId ?? null
 	                            const sourceSummary = summaryId ? selectedDelivery.productSummaries.find((summary) => summary.id === summaryId) : null
 	                            const summaryState = summaryId ? salesStockSummaryDraft.get(summaryId) : null
-	                            const summaryVariance = sourceSummary ? summaryQtyVariance(sourceSummary.remainingWeight, summaryState?.allocatedQty ?? 0) : null
+	                            const summaryVariance = sourceSummary ? salesStockQtyVariance(sourceSummary.remainingWeight, summaryState?.allocatedQty ?? 0) : null
 	                            const isFirstRowOfSummary = summaryState ? summaryState.rowIndices[0] === index : true
 	                            const isLastRowOfSummary = summaryState ? summaryState.rowIndices[summaryState.rowIndices.length - 1] === index : false
 	                            const summaryUnallocatedQty = sourceSummary
@@ -3415,7 +3427,6 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                            })
 	                            const selectedPoSell = poSellOptionForProduct(item.poSellId, item.productId)
 	                            const hasSelectedPoSell = Boolean(item.poSellId && selectedPoSell)
-	                            const rowSummaryCapacity = salesSummaryAvailableForRow(summaryId, index)
 	                            const rowPoCapacity = hasSelectedPoSell ? poSellAvailableForRow(item.poSellId, index) : null
 	                            const poSellVariance = rowPoCapacity != null
 	                              ? poQtyVariance(rowPoCapacity, item.qty)
@@ -3436,12 +3447,18 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                                    </>
 	                                  ) : <span className="text-slate-300">-</span>}
 	                                </td>
-	                                <td className="p-2 text-right tabular-nums">{isFirstRowOfSummary ? formatMoney(sourceSummary?.grossWeight ?? item.grossWeight) : ''}</td>
-	                                <td className="p-2 text-right tabular-nums text-amber-700">{isFirstRowOfSummary ? formatMoney(sourceSummary?.deductWeight ?? item.deductWeight) : ''}</td>
 	                                <td className="p-2 text-right tabular-nums text-emerald-700">{isFirstRowOfSummary ? formatMoney(sourceSummary?.remainingWeight ?? item.netWeight ?? item.qty) : ''}</td>
 	                                <td className="p-2">
-	                                  <input data-error-key={`items.${index}.qty`} className={`w-full rounded-md border bg-emerald-50 px-2 py-2 text-right font-bold tabular-nums text-emerald-700 ${salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass} ${hasSelectedPoSell ? 'cursor-not-allowed bg-slate-100 text-slate-500' : ''}`} disabled={hasSelectedPoSell} max={rowPoCapacity === null ? rowSummaryCapacity : Math.min(rowSummaryCapacity, rowPoCapacity)} min="0" step="0.01" type="number" value={item.qty || ''} onChange={(event) => updateSalesItem(index, 'qty', Number(event.target.value || 0))} />
+	                                  <input data-error-key={`items.${index}.netWeight`} className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-bold tabular-nums text-slate-700 ${salesFieldErrors[`items.${index}.netWeight`] || salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass} ${hasSelectedPoSell ? 'cursor-not-allowed bg-slate-100 text-slate-500' : ''}`} disabled={hasSelectedPoSell} min="0" step="0.01" type="number" value={item.netWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'netWeight', Number(event.target.value || 0))} />
+	                                  {salesFieldErrors[`items.${index}.netWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.netWeight`]}</div> : null}
 	                                  {salesFieldErrors[`items.${index}.qty`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.qty`]}</div> : null}
+	                                </td>
+	                                <td className="p-2">
+	                                  <input data-error-key={`items.${index}.deductWeight`} className={`w-full rounded-md border bg-amber-50 px-2 py-2 text-right font-bold tabular-nums text-amber-700 ${salesFieldErrors[`items.${index}.deductWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'deductWeight', Number(event.target.value || 0))} />
+	                                  {salesFieldErrors[`items.${index}.deductWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.deductWeight`]}</div> : null}
+	                                </td>
+	                                <td className="p-2">
+	                                  <div data-error-key={`items.${index}.qty`} className={`rounded-md border px-2 py-2 text-right font-bold tabular-nums ${salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{formatMoney(item.qty)}</div>
 	                                </td>
                                 <td className="p-2">
                                   <select className="w-full rounded-md border bg-blue-50 px-2 py-2 text-xs" value={hasSelectedPoSell ? item.poSellId ?? '' : ''} onChange={(event) => updateSalesItemPoSell(index, event.target.value || null)}>
@@ -3489,9 +3506,9 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                         <tfoot className="border-t bg-emerald-50 font-bold">
                           <tr>
                             <td className="p-2 text-right text-slate-700">รวม</td>
-	                            <td className="p-2 text-right tabular-nums">{formatMoney((selectedDelivery?.productSummaries ?? []).reduce((sum, summary) => sum + summary.grossWeight, 0))}</td>
-	                            <td className="p-2 text-right tabular-nums text-amber-700">{formatMoney((selectedDelivery?.productSummaries ?? []).reduce((sum, summary) => sum + summary.deductWeight, 0))}</td>
 	                            <td className="p-2 text-right tabular-nums text-emerald-700">{formatMoney((selectedDelivery?.productSummaries ?? []).reduce((sum, summary) => sum + summary.remainingWeight, 0))}</td>
+	                            <td className="p-2 text-right tabular-nums">{formatMoney(salesForm.items.reduce((sum, item) => sum + item.netWeight, 0))}</td>
+	                            <td className="p-2 text-right tabular-nums text-amber-700">{formatMoney(salesForm.items.reduce((sum, item) => sum + item.deductWeight, 0))}</td>
 	                            <td className="p-2 text-right tabular-nums text-emerald-700">{formatMoney(salesForm.items.reduce((sum, item) => sum + item.qty, 0))}</td>
 	                            <td></td>
 	                            <td></td>

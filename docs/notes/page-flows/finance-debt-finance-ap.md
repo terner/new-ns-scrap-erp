@@ -6,7 +6,7 @@ tags:
   - finance-debt
   - accounts-payable
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-24
 route: /finance/ap
 ---
 
@@ -43,12 +43,13 @@ Legacy `view-ap`:
 ## Page Responsibilities
 
 - แสดงยอดค้างจ่ายจาก `purchase_bills`.
-- คำนวณ paid จาก `payments` ที่ไม่ cancelled/reversed.
-- คำนวณ `payableBalance = totalAmount - paidAmount`.
+- อ่าน `paidAmount` จาก `purchase_bills.paid_amount` เป็น source หลัก.
+- อ่าน `payableBalance` จาก `purchase_bills.payable_balance` เป็น source หลัก.
 - คำนวณ aging bucket.
 - สรุป supplier/branch/bucket.
 - export `.xlsx` ตาม filter ปัจจุบัน.
 - ใช้เป็นหน้าอ่านสถานะเพื่อเตรียมต่อไปยัง Payment Approval / Payment.
+- ไม่มี AP channel filter จนกว่า purchase flow จะมี purchase channel เป็น source จริง.
 
 ## Non-Responsibilities
 
@@ -103,16 +104,18 @@ Permission ปัจจุบัน: `finance.cash.view`.
 - Outward bill id = `purchase_bills.doc_no`.
 - Supplier/branch filter uses outward business code.
 - Current row fields include `docNo`, `date`, `dueDate`, `supplierCode`, `supplierName`, `branchName`, `status`, `transactionMode`, `totalAmount`, `paidAmount`, `payableBalance`, `aging`, `bucket`.
+- `totalAmount`, `paidAmount`, and `payableBalance` must come from `purchase_bills.total_amount`, `purchase_bills.paid_amount`, and `purchase_bills.payable_balance`.
 - Current API does not include `created_at`; target table/export should add created date.
 
 ## Validation / Status Rules
 
 - Exclude purchase bill cancelled statuses by default.
-- Exclude cancelled/reversed payments from paid amount.
+- Exclude cancelled/reversed payments and allocations from drilldown totals and audit summaries.
 - Only show rows with balance > 0.01.
 - AP status must eventually reflect workflow states clearly: `ยังไม่อนุมัติ`, `รอจ่าย`, `ชำระบางส่วน`, `เสร็จสิ้น`, `ยกเลิก`.
 - If a source has PMA approved or payment cycle active, edit/cancel locks belong to source write API and must be visible from AP drilldown.
-- Current AP due date still uses bill date + credit term 0; target should use bill due date or supplier credit term.
+- Current AP aging base uses `purchase_bills.date`; this is the accepted current policy because there is no confirmed supplier credit term / PB due-date source in this implementation batch.
+- The AP page must not derive visible balance from `payments` before the Purchase Bill snapshot.
 
 ## Side Effects
 
@@ -122,11 +125,12 @@ Permission ปัจจุบัน: `finance.cash.view`.
 
 - Current `apps/next` page/API code is accepted as P1 baseline as of 2026-06-11.
 - Current API supports filters, sort, pagination, xlsx export, and supplier/bucket summary.
-- Current AP due date is a known gap because credit term is hardcoded to 0.
+- Current AP aging base date is intentionally `purchase_bills.date` under the no-credit-term policy.
 
 ## Current Gap
 
-- Due date/source must be reconciled with supplier credit term and purchase bill due date.
+- API still needs to stop deriving visible balance from payment rows and read the `purchase_bills` balance snapshot first.
+- AP channel filter must be removed/hidden until purchase channel exists as a real document source.
 - PMA/PMT state separation and locks need end-to-end runtime proof.
 - Source links to PB/PMA/PMT need completion in detail.
 - Need created date in list/detail/export.
@@ -136,6 +140,7 @@ Permission ปัจจุบัน: `finance.cash.view`.
 - [x] Verify current Next page/component against this page-flow
 - [x] Verify API route handlers match Current API and status rules above
 - [x] Capture legacy AP baseline
-- [ ] Fix/confirm AP due date source
+- [ ] Switch API visible balance to `purchase_bills.payable_balance` / `paid_amount`
+- [ ] Remove AP channel filter until purchase channel exists
 - [ ] Add source document links and workflow state columns
 - [ ] Add created-date display/export

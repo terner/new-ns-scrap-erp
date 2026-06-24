@@ -81,11 +81,11 @@ function bucketCardClass(bucket: string) {
 }
 
 function bucketLabel(bucket: string) {
-  return bucket === 'Current' ? 'ยังไม่ถึง' : `${bucket} วัน`
+  return bucket === 'Current' ? 'วันนี้/อนาคต' : `${bucket} วัน`
 }
 
 function bucketLongLabel(bucket: string) {
-  return bucket === 'Current' ? 'ยังไม่ถึงกำหนด' : `${bucket} วัน`
+  return bucket === 'Current' ? 'วันนี้/อนาคต' : `${bucket} วัน`
 }
 
 function moneyOrDash(value: number) {
@@ -240,12 +240,12 @@ export function AccountsPayablePageClient() {
             <div className="mt-1 text-sm opacity-90">{data?.summary.bills ?? 0} บิล · {data?.summary.suppliers ?? 0} Supplier</div>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/20 pt-4">
               <div>
-                <div className="text-[10px] opacity-75">⚠ เกินกำหนด</div>
+                <div className="text-[10px] opacity-75">⚠ อายุหนี้แล้ว</div>
                 <div className="text-lg font-bold text-amber-200">{formatMoney(overdueAp)}</div>
                 <div className="text-[10px] opacity-75">{overduePercent}%</div>
               </div>
               <div>
-                <div className="text-[10px] opacity-75">⏰ ครบใน 7 วัน</div>
+                <div className="text-[10px] opacity-75">⏰ อายุไม่เกิน 7 วัน</div>
                 <div className="text-lg font-bold text-yellow-200">{formatMoney(dueIn7)}</div>
               </div>
             </div>
@@ -294,8 +294,8 @@ export function AccountsPayablePageClient() {
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 text-sm">
         <Metric label="ค้างจ่ายรวม" tone="red" value={formatMoney(totalAp)} />
-        <Metric label="เกินกำหนด" tone="amber" value={formatMoney(overdueAp)} />
-        <Metric label="ครบใน 7 วัน" tone="yellow" value={formatMoney(dueIn7)} />
+        <Metric label="อายุหนี้แล้ว" tone="amber" value={formatMoney(overdueAp)} />
+        <Metric label="อายุไม่เกิน 7 วัน" tone="yellow" value={formatMoney(dueIn7)} />
         <Metric label="บิลค้างจ่าย" value={`${data?.summary.bills ?? 0} ใบ`} />
         <Metric className="col-span-2 lg:col-span-1" label="Supplier ค้างจ่าย" value={`${data?.summary.suppliers ?? 0} ราย`} />
       </div>
@@ -521,7 +521,7 @@ export function AccountsPayablePageClient() {
               <div className="flex justify-between items-start gap-2">
                 <span className="font-bold text-slate-900 text-[15px] leading-snug">{row.supplierName}</span>
                 <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold shrink-0 ${row.oldest > 30 ? 'bg-red-100 text-red-700' : row.oldest > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
-                  {row.oldest > 0 ? `เกินกำหนด ${row.oldest} วัน` : 'ยังไม่ถึงกำหนด'}
+                  {row.oldest > 0 ? `อายุหนี้ ${row.oldest} วัน` : 'วันนี้/อนาคต'}
                 </span>
               </div>
               
@@ -582,7 +582,7 @@ export function AccountsPayablePageClient() {
                     <span className="text-slate-700 font-medium">{formatDateDisplay(row.date)}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">ครบกำหนด:</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">นับอายุจาก:</span>
                     <span className="text-slate-700 font-medium">{formatDateDisplay(row.dueDate)}</span>
                   </div>
                 </div>
@@ -743,7 +743,7 @@ function SummaryTable({
             <ResizableTableHead align="right" label="61-90" resizeProps={columnResize.getResizeHandleProps('b90', '61-90')} />
             <ResizableTableHead align="right" label="&gt;90" resizeProps={columnResize.getResizeHandleProps('gt90', '&gt;90')} />
             <ResizableTableHead align="right" label="รวมค้างจ่าย" resizeProps={columnResize.getResizeHandleProps('total', 'รวมค้างจ่าย')} />
-            <ResizableTableHead align="right" label="เกินกำหนดสุด" resizeProps={columnResize.getResizeHandleProps('oldest', 'เกินกำหนดสุด')} />
+            <ResizableTableHead align="right" label="อายุหนี้สูงสุด" resizeProps={columnResize.getResizeHandleProps('oldest', 'อายุหนี้สูงสุด')} />
           </tr>
         </thead>
         <tbody>
@@ -833,7 +833,7 @@ function DetailTable({
             <ResizableTableHead activeSortKey={selectedSort} direction={sortDirection} label="Supplier" resizeProps={columnResize.getResizeHandleProps('supplierName', 'Supplier')} sortKey="supplierName" onSort={onSort} />
             <ResizableTableHead activeSortKey={selectedSort} direction={sortDirection} label="บิล" resizeProps={columnResize.getResizeHandleProps('docNo', 'บิล')} sortKey="docNo" onSort={onSort} />
             <ResizableTableHead activeSortKey={selectedSort} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} sortKey="date" onSort={onSort} />
-            <ResizableTableHead activeSortKey={selectedSort} direction={sortDirection} label="Due" resizeProps={columnResize.getResizeHandleProps('dueDate', 'Due')} sortKey="dueDate" onSort={onSort} />
+            <ResizableTableHead activeSortKey={selectedSort} direction={sortDirection} label="นับอายุจาก" resizeProps={columnResize.getResizeHandleProps('dueDate', 'นับอายุจาก')} sortKey="dueDate" onSort={onSort} />
             <ResizableTableHead activeSortKey={selectedSort} align="center" direction={sortDirection} label="Aging" resizeProps={columnResize.getResizeHandleProps('aging', 'Aging')} sortKey="aging" onSort={onSort} />
             <ResizableTableHead align="right" label="ยอด" resizeProps={columnResize.getResizeHandleProps('totalAmount', 'ยอด')} />
             <ResizableTableHead align="right" label="จ่ายแล้ว" resizeProps={columnResize.getResizeHandleProps('paidAmount', 'จ่ายแล้ว')} />
@@ -893,8 +893,7 @@ function DetailModal({ onClose, row }: { onClose: () => void; row: ApRow }) {
             <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">ข้อมูลเอกสาร</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DetailItem label="วันที่บิล" value={formatDateDisplay(row.date)} />
-              <DetailItem label="ครบกำหนด" value={formatDateDisplay(row.dueDate)} />
-              <DetailItem label="Credit term" value={`${row.creditTerm} วัน`} />
+              <DetailItem label="นับอายุจาก" value={formatDateDisplay(row.dueDate)} />
               <DetailItem label="อายุหนี้" value={`${row.aging} วัน (${row.bucket})`} />
               <DetailItem label="ช่องทางซื้อ" value={row.channelName || '-'} />
               <DetailItem label="สาขา" value={row.branchName || '-'} />

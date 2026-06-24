@@ -46,8 +46,8 @@ Production cost report and other legacy/supporting production report surfaces ar
 
 | Area | Current source shape |
 |---|---|
-| AR | reads `sales_bills`, `receipts`, customers, branches, channels, and pending issue summary; excludes cancelled by default. |
-| AP | reads `purchase_bills`, `payments`, suppliers, branches; excludes cancelled purchase-bill statuses by default. |
+| AR | target visible balance reads `sales_bills.receivable_balance` / `received_amount`; receipt and customer-advance facts are drilldown/audit; no pending issue summary in target runtime. |
+| AP | target visible balance reads `purchase_bills.payable_balance` / `paid_amount`; payment/PMA/supplier-advance facts are drilldown/audit; excludes cancelled purchase-bill statuses by default. |
 | Bank | reads `bank_statement` plus active accounts and computes running balances from opening balance + statement rows. |
 | Cash position | derives account balances, AR exposure, and AP exposure from accounts, bank statement, sales bills, receipts, purchase bills, and payments. |
 | Customer advance | current code reads `bank_statement` rows with `ref_type = CADV`; used/remaining allocation is still a baseline gap. |

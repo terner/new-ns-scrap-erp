@@ -217,19 +217,15 @@ function salesItems(
   parsedProductIds: bigint[],
   productById: Map<bigint, { code: string | null; name: string; unit: string | null }>,
   deliverySummarySourceMap: Map<string, DeliverySummarySource> = new Map(),
+  stockIssueQtyByIndex: Map<number, number> = new Map(),
 ) {
   return values.items.map((item, index) => {
     const productId = parsedProductIds[index]
     const product = productById.get(productId)
     const deliverySummary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
-    const deliverySummaryNetWeight = deliverySummary ? toNumber(deliverySummary.net_weight) : 0
-    const deliveryRatio = deliverySummary && deliverySummaryNetWeight > 0 ? item.qty / deliverySummaryNetWeight : 0
-    const grossWeight = deliverySummary && deliveryRatio > 0
-      ? toNumber(deliverySummary.gross_weight) * deliveryRatio
-      : item.grossWeight
-    const deductWeight = deliverySummary && deliveryRatio > 0
-      ? toNumber(deliverySummary.deduct_weight) * deliveryRatio
-      : item.deductWeight
+    const stockIssueQty = deliverySummary
+      ? stockIssueQtyByIndex.get(index) ?? 0
+      : item.qty
     const amount = Math.max(0, item.qty * item.price - item.discount)
     return {
       amount,
@@ -238,9 +234,9 @@ function salesItems(
       deliverySummaryId: item.deliverySummaryId,
       deliveryTicketDocNo: item.deliveryTicketDocNo,
       deliveryTicketId: item.deliveryTicketId,
-      deductWeight,
+      deductWeight: item.deductWeight,
       discount: item.discount,
-      grossWeight,
+      grossWeight: deliverySummary ? item.netWeight : item.grossWeight,
       id: `${String(index + 1).padStart(2, '0')}`,
       netWeight: item.qty,
       note: item.note,
@@ -249,6 +245,7 @@ function salesItems(
       productId: requireBusinessCode(product?.code, `สินค้า ${productId}`),
       productName: product?.name ?? '',
       qty: item.qty,
+      stockIssueQty,
       tradingCostSourceId: item.tradingCostSourceId,
       unit: product?.unit ?? 'กก.',
       unitPrice: item.price,
@@ -279,11 +276,12 @@ function salesBillLineRows(input: {
     gross_weight: item.grossWeight,
     line_amount: item.amount,
     line_no: index + 1,
-    meta: {
-      deliveryLineId: item.deliveryLineId ?? null,
-      deliverySummaryId: item.deliverySummaryId ?? null,
-      tradingCostSourceId: item.tradingCostSourceId ?? null,
-    },
+      meta: {
+        deliveryLineId: item.deliveryLineId ?? null,
+        deliverySummaryId: item.deliverySummaryId ?? null,
+        stockIssueQty: item.stockIssueQty,
+        tradingCostSourceId: item.tradingCostSourceId ?? null,
+      },
     net_weight: item.netWeight,
     notes: item.note || null,
     product_code_snapshot: item.productCode,
@@ -354,18 +352,21 @@ function sourceAllocationRows(input: {
 
   return input.items.flatMap((item, index) => {
     if (!isDeliveryBackedSalesItem(item)) return []
-    const lineNo = index + 1
+      const lineNo = index + 1
+    const stockIssueQty = Math.max(0, item.stockIssueQty)
     return [{
       allocated_deduct_weight: item.deductWeight,
       allocated_gross_weight: item.grossWeight,
-      allocated_net_weight: item.qty,
-      allocated_qty: item.qty,
+      allocated_net_weight: stockIssueQty,
+      allocated_qty: stockIssueQty,
       created_at: input.createdAt,
       created_by: input.actor,
       meta: {
         deliveryLineId: item.deliveryLineId ?? null,
         deliverySummaryId: item.deliverySummaryId ?? null,
+        salesNetWeight: item.qty,
         source: 'sales_bill_create_from_wto',
+        stockIssueQty,
       },
       movement_owner: 'SALES_BILL',
       product_code_snapshot: item.productCode,
@@ -549,7 +550,7 @@ async function loadDeliveryAvailability(deliveryDocNo: string) {
       const record = item as Record<string, unknown>
       const ticketDocNo = typeof record.deliveryTicketId === 'string' ? record.deliveryTicketId : ''
       const summaryId = typeof record.deliverySummaryId === 'string' ? record.deliverySummaryId : ''
-      const qty = jsonNumber(record.qty)
+      const qty = jsonNumber(record.stockIssueQty ?? record.qty)
       if (ticketDocNo !== ticket.doc_no || !summaryId || qty <= 0) return
       usedQtyBySummaryId.set(summaryId, (usedQtyBySummaryId.get(summaryId) ?? 0) + qty)
     })
@@ -715,9 +716,19 @@ async function validateStockDeliverySelection(
   }
 
   const { deliverySummarySourceMap, lineToSummaryRef } = deliveryReferenceMaps(ticket, productCodeById)
-  const requestedQtyBySummaryId = new Map<string, number>()
+  const availableQtyBySummaryId = new Map<string, number>()
+  const acceptedWeightBySummaryId = new Map<string, number>()
+  const stockIssueQtyByItemIndex = new Map<number, number>()
 
-  for (const item of deliveryItems) {
+  for (const summary of ticket.weight_ticket_product_summaries) {
+    const productCode = summary.product_id != null ? productCodeById.get(summary.product_id) ?? '' : ''
+    const summaryId = deliverySummaryOutwardId(ticket.doc_no, productCode, summary.line_count)
+    const availableQty = Math.max(0, toNumber(summary.net_weight) - (usedQtyBySummaryId.get(summaryId) ?? 0))
+    availableQtyBySummaryId.set(summaryId, availableQty)
+  }
+
+  for (const [itemIndex, item] of values.items.entries()) {
+    if (!item.deliveryTicketId) continue
     const resolvedSummaryRef = item.deliverySummaryId ?? (item.deliveryLineId ? lineToSummaryRef.get(item.deliveryLineId) ?? null : null)
     if (item.deliveryTicketId !== ticket.doc_no || !resolvedSummaryRef) {
       return { error: 'รายการ Stock ต้องอ้างอิงรายการจากใบส่งของเดียวกัน' as const }
@@ -733,24 +744,29 @@ async function validateStockDeliverySelection(
     if (summarySource.product_id !== itemProduct.id) {
       return { error: 'สินค้าในบิลไม่ตรงกับสินค้าในใบส่งของ' as const }
     }
-    requestedQtyBySummaryId.set(resolvedSummaryRef, (requestedQtyBySummaryId.get(resolvedSummaryRef) ?? 0) + item.qty)
+    const buyerAcceptedWeight = Math.max(0, item.netWeight)
+    const expectedNetWeight = Number(Math.max(0, buyerAcceptedWeight - item.deductWeight).toFixed(2))
+    if (buyerAcceptedWeight <= 0.0001) {
+      return { error: `กรอกจำนวนที่ขายได้ของ ${summarySource.product_name}` as const }
+    }
+    if (item.deductWeight > buyerAcceptedWeight + 0.0001) {
+      return { error: `หักสิ่งเจือปนของ ${summarySource.product_name} เกินจำนวนที่ขายได้` as const }
+    }
+    if (Math.abs(expectedNetWeight - item.qty) > 0.01) {
+      return { error: `น้ำหนักขายสุทธิของ ${summarySource.product_name} ไม่ตรงกับจำนวนที่ขายได้หลังหักสิ่งเจือปน` as const }
+    }
+    const acceptedBefore = acceptedWeightBySummaryId.get(resolvedSummaryRef) ?? 0
+    const availableQty = availableQtyBySummaryId.get(resolvedSummaryRef) ?? 0
+    const remainingForStock = Math.max(0, availableQty - acceptedBefore)
+    const stockIssueQty = Math.min(buyerAcceptedWeight, remainingForStock)
+    if (stockIssueQty <= 0.0001) {
+      return { error: `${summarySource.product_name} ไม่มี pending_out คงเหลือสำหรับตัด stock` as const }
+    }
+    acceptedWeightBySummaryId.set(resolvedSummaryRef, acceptedBefore + buyerAcceptedWeight)
+    stockIssueQtyByItemIndex.set(itemIndex, Number(stockIssueQty.toFixed(2)))
   }
 
-  for (const summary of ticket.weight_ticket_product_summaries) {
-    const productCode = summary.product_id != null ? productCodeById.get(summary.product_id) ?? '' : ''
-    const summaryId = deliverySummaryOutwardId(ticket.doc_no, productCode, summary.line_count)
-    const availableQty = Math.max(0, toNumber(summary.net_weight) - (usedQtyBySummaryId.get(summaryId) ?? 0))
-    const requestedQty = requestedQtyBySummaryId.get(summaryId) ?? 0
-    if (requestedQty > availableQty + 0.0001) {
-      return { error: `จำนวนเกินน้ำหนักคงเหลือของ ${summary.product_name}` as const }
-    }
-    if (availableQty > 0.0001 && requestedQty < availableQty - 0.0001) {
-      const remainingQty = Math.max(0, availableQty - requestedQty).toLocaleString('th-TH', { maximumFractionDigits: 2 })
-      return { error: `ใบส่งของต้องจัดสรรให้ครบก่อนบันทึก: ${summary.product_name} ยังเหลือ ${remainingQty} กก.` as const }
-    }
-  }
-
-  return { deliverySummarySourceMap, ticket }
+  return { deliverySummarySourceMap, stockIssueQtyByItemIndex, ticket }
 }
 
 async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchScope>>) {
@@ -1336,6 +1352,7 @@ export async function POST(request: Request) {
     const productById = new Map(products.map((product) => [product.id, product]))
     const productCodeById = new Map(products.map((product) => [product.id, requireBusinessCode(product.code, `สินค้า ${product.id}`)]))
     let deliverySummarySourceMap = new Map<string, DeliverySummarySource>()
+    let stockIssueQtyByItemIndex = new Map<number, number>()
     let stockDeliveryTicket: DeliveryTicketOptionRow | null = null
     if (values.transactionMode === 'STOCK' || (values.transactionMode === 'TRADING' && Boolean(values.deliveryTicketId))) {
       const deliveryValidation = await validateStockDeliverySelection(values, branch?.id ?? null, customer.id, productByCode, productCodeById)
@@ -1343,11 +1360,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ code: 'BAD_REQUEST', error: deliveryValidation.error }, { status: 400 })
       }
       deliverySummarySourceMap = deliveryValidation.deliverySummarySourceMap
+      stockIssueQtyByItemIndex = deliveryValidation.stockIssueQtyByItemIndex
       stockDeliveryTicket = deliveryValidation.ticket
     }
 
     const docNo = await nextDailyDocNo('sales_bills', 'SB', billDate)
-    const items = salesItems(values, parsedProductIds as bigint[], productById, deliverySummarySourceMap)
+    const items = salesItems(values, parsedProductIds as bigint[], productById, deliverySummarySourceMap, stockIssueQtyByItemIndex)
     const poSellAllocations = new Map<string, ReturnType<typeof allocatePoSellForSalesBill>>()
     for (const poSellDocNo of requestedPoSellDocNos) {
       const poSell = poSellByDocNo.get(poSellDocNo)
@@ -1761,6 +1779,13 @@ export async function POST(request: Request) {
       if (stockDeliveryTicket) {
         const consumedStockLines = await consumeActiveWtoStockHolds(tx, {
           actor,
+          allocations: items
+            .filter(isDeliveryBackedSalesItem)
+            .map((item) => ({
+              productId: productByCode.get(item.productId)?.id ?? BigInt(0),
+              qty: item.stockIssueQty,
+            }))
+            .filter((allocation) => allocation.productId !== BigInt(0) && allocation.qty > 0.0001),
           billDate: normalizeDate(billDate),
           branchId: branch.id,
           salesBillDocNo: createdBill.doc_no,
@@ -1789,9 +1814,13 @@ export async function POST(request: Request) {
             actor,
             allocatedDeductWeight: item.deductWeight,
             allocatedGrossWeight: item.grossWeight,
-            allocatedNetWeight: item.qty,
-            allocatedQty: item.qty,
-            meta: { reason: 'sales_bill_create' },
+            allocatedNetWeight: item.stockIssueQty,
+            allocatedQty: item.stockIssueQty,
+            meta: {
+              reason: 'sales_bill_create',
+              salesNetWeight: item.qty,
+              stockIssueQty: item.stockIssueQty,
+            },
             productCodeSnapshot: item.productCode,
             productId: item.productId ? productByCode.get(item.productId)?.id ?? null : null,
             productNameSnapshot: item.productName,
@@ -1810,7 +1839,7 @@ export async function POST(request: Request) {
           if (!isDeliveryBackedSalesItem(item)) return
           const summary = item.deliverySummaryId ? deliverySummarySourceMap.get(item.deliverySummaryId) : null
           if (!summary) return
-          summaryUsage.set(summary.id, (summaryUsage.get(summary.id) ?? 0) + item.qty)
+          summaryUsage.set(summary.id, (summaryUsage.get(summary.id) ?? 0) + item.stockIssueQty)
         })
         await Promise.all([...summaryUsage.entries()].map(([summaryId, qty]) => tx.weight_ticket_product_summaries.update({
           data: {
@@ -1820,9 +1849,14 @@ export async function POST(request: Request) {
           },
           where: { id: summaryId },
         })))
+        const remainingAfterBilling = await tx.weight_ticket_product_summaries.aggregate({
+          _sum: { remaining_weight: true },
+          where: { weight_ticket_id: stockDeliveryTicket.id },
+        })
+        const nextTicketStatus = toNumber(remainingAfterBilling._sum.remaining_weight) > 0.0001 ? 'delivered' : 'billed'
         await tx.weight_tickets.update({
           data: {
-            status: 'billed',
+            status: nextTicketStatus,
             updated_at: createdAt,
             updated_by: actor,
           },
@@ -1837,7 +1871,7 @@ export async function POST(request: Request) {
             reason: 'sales_bill_create',
             salesBillDocNo: createdBill.doc_no,
           },
-          toStatus: 'billed',
+          toStatus: nextTicketStatus,
           weightTicketId: stockDeliveryTicket.id,
         })
       }

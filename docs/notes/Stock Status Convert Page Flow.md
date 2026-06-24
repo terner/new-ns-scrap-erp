@@ -25,16 +25,17 @@ updated: 2026-06-21
 - Page type: stock movement write flow
 - Ledger ref type: `SC`
 
-หน้านี้ใช้แปลง stock ระหว่าง status bucket `RM` และ `FG` ภายใน `product + branch + warehouse + lot` เดิม เช่น `ทองแดงเบอร์ 3 RM -> ทองแดงเบอร์ 3 FG` หรือย้อนกลับ `FG -> RM`
+หน้านี้ใช้ทำ `Stock Reclassification / แก้ classification ผิด` ระหว่าง status bucket `RM` และ `FG` ภายใน `product + branch + warehouse + lot` เดิม เช่น รับซื้อเข้ามาเป็น `RM` แต่ตรวจพบภายหลังว่าจริง ๆ ควรเป็น `FG` หรือย้อนกลับ `FG -> RM`
 
 ขอบเขตล่าสุดจาก requirement 2026-06-13:
 
-- ใช้สำหรับปรับวัตถุดิบเป็นสินค้าสำเร็จรูปในเชิง stock status เช่น `RM = ทองแดง scrap`, `FG = copper ingot`
+- ใช้สำหรับแก้สถานะ stock ที่ลงผิดตั้งแต่ต้นหรือจัดประเภทผิด ไม่ใช่การแปรรูปจริง เช่น รับของเข้าเป็น `RM` แต่จริง ๆ ควรอยู่ bucket `FG`
 - ระบบต้องลด stock ฝั่งต้นทางและเพิ่ม stock ฝั่งปลายทางทันที
-- ผลลัพธ์ต้องไปต่อที่ `Stock Ledger`, `WAC`, และรายงาน/มุมมอง Production ที่อ่าน fact จาก ledger
+- ผลลัพธ์ต้องไปต่อที่ `Stock Ledger` และ stock balance ในฐานะ quantity reclassification; ไม่ใช่ event ที่ตั้งต้นทุนใหม่หรือ reprice WAC
 - flow ปกติรองรับสองทิศทางเท่านั้น: `RM -> FG` และ `FG -> RM`
 - `WIP` ไม่อยู่ใน flow ปกติของหน้านี้ เพราะ WIP เป็น fact ของ Production Input/Output; ถ้าต้องแก้ WIP ต้องเป็น admin correction หรือ production reversal ที่แยก policy
 - หน้านี้ไม่เปลี่ยน product code/grade; ถ้าต้องเปลี่ยนจากสินค้า/grade หนึ่งไปอีกสินค้า/grade หนึ่ง ให้ใช้ `/stock/convert` หรือ production flow ตาม business case
+- ถ้าเป็นการแปรรูปจริง มี yield/loss/process cost หรือเปลี่ยนวัตถุดิบเป็นสินค้าใหม่ ต้องใช้ Production flow ไม่ใช่ `SC`
 
 ## Source Of Truth
 
@@ -43,7 +44,8 @@ updated: 2026-06-21
   - out จากสถานะต้นทาง
   - in เข้าสถานะปลายทาง
 - Balance ต้องเปลี่ยนเฉพาะ status/output category ไม่ใช่ product, branch, warehouse, หรือ lot
-- WAC ต้องใช้ต้นทุนเฉลี่ยของ source status bucket ณ เวลาบันทึก และส่งต่อให้ target status bucket ด้วย value เดียวกัน
+- `SC` ไม่ตั้งต้นทุนใหม่ ไม่คำนวณ WAC ใหม่เอง ไม่สร้าง margin และไม่รับ manual cost override ใน flow ปกติ
+- ถ้าระบบต้องเขียน `unit_cost/value` ใน paired ledger เพื่อ audit ให้ carry ค่าเดิมตาม source เท่านั้น และต้องไม่ถือว่า `SC` เป็นจุดเปลี่ยนราคาทุน
 
 ## Main UI Contract
 
@@ -123,7 +125,7 @@ Target validation:
 - target row: `ref_type = 'SC'`, `qty_in`, `output_category = toStatus`
 - `RM -> FG`: stock RM ลด, stock FG เพิ่ม
 - `FG -> RM`: stock FG ลด, stock RM เพิ่ม
-- cost/value ใช้ average cost ของ source key ณ วันที่บันทึก; `value = qty * source unit cost`
+- cost/value ของ `SC` ใช้เพื่อ preserve audit เท่านั้น; ไม่สร้างต้นทุนใหม่และไม่ reprice WAC จาก action นี้
 - `ref_no` และ `ref_id` ต้องผูก rows ทั้งคู่เข้าชุดเดียวกัน
 - เหตุผลต้องอยู่ใน ledger notes หรือ audit table
 - actor และ created date ต้องถูกเก็บและแสดงใน history
@@ -133,7 +135,24 @@ Target validation:
 - `SC` เป็น stock status conversion fact ไม่ใช่ production order และไม่ควรเพิ่มจำนวนใบสั่งผลิต
 - Production Dashboard/Report ที่ต้องเห็นรายการนี้ต้องแสดงเป็น source แยก เช่น `Status Convert to FG` หรืออ่านผ่าน Stock Ledger/WAC section แยกจาก `PO2` output
 - ห้ามนำ `SC` ไปรวมเป็น production output จากใบสั่งผลิตโดยไม่ติด label source เพราะจะทำให้ yield/loss ของ production order เพี้ยน
-- Target WAC ของ status ปลายทางต้องรับ value จาก source WAC ของ status ต้นทางเพื่อให้ stock value รวมไม่เปลี่ยนจากการเปลี่ยน bucket
+- `SC` ต้องไม่เป็นจุดเปลี่ยนราคาทุน/ต้นทุนเฉลี่ย; เป็นการแก้ classification และจำนวนใน bucket เท่านั้น
+- `RM -> FG`: RM qty ลด, FG qty เพิ่ม; ต้นทุนเฉลี่ยไม่เปลี่ยนจาก action นี้
+- `FG -> RM`: FG qty ลด, RM qty เพิ่ม; ต้นทุนเฉลี่ยไม่เปลี่ยนจาก action นี้
+- มูลค่ารวมของ stock ทั้งบริษัท/สินค้า/คลังไม่ควรเปลี่ยนจาก `SC` ถ้าไม่มี loss/gain; ถ้ามี loss/gain แปลว่าไม่ใช่ normal `SC` และต้องใช้ policy อื่น
+- ถ้ารู้เอกสารต้นทางที่ลง classification ผิด เช่น PB/WTI/ADJ ควรเก็บเป็น reference/audit note แต่ห้ามให้ `SC` override หรือสร้าง cost ใหม่
+
+ตัวอย่าง:
+
+```text
+รับซื้อผิดเป็น RM:
+RM +100 กก. @ 40 = 4,000
+
+แก้เป็น FG ด้วย SC:
+RM qty ลด 100
+FG qty เพิ่ม 100
+
+ต้นทุนเฉลี่ยไม่ถูกคำนวณใหม่จาก action SC นี้
+```
 
 ## Cancel / Reverse Policy
 
@@ -178,7 +197,7 @@ Target ที่ควรใช้:
 - มี write baseline ที่สร้าง paired `SC` ledger rows แล้ว
 - Runtime ปัจจุบันจำกัด normal flow เป็น `RM <-> FG` แล้ว และถอด `WIP` ออกจาก form/API write path เว้นแต่มี admin correction policy
 - Runtime ปัจจุบันใช้ hold-aware `readyQty` สำหรับ source availability check แล้ว
-- Runtime ปัจจุบันให้ WAC คำนวณแยกตาม source status bucket แล้ว
+- Runtime ปัจจุบันให้ `SC` ทำงานบน source status bucket และไม่เปิด cost override; target wording ล่าสุดถือว่า `SC` เป็น quantity reclassification ไม่ใช่ WAC-changing event
 - Runtime ปัจจุบันบังคับ required reason แล้ว
 - Runtime ปัจจุบันรองรับ append-only reverse เป็น paired `SC-REV` ledger rows แล้ว และ block reverse เมื่อ target bucket ready stock ไม่พอ
 - Stock reconciliation ตรวจ `SC`/`SC-REV` pair integrity, net zero, และ missing source แล้ว

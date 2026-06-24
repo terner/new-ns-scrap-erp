@@ -24,7 +24,7 @@ target table design รายละเอียดอยู่ที่ [[Docume
 
 - Purchase: `POB`, `WTI`, `WTO`, `PB`, `ADV`
 - Payment: `PMA`, `PMT`
-- Sales: `POS`, `PSALE`, `SB`, `RCP`
+- Sales: `POS`, `WTO`, `SB`, `RCP` (`PSALE` เป็น legacy-only reference หลังถอด `/sales/stock-issue` ออกจาก target runtime)
 - Stock/production/finance documents ที่มี `doc_no`, `document_no`, `voucher_no`, หรือ `ref_no` ที่ผู้ใช้เห็นและใช้ค้นหา
 
 ไม่ใช้กฎนี้กับ:
@@ -104,7 +104,7 @@ Timeline/event log ของเอกสารควรมี field ขั้น
 เรียงลำดับตามเอกสารที่ผู้ใช้ต้อง trace และมีผลต่อยอดก่อน:
 
 1. Purchase/Payment: `WTI`, `POB`, `PB`, `ADV`, `PMA`, `PMT`
-2. Sales/Receipt: `WTO`, `POS`, `PSALE`, `SB`, `RCP`
+2. Sales/Receipt: `WTO`, `POS`, `SB`, `RCP` (`PSALE` เฉพาะ legacy/data repair)
 3. Stock/production documents ที่ post หรือ reverse ได้
 4. Finance/support vouchers ที่มีเลขเอกสารและผู้ใช้อ้างอิงย้อนหลัง
 
@@ -121,7 +121,7 @@ Timeline/event log ของเอกสารควรมี field ขั้น
 | `payment_approvals` | `doc_no` / `PMA` | ขาด | ต้องมี `payment_approval_status_logs` สำหรับ approve, void, consume/paid, reverse และ detail/timeline |
 | `payments` | `doc_no` / `PMT` | ขาด | มี payment history list แต่ยังไม่มี `payment_status_logs`, `payment_allocations`, `payment_account_splits` และ detail/timeline ของ PMT เอง |
 | `po_sells` | `doc_no` / `POS` | ขาด | ต้องมี PO Sell status log และ detail/timeline |
-| `stock_issues` | `doc_no` / `PSALE` หรือ stock issue | ขาด | ต้องมี issue/post/cancel/reverse timeline และ stock effect trace |
+| `stock_issues` | `doc_no` / `PSALE` หรือ stock issue | legacy-only | ถ้ามีข้อมูลเดิมให้ใช้เป็น migration/data-repair reference เท่านั้น; target runtime ไม่สร้าง PSALE timeline ใหม่ |
 | `sales_bills` | `doc_no`, `ref_no` / `SB` | ขาด | ต้องมี sales bill status log, receipt/payment allocation events, cancel/reverse timeline |
 | `receipts` | `doc_no` / `RCP` | ขาด | ต้องมี receipt/payment-in event log, cancel/reverse timeline, และ detail/timeline |
 | `expenses` | `doc_no` / expense source | ขาด | ต้องมี expense source timeline และ handoff/approval/payment events |

@@ -121,7 +121,7 @@ Default aging ที่ user เห็นในหน้ารายการค
 
 | Document | Aging type | reference date | included when | stop counting when |
 |---|---|---|---|---|
-| `PB` | `financial_due_aging` | `purchase_bills.due_date` ถ้ามี; ถ้าไม่มีใช้ `purchase_bills.date + supplier credit term`; ถ้ายังไม่มี credit term ให้ใช้ `purchase_bills.date` | `payable_balance > 0` และไม่ถูกยกเลิก | payable balance เป็น 0, วันที่จ่ายจริง, หรือยกเลิก |
+| `PB` | `financial_due_aging` | current policy: ใช้ `purchase_bills.date` เป็น aging base เพราะยังไม่มี confirmed supplier credit term / PB due-date source; ถ้าอนาคตเพิ่ม source จริงค่อยเปลี่ยน policy/schema | `payable_balance > 0` และไม่ถูกยกเลิก | payable balance เป็น 0, วันที่จ่ายจริง, หรือยกเลิก |
 | `SB` | `financial_due_aging` | `sales_bills.due_date` ถ้ามี; ถ้าไม่มีใช้ `sales_bills.date + customer credit term` | `receivable_balance > 0` และไม่ถูกยกเลิก | receivable balance เป็น 0, วันที่รับเงินจริง, หรือยกเลิก |
 | `WTI` | `operational_pending_aging` | `weight_tickets.document_date` | status `รับของแล้ว` และยังไม่ถูกใช้ใน `PB` | status `เสร็จสิ้น` หรือ `ยกเลิก`; business close ใช้วันที่ `PB` ที่นำไปใช้, audit close ใช้เวลา link จริง |
 | `WTO` | `operational_pending_aging` | `weight_tickets.document_date` | status `ส่งของแล้ว` และยังไม่ถูกใช้ใน `SB` | status `ออกบิลแล้ว` หรือ `ยกเลิก`; business close ใช้วันที่ `SB` ที่นำไปใช้, audit close ใช้เวลา link จริง |
@@ -139,14 +139,15 @@ Default aging ที่ user เห็นในหน้ารายการค
 
 - ใช้ยอดคงเหลือจริงหลัง payment/receipt/allocation
 - ใช้ due date ที่ snapshot ตอนออกบิล ถ้ามี
-- ถ้าไม่มี due date ให้ derive จาก credit term ของเอกสารหรือคู่ค้า
+- `SB`: ถ้าไม่มี due date ให้ derive จาก credit term ของเอกสารหรือคู่ค้า
+- `PB`: policy ปัจจุบันยังไม่ใช้ supplier credit term; ใช้วันที่บิลเป็นฐาน aging/alert เท่านั้น
 - หากไม่มีทั้ง due date และ credit term ให้ใช้วันที่เอกสารเป็น fallback แบบชัดเจนใน report ไม่ใช่ silent fallback ใน write path
 - payment/receipt ที่บันทึกย้อนหลังต้องหยุด financial aging ด้วย `paymentDate` / `receiptDate` ในมุม business aging และเก็บ `created_at` ของ PMT/RCT ไว้สำหรับ audit/process latency แยกต่างหาก
 
 Current runtime note:
 
 - `/api/finance/ar` derive due date จาก `sales_bills.due_date` หรือ `sales_bills.date + credit_term`
-- `/api/finance/ap` ตอนนี้ใช้ `purchase_bills.date` เป็น due date เพราะ `creditTerm = 0`; ยังไม่ครบ target ถ้าต้องรองรับ supplier credit term จริง
+- `/api/finance/ap` ตอนนี้ใช้ `purchase_bills.date` เป็น aging base ตาม policy ปัจจุบัน; supplier credit term / PB due date ยังไม่อยู่ใน implementation batch นี้
 
 ## WTI / WTO Notes
 
@@ -185,7 +186,7 @@ Current API ที่มีแล้ว:
 
 | API | ครอบคลุม | สถานะ |
 |---|---|---|
-| `GET /api/finance/ap` | `PB` AP aging | มีแล้ว แต่ยังใช้ `creditTerm = 0` |
+| `GET /api/finance/ap` | `PB` AP aging | มีแล้ว และใช้ `purchase_bills.date` เป็น aging base ตาม current policy |
 | `GET /api/finance/ar` | `SB` AR aging | มีแล้ว และ derive จาก due date / customer credit term |
 
 Target follow-up:
@@ -196,7 +197,7 @@ Target follow-up:
 | `/daily/weight-ticket-list` payload | เพิ่ม `ageDays`, `ageBucket`, `openReason` สำหรับ WTI/WTO ที่ยังค้างออกบิล |
 | `/purchase/po-buy` payload | เพิ่ม aging ของ PO ที่ยังค้างรับ/ค้างออกบิล |
 | `/sales/po-sell` payload | เพิ่ม aging ของ PO ที่ยังค้างส่ง/ค้างออกบิล |
-| `/finance/ap` | ปรับ PB due date ให้รองรับ supplier credit term / bill due date ตาม target |
+| `/finance/ap` | คง current no-credit-term policy: ใช้ `purchase_bills.date` เป็น aging base; หากอนาคตต้องรองรับ supplier credit term / bill due date ต้องออกแบบ source/schema ใหม่ก่อน |
 
 ยังไม่ควรเพิ่ม path ใหม่ใน OpenAPI จนกว่า implementation route จะถูกสร้างจริง
 
@@ -218,7 +219,7 @@ Target follow-up:
 - [ ] เพิ่ม helper กลางสำหรับคำนวณ `financial_due_aging` และ `operational_pending_aging`
 - [ ] เพิ่ม contract วันที่ให้ aging response แยก `referenceDateType`, `closedBusinessDate`, และ `closedSystemAt`
 - [ ] ตรวจทุกหน้า list/detail ของเอกสารให้แสดง `วันที่สร้างรายการ` แยกจากวันที่เอกสาร/วันที่จ่าย/วันที่ครบกำหนด
-- [ ] ปรับ `/api/finance/ap` ให้รองรับ due date / supplier credit term ตาม target
+- [ ] คง `/api/finance/ap` บน no-credit-term policy: ใช้ `purchase_bills.date` เป็น aging base และออกแบบ source/schema ใหม่ก่อนถ้าจะเพิ่ม supplier credit term / PB due date ในอนาคต
 - [ ] เพิ่ม aging fields ใน `WTI/WTO` list/detail read model
 - [ ] เพิ่ม aging fields ใน `POB/POS` list/read model
 - [ ] ออกแบบ report รวม `Document Aging` ก่อนเพิ่ม OpenAPI path ใหม่

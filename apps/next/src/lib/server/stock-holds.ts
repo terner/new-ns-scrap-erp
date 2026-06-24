@@ -519,6 +519,7 @@ export async function closeActiveWtoStockHolds(tx: TxClient, input: {
 
 export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
   actor: string
+  allocations?: Array<{ productId: bigint; qty: number }>
   billDate: Date
   branchId: bigint
   salesBillDocNo: string
@@ -560,7 +561,25 @@ export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
       }), qty > 0 ? value / qty : 0] as const
     }),
   )
-  const consumedLines: ConsumedWtoStockHoldLine[] = holds.map((hold) => {
+  const requestedByProductId = new Map<bigint, number>()
+  input.allocations?.forEach((allocation) => {
+    if (allocation.qty <= 0.0001) return
+    requestedByProductId.set(allocation.productId, (requestedByProductId.get(allocation.productId) ?? 0) + allocation.qty)
+  })
+  const shouldLimitByAllocation = requestedByProductId.size > 0
+
+  const consumedLines: ConsumedWtoStockHoldLine[] = []
+  const holdUpdates: Array<{
+    consumedQty: number
+    hold: (typeof holds)[number]
+    remainingQty: number
+  }> = []
+
+  for (const hold of holds) {
+    const holdQty = toNumber(hold.qty)
+    const requestedQty = shouldLimitByAllocation ? requestedByProductId.get(hold.product_id) ?? 0 : holdQty
+    if (requestedQty <= 0.0001) continue
+    const qty = Math.min(holdQty, requestedQty)
     const unitCost = unitCostByKey.get(bucketKey({
       lotNo: hold.lot_no,
       notAvailableForSale: hold.not_available_for_sale,
@@ -568,8 +587,7 @@ export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
       productId: hold.product_id,
       warehouseId: hold.warehouse_id,
     })) ?? 0
-    const qty = toNumber(hold.qty)
-    return {
+    consumedLines.push({
       holdKey: hold.hold_key,
       lotNo: hold.lot_no,
       notAvailableForSale: hold.not_available_for_sale,
@@ -582,8 +600,21 @@ export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
       valueOut: qty * unitCost,
       warehouseId: hold.warehouse_id,
       weightTicketLineId: hold.weight_ticket_line_id,
+    })
+    holdUpdates.push({ consumedQty: qty, hold, remainingQty: Math.max(0, holdQty - qty) })
+    if (shouldLimitByAllocation) {
+      requestedByProductId.set(hold.product_id, Math.max(0, requestedQty - qty))
     }
-  })
+  }
+
+  const missingProducts = [...requestedByProductId.entries()].filter(([, qty]) => qty > 0.0001)
+  if (missingProducts.length) {
+    throw new WtoStockHoldError('pending_out ไม่พอสำหรับตัด stock กรุณาโหลดข้อมูลใหม่')
+  }
+  if (!consumedLines.length) {
+    throw new WtoStockHoldError('ไม่พบ pending_out ที่พร้อมใช้สำหรับจำนวนที่ออกบิล')
+  }
+
   await tx.stock_ledger.createMany({
     data: consumedLines.map((line) => ({
       branch_id: input.branchId,
@@ -609,23 +640,71 @@ export async function consumeActiveWtoStockHolds(tx: TxClient, input: {
     })),
   })
   const now = new Date()
-  const consumed = await tx.stock_holds.updateMany({
-    data: {
-      consumed_at: now,
-      consumed_by: input.actor,
-      consumed_by_ref_no: input.salesBillDocNo,
-      consumed_by_ref_type: 'SB',
-      status: 'consumed',
-      updated_at: now,
-      updated_by: input.actor,
-    },
-    where: {
-      id: { in: holds.map((hold) => hold.id) },
-      status: 'active',
-    },
-  })
-  if (consumed.count !== holds.length) {
-    throw new WtoStockHoldError('pending_out ของใบส่งของนี้ถูกใช้งานไปแล้ว กรุณาโหลดข้อมูลใหม่')
+  for (const update of holdUpdates) {
+    if (update.remainingQty <= 0.0001) {
+      const consumed = await tx.stock_holds.updateMany({
+        data: {
+          consumed_at: now,
+          consumed_by: input.actor,
+          consumed_by_ref_no: input.salesBillDocNo,
+          consumed_by_ref_type: 'SB',
+          status: 'consumed',
+          updated_at: now,
+          updated_by: input.actor,
+        },
+        where: {
+          id: update.hold.id,
+          status: 'active',
+        },
+      })
+      if (consumed.count !== 1) {
+        throw new WtoStockHoldError('pending_out ของใบส่งของนี้ถูกใช้งานไปแล้ว กรุณาโหลดข้อมูลใหม่')
+      }
+      continue
+    }
+
+    const reduced = await tx.stock_holds.updateMany({
+      data: {
+        qty: update.remainingQty,
+        updated_at: now,
+        updated_by: input.actor,
+      },
+      where: {
+        id: update.hold.id,
+        status: 'active',
+      },
+    })
+    if (reduced.count !== 1) {
+      throw new WtoStockHoldError('pending_out ของใบส่งของนี้ถูกใช้งานไปแล้ว กรุณาโหลดข้อมูลใหม่')
+    }
+    await tx.stock_holds.create({
+      data: {
+        branch_id: update.hold.branch_id,
+        consumed_at: now,
+        consumed_by: input.actor,
+        consumed_by_ref_no: input.salesBillDocNo,
+        consumed_by_ref_type: 'SB',
+        created_at: now,
+        created_by: input.actor,
+        held_at: update.hold.held_at,
+        lot_no: update.hold.lot_no,
+        meta: update.hold.meta ?? undefined,
+        not_available_for_sale: update.hold.not_available_for_sale,
+        note: update.hold.note,
+        output_category: update.hold.output_category,
+        product_id: update.hold.product_id,
+        qty: update.consumedQty,
+        source_doc_no: update.hold.source_doc_no,
+        source_line_no: update.hold.source_line_no,
+        source_type: update.hold.source_type,
+        status: 'consumed',
+        updated_at: now,
+        updated_by: input.actor,
+        warehouse_id: update.hold.warehouse_id,
+        weight_ticket_id: update.hold.weight_ticket_id,
+        weight_ticket_line_id: update.hold.weight_ticket_line_id,
+      },
+    })
   }
 
   return consumedLines
@@ -703,17 +782,6 @@ export async function reopenConsumedWtoStockHoldsForSalesBill(tx: TxClient, inpu
   })
   if (!holds.length) {
     throw new WtoStockHoldError('ไม่พบ pending_out ที่ถูกใช้โดยบิลขายนี้')
-  }
-
-  const activeHold = await tx.stock_holds.findFirst({
-    select: { id: true },
-    where: {
-      status: 'active',
-      weight_ticket_id: { in: [...new Set(holds.map((hold) => hold.weight_ticket_id))] },
-    },
-  })
-  if (activeHold) {
-    throw new WtoStockHoldError('ใบส่งของนี้มี pending_out active อยู่แล้ว กรุณาตรวจสอบก่อนยกเลิกซ้ำ')
   }
 
   const reopened = await tx.stock_holds.updateMany({

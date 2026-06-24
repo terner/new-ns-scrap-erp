@@ -13,6 +13,8 @@ updated: 2026-06-11
 
 เอกสารนี้เป็นภาพรวมของหมวด `Main / Dashboard & Reports` และหน้า `/reports` ใน active Next app. ทุกหน้าในชุดนี้เป็น read-model/report surface: อ่านข้อมูลจากเอกสารต้นทาง, ledger, master data และ helper report ที่มีอยู่ แต่ไม่สร้างธุรกรรม ไม่ post บัญชี ไม่ตัด stock และไม่เปลี่ยนสถานะเอกสารต้นทาง
 
+ข้อมูล Dashboard ย้อนหลังต้องตาม [[Reporting History Snapshot Policy]]: รายงานที่ตอบวันที่ในอดีตต้องอ่านจาก transaction facts/document snapshots/reporting snapshots ตาม `as_of_date` ไม่ใช้ยอด current-state ปัจจุบันย้อนแทนอดีต
+
 ## Menu Scope
 
 | Route | Page | Current API | Permission | Source of truth |
@@ -36,6 +38,7 @@ updated: 2026-06-11
 - Export/CSV/print ต้องใช้ filter condition ชุดเดียวกับข้อมูลที่ผู้ใช้เห็น
 - drilldown ต้อง link ไป source route ด้วย outward document number/code และ resolve internal id ฝั่ง server
 - หน้า anomaly สามารถแนะนำ action/link ได้ แต่ไม่มี auto-fix/write action
+- รายเดือน/รายปีต้อง roll up จาก daily snapshot/facts ที่ตรวจแล้ว: movement metric ใช้ผลรวมรายวัน ส่วน balance metric ใช้ ending balance ณ วันสุดท้ายของช่วง
 
 ## Current Query Patterns
 
@@ -66,6 +69,7 @@ If a dashboard card needs a corrective action, it must navigate to the owning tr
 ## Open Gaps
 
 - define final formula owner for each KPI before changing report math
+- define historical snapshot/read-model owner for Bill, PO, Finance, Stock, and Tracking dashboards before enabling long-range as-of reporting
 - add row-level source-document drilldown where current payload only returns summary rows
 - align Profit & Cost COGS with final Stock Ledger/WAC policy
 - decide whether `/reports` CSV export should become server-side Excel for large datasets

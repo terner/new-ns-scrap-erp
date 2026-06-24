@@ -6,7 +6,7 @@ tags:
   - finance-debt
   - accounts-receivable
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-24
 route: /finance/ar
 ---
 
@@ -43,11 +43,12 @@ Legacy `view-ar`:
 ## Page Responsibilities
 
 - แสดงยอดค้างรับจาก `sales_bills`.
-- คำนวณ received จาก `receipts` ที่ไม่ cancelled.
-- คำนวณ `receivableBalance = totalAmount - receivedAmount`.
+- อ่าน `receivedAmount` จาก `sales_bills.received_amount` เป็น source หลัก.
+- อ่าน `receivableBalance` จาก `sales_bills.receivable_balance` เป็น source หลัก.
 - คำนวณ aging/due date ตาม `due_date` หรือ credit term.
 - สรุปตาม customer, branch, channel, bucket.
-- แสดงเฉพาะ AR จาก `sales_bills` และ `receipts`; WTO pending_out ที่ยังไม่เปิดบิลไม่เป็น AR และไม่ถูกสรุปเป็น pending sale.
+- แสดงเฉพาะ AR จาก `sales_bills`; `receipts`, `customer_receipt_allocations`, และ Customer Advance allocation ใช้เป็น drilldown/audit เท่านั้น.
+- WTO pending_out ที่ยังไม่เปิดบิลไม่เป็น AR และไม่ถูกสรุปเป็น pending sale.
 - export `.xlsx` ตาม filter ปัจจุบัน.
 
 ## Non-Responsibilities
@@ -95,7 +96,7 @@ Response:
 - `byBucket`
 - `filters.branches/customers/channels/statuses`
 - `pagination`
-- `summary` including `total`, `overdue`, `dueIn7`, `pendingIssue`
+- `summary` including `total`, `overdue`, `dueIn7`
 
 Permission ปัจจุบัน: `finance.cash.view`.
 
@@ -104,16 +105,18 @@ Permission ปัจจุบัน: `finance.cash.view`.
 - Outward bill id = `sales_bills.doc_no`.
 - Customer/branch/channel filter uses outward business code.
 - Current row fields include `docNo`, `date`, `dueDate`, `customerCode`, `customerName`, `branchName`, `channelName`, `status`, `transactionMode`, `totalAmount`, `receivedAmount`, `receivableBalance`, `aging`, `bucket`.
+- `totalAmount`, `receivedAmount`, and `receivableBalance` must come from `sales_bills.total_amount`, `sales_bills.received_amount`, and `sales_bills.receivable_balance`.
 - Current API does not include `created_at`; target table/export should add created date.
 
 ## Validation / Status Rules
 
 - Exclude `sales_bills.status = cancelled` unless explicit status filter requests otherwise.
-- Exclude cancelled receipts from received amount.
+- Exclude cancelled receipt/allocation facts from drilldown totals and audit summaries.
 - Only show rows with balance > 0.01.
 - Aging uses `due_date` first; fallback is bill date + bill/customer credit term.
 - Aging stops naturally when balance reaches zero because row disappears from active AR.
 - Customer advance allocation must reduce receivable through allocation facts, not text parsing.
+- The AR page must not derive visible balance from legacy `receipts` before the Sales Bill snapshot.
 
 ## Side Effects
 
@@ -122,12 +125,12 @@ Permission ปัจจุบัน: `finance.cash.view`.
 ## Current Code Baseline
 
 - Current `apps/next` page/API code is accepted as P1 baseline as of 2026-06-11.
-- Current API already supports filters, sort, pagination, xlsx export, and pending issue summary.
+- Current API already supports filters, sort, pagination, and xlsx export.
 - Current drilldown/source links and `created_at` display remain incomplete.
 
 ## Current Gap
 
-- Dedicated customer advance allocation facts still missing.
+- API still needs to stop deriving visible balance from legacy receipt rows and read the `sales_bills` balance snapshot first.
 - Source links to SB/RCP/customer advance allocation need to be completed in row detail.
 - Need created date in list/detail/export.
 
@@ -136,6 +139,7 @@ Permission ปัจจุบัน: `finance.cash.view`.
 - [x] Verify current Next page/component against this page-flow
 - [x] Verify API route handlers match Current API and status rules above
 - [x] Capture legacy AR baseline
+- [ ] Switch API visible balance to `sales_bills.receivable_balance` / `received_amount`
 - [ ] Add source document links
 - [ ] Add created-date display/export
-- [ ] Reconcile customer advance allocation when target tables exist
+- [ ] Add Customer Advance allocation drilldown

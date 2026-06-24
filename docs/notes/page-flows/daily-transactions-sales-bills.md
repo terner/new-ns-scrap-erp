@@ -84,6 +84,7 @@ SB ตั้งลูกหนี้, consume WTO `pending_out`, ตัด stock
 - Trading PB line ต้องไม่ตัด stock และไม่สร้าง stock ledger แม้เป็นทองเหลือง/ทองแดงหรือผูก PO Sell
 - Trading SB ต้องเลือก PB Trading source ก่อนบันทึกเฉพาะทุก PB-derived row โดย source เป็น `PB:<docNo>:<lineNo>` จาก Trading PB; WTO-derived rows ใน mixed-source Trading ไม่ต้องมี Trading PB/Cost Source เพราะใช้ pending_out/ledger ของ WTO แทน; manual `SRC:<sourceNo>:1` ยังเป็น backend-supported source แต่ไม่ใช่ primary create UX รอบนี้
 - Trading SB mixed-source ที่เลือก WTO ต้อง validate WTO active/same branch/customer/not billed/fully allocated เหมือน Stock SB และ stock side effect ต้องเกิดเฉพาะ WTO-derived rows
+- Stock SB item table ต้องไม่แสดง `Gross`; ให้แสดง `น้ำหนักสุทธิที่ส่ง` จาก WTO หลังหักภาชนะแล้ว, `จำนวนที่ขายได้`, `หักสิ่งเจือปน`, และ `น้ำหนักขายสุทธิ = จำนวนที่ขายได้ - หักสิ่งเจือปน`
 - รายการจาก PB Trading auto จากน้ำหนักคงเหลือซื้อเข้า `น้ำหนักที่ขาย`; ผู้ใช้กรอก `หัก` เอง และระบบคำนวณ `น้ำหนักสุทธิขาย = น้ำหนักที่ขาย - หัก` เป็น read-only; column `อ้างอิง` ใช้เลือก Spot Sale หรือ PO Sell ต่อ line; `ราคา/หน่วย` เริ่มว่างเมื่อเป็น Spot Sale, ถ้าเลือก PO Sell ต้อง auto ราคาจาก PO Sell และ lock ไม่ให้แก้ไข, ไม่มีหมายเหตุรายสินค้า, ไม่มีส่วนลดรายบรรทัดใน Trading item table, และยอดรายการเป็นค่าคำนวณจาก `น้ำหนักสุทธิขาย x ราคา/หน่วย`
 - รายการจาก PB Trading ที่เลือก PO Sell ต้องตัด PO Sell ไม่เกิน remaining; ถ้าน้ำหนักรายการมากกว่า remaining ระบบต้องแทรกแถว Spot Sale ถัดจากแถวเดิมสำหรับน้ำหนักส่วนที่เหลือ โดยยังอ้าง source PB line เดิมเพื่อคุม cost/source allocation
 - ใน item table ถ้าหลายแถวต่อกันเป็นสินค้าเดียวกันจากบิลซื้อเดียวกัน ให้แสดงเป็นกลุ่มเดียว ไม่ใส่เส้นคั่นหนักระหว่างแถวในกลุ่ม และไม่แสดงชื่อสินค้า/แหล่งสินค้าซ้ำ; column แหล่งสินค้าต้องแสดงเลข PB, น้ำหนักจากบิลซื้อ, และ supplier ของ source นั้น; ถ้าเป็นบิลซื้อคนละใบหรือคนละสินค้าให้เริ่มกลุ่มใหม่และคั่นรายการตามปกติ
@@ -96,9 +97,9 @@ SB ตั้งลูกหนี้, consume WTO `pending_out`, ตัด stock
 - ตั้ง AR/source receivable
 - เขียน `stock_ledger.ref_type = SB` สำหรับ stock-out ที่ SB เป็น movement owner
 - Trading SB เป็น mixed-source ได้: PB Trading lines ไม่เป็น stock movement owner และมีผลต่อ Trading Matching / PO Sell allocation เท่านั้น; WTO lines เป็น stock movement owner ผ่าน Sales Stock flow
-- เขียน `stock_ledger.ref_type = SB-CANCEL` เมื่อ cancel SB เพื่อคืน stock แบบ append-only reversal
-- consume WTO `pending_out` when SB is saved; restore WTO `pending_out` when SB is cancelled
-- update/restore WTO `pending_out` and update WTO/PO Sell usage/status
+- เขียน `stock_ledger.ref_type = SB-CANCEL` เมื่อ cancel SB เพื่อคืน stock แบบ append-only reversal ด้วย unit cost/value เดิมของ `SB`; หลังคืนแล้ว WAC ปัจจุบันคำนวณใหม่จาก ledger ปัจจุบัน
+- consume WTO `pending_out` when SB is saved; restore WTO `pending_out` when SB is cancelled only if no return-from-WTO/SB has happened
+- update/restore WTO `pending_out` and update WTO/PO Sell usage/status; after a return exists, SB cancel must not reopen holds and must return stock directly through `SB-CANCEL`
 - ส่งต่อไป `/sales/receipts` สำหรับรับเงิน
 
 ## Current Code Baseline
@@ -114,11 +115,11 @@ SB ตั้งลูกหนี้, consume WTO `pending_out`, ตัด stock
 - target create path for `TRADING` SB now changes from manual row-level cost source entry to PB-first mixed-source entry: user searches/selects a Trading PB in a combobox and all PB-derived lines from that PB are auto-filled immediately; the add button adds another PB selector row, users can optionally select one WTO to append stock-derived lines in a separate section, and still use the same PO Sell remaining reduction path when a row is linked
 - PB-derived Trading rows write active `trading_allocation_facts`; WTO-derived rows write `sales_bill_source_allocations`, consume WTO `pending_out`, write `stock_ledger.ref_type = SB`, usage/status logs, and do not create Trading cost facts
 - durable allocation fact tables exist for `SB line`, `WTO -> SB`, `SB -> PO Sell/Spot Sale`, and `Customer advance -> SB`; new create/cancel writes them and read surfaces use them before legacy JSON snapshots
-- cancel write path exists for WTO-backed Stock SB: blocks active RCP, rejects legacy PSALE-backed SB as data repair, restores consumed WTO `pending_out`, appends `SB-CANCEL` without deleting the original `SB` ledger, appends `released_from_sales_bill`, returns WTO to `delivered`, reverses PO Sell usage, and appends `sales_bill_status_logs`
+- cancel write path exists for WTO-backed Stock SB: blocks active RCP, rejects legacy PSALE-backed SB as data repair, appends `SB-CANCEL` with original SB unit cost/value without deleting the original `SB` ledger, appends `released_from_sales_bill`, reverses PO Sell usage, and appends `sales_bill_status_logs`; it restores consumed WTO `pending_out` and returns WTO to `delivered` only when no return-from-WTO/SB exists, otherwise it leaves return/diff audit intact and returns stock directly through `SB-CANCEL`
 - Runtime cleanup removed intermediate stock-issue create/cancel entry points: new Sales Bill writes reject PSALE fields with `410`, do not query/update `stock_issues`, do not create `source_type = PSALE`, and require WTO direct for stock sale
 - UI list action opens SB cancel dialog and calls `PATCH /api/sales/bills/{docNo}`; server remains the source of truth for receipt-lock and reversal validation through `canCancel`/`lockedReason` from `GET /api/sales/bills`
-- QA sample `SB2606-0003` confirmed `SB` + `SB-CANCEL` ledger net zero, WTO `WTO012606-0005` returned to `delivered`, `pending_out` returned, and PO Sell `POS6906-0009` header plus `items[].remainingQty` returned to outstanding
-- Browser QA sample `SB2606-0004` confirmed row-level cancel dialog works, PATCH returns 200, the row changes to cancelled, the cancel button becomes disabled, `SB` + `SB-CANCEL` ledger nets to zero, WTO `WTO012606-0003` returned to `delivered`, `pending_out` returned, and PO Sell `POS6906-0003` returned to outstanding
+- QA sample `SB2606-0003` confirmed the no-return cancel case: `SB` + `SB-CANCEL` ledger net zero, WTO `WTO012606-0005` returned to `delivered`, `pending_out` returned, and PO Sell `POS6906-0009` header plus `items[].remainingQty` returned to outstanding
+- Browser QA sample `SB2606-0004` confirmed the no-return cancel case: row-level cancel dialog works, PATCH returns 200, the row changes to cancelled, the cancel button becomes disabled, `SB` + `SB-CANCEL` ledger nets to zero, WTO `WTO012606-0003` returned to `delivered`, `pending_out` returned, and PO Sell `POS6906-0003` returned to outstanding
 - Historical intermediate stock-issue QA samples are retained only as legacy proof; they are not part of the target Sales Bill flow
 - edit write path still does not exist by policy; Trading SB has allocation-only correction through audited fact reversal/recreate, while other SB correction remains cancel/recreate after receipt-lock validation
 - Trading SB source allocation to Trading PB and manual non-PB Trading Cost Source now has a durable create/cancel path through `trading_allocation_facts`; SB detail and print read active line facts for Trading source labels and matched COGS

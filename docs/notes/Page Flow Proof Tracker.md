@@ -21,7 +21,7 @@ updated: 2026-06-11
 | ใส่ `### Current API` หรือ no-API declaration ทุกหน้า | Done: 107/107 |
 | Master Data current code accepted as baseline | Done: see [[Master Data Current Code Baseline]] |
 | P3 Admin/System proof against current code | Done: 6/6 admin/system menu pages |
-| P2 Reports/Tracking/Trading/Dual Costing/Finance Accounting proof against current code | Done: 45/45 P2 menu pages; see [[P2 Report Current Code Baseline]] |
+| P2 Reports/Tracking/Trading/Dual Costing/Finance Accounting proof against current code | Done for the tracked P2 menu set; Finance Accounting currently includes the `Accounting Periods` and `Posting Rules` policy pages; see [[P2 Report Current Code Baseline]] |
 | P1 Finance/Production/Daily read models proof against current code | Done: 12/12 P1 menu pages; see [[P1 Finance Production Current Code Baseline]] |
 | P0 Transaction/Stock/Payment proof against current code | Done: 20/20 P0 menu pages; see [[P0 Transaction Stock Payment Current Code Baseline]] |
 | พิสูจน์กับ current Next code/API ทีละหน้า | Done for P0/P1/P2/P3 active menu proof groups |
@@ -117,7 +117,7 @@ P2 ทำเสร็จตาม current-code baseline แล้ว ดู [[P2
 | Trading / PO Reports | `/trading/dashboard`, `/trading/matching`, `/po-reports/outstanding` |
 | Dual Costing | `/dual-costing/cost-pool`, `/dual-costing/cost-allocator`, `/dual-costing/waiting-allocations`, `/dual-costing/cost-allocation-ledger`, `/dual-costing/report`, `/dual-costing/match-log`, `/dual-costing/deal-margin`, `/dual-costing/compare-margin` |
 | General Reports | `/reports` |
-| Finance Accounting | `/finance-accounting/financial-dashboard`, `/finance-accounting/cash-flow-analysis`, `/finance-accounting/cf-forecast-calendar`, `/finance-accounting/working-capital`, `/finance-accounting/stock-finance`, `/finance-accounting/profit-leak`, `/finance-accounting/tax-vat-wht`, `/finance-accounting/pl-statement`, `/finance-accounting/balance-sheet`, `/finance-accounting/cash-flow-statement`, `/finance-accounting/asset-register`, `/finance-accounting/depreciation`, `/finance-accounting/asset-disposal`, `/finance-accounting/loan-contracts`, `/finance-accounting/loan-dashboard`, `/finance-accounting/asset-overview`, `/finance-accounting/equity-maint`, `/finance-accounting/opening-balance`, `/finance-accounting/historical-data` |
+| Finance Accounting | `/finance-accounting/financial-dashboard`, `/finance-accounting/cash-flow-analysis`, `/finance-accounting/cf-forecast-calendar`, `/finance-accounting/working-capital`, `/finance-accounting/stock-finance`, `/finance-accounting/profit-leak`, `/finance-accounting/tax-vat-wht`, `/finance-accounting/pl-statement`, `/finance-accounting/balance-sheet`, `/finance-accounting/cash-flow-statement`, `/finance-accounting/asset-register`, `/finance-accounting/depreciation`, `/finance-accounting/asset-disposal`, `/finance-accounting/loan-contracts`, `/finance-accounting/loan-dashboard`, `/finance-accounting/asset-overview`, `/finance-accounting/equity-maint`, `/finance-accounting/opening-balance`, `/finance-accounting/accounting-periods`, `/finance-accounting/posting-rules`, `/finance-accounting/historical-data` |
 
 ## P3 Proof Result: Master Data / Admin / System
 

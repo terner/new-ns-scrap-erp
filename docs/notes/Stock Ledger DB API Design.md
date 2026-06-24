@@ -31,7 +31,7 @@ updated: 2026-06-23
 | Table | Role | Notes |
 |---|---|---|
 | `stock_ledger` | movement fact | ใช้ aggregate เป็น stock balance; row เดิมไม่ควรถูกแก้จากหน้า ledger |
-| `stock_holds` | pending_out reservation fact | `WTO` สร้าง active pending_out, `SB` consume pending_out, `SB cancel` reopen pending_out |
+| `stock_holds` | pending_out reservation fact | `WTO` สร้าง active pending_out, `SB` consume pending_out, `SB cancel` reopen pending_out เฉพาะกรณียังไม่มี return-from-WTO/SB |
 | `weight_ticket_status_logs` | WTI/WTO lifecycle | บันทึก created/edited/cancelled/usage status change |
 | `weight_ticket_usage_logs` | WTI/WTO usage fact | บันทึก `WTI -> PB` และ `WTO -> SB` allocation/release |
 | `sales_bill_status_logs` | SB lifecycle | เพิ่มใน migration `20260612120000_add_sales_bill_status_logs.sql`; บันทึก create/cancel/status sync |
@@ -41,10 +41,10 @@ updated: 2026-06-23
 | Ref Type | Owner | Direction | Reversal |
 |---|---|---|---|
 | `PB` | Purchase Bill Stock | stock in | `PB-CANCEL`, `PB-EDIT-REV` |
-| `PB-CANCEL` | Purchase Bill cancel / supplier swap void | stock out | append-only reversal ของ PB net movement; ห้ามลบ `PB` row เดิม |
+| `PB-CANCEL` | Purchase Bill cancel / supplier swap void | stock out | append-only reversal ของ PB net movement ด้วย unit cost/value เดิม; ห้ามลบ `PB` row เดิม |
 | `PB-EDIT-REV` | Purchase Bill edit | stock out | reverse current PB net movement ก่อน append `PB` state ใหม่ |
 | `SB` | Sales Bill Stock | stock out | `SB-CANCEL` |
-| `SB-CANCEL` | Sales Bill cancel | stock in | สร้าง row ใหม่เพื่อคืน stock; ห้ามลบ `SB` row เดิม |
+| `SB-CANCEL` | Sales Bill cancel | stock in | สร้าง row ใหม่เพื่อคืน stock ด้วย unit cost/value เดิมของ `SB`; ห้ามลบ `SB` row เดิม |
 | `ST` | Stock transfer | paired out/in | future cancel ต้อง paired reversal |
 | `SC` | Status convert | paired out/in | `SC-REV` |
 | `SC-REV` | Status convert reverse | paired out/in | append-only reverse rows; `ref_id` points to original `SC.ref_no` |
@@ -56,7 +56,7 @@ updated: 2026-06-23
 
 ## Pending Out / Stock Hold Contract
 
-`stock_holds` เป็นชื่อ technical table ส่วน business contract ให้เรียกว่า `pending_out / รอออก`. ปัจจุบัน runtime ใช้กับ `WTO`: สร้างเมื่อ WTO ถูกบันทึก, consume เมื่อสร้าง SB, และ reopen เมื่อ cancel SB
+`stock_holds` เป็นชื่อ technical table ส่วน business contract ให้เรียกว่า `pending_out / รอออก`. ปัจจุบัน runtime ใช้กับ `WTO`: สร้างเมื่อ WTO ถูกบันทึก, consume เมื่อสร้าง SB, และ reopen เมื่อ cancel SB เฉพาะกรณียังไม่เคยรับของคืนจาก WTO/SB
 
 | Source | Meaning | Ledger timing |
 |---|---|---|
@@ -105,7 +105,8 @@ Lifecycle:
 | Edit unused WTO | old pending_out `released`, new pending_out `active` | no row | stays `delivered` |
 | Cancel unused WTO | active pending_out `cancelled` | no row | `cancelled` |
 | Create SB from WTO | pending_out `consumed` | create `SB` stock-out row | `billed` |
-| Cancel SB from WTO | consumed pending_out reopened to `active` | create `SB-CANCEL` stock-in row | `delivered` |
+| Cancel SB from WTO, no return yet | consumed pending_out reopened to `active` | create `SB-CANCEL` stock-in row | `delivered` |
+| Cancel SB from WTO after return | no reopen/recreate pending_out; keep return facts | create `SB-CANCEL` stock-in row with original SB unit cost/value | return/cancel timeline from facts |
 
 ## Removed PSALE Issue Contract
 
@@ -153,11 +154,11 @@ Transactional side effects:
 
 Direct WTO-backed SB:
 
-1. Reopen consumed pending_out rows (`stock_holds`) for the `SB` back to `active`
-2. Create `stock_ledger.ref_type = SB-CANCEL` rows that reverse the original `SB` stock-out rows
+1. Check whether the related `WTO` already has return-from-WTO/SB facts for the consumed rows. If no return exists, reopen consumed pending_out rows (`stock_holds`) for the `SB` back to `active`; if a return exists, do not reopen/recreate holds.
+2. Create `stock_ledger.ref_type = SB-CANCEL` rows that reverse the original `SB` stock-out rows with the original `SB` unit cost/value; current WAC is recalculated from ledger after the reversal is posted. This direct stock-in is also the required behavior when `WTO` return already happened.
 3. Append `weight_ticket_usage_logs.action = released_from_sales_bill`
-4. Increment `weight_ticket_product_summaries.remaining_weight` and decrement `billed_weight`
-5. Update `WTO.status` back to `delivered`
+4. Increment `weight_ticket_product_summaries.remaining_weight` and decrement `billed_weight` only when reopening pending_out; if return already happened, keep the returned/diff facts as-is.
+5. Update `WTO.status` back to `delivered` only when no return exists; if return exists, derive display status from return/cancel timeline facts instead of recreating pending_out.
 6. Append `weight_ticket_status_logs.action = usage_status_changed`
 7. Reverse PO Sell usage from sales bill item snapshot: decrease `cut_amount`, increase header `remaining_qty/remaining_amount`, restore `items[].remainingQty`, and reopen status when needed
 8. Mark `sales_bills.status = cancelled`, set `cancel_note`, `cancelled_at`, `cancelled_by`, and zero `receivable_balance`
@@ -177,13 +178,13 @@ Response:
 }
 ```
 
-Browser QA checkpoint:
+Browser QA checkpoint (no return-from-WTO/SB case):
 
 - `SB2606-0003` cancelled through the `/sales/bills` UI cancel dialog in dev-target on 2026-06-12.
 - Verified DB side effects:
   - `stock_ledger` has both `SB` (`qty_out = 10`) and `SB-CANCEL` (`qty_in = 10`) for the document.
-  - `WTO012606-0005` returned to `delivered`.
-  - Related pending_out row (`stock_holds`) returned to `active` with no consumed-by reference.
+  - `WTO012606-0005` returned to `delivered` because no return-from-WTO/SB existed.
+  - Related pending_out row (`stock_holds`) returned to `active` with no consumed-by reference because this was a no-return cancel case.
   - `POS6906-0009` returned to `Open`, `remaining_qty = 10`, `remaining_amount = 10`, `cut_amount = 0`, and `items[].remainingQty = 10`.
   - `/api/stock/reconciliation` returned HTTP 200.
 
@@ -200,7 +201,7 @@ Runtime bug fixes from QA:
 Write policy:
 
 - create Stock PB: append `stock_ledger.ref_type = PB`
-- cancel Stock PB: append `stock_ledger.ref_type = PB-CANCEL` จาก net movement ของ doc นั้น
+- cancel Stock PB: append `stock_ledger.ref_type = PB-CANCEL` จาก net movement ของ doc นั้น โดยใช้ unit cost/value เดิมของ `PB`; current WAC คำนวณใหม่จาก ledger หลัง reversal
 - supplier swap: mark PB เดิมเป็น `cancelled_supplier_swap`, append `PB-CANCEL` ให้ PB เดิม, แล้วสร้าง PB ใหม่พร้อม `PB` rows ใหม่
 - edit Stock PB: reject การเปลี่ยน `transactionMode` ข้าม `STOCK/TRADING`; append `PB-EDIT-REV` จาก net movement ปัจจุบัน แล้ว append `PB` rows ของ state ใหม่
 - duplicate `PB-CANCEL` สำหรับ doc เดิมต้องถูก reject ก่อนเขียน
