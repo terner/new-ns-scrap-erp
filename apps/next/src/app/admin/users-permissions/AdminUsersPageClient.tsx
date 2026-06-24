@@ -291,7 +291,6 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
     return {
       active: users.filter((user) => user.active).length,
       branchScoped: users.filter((user) => user.branches.length > 0).length,
-      pendingAuth: users.filter((user) => !user.authUserId).length,
       mustChange: users.filter((user) => user.mustChangePassword).length,
     }
   }, [data?.users])
@@ -490,7 +489,7 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
 
       {/* AcexPOS Style KPI / Summary Cards */}
       {isUsersPage ? (
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm animate-fade-in">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 text-sm animate-fade-in">
         {/* 1. ผู้ใช้ Active */}
         <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shrink-0">
@@ -511,18 +510,8 @@ export function AdminUsersPageClient({ mode }: AdminUsersPageClientProps) {
             <div className="text-sm font-bold text-blue-700 mt-0.5 tabular-nums">{userSummary.branchScoped}</div>
           </div>
         </div>
-        {/* 3. ยังไม่ link Auth */}
-        <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xl shrink-0">
-            🔗
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-slate-500 truncate">ยังไม่ link Auth</div>
-            <div className="text-sm font-bold text-amber-700 mt-0.5 tabular-nums">{userSummary.pendingAuth}</div>
-          </div>
-        </div>
-        {/* 4. ต้องเปลี่ยน Password */}
-        <div className="bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
+        {/* 3. ต้องเปลี่ยน Password */}
+        <div className="col-span-2 md:col-span-1 bg-white p-3 sm:p-5 border border-slate-100 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-100 text-purple-750 flex items-center justify-center text-xl shrink-0">
             🔑
           </div>
