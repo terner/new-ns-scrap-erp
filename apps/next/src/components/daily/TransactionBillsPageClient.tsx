@@ -183,6 +183,7 @@ type Option = {
   id: string
   label?: string | null
   line_id?: string | null
+  marketScope?: string | null
   name: string
   product_id?: string | null
   remainingAmount?: number | null
@@ -762,6 +763,12 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   })
   const inactiveAdvancePayments = matchingAdvancePayments.filter((option) => !activeAdvancePayments.some((activeOption) => activeOption.id === option.id))
   const activeCustomers = options.customers.filter((option) => option.active !== false)
+  const defaultSalesChannelForCustomer = (customerId: string) => {
+    const customer = activeCustomers.find((option) => option.id === customerId)
+    const targetScope = customer?.marketScope === 'ต่างประเทศ' ? 'ต่างประเทศ' : customer?.marketScope === 'ในประเทศ' ? 'ในประเทศ' : null
+    if (!targetScope) return null
+    return activeSalesChannels.find((channel) => [channel.name, channel.code, channel.id].some((value) => String(value ?? '').trim() === targetScope))?.id ?? null
+  }
   const matchingCustomerAdvancePayments = (options.customerAdvancePayments ?? []).filter((option) => {
     if (!salesForm.customerId || option.customer_id !== salesForm.customerId) return false
     return true
@@ -1786,7 +1793,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
       if (key === 'branchId' || key === 'customerId' || key === 'transactionMode') {
         next.deliveryTicketId = null
-        if (key === 'customerId') next.customerAdvanceId = null
+        if (key === 'customerId') {
+          next.customerAdvanceId = null
+          next.channelId = defaultSalesChannelForCustomer(typeof value === 'string' ? value : '') ?? ''
+        }
         if (key === 'transactionMode' && value === 'STOCK') {
           next.items = [blankSalesItem()]
         } else if (key === 'transactionMode' && value === 'TRADING') {

@@ -97,6 +97,19 @@ const optionalPhoneSchema = z.preprocess(
     .default(null),
 )
 
+export const CUSTOMER_LEGAL_ENTITY_TYPES = [
+  'บริษัทจำกัด (บจก.)',
+  'ห้างหุ้นส่วนจำกัด (หจก.)',
+  'บริษัทมหาชนจำกัด (บมจ.)',
+  'หน่วยงาน/องค์กร',
+  'อื่น ๆ',
+] as const
+
+const optionalLegalEntityTypeSchema = z.preprocess(
+  blankToNull,
+  z.enum(CUSTOMER_LEGAL_ENTITY_TYPES).nullable().default(null),
+)
+
 export const customerSchema = z.object({
   id: z.string().min(1),
   code: z.string().min(1),
@@ -105,6 +118,7 @@ export const customerSchema = z.object({
   firstName: z.string().nullable().default(null),
   lastName: z.string().nullable().default(null),
   type: z.enum(['บุคคล', 'นิติบุคคล']).default('นิติบุคคล'),
+  legalEntityType: z.enum(CUSTOMER_LEGAL_ENTITY_TYPES).nullable().default(null),
   marketScope: z.enum(['ในประเทศ', 'ต่างประเทศ']).default('ในประเทศ'),
   taxId: z.string().nullable().default(null),
   phone: z.string().nullable().default(null),
@@ -169,6 +183,7 @@ export const customerFormSchema = z.object({
   firstName: optionalPersonName('ชื่อ'),
   lastName: optionalPersonName('นามสกุล'),
   type: z.enum(['บุคคล', 'นิติบุคคล'], { required_error: 'เลือกประเภทลูกค้า' }),
+  legalEntityType: optionalLegalEntityTypeSchema,
   marketScope: z.enum(['ในประเทศ', 'ต่างประเทศ']).default('ในประเทศ'),
   taxId: optionalTaxIdSchema,
   phone: optionalPhoneSchema,

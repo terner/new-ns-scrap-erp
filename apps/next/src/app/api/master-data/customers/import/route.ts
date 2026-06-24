@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
-import { customerFormSchema } from '@/lib/customer'
+import { CUSTOMER_LEGAL_ENTITY_TYPES, customerFormSchema, type CustomerFormValues } from '@/lib/customer'
 import { toCustomerWriteInput } from '@/lib/domain/customer'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -37,6 +37,7 @@ const headerMap = {
   email: ['อีเมล', 'email'],
   firstName: ['ชื่อ', 'firstName'],
   lastName: ['นามสกุล', 'lastName'],
+  legalEntityType: ['รูปแบบบริษัท', 'legalEntityType', 'legal_entity_type'],
   marketScope: ['ประเทศ/ตลาด', 'marketScope'],
   name: ['ชื่อลูกค้า/บริษัท', 'ชื่อบริษัท', 'name'],
   nameTitle: ['คำนำหน้าชื่อ', 'nameTitle'],
@@ -94,6 +95,25 @@ function normalizeCustomerType(value: string, row: ImportRow) {
   if (normalized === 'บุคคล' || normalized === 'person' || normalized === 'individual') return 'บุคคล'
   if (normalized === 'นิติบุคคล' || normalized === 'company' || normalized === 'corporate') return 'นิติบุคคล'
   return cellText(row, 'firstName') || cellText(row, 'lastName') ? 'บุคคล' : 'นิติบุคคล'
+}
+
+function isCustomerLegalEntityType(value: string): value is NonNullable<CustomerFormValues['legalEntityType']> {
+  return (CUSTOMER_LEGAL_ENTITY_TYPES as readonly string[]).includes(value)
+}
+
+function normalizeLegalEntityType(value: string): CustomerFormValues['legalEntityType'] {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (isCustomerLegalEntityType(trimmed)) return trimmed
+
+  const normalized = trimmed.toLowerCase().replace(/\s+/g, '')
+  if (['บจก', 'บจก.', 'บริษัทจำกัด', 'companylimited', 'coltd', 'co.,ltd.', 'limited'].includes(normalized)) return 'บริษัทจำกัด (บจก.)'
+  if (['หจก', 'หจก.', 'ห้างหุ้นส่วนจำกัด', 'limitedpartnership'].includes(normalized)) return 'ห้างหุ้นส่วนจำกัด (หจก.)'
+  if (['บมจ', 'บมจ.', 'บริษัทมหาชนจำกัด', 'publiccompanylimited', 'publiccompany'].includes(normalized)) return 'บริษัทมหาชนจำกัด (บมจ.)'
+  if (['หน่วยงาน', 'องค์กร', 'หน่วยงาน/องค์กร', 'organization', 'organisation'].includes(normalized)) return 'หน่วยงาน/องค์กร'
+  if (['อื่นๆ', 'อื่นๆ.', 'อื่น ๆ', 'other'].includes(normalized)) return 'อื่น ๆ'
+
+  throw new Error('รูปแบบบริษัทต้องเป็น บจก., หจก., บมจ., หน่วยงาน/องค์กร หรือ อื่น ๆ')
 }
 
 function normalizeMarketScope(value: string, countryCode: string, country: string) {
@@ -204,6 +224,12 @@ export async function POST(request: Request) {
       const addressCountry = cellText(row, 'addressCountry')
       const countryCode = cellText(row, 'countryCode')
       const marketScope = normalizeMarketScope(cellText(row, 'marketScope'), countryCode, addressCountry)
+      let legalEntityType: CustomerFormValues['legalEntityType'] = null
+      try {
+        legalEntityType = normalizeLegalEntityType(cellText(row, 'legalEntityType'))
+      } catch (caught) {
+        issues.push(firstIssueMessage(rowNumber, caught instanceof Error ? caught.message : 'รูปแบบบริษัทไม่ถูกต้อง'))
+      }
       const values = {
         id: code || undefined,
         code: code || null,
@@ -212,6 +238,7 @@ export async function POST(request: Request) {
         firstName: cellText(row, 'firstName') || null,
         lastName: cellText(row, 'lastName') || null,
         type: normalizeCustomerType(cellText(row, 'type'), row),
+        legalEntityType,
         marketScope,
         taxId: cellText(row, 'taxId') || null,
         phone: cellText(row, 'phone') || '',

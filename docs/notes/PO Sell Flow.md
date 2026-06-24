@@ -39,7 +39,7 @@ Legacy behavior to preserve unless a later requirement explicitly changes it:
 | Step | Actor | Action | Result |
 |---|---|---|---|
 | 1 | User | Opens `/sales/po-sell` and clicks create | Form opens with empty customer/channel/branch, one item row, and delivery date |
-| 2 | User | Selects customer, optional branch/channel, delivery date, products, quantities, prices, and note | Client validates required customer, delivery date, at least one item, product, qty, and price |
+| 2 | User | Selects customer, optional branch/channel, delivery date, products, quantities, prices, and note | Client auto-selects sales channel from `Customer.marketScope` (`ในประเทศ`/`ต่างประเทศ`) and validates required customer, delivery date, at least one item, product, qty, and price |
 | 3 | System | Saves through `POST /api/sales/po-sell` | Creates `po_sells` row with generated `POS...` doc no |
 | 4 | System | Stores item snapshot and totals | `items`, `qty`, `total_amount`, `remaining_qty`, and `remaining_amount` are initialized from submitted lines |
 | 5 | System | Sets initial status | `status = Open`, match status derives as `Not Matched` |
@@ -51,8 +51,8 @@ PO Sell follows the same operational rule as PO Buy: edit/cancel is allowed only
 
 | Action | Allowed When | System Result |
 |---|---|---|
-| Edit | `status = Open`, full quantity/value still remaining, and no active downstream Sales Bill / PO Sell allocation / Dual Costing allocation fact | Updates customer/branch/channel/delivery date/items/totals and `updated_by` / `updated_at`; keeps the original doc no and created date |
-| Cancel | `status = Open`, full quantity/value still remaining, and no active downstream Sales Bill / PO Sell allocation / Dual Costing allocation fact | Requires a cancel note, sets `status = Cancelled`, clears remaining quantity/value, keeps the original document for audit |
+| Edit | `status = Open`, full quantity/value still remaining, and no active downstream Sales Bill / PO Sell allocation | Updates customer/branch/channel/delivery date/items/totals and `updated_by` / `updated_at`; keeps the original doc no and created date |
+| Cancel | `status = Open`, full quantity/value still remaining, and no active downstream Sales Bill / PO Sell allocation | Requires a cancel note, sets `status = Cancelled`, clears remaining quantity/value, keeps the original document for audit |
 
 The list UI keeps `แก้ไข` and `ยกเลิก` buttons visible on every row, but disables them with a reason when the row is no longer eligible.
 

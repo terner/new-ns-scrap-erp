@@ -237,7 +237,7 @@ async function optionsPayload(scope: { codes: string[] | null }) {
       select: { active: true, code: true, id: true, name: true },
       where: scope.codes === null ? undefined : { code: { in: scope.codes } },
     }),
-    prisma.customers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    prisma.customers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, market_scope: true, name: true } }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
     prisma.sales_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
   ])
@@ -247,8 +247,11 @@ async function optionsPayload(scope: { codes: string[] | null }) {
       id: requireBusinessCode(branch.code, `สาขา ${branch.id}`),
     })),
     customers: customers.map((customer) => ({
-      ...customer,
       id: requireBusinessCode(customer.code, `ลูกค้า ${customer.id}`),
+      active: customer.active,
+      code: customer.code,
+      marketScope: customer.market_scope === 'ต่างประเทศ' ? 'ต่างประเทศ' : 'ในประเทศ',
+      name: customer.name,
     })),
     products: products.map((product) => ({
       ...product,

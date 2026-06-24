@@ -815,6 +815,7 @@ model customers {
   address_postal_code      String?
   address_country          String?                    @default("ไทย")
   market_scope             String                     @default("ในประเทศ")
+  legal_entity_type        String?
   name_title               String?
   first_name               String?
   last_name                String?

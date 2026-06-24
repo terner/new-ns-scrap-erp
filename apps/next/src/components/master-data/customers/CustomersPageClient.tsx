@@ -3,6 +3,7 @@
 import { Download, Plus, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  CUSTOMER_LEGAL_ENTITY_TYPES,
   customerFormSchema,
   exportCustomers,
   importCustomers,
@@ -24,7 +25,7 @@ import { getErrorMessage } from '@/lib/api-client'
 import { formatPhoneDisplay, sanitizePhoneInput } from '@/lib/format'
 import { listThaiDistricts, listThaiProvinces, listThaiSubdistricts, type ThaiDistrict, type ThaiProvince, type ThaiSubdistrict } from '@/lib/thai-address'
 
-type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'phone' | 'email' | 'creditTerm' | 'creditLimit' | 'active'
+type SortKey = 'code' | 'name' | 'taxId' | 'type' | 'legalEntityType' | 'marketScope' | 'phone' | 'email' | 'creditTerm' | 'creditLimit' | 'active'
 type CustomerColumnKey = SortKey | 'action' | 'address'
 
 const customerColumns: Array<ResizableColumnDefinition<CustomerColumnKey>> = [
@@ -32,6 +33,8 @@ const customerColumns: Array<ResizableColumnDefinition<CustomerColumnKey>> = [
   { key: 'name', defaultWidth: 260, minWidth: 180 },
   { key: 'taxId', defaultWidth: 130, minWidth: 110 },
   { key: 'type', defaultWidth: 95, minWidth: 80 },
+  { key: 'legalEntityType', defaultWidth: 140, minWidth: 110 },
+  { key: 'marketScope', defaultWidth: 110, minWidth: 90 },
   { key: 'phone', defaultWidth: 110, minWidth: 90 },
   { key: 'email', defaultWidth: 140, minWidth: 100 },
   { key: 'address', defaultWidth: 260, minWidth: 180 },
@@ -50,6 +53,7 @@ const emptyCustomerForm: CustomerFormValues = {
   firstName: null,
   lastName: null,
   type: 'นิติบุคคล',
+  legalEntityType: null,
   taxId: null,
   phone: '',
   email: null,
@@ -91,6 +95,7 @@ function customerToForm(customer: Customer): CustomerFormValues {
     firstName: customer.firstName,
     lastName: customer.lastName,
     type: customer.type,
+    legalEntityType: customer.legalEntityType,
     taxId: customer.taxId,
     phone: formatPhoneDisplay(customer.phone) ?? '',
     email: customer.email,
@@ -129,6 +134,10 @@ function formatMoney(value: number | null) {
 
 function uniqueValues<T>(values: T[]) {
   return Array.from(new Set(values))
+}
+
+function legalEntityTypeFromOption(value: string): CustomerFormValues['legalEntityType'] {
+  return CUSTOMER_LEGAL_ENTITY_TYPES.find((type) => type === value) ?? null
 }
 
 function compareCustomers(left: Customer, right: Customer, key: SortKey, direction: 'asc' | 'desc') {
@@ -636,6 +645,8 @@ export function CustomersPageClient() {
                     <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ชื่อบริษัท" resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อบริษัท')} sortKey="name" onSort={setSort} />
                     <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขผู้เสียภาษี" resizeProps={columnResize.getResizeHandleProps('taxId', 'เลขผู้เสียภาษี')} sortKey="taxId" onSort={setSort} />
                     <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ประเภท" resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} sortKey="type" onSort={setSort} />
+                    <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="รูปแบบบริษัท" resizeProps={columnResize.getResizeHandleProps('legalEntityType', 'รูปแบบบริษัท')} sortKey="legalEntityType" onSort={setSort} />
+                    <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ประเทศ/ตลาด" resizeProps={columnResize.getResizeHandleProps('marketScope', 'ประเทศ/ตลาด')} sortKey="marketScope" onSort={setSort} />
                     <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="โทร" resizeProps={columnResize.getResizeHandleProps('phone', 'โทร')} sortKey="phone" onSort={setSort} />
                     <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="อีเมล" resizeProps={columnResize.getResizeHandleProps('email', 'อีเมล')} sortKey="email" onSort={setSort} />
                     <ResizableTableHead direction={sortDirection} label="ที่อยู่" resizeProps={columnResize.getResizeHandleProps('address', 'ที่อยู่')} />
@@ -664,6 +675,8 @@ export function CustomersPageClient() {
                       <TableCell className="truncate text-xs font-semibold text-slate-800" title={customer.name}>{customer.name}</TableCell>
                       <TableCell className="whitespace-nowrap font-mono text-xs font-semibold text-slate-700">{displayValue(customer.taxId)}</TableCell>
                       <TableCell className="text-xs font-semibold text-slate-700">{displayValue(customer.type)}</TableCell>
+                      <TableCell className="truncate text-xs font-semibold text-slate-700" title={customer.legalEntityType ?? undefined}>{customer.type === 'นิติบุคคล' ? displayValue(customer.legalEntityType) : '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs font-semibold text-slate-700">{customer.marketScope}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs font-semibold text-slate-700">{displayValue(formatPhoneDisplay(customer.phone))}</TableCell>
                       <TableCell className="truncate text-xs font-semibold text-slate-700" title={customer.email ?? undefined}>{displayValue(customer.email)}</TableCell>
                       <TableCell className="truncate text-xs font-semibold text-slate-700" title={customer.address ?? undefined}>{displayValue(customer.address)}</TableCell>
@@ -693,7 +706,7 @@ export function CustomersPageClient() {
                   ))}
                   {paginatedCustomers.length === 0 ? (
                     <TableRow>
-                      <TableCell className="p-4 text-center text-sm text-slate-500" colSpan={11}>ไม่พบข้อมูลที่ค้นหา</TableCell>
+                      <TableCell className="p-4 text-center text-sm text-slate-500" colSpan={13}>ไม่พบข้อมูลที่ค้นหา</TableCell>
                     </TableRow>
                   ) : null}
                 </TableBody>
@@ -732,6 +745,14 @@ export function CustomersPageClient() {
                   <div>
                     <span className="block text-slate-400 font-medium">ประเภท</span>
                     <span className="font-semibold text-slate-700">{displayValue(customer.type)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-400 font-medium">ประเทศ/ตลาด</span>
+                    <span className="font-semibold text-slate-700">{customer.marketScope}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-400 font-medium">รูปแบบบริษัท</span>
+                    <span className="font-semibold text-slate-700">{customer.type === 'นิติบุคคล' ? displayValue(customer.legalEntityType) : '-'}</span>
                   </div>
                   <div>
                     <span className="block text-slate-400 font-medium">โทรศัพท์</span>
@@ -828,6 +849,7 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
       ...current,
       type: value,
       name: value === 'บุคคล' ? null : current.name,
+      legalEntityType: value === 'บุคคล' ? null : current.legalEntityType,
       nameTitle: value === 'บุคคล' ? current.nameTitle : null,
       firstName: value === 'บุคคล' ? current.firstName : null,
       lastName: value === 'บุคคล' ? current.lastName : null,
@@ -888,7 +910,12 @@ function CustomerForm({ customer, districts, isSaving, provinces, subdistricts, 
                 <TextField required error={errors.lastName} label="นามสกุล" value={form.lastName ?? ''} onChange={(value) => update('lastName', value || null)} />
               </>
             ) : (
-              <TextField required className="md:col-span-2" error={errors.name} label="ชื่อบริษัท" value={form.name ?? ''} onChange={(value) => update('name', value || null)} />
+              <>
+                <TextField required className="md:col-span-2" error={errors.name} label="ชื่อบริษัท" value={form.name ?? ''} onChange={(value) => update('name', value || null)} />
+                <SelectField error={errors.legalEntityType} label="รูปแบบบริษัท" placeholder="เลือกรูปแบบบริษัท" value={form.legalEntityType ?? ''} onChange={(value) => update('legalEntityType', legalEntityTypeFromOption(value))}>
+                  {CUSTOMER_LEGAL_ENTITY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                </SelectField>
+              </>
             )}
             <TextField error={errors.taxId} label="เลขผู้เสียภาษี" value={form.taxId ?? ''} onChange={(value) => update('taxId', value || null)} />
             <label className="block">
@@ -1049,4 +1076,3 @@ function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolea
   const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-100'
   return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
 }
-

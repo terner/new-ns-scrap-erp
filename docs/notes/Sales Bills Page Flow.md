@@ -152,7 +152,7 @@ PO Sell
 | วันที่ครบกำหนด/กำหนดชำระ | ไม่ | คำนวณจาก credit term ได้ แต่แสดงให้แก้/ตรวจตาม business rule |
 | สาขา/คลัง | ใช่ | Required; ใช้กรอง `WTO`, `PO Sell`, Customer advance และหัวกระดาษ |
 | Customer | ใช่ | ใช้ search dropdown; ค้นหาได้จากรหัส/ชื่อลูกค้า และใช้กรอง `WTO`, `PO Sell`, Customer advance และ AR |
-| ช่องทางขาย | ใช่ | ใช้ search dropdown และต้องเลือกก่อนบันทึก `SB` |
+| ช่องทางขาย | ใช่ | ใช้ search dropdown; เมื่อเลือกลูกค้า ระบบ auto ตั้งจาก `Customer.marketScope` เป็น `ในประเทศ` หรือ `ต่างประเทศ` และยังแก้เองได้ก่อนบันทึก `SB` |
 | เครดิตเทอม | ไม่ | ดึงจาก Customer ได้ แต่ snapshot ลงบิล |
 | หมายเหตุ | ไม่ | ข้อมูลประกอบเอกสาร |
 

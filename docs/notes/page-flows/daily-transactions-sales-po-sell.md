@@ -69,6 +69,7 @@ POS เป็น customer commitment/reservation ฝั่งขาย ก่อ
 - list table ต้องมีคอลัมน์ `วันที่สร้างรายการ`, `วันที่ส่งมอบ`, และ `อัพเดตล่าสุด`
 - คอลัมน์ `อัพเดตล่าสุด` ต้องอยู่ถัดจาก `สถานะ Match` และแสดง `updated_by` พร้อม timestamp จาก `updated_at`
 - date filter ของหน้า PO Sell ใช้ `created_at` / `วันที่สร้างรายการ`
+- customer options ต้องส่ง `marketScope` จาก `customers.market_scope`; เมื่อผู้ใช้เลือกลูกค้า ระบบต้อง auto ตั้ง `ช่องทางขาย` เป็น `ในประเทศ` หรือ `ต่างประเทศ` ตามค่า master ลูกค้า โดยยังให้ผู้ใช้แก้ช่องทางขายเองได้ก่อนบันทึก
 - `สถานะเอกสาร` ใน table/card/detail ใช้ status display ตาม `docs/design.md`: dot + ข้อความสี ไม่ใช้ badge background
 - `สถานะ Match` แสดงเป็นข้อความสีอย่างเดียว ไม่มี dot
 - `สถานะ Match` ใน filter/table/card/detail/export ต้องใช้ label ภาษาไทยชุดเดียวกัน: `ยังไม่จับคู่`, `จับคู่บางส่วน`, `จับคู่ครบ`, `จับคู่เกิน`, `ยกเลิก`
@@ -82,8 +83,8 @@ POS เป็น customer commitment/reservation ฝั่งขาย ก่อ
 - customer/branch/product/qty/price required
 - qty > 0 แยกตามหน่วย
 - SB allocation ต้องไม่เกิน POS remaining
-- แก้ไข/ยกเลิกได้เฉพาะ POS ที่ยังเป็น `Open` และยังไม่มี downstream active allocation / Sales Bill / Dual Costing fact
-- lock เมื่อมี downstream active SB allocation, direct Sales Bill reference, หรือ active Dual Costing allocation fact
+- แก้ไข/ยกเลิกได้เฉพาะ POS ที่ยังเป็น `Open` และยังไม่มี downstream active Sales Bill / PO Sell allocation
+- lock เมื่อมี downstream active SB allocation หรือ direct Sales Bill reference
 - ยกเลิกต้องกรอกหมายเหตุ และระบบเปลี่ยนสถานะเป็น `Cancelled` โดยไม่ลบเอกสาร
 - ถ้า POS ถูกตัดไปบางส่วนแล้ว (`remaining_qty < qty` หรือ `cut_amount > 0` แต่ยังเหลือ quantity) list ต้องแสดงสถานะ `ออกบิลบางส่วน` แทน `เปิดอยู่`
 

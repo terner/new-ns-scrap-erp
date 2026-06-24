@@ -69,6 +69,7 @@ SB ตั้งลูกหนี้, consume WTO `pending_out`, ตัด stock
 
 - UI ใช้ outward business document/code เป็นหลัก และให้ server resolve internal id
 - list/detail/print/export ต้องอ่าน source contract เดียวกันเพื่อลด drift
+- customer options ต้องส่ง `marketScope` จาก `customers.market_scope`; เมื่อผู้ใช้เลือกลูกค้า ระบบต้อง auto ตั้ง `ช่องทางขาย` เป็น `ในประเทศ` หรือ `ต่างประเทศ` ตามค่า master ลูกค้า โดยยังให้ผู้ใช้แก้ช่องทางขายเองได้ก่อนบันทึก
 - transaction write ต้องทำใน server transaction และ append timeline/status/audit ตาม document policy
 - ถ้า field เป็น money/qty/date/business code ให้ validate ตาม `docs/design.md` และ server-side ซ้ำ
 

@@ -34,6 +34,8 @@ customer master used by POS/WTO/SB/RCP/AR
 - รองรับ list/search/filter/sort/resize/export/import เฉพาะที่ API ของหน้านี้เปิดไว้
 - ใช้ code/name/status เป็น outward UI identity และให้ server resolve internal id
 - แสดง created date/status และใช้งาน active-only ใน transaction pages
+- เก็บ `market_scope` เป็น `ในประเทศ` หรือ `ต่างประเทศ` เพื่อให้ PO Sell และ Sales Bill auto ตั้ง `ช่องทางขาย` ตามลูกค้าได้ โดยไม่ต้องให้ผู้ใช้เลือกซ้ำทุกครั้ง
+- เก็บ `legal_entity_type` สำหรับลูกค้า `นิติบุคคล` เช่น บจก./หจก./บมจ. แยกจาก `type` และ `market_scope`; กระทบเฉพาะตารางลูกค้า, modal รายละเอียด, import และ export ของ master ลูกค้า
 - เก็บ snapshot ลง business documents เมื่อ master ถูกนำไปใช้ในเอกสารที่ต้องรักษาประวัติ
 
 ## Non-Responsibilities

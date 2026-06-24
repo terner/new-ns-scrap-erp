@@ -763,7 +763,7 @@ async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchS
         ...(allowedBranchCodes ? { code: { in: allowedBranchCodes } } : {}),
       },
     }),
-    prisma.customers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
+    prisma.customers.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, market_scope: true, name: true } }),
     prisma.products.findMany({ orderBy: [{ active: 'desc' }, { code: 'asc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true, unit: true } }),
     prisma.sales_channels.findMany({ orderBy: [{ active: 'desc' }, { name: 'asc' }], select: { active: true, code: true, id: true, name: true } }),
     prisma.warehouses.findMany({
@@ -926,8 +926,11 @@ async function salesOptionsPayload(scope: Awaited<ReturnType<typeof salesBranchS
       id: branch.code,
     })),
     customers: customers.map((customer) => ({
-      ...customer,
       id: requireBusinessCode(customer.code, `ลูกค้า ${customer.id}`),
+      active: customer.active,
+      code: customer.code,
+      marketScope: customer.market_scope === 'ต่างประเทศ' ? 'ต่างประเทศ' : 'ในประเทศ',
+      name: customer.name,
     })),
     deliveries: deliveryTickets
       .map((ticket) => deliveryTicketOptionJson(ticket, deliveryUsageMap, productCodeById))

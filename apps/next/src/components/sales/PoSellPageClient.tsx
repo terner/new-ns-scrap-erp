@@ -22,6 +22,7 @@ type Option = {
   active?: boolean | null
   code?: string | null
   id: string
+  marketScope?: string | null
   name: string
   unit?: string | null
 }
@@ -306,6 +307,12 @@ export function PoSellPageClient() {
   const activeChannels = (data?.options.salesChannels ?? []).filter((option) => option.active !== false)
   const activeCustomers = (data?.options.customers ?? []).filter((option) => option.active !== false)
   const activeProducts = (data?.options.products ?? []).filter((option) => option.active !== false)
+  const defaultSalesChannelForCustomer = (customerId: string) => {
+    const customer = activeCustomers.find((option) => option.id === customerId)
+    const targetScope = customer?.marketScope === 'ต่างประเทศ' ? 'ต่างประเทศ' : customer?.marketScope === 'ในประเทศ' ? 'ในประเทศ' : null
+    if (!targetScope) return null
+    return activeChannels.find((channel) => [channel.name, channel.code, channel.id].some((value) => String(value ?? '').trim() === targetScope))?.id ?? null
+  }
   const formSubtotal = form.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - item.discount), 0)
   const formQty = form.items.reduce((sum, item) => sum + item.qty, 0)
   const vatRatePercent = 7
@@ -378,7 +385,14 @@ export function PoSellPageClient() {
   }
 
   function updateForm<K extends keyof PoSellFormValues>(key: K, value: PoSellFormValues[K]) {
-    setForm((current) => ({ ...current, [key]: value }))
+    setForm((current) => {
+      const next = { ...current, [key]: value }
+      if (key === 'customerId') {
+        const nextChannelId = defaultSalesChannelForCustomer(typeof value === 'string' ? value : '')
+        next.channelId = nextChannelId ?? null
+      }
+      return next
+    })
     setFieldErrors((current) => ({ ...current, [key]: '' }))
   }
 
