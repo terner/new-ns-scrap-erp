@@ -106,6 +106,21 @@ function imageFromDataUrl(value: string) {
   }
 }
 
+function resolveThaiFontPath() {
+  const cwd = process.cwd()
+  const candidates = [
+    join(cwd, 'public/fonts/NotoSansThai-Regular.ttf'),
+    join(cwd, 'src/assets/fonts/NotoSansThai-Regular.ttf'),
+    join(cwd, 'apps/next/public/fonts/NotoSansThai-Regular.ttf'),
+    join(cwd, 'apps/next/src/assets/fonts/NotoSansThai-Regular.ttf'),
+  ]
+  const fontPath = candidates.find((candidate) => existsSync(candidate))
+  if (!fontPath) {
+    throw new Error(`ไม่พบไฟล์ฟอนต์ไทย NotoSansThai-Regular.ttf ใน path ที่รองรับ: ${candidates.join(', ')}`)
+  }
+  return fontPath
+}
+
 async function loadCompanyPrintProfile(branchId: string): Promise<CompanyPrintProfile | null> {
   const branch = await prisma.branches.findFirst({
     select: { id: true },
@@ -162,11 +177,7 @@ async function drawImageTile(pdfDoc: PDFDocument, page: PDFPage, rawValue: strin
 export async function generateWeightTicketPdf(ticket: WeightTicketRecord, profile: CompanyPrintProfile | null) {
   const pdfDoc = await PDFDocument.create()
   pdfDoc.registerFontkit(fontkit)
-  let fontPath = join(process.cwd(), 'src/assets/fonts/NotoSansThai-Regular.ttf')
-  if (!existsSync(fontPath)) {
-    fontPath = join(process.cwd(), 'apps/next/src/assets/fonts/NotoSansThai-Regular.ttf')
-  }
-  const fontBytes = await readFile(fontPath)
+  const fontBytes = await readFile(resolveThaiFontPath())
   const font = await pdfDoc.embedFont(fontBytes, { subset: true })
   const green = rgb(0, 0.48, 0.34)
   const slate = rgb(0.13, 0.18, 0.27)

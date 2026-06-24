@@ -345,9 +345,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       targetType: 'weight_ticket',
     })
 
-    // Trigger auto-send to LINE if enabled on edit
+    // Trigger auto-send to LINE if enabled for this document type on edit
+    const autoSendKey = mapped.type === 'WTI' ? 'LINE_AUTO_SEND_WTI' : 'LINE_AUTO_SEND_WTO'
     const autoSendConfig = await prisma.system_settings.findUnique({
-      where: { key: 'LINE_AUTO_SEND' },
+      where: { key: autoSendKey },
     })
     if (autoSendConfig?.value === 'true') {
       const requestOrigin = (req: Request) => {
@@ -363,6 +364,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         origin: requestOrigin(request),
         requestedBy: actor,
         scopedBranchIds,
+        force: false,
       }).catch((err) => {
         console.error('[weight-ticket-auto-send] failed to auto send LINE notification on update:', err)
       })

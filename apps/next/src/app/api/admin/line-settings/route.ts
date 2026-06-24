@@ -13,6 +13,7 @@ const settingsSchema = z.object({
   lineDefaultTargetId: z.string().trim().nullable().or(z.literal('')),
   pdfBucket: z.string().trim().min(1, 'ระบุชื่อ Storage Bucket'),
   appUrl: z.string().trim().url('URL ไม่ถูกต้อง').or(z.literal('')),
+  lineAutoSend: z.boolean().optional(),
   lineAutoSendWti: z.boolean().default(false),
   lineAutoSendWto: z.boolean().default(false),
   googleSheetsWebhookUrl: z.string().trim().url('URL ไม่ถูกต้อง').or(z.literal('')).nullable().or(z.literal('')),
@@ -32,6 +33,7 @@ export async function GET() {
             'LINE_DEFAULT_TARGET_ID',
             'WEIGHT_TICKET_PDF_BUCKET',
             'NEXT_PUBLIC_APP_URL',
+            'LINE_AUTO_SEND',
             'LINE_AUTO_SEND_WTI',
             'LINE_AUTO_SEND_WTO',
             'GOOGLE_SHEETS_WEBHOOK_URL',
@@ -41,6 +43,9 @@ export async function GET() {
     })
 
     const configMap = Object.fromEntries(dbSettings.map((s) => [s.key, s.value]))
+    const legacyAutoSend = configMap.LINE_AUTO_SEND === 'true'
+    const lineAutoSendWti = configMap.LINE_AUTO_SEND_WTI ? configMap.LINE_AUTO_SEND_WTI === 'true' : legacyAutoSend
+    const lineAutoSendWto = configMap.LINE_AUTO_SEND_WTO ? configMap.LINE_AUTO_SEND_WTO === 'true' : legacyAutoSend
 
     const maskSecret = (val: string | null | undefined) => {
       if (!val) return ''
@@ -53,8 +58,9 @@ export async function GET() {
       lineDefaultTargetId: configMap.LINE_DEFAULT_TARGET_ID || '',
       pdfBucket: configMap.WEIGHT_TICKET_PDF_BUCKET || 'weight-ticket-pdfs',
       appUrl: configMap.NEXT_PUBLIC_APP_URL || '',
-      lineAutoSendWti: configMap.LINE_AUTO_SEND_WTI === 'true',
-      lineAutoSendWto: configMap.LINE_AUTO_SEND_WTO === 'true',
+      lineAutoSend: lineAutoSendWti && lineAutoSendWto,
+      lineAutoSendWti,
+      lineAutoSendWto,
       googleSheetsWebhookUrl: configMap.GOOGLE_SHEETS_WEBHOOK_URL || '',
     })
   } catch (caught) {
@@ -71,6 +77,10 @@ export async function POST(request: Request) {
     const body = await request.json()
     const values = settingsSchema.parse(body)
     const actor = currentActor(context)
+    const hasLegacyAutoSend = typeof values.lineAutoSend === 'boolean'
+    const lineAutoSendWti = hasLegacyAutoSend ? values.lineAutoSend === true : values.lineAutoSendWti
+    const lineAutoSendWto = hasLegacyAutoSend ? values.lineAutoSend === true : values.lineAutoSendWto
+    const legacyAutoSend = lineAutoSendWti && lineAutoSendWto
 
     const isMasked = (val: string | null | undefined) => {
       if (!val) return false
@@ -81,8 +91,9 @@ export async function POST(request: Request) {
       { key: 'LINE_DEFAULT_TARGET_ID', value: values.lineDefaultTargetId || null },
       { key: 'WEIGHT_TICKET_PDF_BUCKET', value: values.pdfBucket },
       { key: 'NEXT_PUBLIC_APP_URL', value: values.appUrl || null },
-      { key: 'LINE_AUTO_SEND_WTI', value: values.lineAutoSendWti ? 'true' : 'false' },
-      { key: 'LINE_AUTO_SEND_WTO', value: values.lineAutoSendWto ? 'true' : 'false' },
+      { key: 'LINE_AUTO_SEND', value: legacyAutoSend ? 'true' : 'false' },
+      { key: 'LINE_AUTO_SEND_WTI', value: lineAutoSendWti ? 'true' : 'false' },
+      { key: 'LINE_AUTO_SEND_WTO', value: lineAutoSendWto ? 'true' : 'false' },
       { key: 'GOOGLE_SHEETS_WEBHOOK_URL', value: values.googleSheetsWebhookUrl || null },
     ]
 
