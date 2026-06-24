@@ -34,6 +34,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       requestedBy: enteredByLabel(auth),
       scopedBranchIds: branchScopeIds(auth),
       targetId: body.targetId || undefined,
+      force: true,
     })
 
     if (result.status !== 200) {

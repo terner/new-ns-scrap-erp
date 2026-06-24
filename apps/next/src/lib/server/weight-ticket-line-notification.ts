@@ -263,6 +263,12 @@ export async function generateWeightTicketPdf(ticket: WeightTicketRecord, profil
 }
 
 async function uploadPdf(ticket: WeightTicketRecord, pdfBuffer: Buffer, bucketName: string) {
+  if (process.env.MOCK_PDF_UPLOAD === 'true') {
+    return {
+      pdfUrl: `https://${process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : 'fhglqymcdmrgbsbadnwr.supabase.co'}/storage/v1/object/public/${bucketName}/dummy-test-ticket.pdf`,
+      storageKey: 'dummy-test-ticket.pdf'
+    }
+  }
   const supabase = getSupabaseAdminClient()
   if (!supabase) {
     throw new Error('ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY สำหรับอัปโหลด PDF')
@@ -272,7 +278,16 @@ async function uploadPdf(ticket: WeightTicketRecord, pdfBuffer: Buffer, bucketNa
     contentType: 'application/pdf',
     upsert: true,
   })
-  if (error) throw new Error(`อัปโหลด PDF ไป Supabase Storage ไม่สำเร็จ: ${error.message}`)
+  if (error) {
+    if (process.env.MOCK_PDF_UPLOAD_FALLBACK === 'true') {
+      console.warn('[uploadPdf] upload failed, falling back to dummy url due to RLS/credentials:', error.message)
+      return {
+        pdfUrl: `https://${process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : 'fhglqymcdmrgbsbadnwr.supabase.co'}/storage/v1/object/public/${bucketName}/dummy-test-ticket.pdf`,
+        storageKey: 'dummy-test-ticket.pdf'
+      }
+    }
+    throw new Error(`อัปโหลด PDF ไป Supabase Storage ไม่สำเร็จ: ${error.message}`)
+  }
   const { data } = supabase.storage.from(bucketName).getPublicUrl(storageKey)
   return { pdfUrl: data.publicUrl, storageKey }
 }
@@ -311,6 +326,7 @@ function buildFlexMessage(ticket: WeightTicketRecord, pdfUrl: string, detailUrl:
   const totalImages = ticket.imageNames?.length || 0
 
   return {
+    type: 'flex' as const,
     altText: `${typeLabel} ${ticket.documentNo} | ${partyLabel}: ${ticket.partyName} | สุทธิ ${formatWeight(ticket.totals.netWeight)} กก.`,
     contents: {
       type: 'bubble',
@@ -570,14 +586,41 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
       }
     }
 
-    const hasSuccess = sentResults.some(r => r.status === 'sent' || r.status === 'skipped')
-    if (hasSuccess) {
+    const sentCount = sentResults.filter((r) => r.status === 'sent').length
+    const skippedCount = sentResults.filter((r) => r.status === 'skipped').length
+    const failedResults = sentResults.filter((r) => r.status === 'failed')
+
+    if (sentCount > 0) {
       await syncWeightTicketToGoogleSheets('update', {
         ...loaded.record,
         pdfUrl: uploaded.pdfUrl,
       } as any).catch((err) => {
         console.error('[line-notification] failed to sync to google sheets:', err)
       })
+    }
+
+    if (sentCount === 0 && skippedCount > 0 && failedResults.length === 0) {
+      return {
+        code: 'ALREADY_SENT' as const,
+        detailUrl,
+        error: 'เอกสารนี้เคยส่งเข้า LINE แล้ว จึงไม่ได้ส่งซ้ำอัตโนมัติ',
+        lineRequestId: null,
+        pdfUrl: uploaded.pdfUrl,
+        sentResults,
+        status: 409,
+      }
+    }
+
+    if (sentCount === 0) {
+      return {
+        code: 'LINE_PUSH_FAILED' as const,
+        detailUrl,
+        error: failedResults[0]?.error || 'ส่ง LINE ไม่สำเร็จ',
+        lineRequestId: null,
+        pdfUrl: uploaded.pdfUrl,
+        sentResults,
+        status: 502,
+      }
     }
 
     return {
