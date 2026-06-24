@@ -30,6 +30,7 @@ type NotifyOptions = {
   requestedBy: string
   scopedBranchIds: string[]
   targetId?: string
+  force?: boolean
 }
 
 type NotificationLogStatus = 'failed' | 'sent'
@@ -271,34 +272,85 @@ function buildDetailUrl(origin: string, documentNo: string) {
 
 function buildFlexMessage(ticket: WeightTicketRecord, pdfUrl: string, detailUrl: string, customMessage?: string) {
   const partyLabel = ticket.type === 'WTI' ? 'ผู้ขาย' : 'ลูกค้า'
-  const title = `${typeLabels[ticket.type]} ${ticket.documentNo}`
+  const typeLabel = typeLabels[ticket.type] || (ticket.type === 'WTI' ? 'ใบรับของ WTI' : 'ใบส่งของ WTO')
+  const themeColor = ticket.type === 'WTI' ? '#0f766e' : '#0284c7'
+
+  let docDateStr = ''
+  try {
+    const date = ticket.createdAt ? new Date(ticket.createdAt) : new Date()
+    const parts = new Intl.DateTimeFormat('en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Bangkok'
+    }).formatToParts(date)
+    const byType = Object.fromEntries(parts.map(p => [p.type, p.value]))
+    const yearBE = parseInt(byType.year, 10) + 543
+    docDateStr = `${byType.day}/${byType.month}/${yearBE} ${byType.hour}:${byType.minute}`
+  } catch {
+    docDateStr = formatDateDisplay(ticket.documentDate)
+  }
+
+  const uniqueWarehouses = [...new Set(ticket.lines.map(l => l.warehouseName).filter(Boolean))]
+  const warehouseDisplay = ticket.warehouseName || (uniqueWarehouses.length > 0 ? uniqueWarehouses.join(', ') : '-')
+
+  const totalImages = ticket.imageNames?.length || 0
+
   return {
-    altText: `${title} | ${partyLabel}: ${ticket.partyName} | สุทธิ ${formatWeight(ticket.totals.netWeight)} กก.`,
+    altText: `${typeLabel} ${ticket.documentNo} | ${partyLabel}: ${ticket.partyName} | สุทธิ ${formatWeight(ticket.totals.netWeight)} กก.`,
     contents: {
+      type: 'bubble',
       body: {
-        contents: [
-          { color: '#0f766e', size: 'sm', text: ticket.type, type: 'text', weight: 'bold' },
-          { color: '#111827', size: 'lg', text: title, type: 'text', weight: 'bold', wrap: true },
-          ...(customMessage ? [{ color: '#475569', margin: 'sm', size: 'sm', text: customMessage, type: 'text', wrap: true }] : []),
-          { margin: 'md', type: 'separator' },
-          { contents: [{ color: '#64748b', flex: 2, size: 'sm', text: partyLabel, type: 'text' }, { color: '#111827', flex: 5, size: 'sm', text: ticket.partyName, type: 'text', wrap: true }], layout: 'baseline', margin: 'md', type: 'box' },
-          { contents: [{ color: '#64748b', flex: 2, size: 'sm', text: 'สาขา', type: 'text' }, { color: '#111827', flex: 5, size: 'sm', text: ticket.branchName, type: 'text', wrap: true }], layout: 'baseline', margin: 'sm', type: 'box' },
-          { contents: [{ color: '#64748b', flex: 2, size: 'sm', text: 'ทะเบียนรถ', type: 'text' }, { color: '#111827', flex: 5, size: 'sm', text: ticket.vehicleNo || '-', type: 'text', wrap: true }], layout: 'baseline', margin: 'sm', type: 'box' },
-          { contents: [{ color: '#64748b', flex: 2, size: 'sm', text: 'สุทธิ', type: 'text' }, { color: '#0f766e', flex: 5, size: 'md', text: `${formatWeight(ticket.totals.netWeight)} กก.`, type: 'text', weight: 'bold' }], layout: 'baseline', margin: 'sm', type: 'box' },
-        ],
         type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: typeLabel, size: 'sm', color: themeColor, weight: 'bold' },
+          { type: 'text', text: ticket.documentNo, size: 'lg', weight: 'bold', color: '#111827', wrap: true },
+          ...(customMessage ? [{ type: 'text', text: customMessage, margin: 'sm', size: 'sm', color: '#475569', wrap: true }] : []),
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            spacing: 'sm',
+            contents: [
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: partyLabel, color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: ticket.partyName, color: '#111827', size: 'sm', flex: 5, wrap: true }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'สาขา', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: ticket.branchName, color: '#111827', size: 'sm', flex: 5, wrap: true }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'วันที่/เวลา', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: docDateStr, color: '#111827', size: 'sm', flex: 5, wrap: true }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'โกดัง', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: warehouseDisplay, color: '#111827', size: 'sm', flex: 5, wrap: true }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'ทะเบียนรถ', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: ticket.vehicleNo || '-', color: '#111827', size: 'sm', flex: 5, wrap: true }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'ผู้บันทึก', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: ticket.enteredBy, color: '#111827', size: 'sm', flex: 5, wrap: true }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'รูปประกอบ', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: `${totalImages} รูป`, color: '#111827', size: 'sm', flex: 5 }] },
+            ]
+          },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            spacing: 'sm',
+            contents: [
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'น้ำหนักรวม', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: `${formatWeight(ticket.totals.grossWeight)} กก.`, color: '#111827', size: 'sm', flex: 5 }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'หักภาชนะ', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: `${formatWeight(ticket.totals.containerDeductionWeight)} กก.`, color: '#111827', size: 'sm', flex: 5 }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'หักสิ่งเจือปน', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: `${formatWeight(ticket.totals.deductionWeight)} กก.`, color: '#111827', size: 'sm', flex: 5 }] },
+              { type: 'box', layout: 'baseline', contents: [{ type: 'text', text: 'สุทธิ', color: '#64748b', size: 'sm', flex: 2 }, { type: 'text', text: `${formatWeight(ticket.totals.netWeight)} กก.`, color: themeColor, size: 'md', flex: 5, weight: 'bold' }] }
+            ]
+          }
+        ]
       },
       footer: {
-        contents: [
-          { action: { label: 'เปิด PDF', type: 'uri', uri: pdfUrl }, color: '#0f766e', style: 'primary', type: 'button' },
-          { action: { label: 'เปิดในระบบ', type: 'uri', uri: detailUrl }, style: 'secondary', type: 'button' },
-        ],
-        spacing: 'sm',
         type: 'box',
-      },
-      type: 'bubble',
-    },
-    type: 'flex',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          { type: 'button', style: 'primary', color: themeColor, action: { type: 'uri', label: 'เปิด PDF', uri: pdfUrl } },
+          { type: 'button', style: 'secondary', action: { type: 'uri', label: 'เปิดในระบบ', uri: detailUrl } }
+        ]
+      }
+    }
   }
 }
 
@@ -413,15 +465,36 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
   }
 
   const configs = await resolveNotificationConfigs()
-  let targetId = options.targetId || configs.lineDefaultTargetId
-  if (!targetId) {
-    const latestGroup = await prisma.line_groups.findFirst({
-      orderBy: { updated_at: 'desc' },
+
+  let targets: string[] = []
+  if (options.targetId) {
+    targets = [options.targetId]
+  } else if (configs.lineDefaultTargetId) {
+    targets = [configs.lineDefaultTargetId]
+  } else {
+    // Multi-target & Branch Routing
+    const isWti = loaded.record.type === 'WTI'
+    const targetGroups = await prisma.line_groups.findMany({
+      where: {
+        is_active: true,
+        notify_wti: isWti ? true : undefined,
+        notify_wto: !isWti ? true : undefined,
+        OR: [
+          { branch_code: null },
+          { branch_code: '' },
+          { branch_code: loaded.record.branchId }
+        ]
+      }
     })
-    targetId = latestGroup?.group_id || ''
+    targets = targetGroups.map(g => g.group_id)
   }
-  if (!targetId) {
-    return { code: 'LINE_NOT_CONFIGURED' as const, status: 400, error: 'ยังไม่ได้ตั้งค่ากลุ่มไลน์ปลายทางและไม่พบกลุ่มไลน์ที่ลงทะเบียนไว้' }
+
+  if (targets.length === 0) {
+    return {
+      code: 'NO_TARGETS_ROUTED' as const,
+      status: 400,
+      error: 'ไม่มีกลุ่มไลน์ที่ตรงกับเงื่อนไขการส่งแจ้งเตือน',
+    }
   }
 
   try {
@@ -434,43 +507,78 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
       type: 'text',
       text: buildTextMessageContent(loaded.record, uploaded.pdfUrl)
     }
-    const lineRequestId = await sendLinePush(targetId, [textMessage, flexMessage], configs.lineChannelAccessToken)
-    await recordNotificationLog({
-      customMessage: options.customMessage,
-      lineRequestId,
-      pdfStorageBucket: configs.pdfBucket,
-      pdfStorageKey: uploaded.storageKey,
-      pdfUrl: uploaded.pdfUrl,
-      requestedBy: options.requestedBy,
-      status: 'sent',
-      targetId,
-      ticketId: loaded.id,
-    })
-    // Sync to Google Sheets with the generated PDF URL
-    await syncWeightTicketToGoogleSheets('update', {
-      ...loaded.record,
-      pdfUrl: uploaded.pdfUrl,
-    } as any).catch((err) => {
-      console.error('[line-notification] failed to sync to google sheets:', err)
-    })
+
+    const sentResults: Array<{ targetId: string; status: 'sent' | 'failed' | 'skipped'; lineRequestId?: string; error?: string }> = []
+    let lastSentRequestId: string | null = null
+
+    for (const target of targets) {
+      // 1. Check double send from logs if force is not true
+      if (!options.force) {
+        const existingLogs = await prisma.$queryRaw<Array<{ id: unknown }>>`
+          select id
+          from public.weight_ticket_notification_logs
+          where weight_ticket_id = ${loaded.id}
+            and status = 'sent'
+            and target_id = ${target}
+          limit 1
+        `
+        if (existingLogs.length > 0) {
+          sentResults.push({ targetId: target, status: 'skipped' })
+          continue
+        }
+      }
+
+      // 2. Send Line Push
+      try {
+        const lineRequestId = await sendLinePush(target, [textMessage, flexMessage], configs.lineChannelAccessToken)
+        lastSentRequestId = lineRequestId || null
+        await recordNotificationLog({
+          customMessage: options.customMessage,
+          lineRequestId,
+          pdfStorageBucket: configs.pdfBucket,
+          pdfStorageKey: uploaded.storageKey,
+          pdfUrl: uploaded.pdfUrl,
+          requestedBy: options.requestedBy,
+          status: 'sent',
+          targetId: target,
+          ticketId: loaded.id,
+        })
+        sentResults.push({ targetId: target, status: 'sent', lineRequestId: lineRequestId || undefined })
+      } catch (err: any) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        await recordNotificationLog({
+          customMessage: options.customMessage,
+          errorMessage: errMsg,
+          pdfStorageBucket: configs.pdfBucket,
+          requestedBy: options.requestedBy,
+          status: 'failed',
+          targetId: target,
+          ticketId: loaded.id,
+        })
+        sentResults.push({ targetId: target, status: 'failed', error: errMsg })
+      }
+    }
+
+    const hasSuccess = sentResults.some(r => r.status === 'sent' || r.status === 'skipped')
+    if (hasSuccess) {
+      await syncWeightTicketToGoogleSheets('update', {
+        ...loaded.record,
+        pdfUrl: uploaded.pdfUrl,
+      } as any).catch((err) => {
+        console.error('[line-notification] failed to sync to google sheets:', err)
+      })
+    }
+
     return {
       code: 'SENT' as const,
       detailUrl,
-      lineRequestId,
+      lineRequestId: lastSentRequestId,
       pdfUrl: uploaded.pdfUrl,
       status: 200,
+      sentResults
     }
   } catch (caught) {
-    const errorMessage = caught instanceof Error ? caught.message : 'ส่ง LINE ไม่สำเร็จ'
-    await recordNotificationLog({
-      customMessage: options.customMessage,
-      errorMessage,
-      pdfStorageBucket: configs.pdfBucket,
-      requestedBy: options.requestedBy,
-      status: 'failed',
-      targetId,
-      ticketId: loaded.id,
-    })
+    const errorMessage = caught instanceof Error ? caught.message : 'สร้างเอกสารหรืออัปโหลด PDF ไม่สำเร็จ'
     return { code: 'SEND_FAILED' as const, status: 500, error: errorMessage }
   }
 }

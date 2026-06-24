@@ -3949,6 +3949,10 @@ model line_groups {
   group_id    String   @unique
   name        String
   picture_url String?
+  branch_code String?
+  notify_wti  Boolean  @default(true)
+  notify_wto  Boolean  @default(true)
+  is_active   Boolean  @default(true)
   updated_at  DateTime @default(now()) @db.Timestamptz(6)
 
   @@schema("public")

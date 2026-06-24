@@ -13,7 +13,8 @@ const settingsSchema = z.object({
   lineDefaultTargetId: z.string().trim().nullable().or(z.literal('')),
   pdfBucket: z.string().trim().min(1, 'ระบุชื่อ Storage Bucket'),
   appUrl: z.string().trim().url('URL ไม่ถูกต้อง').or(z.literal('')),
-  lineAutoSend: z.boolean().default(false),
+  lineAutoSendWti: z.boolean().default(false),
+  lineAutoSendWto: z.boolean().default(false),
   googleSheetsWebhookUrl: z.string().trim().url('URL ไม่ถูกต้อง').or(z.literal('')).nullable().or(z.literal('')),
 })
 
@@ -31,7 +32,8 @@ export async function GET() {
             'LINE_DEFAULT_TARGET_ID',
             'WEIGHT_TICKET_PDF_BUCKET',
             'NEXT_PUBLIC_APP_URL',
-            'LINE_AUTO_SEND',
+            'LINE_AUTO_SEND_WTI',
+            'LINE_AUTO_SEND_WTO',
             'GOOGLE_SHEETS_WEBHOOK_URL',
           ],
         },
@@ -40,13 +42,19 @@ export async function GET() {
 
     const configMap = Object.fromEntries(dbSettings.map((s) => [s.key, s.value]))
 
+    const maskSecret = (val: string | null | undefined) => {
+      if (!val) return ''
+      return '••••••••••••••••'
+    }
+
     return NextResponse.json({
-      lineChannelAccessToken: configMap.LINE_CHANNEL_ACCESS_TOKEN || '',
-      lineChannelSecret: configMap.LINE_CHANNEL_SECRET || '',
+      lineChannelAccessToken: maskSecret(configMap.LINE_CHANNEL_ACCESS_TOKEN),
+      lineChannelSecret: maskSecret(configMap.LINE_CHANNEL_SECRET),
       lineDefaultTargetId: configMap.LINE_DEFAULT_TARGET_ID || '',
       pdfBucket: configMap.WEIGHT_TICKET_PDF_BUCKET || 'weight-ticket-pdfs',
       appUrl: configMap.NEXT_PUBLIC_APP_URL || '',
-      lineAutoSend: configMap.LINE_AUTO_SEND === 'true',
+      lineAutoSendWti: configMap.LINE_AUTO_SEND_WTI === 'true',
+      lineAutoSendWto: configMap.LINE_AUTO_SEND_WTO === 'true',
       googleSheetsWebhookUrl: configMap.GOOGLE_SHEETS_WEBHOOK_URL || '',
     })
   } catch (caught) {
@@ -64,15 +72,26 @@ export async function POST(request: Request) {
     const values = settingsSchema.parse(body)
     const actor = currentActor(context)
 
+    const isMasked = (val: string | null | undefined) => {
+      if (!val) return false
+      return val.includes('••') || val === '••••••••••••••••'
+    }
+
     const updates = [
-      { key: 'LINE_CHANNEL_ACCESS_TOKEN', value: values.lineChannelAccessToken || null },
-      { key: 'LINE_CHANNEL_SECRET', value: values.lineChannelSecret || null },
       { key: 'LINE_DEFAULT_TARGET_ID', value: values.lineDefaultTargetId || null },
       { key: 'WEIGHT_TICKET_PDF_BUCKET', value: values.pdfBucket },
       { key: 'NEXT_PUBLIC_APP_URL', value: values.appUrl || null },
-      { key: 'LINE_AUTO_SEND', value: values.lineAutoSend ? 'true' : 'false' },
+      { key: 'LINE_AUTO_SEND_WTI', value: values.lineAutoSendWti ? 'true' : 'false' },
+      { key: 'LINE_AUTO_SEND_WTO', value: values.lineAutoSendWto ? 'true' : 'false' },
       { key: 'GOOGLE_SHEETS_WEBHOOK_URL', value: values.googleSheetsWebhookUrl || null },
     ]
+
+    if (!isMasked(values.lineChannelAccessToken)) {
+      updates.push({ key: 'LINE_CHANNEL_ACCESS_TOKEN', value: values.lineChannelAccessToken || null })
+    }
+    if (!isMasked(values.lineChannelSecret)) {
+      updates.push({ key: 'LINE_CHANNEL_SECRET', value: values.lineChannelSecret || null })
+    }
 
     await prisma.$transaction(
       updates.map((item) =>

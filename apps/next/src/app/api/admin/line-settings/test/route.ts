@@ -19,6 +19,14 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { token, targetId } = testSchema.parse(body)
 
+    let finalToken = token
+    if (token === '••••••••••••••••' || token.includes('••')) {
+      const config = await prisma.system_settings.findUnique({
+        where: { key: 'LINE_CHANNEL_ACCESS_TOKEN' },
+      })
+      finalToken = config?.value || ''
+    }
+
     let finalTargetId = targetId
     if (!finalTargetId) {
       // Fallback to the latest registered group
@@ -123,7 +131,7 @@ export async function POST(request: Request) {
     const response = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${finalToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

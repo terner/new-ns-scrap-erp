@@ -283,9 +283,10 @@ export async function POST(request: Request) {
     const mapped = mapWeightTicketRow(created, usage)
     await syncWeightTicketToGoogleSheets('create', mapped)
 
-    // Trigger auto-send to LINE if enabled
+    // Trigger auto-send to LINE if enabled for specific type
+    const autoSendKey = mapped.type === 'WTI' ? 'LINE_AUTO_SEND_WTI' : 'LINE_AUTO_SEND_WTO'
     const autoSendConfig = await prisma.system_settings.findUnique({
-      where: { key: 'LINE_AUTO_SEND' },
+      where: { key: autoSendKey },
     })
     if (autoSendConfig?.value === 'true') {
       const requestOrigin = (req: Request) => {
@@ -301,6 +302,7 @@ export async function POST(request: Request) {
         origin: requestOrigin(request),
         requestedBy: enteredBy,
         scopedBranchIds,
+        force: false,
       }).catch((err) => {
         console.error('[weight-ticket-auto-send] failed to auto send LINE notification:', err)
       })
