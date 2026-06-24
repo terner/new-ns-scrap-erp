@@ -69,7 +69,7 @@ POS เป็น customer commitment/reservation ฝั่งขาย ก่อ
 - list table ต้องมีคอลัมน์ `วันที่สร้างรายการ`, `วันที่ส่งมอบ`, และ `อัพเดตล่าสุด`
 - คอลัมน์ `อัพเดตล่าสุด` ต้องอยู่ถัดจาก `สถานะ Match` และแสดง `updated_by` พร้อม timestamp จาก `updated_at`
 - date filter ของหน้า PO Sell ใช้ `created_at` / `วันที่สร้างรายการ`
-- customer options ต้องส่ง `marketScope` จาก `customers.market_scope`; เมื่อผู้ใช้เลือกลูกค้า ระบบต้อง auto ตั้ง `ช่องทางขาย` เป็น `ในประเทศ` หรือ `ต่างประเทศ` ตามค่า master ลูกค้า โดยยังให้ผู้ใช้แก้ช่องทางขายเองได้ก่อนบันทึก
+- customer options ต้องส่ง `marketScope` จาก `customers.market_scope`; เมื่อผู้ใช้เลือกลูกค้า ระบบต้อง auto ตั้ง `ช่องทางขาย` เป็น `ในประเทศ` หรือ `ต่างประเทศ` ตามค่า master ลูกค้า และใน modal PO Sell ให้แสดงเป็น read-only เพื่อกันผู้ใช้เลือกช่องทางที่ไม่ตรงกับลูกค้า
 - `สถานะเอกสาร` ใน table/card/detail ใช้ status display ตาม `docs/design.md`: dot + ข้อความสี ไม่ใช้ badge background
 - `สถานะ Match` แสดงเป็นข้อความสีอย่างเดียว ไม่มี dot
 - `สถานะ Match` ใน filter/table/card/detail/export ต้องใช้ label ภาษาไทยชุดเดียวกัน: `ยังไม่จับคู่`, `จับคู่บางส่วน`, `จับคู่ครบ`, `จับคู่เกิน`, `ยกเลิก`

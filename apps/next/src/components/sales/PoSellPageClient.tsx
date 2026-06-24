@@ -304,15 +304,26 @@ export function PoSellPageClient() {
   const currentPage = Math.min(page, totalPages)
   const pageRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const activeBranches = (data?.options.branches ?? []).filter((option) => option.active !== false)
-  const activeChannels = (data?.options.salesChannels ?? []).filter((option) => option.active !== false)
-  const activeCustomers = (data?.options.customers ?? []).filter((option) => option.active !== false)
+  const activeChannels = useMemo(() => (data?.options.salesChannels ?? []).filter((option) => option.active !== false), [data?.options.salesChannels])
+  const activeCustomers = useMemo(() => (data?.options.customers ?? []).filter((option) => option.active !== false), [data?.options.customers])
   const activeProducts = (data?.options.products ?? []).filter((option) => option.active !== false)
-  const defaultSalesChannelForCustomer = (customerId: string) => {
+  const defaultSalesChannelForCustomer = useCallback((customerId: string) => {
     const customer = activeCustomers.find((option) => option.id === customerId)
     const targetScope = customer?.marketScope === 'ต่างประเทศ' ? 'ต่างประเทศ' : customer?.marketScope === 'ในประเทศ' ? 'ในประเทศ' : null
     if (!targetScope) return null
     return activeChannels.find((channel) => [channel.name, channel.code, channel.id].some((value) => String(value ?? '').trim() === targetScope))?.id ?? null
-  }
+  }, [activeChannels, activeCustomers])
+  const selectedCustomer = form.customerId
+    ? activeCustomers.find((customer) => customer.id === form.customerId) ?? null
+    : null
+  const selectedChannel = form.channelId
+    ? (data?.options.salesChannels ?? []).find((channel) => channel.id === form.channelId) ?? null
+    : null
+  const selectedChannelLabel = selectedChannel
+    ? selectedChannel.code ? `${selectedChannel.code} — ${selectedChannel.name}` : selectedChannel.name
+    : form.customerId
+      ? `ไม่พบช่องทางขาย${selectedCustomer?.marketScope ? `สำหรับ ${selectedCustomer.marketScope}` : ''}`
+      : 'เลือกลูกค้าก่อน'
   const formSubtotal = form.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - item.discount), 0)
   const formQty = form.items.reduce((sum, item) => sum + item.qty, 0)
   const vatRatePercent = 7
@@ -373,6 +384,14 @@ export function PoSellPageClient() {
     setShowForm(true)
   }
 
+  useEffect(() => {
+    setForm((current) => {
+      const nextChannelId = current.customerId ? defaultSalesChannelForCustomer(current.customerId) : null
+      if ((current.channelId ?? null) === nextChannelId) return current
+      return { ...current, channelId: nextChannelId }
+    })
+  }, [defaultSalesChannelForCustomer])
+
   function openCancelDialog(row: PoSellRow) {
     if (!row.canCancel) {
       setError(row.cancelDisabledReason || 'รายการนี้ยังไม่สามารถยกเลิกได้')
@@ -393,7 +412,11 @@ export function PoSellPageClient() {
       }
       return next
     })
-    setFieldErrors((current) => ({ ...current, [key]: '' }))
+    setFieldErrors((current) => ({
+      ...current,
+      [key]: '',
+      ...(key === 'customerId' ? { channelId: '' } : {}),
+    }))
   }
 
   function updateItem(index: number, key: keyof PoSellFormValues['items'][number], value: string | number | null) {
@@ -793,12 +816,12 @@ export function PoSellPageClient() {
       {showForm ? (
         <PoSellFormModal
           branches={activeBranches}
-          channels={activeChannels}
           customers={activeCustomers}
           errors={fieldErrors}
           form={form}
           isSaving={isSaving}
           products={activeProducts}
+          selectedChannelLabel={selectedChannelLabel}
           subtotal={formSubtotal}
           submitLabel={editingDocNo ? 'บันทึกการแก้ไข' : 'บันทึก PO Sell'}
           title={editingDocNo ? `แก้ไข PO Sell ${editingDocNo}` : 'สร้าง PO Sell (จองขาย)'}
@@ -1039,12 +1062,12 @@ function DecimalPatternInput({
 
 function PoSellFormModal({
   branches,
-  channels,
   customers,
   errors,
   form,
   isSaving,
   products,
+  selectedChannelLabel,
   submitLabel,
   subtotal,
   title,
@@ -1060,12 +1083,12 @@ function PoSellFormModal({
   onUpdateItem,
 }: {
   branches: Option[]
-  channels: Option[]
   customers: Option[]
   errors: Record<string, string>
   form: PoSellFormValues
   isSaving: boolean
   products: Option[]
+  selectedChannelLabel: string
   submitLabel: string
   subtotal: number
   title: string
@@ -1133,10 +1156,11 @@ function PoSellFormModal({
               </div>
               <div className="col-span-2">
                 <label className="mb-1 block text-xs font-medium text-slate-600">ช่องทางขาย</label>
-                <UiSelect className={`!h-9 w-full px-2 py-1.5 text-sm ${form.channelId ? '' : 'text-slate-400'} rounded-lg border-slate-300 focus:border-slate-400 focus:ring-0 outline-none`} value={form.channelId ?? ''} onChange={(event) => onUpdate('channelId', event.target.value || null)}>
-                  <option value="">เลือกช่องทางขาย</option>
-                  {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}
-                </UiSelect>
+                <UiInput
+                  readOnly
+                  className={`!h-9 w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-0 ${errors.channelId ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-slate-100 text-slate-700'}`}
+                  value={selectedChannelLabel}
+                />
                 {fieldError('channelId')}
               </div>
             </div>

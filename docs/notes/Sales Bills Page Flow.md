@@ -152,7 +152,7 @@ PO Sell
 | วันที่ครบกำหนด/กำหนดชำระ | ไม่ | คำนวณจาก credit term ได้ แต่แสดงให้แก้/ตรวจตาม business rule |
 | สาขา/คลัง | ใช่ | Required; ใช้กรอง `WTO`, `PO Sell`, Customer advance และหัวกระดาษ |
 | Customer | ใช่ | ใช้ search dropdown; ค้นหาได้จากรหัส/ชื่อลูกค้า และใช้กรอง `WTO`, `PO Sell`, Customer advance และ AR |
-| ช่องทางขาย | ใช่ | ใช้ search dropdown; เมื่อเลือกลูกค้า ระบบ auto ตั้งจาก `Customer.marketScope` เป็น `ในประเทศ` หรือ `ต่างประเทศ` และยังแก้เองได้ก่อนบันทึก `SB` |
+| ช่องทางขาย | ใช่ | ระบบ auto ตั้งจาก `Customer.marketScope` เป็น `ในประเทศ` หรือ `ต่างประเทศ` เมื่อเลือกลูกค้า และแสดงเป็น read-only ใน modal เพื่อกันเลือกช่องทางไม่ตรงกับลูกค้า |
 | เครดิตเทอม | ไม่ | ดึงจาก Customer ได้ แต่ snapshot ลงบิล |
 | หมายเหตุ | ไม่ | ข้อมูลประกอบเอกสาร |
 
@@ -290,7 +290,7 @@ Design/API รายละเอียดอยู่ที่ [[Stock Ledger DB
 - [x] ตัดช่อง `เลขที่อ้างอิง` free-text ออกจาก create/edit `SB`
 - [x] ไม่แสดง `ทะเบียนรถ` ใน create/edit/detail/print `SB`
 - [x] ไม่แสดงเลข `WTO` ซ้ำในรายการสินค้า เพราะแสดงใน source summary/document info แล้ว
-- [x] ช่องทางขายเป็น required search combobox ภายใน modal ไม่ใช้ native select เพื่อไม่ให้รายการ dropdown หลุดออกจาก form
+- [x] ช่องทางขายเป็น required read-only field ภายใน modal โดย auto จาก Customer market scope
 - [x] รายการ `STOCK` ไม่แสดง `+ เพิ่มรายการ` หรือปุ่มลบสินค้า manual
 
 #### Batch SB-2: Item Allocation UX

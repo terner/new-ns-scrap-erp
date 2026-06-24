@@ -762,13 +762,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     return isSelected || (option.active !== false && (option.remainingAmount ?? 0) > 0.01)
   })
   const inactiveAdvancePayments = matchingAdvancePayments.filter((option) => !activeAdvancePayments.some((activeOption) => activeOption.id === option.id))
-  const activeCustomers = options.customers.filter((option) => option.active !== false)
-  const defaultSalesChannelForCustomer = (customerId: string) => {
+  const activeCustomers = useMemo(() => options.customers.filter((option) => option.active !== false), [options.customers])
+  const activeSalesChannels = useMemo(() => options.salesChannels.filter((option) => option.active !== false), [options.salesChannels])
+  const defaultSalesChannelForCustomer = useCallback((customerId: string) => {
     const customer = activeCustomers.find((option) => option.id === customerId)
     const targetScope = customer?.marketScope === 'ต่างประเทศ' ? 'ต่างประเทศ' : customer?.marketScope === 'ในประเทศ' ? 'ในประเทศ' : null
     if (!targetScope) return null
     return activeSalesChannels.find((channel) => [channel.name, channel.code, channel.id].some((value) => String(value ?? '').trim() === targetScope))?.id ?? null
-  }
+  }, [activeCustomers, activeSalesChannels])
   const matchingCustomerAdvancePayments = (options.customerAdvancePayments ?? []).filter((option) => {
     if (!salesForm.customerId || option.customer_id !== salesForm.customerId) return false
     return true
@@ -831,8 +832,18 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   })()
   const selectedTradingPurchaseSourceIds = new Set(tradingPurchaseSelectorIds.filter(Boolean))
   const availableTradingPurchaseSources = activeTradingPurchaseBills.filter((source) => !selectedTradingPurchaseSourceIds.has(source.id))
-  const activeSalesChannels = options.salesChannels.filter((option) => option.active !== false)
   const activeSuppliers = options.suppliers.filter((option) => option.active !== false)
+  const selectedSalesChannel = salesForm.channelId
+    ? options.salesChannels.find((channel) => channel.id === salesForm.channelId) ?? null
+    : null
+  const selectedCustomer = salesForm.customerId
+    ? activeCustomers.find((customer) => customer.id === salesForm.customerId) ?? null
+    : null
+  const selectedSalesChannelLabel = selectedSalesChannel
+    ? selectedSalesChannel.code ? `${selectedSalesChannel.code} — ${selectedSalesChannel.name}` : selectedSalesChannel.name
+    : salesForm.customerId
+      ? `ไม่พบช่องทางขาย${selectedCustomer?.marketScope ? `สำหรับ ${selectedCustomer.marketScope}` : ''}`
+      : 'เลือกลูกค้าก่อน'
   const defaultPurchaseWarehouse = useCallback((branchId: string) => options.warehouses.find((warehouse) => warehouse.active !== false && warehouse.branch_id === branchId && warehouse.type?.toUpperCase() === 'RM') ?? null, [options.warehouses])
   const defaultPurchaseWarehouseId = useCallback((branchId: string) => defaultPurchaseWarehouse(branchId)?.id ?? null, [defaultPurchaseWarehouse])
   const selectedPurchaseWarehouse = form.warehouseId ? options.warehouses.find((warehouse) => warehouse.id === form.warehouseId) ?? null : null
@@ -1036,6 +1047,16 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       return { ...current, warehouseId: nextWarehouseId }
     })
   }, [defaultPurchaseWarehouseId, form.branchId, form.transactionMode, form.warehouseId, mode])
+
+  useEffect(() => {
+    if (mode !== 'sales') return
+
+    setSalesForm((current) => {
+      const nextChannelId = current.customerId ? defaultSalesChannelForCustomer(current.customerId) ?? '' : ''
+      if ((current.channelId ?? '') === nextChannelId) return current
+      return { ...current, channelId: nextChannelId }
+    })
+  }, [defaultSalesChannelForCustomer, mode])
 
   useEffect(() => {
     if (mode !== 'sales') return
@@ -1840,7 +1861,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     if (key === 'branchId' || key === 'customerId' || key === 'transactionMode') {
       setTradingPurchaseSelectorIds([''])
     }
-    setSalesFieldErrors((current) => ({ ...current, [key]: '' }))
+    setSalesFieldErrors((current) => ({
+      ...current,
+      [key]: '',
+      ...(key === 'customerId' ? { channelId: '' } : {}),
+    }))
   }
 
   function updateSalesItem(index: number, key: keyof SalesBillFormValues['items'][number], value: string | number | null) {
@@ -3196,20 +3221,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                 <div className="grid gap-3 md:grid-cols-4">
                   <CustomerSearchCombobox className="md:col-span-2" disabled={customerLockedByDelivery} error={salesFieldErrors.customerId} errorKey="customerId" options={activeCustomers} value={salesForm.customerId} onChange={(value) => updateSalesForm('customerId', value)} />
                   <BranchSelectCombobox branches={activeBranches} disabled={stockDeliveryLocked} error={salesFieldErrors.branchId} errorKey="branchId" inputId="sales-bill-branch-search" label="สาขา/คลัง *" placeholder="เลือกสาขา/คลัง" value={salesForm.branchId} onChange={(branchId) => updateSalesForm('branchId', branchId ?? '')} />
-                  <SearchCombobox
-                    error={salesFieldErrors.channelId}
-                    errorKey="channelId"
-                    inputId="sales-bill-channel-search"
-                    label="ช่องทางขาย *"
-                    options={activeSalesChannels.map((channel) => ({
-                      id: channel.id,
-                      label: channel.code ? `${channel.code} — ${channel.name}` : channel.name,
-                      searchText: `${channel.code ?? ''} ${channel.name} ${channel.id}`.toLowerCase(),
-                    }))}
-                    placeholder="เลือกช่องทางขาย"
-                    value={salesForm.channelId ?? ''}
-                    onChange={(value) => updateSalesForm('channelId', value)}
-                  />
+                  <Field className="block" error={salesFieldErrors.channelId} label="ช่องทางขาย *">
+                    <Input
+                      data-error-key="channelId"
+                      readOnly
+                      className={salesFieldErrors.channelId ? 'border-red-400 bg-red-50 text-red-700' : 'bg-slate-100 text-slate-700'}
+                      value={selectedSalesChannelLabel}
+                    />
+                  </Field>
                 </div>
                 {salesForm.transactionMode === 'TRADING' ? (
                   <div className="mt-3 max-w-sm">
