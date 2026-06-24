@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { parseInternalBigIntId } from '@/lib/business-code'
-import { calculateTicketTotals, weightTicketFormSchema } from '@/lib/weight-tickets'
+import { calculateTicketTotals, isOtherProductImpurityId, isOtherProductImpurityLabel, weightTicketFormSchema } from '@/lib/weight-tickets'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { recordAuditLog } from '@/lib/server/app-logging'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
@@ -157,15 +157,35 @@ export async function POST(request: Request) {
     }
 
     const impurityById = new Map(impurities.map((impurity) => [impurity.id, impurity] as const))
+    const wtoOtherProductImpurityIndex = values.lines.findIndex((line) => isOtherProductImpurityId(line.impurityId) && values.type === 'WTO')
+    if (wtoOtherProductImpurityIndex >= 0) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: `รายการที่ ${wtoOtherProductImpurityIndex + 1}: ใบส่งของไม่รองรับสิ่งเจือปนแบบสินค้าอื่น`,
+        fieldErrors: { [`lines.${wtoOtherProductImpurityIndex}.impurityId`]: ['ใบส่งของไม่รองรับสิ่งเจือปนแบบสินค้าอื่น'] },
+      }, { status: 400 })
+    }
     const missingImpurityIndex = values.lines.findIndex((line, index) => {
       const impurityId = parsedImpurityIds[index]
-      return Boolean(line.impurityId) && (impurityId == null || !impurityById.has(impurityId))
+      return Boolean(line.impurityId) && !isOtherProductImpurityId(line.impurityId) && (impurityId == null || !impurityById.has(impurityId))
     })
     if (missingImpurityIndex >= 0) {
       return NextResponse.json({
         code: 'BAD_REQUEST',
         error: `รายการที่ ${missingImpurityIndex + 1}: สิ่งเจือปนไม่ถูกต้องหรือถูกปิดใช้งาน`,
         fieldErrors: { [`lines.${missingImpurityIndex}.impurityId`]: ['สิ่งเจือปนไม่ถูกต้องหรือถูกปิดใช้งาน'] },
+      }, { status: 400 })
+    }
+    const legacyOtherProductImpurityIndex = values.lines.findIndex((line, index) => {
+      const impurityId = parsedImpurityIds[index]
+      if (!line.impurityId || isOtherProductImpurityId(line.impurityId) || impurityId == null) return false
+      return isOtherProductImpurityLabel(impurityById.get(impurityId)?.name)
+    })
+    if (legacyOtherProductImpurityIndex >= 0) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: `รายการที่ ${legacyOtherProductImpurityIndex + 1}: สินค้าอื่นเป็นตัวเลือกของระบบสำหรับ WTI เท่านั้น ไม่ใช่ master สิ่งเจือปน`,
+        fieldErrors: { [`lines.${legacyOtherProductImpurityIndex}.impurityId`]: ['เลือกตัวเลือกสินค้าอื่นของระบบแทน master data'] },
       }, { status: 400 })
     }
 

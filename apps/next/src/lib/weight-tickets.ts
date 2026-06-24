@@ -163,6 +163,18 @@ const typeEnum = z.enum(['WTI', 'WTO'])
 const statusEnum = z.enum(['received', 'delivered', 'partially_billed', 'billed', 'cancelled'])
 const deductionModeEnum = z.enum(['none', 'kg', 'percent'])
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
+export const OTHER_PRODUCT_IMPURITY_ID = '__OTHER_PRODUCT__'
+export const OTHER_PRODUCT_IMPURITY_LABEL = 'สินค้าอื่น'
+export const OTHER_PRODUCT_IMPURITY_LABELS = [OTHER_PRODUCT_IMPURITY_LABEL, 'อื่นๆ', 'อย่างอื่น'] as const
+
+export function isOtherProductImpurityId(value: string | null | undefined) {
+  return value === OTHER_PRODUCT_IMPURITY_ID
+}
+
+export function isOtherProductImpurityLabel(value: string | null | undefined) {
+  const label = value?.trim()
+  return OTHER_PRODUCT_IMPURITY_LABELS.some((candidate) => candidate === label)
+}
 
 const blankToEmpty = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 
@@ -271,6 +283,13 @@ export const weightTicketFormSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: 'เลือกคลัง',
         path: ['lines', index, 'warehouseId'],
+      })
+    }
+    if (isOtherProductImpurityId(line.impurityId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ใบส่งของไม่รองรับสิ่งเจือปนแบบสินค้าอื่น',
+        path: ['lines', index, 'impurityId'],
       })
     }
   })

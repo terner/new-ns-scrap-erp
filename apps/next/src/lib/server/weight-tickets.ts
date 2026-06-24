@@ -1,6 +1,13 @@
 import type { Prisma } from '../../../generated/prisma/client'
 import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
-import { calculateLineTotals, type WeightTicketFormValues, type WeightTicketStatus, type WeightTicketType } from '@/lib/weight-tickets'
+import {
+  calculateLineTotals,
+  isOtherProductImpurityId,
+  OTHER_PRODUCT_IMPURITY_LABEL,
+  type WeightTicketFormValues,
+  type WeightTicketStatus,
+  type WeightTicketType,
+} from '@/lib/weight-tickets'
 import type { AppAuthContext } from '@/lib/server/auth-context'
 import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
@@ -346,7 +353,8 @@ export function buildWeightTicketLineRows(
     const product = productByCode.get(productCode)
     const warehouseCode = line.warehouseId.trim().toUpperCase()
     const warehouse = warehouseCode ? warehouseByCode.get(warehouseCode) : null
-    const impurityId = parseInternalBigIntId(line.impurityId)
+    const isOtherProductImpurity = isOtherProductImpurityId(line.impurityId)
+    const impurityId = isOtherProductImpurity ? null : parseInternalBigIntId(line.impurityId)
     if (!product) {
       throw new Error(`สินค้า ${line.productId} ไม่มี business code ที่ใช้งานได้`)
     }
@@ -361,7 +369,7 @@ export function buildWeightTicketLineRows(
       image_count: line.imageNames.length,
       image_names: line.imageNames,
       impurity_id: impurityId ?? null,
-      impurity_name: impurity?.name ?? null,
+      impurity_name: isOtherProductImpurity ? OTHER_PRODUCT_IMPURITY_LABEL : impurity?.name ?? null,
       impurity_source_line_no: line.impuritySourceLineId ? lineNoById.get(line.impuritySourceLineId) ?? null : null,
       line_no: index + 1,
       net_weight: lineTotals.netWeight,

@@ -24,8 +24,12 @@ import {
   encodeStoredImageAsset,
   formatWeight,
   getWeightTicket,
+  isOtherProductImpurityId,
+  isOtherProductImpurityLabel,
   normalizeDecimalInput,
   normalizeVehicleNo,
+  OTHER_PRODUCT_IMPURITY_ID,
+  OTHER_PRODUCT_IMPURITY_LABEL,
   saveWeightTicket,
   type DeductionMode,
   type OptionItem,
@@ -121,10 +125,8 @@ function getLineImpurityId(line: FormWeightTicketLine) {
   return line.impurityId ?? ''
 }
 
-function isOtherProductImpurityOption(impurities: Array<{ id: string; label: string }>, impurityId: string) {
-  const impurity = impurities.find((entry) => entry.id === impurityId)
-  const label = impurity?.label.trim()
-  return label === 'สินค้าอื่น' || label === 'อื่นๆ' || label === 'อย่างอื่น'
+function isOtherProductImpurityOption(impurityId: string) {
+  return isOtherProductImpurityId(impurityId)
 }
 
 function isImpurityPurchaseLine(line: FormWeightTicketLine) {
@@ -485,6 +487,18 @@ export function WeightTicketsPageClient({
   const impurityProducts = useMemo(() => {
     return products.filter(p => isImpurityProduct(p))
   }, [products, isImpurityProduct])
+  const impurityOptions = useMemo(() => {
+    const masterOptions = impurities.filter((impurity) => !isOtherProductImpurityLabel(impurity.label))
+    if (form.type !== 'WTI') return masterOptions
+    return [
+      ...masterOptions,
+      {
+        description: 'ใช้เฉพาะใบรับของ เมื่อสิ่งที่ปนมาเป็นสินค้าอีกตัว',
+        id: OTHER_PRODUCT_IMPURITY_ID,
+        label: OTHER_PRODUCT_IMPURITY_LABEL,
+      },
+    ]
+  }, [form.type, impurities])
   const wtoProductKeys = useMemo(() => {
     if (form.type !== 'WTO' || !form.branchId) return []
     return [...new Set(form.lines.map((line) => line.productId).filter(Boolean))]
@@ -557,7 +571,7 @@ export function WeightTicketsPageClient({
               searchText: [code, customer.name].filter(Boolean).join(' '),
             }
           }))
-          setImpurities(data.impurities ?? [])
+          setImpurities((data.impurities ?? []).filter((impurity) => !isOtherProductImpurityLabel(impurity.label)))
           void loadProducts(controller.signal)
         }
       } catch (caught) {
@@ -782,9 +796,9 @@ export function WeightTicketsPageClient({
           next[`line-${line.id}-impurity`] = 'เลือกสิ่งเจือปน'
         }
         if (line.deductionMode !== 'none' && !getLineImpurityId(line)) {
-          next[`line-${line.id}-impurity`] = impurities.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งานใน master data'
+          next[`line-${line.id}-impurity`] = impurityOptions.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งานใน master data'
         }
-        if (isOtherProductImpurityOption(impurities, getLineImpurityId(line)) && !line.impurityProductId) {
+        if (isOtherProductImpurityOption(getLineImpurityId(line)) && !line.impurityProductId) {
           next[`line-${line.id}-impurity-product`] = 'เลือกสินค้าที่ปนมา'
         }
         if (line.impurityProductId) {
@@ -802,7 +816,7 @@ export function WeightTicketsPageClient({
       }
     })
     return next
-  }, [form, impurities])
+  }, [form, impurityOptions])
 
   const ticketTheme = form.type === 'WTI'
     ? {
@@ -959,7 +973,7 @@ export function WeightTicketsPageClient({
     nextLine.containerDeductionWeight = '0'
     nextLine.deductionMode = 'kg'
     nextLine.deductionValue = ''
-    nextLine.impurityId = impurities[0]?.id || ''
+    nextLine.impurityId = impurityOptions[0]?.id || ''
     nextLine.impurityPurchaseAction = 'none'
     nextLine.note = 'หักสิ่งเจือปนเพิ่มเติม'
     nextLine.parentId = sourceLine.id
@@ -996,7 +1010,7 @@ export function WeightTicketsPageClient({
           : 'สินค้า'
         const parentLines = current.lines.filter(l => !l.parentId && !l.impuritySourceLineId)
         const parentIndex = parentLine ? parentLines.findIndex(l => l.id === parentLine.id) + 1 : 1
-        const impurityLabel = impurities.find(i => i.id === currentSourceLine.impurityId)?.label || 'สิ่งเจือปน'
+        const impurityLabel = impurityOptions.find(i => i.id === currentSourceLine.impurityId)?.label || 'สิ่งเจือปน'
 
         const nextLine = createFormWeightTicketLine()
         nextLine.productId = targetProductId
@@ -1618,7 +1632,7 @@ export function WeightTicketsPageClient({
 	                              <div className="divide-y divide-slate-100">
 	                                {boughtImpurityLines.map(({ purchaseLine, sourceLine }) => {
 	                                  const product = products.find((entry) => entry.id === sourceLine.impurityProductId)
-	                                  const impurityName = impurities.find((entry) => entry.id === sourceLine.impurityId)?.label ?? 'สิ่งเจือปน'
+	                                  const impurityName = impurityOptions.find((entry) => entry.id === sourceLine.impurityId)?.label ?? 'สิ่งเจือปน'
 	                                  const sourceParentLine = sourceLine.parentId ? form.lines.find((entry) => entry.id === sourceLine.parentId) : null
 	                                  const sourceProduct = sourceParentLine ? products.find((entry) => entry.id === sourceParentLine.productId) : null
 	                                  const purchaseWeight = calculateAdjustedLineTotals(sourceLine, form.lines).deductionWeight
@@ -1678,7 +1692,7 @@ export function WeightTicketsPageClient({
                               </div>
                             )
                           }
-                          const hasOtherProductImpurity = childLines.some((child) => isOtherProductImpurityOption(impurities, getLineImpurityId(child)))
+                          const hasOtherProductImpurity = childLines.some((child) => isOtherProductImpurityOption(getLineImpurityId(child)))
                           const hasPercentDeduction = childLines.some((child) => child.deductionMode === 'percent')
                           const impurityHeaderGridColumns = hasOtherProductImpurity
                             ? hasPercentDeduction
@@ -1711,7 +1725,7 @@ export function WeightTicketsPageClient({
                               {childLines.map((child) => {
                                 const selectedImpurityId = getLineImpurityId(child)
                                 const hasSelectedImpurity = Boolean(selectedImpurityId)
-                                const isOtherProductImpurity = isOtherProductImpurityOption(impurities, selectedImpurityId)
+                                const isOtherProductImpurity = isOtherProductImpurityOption(selectedImpurityId)
                                 const impurityPurchaseProducts = normalProducts.filter((product) => product.id !== line.productId)
                                 const mustSelectImpurityProductFirst = isOtherProductImpurity && !child.impurityProductId
                                 const canEditImpurityDeduction = hasSelectedProduct && hasSelectedImpurity && !mustSelectImpurityProductFirst
@@ -1729,8 +1743,8 @@ export function WeightTicketsPageClient({
                                           inputId={`weight-impurity-${child.id}`}
                                           hideLabel
                                           label="สิ่งเจือปน*"
-                                          options={impurities}
-                                          placeholder={impurities.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งาน'}
+                                          options={impurityOptions}
+                                          placeholder={impurityOptions.length > 0 ? 'เลือกสิ่งเจือปน' : 'ยังไม่มีสิ่งเจือปนที่ใช้งาน'}
                                           value={selectedImpurityId}
                                           onChange={(value) => {
                                             markTouched(`line-${child.id}-impurity`)
@@ -1738,8 +1752,8 @@ export function WeightTicketsPageClient({
                                               ...current,
                                               impurityId: value,
                                               impurityPurchaseAction: 'none',
-                                              deductionValue: isOtherProductImpurityOption(impurities, value) && !current.impurityProductId ? '' : current.deductionValue,
-                                              impurityProductId: isOtherProductImpurityOption(impurities, value) ? current.impurityProductId ?? '' : '',
+                                              deductionValue: isOtherProductImpurityOption(value) && !current.impurityProductId ? '' : current.deductionValue,
+                                              impurityProductId: isOtherProductImpurityOption(value) ? current.impurityProductId ?? '' : '',
                                             }))
                                           }}
                                         />
