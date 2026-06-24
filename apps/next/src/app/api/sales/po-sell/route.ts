@@ -136,38 +136,16 @@ function itemRows(
   }]
 }
 
-async function activeDualCostingPoSellFactCount(poSellId: bigint, tx: Pick<typeof prisma, '$queryRaw'> = prisma) {
-  const rows = await tx.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
-    select count(*)::bigint as count
-    from public.dual_costing_allocation_facts
-    where po_sell_id = ${poSellId}
-      and status = 'active'
-  `)
-  return Number(rows[0]?.count ?? 0n)
-}
-
-async function activeDualCostingPoSellFactRefs(poSellIds: bigint[]) {
-  if (poSellIds.length === 0) return []
-  return prisma.$queryRaw<Array<{ po_sell_id: bigint }>>(Prisma.sql`
-    select po_sell_id
-    from public.dual_costing_allocation_facts
-    where po_sell_id in (${Prisma.join(poSellIds)})
-      and status = 'active'
-      and po_sell_id is not null
-  `)
-}
-
 async function activePoSellDownstreamCount(poSellId: bigint, tx: typeof prisma = prisma) {
-  const [allocationCount, directBillCount, factCount] = await Promise.all([
+  const [allocationCount, directBillCount] = await Promise.all([
     tx.sales_bill_po_sell_allocations.count({
       where: { po_sell_id: poSellId, status: 'active' },
     }),
     tx.sales_bills.count({
       where: { po_sell_id: poSellId, NOT: { status: { in: CANCELLED_STATUSES } } },
     }),
-    activeDualCostingPoSellFactCount(poSellId, tx),
   ])
-  return allocationCount + directBillCount + factCount
+  return allocationCount + directBillCount
 }
 
 function documentStatus(status: string | null | undefined, remainingQty: number, qty = 0, cutAmount = 0): PoSellDocumentStatus {
@@ -325,15 +303,12 @@ export async function GET(request: Request) {
       }),
     ])
     const poSellIds = poSells.map((po) => po.id)
-    const [activeAllocations, activeFacts] = poSellIds.length
-      ? await Promise.all([
-        prisma.sales_bill_po_sell_allocations.findMany({
-          select: { po_sell_id: true },
-          where: { po_sell_id: { in: poSellIds }, status: 'active' },
-        }),
-        activeDualCostingPoSellFactRefs(poSellIds),
-      ])
-      : [[], []]
+    const activeAllocations = poSellIds.length
+      ? await prisma.sales_bill_po_sell_allocations.findMany({
+        select: { po_sell_id: true },
+        where: { po_sell_id: { in: poSellIds }, status: 'active' },
+      })
+      : []
 
     const branchById = new Map(branches.map((branch) => [branch.id, branch]))
     const channelById = new Map(channels.map((channel) => [channel.id, channel]))
@@ -341,9 +316,6 @@ export async function GET(request: Request) {
     const lockedPoSellIds = new Set<bigint>()
     activeAllocations.forEach((allocation) => {
       if (allocation.po_sell_id) lockedPoSellIds.add(allocation.po_sell_id)
-    })
-    activeFacts.forEach((fact) => {
-      if (fact.po_sell_id) lockedPoSellIds.add(fact.po_sell_id)
     })
 
     const salesBillIdsByPoSellId = new Map<bigint, Set<bigint>>()
