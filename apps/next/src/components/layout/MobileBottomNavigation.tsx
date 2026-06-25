@@ -13,6 +13,7 @@ import {
   Package,
   Truck,
   Menu,
+  LayoutDashboard,
 } from 'lucide-react'
 import { canAccessPath } from '@/lib/navigation'
 
@@ -65,6 +66,11 @@ export function MobileBottomNavigation({ onOpenSidebar }: MobileBottomNavigation
   }
 
   const candidateTabs = [
+    {
+      href: '/production/dashboard',
+      icon: LayoutDashboard,
+      label: 'แดชบอร์ด',
+    },
     {
       href: '/production/orders',
       icon: Factory,

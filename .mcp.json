@@ -1,5 +1,16 @@
 {
   "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "description": "CodeGraph local code intelligence MCP",
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@colbymchenry/codegraph",
+        "serve",
+        "--mcp"
+      ]
+    },
     "supabase": {
       "type": "http",
       "description": "NS Scrap ERP DEV/TARGET project in a separate Supabase account/context from the customer's legacy production project. Use for development, schema migration testing, Supabase Auth, RLS, and frontend integration. Project ref: fhglqymcdmrgbsbadnwr.",

@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation'
+import { getCurrentAuthContext } from '@/lib/server/auth-context'
 import { Card } from '@/components/ui/Card'
 
 const nextSteps = [
@@ -6,7 +8,30 @@ const nextSteps = [
   'เลือกว่าจะ migrate route ไหนจาก Vue มาเป็น Next.js ก่อน',
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
+  let landingPath: string | null = null
+
+  try {
+    const authContext = await getCurrentAuthContext()
+    const roleCodes = (authContext?.roles ?? [])
+      .map((r) => String(r.code ?? '').toLowerCase())
+      .filter(Boolean)
+
+    if (roleCodes.includes('admin') || roleCodes.includes('owner')) {
+      landingPath = '/owner-daily'
+    } else if (roleCodes.includes('production_department')) {
+      landingPath = '/production/dashboard'
+    } else if (roleCodes.includes('sorting_department')) {
+      landingPath = '/daily/weight-ticket-list'
+    }
+  } catch {
+    // Ignore auth error, let it render normal HomePage or be redirected by middleware
+  }
+
+  if (landingPath) {
+    redirect(landingPath)
+  }
+
   return (
     <section className="space-y-4">
       <div>

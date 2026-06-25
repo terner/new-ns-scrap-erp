@@ -1345,7 +1345,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
           </thead>
           <tbody>
             {sortedRows.map((row, index) => (
-              <tr key={row.id} className={`border-t border-slate-100 ${hover}`}>
+              <tr key={`${row.id || 'rank'}-${index}`} className={`border-t border-slate-100 ${hover}`}>
                 <td className={`p-2 font-bold ${text} text-xs`}>{index + 1}</td>
                 <td className="p-2 text-xs text-slate-700 truncate">{row.name}</td>
                 <td className="p-2 text-right text-xs text-slate-600">{row.bills}</td>
@@ -1371,7 +1371,7 @@ function RankTable({ color, rows, title }: { color: 'blue' | 'emerald'; rows: Ra
       {/* Mobile view */}
       <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
         {sortedRows.map((row, index) => (
-          <div key={row.id} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={`${row.id || 'rank'}-${index}`} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">
                 <span className={`font-bold mr-1.5 ${text}`}>#{index + 1}</span>
@@ -1481,7 +1481,7 @@ function ProductRank({ rows, title, tone }: { rows: { amount: number; code: stri
           </thead>
           <tbody>
             {sortedRows.map((row, index) => (
-              <tr key={row.id} className={`border-t border-slate-100 ${hover}`}>
+              <tr key={`${row.id || 'prod'}-${index}`} className={`border-t border-slate-100 ${hover}`}>
                 <td className={`p-2 font-bold ${text} text-xs`}>{index + 1}</td>
                 <td className="p-2 font-mono text-xs text-slate-600 truncate">{row.code}</td>
                 <td className="p-2 text-xs text-slate-700 truncate">{row.name}</td>
@@ -1502,7 +1502,7 @@ function ProductRank({ rows, title, tone }: { rows: { amount: number; code: stri
       {/* Mobile view */}
       <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
         {sortedRows.map((row, index) => (
-          <div key={row.id} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+          <div key={`${row.id || 'prod'}-${index}`} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">
                 <span className={`font-bold mr-1.5 ${text}`}>#{index + 1}</span>
@@ -1599,8 +1599,8 @@ function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id:
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/30">
+            {sortedRows.map((row, index) => (
+              <tr key={`${row.id || 'sales'}-${index}`} className="border-t border-slate-100 hover:bg-slate-50/30">
                 <td className="p-2 text-slate-700 font-medium truncate">{row.name}</td>
                 <td className="p-2 text-right text-slate-600">{row.suppliers} supplier</td>
                 <td className="p-2 text-right text-slate-600">{money(row.qty)} กก.</td>
@@ -1619,8 +1619,8 @@ function SalespersonTable({ rows }: { rows: { amount: number; bills: number; id:
 
       {/* Mobile view */}
       <div className="block sm:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
-        {sortedRows.map((row) => (
-          <div key={row.id} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+        {sortedRows.map((row, index) => (
+          <div key={`${row.id || 'sales'}-${index}`} className="p-2.5 bg-white rounded-lg border border-slate-200 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800">{row.name}</span>
               <span className="font-bold text-blue-600">{money(row.amount)}</span>

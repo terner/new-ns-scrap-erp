@@ -234,7 +234,7 @@ export function AccountsPayablePageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-red-600 via-rose-700 to-pink-800 p-6 text-white shadow-lg">
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-md-full bg-white/10" />
           <div className="relative">
@@ -252,25 +252,6 @@ export function AccountsPayablePageClient() {
                 <div className="text-lg font-bold text-yellow-200">{formatMoney(dueIn7)}</div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-md bg-white p-4 shadow">
-          <div className="mb-3 text-sm font-bold text-slate-700">📊 Aging Buckets</div>
-          <div className="space-y-2">
-            {bucketRows.map((bucket) => (
-              <div key={bucket.bucket} className="flex items-center gap-2 text-xs">
-                <div className={`w-20 ${bucketTextClass(bucket.bucket)}`}>
-                  {bucketLabel(bucket.bucket)}
-                </div>
-                <div className="relative h-5 flex-1 overflow-hidden rounded-md-full bg-slate-100">
-                  <div className={`h-5 rounded-md-full ${bucketBarClass(bucket.bucket)}`} style={{ width: percentage(bucket.total, totalAp) }} />
-                  <span className="absolute right-2 top-0 text-[10px] font-bold leading-5 text-slate-700">{bucket.bills} ใบ</span>
-                </div>
-                <div className="w-24 text-right font-bold text-slate-700">{formatMoney(bucket.total)}</div>
-              </div>
-            ))}
-            {!isLoading && bucketRows.length === 0 ? <div className="py-4 text-center text-slate-400">ไม่มีเจ้าหนี้คงค้าง</div> : null}
           </div>
         </div>
 

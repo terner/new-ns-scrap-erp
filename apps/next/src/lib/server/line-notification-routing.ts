@@ -168,6 +168,20 @@ export async function resolveLineTargetsForWeightTicket(ticket: any): Promise<Ro
         })
       }
     }
+
+    if (decisions.length === 0) {
+      const activeTargets = targets.filter(t => t.is_active)
+      for (const t of activeTargets) {
+        decisions.push({
+          targetId: t.target_id,
+          targetType: t.target_type,
+          displayName: t.display_name,
+          ruleId: null,
+          ruleName: null,
+          reason: 'ส่งหาทุกกลุ่มแจ้งเตือนที่เปิดใช้งาน (All Active Targets) เนื่องจากไม่มีกฎคัดกรองหรือกลุ่มดีฟอลต์กำหนดไว้'
+        })
+      }
+    }
   }
 
   return decisions

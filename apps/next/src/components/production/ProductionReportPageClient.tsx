@@ -156,6 +156,8 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const latestLoadRequestRef = useRef(0)
+  const [rangeType, setRangeType] = useState<'today' | 'last7' | 'last30' | 'last90' | 'month' | 'year' | 'custom'>('custom')
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'machines'>('overview')
 
   const loadData = useCallback(async () => {
     const requestId = latestLoadRequestRef.current + 1
@@ -257,6 +259,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
     }
     setDateFrom(start.toISOString().slice(0, 10))
     setDateTo(end.toISOString().slice(0, 10))
+    setRangeType(range)
   }
 
   function exportCsv() {
@@ -433,11 +436,12 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       <section className="space-y-4">
         {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-        <div className="rounded-md bg-gradient-to-r from-purple-700 to-pink-600 p-5 text-white shadow-lg">
+        {/* Desktop Header: Premium Gradient Card */}
+        <div className="hidden lg:block rounded-xl bg-gradient-to-r from-purple-700 to-pink-600 p-5 text-white shadow-sm border border-transparent">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold">แดชบอร์ดการผลิต</h1>
-              <p className="mt-1 text-sm opacity-90">รายงานการผลิตแบบสรุป รายวัน / รายเดือน + Charts</p>
+              <h1 className="text-2xl font-bold">แดชบอร์ดการผลิต</h1>
+              <p className="mt-1 text-xs opacity-90">รายงานการผลิตแบบสรุป รายวัน / รายเดือน + Charts</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {[
@@ -447,35 +451,147 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                 ['last90', '90 วัน'],
                 ['month', 'เดือนนี้'],
                 ['year', 'ปีนี้'],
-              ].map(([value, label]) => <button key={value} className="rounded-md bg-white/20 px-3 py-1.5 text-sm hover:bg-white/30" type="button" onClick={() => applyDashboardRange(value as Parameters<typeof applyDashboardRange>[0])}>{label}</button>)}
-              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={dateFrom} onChange={setDateFrom} />
+              ].map(([value, label]) => {
+                const isActive = rangeType === value
+                return (
+                  <button
+                    key={value}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      isActive
+                        ? 'bg-white text-purple-700 shadow-sm border border-white'
+                        : 'bg-white/20 text-white hover:bg-white/30 border border-transparent'
+                    }`}
+                    type="button"
+                    onClick={() => applyDashboardRange(value as Parameters<typeof applyDashboardRange>[0])}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+              <DatePickerInput
+                className="w-[120px] bg-white text-slate-900 h-9"
+                value={dateFrom}
+                onChange={(val) => { setDateFrom(val); setRangeType('custom') }}
+              />
               <span className="text-sm">→</span>
-              <DatePickerInput className="w-[130px] bg-white text-slate-900" value={dateTo} onChange={setDateTo} />
+              <DatePickerInput
+                className="w-[120px] bg-white text-slate-900 h-9"
+                value={dateTo}
+                onChange={(val) => { setDateTo(val); setRangeType('custom') }}
+              />
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm">
+        {/* Mobile Header & Controls (Clean Native App Style) */}
+        <div className="lg:hidden flex flex-col gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">แดชบอร์ดการผลิต</h1>
+            <p className="text-xs text-slate-500 font-medium">รายงานการผลิตแบบสรุป รายวัน / รายเดือน</p>
+          </div>
+          
+          {/* Horizontal scrollable range filter pills */}
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[
+              ['today', 'วันนี้'],
+              ['last7', '7 วัน'],
+              ['last30', '30 วัน'],
+              ['last90', '90 วัน'],
+              ['month', 'เดือนนี้'],
+              ['year', 'ปีนี้'],
+            ].map(([value, label]) => {
+              const isActive = rangeType === value
+              return (
+                <button
+                  key={value}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all shrink-0 border ${
+                    isActive
+                      ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                  type="button"
+                  onClick={() => applyDashboardRange(value as Parameters<typeof applyDashboardRange>[0])}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Date Picker Row for Custom Dates */}
+          <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm w-full">
+            <span className="text-xs text-slate-500 font-bold shrink-0">กำหนดเอง:</span>
+            <DatePickerInput
+              className="flex-1 min-w-0 bg-slate-50 border-slate-200 h-9"
+              value={dateFrom}
+              onChange={(val) => { setDateFrom(val); setRangeType('custom') }}
+            />
+            <span className="text-slate-400 text-xs font-bold shrink-0">→</span>
+            <DatePickerInput
+              className="flex-1 min-w-0 bg-slate-50 border-slate-200 h-9"
+              value={dateTo}
+              onChange={(val) => { setDateTo(val); setRangeType('custom') }}
+            />
+          </div>
+        </div>
+
+        {/* Mobile iOS-Style Segmented Tab Navigation */}
+        <div className="lg:hidden flex rounded-xl bg-slate-100 p-1 border border-slate-200/40">
+          {(['overview', 'products', 'machines'] as const).map((tab) => {
+            const isActive = activeTab === tab
+            const label = tab === 'overview' ? '📊 ภาพรวม' : tab === 'products' ? '📦 สินค้า' : '⚙️ เครื่องจักร'
+            return (
+              <button
+                key={tab}
+                className={`flex-1 rounded-lg py-2 text-xs font-bold text-center transition-all ${
+                  isActive
+                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/20'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* KPI Cards Container */}
+        <div className={`grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm ${
+          activeTab === 'overview' ? 'grid lg:grid' : 'hidden lg:grid'
+        }`}>
           <DashboardKpi label="ใบสั่งผลิต" note={`Input ${formatMoney(summary.inputQty ?? 0)} | Output ${formatMoney(summary.outputQty ?? 0)}`} tone="blue" value={formatMoney(summary.count ?? 0)} emoji="🏭" />
           <DashboardKpi label="ผลิตได้" note="กก. ไม่รวม Loss" tone="emerald" value={formatMoney(summary.outputQty ?? 0)} emoji="📦" />
           <DashboardKpi label="WIP คงเหลือทั้งระบบ" note="กก. ที่ยังผลิตค้างอยู่" tone="amber" value={formatMoney(summary.totalWipQty ?? summary.wipQty ?? 0)} emoji="⚙️" />
           <DashboardKpi label="Yield %" note={`Loss ${Number(summary.lossPct ?? 0).toFixed(1)}%`} tone="purple" value={`${Number(summary.yieldPct ?? 0).toFixed(1)}%`} emoji="📈" />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Charts Container */}
+        <div className={`grid-cols-1 gap-4 lg:grid-cols-2 ${
+          activeTab === 'overview' ? 'grid lg:grid' : 'hidden lg:grid'
+        }`}>
           <ChartPanel title="ผลิตรายวัน (Input/Output/Loss)" type="line" rows={daily.map((item) => ({ label: item.date.slice(5), input: item.inputQty, output: item.outputQty, loss: item.lossQty }))} />
           <ChartPanel title="ผลิตรายเดือน (12 เดือนล่าสุด)" type="bar" rows={monthly.map((item) => ({ label: item.month.slice(5), input: item.inputQty, output: item.outputQty, loss: 0 }))} />
         </div>
 
+        {/* Status Panels & Product Lists */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+          {/* Status List */}
+          <div className={`rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm ${
+            activeTab === 'overview' ? 'block lg:block' : 'hidden lg:block'
+          }`}>
             <h3 className="mb-3 font-bold text-slate-700 text-sm">สถานะใบสั่งผลิต</h3>
             <div className="space-y-2">
               {byStatus.map((item) => <StatusBar key={item.status} count={item.count} max={Math.max(1, ...byStatus.map((row) => row.count))} status={item.status} />)}
               {!byStatus.length ? <div className="py-6 text-center text-sm text-slate-400">ยังไม่มีข้อมูล</div> : null}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-100 bg-white shadow-sm lg:col-span-2 flex flex-col overflow-hidden">
+
+          {/* Top Products Card */}
+          <div className={`rounded-xl border border-slate-200/60 bg-white shadow-sm lg:col-span-2 flex flex-col overflow-hidden ${
+            activeTab === 'products' ? 'flex lg:flex' : 'hidden lg:flex'
+          }`}>
             <div className="border-b border-slate-100 bg-emerald-50/50 p-3"><h3 className="font-bold text-emerald-700 text-sm">Top 10 สินค้าที่ผลิตมากสุด</h3></div>
             
             {/* Desktop View */}
@@ -512,7 +628,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             {/* Mobile View */}
             <div className="lg:hidden p-3 space-y-3 bg-slate-50/30 flex-1">
               {topProducts.map((item, index) => (
-                <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm space-y-3">
                   <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
@@ -544,12 +660,15 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                   </div>
                 </div>
               ))}
-              {!topProducts.length ? <div className="py-4 text-center text-sm text-slate-400 bg-white rounded-xl border border-slate-200">ยังไม่มีข้อมูลในช่วงนี้</div> : null}
+              {!topProducts.length ? <div className="py-4 text-center text-sm text-slate-400 bg-white rounded-xl border border-slate-200/60">ยังไม่มีข้อมูลในช่วงนี้</div> : null}
             </div>
           </div>
         </div>
  
-        <div className="rounded-xl border border-slate-100 bg-white shadow-sm flex flex-col overflow-hidden">
+        {/* Machine Utilization Card */}
+        <div className={`rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col overflow-hidden ${
+          activeTab === 'machines' ? 'flex lg:flex' : 'hidden lg:flex'
+        }`}>
           <div className="border-b border-slate-100 bg-indigo-50/50 p-3"><h3 className="font-bold text-indigo-700 text-sm">Machine Utilization (ปริมาณผลิตต่อเครื่อง)</h3></div>
           
           {/* Desktop View */}
@@ -578,7 +697,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
           {/* Mobile View */}
           <div className="lg:hidden p-3 space-y-3 bg-slate-50/30">
             {machineUtil.map((item) => (
-              <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+              <div key={item.name} className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm space-y-3">
                 <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
                   <span className="font-bold text-slate-900 text-base">{item.name}</span>
                   <span className="text-base font-bold text-indigo-700">{formatMoney(item.qty)} กก.</span>
@@ -1082,7 +1201,7 @@ function DashboardKpi({
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-slate-500 truncate">{label}</div>
         <div className={`text-base font-bold ${color} mt-0.5 tabular-nums`}>{value}</div>
-        <div className="text-xs text-slate-500 font-medium mt-0.5 truncate">{note}</div>
+        <div className="text-xs text-slate-500 font-medium mt-0.5 whitespace-pre-wrap break-all sm:truncate">{note}</div>
       </div>
     </div>
   )
@@ -1091,14 +1210,14 @@ function DashboardKpi({
 function ChartPanel({ rows, title, type }: { rows: Array<{ input: number; label: string; loss: number; output: number }>; title: string; type: 'bar' | 'line' }) {
   const max = Math.max(1, ...rows.flatMap((row) => [row.input, row.output, row.loss]))
   return (
-    <div className="rounded-md bg-white p-4 shadow-lg">
-      <h3 className="mb-2 font-bold text-slate-700">{title}</h3>
-      <div className="flex h-[300px] items-end gap-2 overflow-x-auto border-b border-slate-100 pb-8">
+    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
+      <h3 className="mb-2 font-bold text-slate-700 text-sm">{title}</h3>
+      <div className="flex h-[220px] sm:h-[260px] lg:h-[300px] items-end gap-2 overflow-x-auto border-b border-slate-100 pb-8">
         {rows.map((row) => (
-          <div key={row.label} className="relative flex min-w-10 flex-1 items-end justify-center gap-1">
-            <div className={`${type === 'line' ? 'rounded-md-t' : 'rounded-md-t'} w-2 bg-blue-500`} style={{ height: `${Math.max(2, (row.input / max) * 240)}px` }} title={`Input ${formatMoney(row.input)}`} />
-            <div className="w-2 rounded-md-t bg-emerald-500" style={{ height: `${Math.max(2, (row.output / max) * 240)}px` }} title={`Output ${formatMoney(row.output)}`} />
-            {type === 'line' ? <div className="w-2 rounded-md-t bg-red-500" style={{ height: `${Math.max(2, (row.loss / max) * 240)}px` }} title={`Loss ${formatMoney(row.loss)}`} /> : null}
+          <div key={row.label} className="relative flex min-w-10 flex-1 items-end justify-center gap-1 h-full">
+            <div className="w-2 rounded-t bg-blue-500" style={{ height: `${Math.max(1, (row.input / max) * 85)}%` }} title={`Input ${formatMoney(row.input)}`} />
+            <div className="w-2 rounded-t bg-emerald-500" style={{ height: `${Math.max(1, (row.output / max) * 85)}%` }} title={`Output ${formatMoney(row.output)}`} />
+            {type === 'line' ? <div className="w-2 rounded-t bg-red-500" style={{ height: `${Math.max(1, (row.loss / max) * 85)}%` }} title={`Loss ${formatMoney(row.loss)}`} /> : null}
             <span className="absolute -bottom-6 text-[10px] text-slate-400">{row.label}</span>
           </div>
         ))}
@@ -1113,7 +1232,7 @@ function StatusBar({ count, max, status }: { count: number; max: number; status:
   return (
     <div className="text-sm">
       <div className="mb-1 flex justify-between"><span>{status}</span><b>{count}</b></div>
-      <div className="h-2 overflow-hidden rounded-md-full bg-slate-100"><div className="h-full rounded-md-full bg-purple-500" style={{ width: `${Math.max(4, (count / max) * 100)}%` }} /></div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-purple-500" style={{ width: `${Math.max(4, (count / max) * 100)}%` }} /></div>
     </div>
   )
 }

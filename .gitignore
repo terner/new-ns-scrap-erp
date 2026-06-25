@@ -35,3 +35,4 @@ supabase/migrations/20260519044843_create_fx_rates_table.sql
 .claude/
 .agents/skills.disabled/
 .vercel
+.codegraph/

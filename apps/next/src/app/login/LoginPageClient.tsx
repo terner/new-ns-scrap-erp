@@ -33,8 +33,8 @@ function safeRedirectPath(value: string | null) {
 }
 
 function landingPathForRoleCodes(roleCodes: string[]) {
-  if (roleCodes.includes('owner')) return '/owner-daily'
-  if (roleCodes.includes('production_department')) return '/production/orders'
+  if (roleCodes.includes('admin') || roleCodes.includes('owner')) return '/owner-daily'
+  if (roleCodes.includes('production_department')) return '/production/dashboard'
   if (roleCodes.includes('sorting_department')) return '/daily/weight-ticket-list'
   return '/'
 }

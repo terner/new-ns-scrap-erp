@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
 import { dailyFetchJson, formatMoney, todayDateInput } from '@/lib/daily'
@@ -36,14 +36,16 @@ type ArRow = {
   marketScope: string
   receivableBalance: number
   receivedAmount: number
+  refNo: string
   status: string
   totalAmount: number
   transactionMode: string
+  vatInvoiceNo: string
 }
 
 type ArPayload = {
   byBucket: Array<{ bucket: string; bills: number; total: number }>
-  byCustomer: Array<{ bills: number; current: number; customerName: string; gt90: number; oldest: number; total: number; b30: number; b60: number; b90: number }>
+  byCustomer: Array<{ customerId: string; bills: number; current: number; customerName: string; gt90: number; oldest: number; total: number; b30: number; b60: number; b90: number }>
   filters: { branches: SelectOption[]; channels: SelectOption[]; customers: SelectOption[]; statuses: string[] }
   pagination: { page: number; pageSize: number; totalPages: number; totalRows: number }
   rows: ArRow[]
@@ -124,6 +126,53 @@ export function AccountsReceivablePageClient() {
   const [to, setTo] = useState(todayDateInput())
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const hasFilters = Boolean(branchId || bucket || channelId || customerId || from || q.trim() || status || to)
+
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
+  const [customerBills, setCustomerBills] = useState<Record<string, ArRow[]>>({})
+  const [loadingCustomers, setLoadingCustomers] = useState<Record<string, boolean>>({})
+
+  // Clear expanded customers and cache when page filters change
+  useEffect(() => {
+    setExpandedCustomers(new Set())
+    setCustomerBills({})
+    setLoadingCustomers({})
+  }, [branchId, bucket, channelId, customerId, from, q, status, to])
+
+  const toggleCustomerExpand = useCallback(async (custCode: string) => {
+    setExpandedCustomers((prev) => {
+      const next = new Set(prev)
+      if (next.has(custCode)) {
+        next.delete(custCode)
+      } else {
+        next.add(custCode)
+      }
+      return next
+    })
+
+    if (!customerBills[custCode] && !loadingCustomers[custCode]) {
+      setLoadingCustomers((prev) => ({ ...prev, [custCode]: true }))
+      try {
+        const params = new URLSearchParams()
+        if (branchId) params.set('branchId', branchId)
+        if (bucket) params.set('bucket', bucket)
+        if (channelId) params.set('channelId', channelId)
+        params.set('customerId', custCode)
+        if (from) params.set('from', from)
+        if (q.trim()) params.set('q', q.trim())
+        if (status) params.set('status', status)
+        if (to) params.set('to', to)
+        params.set('page', '1')
+        params.set('pageSize', '1000')
+
+        const res = await dailyFetchJson<{ rows: ArRow[] }>(`/api/finance/ar?${params.toString()}`)
+        setCustomerBills((prev) => ({ ...prev, [custCode]: res.rows }))
+      } catch (err) {
+        console.error('Failed to fetch bills for customer', custCode, err)
+      } finally {
+        setLoadingCustomers((prev) => ({ ...prev, [custCode]: false }))
+      }
+    }
+  }, [branchId, bucket, channelId, from, q, status, to, customerBills, loadingCustomers])
 
 
   const query = useMemo(() => {
@@ -470,7 +519,19 @@ export function AccountsReceivablePageClient() {
         </div>
       </div>
 
-      {tab === 'summary' ? <SummaryTable buckets={bucketRows} rows={data?.byCustomer ?? []} summary={data?.summary} isLoading={isLoading} /> : null}
+      {tab === 'summary' ? (
+        <SummaryTable
+          buckets={bucketRows}
+          rows={data?.byCustomer ?? []}
+          summary={data?.summary}
+          isLoading={isLoading}
+          expandedCustomers={expandedCustomers}
+          customerBills={customerBills}
+          loadingCustomers={loadingCustomers}
+          onToggleExpand={toggleCustomerExpand}
+          onOpenDetail={setSelectedRow}
+        />
+      ) : null}
       {tab === 'detail' ? <DetailTable isLoading={isLoading} onSort={changeSort} rows={data?.rows ?? []} selectedSort={sortKey} sortDirection={sortDirection} onOpen={setSelectedRow} /> : null}
 
       {/* Mobile Card list for Summary tab */}
@@ -480,32 +541,113 @@ export function AccountsReceivablePageClient() {
             <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-200">กำลังโหลดข้อมูล</div>
           ) : null}
 
-          {!isLoading && (data?.byCustomer ?? []).map((row) => (
-            <div key={row.customerName} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-              <div className="flex justify-between items-start gap-2">
-                <span className="font-bold text-slate-900 text-[15px] leading-snug">{row.customerName}</span>
-                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold shrink-0 ${row.oldest > 30 ? 'bg-red-100 text-red-700' : row.oldest > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
-                  {row.oldest > 0 ? `เกินกำหนด ${row.oldest} วัน` : 'ยังไม่ถึงกำหนด'}
-                </span>
-              </div>
+          {!isLoading && (data?.byCustomer ?? []).map((row) => {
+            const isExpanded = expandedCustomers.has(row.customerId)
+            const bills = customerBills[row.customerId] || []
+            const isBillsLoading = loadingCustomers[row.customerId]
 
-              <div className="text-xs text-slate-600 space-y-2">
-                <div className="text-sm font-medium">
-                  จำนวนบิล: <span className="text-slate-800">{row.bills} ใบ</span>
+            return (
+              <div key={row.customerName} className="rounded-md border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="font-bold text-slate-900 text-[15px] leading-snug">{row.customerName}</span>
+                  <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold shrink-0 ${row.oldest > 30 ? 'bg-red-100 text-red-700' : row.oldest > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
+                    {row.oldest > 0 ? `เกินกำหนด ${row.oldest} วัน` : 'ยังไม่ถึงกำหนด'}
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 font-mono text-[13px]">
-                  <div>
-                    <span className="text-slate-400 block text-[10px] font-semibold">ยอดค้างรับรวม:</span>
-                    <span className="text-blue-700 font-bold tabular-nums">{formatMoney(row.total)}</span>
+
+                <div className="text-xs text-slate-600 space-y-2">
+                  <div className="text-sm font-medium">
+                    จำนวนบิล: <span className="text-slate-800">{row.bills} ใบ</span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px] font-semibold">Current:</span>
-                    <span className="text-slate-600 tabular-nums">{formatMoney(row.current)}</span>
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 font-mono text-[13px]">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] font-semibold">ยอดค้างรับรวม:</span>
+                      <span className="text-blue-700 font-bold tabular-nums">{formatMoney(row.total)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] font-semibold">Current:</span>
+                      <span className="text-slate-600 tabular-nums">{formatMoney(row.current)}</span>
+                    </div>
                   </div>
                 </div>
+
+                {/* Collapsible toggle button */}
+                <div className="pt-2 border-t border-slate-100 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => void toggleCustomerExpand(row.customerId)}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 focus:outline-none flex items-center gap-1 py-1 px-3 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200/60"
+                  >
+                    <span>{isExpanded ? 'ซ่อนบิลย่อย' : `ดูบิลย่อย (${row.bills} ใบ)`}</span>
+                    <span>{isExpanded ? '▲' : '▼'}</span>
+                  </button>
+                </div>
+
+                {/* Mobile sub-bills list */}
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-dashed border-slate-200 space-y-2 bg-slate-50/50 p-2.5 rounded-lg">
+                    {isBillsLoading ? (
+                      <div className="text-center text-xs text-slate-500 py-2">กำลังโหลด...</div>
+                    ) : bills.length === 0 ? (
+                      <div className="text-center text-xs text-slate-400 py-2">ไม่มีรายการบิล</div>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          {bills.map((bill) => {
+                            const isOverseas = bill.marketScope === 'ต่างประเทศ'
+                            return (
+                              <div key={bill.id} className="bg-white p-2.5 rounded-md border border-slate-200/50 text-[11px] space-y-1.5 shadow-sm">
+                                <div className="flex justify-between items-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedRow(bill)}
+                                    className="font-mono font-bold text-blue-600 text-left outline-none"
+                                  >
+                                    {bill.docNo || '-'}
+                                  </button>
+                                  <span className={`px-1.5 py-0.5 rounded font-semibold text-[9px] ${bill.aging > 30 ? 'bg-red-50 text-red-600' : bill.aging > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-600'}`}>
+                                    {bill.aging > 0 ? `เกินกำหนด ${bill.aging} วัน` : 'ยังไม่ถึงกำหนด'}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-1.5 text-slate-500">
+                                  <div>เลขใบกำกับ: <span className="text-slate-800 font-mono">{bill.vatInvoiceNo || '-'}</span></div>
+                                  {isOverseas ? (
+                                    <div>เลข order: <span className="text-slate-800 font-mono">{bill.refNo || '-'}</span></div>
+                                  ) : (
+                                    <div />
+                                  )}
+                                  <div>วันที่ออก: <span className="text-slate-800">{formatDateDisplay(bill.date)}</span></div>
+                                  <div>ครบกำหนด: <span className="text-slate-800">{formatDateDisplay(bill.dueDate)}</span></div>
+                                </div>
+                                <div className="pt-1.5 border-t border-slate-100 flex justify-between items-center text-xs">
+                                  <span className="text-slate-400 font-medium">ยอดค้าง:</span>
+                                  <span className="font-mono font-bold text-blue-700">{formatMoney(bill.receivableBalance)}</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        
+                        {/* Subtotal row */}
+                        <div className="bg-slate-200/60 p-2 rounded-md text-xs font-bold space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-600">ยอดค้างรวม ({bills.length} ใบ):</span>
+                            <span className="font-mono text-blue-700">{formatMoney(bills.reduce((sum, b) => sum + b.receivableBalance, 0))}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-600">เกินกำหนดสูงสุด:</span>
+                            <span className={`font-mono ${Math.max(...bills.map(b => b.aging)) > 30 ? 'text-red-700' : Math.max(...bills.map(b => b.aging)) > 0 ? 'text-amber-700' : 'text-slate-600'}`}>
+                              {Math.max(...bills.map(b => b.aging)) > 0 ? `${Math.max(...bills.map(b => b.aging))} วัน` : '-'}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {!isLoading && (data?.byCustomer ?? []).length === 0 ? (
             <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-200">
@@ -803,11 +945,21 @@ function SummaryTable({
   isLoading,
   rows,
   summary,
+  expandedCustomers,
+  customerBills,
+  loadingCustomers,
+  onToggleExpand,
+  onOpenDetail,
 }: {
   buckets: ArPayload['byBucket']
   isLoading: boolean
   rows: ArPayload['byCustomer']
   summary: ArPayload['summary'] | undefined
+  expandedCustomers: Set<string>
+  customerBills: Record<string, ArRow[]>
+  loadingCustomers: Record<string, boolean>
+  onToggleExpand: (customerCode: string) => void
+  onOpenDetail: (row: ArRow) => void
 }) {
   const bucketTotal = (bucket: string) => buckets.find((item) => item.bucket === bucket)?.total ?? 0
   const columnResize = useResizableColumns('finance.ar.summary.v5', summaryColumns)
@@ -843,19 +995,103 @@ function SummaryTable({
         <tbody>
           {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></tr> : null}
           {!isLoading && rows.length === 0 ? <tr><td className="p-6 text-center text-slate-400" colSpan={9}>ไม่มีลูกหนี้คงค้าง</td></tr> : null}
-          {!isLoading && rows.map((row) => (
-            <tr key={row.customerName} className={`border-t border-slate-100 hover:bg-blue-50/10 ${row.oldest > 30 ? 'bg-red-50/40' : row.oldest > 0 ? 'bg-amber-50/30' : ''}`}>
-              <td className="p-2 font-medium">{row.customerName}</td>
-              <td className="p-2 text-right">{row.bills}</td>
-              <td className="p-2 text-right text-slate-600">{moneyOrDash(row.current)}</td>
-              <td className="p-2 text-right text-blue-700">{moneyOrDash(row.b30)}</td>
-              <td className="p-2 text-right text-amber-700">{moneyOrDash(row.b60)}</td>
-              <td className="p-2 text-right text-orange-700">{moneyOrDash(row.b90)}</td>
-              <td className="p-2 text-right font-bold text-red-700">{moneyOrDash(row.gt90)}</td>
-              <td className="p-2 text-right text-base font-bold text-blue-700">{formatMoney(row.total)}</td>
-              <td className={`p-2 text-right ${row.oldest > 30 ? 'font-bold text-red-700' : row.oldest > 0 ? 'text-amber-700' : 'text-slate-500'}`}>{row.oldest > 0 ? `${row.oldest} วัน` : '-'}</td>
-            </tr>
-          ))}
+          {!isLoading && rows.map((row) => {
+            const isExpanded = expandedCustomers.has(row.customerId)
+            const bills = customerBills[row.customerId] || []
+            const isBillsLoading = loadingCustomers[row.customerId]
+
+            return (
+              <Fragment key={row.customerName}>
+                <tr className={`border-t border-slate-100 hover:bg-blue-50/10 ${isExpanded ? 'bg-blue-50/20' : row.oldest > 30 ? 'bg-red-50/40' : row.oldest > 0 ? 'bg-amber-50/30' : ''}`}>
+                  <td className="p-2 font-medium">
+                    <div className="flex items-center gap-1.5 cursor-pointer select-none" onClick={() => onToggleExpand(row.customerId)}>
+                      <span className="text-slate-400 text-xs w-4 text-center">
+                        {isExpanded ? '▼' : '▶'}
+                      </span>
+                      <span className="truncate">{row.customerName}</span>
+                    </div>
+                  </td>
+                  <td className="p-2 text-right">{row.bills}</td>
+                  <td className="p-2 text-right text-slate-600">{moneyOrDash(row.current)}</td>
+                  <td className="p-2 text-right text-blue-700">{moneyOrDash(row.b30)}</td>
+                  <td className="p-2 text-right text-amber-700">{moneyOrDash(row.b60)}</td>
+                  <td className="p-2 text-right text-orange-700">{moneyOrDash(row.b90)}</td>
+                  <td className="p-2 text-right font-bold text-red-700">{moneyOrDash(row.gt90)}</td>
+                  <td className="p-2 text-right text-base font-bold text-blue-700">{formatMoney(row.total)}</td>
+                  <td className={`p-2 text-right ${row.oldest > 30 ? 'font-bold text-red-700' : row.oldest > 0 ? 'text-amber-700' : 'text-slate-500'}`}>{row.oldest > 0 ? `${row.oldest} วัน` : '-'}</td>
+                </tr>
+                {isExpanded && (
+                  <tr className="bg-slate-50/60 border-t border-slate-100">
+                    <td colSpan={9} className="p-3 pl-8">
+                      {isBillsLoading ? (
+                        <div className="text-slate-500 text-xs py-2 text-center">กำลังโหลดบิลย่อย...</div>
+                      ) : bills.length === 0 ? (
+                        <div className="text-slate-400 text-xs py-2 text-center">ไม่มีรายการบิล</div>
+                      ) : (
+                        <div className="overflow-x-auto border border-slate-200/50 rounded-lg bg-white shadow-sm max-w-full">
+                          <table className="w-full text-xs text-slate-700">
+                            <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 font-bold">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-semibold">เลขที่เอกสาร</th>
+                                <th className="px-3 py-2 text-left font-semibold">เลขที่ใบกำกับ</th>
+                                <th className="px-3 py-2 text-left font-semibold">เลข order ส่งออก</th>
+                                <th className="px-3 py-2 text-left font-semibold">วันที่ออก</th>
+                                <th className="px-3 py-2 text-left font-semibold">วันครบกำหนด</th>
+                                <th className="px-3 py-2 text-right font-semibold">ยอดค้าง</th>
+                                <th className="px-3 py-2 text-right font-semibold">อายุหนี้</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {bills.map((bill) => {
+                                const isOverseas = bill.marketScope === 'ต่างประเทศ'
+                                return (
+                                  <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-3 py-2 font-mono">
+                                      <button
+                                        type="button"
+                                        onClick={() => onOpenDetail(bill)}
+                                        className="text-blue-600 hover:underline font-semibold text-left outline-none"
+                                      >
+                                        {bill.docNo || '-'}
+                                      </button>
+                                    </td>
+                                    <td className="px-3 py-2 font-mono">{bill.vatInvoiceNo || '-'}</td>
+                                    <td className="px-3 py-2 font-mono">{isOverseas ? (bill.refNo || '-') : ''}</td>
+                                    <td className="px-3 py-2">{formatDateDisplay(bill.date)}</td>
+                                    <td className="px-3 py-2">{formatDateDisplay(bill.dueDate)}</td>
+                                    <td className="px-3 py-2 text-right font-mono font-bold text-blue-700">
+                                      {formatMoney(bill.receivableBalance)}
+                                    </td>
+                                    <td className={`px-3 py-2 text-right font-semibold ${bill.aging > 30 ? 'text-red-600' : bill.aging > 0 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                      {bill.aging > 0 ? `${bill.aging} วัน` : 'ยังไม่ถึงกำหนด'}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                            <tfoot className="bg-slate-50/80 font-bold border-t border-slate-200">
+                              <tr>
+                                <td colSpan={3} className="px-3 py-2 text-slate-500">
+                                  รวม ({bills.length} ใบ)
+                                </td>
+                                <td colSpan={2} />
+                                <td className="px-3 py-2 text-right font-mono text-blue-700">
+                                  {formatMoney(bills.reduce((sum, b) => sum + b.receivableBalance, 0))}
+                                </td>
+                                <td className={`px-3 py-2 text-right font-semibold ${Math.max(...bills.map(b => b.aging)) > 30 ? 'text-red-600' : Math.max(...bills.map(b => b.aging)) > 0 ? 'text-amber-600' : 'text-slate-500'}`}>
+                                  {Math.max(...bills.map(b => b.aging)) > 0 ? `${Math.max(...bills.map(b => b.aging))} วัน` : '-'}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
         </tbody>
         {!isLoading && rows.length > 0 ? (
           <tfoot className="bg-slate-100 font-bold">

@@ -177,11 +177,13 @@ export async function GET(request: Request) {
           marketScope: bill.customers?.market_scope ?? 'ในประเทศ',
           receivableBalance,
           receivedAmount,
+          refNo: bill.ref_no ?? '',
           salesBillId: bill.id.toString(),
           sourceOfTruth: 'sales_bills',
           status: bill.status ?? 'open',
           totalAmount,
           transactionMode: bill.transaction_mode ?? 'STOCK',
+          vatInvoiceNo: bill.vat_invoice_no ?? '',
         }
       })
       .filter((row) => row.receivableBalance > 0.01)
