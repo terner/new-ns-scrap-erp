@@ -233,6 +233,26 @@ export function SearchCombobox({
           if (!shouldAutoSelectText()) return
           requestAnimationFrame(() => inputRef.current?.select())
         }}
+        onBlur={() => {
+          // Delay close so a click on a portal option (which blurs the input
+          // first) still registers. Restores the query like handleOutsideClick
+          // does, and prevents multiple combobox popups stacking in forms that
+          // render more than one (e.g. production order product pickers).
+          window.setTimeout(() => {
+            if (!open) return
+            const exactMatch = options.find((option) => option.label.toLowerCase() === query.trim().toLowerCase())
+            if (exactMatch) {
+              lastEmittedValueRef.current = exactMatch.id
+              onChange(exactMatch.id)
+              setQuery(exactMatch.label)
+            } else if (selectedOption) {
+              setQuery(selectedOption.label)
+            } else {
+              setQuery('')
+            }
+            setOpen(false)
+          }, 150)
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             setOpen(false)
