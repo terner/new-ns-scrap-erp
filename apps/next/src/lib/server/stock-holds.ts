@@ -91,6 +91,24 @@ export type ConsumedWtoStockHoldLine = {
   weightTicketLineId: bigint | null
 }
 
+export type ReturnedWtoStockHoldResult = {
+  branchId: bigint
+  holdKey: string
+  lossQty: number
+  lossUnitCost: number
+  lossValueOut: number
+  pendingQty: number
+  productCode: string | null
+  productId: bigint
+  productName: string
+  returnedQty: number
+  sourceDocNo: string
+  sourceLineNo: number | null
+  warehouseId: bigint
+  weightTicketId: bigint
+  weightTicketLineId: bigint | null
+}
+
 function normalizeCode(value: string | null | undefined) {
   return String(value ?? '').trim().toUpperCase()
 }
@@ -805,4 +823,200 @@ export async function reopenConsumedWtoStockHoldsForSalesBill(tx: TxClient, inpu
   }
 
   return holds
+}
+
+export async function closeActiveWtoStockHoldForSalesBillReturn(tx: TxClient, input: {
+  actor: string
+  holdKey: string
+  note?: string | null
+  reason?: string | null
+  returnDate: Date
+  returnedQty: number
+  salesBillDocNo: string
+  salesChannelId?: bigint | null
+}) {
+  const hold = await tx.stock_holds.findFirst({
+    include: {
+      products: { select: { code: true, id: true, name: true } },
+      weight_tickets: { select: { doc_no: true, doc_type: true, id: true } },
+    },
+    where: {
+      hold_key: input.holdKey,
+      source_type: 'WTO',
+      status: 'active',
+    },
+  })
+  if (!hold) {
+    throw new WtoStockHoldError('ไม่พบ pending_out ที่พร้อมรับคืน กรุณาโหลดข้อมูลใหม่')
+  }
+  if (hold.weight_tickets.doc_type !== 'WTO') {
+    throw new WtoStockHoldError('รับคืนได้เฉพาะ pending_out จากใบส่งของ WTO')
+  }
+
+  const pendingQty = toNumber(hold.qty)
+  const returnedQty = Number(input.returnedQty.toFixed(2))
+  if (pendingQty <= 0.0001) {
+    throw new WtoStockHoldError('pending_out นี้ไม่มีจำนวนคงเหลือให้รับคืน')
+  }
+  if (returnedQty < -0.0001) {
+    throw new WtoStockHoldError('น้ำหนักรับคืนต้องไม่ติดลบ')
+  }
+  if (returnedQty > pendingQty + 0.0001) {
+    throw new WtoStockHoldError(`น้ำหนักรับคืนเกิน pending_out (${pendingQty.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.)`)
+  }
+
+  const normalizedReturnedQty = Math.max(0, Math.min(pendingQty, returnedQty))
+  const lossQty = Number(Math.max(0, pendingQty - normalizedReturnedQty).toFixed(2))
+  if (lossQty > 0.0001 && !input.reason?.trim()) {
+    throw new WtoStockHoldError('น้ำหนักรับคืนไม่เท่ากับ pending_out ต้องกรอกเหตุผลส่วนต่างก่อนบันทึก', {
+      reason: ['กรอกเหตุผลส่วนต่าง'],
+    })
+  }
+
+  const now = new Date()
+  let lossUnitCost = 0
+  let lossValueOut = 0
+  if (lossQty > 0.0001) {
+    const ledgerSums = await tx.stock_ledger.groupBy({
+      _sum: { qty_in: true, qty_out: true, value_in: true, value_out: true },
+      by: ['product_id', 'warehouse_id', 'output_category', 'lot_no', 'not_available_for_sale'],
+      where: {
+        branch_id: hold.branch_id,
+        lot_no: hold.lot_no,
+        not_available_for_sale: hold.not_available_for_sale,
+        output_category: hold.output_category,
+        product_id: hold.product_id,
+        warehouse_id: hold.warehouse_id,
+      },
+    })
+    const bucket = ledgerSums.find((row) => bucketKey({
+      lotNo: row.lot_no,
+      notAvailableForSale: row.not_available_for_sale,
+      outputCategory: row.output_category,
+      productId: row.product_id,
+      warehouseId: row.warehouse_id,
+    }) === bucketKey({
+      lotNo: hold.lot_no,
+      notAvailableForSale: hold.not_available_for_sale,
+      outputCategory: hold.output_category,
+      productId: hold.product_id,
+      warehouseId: hold.warehouse_id,
+    }))
+    const bucketQty = toNumber(bucket?._sum.qty_in) - toNumber(bucket?._sum.qty_out)
+    const bucketValue = toNumber(bucket?._sum.value_in) - toNumber(bucket?._sum.value_out)
+    if (bucketQty <= 0.0001 || bucketValue < 0) {
+      throw new WtoStockHoldError('ไม่พบต้นทุนเฉลี่ยของ stock bucket สำหรับลงของขาด กรุณาตรวจ stock ledger ก่อนบันทึกรับคืน')
+    }
+    lossUnitCost = bucketValue / bucketQty
+    lossValueOut = lossQty * lossUnitCost
+  }
+
+  if (normalizedReturnedQty > 0.0001 && lossQty > 0.0001) {
+    const released = await tx.stock_holds.updateMany({
+      data: {
+        note: input.note ?? null,
+        qty: normalizedReturnedQty,
+        release_reason: 'sales_bill_stock_return',
+        released_at: now,
+        released_by: input.actor,
+        status: 'released',
+        updated_at: now,
+        updated_by: input.actor,
+      },
+      where: { id: hold.id, status: 'active' },
+    })
+    if (released.count !== 1) {
+      throw new WtoStockHoldError('pending_out นี้ถูกเปลี่ยนสถานะไปแล้ว กรุณาโหลดข้อมูลใหม่')
+    }
+    await tx.stock_holds.create({
+      data: {
+        branch_id: hold.branch_id,
+        created_at: now,
+        created_by: input.actor,
+        held_at: hold.held_at,
+        lot_no: hold.lot_no,
+        meta: hold.meta ?? undefined,
+        not_available_for_sale: hold.not_available_for_sale,
+        note: input.reason ?? input.note ?? null,
+        output_category: hold.output_category,
+        product_id: hold.product_id,
+        qty: lossQty,
+        release_reason: 'sales_bill_stock_return_loss',
+        released_at: now,
+        released_by: input.actor,
+        source_doc_no: hold.source_doc_no,
+        source_line_no: hold.source_line_no,
+        source_type: hold.source_type,
+        status: 'lost',
+        updated_at: now,
+        updated_by: input.actor,
+        warehouse_id: hold.warehouse_id,
+        weight_ticket_id: hold.weight_ticket_id,
+        weight_ticket_line_id: hold.weight_ticket_line_id,
+      },
+    })
+  } else {
+    const status = lossQty > 0.0001 ? 'lost' : 'released'
+    const closed = await tx.stock_holds.updateMany({
+      data: {
+        note: lossQty > 0.0001 ? input.reason ?? input.note ?? null : input.note ?? null,
+        release_reason: lossQty > 0.0001 ? 'sales_bill_stock_return_loss' : 'sales_bill_stock_return',
+        released_at: now,
+        released_by: input.actor,
+        status,
+        updated_at: now,
+        updated_by: input.actor,
+      },
+      where: { id: hold.id, status: 'active' },
+    })
+    if (closed.count !== 1) {
+      throw new WtoStockHoldError('pending_out นี้ถูกเปลี่ยนสถานะไปแล้ว กรุณาโหลดข้อมูลใหม่')
+    }
+  }
+
+  if (lossQty > 0.0001) {
+    await tx.stock_ledger.create({
+      data: {
+        branch_id: hold.branch_id,
+        created_by: input.actor,
+        date: input.returnDate,
+        lot_no: hold.lot_no,
+        movement_type: 'ของขาดจากรับคืน WTO',
+        note: input.reason ?? `รับคืน WTO ${hold.source_doc_no} ไม่ครบ`,
+        notes: `ปิด pending_out ${hold.hold_key} จาก SB ${input.salesBillDocNo}`,
+        not_available_for_sale: hold.not_available_for_sale,
+        output_category: hold.output_category,
+        product_id: hold.product_id,
+        qty_in: 0,
+        qty_out: lossQty,
+        ref_id: input.salesBillDocNo,
+        ref_no: input.salesBillDocNo,
+        ref_type: 'WTO-RETURN-LOSS',
+        return_reason: input.reason ?? null,
+        sales_channel_id: input.salesChannelId ?? null,
+        unit_cost: lossUnitCost,
+        value_in: 0,
+        value_out: lossValueOut,
+        warehouse_id: hold.warehouse_id,
+      },
+    })
+  }
+
+  return {
+    branchId: hold.branch_id,
+    holdKey: hold.hold_key,
+    lossQty,
+    lossUnitCost,
+    lossValueOut,
+    pendingQty,
+    productCode: hold.products.code,
+    productId: hold.product_id,
+    productName: hold.products.name,
+    returnedQty: normalizedReturnedQty,
+    sourceDocNo: hold.source_doc_no,
+    sourceLineNo: hold.source_line_no,
+    warehouseId: hold.warehouse_id,
+    weightTicketId: hold.weight_ticket_id,
+    weightTicketLineId: hold.weight_ticket_line_id,
+  } satisfies ReturnedWtoStockHoldResult
 }

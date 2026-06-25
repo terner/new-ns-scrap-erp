@@ -7,8 +7,10 @@ type DbClient = Prisma.TransactionClient
 export const WEIGHT_TICKET_USAGE_ACTION = {
   ALLOCATED_TO_SALES_BILL: 'allocated_to_sales_bill',
   ALLOCATED_TO_PURCHASE_BILL: 'allocated_to_purchase_bill',
+  LOSS_FROM_SALES_BILL: 'loss_from_sales_bill',
   RELEASED_FROM_SALES_BILL: 'released_from_sales_bill',
   RELEASED_FROM_PURCHASE_BILL: 'released_from_purchase_bill',
+  RETURNED_FROM_SALES_BILL: 'returned_from_sales_bill',
 } as const
 
 export type WeightTicketUsageAction = typeof WEIGHT_TICKET_USAGE_ACTION[keyof typeof WEIGHT_TICKET_USAGE_ACTION]

@@ -1344,6 +1344,14 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     await Promise.all([loadData(), reloadSalesDetail(docNo)])
   }
 
+  async function returnSalesBillStock(docNo: string, values: { holdKey: string; note?: string | null; reason?: string | null; returnedQty: number }) {
+    await dailyFetchJson(`/api/sales/bills/${encodeURIComponent(docNo)}/stock-return`, {
+      body: JSON.stringify(values),
+      method: 'POST',
+    })
+    await Promise.all([loadData(), reloadSalesDetail(docNo)])
+  }
+
   async function printPurchaseBill(rowOrDetail: BillRow | PurchaseBillDetail) {
     const docNo = rowOrDetail.docNo
     setPrintingBillDocNo(docNo)
@@ -3755,6 +3763,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
           }}
           onCorrectTradingAllocations={correctTradingAllocations}
           onPrint={(detail) => void printSalesBill(detail)}
+          onReturnStock={returnSalesBillStock}
 	        />
 	      ) : null}
 	      {cancelingBill ? (
@@ -4040,6 +4049,7 @@ function SalesBillDetailModal({
   onClose,
   onCorrectTradingAllocations,
   onPrint,
+  onReturnStock,
 }: {
   detail: SalesBillDetail | null
   docNo: string
@@ -4050,11 +4060,17 @@ function SalesBillDetailModal({
   onClose: () => void
   onCorrectTradingAllocations: (docNo: string, allocations: Array<{ salesLineNo: number; tradingCostSourceId: string }>, note: string) => Promise<void>
   onPrint: (detail: SalesBillDetail) => void
+  onReturnStock: (docNo: string, values: { holdKey: string; note?: string | null; reason?: string | null; returnedQty: number }) => Promise<void>
 }) {
   const [correctionError, setCorrectionError] = useState<string | null>(null)
   const [correctionNote, setCorrectionNote] = useState('')
   const [correctionSources, setCorrectionSources] = useState<Record<number, string>>({})
   const [isCorrecting, setIsCorrecting] = useState(false)
+  const [isReturningHoldKey, setIsReturningHoldKey] = useState<string | null>(null)
+  const [returnError, setReturnError] = useState<string | null>(null)
+  const [returnNoteByHold, setReturnNoteByHold] = useState<Record<string, string>>({})
+  const [returnQtyByHold, setReturnQtyByHold] = useState<Record<string, string>>({})
+  const [returnReasonByHold, setReturnReasonByHold] = useState<Record<string, string>>({})
   const [showCorrection, setShowCorrection] = useState(false)
 
   useEffect(() => {
@@ -4077,6 +4093,22 @@ function SalesBillDetailModal({
       return [item.lineNo, sourceId]
     })))
     setCorrectionError(null)
+  }, [detail])
+
+  useEffect(() => {
+    if (!detail) {
+      setReturnQtyByHold({})
+      setReturnReasonByHold({})
+      setReturnNoteByHold({})
+      setReturnError(null)
+      setIsReturningHoldKey(null)
+      return
+    }
+    setReturnQtyByHold(Object.fromEntries(detail.stockReturnOptions.map((option) => [option.holdKey, String(option.pendingQty)])))
+    setReturnReasonByHold({})
+    setReturnNoteByHold({})
+    setReturnError(null)
+    setIsReturningHoldKey(null)
   }, [detail])
 
   const submitCorrection = async () => {
@@ -4103,6 +4135,39 @@ function SalesBillDetailModal({
       setCorrectionError(caught instanceof Error ? caught.message : 'แก้ไข Trading allocation ไม่สำเร็จ')
     } finally {
       setIsCorrecting(false)
+    }
+  }
+
+  const submitStockReturn = async (option: SalesBillDetail['stockReturnOptions'][number]) => {
+    if (!detail) return
+    setReturnError(null)
+    const returnedQty = Number(returnQtyByHold[option.holdKey] ?? 0)
+    if (!Number.isFinite(returnedQty) || returnedQty < 0) {
+      setReturnError('กรอกน้ำหนักที่ชั่งคืนเป็นตัวเลขที่ไม่ติดลบ')
+      return
+    }
+    if (returnedQty > option.pendingQty + 0.0001) {
+      setReturnError(`น้ำหนักรับคืนของ ${option.productName} เกิน pending_out ${formatMoney(option.pendingQty)} กก.`)
+      return
+    }
+    const lossQty = Math.max(0, option.pendingQty - returnedQty)
+    const reason = returnReasonByHold[option.holdKey]?.trim() ?? ''
+    if (lossQty > 0.0001 && !reason) {
+      setReturnError(`รับคืน ${option.productName} ขาด ${formatMoney(lossQty)} กก. ต้องกรอกเหตุผลส่วนต่าง`)
+      return
+    }
+    setIsReturningHoldKey(option.holdKey)
+    try {
+      await onReturnStock(detail.docNo, {
+        holdKey: option.holdKey,
+        note: returnNoteByHold[option.holdKey]?.trim() || null,
+        reason: reason || null,
+        returnedQty,
+      })
+    } catch (caught) {
+      setReturnError(caught instanceof Error ? caught.message : 'รับของคืนไม่สำเร็จ')
+    } finally {
+      setIsReturningHoldKey(null)
     }
   }
 
@@ -4315,6 +4380,89 @@ function SalesBillDetailModal({
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+              {detail.stockReturnOptions.length > 0 ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 lg:col-span-2">
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-semibold text-amber-900">รับของคืนจาก pending_out</div>
+                      <div className="mt-1 text-xs text-amber-800">กรอกน้ำหนักที่ชั่งคืนจริง ถ้าน้อยกว่า pending_out ระบบจะบันทึกส่วนต่างเป็นของขาดและลง Stock Ledger</div>
+                    </div>
+                  </div>
+                  {returnError ? <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">{returnError}</div> : null}
+                  <div className="overflow-x-auto rounded-md border border-amber-200 bg-white">
+                    <table className="w-full min-w-[860px] text-xs">
+                      <thead className="bg-amber-50 text-amber-900">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">WTO / สินค้า</th>
+                          <th className="px-3 py-2 text-left font-medium">คลัง</th>
+                          <th className="px-3 py-2 text-right font-medium">pending_out</th>
+                          <th className="px-3 py-2 text-right font-medium">น้ำหนักชั่งคืนจริง</th>
+                          <th className="px-3 py-2 text-right font-medium">ส่วนต่างขาด</th>
+                          <th className="px-3 py-2 text-left font-medium">เหตุผลส่วนต่าง</th>
+                          <th className="px-3 py-2 text-left font-medium">หมายเหตุ</th>
+                          <th className="px-3 py-2 text-right font-medium">จัดการ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.stockReturnOptions.map((option) => {
+                          const returnedQty = Number(returnQtyByHold[option.holdKey] ?? option.pendingQty)
+                          const lossQty = Math.max(0, option.pendingQty - (Number.isFinite(returnedQty) ? returnedQty : 0))
+                          const requiresReason = lossQty > 0.0001
+                          return (
+                            <tr key={option.holdKey} className="border-t border-amber-100 align-top">
+                              <td className="px-3 py-2">
+                                <div className="font-mono text-[11px] text-slate-700">{option.weightTicketDocNo}</div>
+                                <div className="font-medium text-slate-900">{option.productName}</div>
+                                <div className="text-slate-500">{[option.productCode, option.sourceLineNo ? `line ${option.sourceLineNo}` : null].filter(Boolean).join(' · ')}</div>
+                              </td>
+                              <td className="px-3 py-2 text-slate-700">{option.warehouseName || '-'}</td>
+                              <td className="px-3 py-2 text-right font-semibold tabular-nums text-amber-800">{formatMoney(option.pendingQty)}</td>
+                              <td className="px-3 py-2">
+                                <input
+                                  className={`w-full rounded-md border px-2 py-2 text-right tabular-nums ${requiresReason ? 'border-amber-300 bg-amber-50' : 'border-slate-300 bg-white'} ${numberInputClass}`}
+                                  min="0"
+                                  max={option.pendingQty}
+                                  step="0.01"
+                                  type="number"
+                                  value={returnQtyByHold[option.holdKey] ?? ''}
+                                  onChange={(event) => setReturnQtyByHold((current) => ({ ...current, [option.holdKey]: event.target.value }))}
+                                />
+                              </td>
+                              <td className={`px-3 py-2 text-right font-semibold tabular-nums ${requiresReason ? 'text-red-700' : 'text-emerald-700'}`}>{formatMoney(lossQty)}</td>
+                              <td className="px-3 py-2">
+                                <input
+                                  className={`w-full rounded-md border px-2 py-2 ${requiresReason && !returnReasonByHold[option.holdKey]?.trim() ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white'}`}
+                                  placeholder={requiresReason ? 'ระบุเหตุผลของขาด' : 'ไม่บังคับ'}
+                                  value={returnReasonByHold[option.holdKey] ?? ''}
+                                  onChange={(event) => setReturnReasonByHold((current) => ({ ...current, [option.holdKey]: event.target.value }))}
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  className="w-full rounded-md border border-slate-300 bg-white px-2 py-2"
+                                  placeholder="หมายเหตุ"
+                                  value={returnNoteByHold[option.holdKey] ?? ''}
+                                  onChange={(event) => setReturnNoteByHold((current) => ({ ...current, [option.holdKey]: event.target.value }))}
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <Button
+                                  className="h-8 px-3 text-xs font-normal"
+                                  disabled={isReturningHoldKey === option.holdKey}
+                                  type="button"
+                                  onClick={() => void submitStockReturn(option)}
+                                >
+                                  {isReturningHoldKey === option.holdKey ? 'กำลังบันทึก...' : 'บันทึกรับคืน'}
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
               <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-medium text-slate-700">ประวัติสถานะ SB</div>

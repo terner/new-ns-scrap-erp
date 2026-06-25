@@ -64,6 +64,15 @@ export type SalesBillDetail = {
     type: string
     unit: string
   }>
+  stockReturnOptions: Array<{
+    holdKey: string
+    pendingQty: number
+    productCode: string
+    productName: string
+    sourceLineNo: number | null
+    warehouseName: string
+    weightTicketDocNo: string
+  }>
   subtotal: number
   timeline: Array<{
     action: string
@@ -511,6 +520,25 @@ export async function getSalesBillDetail(
       : Promise.resolve([]),
   ])
 
+  const allocatedWtoDocNos = Array.from(new Set(weightTicketUsageLogs
+    .filter((log) => log.action === 'allocated_to_sales_bill')
+    .map((log) => log.weight_ticket_doc_no)
+    .filter(Boolean)))
+  const activeReturnHolds = allocatedWtoDocNos.length
+    ? await prisma.stock_holds.findMany({
+        include: {
+          products: { select: { code: true, name: true } },
+          warehouses: { select: { name: true } },
+        },
+        orderBy: [{ source_doc_no: 'asc' }, { source_line_no: 'asc' }, { id: 'asc' }],
+        where: {
+          source_doc_no: { in: allocatedWtoDocNos },
+          source_type: 'WTO',
+          status: 'active',
+        },
+      })
+    : []
+
   const vehicleByDeliveryDocNo = new Map(deliveryTickets.map((ticket) => [ticket.doc_no, ticket.vehicle_no ?? '']))
   const poSellDocNoSet = new Set(poSells.map((poSell) => poSell.doc_no))
   const tradingFactByLineNo = new Map<number, (typeof tradingAllocationFacts)[number]>()
@@ -561,8 +589,20 @@ export async function getSalesBillDetail(
       lineNo: log.target_line_no,
       productName: log.product_name_snapshot ?? '-',
       qty: toNumber(log.allocated_net_weight) || toNumber(log.allocated_qty),
-      status: log.action === 'released_from_sales_bill' ? 'cancelled' : 'active',
-      title: log.action === 'released_from_sales_bill' ? 'คืน WTO จากบิลขาย' : 'ใช้ WTO ในบิลขาย',
+      status: log.action === 'released_from_sales_bill'
+        ? 'cancelled'
+        : log.action === 'loss_from_sales_bill'
+          ? 'loss'
+          : log.action === 'returned_from_sales_bill'
+            ? 'returned'
+            : 'active',
+      title: log.action === 'released_from_sales_bill'
+        ? 'คืน WTO จากบิลขาย'
+        : log.action === 'loss_from_sales_bill'
+          ? 'ตัดของขาดจากรับคืน WTO'
+          : log.action === 'returned_from_sales_bill'
+            ? 'รับของคืนจาก WTO'
+            : 'ใช้ WTO ในบิลขาย',
       type: 'WTO usage log',
       unit: 'กก.',
     })),
@@ -655,6 +695,15 @@ export async function getSalesBillDetail(
     status: bill.status ?? '',
     statusLabel: salesBillStatusLabel(bill.status),
     sourceUsageFacts,
+    stockReturnOptions: activeReturnHolds.map((hold) => ({
+      holdKey: hold.hold_key,
+      pendingQty: toNumber(hold.qty),
+      productCode: hold.products.code ?? '',
+      productName: hold.products.name,
+      sourceLineNo: hold.source_line_no,
+      warehouseName: hold.warehouses.name,
+      weightTicketDocNo: hold.source_doc_no,
+    })),
     subtotal: toNumber(bill.subtotal),
     timeline,
     totalAmount: toNumber(bill.total_amount),

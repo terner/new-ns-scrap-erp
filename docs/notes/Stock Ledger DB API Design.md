@@ -11,7 +11,7 @@ tags:
   - ledger
 status: draft
 created: 2026-06-12
-updated: 2026-06-23
+updated: 2026-06-25
 ---
 
 # Stock Ledger DB API Design
@@ -45,6 +45,7 @@ updated: 2026-06-23
 | `PB-EDIT-REV` | Purchase Bill edit | stock out | reverse current PB net movement ก่อน append `PB` state ใหม่ |
 | `SB` | Sales Bill Stock | stock out | `SB-CANCEL` |
 | `SB-CANCEL` | Sales Bill cancel | stock in | สร้าง row ใหม่เพื่อคืน stock ด้วย unit cost/value เดิมของ `SB`; ห้ามลบ `SB` row เดิม |
+| `WTO-RETURN-LOSS` | Sales Bill WTO return loss | stock out | ใช้เมื่อรับคืน pending_out จริงน้อยกว่าน้ำหนักค้าง; ต้องมี reason และอ้าง SB/WTO |
 | `ST` | Stock transfer | paired out/in | future cancel ต้อง paired reversal |
 | `SC` | Status convert | paired out/in | `SC-REV` |
 | `SC-REV` | Status convert reverse | paired out/in | append-only reverse rows; `ref_id` points to original `SC.ref_no` |
@@ -106,7 +107,9 @@ Lifecycle:
 | Cancel unused WTO | active pending_out `cancelled` | no row | `cancelled` |
 | Create SB from WTO | pending_out `consumed` | create `SB` stock-out row | `billed` |
 | Cancel SB from WTO, no return yet | consumed pending_out reopened to `active` | create `SB-CANCEL` stock-in row | `delivered` |
-| Cancel SB from WTO after return | no reopen/recreate pending_out; keep return facts | create `SB-CANCEL` stock-in row with original SB unit cost/value | return/cancel timeline from facts |
+| Return remaining pending_out, full return | active pending_out `released` | no row; hold release makes stock available because this qty was never stock-out | stays `delivered` or `billed` when no remaining hold |
+| Return remaining pending_out, short return | returned qty `released`, shortage qty `lost` | create `WTO-RETURN-LOSS` stock-out row for shortage only | stays `delivered` or `billed` when no remaining hold |
+| Cancel SB from WTO after return | no reopen/recreate pending_out; keep return/loss facts | create `SB-CANCEL` stock-in row with original SB unit cost/value for the sold qty only | return/cancel timeline from facts |
 
 ## Removed PSALE Issue Contract
 

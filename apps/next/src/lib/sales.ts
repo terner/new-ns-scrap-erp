@@ -91,6 +91,19 @@ export const salesBillCancelSchema = z.object({
     .regex(generalTextPattern, 'เหตุผลการยกเลิกมีรูปแบบไม่ถูกต้อง'),
 })
 
+export const salesBillStockReturnSchema = z.object({
+  holdKey: z.string()
+    .trim()
+    .min(1, 'เลือก pending_out ที่ต้องรับคืน')
+    .max(120, 'รหัส hold ยาวเกินไป')
+    .regex(safeIdPattern, 'รหัส hold มีรูปแบบไม่ถูกต้อง'),
+  note: optionalGeneralText('หมายเหตุรับคืน', 500),
+  reason: optionalGeneralText('เหตุผลส่วนต่าง', 500),
+  returnedQty: z.coerce.number({ invalid_type_error: 'น้ำหนักที่ชั่งคืนต้องเป็นตัวเลข' })
+    .finite('น้ำหนักที่ชั่งคืนต้องเป็นตัวเลข')
+    .min(0, 'น้ำหนักที่ชั่งคืนต้องไม่ติดลบ'),
+})
+
 export const poSellFormSchema = z.object({
   branchId: optionalSafeId('สาขา'),
   channelId: optionalSafeId('ช่องทางขาย'),
@@ -103,4 +116,5 @@ export const poSellFormSchema = z.object({
 
 export type SalesBillFormValues = z.infer<typeof salesBillFormSchema>
 export type SalesBillCancelValues = z.infer<typeof salesBillCancelSchema>
+export type SalesBillStockReturnValues = z.infer<typeof salesBillStockReturnSchema>
 export type PoSellFormValues = z.infer<typeof poSellFormSchema>

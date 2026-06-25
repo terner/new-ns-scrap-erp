@@ -262,7 +262,7 @@ stock balance key  = branch + warehouse + product + lot/status flags
 - `WTO cancel` ที่ยังไม่ถูกใช้ ต้อง release `pending_out`
 - `SB save from WTO` ต้อง consume `pending_out` แล้วสร้าง `stock_ledger.ref_type = SB`
 - `SB save from WTO` แบบขายไม่ครบต้อง consume เฉพาะส่วนที่ออกบิลและคง remaining `pending_out` สำหรับรับของคืน
-- `WTO return from SB` ต้องเขียน stock ledger ขาเข้าโดยอ้าง `WTO`/`SB`, ใช้น้ำหนักชั่งกลับจริง และใช้ unit cost ที่ snapshot ณ ตอนออกบิลขาย
+- `WTO return from SB` คืนครบต้อง release active `pending_out` โดยไม่เขียน ledger เพราะของยังอยู่ใน on-hand; ถ้าชั่งคืนจริงน้อยกว่า pending_out ต้องบังคับเหตุผลและเขียน `stock_ledger.ref_type = WTO-RETURN-LOSS` สำหรับส่วนขาด
 - `SB cancel` ต้อง reverse `SB` ledger และ reopen/recreate `pending_out` ของ WTO ที่กลับไปรอออกบิล ถ้า WTO ยัง active
 
 สถานะ pending_out target:
@@ -344,7 +344,7 @@ user-facing label:
 - `PB Stock save` เป็น stock-in และเป็นจุดที่ทำให้จำนวน, stock value, และ WAC ปัจจุบันเปลี่ยนตามราคาซื้อของบิลนั้น
 - `PB cancel` ต้อง append `PB-CANCEL` เป็น stock-out ด้วย unit cost/value เดิมของ `PB` ที่ถูกยกเลิก แล้วให้ WAC ปัจจุบันคำนวณใหม่จาก ledger ที่เหลือ
 - `SB Stock save` เป็น stock-out และใช้ WAC ณ ตอนออกบิลขายเป็น COGS snapshot ใน `stock_ledger.unit_cost/value_out`
-- `SB cancel` หรือ `รับของคืน` ต้องคืน stock ด้วย unit cost/value เดิมที่ snapshot จาก `SB` แล้วให้ WAC ปัจจุบันคำนวณใหม่จาก stock ปัจจุบันบวก value ที่คืนเข้า
+- `SB cancel` ต้องคืน stock ด้วย unit cost/value เดิมที่ snapshot จาก `SB`; `รับของคืน` ของ remaining pending_out ที่คืนครบไม่เปลี่ยน WAC แต่ถ้าคืนขาดจะตัด loss ด้วย `WTO-RETURN-LOSS` และทำให้ WAC/stock value คำนวณใหม่จาก ledger
 - `WTO/pending_out` ไม่เปลี่ยน WAC เพราะยังไม่ใช่ stock ledger movement
 - `SC RM<->FG` ไม่เป็น cost event และไม่ reprice WAC; เป็น quantity reclassification เพื่อแก้ classification ผิดเท่านั้น
 
@@ -382,7 +382,7 @@ SB-CANCEL คืน 50 kg @ 40
 - `SB Stock save` = consume `pending_out` แล้วตัด stock ออกโดยอ้าง `WTO`; ยอดขายคิดจากน้ำหนักขายสุทธิใน SB แต่ stock/COGS consume ต้องอิงน้ำหนัก source จาก WTO ที่ถูกนำไปออกบิล
 - ถ้า `SB` ขายไม่ครบตาม WTO ต้องเหลือ `pending_out` สำหรับ action `รับของคืน`; ห้ามนำ remaining นี้ไปเปิด SB ใบอื่นแบบเงียบ ๆ
 - `รับของคืน` ต้องให้ผู้ใช้กรอกน้ำหนักที่ชั่งกลับมาจริงและกดยืนยันก่อนคืน stock เข้า available
-- มูลค่ารับคืนจาก `pending_out` ต้องใช้ WAC/cost per unit ณ ตอนออกบิลขายที่ snapshot ไว้บน `SB`/`stock_ledger` ไม่ใช้ WAC ปัจจุบันหรือราคาขาย
+- ถ้ารับคืนครบ ระบบ release hold เท่านั้น ไม่เขียน stock-in ledger; ถ้ารับคืนขาด ส่วนต่างต้องลง `WTO-RETURN-LOSS` ด้วย WAC ของ bucket ณ เวลาปิดรับคืน ไม่ใช้ราคาขายและไม่ให้ผู้ใช้กรอกต้นทุนเอง
 - `WTI/WTO` ถูก lock หลังถูกใช้กับ `PB/SB`; กรณี `WTO` ออกบิลบางส่วนจะยังมี action เฉพาะ `รับของคืน` สำหรับ remaining pending_out
 
 ### Current state ณ 2026-06-11

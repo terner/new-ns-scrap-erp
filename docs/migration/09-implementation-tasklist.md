@@ -682,7 +682,7 @@ Reporting rule:
     - [x] add `SB Stock` create flow consume-hold + stock-out ledger write by referencing WTO intended warehouse; WTI/WTO must not write stock ledger rows
     - [x] split Sales Bill stock quantity from commercial sales quantity: `จำนวนที่ขายได้ - หักสิ่งเจือปน = น้ำหนักขายสุทธิ`, while stock consume is capped by WTO pending_out source quantity
     - [x] support partial consume of active `stock_holds` so remaining `pending_out` stays active after a partial Sales Bill
-    - [ ] add explicit `รับของคืน` UI/API action for remaining WTO pending_out after a partial Sales Bill; user must enter actual returned weight and the action must release/close hold with audit log
+    - [x] add explicit `รับของคืน` UI/API action for remaining WTO pending_out after a partial Sales Bill; user must enter actual returned weight, exact return releases/closes hold without ledger movement, short return requires a reason and posts `WTO-RETURN-LOSS` stock ledger for the loss qty
     - [x] show stock balance as `คงเหลือจริง / จองไว้ / พร้อมส่ง` in `/stock/balance`
     - [x] show hold/consume context in SB create from WTO at baseline level
     - [x] transaction-safe release/cancel on `SB`; full edit/rebuild remains disabled until read-model normalization is complete
