@@ -11,7 +11,7 @@ tags:
   - legacy-baseline
 status: draft
 created: 2026-06-11
-updated: 2026-06-11
+updated: 2026-06-23
 ---
 
 # Dual Costing Flow
@@ -59,19 +59,55 @@ Legacy มี `PO Buy` และ `PO Sell` อยู่ในหมวด Dual C
 ## Core Data Flow
 
 ```mermaid
-flowchart LR
+flowchart TD
   POB["PO Buy eligible\nทองแดง/ทองเหลือง"] --> CP["Cost Pool"]
   SPOT["Stock PB Spot / No PO eligible"] --> CP
-  CP --> CA["Cost Allocator"]
-  POS["PO Sell eligible"] --> CA
-  SBSPOT["Spot Sales Bill eligible"] --> WA["Waiting Allocations"]
+  PROD["Production Output eligible"] --> CP
+  REGADE["Grade Adjustment / Regrade eligible"] --> CP
+  POS["PO Sell eligible"] --> WA["Waiting Allocations"]
+  SBSPOT["Sales Bill eligible"] --> WA
+  PRODI["Production issue eligible"] --> WA
   WA --> CA
-  CA --> ML["Match Log"]
-  ML --> LEDGER["Allocation Ledger"]
+  CP --> CA["Cost Allocator"]
+  CA --> PREVIEW["Preview Full Match"]
+  PREVIEW --> CHECK{"Cost Pool enough\nfor full target qty?"}
+  CHECK -->|No| BLOCK["Block Confirm\nshow insufficient pool"]
+  CHECK -->|Yes| LEDGER["Allocation Ledger"]
+  LEDGER --> CP2["Reduce Cost Pool availability"]
+  LEDGER --> WA2["Remove target from Waiting Allocations"]
   LEDGER --> DCR["Dual Costing Report"]
   LEDGER --> DM["Deal Margin"]
   DCR --> CMP["Compare Deal vs Stock"]
   SBWAC["Sales Bill WAC/COGS"] --> CMP
+```
+
+## Full-Match Allocation Policy
+
+Decision 2026-06-23: target flow ตัด `match บางส่วน` ออกจาก Dual Costing รอบนี้ เพื่อให้ Waiting Allocations และ Cost Allocator ทำงานแบบง่ายและตรวจสอบได้ชัดเจน
+
+หลักการใหม่:
+
+- Waiting Allocations แสดงเฉพาะรายการที่ยังไม่ถูก allocate เลย
+- Cost Allocator ต้อง allocate เต็มจำนวนของ target row เท่านั้น
+- ถ้า Cost Pool ของสินค้านั้นไม่พอสำหรับจำนวนเต็ม ต้องห้ามกด Confirm Match
+- หลัง Confirm Match สำเร็จ รายการ target ต้องหายจาก Waiting Allocations
+- ไม่มีสถานะ `partially_allocated` ใน target flow ใหม่
+- ไม่มีปุ่ม `จัดสรรต่อ`
+
+Required calculation:
+
+```text
+required_qty = target row qty
+available_cost_pool_qty = sum Cost Pool available qty for selected product
+
+Confirm enabled only when available_cost_pool_qty >= required_qty
+```
+
+หลัง Confirm:
+
+```text
+allocated_qty = required_qty
+waiting target visibility = hidden / excluded from Waiting Allocations
 ```
 
 ## Target Cost Pool Source Decision
@@ -99,9 +135,11 @@ Clarification 2026-06-13: `stock_cost_pool_entries` ที่ใช้โดย 
 | `Partially Used` | ถูก match ไปบางส่วน |
 | `Fully Used` | ถูกใช้ครบ |
 | `pending_allocation` | รายการขาย eligible ยังไม่ถูก allocate ต้นทุน |
-| `partially_allocated` | รายการขายถูก allocate บางส่วน |
+| `allocated` | รายการ target ถูก allocate ครบแล้ว และไม่ต้องแสดงใน Waiting Allocations |
 | `approved` | match/allocation active |
 | `reversed` | match ถูก reverse และต้องคืน available qty |
+
+หมายเหตุ: `Partially Used` ยังใช้ได้ฝั่ง Cost Pool เพราะ Cost Pool lot หนึ่งอาจถูกใช้กับหลาย target เต็มรายการคนละใบได้ แต่ฝั่ง target/Waiting Allocations ไม่รองรับ partial target allocation ใน flow ล่าสุด
 
 ## Current Next API Map
 
@@ -120,8 +158,11 @@ Clarification 2026-06-13: `stock_cost_pool_entries` ที่ใช้โดย 
 
 - `/api/dual-costing/cost-pool` must filter product eligibility by `products.metal_group`.
 - Cost Pool PB/Production/Regrade visibility follows the legacy baseline until durable allocation/cost-deducted policy replaces it.
-- Current `Cost Allocator` is read-only simulation; default target is Sales Bill no-PO Spot Sell and no durable allocation write API exists yet.
-- Current `Match Log` and `Allocation Ledger` read from `trading_deals`; target needs a durable allocation ledger/match log when allocator write is implemented.
+- `Cost Allocator` confirm must allocate the full target qty only; no partial target allocation.
+- Confirm must be disabled when Cost Pool available qty is less than target required qty.
+- Waiting Allocations must exclude target rows that already have approved allocation for the full target qty.
+- Current `Cost Allocator` may still be read-only simulation in code; target needs a durable allocation ledger/match log before enabling confirm.
+- Current `Match Log` and `Allocation Ledger` may read from `trading_deals`; target needs a durable allocation ledger/match log when allocator write is implemented.
 - Reverse/edit rules must be append-only or reverse-based; no physical delete of allocation history.
 - Report formulas must always label whether they use Deal Cost or WAC.
 

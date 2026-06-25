@@ -27,10 +27,6 @@ type CostPoolRow = {
   usedQty: number
 }
 
-type CostPoolPayload = {
-  rows: CostPoolRow[]
-}
-
 type PoSellItem = {
   productCode?: string | null
   productId?: string | number | bigint | null
@@ -132,38 +128,15 @@ function isDualCostingGroup(group?: string | null) {
 
 function sortPool(rows: CostPoolRow[], mode: string, targetCost: number) {
   const nextRows = [...rows]
-  if (mode === 'Cheap') {
-    return nextRows.sort((left, right) => 
-      (left.unitCost - right.unitCost) || 
-      left.date.localeCompare(right.date) || 
-      left.costPoolId.localeCompare(right.costPoolId)
-    )
-  }
-  if (mode === 'Expensive') {
-    return nextRows.sort((left, right) => 
-      (right.unitCost - left.unitCost) || 
-      left.date.localeCompare(right.date) || 
-      left.costPoolId.localeCompare(right.costPoolId)
-    )
-  }
-  if (mode === 'LIFO') {
-    return nextRows.sort((left, right) => 
-      right.date.localeCompare(left.date) || 
-      left.costPoolId.localeCompare(right.costPoolId)
-    )
-  }
-  if (mode === 'Manual') {
-    return nextRows.sort((left, right) => 
-      (Math.abs(left.unitCost - targetCost) - Math.abs(right.unitCost - targetCost)) || 
-      left.date.localeCompare(right.date) || 
-      left.costPoolId.localeCompare(right.costPoolId)
-    )
-  }
-  // FIFO
-  return nextRows.sort((left, right) => 
-    left.date.localeCompare(right.date) || 
-    left.costPoolId.localeCompare(right.costPoolId)
-  )
+  const incomingAsc = (left: CostPoolRow, right: CostPoolRow) =>
+    left.date.localeCompare(right.date) ||
+    left.sourceNo.localeCompare(right.sourceNo, undefined, { numeric: true }) ||
+    left.costPoolId.localeCompare(right.costPoolId, undefined, { numeric: true })
+  if (mode === 'Cheap') return nextRows.sort((left, right) => left.unitCost - right.unitCost || incomingAsc(left, right))
+  if (mode === 'Expensive') return nextRows.sort((left, right) => right.unitCost - left.unitCost || incomingAsc(left, right))
+  if (mode === 'LIFO') return nextRows.sort((left, right) => right.date.localeCompare(left.date) || left.sourceNo.localeCompare(right.sourceNo, undefined, { numeric: true }) || left.costPoolId.localeCompare(right.costPoolId, undefined, { numeric: true }))
+  if (mode === 'Manual') return nextRows.sort((left, right) => Math.abs(left.unitCost - targetCost) - Math.abs(right.unitCost - targetCost) || incomingAsc(left, right))
+  return nextRows.sort(incomingAsc)
 }
 
 export async function GET(request: Request) {
@@ -702,4 +675,3 @@ export async function POST(request: Request) {
     return apiErrorResponse(caught, 'ยืนยันการจัดสรรต้นทุนไม่สำเร็จ', 500)
   }
 }
-

@@ -5,7 +5,7 @@ tags:
   - menu
   - dual-costing
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-23
 route: /dual-costing/waiting-allocations
 ---
 
@@ -33,7 +33,7 @@ Legacy sections:
 - PO Sell weight-diff alert: เทียบน้ำหนัก PO Sell กับ Sales Bill จริง เพื่อชี้ว่าต้องปรับการตัด Cost Pool
 - PO Sell pending allocation: PO Sell eligible ที่ matched cost ยังไม่ครบ
 - Grade Adjustment pending cost: GA ที่ posted แล้วแต่ยังค้าง match cost
-- Spot Sales Bill pending allocation: SB item eligible ที่ยังไม่ได้ allocate หรือ allocate บางส่วน
+- Spot Sales Bill pending allocation: SB item eligible ที่ยังไม่ได้ allocate
 - summary cards และ category summary
 - action `Allocate` เปิด Cost Allocator พร้อม preselect
 
@@ -43,16 +43,15 @@ Legacy sections:
 
 Target scope ล่าสุด:
 
-- แสดง Spot Sell / Sales Bill ไม่มี PO เป็น target หลักที่ยังค้าง allocation
-- PO Sell เป็น legacy mode ที่ยังเปิดใน Cost Allocator เพื่ออ่านเทียบ แต่ไม่ใช่ scope หลักรอบนี้
+- แสดงรายการ target ที่ยังไม่ถูก allocate จาก PO Sell, Sales Bill และ Production
 - แสดงเฉพาะทองแดง/ทองเหลือง
 - action หลักคือเปิด Cost Allocator พร้อม context
-- Grade Adjustment/Production queue เป็น legacy evidence เท่านั้น ยังไม่เข้า target Cost Pool จนกว่าจะมี decision ใหม่
+- ตัด flow match บางส่วนออก: ถ้ารายการ target ถูก allocate แล้ว ต้องไม่แสดงใน Waiting Allocations
 
 ## Page Responsibilities
 
-- แสดงจำนวนรายการค้าง allocate แยก `pending_allocation` และ `partially_allocated`
-- แสดงลูกค้า, เอกสารขาย, วันที่, สินค้า, metal group, qty sold, allocated qty, remaining qty, unit price, pending revenue
+- แสดงจำนวนรายการค้าง allocate เฉพาะ `pending_allocation`
+- แสดงลูกค้า/แหล่งอ้างอิง, เอกสาร, วันที่, สินค้า, metal group, qty ที่ต้อง allocate, unit price, pending revenue
 - filter ด้วย search/status/category
 - เปิด Cost Allocator พร้อม target ที่เลือก
 - ชี้ risk เรื่องน้ำหนัก PO Sell vs SB ไม่ตรงเมื่อมีข้อมูล
@@ -73,6 +72,7 @@ Target scope ล่าสุด:
 | 2 | กรอง status/category/search | แสดงเฉพาะรายการที่ตรง |
 | 3 | ดู summary | เห็น count/qty/revenue pending |
 | 4 | กด Allocate | เปิด Cost Allocator พร้อม preselect target |
+| 5 | Cost Allocator confirm สำเร็จ | รายการ target ต้องหายจาก Waiting Allocations |
 
 ## API / Data Contract
 
@@ -102,17 +102,16 @@ Required row fields:
 - `productName`
 - `metalGroup`
 - `qty`
-- `allocatedQty`
-- `remainingQty`
 - `unitPrice`
 - `revenuePending`
 - `allocationStatus`
 
 ## Validation / Status Rules
 
-- `remainingQty = qty - allocatedQty`, not below zero.
-- `allocationStatus = pending_allocation` when allocated qty is zero.
-- `allocationStatus = partially_allocated` when allocated qty > 0 but still less than qty.
+- Waiting Allocations แสดงเฉพาะ target row ที่ยังไม่ถูก allocate แบบ full match.
+- `allocationStatus = pending_allocation` เท่านั้นสำหรับ row ที่แสดงในหน้านี้.
+- ถ้า target มี approved allocation แล้วครบจำนวน ต้อง exclude ออกจาก API response.
+- ไม่รองรับ `partially_allocated` ใน target flow ล่าสุด.
 - Only eligible product groups appear.
 - Cancelled sales bills or reversed/cancelled trading deals must not count as active allocation.
 
@@ -131,13 +130,15 @@ Read-only. `Allocate` navigation/preselect is a UI action only.
 
 - No allocation write from this page.
 - No aging/staleness threshold for waiting allocation yet.
-- Grade Adjustment/Production waiting sections from legacy need a separate target decision before reintroducing.
 - Weight-diff adjustment is documented from legacy but not target-complete in Next.
+- API/read model must use the same allocation key as Allocation Ledger: source type, source doc no/id, source line id, and product id.
+- Fully allocated targets must be hidden from Waiting Allocations after refresh.
 
 ## Implementation Checklist
 
 - [x] Legacy queue sections inspected
 - [x] Current API identified
 - [x] Add direct navigation contract to Cost Allocator in Next
+- [x] Confirm target policy: full match only, no partial target allocation
 - [ ] Define stale allocation aging buckets
-- [ ] Decide whether GA/Production pending cost returns to target scope
+- [ ] Align Waiting Allocations allocated detection with durable Allocation Ledger key
