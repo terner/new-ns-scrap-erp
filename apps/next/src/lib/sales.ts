@@ -20,6 +20,11 @@ const optionalGeneralText = (label: string, maxLength = 500) => z.preprocess(
   z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(generalTextPattern, `${label}มีรูปแบบไม่ถูกต้อง`).nullable().default(null),
 )
 
+const optionalBusinessCode = (label: string, maxLength = 80) => z.preprocess(
+  blankToNull,
+  z.string().trim().max(maxLength, `${label}ยาวเกินไป`).regex(/^[A-Za-z0-9_./-]+$/, `${label}ใช้ได้เฉพาะอังกฤษ ตัวเลข จุด ขีดกลาง underscore และ slash`).nullable().default(null),
+)
+
 const requiredDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD')
 const positiveNumber = (label: string) => z.coerce.number({ invalid_type_error: `${label}ต้องเป็นตัวเลข` }).finite(`${label}ต้องเป็นตัวเลข`).gt(0, `${label}ต้องมากกว่า 0`)
 const money = (label: string) => z.coerce.number({ invalid_type_error: `${label}ต้องเป็นตัวเลข` }).finite(`${label}ต้องเป็นตัวเลข`).min(0, `${label}ต้องไม่ติดลบ`)
@@ -48,6 +53,7 @@ export const salesBillFormSchema = z.object({
   customerId: z.string().trim().min(1, 'เลือกลูกค้า').max(80, 'รหัสลูกค้ายาวเกินไป').regex(safeIdPattern, 'รหัสลูกค้ามีรูปแบบไม่ถูกต้อง'),
   deliveryTicketId: optionalSafeId('ใบส่งของ'),
   discountTotal: money('ส่วนลดท้ายบิล').default(0),
+  exportOrderNo: optionalBusinessCode('เลขที่ order ส่งออก'),
   hasVat: z.boolean().default(false),
   items: z.array(salesLineItemSchema).min(1, 'เพิ่มรายการสินค้าอย่างน้อย 1 รายการ').max(50, 'รายการสินค้ามากเกินไป'),
   licensePlate: optionalGeneralText('ทะเบียนรถ', 40),

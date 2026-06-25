@@ -18,6 +18,7 @@ export type SalesBillDetail = {
   discount: number
   docNo: string
   dueDate: string
+  exportOrderNo: string
   hasVat: boolean
   items: Array<{
     amount: number
@@ -684,6 +685,7 @@ export async function getSalesBillDetail(
     discount: toNumber(bill.discount_total ?? bill.discount),
     docNo: bill.doc_no,
     dueDate: bill.due_date ? toDateOnly(bill.due_date) : '',
+    exportOrderNo: bill.export_order_no ?? '',
     hasVat: Boolean(bill.has_vat),
     items,
     note: bill.note ?? bill.notes ?? '',

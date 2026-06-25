@@ -230,6 +230,7 @@ export function buildSalesBillPrintHtml(bill: SalesBillDetail, profile: CompanyP
             <div><div class="field-label">รหัสลูกค้า</div><div class="field-value">${escapeHtml(bill.customerCode)}</div></div>
             <div><div class="field-label">เลขผู้เสียภาษี</div><div class="field-value">${escapeHtml(plain(bill.customerTaxId))}</div></div>
             <div><div class="field-label">ช่องทางขาย</div><div class="field-value">${escapeHtml(plain(bill.channelName))}</div></div>
+            ${bill.exportOrderNo ? `<div><div class="field-label">เลขที่ order ส่งออก</div><div class="field-value">${escapeHtml(bill.exportOrderNo)}</div></div>` : ''}
             <div style="grid-column:1 / -1"><div class="field-label">ที่อยู่</div><div class="field-value">${escapeHtml(plain(bill.customerAddress))}</div></div>
           </div>
         </div>

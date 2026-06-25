@@ -2532,6 +2532,7 @@ model sales_bills {
   doc_no                                  String                                    @unique(map: "uq_sales_bills_doc_no")
   date                                    DateTime                                  @db.Date
   ref_no                                  String?
+  export_order_no                         String?
   transaction_mode                        String?                                   @default("STOCK")
   vat_type                                String?                                   @default("EXCLUDE")
   credit_term                             Int?                                      @default(0)

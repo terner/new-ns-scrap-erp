@@ -5,6 +5,7 @@ import type { Prisma } from '../../../generated/prisma/client'
 type CustomerReference = {
   code: string
   id: bigint
+  market_scope: string | null
   name: string
 }
 
@@ -16,7 +17,7 @@ export async function findActiveCustomerReferenceByCodeOrId(
   const internalId = parseInternalBigIntId(normalized)
 
   const customer = await prisma.customers.findFirst({
-    select: { code: true, id: true, name: true },
+    select: { code: true, id: true, market_scope: true, name: true },
     where: {
       active: true,
       OR: [
@@ -31,6 +32,7 @@ export async function findActiveCustomerReferenceByCodeOrId(
   return {
     code: requireBusinessCode(customer.code, `ลูกค้า ${customer.id}`),
     id: customer.id as bigint,
+    market_scope: customer.market_scope,
     name: customer.name,
   }
 }

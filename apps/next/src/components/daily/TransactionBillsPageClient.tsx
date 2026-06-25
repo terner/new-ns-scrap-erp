@@ -571,6 +571,7 @@ const initialSalesForm = (): SalesBillFormValues => ({
   customerId: '',
   deliveryTicketId: null,
   discountTotal: 0,
+  exportOrderNo: null,
   hasVat: false,
   items: [blankSalesItem()],
   licensePlate: null,
@@ -856,6 +857,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     : salesForm.customerId
       ? `ไม่พบช่องทางขาย${selectedCustomer?.marketScope ? `สำหรับ ${selectedCustomer.marketScope}` : ''}`
       : 'เลือกลูกค้าก่อน'
+  const isExportSalesBill = selectedCustomer?.marketScope === 'ต่างประเทศ'
   const defaultPurchaseWarehouse = useCallback((branchId: string) => options.warehouses.find((warehouse) => warehouse.active !== false && warehouse.branch_id === branchId && warehouse.type?.toUpperCase() === 'RM') ?? null, [options.warehouses])
   const defaultPurchaseWarehouseId = useCallback((branchId: string) => defaultPurchaseWarehouse(branchId)?.id ?? null, [defaultPurchaseWarehouse])
   const selectedPurchaseWarehouse = form.warehouseId ? options.warehouses.find((warehouse) => warehouse.id === form.warehouseId) ?? null : null
@@ -1833,11 +1835,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
             next.customerId = ''
             next.customerAdvanceId = null
             next.channelId = ''
+            next.exportOrderNo = null
           }
         }
         if (key === 'customerId') {
           next.customerAdvanceId = null
           next.channelId = defaultSalesChannelForCustomer(typeof value === 'string' ? value : '') ?? ''
+          next.exportOrderNo = null
         }
         if (key === 'transactionMode' && value === 'STOCK') {
           next.items = [blankSalesItem()]
@@ -2224,6 +2228,13 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       setSalesFieldErrors(nextFieldErrors)
       setError(parsed.error.issues[0]?.message ?? 'กรุณาตรวจสอบข้อมูลในฟอร์ม')
       focusFieldError(firstErrorKeyFromZodIssues(parsed.error.issues))
+      return
+    }
+
+    if (isExportSalesBill && !parsed.data.exportOrderNo?.trim()) {
+      setSalesFieldErrors((current) => ({ ...current, exportOrderNo: 'กรอกเลขที่ order ส่งออก' }))
+      setError('กรอกเลขที่ order ส่งออกสำหรับบิลขายต่างประเทศ')
+      focusFieldError('exportOrderNo')
       return
     }
 
@@ -3255,7 +3266,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 
               <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
                 <h4 className="mb-3 flex items-center gap-2 font-bold text-slate-700"><StepBadge tone="blue">2</StepBadge>ข้อมูลบิล</h4>
-                <div className="grid gap-3 md:grid-cols-4">
+                <div className={`grid gap-3 ${isExportSalesBill ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
                   <BranchSelectCombobox branches={activeBranches} disabled={stockDeliveryLocked} error={salesFieldErrors.branchId} errorKey="branchId" inputId="sales-bill-branch-search" label="สาขา/คลัง *" placeholder="เลือกสาขา/คลัง" value={salesForm.branchId} onChange={(branchId) => updateSalesForm('branchId', branchId ?? '')} />
                   <CustomerSearchCombobox className="md:col-span-2" disabled={customerLockedByDelivery || !salesForm.branchId} error={salesFieldErrors.customerId} errorKey="customerId" options={activeCustomers} placeholder={salesForm.branchId ? 'ค้นหารหัสหรือชื่อลูกค้า' : 'เลือกสาขา/คลังก่อน'} value={salesForm.customerId} onChange={(value) => updateSalesForm('customerId', value)} />
                   <Field className="block" error={salesFieldErrors.channelId} label="ช่องทางขาย *">
@@ -3266,6 +3277,15 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       value={selectedSalesChannelLabel}
                     />
                   </Field>
+                  {isExportSalesBill ? (
+                    <InputField
+                      error={salesFieldErrors.exportOrderNo}
+                      errorKey="exportOrderNo"
+                      label="เลขที่ order ส่งออก *"
+                      value={salesForm.exportOrderNo ?? ''}
+                      onChange={(value) => updateSalesForm('exportOrderNo', value || null)}
+                    />
+                  ) : null}
                 </div>
                 {salesForm.transactionMode === 'TRADING' ? (
                   <div className="mt-3 max-w-sm">
@@ -4209,6 +4229,7 @@ function SalesBillDetailModal({
                 <DetailItem className="col-span-2 sm:col-span-3" label="ลูกค้า" value={`${detail.customerCode ? `[${detail.customerCode}] ` : ''}${detail.customerName}`} />
                 <DetailItem label="สาขา/คลัง" value={[detail.branchName, detail.warehouseName].filter((value) => value && value !== '-').join(' / ') || '-'} />
                 <DetailItem label="ช่องทางขาย" value={detail.channelName || '-'} />
+                {detail.exportOrderNo ? <DetailItem label="เลขที่ order ส่งออก" value={detail.exportOrderNo} /> : null}
                 <DetailItem label="ประเภทบิล" value={detail.transactionMode || '-'} />
                 <DetailItem label="ผู้ขาย" value={detail.salesName || '-'} />
                 <DetailItem label="ผู้ทำรายการ" value={detail.createdBy || '-'} />

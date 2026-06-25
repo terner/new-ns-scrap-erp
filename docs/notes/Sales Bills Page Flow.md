@@ -169,6 +169,7 @@ PO Sell
 | สาขา/คลัง | ใช่ | Required; ใช้กรอง `WTO`, `PO Sell`, Customer advance และหัวกระดาษ |
 | Customer | ใช่ | ใช้ search dropdown; ค้นหาได้จากรหัส/ชื่อลูกค้า และใช้กรอง `WTO`, `PO Sell`, Customer advance และ AR |
 | ช่องทางขาย | ใช่ | ระบบ auto ตั้งจาก `Customer.marketScope` เป็น `ในประเทศ` หรือ `ต่างประเทศ` เมื่อเลือกลูกค้า และแสดงเป็น read-only ใน modal เพื่อกันเลือกช่องทางไม่ตรงกับลูกค้า |
+| เลขที่ order ส่งออก | เฉพาะต่างประเทศ | แสดงหลัง `ช่องทางขาย` เฉพาะเมื่อ Customer เป็น `ต่างประเทศ`; ต้องกรอกก่อนบันทึก และบันทึกลง `sales_bills.export_order_no`; บิลในประเทศห้ามส่งค่านี้ |
 | เครดิตเทอม | ไม่ | ดึงจาก Customer ได้ แต่ snapshot ลงบิล |
 | หมายเหตุ | ไม่ | ข้อมูลประกอบเอกสาร |
 
@@ -328,6 +329,7 @@ Design/API รายละเอียดอยู่ที่ [[Stock Ledger DB
 - [x] ไม่แสดง `ทะเบียนรถ` ใน create/edit/detail/print `SB`
 - [x] ไม่แสดงเลข `WTO` ซ้ำในรายการสินค้า เพราะแสดงใน source summary/document info แล้ว
 - [x] ช่องทางขายเป็น required read-only field ภายใน modal โดย auto จาก Customer market scope
+- [x] เพิ่ม `เลขที่ order ส่งออก` สำหรับบิลขาย Customer ต่างประเทศ และไม่ reuse `ref_no`
 - [x] รายการ `STOCK` ไม่แสดง `+ เพิ่มรายการ` หรือปุ่มลบสินค้า manual
 
 #### Batch SB-2: Item Allocation UX

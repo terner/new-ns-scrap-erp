@@ -98,6 +98,7 @@ function billJson(row: SalesBillRow, activeReceiptCount = 0, lineCount?: number)
     customerName: row.customers?.name ?? '-',
     date: toDateOnly(row.date),
     docNo: row.doc_no,
+    exportOrderNo: row.export_order_no ?? '',
     grossProfit: toNumber(row.gross_profit),
     id: row.doc_no,
     itemCount: lineCount ?? (Array.isArray(row.items) ? row.items.length : 0),
@@ -1130,6 +1131,7 @@ function buildWorkbook(summaryRows: any[], lineRows: SalesBillLineFactRow[]) {
     'คลัง': row.warehouseName,
     'สาขา': row.branchName,
     'ช่องทางขาย': row.channelName,
+    'เลขที่ order ส่งออก': row.exportOrderNo || '-',
     'สร้างโดย': row.createdBy,
     'สร้างเมื่อ': row.createdAt,
   }))
@@ -1273,6 +1275,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: 'FORBIDDEN', error: 'ไม่มีสิทธิ์สร้างบิลขายในสาขานี้' }, { status: 403 })
     }
     if (!channel) return NextResponse.json({ code: 'BAD_REQUEST', error: 'ช่องทางขายไม่ถูกต้องหรือถูกปิดใช้งาน' }, { status: 400 })
+    const isExportCustomer = customer.market_scope === 'ต่างประเทศ'
+    const exportOrderNo = values.exportOrderNo?.trim() || null
+    if (isExportCustomer && !exportOrderNo) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: 'กรอกเลขที่ order ส่งออกสำหรับบิลขายต่างประเทศ',
+        fieldErrors: { exportOrderNo: ['กรอกเลขที่ order ส่งออก'] },
+      }, { status: 400 })
+    }
+    if (!isExportCustomer && exportOrderNo) {
+      return NextResponse.json({
+        code: 'BAD_REQUEST',
+        error: 'เลขที่ order ส่งออกใช้ได้เฉพาะบิลขายต่างประเทศ',
+        fieldErrors: { exportOrderNo: ['เลขที่ order ส่งออกใช้ได้เฉพาะบิลขายต่างประเทศ'] },
+      }, { status: 400 })
+    }
     if (
       values.transactionMode === 'TRADING'
       && values.warehouseId
@@ -1588,6 +1606,7 @@ export async function POST(request: Request) {
           discount_total: values.discountTotal,
           doc_no: docNo,
           cogs_amount: totalCost,
+          export_order_no: exportOrderNo,
           gross_profit: totals.totalAmount - totalCost,
           has_vat: values.hasVat,
           items: items as Prisma.InputJsonValue,
