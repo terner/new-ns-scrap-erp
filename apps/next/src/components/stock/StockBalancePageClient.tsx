@@ -1636,7 +1636,8 @@ function DetailTable({
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-semibold">
             {isLoading ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && rows.map((row) => (              <tr
+            {!isLoading && rows.map((row) => (
+              <tr
                 key={row.key}
                 className={`cursor-pointer transition-colors focus-visible:outline-none ${row.qty < 0 ? 'bg-red-50/30 hover:bg-red-50/60 focus-visible:bg-red-50/60' : 'hover:bg-slate-50/50 focus-visible:bg-slate-50'}`}
                 role="button"
@@ -1657,7 +1658,8 @@ function DetailTable({
                 </td>
                 <td className="p-3.5 text-slate-800 overflow-hidden truncate">{row.productMetalGroup || 'อื่นๆ'}</td>
                 <td className="p-3.5 text-center overflow-hidden truncate"><StockStatusCell row={row} /></td>
-                <td className="p-3.5 text-slate-655 overflow-hidden truncate" title={row.branchName}>                  {row.branchName}
+                <td className="p-3.5 text-slate-655 overflow-hidden truncate" title={row.branchName}>
+                  {row.branchName}
                 </td>
                 <td className={`p-3.5 text-right overflow-hidden truncate ${row.qty < 0 ? 'text-red-655' : ''}`}>{formatMoney(row.qty)}</td>
                 <td className="p-3.5 text-right border-r border-slate-105 text-slate-800 overflow-hidden truncate">{row.awaitingBillQty ? formatMoney(row.awaitingBillQty) : '-'}</td>
@@ -1667,7 +1669,8 @@ function DetailTable({
                 <td className="p-3.5 text-right text-emerald-700 font-mono overflow-hidden truncate">{formatMoney(row.value)}</td>
               </tr>
             ))}
-            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>ไม่มีสต๊อก</td></tr> : null}          </tbody>
+            {!isLoading && rows.length === 0 ? <tr><td className="p-8 text-center text-slate-400" colSpan={10}>ไม่มีสต๊อก</td></tr> : null}
+          </tbody>
           {rows.length ? (
             <tfoot className="bg-slate-50 border-t border-slate-200/80 font-bold text-slate-800">
               <tr>
@@ -1677,7 +1680,8 @@ function DetailTable({
                 <td className="p-3.5 text-right text-amber-700 bg-amber-50/10 border-r border-slate-100 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.onHoldQty, 0))}</td>
                 <td className="p-3.5 text-right text-emerald-700 bg-emerald-50/10 border-r border-slate-100 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.readyQty, 0))}</td>
                 <td className="overflow-hidden truncate" />
-                <td className="p-3.5 text-right text-emerald-700 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td>              </tr>
+                <td className="p-3.5 text-right text-emerald-700 font-mono overflow-hidden truncate">{formatMoney(rows.reduce((sum, row) => sum + row.value, 0))}</td>
+              </tr>
             </tfoot>
           ) : null}
         </table>
