@@ -44,15 +44,15 @@ const configs: Record<string, { apiPath: string; columns: Column[]; metrics: Arr
     apiPath: '/api/production/report',
     title: 'รายงานการผลิต / Yield',
     exportable: true,
-    metrics: [{ key: 'count', label: 'ใบสั่งผลิต' }, { key: 'inputQty', label: 'วัตถุดิบรวม', type: 'number' }, { key: 'outputQty', label: 'ผลผลิตรวม', type: 'number' }, { key: 'lossQty', label: 'Loss รวม', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'costPerKg', label: 'ต้นทุน/กก.', type: 'money' }],
-    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'productionType', label: 'ประเภทเครื่องจักร' }, { key: 'inputProducts', label: 'สินค้าที่เบิกผลิต' }, { key: 'machineName', label: 'เครื่องจักร' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }],
+    metrics: [{ key: 'count', label: 'ใบสั่งผลิต' }, { key: 'inputQty', label: 'วัตถุดิบรวม', type: 'number' }, { key: 'outputQty', label: 'ผลผลิตรวม', type: 'number' }, { key: 'lossQty', label: 'Loss รวม', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'costPerKg', label: 'ต้นทุนผลผลิต ฿/กก.', type: 'money' }],
+    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'productionType', label: 'ประเภทเครื่องจักร' }, { key: 'inputProducts', label: 'สินค้าที่เบิกผลิต' }, { key: 'machineName', label: 'เครื่องจักร' }, { key: 'inputQty', label: 'Input', type: 'number' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'wipQty', label: 'WIP', type: 'number' }, { key: 'lossQty', label: 'Loss', type: 'number' }, { key: 'yieldPct', label: 'Yield', type: 'percent' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: 'ต้นทุนผลผลิต ฿/กก.', type: 'money' }],
   },
   cost: {
     apiPath: '/api/production/production-cost-report',
     title: 'Production Cost Report',
     exportable: true,
-    metrics: [{ key: 'inputCost', label: 'RM Cost', type: 'money' }, { key: 'processCost', label: 'Process Cost', type: 'money' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: 'ต้นทุน/กก.', type: 'money' }],
-    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'inputCost', label: 'RM', type: 'money' }, { key: 'processCost', label: 'Process', type: 'money' }, { key: 'totalCost', label: 'Total', type: 'money' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'costPerKg', label: '฿/กก.', type: 'money' }, { key: 'productionType', label: 'Method' }],
+    metrics: [{ key: 'inputCost', label: 'RM Cost', type: 'money' }, { key: 'processCost', label: 'Process Cost', type: 'money' }, { key: 'totalCost', label: 'Total Cost', type: 'money' }, { key: 'costPerKg', label: 'ต้นทุนผลผลิต ฿/กก.', type: 'money' }],
+    columns: [{ key: 'docNo', label: 'เลขที่' }, { key: 'date', label: 'วันที่', type: 'date' }, { key: 'inputCost', label: 'RM', type: 'money' }, { key: 'processCost', label: 'Process', type: 'money' }, { key: 'totalCost', label: 'Total', type: 'money' }, { key: 'outputQty', label: 'Output', type: 'number' }, { key: 'costPerKg', label: 'ต้นทุนผลผลิต ฿/กก.', type: 'money' }, { key: 'productionType', label: 'Method' }],
   },
   yieldLoss: {
     apiPath: '/api/production/yield-loss-report',
@@ -292,7 +292,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
     }
 
     function exportCostCsv() {
-      const header = ['เลขที่', 'วันที่', 'RM', 'Labor', 'Electricity', 'Machine', 'Fuel', 'Maintenance', 'Other Proc', 'Total Cost', 'Output (kg)', '฿/กก.', 'Method']
+      const header = ['เลขที่', 'วันที่', 'RM', 'Labor', 'Electricity', 'Machine', 'Fuel', 'Maintenance', 'Other Proc', 'Total Cost', 'Output (kg)', 'ต้นทุนผลผลิต ฿/กก.', 'Method']
       const body = costRows.map((row) => {
         const costs = costBreakdown(row)
         return [
@@ -360,7 +360,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
         <div className="overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm hidden lg:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
+              <thead className="bg-slate-50 border-b border-slate-100"><tr><th className="p-2 text-left">เลขที่</th><th className="p-2 text-left">วันที่</th><th className="p-2 text-right">RM</th><th className="p-2 text-right">Labor</th><th className="p-2 text-right">Electricity</th><th className="p-2 text-right">Machine</th><th className="p-2 text-right">Fuel</th><th className="p-2 text-right">Maintenance</th><th className="p-2 text-right">Other Proc</th><th className="p-2 text-right">Total Cost</th><th className="p-2 text-right">Output (kg)</th><th className="p-2 text-right">ต้นทุนผลผลิต ฿/กก.</th><th className="p-2 text-left">Method</th></tr></thead>
               <tbody>
                 {isLoading ? <tr><td className="py-6 text-center text-slate-500" colSpan={13}>กำลังโหลดข้อมูล</td></tr> : null}
                 {!isLoading && costRows.map((row, index) => {
@@ -605,7 +605,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                     <th className="p-2 text-right text-xs font-semibold text-slate-500">รอบ</th>
                     <th className="p-2 text-right text-xs font-semibold text-slate-500">น้ำหนัก</th>
                     <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุนรวม</th>
-                    <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุน/กก.</th>
+                    <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุนผลผลิต ฿/กก.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -912,7 +912,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                     <th className="p-2 text-right text-xs font-semibold text-slate-500">รอบ</th>
                     <th className="p-2 text-right text-xs font-semibold text-slate-500">น้ำหนักรวม</th>
                     <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุนรวม</th>
-                    <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุน/กก.</th>
+                    <th className="p-2 text-right text-xs font-semibold text-slate-500">ต้นทุนผลผลิต ฿/กก.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -950,7 +950,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
                       <span className="text-sm font-bold text-slate-800">{formatMoney(item.cost)} ฿</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="text-slate-500 font-semibold">ต้นทุน/กก.</span>
+                      <span className="text-slate-500 font-semibold">ต้นทุนผลผลิต ฿/กก.</span>
                       <span className="text-base font-bold text-slate-900">{formatMoney(item.unitCost)} ฿/กก.</span>
                     </div>
                   </div>
