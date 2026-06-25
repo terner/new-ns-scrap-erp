@@ -238,11 +238,11 @@ export function branchScopeIds(context: AppAuthContext) {
 }
 
 export function enteredByLabel(context: AppAuthContext) {
-  return context.appUser?.displayName
-    ?? context.appUser?.username
-    ?? context.appUser?.email
-    ?? context.authUser.email
-    ?? context.authUser.id
+  // NSERP-85: show only the system Display Name for the weighing staff on
+  // weight tickets / receipts. If display_name is missing it shows '-'
+  // rather than leaking username/email, so the underlying user record is the
+  // single source of truth for the staff's name.
+  return context.appUser?.displayName ?? '-'
 }
 
 export function defaultTicketStatus(type: WeightTicketType): WeightTicketStatus {
