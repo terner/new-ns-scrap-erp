@@ -302,6 +302,12 @@ export function PaymentApprovalPageClient() {
 
   const purchaseApprovalRows = useMemo(() => data.apRows.filter((row) => row.sourceType === 'purchase_bill'), [data.apRows])
   const advanceApprovalRows = useMemo(() => data.apRows.filter((row) => row.sourceType === 'advance_payment'), [data.apRows])
+  const pendingTabCounts = useMemo(() => ({
+    advance: advanceApprovalRows.filter((row) => row.approvalStatus === 'pending').length,
+    ap: purchaseApprovalRows.filter((row) => row.approvalStatus === 'pending').length,
+    expense: data.expenseRows.filter((row) => row.approvalStatus === 'pending').length,
+    pettyReturn: data.pettyReturnRows.filter((row) => row.approvalStatus === 'pending').length,
+  }), [advanceApprovalRows, data.expenseRows, data.pettyReturnRows, purchaseApprovalRows])
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -686,16 +692,16 @@ export function PaymentApprovalPageClient() {
       <div className="overflow-hidden rounded-md bg-white shadow">
         <div className="flex border-b border-slate-100">
           <button className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'ap' ? 'border-red-600 text-red-700' : 'border-transparent text-slate-500'}`} type="button" onClick={() => setTab('ap')}>
-            ต้นทุน / Supplier <span className="ml-2 rounded-md-full bg-red-100 px-2 py-0.5 text-xs text-red-700">{purchaseApprovalRows.length}</span>
+            ต้นทุน / Supplier <span className="ml-2 rounded-md-full bg-red-100 px-2 py-0.5 text-xs text-red-700">{pendingTabCounts.ap}</span>
           </button>
           <button className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'advance' ? 'border-amber-600 text-amber-700' : 'border-transparent text-slate-500'}`} type="button" onClick={() => setTab('advance')}>
-            จ่ายเงินล่วงหน้า / มัดจำ <span className="ml-2 rounded-md-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">{advanceApprovalRows.length}</span>
+            จ่ายเงินล่วงหน้า / มัดจำ <span className="ml-2 rounded-md-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">{pendingTabCounts.advance}</span>
           </button>
           <button className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'expense' ? 'border-purple-600 text-purple-700' : 'border-transparent text-slate-500'}`} type="button" onClick={() => setTab('expense')}>
-            ค่าใช้จ่าย <span className="ml-2 rounded-md-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">{data.expenseRows.length}</span>
+            ค่าใช้จ่าย <span className="ml-2 rounded-md-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">{pendingTabCounts.expense}</span>
           </button>
           <button className={`border-b-2 px-5 py-3 text-sm font-medium ${tab === 'pettyReturn' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500'}`} type="button" onClick={() => setTab('pettyReturn')}>
-            การคืนเงินสำรองจ่าย / คืนเงินกู้กรรมการ <span className="ml-2 rounded-md-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{data.pettyReturnRows.length}</span>
+            การคืนเงินสำรองจ่าย / คืนเงินกู้กรรมการ <span className="ml-2 rounded-md-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{pendingTabCounts.pettyReturn}</span>
           </button>
         </div>
 
