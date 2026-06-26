@@ -437,6 +437,9 @@ export async function generateWeightTicketPdf(
   let browsersPath = join(process.cwd(), '.playwright-browsers')
   if (!existsSync(browsersPath)) {
     browsersPath = join(process.cwd(), '..', '.playwright-browsers')
+    if (!existsSync(browsersPath)) {
+      browsersPath = join(process.cwd(), '..', '..', '.playwright-browsers')
+    }
   }
   process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath
 
