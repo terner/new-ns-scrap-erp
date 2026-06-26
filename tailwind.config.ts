@@ -14,7 +14,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Sarabun"', 'sans-serif'],
+        sans: ['"Noto Sans Thai"', 'sans-serif'],
       },
       boxShadow: {
         panel: '0 1px 3px rgba(15, 23, 42, 0.10)',

@@ -1108,7 +1108,7 @@ export function LineSettingsPageClient() {
                     <span className="text-base leading-none mt-0.5">✅</span>
                     <div>
                       <div className="text-sm font-bold text-slate-800">PDF Generator & Fonts Status</div>
-                      <p className="text-xs text-slate-550 mt-0.5">ฟอนต์ Sarabun และ NotoSansThai พร้อมใช้งานในโหมด PDF Rendering</p>
+                      <p className="text-xs text-slate-550 mt-0.5">ฟอนต์ NotoSansThai พร้อมใช้งานในโหมด PDF Rendering</p>
                     </div>
                   </div>
 

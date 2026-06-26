@@ -470,12 +470,12 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <title>${escapeHtml(docTitle)} ${escapeHtml(ticket.documentNo)}</title>
     <style>
       @page { size: A4 portrait; margin: 10mm; }
       * { box-sizing: border-box; }
-      body { margin: 0; color: #0f172a; font-family: 'Sarabun', Arial, sans-serif; font-size: 11px; line-height: 1.35; background: #f8fafc; }
+      body { margin: 0; color: #0f172a; font-family: 'Noto Sans Thai', Arial, sans-serif; font-size: 11px; line-height: 1.35; background: #f8fafc; }
       .toolbar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: #0f172a; color: white; }
       .toolbar button { border: 0; border-radius: 6px; padding: 7px 14px; background: #15803d; color: white; font: inherit; cursor: pointer; }
       .toolbar button.secondary { background: #475569; }
@@ -485,53 +485,53 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
       .header { display: grid; grid-template-columns: 1fr .9fr; gap: 12px; align-items: start; border-bottom: 1px solid #cbd5e1; padding-bottom: 12px; flex: 0 0 auto; }
       .company { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: start; min-width: 0; }
       .logo, .logo-placeholder { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; }
-      .logo-placeholder { display: flex; align-items: center; justify-content: center; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 9px; font-weight: 800; text-align: center; }
-      .company-name { font-size: 16px; font-weight: 800; color: #0f172a; }
+      .logo-placeholder { display: flex; align-items: center; justify-content: center; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 9px; font-weight: 700; text-align: center; }
+      .company-name { font-size: 16px; font-weight: 700; color: #0f172a; }
       .company-en { font-size: 10px; font-weight: 700; color: #475569; margin-top: 1px; }
       .company-info { margin-top: 4px; color: #475569; font-size: 10px; }
       .doc-head { text-align: right; }
-      .doc-title { font-size: 22px; font-weight: 900; color: #14532d; letter-spacing: 0; }
+      .doc-title { font-size: 22px; font-weight: 700; color: #14532d; letter-spacing: 0; }
       .doc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; text-align: left; }
       .kv { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 7px; background: #f8fafc; }
       .kv .label, .field-label, .summary-card .label { color: #475569; font-size: 9.5px; font-weight: 500; }
-      .kv .value, .field-value { font-size: 12.5px; font-weight: 700; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
-      .field-value.strong { font-size: 15.5px; color: #059669; font-weight: 800; }
+      .kv .value, .field-value { font-size: 12.5px; font-weight: 600; color: #0f172a; margin-top: 1px; overflow-wrap: anywhere; }
+      .field-value.strong { font-size: 15.5px; color: #059669; font-weight: 700; }
       .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; flex: 0 0 auto; }
       .panel { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
-      .panel-title { padding: 6px 9px; background: #f1f5f9; color: #334155; font-weight: 900; }
+      .panel-title { padding: 6px 9px; background: #f1f5f9; color: #334155; font-weight: 700; }
       .panel-body { padding: 8px 9px; }
       .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; }
       table { width: 100%; border-collapse: collapse; }
       .items { margin-top: 12px; font-size: 11.5px; table-layout: fixed; flex: 0 0 auto; }
-      .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 900; }
+      .items th { background: #e2e8f0; border: 1px solid #cbd5e1; color: #1e293b; padding: 6px 5px; text-align: left; font-weight: 700; }
       .items td { border: 1px solid #dbe3ea; padding: 6px 5px; vertical-align: top; }
       .items .empty td { height: 24px; color: transparent; }
       .items .product-heading td { background: #f1f5f9; }
       .items .lot-row td { background: #ffffff; }
       .items .source-row td { background: #f8fafc; }
       .items .purchase-row td { background: #eff6ff; }
-      .items .product-total td { background: #ecfdf5; font-weight: 900; }
-      .item-name { font-weight: 850; color: #0f172a; }
+      .items .product-total td { background: #ecfdf5; font-weight: 700; }
+      .item-name { font-weight: 700; color: #0f172a; }
       .muted { color: #64748b; font-size: 9px; margin-top: 1px; }
       .detail-line { margin-top: 1px; overflow-wrap: anywhere; }
       .source-row .detail-line:first-child,
-      .purchase-row .detail-line:first-child { color: #334155; font-weight: 800; }
+      .purchase-row .detail-line:first-child { color: #334155; font-weight: 700; }
       .rank-cell { padding-left: 2px !important; padding-right: 2px !important; }
-      .final-weight { color: #059669; font-size: 13.5px; font-weight: 900; }
+      .final-weight { color: #059669; font-size: 13.5px; font-weight: 700; }
       .r { text-align: right; }
       .c { text-align: center; }
-      .strong { font-weight: 900; }
+      .strong { font-weight: 700; }
       .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; align-items: start; break-inside: avoid; page-break-inside: avoid; }
       .note { min-height: 42px; color: #334155; white-space: pre-wrap; }
       .summary-cards { display: grid; gap: 8px; }
       .summary-card { border: 1px solid #dbe3ea; border-radius: 8px; padding: 7px; background: #f8fafc; }
-      .summary-card .value { font-size: 12px; font-weight: 900; color: #0f172a; margin-top: 2px; }
+      .summary-card .value { font-size: 12px; font-weight: 700; color: #0f172a; margin-top: 2px; }
       .photos { margin-top: 12px; break-inside: avoid; page-break-inside: avoid; }
       .photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px; border: 1px solid #cbd5e1; border-top: 0; border-radius: 0 0 8px 8px; }
       .signatures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 16px; break-inside: avoid; page-break-inside: avoid; }
       .sig { text-align: center; color: #475569; }
-      .sig-line { border-top: 1px solid #94a3b8; padding-top: 5px; margin-top: 24px; font-weight: 800; color: #1e293b; }
-      .continued { margin-top: auto; padding-top: 12px; text-align: right; color: #64748b; font-weight: 800; }
+      .sig-line { border-top: 1px solid #94a3b8; padding-top: 5px; margin-top: 24px; font-weight: 700; color: #1e293b; }
+      .continued { margin-top: auto; padding-top: 12px; text-align: right; color: #64748b; font-weight: 700; }
       .footer { margin-top: auto; padding-top: 8px; display: flex; justify-content: space-between; gap: 12px; border-top: 1px dashed #cbd5e1; color: #64748b; font-size: 9px; flex: 0 0 auto; }
       @media print {
         @page { size: A4 portrait; margin: 8mm; }
@@ -581,7 +581,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
 
 function writeLoading(printWindow: Window, ticket: WeightTicketRecord) {
   printWindow.document.open()
-  printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>กำลังเตรียมใบพิมพ์</title></head><body style="font-family:'Sarabun',Arial,sans-serif;margin:32px;color:#0f172a">กำลังเตรียมใบพิมพ์${ticket.type === 'WTI' ? 'ใบรับสินค้า' : 'ใบส่งของ'}...</body></html>`)
+  printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>กำลังเตรียมใบพิมพ์</title></head><body style="font-family:'Noto Sans Thai',Arial,sans-serif;margin:32px;color:#0f172a">กำลังเตรียมใบพิมพ์${ticket.type === 'WTI' ? 'ใบรับสินค้า' : 'ใบส่งของ'}...</body></html>`)
   printWindow.document.close()
 }
 
