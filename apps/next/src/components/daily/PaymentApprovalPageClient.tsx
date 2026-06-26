@@ -118,6 +118,7 @@ const approvalFilterOptions: Array<{ label: string; values: ApprovalStatus[] }> 
   { label: 'อนุมัติแล้ว', values: ['approved'] },
   { label: 'ยกเลิกแล้ว', values: ['voided'] },
 ]
+const defaultApprovalStatusFilter: ApprovalStatus[] = ['pending']
 
 function formatDecimalWithGrouping(value: number) {
   return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -260,7 +261,7 @@ export function PaymentApprovalPageClient() {
   const [inputDrafts, setInputDrafts] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmittingApproval, setIsSubmittingApproval] = useState(false)
-  const [approvalStatusFilter, setApprovalStatusFilter] = useState<ApprovalStatus[]>([])
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<ApprovalStatus[]>(defaultApprovalStatusFilter)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -410,13 +411,16 @@ export function PaymentApprovalPageClient() {
   const currentExpenseDetailRow = detail?.tab === 'expense' || detail?.tab === 'pettyReturn' ? detail.row : null
   const currentSplitRow = detail?.row.approvalStatus === 'pending' ? detail.row : null
   const splitDiff = currentSplitRow ? approvalBalanceForRow(currentSplitRow) - splitTotal : 0
+  const isDefaultApprovalStatusFilter = approvalStatusFilter.length === defaultApprovalStatusFilter.length
+    && defaultApprovalStatusFilter.every((status) => approvalStatusFilter.includes(status))
+  const hasCustomFilters = Boolean(search || dateFrom || dateTo || !isDefaultApprovalStatusFilter || sortKey !== 'date' || sortDirection !== 'desc')
 
   useEffect(() => {
     setPage(1)
   }, [approvalStatusFilter, dateFrom, dateTo, pageSize, search, sortDirection, sortKey, tab])
 
   function clearFilters() {
-    setApprovalStatusFilter([])
+    setApprovalStatusFilter(defaultApprovalStatusFilter)
     setDateFrom('')
     setDateTo('')
     setSearch('')
@@ -703,7 +707,7 @@ export function PaymentApprovalPageClient() {
             <DatePickerInput id="payment-approval-date-from" value={dateFrom} onChange={setDateFrom} />
             <span className="text-slate-400">→</span>
             <DatePickerInput id="payment-approval-date-to" value={dateTo} onChange={setDateTo} />
-            {(search || dateFrom || dateTo || approvalStatusFilter.length > 0 || sortKey !== 'date' || sortDirection !== 'desc') ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
+            {hasCustomFilters ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">สถานะ:</span>
@@ -734,7 +738,7 @@ export function PaymentApprovalPageClient() {
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
               onClick={() => setShowMobileFilters(true)}
             >
-              ตัวกรอง {search || dateFrom || dateTo || approvalStatusFilter.length > 0 ? '(มี)' : ''}
+              ตัวกรอง {hasCustomFilters ? '(มี)' : ''}
             </button>
           </div>
         </div>
