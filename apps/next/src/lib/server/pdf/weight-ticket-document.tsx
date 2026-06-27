@@ -96,11 +96,11 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 12,
   },
-  companyBlock: { flexDirection: 'row', flex: 1.25 },
-  logo: { width: 50, height: 50, marginRight: 10, objectFit: 'contain' },
+  companyBlock: { flexDirection: 'row', flex: 1.3 },
+  logo: { width: 56, height: 56, marginRight: 10, objectFit: 'contain' },
   logoPlaceholder: {
-    width: 50,
-    height: 50,
+    width: 56,
+    height: 56,
     marginRight: 10,
     borderWidth: 1,
     borderStyle: 'dashed',
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   companyName: { fontSize: 13, fontWeight: 700, color: TEXT_DARK },
   companyEn: { fontSize: 8.5, fontWeight: 700, color: TEXT_SECONDARY, marginTop: 1 },
   companyInfo: { fontSize: 7.5, color: TEXT_SECONDARY, marginTop: 2.5 },
-  docHead: { flex: 0.75, alignItems: 'flex-end' },
+  docHead: { flex: 0.7, alignItems: 'flex-end' },
   docTitle: { fontSize: 14, fontWeight: 700, color: DOC_TITLE_GREEN },
 
   // Section grid (party + doc info)
