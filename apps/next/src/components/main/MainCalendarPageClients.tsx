@@ -131,7 +131,7 @@ export function CashFlowCalendarPageClient() {
         <Metric label="Net Cash Flow" value={money((summary.totalIn ?? 0) - (summary.totalOut ?? 0))} tone={(summary.totalIn ?? 0) >= (summary.totalOut ?? 0) ? 'blue' : 'red'} />
         <Metric label="ยอดปลายเดือน" value={money(summary.endingCash)} tone="gradient" />
       </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(380px,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel title="📈 เงินเข้า-ออกรายวัน">
           <DailyCashInOutChart days={data?.days ?? []} />
         </Panel>
@@ -152,8 +152,8 @@ export function CashFlowCalendarPageClient() {
 
 function RunningBalanceLineChart({ days, maxBalance, minBalance }: { days: CashDay[]; maxBalance: number; minBalance: number }) {
   const width = 640
-  const height = 220
-  const padding = { bottom: 34, left: 58, right: 18, top: 18 }
+  const height = 240
+  const padding = { bottom: 34, left: 74, right: 18, top: 20 }
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
   const range = Math.max(1, maxBalance - minBalance)
@@ -179,35 +179,35 @@ function RunningBalanceLineChart({ days, maxBalance, minBalance }: { days: CashD
         <div className="font-medium text-slate-500">เส้นประ = ระดับ 0 บาท</div>
       </div>
       <div className="rounded-md bg-white p-2">
-        <svg aria-label="กราฟเส้นยอดเงินสะสม" className="h-64 w-full overflow-visible" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
-          <rect fill="#f8fafc" height={chartHeight} rx="8" width={chartWidth} x={padding.left} y={padding.top} />
-          {ticks.map((tick, index) => (
-            <g key={`${tick}-${index}`}>
-              <line stroke="#e2e8f0" x1={padding.left} x2={padding.left + chartWidth} y1={yFor(tick)} y2={yFor(tick)} />
-              <text fill="#64748b" fontSize="11" textAnchor="end" x={padding.left - 10} y={yFor(tick) + 4}>
-                {compactMoney(tick)}
-              </text>
-            </g>
-          ))}
-          <line stroke="#94a3b8" strokeDasharray="5 5" x1={padding.left} x2={padding.left + chartWidth} y1={zeroY} y2={zeroY} />
-          <text fill="#64748b" fontSize="11" x={padding.left + chartWidth - 56} y={zeroY - 6}>0 บาท</text>
-          <path d={linePath} fill="none" stroke="#2563eb" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-          {points.map(({ day, x, y }, index) => (
-            <g key={day.date}>
-              <circle cx={x} cy={y} fill={day.ending < 0 ? '#ef4444' : '#2563eb'} r="4">
-                <title>{`${dateLabel(day.date)} ยอดสะสม ${money(day.ending)}`}</title>
-              </circle>
-              {(days.length <= 8 || index % labelEvery === 0) ? (
-                <text fill="#475569" fontSize="11" textAnchor="middle" x={x} y={height - 10}>
-                  {dateLabel(day.date)}
+        <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-2">
+          <div className="flex h-72 items-center justify-center text-xs font-bold text-slate-700 [writing-mode:vertical-rl] rotate-180">บาท</div>
+          <svg aria-label="กราฟเส้นยอดเงินสะสม" className="h-72 w-full overflow-visible" preserveAspectRatio="none" role="img" viewBox={`0 0 ${width} ${height}`}>
+            <rect fill="#f8fafc" height={chartHeight} rx="8" width={chartWidth} x={padding.left} y={padding.top} />
+            {ticks.map((tick, index) => (
+              <g key={`${tick}-${index}`}>
+                <line stroke="#e2e8f0" x1={padding.left} x2={padding.left + chartWidth} y1={yFor(tick)} y2={yFor(tick)} />
+                <text fill="#64748b" fontSize="11" textAnchor="end" x={padding.left - 10} y={yFor(tick) + 4}>
+                  {compactMoney(tick)}
                 </text>
-              ) : null}
-            </g>
-          ))}
-          <text fill="#334155" fontSize="11" fontWeight="700" textAnchor="middle" transform={`rotate(-90 16 ${height / 2})`} x="16" y={height / 2}>
-            บาท
-          </text>
-        </svg>
+              </g>
+            ))}
+            <line stroke="#94a3b8" strokeDasharray="5 5" x1={padding.left} x2={padding.left + chartWidth} y1={zeroY} y2={zeroY} />
+            <text fill="#64748b" fontSize="11" textAnchor="end" x={padding.left + chartWidth - 8} y={zeroY - 6}>0 บาท</text>
+            <path d={linePath} fill="none" stroke="#2563eb" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+            {points.map(({ day, x, y }, index) => (
+              <g key={day.date}>
+                <circle cx={x} cy={y} fill={day.ending < 0 ? '#ef4444' : '#2563eb'} r="4">
+                  <title>{`${dateLabel(day.date)} ยอดสะสม ${money(day.ending)}`}</title>
+                </circle>
+                {(days.length <= 8 || index % labelEvery === 0) ? (
+                  <text fill="#475569" fontSize="11" textAnchor="middle" x={x} y={height - 10}>
+                    {dateLabel(day.date)}
+                  </text>
+                ) : null}
+              </g>
+            ))}
+          </svg>
+        </div>
       </div>
     </div>
   )
@@ -234,7 +234,8 @@ function DailyCashInOutChart({ days }: { days: CashDay[] }) {
         <div className="text-xs font-medium text-slate-500">แสดงเฉพาะวันที่มีเงินเข้า/เงินออก</div>
       </div>
       <div className="rounded-md bg-white p-2">
-        <div className="grid grid-cols-[80px_minmax(0,1fr)] gap-2">
+        <div className="grid grid-cols-[28px_72px_minmax(0,1fr)] gap-2">
+          <div className="flex h-72 items-center justify-center text-xs font-bold text-slate-700 [writing-mode:vertical-rl] rotate-180">จำนวนเงิน (บาท)</div>
           <div className="relative h-72 text-[11px] font-medium text-slate-500">
             {ticks.map((tick, index) => (
               <div key={`${tick}-${index}`} className="absolute right-0 -translate-y-1/2 text-right tabular-nums" style={{ top: `${pct(axisMax - tick, axisMax)}%` }}>
