@@ -11,7 +11,10 @@ const companyProfilePayloadSchema = z.object({
 const FIRST_PAGE_ITEM_ROWS = 12
 const CONTINUATION_PAGE_ITEM_ROWS = 17
 
-type PrintWeightRow = {
+/** exported เพื่อให้ react-pdf template ใช้ค่าเดียวกันกับ HTML template */
+export { FIRST_PAGE_ITEM_ROWS, CONTINUATION_PAGE_ITEM_ROWS }
+
+export type PrintWeightRow = {
   className?: string
   containerDeductionWeight: number
   detail: string
@@ -32,7 +35,8 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, '&#39;')
 }
 
-function formatPrintableNumber(value: number) {
+/** exported เพื่อให้ react-pdf template format ตัวเลขเหมือนกัน */
+export function formatPrintableNumber(value: number) {
   return value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
@@ -149,7 +153,7 @@ function sumPrintLines(lines: WeightTicketRecord['lines']) {
   )
 }
 
-function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: boolean): PrintWeightRow[] {
+export function buildPrintWeightRows(ticket: WeightTicketRecord, isReceipt: boolean): PrintWeightRow[] {
   if (!isReceipt) {
     return ticket.lines.map((line, index) => ({
       containerDeductionWeight: line.containerDeductionWeightValue,
