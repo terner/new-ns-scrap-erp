@@ -1,17 +1,59 @@
 import { execSync } from 'child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
+const browsersPath = join(rootDir, '.playwright-browsers');
 
-process.env.PLAYWRIGHT_BROWSERS_PATH = join(rootDir, '.playwright-browsers');
+process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
+
+// ข้ามการติดตั้งซ้ำถ้ามี marker file ที่บันทึก path ตรงกับที่จะติดตั้ง
+// เหตุผล: ลดเวลา build ใน CI/Docker ที่รัน install-playwright.js หลายครั้ง
+const markerFile = join(browsersPath, '.installed');
+if (existsSync(markerFile)) {
+  try {
+    const marker = JSON.parse(readFileSync(markerFile, 'utf8'));
+    if (marker && marker.path === browsersPath) {
+      console.log('[install-playwright] Chromium already installed at:', browsersPath, '(skipped via marker)');
+      process.exit(0);
+    }
+  } catch {
+    // marker อ่านไม่ได้ → ติดตั้งใหม่
+  }
+}
+
+if (!existsSync(browsersPath)) {
+  mkdirSync(browsersPath, { recursive: true });
+}
 
 try {
-  console.log('Installing Playwright chromium browser to:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+  console.log('[install-playwright] Installing Playwright chromium browser to:', browsersPath);
   execSync('npx playwright install chromium', { stdio: 'inherit' });
 } catch (err) {
-  console.error('Failed to install playwright browser:', err);
+  console.error('[install-playwright] Failed to install playwright browser:', err);
   process.exit(1);
+}
+
+// เขียน marker file หลังติดตั้งสำเร็จ — runtime path resolver และ health endpoint ใช้ตรวจสอบได้
+try {
+  writeFileSync(
+    markerFile,
+    JSON.stringify(
+      {
+        path: browsersPath,
+        installedAt: new Date().toISOString(),
+        nodeVersion: process.version,
+        platform: `${process.platform}-${process.arch}`,
+      },
+      null,
+      2
+    ) + '\n'
+  );
+  console.log('[install-playwright] Marker file written at:', markerFile);
+} catch (err) {
+  // ไม่ fatal — แค่ไม่สามารถ skip ใน build ครั้งถัดไป
+  console.warn('[install-playwright] Could not write marker file (non-fatal):', err?.message || err);
 }

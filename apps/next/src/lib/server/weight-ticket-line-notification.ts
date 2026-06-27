@@ -77,6 +77,55 @@ function safeStorageSegment(value: string) {
   return value.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
+/**
+ * Resolve ตำแหน่ง Playwright Chromium binary ในขณะรันจริง (runtime) อย่างชัดเจน
+ *
+ * ลำดับการ resolve:
+ *   1. env `PLAYWRIGHT_BROWSERS_PATH` — ทางที่ถูกที่สุด ถ้า container ตั้งไว้ก็ใช้เลย
+ *   2. candidate paths ครอบคลุมทุก layout ที่เป็นไปได้ (workspace root, cwd และ parent levels)
+ *   3. หากไม่พบทั้งหมด → throw error พร้อมคำแนะนำ (แทนที่จะปล่อยให้ Playwright
+ *      fallback ไป default path `/root/.cache/ms-playwright/` ที่ว่างเปล่าแล้วพังเงียบ ๆ)
+ *
+ * เหตุผล: Docker multi-stage build อาจไม่ COPY `.playwright-browsers/` จาก builder
+ * stage เข้าสู่ runtime image. การ throw ที่ชัดเจนช่วยให้ debug ได้ทันทีผ่านข้อความ error
+ * และช่วยให้ทีม infra ตั้ง env var ตัวเดียวก็แก้ได้โดยไม่ต้องแก้โค้ด
+ */
+export function resolvePlaywrightBrowsersPath(): string {
+  // 1) env var ที่ container/DevOps อาจตั้งไว้
+  const envPath = process.env.PLAYWRIGHT_BROWSERS_PATH
+  if (envPath && existsSync(envPath)) {
+    return envPath
+  }
+
+  // 2) candidate paths — ครอบคลุมทุก layout ที่เป็นไปได้
+  const cwd = process.cwd()
+  const candidates = [
+    join(cwd, '.playwright-browsers'),                       // รันจาก workspace root
+    join(cwd, '..', '.playwright-browsers'),                  // รันจาก apps/next (cwd = apps/next)
+    join(cwd, '..', '..', '.playwright-browsers'),            // รันจาก apps/next/src/...
+    join(cwd, 'apps', 'next', '.playwright-browsers'),        // workspace root ที่ binary อยู่ใต้ apps/next
+    join(cwd, 'apps', '.playwright-browsers'),                // รูปแบบอื่น
+  ]
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate
+    }
+  }
+
+  // 3) หาไม่เจอ — throw พร้อมคำแนะนำที่อ่านง่าย แทนการปล่อยให้ Playwright พังเงียบ
+  const triedList = [envPath, ...candidates].filter(Boolean).map((p) => `  • ${p}`).join('\n')
+  throw new Error(
+    `ไม่พบ Playwright Chromium binary ที่ติดตั้งไว้ (PLAYWRIGHT_BROWSERS_PATH).\n` +
+    `Paths ที่ลองค้นหา:\n${triedList}\n\n` +
+    `วิธีแก้ไข (เลือกอย่างใดอย่างหนึ่ง):\n` +
+    `  1) ตั้ง env var PLAYWRIGHT_BROWSERS_PATH ใน runtime container ให้ชี้ไปยังโฟลเดอร์ที่มี Chromium binary\n` +
+    `  2) ตรวจ Dockerfile ให้มีการ COPY .playwright-browsers/ จาก builder stage เข้าสู่ runner stage\n` +
+    `  3) รัน "npx playwright install --with-deps chromium" ใน runtime image ระหว่าง build\n\n` +
+    `เช็คสถานะปัจจุบันได้ที่ endpoint /api/health (ฟิลด์ playwright)`
+  )
+}
+
 function imageFromDataUrl(value: string) {
   const match = value.match(/^data:image\/(png|jpe?g);base64,(.+)$/i)
   if (!match) return null
@@ -434,13 +483,10 @@ export async function generateWeightTicketPdf(
   }
 
   // 5. Use Playwright to launch Chromium in headless mode and render HTML to PDF
-  let browsersPath = join(process.cwd(), '.playwright-browsers')
-  if (!existsSync(browsersPath)) {
-    browsersPath = join(process.cwd(), '..', '.playwright-browsers')
-    if (!existsSync(browsersPath)) {
-      browsersPath = join(process.cwd(), '..', '..', '.playwright-browsers')
-    }
-  }
+  // Chromium binary ต้องถูกติดตั้งตอน build และ copy ข้าม Docker multi-stage เข้าสู่ runtime image.
+  // ปัญหาเดิม: path logic แบบ best-effort ปล่อยให้ Playwright fallback ไป /root/.cache/ms-playwright/
+  // ที่ว่างเปล่า → launch พังเงียบ ๆ. ตอนนี้ resolve แบบชัดเจน และ throw พร้อมคำแนะนำเมื่อหาไม่เจอ
+  const browsersPath = resolvePlaywrightBrowsersPath()
   process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath
 
   const browser = await chromium.launch({
