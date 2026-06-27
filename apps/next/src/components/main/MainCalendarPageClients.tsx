@@ -177,11 +177,13 @@ function DailyCashInOutChart({ days }: { days: CashDay[] }) {
         <div className="text-xs font-medium text-slate-500">แสดงเฉพาะวันที่มีเงินเข้า/เงินออก</div>
       </div>
       <div className="rounded-md bg-white p-2">
-        <div className="grid grid-cols-[70px_minmax(0,1fr)] gap-2">
+        <div className="grid grid-cols-[28px_72px_minmax(0,1fr)] gap-2">
+          <div className="relative h-72">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-90 whitespace-nowrap text-xs font-bold text-slate-700">แกน Y: จำนวนเงิน (บาท)</div>
+          </div>
           <div className="relative h-72 text-[11px] font-medium text-slate-500">
-            <div className="absolute left-0 top-1/2 -translate-x-7 -rotate-90 whitespace-nowrap text-xs font-bold text-slate-700">แกน Y: จำนวนเงิน (บาท)</div>
             {ticks.map((tick, index) => (
-              <div key={`${tick}-${index}`} className="absolute right-0 -translate-y-1/2 pr-2 text-right" style={{ top: `${pct(axisMax - tick, axisMax)}%` }}>
+              <div key={`${tick}-${index}`} className="absolute right-0 -translate-y-1/2 text-right tabular-nums" style={{ top: `${pct(axisMax - tick, axisMax)}%` }}>
                 {compactMoney(tick)}
               </div>
             ))}
