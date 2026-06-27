@@ -772,7 +772,8 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
         if (cancelled) return
         setOptions(payload)
         setInputForm((current) => {
-          const defaultWhCode = current.sourceWarehouseCode || payload.warehouses[0]?.code || ''
+          const defaultWarehouse = payload.warehouses.find((w) => w.name === 'RM สมุทรสาคร')
+          const defaultWhCode = current.sourceWarehouseCode || defaultWarehouse?.code || payload.warehouses[0]?.code || ''
           const selectedWh = payload.warehouses.find((w) => w.code === defaultWhCode)
           const inferredStatus = selectedWh?.type?.toUpperCase() === 'FG' ? 'FG' : 'RM'
           return {
@@ -829,22 +830,49 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
   }, [branchWipWarehouses, createForm.branchCode, createForm.wipWarehouseCode, isCreate])
 
   useEffect(() => {
-    if (!isCreate) return
-    if (!createForm.branchCode || !createForm.targetProductCode || !createForm.destinationWarehouseCode) {
-      setProductStock(null)
-      setProductStockError(null)
-      setIsStockPreviewLoading(false)
-      return
+    let activeBranchCode = ''
+    let activeProductCode = ''
+    let activeWarehouseCode = ''
+
+    if (isCreate) {
+      if (!createForm.branchCode || !createForm.targetProductCode || !createForm.destinationWarehouseCode) {
+        setProductStock(null)
+        setProductStockError(null)
+        setIsStockPreviewLoading(false)
+        return
+      }
+      activeBranchCode = createForm.branchCode
+      activeProductCode = createForm.targetProductCode
+      activeWarehouseCode = createForm.destinationWarehouseCode
+    } else {
+      if (!row) {
+        setProductStock(null)
+        setProductStockError(null)
+        setIsStockPreviewLoading(false)
+        return
+      }
+      const branch = options.branches.find((b) => b.name === row.branchName)
+      const warehouse = options.warehouses.find((w) => w.name === row.warehouseName)
+      if (!branch || !warehouse || !row.productCode) {
+        setProductStock(null)
+        setProductStockError(null)
+        setIsStockPreviewLoading(false)
+        return
+      }
+      activeBranchCode = branch.code
+      activeProductCode = row.productCode
+      activeWarehouseCode = warehouse.code
     }
+
     let cancelled = false
     async function loadProductStock() {
       setIsStockPreviewLoading(true)
       setProductStockError(null)
       try {
         const params = new URLSearchParams({
-          branchCode: createForm.branchCode,
-          productCode: createForm.targetProductCode,
-          warehouseCode: createForm.destinationWarehouseCode,
+          branchCode: activeBranchCode,
+          productCode: activeProductCode,
+          warehouseCode: activeWarehouseCode,
         })
         const payload = await dailyFetchJson<ProductStockPayload>(`/api/production/orders/product-stock?${params.toString()}`)
         if (!cancelled) setProductStock(payload)
@@ -858,7 +886,7 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
     }
     void loadProductStock()
     return () => { cancelled = true }
-  }, [createForm.branchCode, createForm.destinationWarehouseCode, createForm.targetProductCode, isCreate])
+  }, [createForm.branchCode, createForm.destinationWarehouseCode, createForm.targetProductCode, isCreate, row, options.branches, options.warehouses])
 
   async function submitCreate() {
     if (!validateCreateForm()) return
@@ -1216,6 +1244,15 @@ function ProductionOrderModal({ mode, onClose, onRefreshRow, row }: { mode: 'cre
               onReverse={(docNo) => void reverseMovement('inputs', docNo)}
               form={(
                 <div className="grid gap-3 text-sm md:grid-cols-3">
+                  <div className="md:col-span-3">
+                    <ProductStockPreview
+                      destinationWarehouseName={row?.warehouseName ?? ''}
+                      error={productStockError}
+                      isLoading={isStockPreviewLoading}
+                      isReady={true}
+                      stock={productStock}
+                    />
+                  </div>
                   <FormField label="วันที่"><DatePickerInput value={inputForm.date} onChange={(date) => setInputForm((form) => ({ ...form, date }))} /></FormField>
                   <div className="md:col-span-2">
                     <SearchCombobox inputId="production-input-product" label="สินค้า" options={productSearchOptions} placeholder="พิมพ์รหัส/ชื่อสินค้า..." value={inputForm.productCode} onChange={(productCode) => setInputForm((form) => ({ ...form, productCode }))} />

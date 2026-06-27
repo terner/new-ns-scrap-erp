@@ -155,9 +155,15 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
   const [productSearch, setProductSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const latestLoadRequestRef = useRef(0)
   const [rangeType, setRangeType] = useState<'today' | 'last7' | 'last30' | 'last90' | 'month' | 'year' | 'custom'>('custom')
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'machines'>('overview')
+
+  useEffect(() => {
+    setPage(1)
+  }, [productSearch, dateFrom, dateTo])
 
   const loadData = useCallback(async () => {
     const requestId = latestLoadRequestRef.current + 1
@@ -196,6 +202,14 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
       return outputName.includes(query) || outputCode.includes(query) || inputProducts.includes(query)
     })
   }, [rows, productSearch])
+
+  const totalRows = filteredRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedFilteredRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredRows.slice(start, start + pageSize)
+  }, [filteredRows, currentPage, pageSize])
 
   const localSummary = useMemo(() => {
     const inputQty = filteredRows.reduce((sum, row) => sum + Number(row.inputQty ?? 0), 0)
@@ -992,13 +1006,19 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             </thead>
             <tbody>
               {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>กำลังโหลดข้อมูล</td></tr> : null}
-              {!isLoading && filteredRows.map((row, index) => (
+              {!isLoading && pagedFilteredRows.map((row, index) => (
                 <tr key={String(row.id ?? index)} className={`border-t border-slate-100 hover:bg-slate-50 ${mode === 'wip' ? wipAgeClass(Number(row.ageDays ?? 0)) : ''}`}>
-                  {config.columns.map((column) => (
-                    <td key={column.key} className={`whitespace-nowrap p-2 text-xs overflow-hidden truncate ${cellTone(row[column.key], column, mode)}`}>
-                      {formatCell(row[column.key], column.type)}
-                    </td>
-                  ))}
+                  {config.columns.map((column) => {
+                    const isNumeric = column.type === 'number' || column.type === 'money' || column.type === 'percent'
+                    return (
+                      <td
+                        key={column.key}
+                        className={`whitespace-nowrap p-2 text-xs overflow-hidden truncate ${isNumeric ? 'text-right' : 'text-left'} ${cellTone(row[column.key], column, mode)}`}
+                      >
+                        {formatCell(row[column.key], column.type)}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
               {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={config.columns.length}>ไม่มีข้อมูล</td></tr> : null}
@@ -1014,7 +1034,7 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             กำลังโหลดข้อมูล
           </div>
         ) : null}
-        {!isLoading && filteredRows.map((row, index) => {
+        {!isLoading && pagedFilteredRows.map((row, index) => {
           const firstCol = config.columns[0]
           const secondCol = config.columns[1]
           const titleValue = String(row[firstCol?.key] ?? '')
@@ -1052,6 +1072,40 @@ export function ProductionReportPageClient({ mode }: { mode: keyof typeof config
             ไม่มีข้อมูล
           </div>
         ) : null}
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
       </div>
     </section>
   )

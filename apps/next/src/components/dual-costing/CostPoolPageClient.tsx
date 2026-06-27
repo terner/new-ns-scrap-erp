@@ -72,6 +72,12 @@ export function CostPoolPageClient() {
   const [status, setStatus] = useState('all')
   const [toDate, setToDate] = useState('')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [availableOnly, costType, fromDate, productId, search, sort, sourceType, status, toDate])
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -102,6 +108,15 @@ export function CostPoolPageClient() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  const rows = useMemo(() => data?.rows ?? [], [data?.rows])
+  const totalRows = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, currentPage, pageSize])
 
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     return (data?.filters.products ?? []).map((product) => ({
@@ -334,7 +349,7 @@ export function CostPoolPageClient() {
           <TableBody>
             {isLoading ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={12}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
             {!isLoading && !error && (data?.rows.length ?? 0) === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-400" colSpan={12}>Cost Pool ว่างตามตัวกรองปัจจุบัน</TableCell></TableRow> : null}
-            {!isLoading && (data?.rows ?? []).map((row) => (
+            {!isLoading && pagedRows.map((row) => (
               <TableRow key={row.costPoolId} className="hover:bg-slate-50/30 transition-colors border-t border-slate-100">
                 <TableCell className="p-3 pl-4"><span className={`rounded px-2 py-0.5 text-[10px] font-semibold tracking-wide ${costTypeBadgeClass(row.costType)}`}>{row.costType}</span></TableCell>
                 <TableCell className="p-3"><span className={`rounded px-2 py-0.5 text-[10px] font-medium ${sourceBadgeClass(row.sourceType)}`}>{row.sourceType}</span></TableCell>
@@ -352,6 +367,40 @@ export function CostPoolPageClient() {
             ))}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
       </div>
     </DualCostingPageSection>
   )

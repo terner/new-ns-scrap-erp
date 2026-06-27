@@ -16,6 +16,7 @@ import { TableNumberCell } from '@/components/ui/TableNumberCell'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 import { supplierAdvancePaymentFormSchema } from '@/lib/purchase-advance'
+import { openAdvancePaymentPrint } from '@/lib/advance-payment-print'
 
 type OptionRow = {
   active: boolean | null
@@ -296,6 +297,31 @@ export function AdvancePaymentsPageClient() {
     }))
     setIsFormOpen(true)
   }, [])
+
+  const handlePrint = (row: AdvancePaymentRow) => {
+    void openAdvancePaymentPrint({
+      id: row.id,
+      docNo: row.docNo,
+      advanceDate: row.advanceDate,
+      amount: row.amount,
+      allocatedAmount: row.allocatedAmount,
+      remainingAmount: row.remainingAmount,
+      branchId: row.branchId,
+      branchName: row.branchName,
+      supplierName: row.supplierName,
+      customerName: row.customerName,
+      plateNo: row.plateNo,
+      productName: row.productName,
+      netWeight: row.netWeight,
+      pricePerKg: row.pricePerKg,
+      paymentMethod: row.paymentMethod,
+      accountName: row.accountName,
+      remark: row.remark,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt,
+      allocations: row.allocations,
+    })
+  }
 
   const openEditForm = useCallback((row: AdvancePaymentDetail | AdvancePaymentRow) => {
     const defaultDateTime = currentDateTimeLocalValue()
@@ -945,6 +971,16 @@ export function AdvancePaymentsPageClient() {
                     <td className="p-2 text-right">
                       <div className="flex justify-end gap-2">
                         <button
+                          className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 cursor-pointer"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handlePrint(row)
+                          }}
+                        >
+                          พิมพ์
+                        </button>
+                        <button
                           className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                           disabled={!row.canEdit}
                           title={!row.canEdit ? row.lockedReason ?? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}
@@ -1099,6 +1135,13 @@ export function AdvancePaymentsPageClient() {
             </div>
           ) : null}
           <DialogFooter className="flex flex-wrap gap-2 justify-end p-4 border-t bg-slate-50 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => detail && handlePrint(detail)}
+            >
+              พิมพ์เอกสาร
+            </Button>
             <Button
               disabled={!detail?.canEdit}
               title={!detail?.canEdit ? detail?.lockedReason ?? 'รายการนี้ยังแก้ไขไม่ได้' : undefined}

@@ -954,7 +954,8 @@ function ReceiptVoucherFormModal({
                 <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-4">
                   <FormField className="col-span-2 md:col-span-1" label="วิธีรับเงิน / เลขบัญชี">
                     <select
-                      className="h-8 md:h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                      disabled={mode === 'edit'}
+                      className="h-8 md:h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
                       value={(() => {
                         const matched = supplierBankAccounts.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === 'รับเงินสด' ? '' : form.paymentMethod))
                         return matched ? `${matched.paymentMethod} บช.${matched.accountNo}` : supplierBankAccounts[0] ? `${supplierBankAccounts[0].paymentMethod} บช.${supplierBankAccounts[0].accountNo}` : ''

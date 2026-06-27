@@ -189,6 +189,8 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
       const qtySummaryText = totalsByUnit(po).map((item) => `${money(item.qty)} ${item.unit}`).join(' / ') || '-'
       const subtotal = po.items.reduce((sum, item) => sum + (item.qty * item.price), 0)
       const totalDiscount = po.items.reduce((sum, item) => sum + item.discount, 0)
+      const vatAmount = po.vatAmount ?? 0
+      const vatRate = po.vatRatePercent ?? 7
 
       bottomSectionHtml = `
         <div class="summary-cards">
@@ -197,8 +199,8 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
             <div class="value">${escapeHtml(qtySummaryText)}</div>
           </div>
           <div class="summary-card">
-            <div class="label">มูลค่าจองรวมทั้งสิ้น / Total Value</div>
-            <div class="value">${money(po.totalAmount)} บาท</div>
+            <div class="label">จำนวนรายการ</div>
+            <div class="value">${escapeHtml(String(po.items.length))} รายการ</div>
           </div>
         </div>
 
@@ -216,6 +218,14 @@ export function buildPoSellPrintHtml(po: PoSellPrintDocument, profile: CompanyPr
             <div class="total-row">
               <div class="total-label">ส่วนลดรวม / Total Discount</div>
               <div class="num">${money(totalDiscount)}</div>
+            </div>
+            <div class="total-row">
+              <div class="total-label">ยอดหลังหักส่วนลด / Net Subtotal</div>
+              <div class="num">${money(subtotal - totalDiscount)}</div>
+            </div>
+            <div class="total-row">
+              <div class="total-label">ภาษีมูลค่าเพิ่ม / VAT (${vatRate}%)</div>
+              <div class="num">${money(vatAmount)}</div>
             </div>
             <div class="total-row final">
               <div class="total-label">จำนวนเงินสุทธิ / Net Total</div>

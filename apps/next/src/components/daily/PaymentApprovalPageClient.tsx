@@ -399,12 +399,14 @@ export function PaymentApprovalPageClient() {
 
   const summary = useMemo(() => {
     return filteredRows.reduce((totals, row) => {
-      const totalFull = row.totalAmount
-      const totalPaid = 'paidAmount' in row ? row.paidAmount : 0
-      const totalRemain = 'payableBalance' in row ? row.payableBalance : row.totalAmount
-      totals.totalFull += totalFull
-      totals.totalPaid += totalPaid
-      totals.totalRemain += totalRemain
+      if (row.approvalStatus !== 'voided') {
+        const totalFull = row.totalAmount
+        const totalPaid = 'paidAmount' in row ? row.paidAmount : 0
+        const totalRemain = 'payableBalance' in row ? row.payableBalance : row.totalAmount
+        totals.totalFull += totalFull
+        totals.totalPaid += totalPaid
+        totals.totalRemain += totalRemain
+      }
       if (row.approvalStatus === 'pending') totals.pendingCount += 1
       if (row.approvalStatus === 'approved') totals.approvedCount += 1
       if (row.approvalStatus === 'voided') totals.voidedCount += 1

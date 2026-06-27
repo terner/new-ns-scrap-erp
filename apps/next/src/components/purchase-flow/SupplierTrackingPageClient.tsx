@@ -259,7 +259,7 @@ export function SupplierTrackingPageClient() {
               onChange={setSupplierId}
             />
           </div>
-          <input className="h-9 rounded-md border border-slate-300 px-3 text-sm outline-none" placeholder="ค้นหา Supplier" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input autoComplete="off" className="h-9 rounded-md border border-slate-300 px-3 text-sm outline-none" placeholder="ค้นหา Supplier" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <a className="inline-flex h-9 items-center justify-center rounded-md bg-blue-700 px-4 text-center text-sm font-bold text-white transition-colors hover:bg-blue-800" href={exportHref}>📥 XLSX</a>
         </div>
       </div>

@@ -172,6 +172,12 @@ export function AssetRegisterPageClient() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [category, search, status])
 
   const supplierOptions = useMemo(() => {
     return (data?.options.suppliers ?? []).map((row) => ({
@@ -227,6 +233,14 @@ export function AssetRegisterPageClient() {
       return matchesSearch && matchesCategory && matchesStatus
     })
   }, [category, data?.rows, search, status])
+
+  const totalRows = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, currentPage, pageSize])
 
   const openCreate = () => {
     setError(null)
@@ -552,7 +566,7 @@ export function AssetRegisterPageClient() {
             </thead>
             <tbody>
               <LoadingOrEmpty colSpan={11} isLoading={isLoading} rows={rows.length} />
-              {rows.map((row) => (
+              {pagedRows.map((row) => (
                 <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
                   <Td><span className="font-mono font-bold text-amber-700">{row.code}</span></Td>
                   <Td><div className="font-semibold text-slate-900">{row.name}</div><div className="text-slate-400 text-[10px]">{row.location || '-'}</div></Td>
@@ -581,7 +595,7 @@ export function AssetRegisterPageClient() {
         ) : rows.length === 0 ? (
           <div className="bg-white rounded-xl p-6 text-center text-xs text-slate-400 shadow-sm border border-slate-100">ยังไม่มีข้อมูลทะเบียนทรัพย์สิน</div>
         ) : (
-          rows.map((row) => (
+          pagedRows.map((row) => (
             <div key={row.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-3 hover:bg-slate-50/50 transition">
               <div className="flex justify-between items-start border-b border-slate-100 pb-2">
                 <div className="min-w-0 flex-1 pr-2">
@@ -608,6 +622,40 @@ export function AssetRegisterPageClient() {
             </div>
           ))
         )}
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
       </div>
 
       {modal === 'asset' ? (
@@ -748,6 +796,12 @@ export function DepreciationPageClient() {
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterDepartment, setFilterDepartment] = useState('all')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [filterCategory, filterDepartment, month, year])
 
   const loadData = useCallback(() => {
     setIsLoading(true)
@@ -789,6 +843,14 @@ export function DepreciationPageClient() {
       return matchCat && matchDept
     })
   }, [data?.rows, filterCategory, filterDepartment])
+
+  const totalRows = filteredRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredRows.slice(start, start + pageSize)
+  }, [filteredRows, currentPage, pageSize])
 
   const totalDepreciationAmount = useMemo(() => {
     return filteredRows.filter((row) => row.status !== 'reversed').reduce((sum, row) => sum + row.depreciationAmount, 0)
@@ -1027,7 +1089,7 @@ export function DepreciationPageClient() {
             </thead>
             <tbody>
               <LoadingOrEmpty colSpan={10} isLoading={isLoading} rows={filteredRows.length} />
-              {filteredRows.map((row) => (
+              {pagedRows.map((row) => (
                 <tr key={row.id} className={`border-t border-slate-100 hover:bg-slate-50/50 transition ${row.status === 'reversed' ? 'bg-slate-50 opacity-70' : ''}`}>
                   <Td><span className="font-mono font-bold text-red-700">{row.refNo}</span></Td>
                   <Td>{row.period}</Td>
@@ -1070,7 +1132,7 @@ export function DepreciationPageClient() {
           ) : filteredRows.length === 0 ? (
             <div className="py-8 text-center text-slate-400 text-xs">ยังไม่มีประวัติการประมวลผลค่าเสื่อม</div>
           ) : (
-            filteredRows.map((row) => (
+            pagedRows.map((row) => (
               <div key={row.id} className={`p-4 space-y-2.5 text-xs ${row.status === 'reversed' ? 'opacity-70 bg-slate-50/50' : 'bg-white'}`}>
                 <div className="flex justify-between items-center">
                   <span className="font-mono font-bold text-red-700">{row.refNo}</span>
@@ -1128,6 +1190,40 @@ export function DepreciationPageClient() {
           )}
         </div>
       </TableShell>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
 
       {preview ? (
         <Modal title={`Preview ค่าเสื่อมงวด ${preview.periodKey}`}>
@@ -1187,6 +1283,12 @@ export function AssetDisposalPageClient() {
   const [modal, setModal] = useState<'create' | 'reverse' | null>(null)
   const [reverseReason, setReverseReason] = useState('')
   const [reverseRow, setReverseRow] = useState<DisposalPayload['rows'][number] | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [data?.rows])
 
   const customerOptions = useMemo(() => {
     return (data?.customerOptions ?? []).map((row) => ({
@@ -1205,6 +1307,15 @@ export function AssetDisposalPageClient() {
   }, [])
 
   useEffect(() => loadData(), [loadData])
+
+  const rows = useMemo(() => data?.rows ?? [], [data?.rows])
+  const totalRows = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, currentPage, pageSize])
 
   const selectedAsset = data?.assetOptions.find((asset) => asset.id === form.assetId)
   const sellingPrice = decimalValue(form.sellingPrice)
@@ -1325,8 +1436,8 @@ export function AssetDisposalPageClient() {
               </tr>
             </thead>
             <tbody>
-              <LoadingOrEmpty colSpan={10} isLoading={isLoading} rows={data?.rows.length ?? 0} emptyText="ยังไม่มีรายการจำหน่ายทรัพย์สิน" />
-              {(data?.rows ?? []).map((row) => (
+              <LoadingOrEmpty colSpan={10} isLoading={isLoading} rows={rows.length} emptyText="ยังไม่มีรายการจำหน่ายทรัพย์สิน" />
+              {pagedRows.map((row) => (
                 <tr key={row.id} className={`border-t border-slate-100 hover:bg-slate-50/50 transition ${row.status === 'reversed' ? 'bg-slate-50 opacity-70' : ''}`}>
                   <Td><span className="font-mono font-bold text-slate-700">{row.disposalNo}</span></Td>
                   <Td>{row.date}</Td>
@@ -1366,10 +1477,10 @@ export function AssetDisposalPageClient() {
         <div className="block lg:hidden divide-y divide-slate-100/60 max-h-[60vh] overflow-y-auto">
           {isLoading ? (
             <div className="py-8 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล...</div>
-          ) : (data?.rows ?? []).length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="py-8 text-center text-slate-400 text-xs">ยังไม่มีรายการจำหน่ายทรัพย์สิน</div>
           ) : (
-            (data?.rows ?? []).map((row) => (
+            pagedRows.map((row) => (
               <div key={row.id} className={`p-4 space-y-2.5 text-xs ${row.status === 'reversed' ? 'opacity-70 bg-slate-50/50' : 'bg-white'}`}>
                 <div className="flex justify-between items-center">
                   <span className="font-mono font-bold text-slate-700">{row.disposalNo}</span>
@@ -1428,6 +1539,40 @@ export function AssetDisposalPageClient() {
           )}
         </div>
       </TableShell>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
+      </div>
 
       {modal === 'create' ? (
         <Modal title="Asset Disposal">

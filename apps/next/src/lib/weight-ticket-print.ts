@@ -298,7 +298,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
 
   function rowHtml(row: PrintWeightRow) {
     if (row.className === 'product-heading') {
-      const colSpan = isReceipt ? 7 : 4
+      const colSpan = isReceipt ? 7 : 5
       return `
         <tr class="item-row product-heading">
           <td class="c rank-cell">${escapeHtml(row.rank || '')}</td>
@@ -325,7 +325,9 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
         <td class="r">${formatPrintableNumber(row.containerDeductionWeight)}</td>
         <td class="r">${formatPrintableNumber(afterContainerWeight)}</td>
         <td class="r">${formatPrintableNumber(row.deductionWeight)}</td>
-        ` : ''}
+        ` : `
+        <td class="r">${formatPrintableNumber(row.containerDeductionWeight)}</td>
+        `}
         <td class="r strong">${formatPrintableNumber(row.netWeight)}</td>
       </tr>
     `
@@ -334,7 +336,7 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
   function emptyRows(count: number) {
     const tds = isReceipt
       ? '<td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td>'
-      : '<td>&nbsp;</td><td></td><td></td><td></td>'
+      : '<td>&nbsp;</td><td></td><td></td><td></td><td></td>'
     return Array.from({ length: Math.max(0, count) }, () => (
       `<tr class="empty">${tds}</tr>`
     )).join('')
@@ -407,7 +409,9 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
               <th class="r" style="width:21mm">หักภาชนะ</th>
               <th class="r" style="width:32mm">น้ำหนักหลังหักภาชนะ</th>
               <th class="r" style="width:26mm">หักสิ่งเจือปน</th>
-              ` : ''}
+              ` : `
+              <th class="r" style="width:21mm">หักภาชนะ</th>
+              `}
               <th class="r" style="width:21mm">น้ำหนักสุทธิ</th>
             </tr>
           </thead>
@@ -424,7 +428,9 @@ export function buildReceiptPrintHtml(ticket: WeightTicketRecord, profile: Compa
                 <td class="r">${formatPrintableNumber(ticket.totals.containerDeductionWeight)} kg</td>
                 <td class="r">${formatPrintableNumber(totalAfterContainer)} kg</td>
                 <td class="r">${formatPrintableNumber(ticket.totals.deductionWeight)} kg</td>
-                ` : ''}
+                ` : `
+                <td class="r">${formatPrintableNumber(ticket.totals.containerDeductionWeight)}</td>
+                `}
                 <td class="r final-weight">${formatPrintableNumber(ticket.totals.netWeight)}</td>
               </tr>
             </tfoot>

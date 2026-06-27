@@ -69,6 +69,12 @@ export function LoanContractsPageClient() {
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, status, type])
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase()
     return (data?.rows ?? []).filter((row) => {
@@ -76,6 +82,14 @@ export function LoanContractsPageClient() {
       return matchesSearch && (status === 'all' || row.status === status) && (type === 'all' || row.loanType === type)
     })
   }, [data?.rows, search, status, type])
+
+  const totalRows = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, currentPage, pageSize])
 
   return (
     <section className="space-y-4">
@@ -103,7 +117,7 @@ export function LoanContractsPageClient() {
 
       {/* Desktop Filter Panel */}
       <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-sm border border-slate-200">
-        <input className="min-w-0 flex-1 h-9 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition" placeholder="ค้นหา loanNo/contractNo/lender..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <input autoComplete="off" className="min-w-0 flex-1 h-9 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition" placeholder="ค้นหา loanNo/contractNo/lender..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
         <select className="h-9 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-slate-400 transition cursor-pointer" value={type} onChange={(event) => setType(event.target.value)}>
           <option value="all">Type: ทั้งหมด</option>
           {(data?.filters.types ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
@@ -118,7 +132,7 @@ export function LoanContractsPageClient() {
       <div className="mb-4 rounded-xl border border-slate-200/60 bg-white p-3 shadow-sm lg:hidden space-y-3">
         <div className="flex gap-2 items-center">
           <input 
-            className="flex-1 h-9 rounded-lg border border-slate-300 px-3 text-xs outline-none bg-white placeholder-slate-400 focus:border-slate-400 transition" 
+            autoComplete="off" className="flex-1 h-9 rounded-lg border border-slate-300 px-3 text-xs outline-none bg-white placeholder-slate-400 focus:border-slate-400 transition" 
             placeholder="ค้นหา loanNo/contractNo/lender..." 
             type="search" 
             value={search} 
@@ -223,7 +237,7 @@ export function LoanContractsPageClient() {
             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500"><tr><Th>เลขสัญญา</Th><Th>ผู้ให้กู้</Th><Th>ประเภท</Th><Th>Asset</Th><Th align="right">Financed</Th><Th align="right">คงเหลือ</Th><Th align="right">งวด</Th><Th align="center">จ่ายแล้ว</Th><Th>งวดถัดไป</Th><Th align="right">เกินกำหนด</Th><Th align="center">สถานะ</Th><Th align="center">actions</Th></tr></thead>
             <tbody>
               <LoadingOrEmpty colSpan={12} isLoading={isLoading} rows={rows.length} />
-              {rows.map((row) => <tr key={row.contractNo} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"><Td><span className="font-mono text-blue-700">{row.contractNo}</span></Td><Td>{row.lenderName}</Td><Td>{row.loanType}</Td><Td>-</Td><Td align="right">{formatMoney(row.principalAmount)}</Td><Td align="right" className="font-bold">{formatMoney(row.outstanding)}</Td><Td align="right">{formatMoney(row.installmentAmount)}</Td><Td align="center">{row.duePaid}/{row.dueTotal}</Td><Td>{row.nextDue || '-'}</Td><Td align="right">{formatMoney(row.overdue)}</Td><Td align="center"><StatusPill status={row.status} /></Td><Td align="center"><div className="flex justify-end gap-2"><InlineDisabledButton>Generate Schedule</InlineDisabledButton><InlineDisabledButton>Schedule</InlineDisabledButton></div></Td></tr>)}
+              {pagedRows.map((row) => <tr key={row.contractNo} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"><Td><span className="font-mono text-blue-700">{row.contractNo}</span></Td><Td>{row.lenderName}</Td><Td>{row.loanType}</Td><Td>-</Td><Td align="right">{formatMoney(row.principalAmount)}</Td><Td align="right" className="font-bold">{formatMoney(row.outstanding)}</Td><Td align="right">{formatMoney(row.installmentAmount)}</Td><Td align="center">{row.duePaid}/{row.dueTotal}</Td><Td>{row.nextDue || '-'}</Td><Td align="right">{formatMoney(row.overdue)}</Td><Td align="center"><StatusPill status={row.status} /></Td><Td align="center"><div className="flex justify-end gap-2"><InlineDisabledButton>Generate Schedule</InlineDisabledButton><InlineDisabledButton>Schedule</InlineDisabledButton></div></Td></tr>)}
             </tbody>
           </table>
         </TableShell>
@@ -234,7 +248,7 @@ export function LoanContractsPageClient() {
         <div className="p-4 text-xs font-semibold text-slate-500 bg-slate-50">รายการสัญญาเงินกู้</div>
         {isLoading && <div className="p-4 text-center text-slate-400 text-xs">กำลังโหลดข้อมูล</div>}
         {!isLoading && rows.length === 0 && <div className="p-4 text-center text-slate-400 text-xs">ไม่มีสัญญา</div>}
-        {!isLoading && rows.map((row) => (
+        {!isLoading && pagedRows.map((row) => (
           <div key={row.contractNo} className="p-4 space-y-2 text-xs">
             <div className="flex justify-between items-start">
               <div>
@@ -257,6 +271,40 @@ export function LoanContractsPageClient() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
       </div>
     </section>
   )

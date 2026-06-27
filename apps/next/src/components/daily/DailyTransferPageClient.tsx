@@ -25,9 +25,9 @@ type TransferPayload = {
   accounts: DailyAccountOption[]
   rows: TransferRow[]
 }
-type TransferColumnKey = 'index' | 'action' | 'amount' | 'byPerson' | 'date' | 'docNo' | 'fee' | 'from' | 'to'
+type TransferColumnKey = 'index' | 'action' | 'amount' | 'byPerson' | 'date' | 'docNo' | 'fee' | 'from' | 'to' | 'notes'
 type Period = '' | 'month' | 'today' | 'week'
-type SortKey = 'docNo' | 'date' | 'from' | 'to' | 'amount' | 'fee' | 'byPerson'
+type SortKey = 'docNo' | 'date' | 'from' | 'to' | 'amount' | 'fee' | 'byPerson' | 'notes'
 
 const pageSizeOptions = [10, 25, 50, 100]
 const transferColumns: Array<ResizableColumnDefinition<TransferColumnKey>> = [
@@ -39,6 +39,7 @@ const transferColumns: Array<ResizableColumnDefinition<TransferColumnKey>> = [
   { key: 'amount', defaultWidth: 110, minWidth: 90 },
   { key: 'fee', defaultWidth: 100, minWidth: 80 },
   { key: 'byPerson', defaultWidth: 160, minWidth: 120 },
+  { key: 'notes', defaultWidth: 200, minWidth: 120 },
   { key: 'action', defaultWidth: 180, minWidth: 150 },
 ]
 
@@ -138,6 +139,9 @@ export function DailyTransferPageClient() {
         } else if (sortKey === 'byPerson') {
           leftValue = left.byPerson || ''
           rightValue = right.byPerson || ''
+        } else if (sortKey === 'notes') {
+          leftValue = left.notes || ''
+          rightValue = right.notes || ''
         }
 
         let comparison = 0
@@ -622,6 +626,11 @@ export function DailyTransferPageClient() {
               <span className="text-slate-400">➡️</span>
               <span className="font-semibold text-emerald-700">{row.toAccountName}</span>
             </div>
+            {row.notes ? (
+              <div className="mb-3 text-[11px] text-slate-600">
+                <span className="font-medium text-slate-500">หมายเหตุ: </span>{row.notes}
+              </div>
+            ) : null}
             <div className="flex justify-between items-end">
               <div className="text-xs text-slate-500">
                 {row.fee > 0 ? (
@@ -658,11 +667,12 @@ export function DailyTransferPageClient() {
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} align="right" label="จำนวน" resizeProps={columnResize.getResizeHandleProps('amount', 'จำนวน')} sortKey="amount" onSort={changeSort} />
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} align="right" label="ค่าธรรมเนียม" resizeProps={columnResize.getResizeHandleProps('fee', 'ค่าธรรมเนียม')} sortKey="fee" onSort={changeSort} />
               <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้ทำรายการ" resizeProps={columnResize.getResizeHandleProps('byPerson', 'ผู้ทำรายการ')} sortKey="byPerson" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="หมายเหตุ" resizeProps={columnResize.getResizeHandleProps('notes', 'หมายเหตุ')} sortKey="notes" onSort={changeSort} />
               <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'Action')} />
             </tr>
           </TableHeader>
           <TableBody className="divide-y divide-slate-100">
-            {isLoading ? <TableRow><td className="p-8 text-center text-slate-500" colSpan={9}>กำลังโหลดข้อมูล</td></TableRow> : null}
+            {isLoading ? <TableRow><td className="p-8 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></TableRow> : null}
             {!isLoading && pagedRows.map((row, index) => (
               <TableRow
                 key={row.id}
@@ -684,13 +694,14 @@ export function DailyTransferPageClient() {
                 <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-slate-700 tabular-nums">{formatMoney(row.amount)}</TableCell>
                 <TableCell className="whitespace-nowrap text-right pr-4 text-xs font-semibold text-amber-700 tabular-nums">{formatMoney(row.fee)}</TableCell>
                 <TableCell className="text-xs font-semibold text-slate-700">{row.byPerson || '-'}</TableCell>
+                <TableCell className="text-xs font-semibold text-slate-700 truncate max-w-[200px]" title={row.notes ?? ''}>{row.notes || '-'}</TableCell>
                 <TableCell className="space-x-2 whitespace-nowrap text-right">
                   <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
                   <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button" onClick={(event) => event.stopPropagation()}>ยกเลิก</button>
                 </TableCell>
               </TableRow>
             ))}
-            {!isLoading && pagedRows.length === 0 ? <TableRow><td className="p-8 text-center text-slate-400" colSpan={9}>ยังไม่มีรายการ</td></TableRow> : null}
+            {!isLoading && pagedRows.length === 0 ? <TableRow><td className="p-8 text-center text-slate-400" colSpan={10}>ยังไม่มีรายการ</td></TableRow> : null}
           </TableBody>
         </Table>
       </div>

@@ -56,6 +56,12 @@ export function TradingMatchingPageClient() {
   const [selectedDeal, setSelectedDeal] = useState<TradingDealRow | null>(null)
   const [tab, setTab] = useState<'allocations' | 'remaining'>('allocations')
   const [toDate, setToDate] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [fromDate, toDate, search, tab])
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -94,6 +100,20 @@ export function TradingMatchingPageClient() {
       return `${row.docNo} ${row.supplierName}`.toLowerCase().includes(query)
     })
   }, [data?.purchases, fromDate, search, toDate])
+
+  const totalRows = tab === 'allocations' ? filteredDeals.length : remainingPurchases.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+
+  const pagedFilteredDeals = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredDeals.slice(start, start + pageSize)
+  }, [filteredDeals, currentPage, pageSize])
+
+  const pagedRemainingPurchases = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return remainingPurchases.slice(start, start + pageSize)
+  }, [remainingPurchases, currentPage, pageSize])
 
   const totals = useMemo(() => {
     const salesAmount = filteredDeals.reduce((sum, row) => sum + row.matchedSalesAmount, 0)
@@ -178,7 +198,7 @@ export function TradingMatchingPageClient() {
         <div className="flex flex-wrap items-center gap-2">
           <DatePickerInput ariaLabel="วันที่เริ่มต้น" className="h-10 text-sm" value={fromDate} onChange={setFromDate} />
           <DatePickerInput ariaLabel="วันที่สิ้นสุด" className="h-10 text-sm" value={toDate} onChange={setToDate} />
-          <input className="min-w-64 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white font-medium text-slate-750 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" placeholder="ค้นหา Sales Bill / Purchase Bill / คู่ค้า / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input autoComplete="off" className="min-w-64 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white font-medium text-slate-750 h-10 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200" placeholder="ค้นหา Sales Bill / Purchase Bill / คู่ค้า / สินค้า" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           {hasFilters ? <button className="rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-655 hover:text-slate-800 hover:bg-slate-50 transition-colors h-10 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={resetFilters}>ล้าง</button> : null}
           <button className="rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-655 hover:text-slate-800 hover:bg-slate-50 transition-colors h-10 outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" type="button" onClick={() => void loadData()}>Refresh</button>
           <a className="inline-flex items-center justify-center rounded-md bg-slate-900 hover:bg-slate-800 px-4 h-10 text-sm font-semibold text-white transition-colors outline-none focus:outline-none focus:ring-0 shadow-xs cursor-pointer" href={exportHref}>Export XLSX</a>
@@ -195,7 +215,7 @@ export function TradingMatchingPageClient() {
           <>
             <div className="block space-y-3 p-4 lg:hidden">
               {isLoading ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-455 font-semibold text-xs shadow-sm">กำลังโหลดข้อมูล</div> : null}
-              {!isLoading && filteredDeals.map((row) => (
+              {!isLoading && pagedFilteredDeals.map((row) => (
                 <button key={row.id} className="block w-full rounded-md border border-slate-200 bg-white p-4 text-left shadow-sm hover:bg-slate-50/50 active:bg-slate-100/50 transition-all outline-none focus:outline-none focus:ring-0 cursor-pointer" type="button" onClick={() => setSelectedDeal(row)}>
                   <div className="flex justify-between gap-3 border-b border-slate-100 pb-2 mb-2">
                     <span className="font-bold text-slate-800 text-sm">{row.salesBillNo || '-'}</span>
@@ -246,7 +266,7 @@ export function TradingMatchingPageClient() {
                 <tbody className="divide-y divide-slate-100">
                   {isLoading ? <tr><td className="p-6 text-center text-slate-500 font-semibold" colSpan={12}>กำลังโหลดข้อมูล</td></tr> : null}
                   {!isLoading && !error && filteredDeals.length === 0 ? <tr><td className="py-8 text-center text-slate-400 font-semibold" colSpan={12}>ยังไม่มี allocation ตามเงื่อนไขที่ค้นหา</td></tr> : null}
-                  {!isLoading && filteredDeals.map((row) => (
+                  {!isLoading && pagedFilteredDeals.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/30 transition-colors">
                       <td className="p-2.5 font-mono font-semibold text-slate-800 overflow-hidden truncate">{row.salesBillNo || '-'}</td>
                       <td className="p-2.5 text-slate-500 font-medium overflow-hidden truncate">{formatDateDisplay(row.date)}</td>
@@ -273,15 +293,49 @@ export function TradingMatchingPageClient() {
         ) : (
           <>
             <div className="block space-y-3 p-4 lg:hidden">
-              {remainingPurchases.map((row) => <RemainingPurchaseCard key={row.id} row={row} />)}
+              {pagedRemainingPurchases.map((row) => <RemainingPurchaseCard key={row.id} row={row} />)}
               {!isLoading && remainingPurchases.length === 0 ? <div className="rounded-md border border-slate-200 bg-white p-8 text-center text-slate-455 font-semibold text-xs shadow-sm">ไม่มีต้นทุน Trading คงเหลือ</div> : null}
             </div>
 
             <div className="hidden p-5 lg:block">
-              <RemainingPurchaseTable rows={remainingPurchases} />
+              <RemainingPurchaseTable rows={pagedRemainingPurchases} />
             </div>
           </>
         )}
+
+        {/* Pagination Controls */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mx-4 mb-4">
+          <div>
+            พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="จำนวนรายการต่อหน้า"
+              className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+            >
+              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+            </select>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage <= 1}
+              type="button"
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage >= totalPages}
+              type="button"
+              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
       </div>
       {selectedDeal ? <DealDetailModal deal={selectedDeal} onClose={() => setSelectedDeal(null)} /> : null}
     </section>

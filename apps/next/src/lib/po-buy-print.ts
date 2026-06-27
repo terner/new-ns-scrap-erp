@@ -41,6 +41,10 @@ export type PoBuyPrintDocument = {
   supplierAddress: string
   supplierName: string
   totalAmount: number
+  hasVat?: boolean | null
+  vatAmount?: number | null
+  vatRatePercent?: number | null
+  vatType?: string | null
 }
 
 function escapeHtml(value: unknown) {
@@ -170,6 +174,10 @@ function qtySummaryByUnit(items: PoBuyPrintItem[], key: 'qty' | 'remainingQty') 
 }
 
 export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProfilePrintValues) {
+  const vatAmount = po.vatAmount ?? 0
+  const vatRate = po.vatRatePercent ?? 7
+  const subtotal = po.totalAmount - vatAmount
+
   const logoHtml = profile.logoUrl ? `<img class="logo" src="${escapeHtml(profile.logoUrl)}" alt="Company logo">` : '<div class="logo no-logo">ไม่มีข้อมูล</div>'
   const title = 'ใบสั่งซื้อ / PO Buy'
   const cancelled = po.status.trim().toLowerCase().includes('cancel')
@@ -233,10 +241,11 @@ export function buildPoBuyPrintHtml(po: PoBuyPrintDocument, profile: CompanyProf
           </div>
         </div>
         <div class="totals">
-          <div class="total-row"><div>ยอดสั่งซื้อรวม</div><div class="num">${money(po.totalAmount)}</div></div>
-          <div class="total-row remaining"><div>มูลค่าคงเหลือ</div><div class="num">${money(po.remainingAmount)}</div></div>
-          <div class="total-row"><div>มูลค่าที่รับแล้ว</div><div class="num">${money(Math.max(0, po.totalAmount - po.remainingAmount))}</div></div>
-          <div class="total-row final"><div>ยอดรวมทั้งสิ้น</div><div class="num">${money(po.totalAmount)}</div></div>
+          <div class="total-row"><div>ยอดรวมสินค้าก่อนภาษี / Subtotal</div><div class="num">${money(subtotal)}</div></div>
+          <div class="total-row"><div>ภาษีมูลค่าเพิ่ม / VAT (${vatRate}%)</div><div class="num">${money(vatAmount)}</div></div>
+          <div class="total-row remaining"><div>มูลค่าคงเหลือ / Remaining</div><div class="num">${money(po.remainingAmount)}</div></div>
+          <div class="total-row"><div>มูลค่าที่รับแล้ว / Received</div><div class="num">${money(Math.max(0, po.totalAmount - po.remainingAmount))}</div></div>
+          <div class="total-row final"><div>ยอดรวมทั้งสิ้น / Grand Total</div><div class="num">${money(po.totalAmount)}</div></div>
         </div>
       </section>
 

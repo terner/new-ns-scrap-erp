@@ -103,6 +103,12 @@ export function CostAllocatorPageClient() {
   const [targetCostInput, setTargetCostInput] = useState('0')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [reloadTrigger, setReloadTrigger] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    setPage(1)
+  }, [selectedProductId, sourceType])
 
   useEffect(() => {
     const poSellIdParam = searchParams.get('poSellId')
@@ -141,6 +147,15 @@ export function CostAllocatorPageClient() {
     void loadData()
     return () => { mounted = false }
   }, [queryString, reloadTrigger])
+
+  const poSells = useMemo(() => data?.poSells ?? [], [data?.poSells])
+  const totalRows = poSells.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedPoSells = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return poSells.slice(start, start + pageSize)
+  }, [poSells, currentPage, pageSize])
 
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     return (data?.filters.products ?? []).map((product) => ({
@@ -355,7 +370,7 @@ export function CostAllocatorPageClient() {
               <TableBody>
                 {isLoading ? <TableRow><TableCell className="py-6 text-center text-slate-500" colSpan={9}>กำลังโหลด target candidates</TableCell></TableRow> : null}
                 {!isLoading && (data?.poSells.length ?? 0) === 0 ? <TableRow><TableCell className="py-6 text-center text-slate-400" colSpan={9}>ไม่มี {sourceTypeLabel} ของสินค้านี้ที่ยังไม่ match</TableCell></TableRow> : null}
-                {(data?.poSells ?? []).map((target) => {
+                {pagedPoSells.map((target) => {
                   const active = selectedPoSellId === target.id
                   return (
                     <TableRow key={target.id} className={active ? 'bg-purple-50/50 border-t border-slate-100 hover:bg-purple-50/60 transition-colors' : 'border-t border-slate-100 hover:bg-slate-50/30 transition-colors'}>
@@ -386,6 +401,40 @@ export function CostAllocatorPageClient() {
                 })}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+            <div>
+              พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label="จำนวนรายการต่อหน้า"
+                className="h-8 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+              >
+                {[5, 10, 25, 50].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+              </select>
+              <button
+                className="h-8 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                disabled={currentPage <= 1}
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+              >
+                ก่อนหน้า
+              </button>
+              <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+              <button
+                className="h-8 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                disabled={currentPage >= totalPages}
+                type="button"
+                onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+              >
+                ถัดไป
+              </button>
+            </div>
           </div>
 
           {hasPoSell ? (

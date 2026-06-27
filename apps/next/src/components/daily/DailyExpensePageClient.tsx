@@ -1422,7 +1422,7 @@ export function DailyExpensePageClient({ dashboardOnly = false }: { dashboardOnl
 
           <div className="rounded-md bg-white p-3 shadow">
             <div className="flex flex-wrap items-center gap-2">
-              <input className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="ค้นหาเลข Voucher / ผู้รับ / อ้างอิง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <input autoComplete="off" className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="ค้นหาเลข Voucher / ผู้รับ / อ้างอิง..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
 
               {/* Mobile Filter Button */}
               <button

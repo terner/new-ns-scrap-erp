@@ -350,7 +350,7 @@ export function BankStatementPageClient() {
       </div>
       <div className="rounded-md bg-white p-3 shadow-lg">
         <div className="grid gap-3 lg:grid-cols-6">
-          <input className="rounded-md border px-3 py-2 text-sm lg:col-span-2" placeholder="ค้นหาเลขอ้างอิง / คำอธิบาย / หมายเหตุ" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
+          <input autoComplete="off" className="rounded-md border px-3 py-2 text-sm lg:col-span-2" placeholder="ค้นหาเลขอ้างอิง / คำอธิบาย / หมายเหตุ" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
           <select className="rounded-md border px-3 py-2 text-sm" value={refType} onChange={(event) => { setPage(1); setRefType(event.target.value) }}>
             <option value="">ทุก ref type</option>
             {(data?.filters.refTypes ?? []).map((item) => <option key={item} value={item}>{item}</option>)}

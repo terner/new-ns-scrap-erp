@@ -487,8 +487,28 @@ export async function POST(request: Request) {
     requirePermission(context, 'finance.cash.view')
 
     const values = supplierPaymentFormSchema.parse(await request.json())
-    const voucherId = values.id ?? `PMT-${randomUUID()}`
     const actor = currentActor(context)
+
+    if (values.id) {
+      const existingPayments = await prisma.payments.findMany({
+        where: { voucher_id: values.id },
+      })
+      if (existingPayments.length > 0) {
+        await prisma.$transaction(async (tx) => {
+          await tx.payments.updateMany({
+            data: {
+              notes: values.notes,
+              updated_at: new Date(),
+              updated_by: actor,
+            },
+            where: { voucher_id: values.id },
+          })
+        })
+        return NextResponse.json({ success: true })
+      }
+    }
+
+    const voucherId = values.id ?? `PMT-${randomUUID()}`
     const paymentDate = normalizeDate(values.date)
     const paymentLines = (values.lines?.length ? values.lines : [{
       approvalId: null,

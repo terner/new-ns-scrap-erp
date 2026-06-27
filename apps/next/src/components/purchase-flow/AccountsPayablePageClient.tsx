@@ -324,7 +324,7 @@ export function AccountsPayablePageClient() {
               </button>
             </div>
             
-            <input className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" placeholder="ค้นหาเลขบิล / ผู้ขาย / ช่องทาง / สาขา" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
+            <input autoComplete="off" className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100" placeholder="ค้นหาเลขบิล / ผู้ขาย / ช่องทาง / สาขา" type="search" value={q} onChange={(event) => { setPage(1); setQ(event.target.value) }} />
             
             <div className="min-w-[260px]">
               <SearchCombobox
@@ -423,7 +423,7 @@ export function AccountsPayablePageClient() {
 
           <div className="relative w-full">
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm pr-8"
+              autoComplete="off" className="w-full rounded-md border px-3 py-2 text-sm pr-8"
               placeholder="ค้นหาเลขบิล / ผู้ขาย / สาขา..."
               type="search"
               value={q}

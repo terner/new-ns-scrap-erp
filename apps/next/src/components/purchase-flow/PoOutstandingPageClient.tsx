@@ -58,6 +58,12 @@ export function PoOutstandingPageClient() {
   const [tab, setTab] = useState<'buy' | 'sell'>('buy')
   const [sortKey, setSortKey] = useState<string | undefined>(undefined)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [partnerFilter, productFilter, search, tab])
 
   const buyResize = useResizableColumns('po-reports.outstanding.buy.v5', buyColumns)
   const sellResize = useResizableColumns('po-reports.outstanding.sell.v5', sellColumns)
@@ -125,6 +131,14 @@ export function PoOutstandingPageClient() {
     }
     return result
   }, [rows, sortKey, sortDirection, tab])
+
+  const totalRows = sortedRows.length
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return sortedRows.slice(start, start + pageSize)
+  }, [sortedRows, currentPage, pageSize])
 
   const totals = useMemo(() => ({
     lines: rows.length,
@@ -407,7 +421,7 @@ export function PoOutstandingPageClient() {
                 </tr>
               ) : null}
               {!isLoading &&
-                sortedRows.map((row) => (
+                pagedRows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-2 text-center">
                       <input className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 outline-none" disabled type="checkbox" title="รอออกแบบ cost-pool write/audit" />
@@ -569,7 +583,7 @@ export function PoOutstandingPageClient() {
                 </tr>
               ) : null}
               {!isLoading &&
-                sortedRows.map((row) => (
+                pagedRows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-2 font-mono text-[11px] text-slate-600 truncate">{row.docNo}</td>
                     <td className="p-2 text-slate-800">{formatDateDisplay(row.date)}</td>
@@ -614,7 +628,7 @@ export function PoOutstandingPageClient() {
           <div className="rounded-xl bg-white p-8 text-center text-slate-500 shadow-sm border border-slate-200/60">กำลังโหลดข้อมูล</div>
         ) : null}
 
-        {!isLoading && rows.map((row) => (
+        {!isLoading && pagedRows.map((row) => (
           <div key={row.id} className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm space-y-2">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
@@ -669,6 +683,40 @@ export function PoOutstandingPageClient() {
             {tab === 'buy' ? 'ไม่มี PO ซื้อค้างรับ' : 'ไม่มี PO ขายค้างส่ง'}
           </div>
         ) : null}
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <div>
+          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+          </select>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage <= 1}
+            type="button"
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ก่อนหน้า
+          </button>
+          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+          <button
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            type="button"
+            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+          >
+            ถัดไป
+          </button>
+        </div>
       </div>
     </section>
   )

@@ -526,7 +526,7 @@ export function PoSellPageClient() {
       {/* Desktop Toolbar (Hidden on Mobile) */}
       <div className="hidden lg:block mb-4 space-y-2 rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
-          <input className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหาเลข PO / ชื่อ Customer / ชื่อสินค้า / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input autoComplete="off" className="min-w-[260px] flex-1 rounded-md border px-3 py-2 text-sm" placeholder="ค้นหาเลข PO / ชื่อ Customer / ชื่อสินค้า / หมายเหตุ..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <label className="text-xs text-slate-500">วันที่สร้างรายการ:</label>
           <DatePickerInput ariaLabel="จากวันที่" className="w-[130px]" title="จากวันที่" value={fromDate} onChange={setFromDate} />
           <span className="text-slate-400">→</span>
@@ -554,7 +554,7 @@ export function PoSellPageClient() {
       {/* Mobile Toolbar (Hidden on Desktop) */}
       <div className="mb-4 space-y-2 rounded-md bg-white p-3 shadow lg:hidden">
         <div className="flex gap-2 items-center">
-          <input className="min-w-[200px] flex-1 rounded-md border px-3 py-2 text-sm h-9" placeholder="ค้นหาเลข PO / Customer / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input autoComplete="off" className="min-w-[200px] flex-1 rounded-md border px-3 py-2 text-sm h-9" placeholder="ค้นหาเลข PO / Customer / สินค้า..." type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <button
             type="button"
             className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"

@@ -20,6 +20,7 @@ This project is an existing NS Scrap ERP system that must be rehabilitated and r
   - if both remotes exist, verify the destination remote before push, branch deletion, or PR creation
 - Update docs at every meaningful checkpoint as if the session can close at any time. Every time development or browser/UAT testing of a business flow is completed, you MUST write or update a flow summary (e.g. in the walkthrough or a design note) explaining "what is what" (the business entities and states) and "why it has to be like this" (the rationale behind the design and logic).
 - Use a sub agent by default for Playwright/browser QA work; the main agent still defines scope and integrates findings.
+- **🚫 NO DOM ON PLANE:** Do not use DOM automation, browser sub-agents, or Playwright to access, login, click, input, or interact with `https://plane.devkub.com/` under any circumstances. All interactions with Plane must be executed programmatically via backend REST APIs or node/bash scripts, or handled manually by the user.
 - If the user requests modifications or code improvements, only perform the code changes and verify compilation locally. Do NOT run browser or DOM UAT testing unless the user explicitly requests testing (i.e. do not use browser sub-agent unless told to test).
 - Split large refactors into reviewable batches with one clear module, transform, or behavior change per batch.
 - During clone/migration batches, use `docs/design.md` as the active design convention source and keep legacy/Vue parity unless a difference is documented and approved.

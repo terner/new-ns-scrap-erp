@@ -359,10 +359,92 @@ export function StockBalancePageClient() {
   }, [displayRows, detailSortKey, detailSortDirection])
 
   const sortedMatrixRows = useMemo(() => {
-    const rows = [...matrixRows]
-    if (!matrixSortKey) return rows
+    const sortProducts = (products: MatrixProductRow[]) => {
+      if (!matrixSortKey) {
+        return [...products].sort((a, b) => matrixProductValue(b) - matrixProductValue(a))
+      }
+      return [...products].sort((a, b) => {
+        let valA: any
+        let valB: any
 
-    return rows.sort((a, b) => {
+        switch (matrixSortKey) {
+          case 'group':
+          case 'product':
+            valA = a.productName
+            valB = b.productName
+            break
+          case 'rmQty':
+            valA = a.rmQty
+            valB = b.rmQty
+            break
+          case 'rmVal':
+            valA = a.rmVal
+            valB = b.rmVal
+            break
+          case 'rmAvgCost':
+            valA = a.rmQty !== 0 ? a.rmVal / a.rmQty : 0
+            valB = b.rmQty !== 0 ? b.rmVal / b.rmQty : 0
+            break
+          case 'wipQty':
+            valA = a.wipQty
+            valB = b.wipQty
+            break
+          case 'wipVal':
+            valA = a.wipVal
+            valB = b.wipVal
+            break
+          case 'wipAvgCost':
+            valA = a.wipQty !== 0 ? a.wipVal / a.wipQty : 0
+            valB = b.wipQty !== 0 ? b.wipVal / b.wipQty : 0
+            break
+          case 'fgQty':
+            valA = a.fgQty
+            valB = b.fgQty
+            break
+          case 'fgVal':
+            valA = a.fgVal
+            valB = b.fgVal
+            break
+          case 'fgAvgCost':
+            valA = a.fgQty !== 0 ? a.fgVal / a.fgQty : 0
+            valB = b.fgQty !== 0 ? b.fgVal / b.fgQty : 0
+            break
+          case 'totalQty':
+            valA = matrixProductQty(a)
+            valB = matrixProductQty(b)
+            break
+          case 'totalValue':
+            valA = matrixProductValue(a)
+            valB = matrixProductValue(b)
+            break
+          case 'totalAvgCost':
+            valA = matrixProductQty(a) !== 0 ? matrixProductValue(a) / matrixProductQty(a) : 0
+            valB = matrixProductQty(b) !== 0 ? matrixProductValue(b) / matrixProductQty(b) : 0
+            break
+          default:
+            return 0
+        }
+
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          return matrixSortDirection === 'asc'
+            ? valA.localeCompare(valB, 'th')
+            : valB.localeCompare(valA, 'th')
+        } else {
+          const numA = Number(valA) || 0
+          const numB = Number(valB) || 0
+          return matrixSortDirection === 'asc' ? numA - numB : numB - numA
+        }
+      })
+    }
+
+    const mappedRows = matrixRows.map((row) => ({
+      ...row,
+      products: sortProducts(row.products),
+    }))
+
+    if (!matrixSortKey) return mappedRows
+
+    return mappedRows.sort((a, b) => {
       let valA: any
       let valB: any
 
