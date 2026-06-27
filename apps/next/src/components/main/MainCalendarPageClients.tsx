@@ -80,6 +80,24 @@ function pct(value: number, max: number) {
   return Math.max(0, Math.min(100, (value / max) * 100))
 }
 
+function dateLabel(date: string) {
+  const [, month, day] = date.split('-')
+  return `${day}/${month}`
+}
+
+function compactMoney(value: number) {
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000) return `${formatMoney(value / 1_000_000)}M`
+  if (absolute >= 1_000) return `${formatMoney(value / 1_000)}K`
+  return formatMoney(value)
+}
+
+function roundedAxisMax(value: number) {
+  if (value <= 0) return 1
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 1)
+  return Math.ceil(value / magnitude) * magnitude
+}
+
 export function CashFlowCalendarPageClient() {
   const [month, setMonth] = useState(currentMonth())
   const [data, setData] = useState<CashPayload | null>(null)
@@ -97,7 +115,6 @@ export function CashFlowCalendarPageClient() {
     document.addEventListener('click', handleClick)
     return () => document.removeEventListener('click', handleClick)
   }, [])
-  const maxFlow = Math.max(1, ...(data?.days ?? []).flatMap((day) => [day.cashIn, day.cashOut]))
   const balances = data?.days.map((day) => day.ending) ?? []
   const minBalance = Math.min(0, ...balances)
   const maxBalance = Math.max(1, ...balances)
@@ -114,12 +131,9 @@ export function CashFlowCalendarPageClient() {
         <Metric label="Net Cash Flow" value={money((summary.totalIn ?? 0) - (summary.totalOut ?? 0))} tone={(summary.totalIn ?? 0) >= (summary.totalOut ?? 0) ? 'blue' : 'red'} />
         <Metric label="ยอดปลายเดือน" value={money(summary.endingCash)} tone="gradient" />
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(380px,1fr)]">
         <Panel title="📈 เงินเข้า-ออกรายวัน">
-          <div className="mb-3 flex gap-4 text-xs text-slate-500"><Legend color="bg-emerald-500" text="เงินเข้า" /><Legend color="bg-red-500" text="เงินออก" /></div>
-          <div className="flex h-48 items-end gap-1 border-b border-l border-slate-100 px-2 pb-1 bg-slate-50/20 rounded-b-lg">
-            {(data?.days ?? []).map((day) => <div key={day.date} className="flex h-full flex-1 items-end justify-center gap-0.5"><span className="w-1.5 rounded-t bg-emerald-500" style={{ height: `${pct(day.cashIn, maxFlow)}%` }} /><span className="w-1.5 rounded-t bg-red-500" style={{ height: `${pct(day.cashOut, maxFlow)}%` }} /></div>)}
-          </div>
+          <DailyCashInOutChart days={data?.days ?? []} />
         </Panel>
         <Panel title="📈 ยอดเงินสะสม (Running Balance)">
           <div className="mb-3 text-xs text-slate-500">เส้นประ = ระดับ 0 บาท · จุดแดง = ติดลบ</div>
@@ -139,6 +153,62 @@ export function CashFlowCalendarPageClient() {
       <Notice text={data?.sourceState.limitations[0]} />{error ? <ErrorBox text={error} /> : null}
       {selectedDay ? <CashDayModal day={selectedDay} onClose={() => setSelectedDayDate('')} /> : null}
     </section>
+  )
+}
+
+function DailyCashInOutChart({ days }: { days: CashDay[] }) {
+  const visibleDays = days.filter((day) => day.cashIn > 0 || day.cashOut > 0)
+  const chartDays = visibleDays.length > 0 ? visibleDays : days
+  const axisMax = roundedAxisMax(Math.max(1, ...chartDays.flatMap((day) => [day.cashIn, day.cashOut])) * 1.1)
+  const ticks = Array.from({ length: 6 }, (_, index) => axisMax - (axisMax / 5) * index)
+  const labelEvery = Math.max(1, Math.ceil(chartDays.length / 8))
+
+  if (chartDays.length === 0) {
+    return <div className="flex h-64 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">ไม่มีข้อมูลเงินเข้า/เงินออกในช่วงนี้</div>
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-4 text-xs">
+          <Legend color="bg-emerald-500" text="เงินเข้า" />
+          <Legend color="bg-red-500" text="เงินออก" />
+        </div>
+        <div className="text-xs font-medium text-slate-500">แสดงเฉพาะวันที่มีเงินเข้า/เงินออก</div>
+      </div>
+      <div className="rounded-md bg-white p-2">
+        <div className="grid grid-cols-[70px_minmax(0,1fr)] gap-2">
+          <div className="relative h-72 text-[11px] font-medium text-slate-500">
+            <div className="absolute left-0 top-1/2 -translate-x-7 -rotate-90 whitespace-nowrap text-xs font-bold text-slate-700">แกน Y: จำนวนเงิน (บาท)</div>
+            {ticks.map((tick, index) => (
+              <div key={`${tick}-${index}`} className="absolute right-0 -translate-y-1/2 pr-2 text-right" style={{ top: `${pct(axisMax - tick, axisMax)}%` }}>
+                {compactMoney(tick)}
+              </div>
+            ))}
+          </div>
+          <div className="relative h-72 border-b border-l border-slate-300">
+            {ticks.map((tick, index) => (
+              <div key={`${tick}-${index}-line`} className="absolute inset-x-0 border-t border-slate-100" style={{ top: `${pct(axisMax - tick, axisMax)}%` }} />
+            ))}
+            <div className="absolute inset-x-3 bottom-0 top-5 flex items-end gap-2">
+              {chartDays.map((day, index) => {
+                const cashInHeight = pct(day.cashIn, axisMax)
+                const cashOutHeight = pct(day.cashOut, axisMax)
+                const showLabel = chartDays.length <= 10 || index % labelEvery === 0
+                return (
+                  <div key={day.date} className="group relative flex h-full min-w-0 flex-1 items-end justify-center gap-1" title={`${dateLabel(day.date)} เงินเข้า ${money(day.cashIn)} / เงินออก ${money(day.cashOut)}`}>
+                    <span className="w-full max-w-5 rounded-t-md bg-emerald-500 transition group-hover:bg-emerald-600" style={{ height: day.cashIn > 0 ? `${Math.max(2, cashInHeight)}%` : 0 }} />
+                    <span className="w-full max-w-5 rounded-t-md bg-red-500 transition group-hover:bg-red-600" style={{ height: day.cashOut > 0 ? `${Math.max(2, cashOutHeight)}%` : 0 }} />
+                    {showLabel ? <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-slate-600">{dateLabel(day.date)}</span> : null}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+        <div className="mt-8 text-center text-xs font-bold text-slate-700">แกน X: วันที่</div>
+      </div>
+    </div>
   )
 }
 
