@@ -79,3 +79,47 @@ browserType.launch: Executable doesn't exist at
 3. รัน `npx playwright install --with-deps chromium` ใน runner stage ตอน build image
 
 **วิธีเช็คผลหลัง deploy:** เปิด `https://ns-dev.devkub.com/api/health` แล้วดูฟิลด์ `playwright.ready`
+
+---
+
+## Batch 4 — Runtime Visibility + Process Consistency + Graceful Degradation
+
+### บริบทที่เพิ่มเข้ามา (หลัง deploy batch 1-3)
+- health endpoint บอก `ready: true` แล้ว แต่บางครั้ง worker ยัง error `/root/.cache/ms-playwright/...`
+- ChatGPT diagnosis: ปัญหาคือ "env มีตอน build แต่หายตอน runtime" หรือ "warm worker ค้างอยู่"
+- สำรวจโค้ดจริง: call site เดียว `chromium.launch()` (line 492 เดิม), ไม่มี worker process แยก → ปัญหาแคบลงเหลือ 2 สาเหตุ
+
+### สิ่งที่แก้ / What changed (batch 4)
+
+#### 1. `launchManagedChromium()` helper — จุดเดียวที่ launch Chromium
+- ทุก job (manual + auto + retry) ต้องผ่าน helper นี้เท่านั้น
+- helper ทำ 3 อย่างก่อน launch:
+  1. resolve path ผ่าน `resolvePlaywrightBrowsersPath()`
+  2. **บังคับ set `process.env.PLAYWRIGHT_BROWSERS_PATH`** ทุกครั้ง (แก้ env หายตอน runtime)
+  3. log runtime fingerprint `[LINE_SEND_WORKER_BEFORE_PLAYWRIGHT]`
+
+#### 2. Runtime fingerprint log — detect warm worker
+log ทุกครั้งก่อน launch มี: `queueId, billNo, pid, hostname, cwd, processUptimeSeconds, nodeEnv, playwrightBrowsersPathEnv, resolvedPath, binaryExists, marker`
+- ถ้า job พัง → เปรียบเทียบ `marker.installedAt` (build time) กับ `processUptimeSeconds` (runtime)
+- ถ้า `processUptimeSeconds > installedAt age` → ยืนยัน warm worker ที่ต้อง restart
+
+#### 3. Smart error แทน Playwright default
+ถ้า Playwright ยังไปหา `/root/.cache/ms-playwright/` ทั้งที่เรา set env แล้ว → throw error ของเราที่บอก:
+> "น่าจะเป็น warm worker/stale process ที่ไม่รับ env ใหม่ (ต้อง restart container)"
+
+พร้อม fingerprint (pid, hostname, uptime) เพื่อให้ DevOps ตรวจได้ทันที
+
+#### 4. Graceful degradation — PDF เป็น optional (ไม่ใช่ hard blocker)
+- แยก PDF gen + upload ออกเป็น try/catch ของตัวเองใน `notifyWeightTicketLine`
+- ถ้า Playwright/Supabase พัง → `pdfUrl = ''` → **ยังส่งข้อความ LINE ได้** (ไม่มี PDF แนบ)
+- template รองรับ `pdfUrl=''` อยู่แล้ว (degrades เป็น `-`)
+- ผู้รับยังได้: ข้อความสรุป + รูปทุกรูป + ลิงก์ระบบ (เหมือนเดิม แค่ไม่มีไฟล์ PDF)
+
+### Why it has to be like this (batch 4)
+- **ทำไมต้อง helper เดียว:** เคสเรา call site เดียวอยู่แล้ว → รวมเป็น helper ทำให้สามารถ enforce "set env ก่อน launch" ได้ทุกครั้งโดยไม่มีโอกาสพลาด
+- **ทำไมต้อง fingerprint log:** เพราะเราควบคุม Dockerfile ไม่ได้ → log เป็นวิธีเดียวที่ยืนยันได้ว่า worker ที่พังเป็น process เดียวกับ health ไหม
+- **ทำไมต้อง graceful:** ถ้า Playwright พัง ผู้ใช้ยังได้ข่าวสาร (แม้ไม่มี PDF) ดีกว่าไม่ได้อะไรเลย และทำให้ Playwright เป็น "nice-to-have" ไม่ใช่ "must-have"
+
+### ข้อจำกัดที่ยังเหลือ (batch 4 ไม่ได้แก้)
+- ถ้า warm worker จริง ๆ → ต้อง restart container (ฝั่ง DevOps) — แต่ batch 4 ทำให้เรามีหลักฐานจาก fingerprint log ที่จะบอก DevOps ได้ชัดเจน
+- ถ้า Docker image ไม่มี binary เลย → PDF จะไม่ถูกสร้าง แต่ข้อความ LINE ยังส่งได้ (graceful)

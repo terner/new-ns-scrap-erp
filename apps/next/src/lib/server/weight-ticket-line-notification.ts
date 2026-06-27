@@ -1,6 +1,7 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { hostname } from 'node:os'
 import { chromium } from 'playwright'
 import { buildReceiptPrintHtml } from '@/lib/weight-ticket-print'
 import { type CompanyProfilePrintValues } from '@/lib/company-profile'
@@ -124,6 +125,90 @@ export function resolvePlaywrightBrowsersPath(): string {
     `  3) รัน "npx playwright install --with-deps chromium" ใน runtime image ระหว่าง build\n\n` +
     `เช็คสถานะปัจจุบันได้ที่ endpoint /api/health (ฟิลด์ playwright)`
   )
+}
+
+/**
+ * อ่าน marker file ที่เขียนโดย install-playwright.js ตอน build stage
+ * เพื่อเปรียบเทียบระหว่าง "build time" กับ "runtime process" — ถ้า worker เก่า
+ * ค้างอยู่ (warm worker) จะเห็น mismatch ของ marker.commit / installedAt ทันที
+ */
+function readPlaywrightMarker(browsersPath: string): {
+  path?: string
+  commit?: string | null
+  installedAt?: string
+  nodeVersion?: string
+  platform?: string
+} | null {
+  try {
+    const markerFile = join(browsersPath, '.installed')
+    if (!existsSync(markerFile)) return null
+    return JSON.parse(readFileSync(markerFile, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * จุดเดียวที่ทำการ launch Chromium ของ Playwright (Single source of truth)
+ *
+ * แก้ปัญหาที่ ChatGPT diagnosis ไว้ถูกต้อง:
+ *  - env `PLAYWRIGHT_BROWSERS_PATH` อาจมีตอน build แต่หายตอน runtime
+ *    → เราบังคับ set process.env ทุกครั้งก่อน launch
+ *  - worker process บางตัวอาจใช้ code/env เก่า → log fingerprint เพื่อยืนยัน
+ *
+ * ทุก job (manual + auto + retry) ต้องผ่านจุดนี้เท่านั้น ห้ามเรียก chromium.launch() ตรง ๆ
+ */
+export async function launchManagedChromium(options?: {
+  queueId?: string | number
+  billNo?: string
+}): Promise<import('playwright').Browser> {
+  const resolvedPath = resolvePlaywrightBrowsersPath()
+
+  // บังคับ set env ทุกครั้งก่อน launch — กัน env หายตอน runtime
+  process.env.PLAYWRIGHT_BROWSERS_PATH = resolvedPath
+
+  const marker = readPlaywrightMarker(resolvedPath)
+
+  // Runtime fingerprint log — ถ้า job พังจะเห็นทันทีว่าเป็น process/env ตัวไหน
+  console.log('[LINE_SEND_WORKER_BEFORE_PLAYWRIGHT]', JSON.stringify({
+    queueId: options?.queueId ?? null,
+    billNo: options?.billNo ?? null,
+    pid: process.pid,
+    hostname: hostname(),
+    cwd: process.cwd(),
+    processUptimeSeconds: Math.round(process.uptime()),
+    nodeEnv: process.env.NODE_ENV ?? null,
+    playwrightBrowsersPathEnv: process.env.PLAYWRIGHT_BROWSERS_PATH,
+    resolvedPath,
+    binaryExists: existsSync(resolvedPath),
+    marker,
+  }))
+
+  try {
+    const browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--font-render-hinting=none',
+        '--disable-font-subpixel-positioning',
+        '--disable-gpu',
+      ],
+    })
+    return browser
+  } catch (err) {
+    // ถ้ายังไปเจอ /root/.cache/... แปลว่า Playwright ไม่รับ env ที่เรา set
+    // → throw error ของเราเองพร้อม fingerprint แทน error ปกติของ Playwright
+    const rawErr = err instanceof Error ? err.message : String(err)
+    if (rawErr.includes('/root/.cache/ms-playwright') || rawErr.includes('ms-playwright')) {
+      throw new Error(
+        `Playwright ยังไปหา default path ที่ว่างเปล่าแทน path ที่เราตั้ง แม้จะ set env แล้ว\n` +
+        `→ น่าจะเป็น warm worker/stale process ที่ไม่รับ env ใหม่ (ต้อง restart container)\n` +
+        `fingerprint: resolvedPath=${resolvedPath}, env=${process.env.PLAYWRIGHT_BROWSERS_PATH}, ` +
+        `pid=${process.pid}, hostname=${hostname()}, uptime=${Math.round(process.uptime())}s\n` +
+        `original: ${rawErr}`
+      )
+    }
+    throw err
+  }
 }
 
 function imageFromDataUrl(value: string) {
@@ -484,18 +569,12 @@ export async function generateWeightTicketPdf(
 
   // 5. Use Playwright to launch Chromium in headless mode and render HTML to PDF
   // Chromium binary ต้องถูกติดตั้งตอน build และ copy ข้าม Docker multi-stage เข้าสู่ runtime image.
-  // ปัญหาเดิม: path logic แบบ best-effort ปล่อยให้ Playwright fallback ไป /root/.cache/ms-playwright/
-  // ที่ว่างเปล่า → launch พังเงียบ ๆ. ตอนนี้ resolve แบบชัดเจน และ throw พร้อมคำแนะนำเมื่อหาไม่เจอ
-  const browsersPath = resolvePlaywrightBrowsersPath()
-  process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath
-
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--font-render-hinting=none',
-      '--disable-font-subpixel-positioning',
-      '--disable-gpu',
-    ]
+  // ปัดทุกการ launch ผ่าน launchManagedChromium() จุดเดียว — เพื่อ:
+  //   - บังคับ set PLAYWRIGHT_BROWSERS_PATH ทุกครั้งก่อน launch (กัน env หายตอน runtime)
+  //   - log runtime fingerprint (pid/hostname/uptime/marker) เพื่อ detect warm worker
+  //   - ถ้า fallback ไป /root/.cache ทั้งที่ set env แล้ว → throw error ที่บอกต้นเหตุชัดเจน
+  const browser = await launchManagedChromium({
+    billNo: ticket.documentNo,
   })
   const context = await browser.newContext()
   const page = await context.newPage()
@@ -1472,27 +1551,44 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
 
   try {
     const profile = await loadCompanyPrintProfile(loaded.record.branchId)
-    const { pdfBuffer, albumImages } = await generateWeightTicketPdf(loaded.record, profile, {
-      showBadges: configs.albumShowBadges,
-      showTimestamps: configs.albumShowTimestamps,
-      quality: configs.albumQuality,
-    })
-    const uploaded = await uploadPdf(loaded.record, pdfBuffer, configs.pdfBucket)
+    const detailUrl = buildDetailUrl(options.origin || configs.appUrl, loaded.record.documentNo)
 
-    // Upload album images
-    const albumImageUrls: string[] = []
-    for (const albumImg of albumImages) {
-      const url = await uploadAlbumImage(loaded.record, albumImg.buffer, albumImg.pageIdx, configs.pdfBucket)
-      albumImageUrls.push(url)
+    // --- PDF + album generation (optional, graceful degradation) ---
+    // ถ้า Playwright/Supabase พัง → ยังส่งข้อความ LINE ได้ (ไม่มี PDF แนบ)
+    // เพราะ template รองรับ pdfUrl='' อยู่แล้ว (degrades เป็น '-')
+    // ทำตามแนวทางของ ChatGPT: อย่าให้ PDF gen เป็น hard blocker ของทั้ง notification
+    let pdfUrl = ''
+    let albumImageUrls: string[] = []
+    let pdfStorageBucket = configs.pdfBucket
+    let pdfStorageKey: string | undefined
+
+    try {
+      const { pdfBuffer, albumImages } = await generateWeightTicketPdf(loaded.record, profile, {
+        showBadges: configs.albumShowBadges,
+        showTimestamps: configs.albumShowTimestamps,
+        quality: configs.albumQuality,
+      })
+      const uploaded = await uploadPdf(loaded.record, pdfBuffer, configs.pdfBucket)
+      pdfUrl = uploaded.pdfUrl
+      pdfStorageKey = uploaded.storageKey
+
+      // Upload album images
+      for (const albumImg of albumImages) {
+        const url = await uploadAlbumImage(loaded.record, albumImg.buffer, albumImg.pageIdx, configs.pdfBucket)
+        albumImageUrls.push(url)
+      }
+    } catch (pdfErr) {
+      // PDF/album พัง → log warning แล้วทำงานต่อ ส่งข้อความอย่างเดียว (ไม่มี PDF แนบ)
+      const errMsg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
+      console.warn('[notifyWeightTicketLine] PDF generation failed, sending message without PDF attachment:', errMsg)
     }
 
-    const detailUrl = buildDetailUrl(options.origin || configs.appUrl, loaded.record.documentNo)
     const imagePublicUrls = await resolveImagePublicUrls(loaded.record, configs.pdfBucket)
-    const flexMessage = buildFlexMessage(loaded.record, uploaded.pdfUrl, detailUrl, imagePublicUrls, albumImageUrls, options.customMessage)
+    const flexMessage = buildFlexMessage(loaded.record, pdfUrl, detailUrl, imagePublicUrls, albumImageUrls, options.customMessage)
     const customTemplate = loaded.record.type === 'WTI' ? configs.wtiTemplate : configs.wtoTemplate
     const textMessage = {
       type: 'text',
-      text: formatCustomTemplate(customTemplate, loaded.record, uploaded.pdfUrl)
+      text: formatCustomTemplate(customTemplate, loaded.record, pdfUrl)
     }
 
     const sentResults: Array<{ targetId: string; status: 'sent' | 'failed' | 'skipped'; lineRequestId?: string; error?: string }> = []
@@ -1523,9 +1619,9 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
         await recordNotificationLog({
           customMessage: options.customMessage,
           lineRequestId,
-          pdfStorageBucket: configs.pdfBucket,
-          pdfStorageKey: uploaded.storageKey,
-          pdfUrl: uploaded.pdfUrl,
+          pdfStorageBucket,
+          pdfStorageKey,
+          pdfUrl,
           requestedBy: options.requestedBy,
           status: 'sent',
           targetId: target,
@@ -1541,7 +1637,7 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
         await recordNotificationLog({
           customMessage: options.customMessage,
           errorMessage: errMsg,
-          pdfStorageBucket: configs.pdfBucket,
+          pdfStorageBucket,
           requestedBy: options.requestedBy,
           status: 'failed',
           targetId: target,
@@ -1558,7 +1654,7 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
     if (sentCount > 0) {
       await syncWeightTicketToGoogleSheets('update', {
         ...loaded.record,
-        pdfUrl: uploaded.pdfUrl,
+        pdfUrl,
       } as any).catch((err) => {
         console.error('[line-notification] failed to sync to google sheets:', err)
       })
@@ -1570,7 +1666,7 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
         detailUrl,
         error: 'เอกสารนี้เคยส่งเข้า LINE แล้ว จึงไม่ได้ส่งซ้ำอัตโนมัติ',
         lineRequestId: null,
-        pdfUrl: uploaded.pdfUrl,
+        pdfUrl,
         sentResults,
         status: 409,
       }
@@ -1582,7 +1678,7 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
         detailUrl,
         error: failedResults[0]?.error || 'ส่ง LINE ไม่สำเร็จ',
         lineRequestId: null,
-        pdfUrl: uploaded.pdfUrl,
+        pdfUrl,
         sentResults,
         status: 502,
       }
@@ -1592,7 +1688,7 @@ export async function notifyWeightTicketLine(documentNo: string, options: Notify
       code: 'SENT' as const,
       detailUrl,
       lineRequestId: lastSentRequestId,
-      pdfUrl: uploaded.pdfUrl,
+      pdfUrl,
       status: 200,
       sentResults
     }
