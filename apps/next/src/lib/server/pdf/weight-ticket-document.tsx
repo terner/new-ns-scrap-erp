@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 12,
   },
-  companyBlock: { flexDirection: 'row', flexGrow: 1, flexShrink: 1 },
+  companyBlock: { flexDirection: 'row', flex: 1.25 },
   logo: { width: 50, height: 50, marginRight: 10, objectFit: 'contain' },
   logoPlaceholder: {
     width: 50,
@@ -115,8 +115,8 @@ const styles = StyleSheet.create({
   companyName: { fontSize: 14, fontWeight: 700, color: TEXT_DARK },
   companyEn: { fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, marginTop: 1 },
   companyInfo: { fontSize: 8, color: TEXT_SECONDARY, marginTop: 3 },
-  docHead: { flexShrink: 0, alignItems: 'flex-end' },
-  docTitle: { fontSize: 16, fontWeight: 700, color: DOC_TITLE_GREEN },
+  docHead: { flex: 0.75, alignItems: 'flex-end' },
+  docTitle: { fontSize: 14, fontWeight: 700, color: DOC_TITLE_GREEN },
 
   // Section grid (party + doc info)
   sectionGrid: { flexDirection: 'row', gap: 8, marginBottom: 12 },
@@ -132,11 +132,9 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontWeight: 700,
     fontSize: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
-  panelBody: { padding: 7, flexDirection: 'row', flexWrap: 'wrap' },
-  field: { width: '50%', marginBottom: 5, paddingRight: 6 },
+  panelBody: { padding: 6, flexDirection: 'row', flexWrap: 'wrap' },
+  field: { width: '50%', marginBottom: 3, paddingRight: 6 },
   fieldLabel: { fontSize: 8, color: TEXT_SECONDARY, fontWeight: 500 },
   fieldValue: { fontSize: 10, fontWeight: 600, color: TEXT_DARK, marginTop: 1 },
   fieldValueStrong: { fontSize: 12, color: FINAL_WEIGHT_GREEN, fontWeight: 700, marginTop: 1 },
@@ -420,7 +418,7 @@ function TableFooter({ ticket, isReceipt }: { ticket: WeightTicketRecord; isRece
         <Text>{formatPrintableNumber(ticket.totals.grossWeight)}</Text>
       </View>
       <View style={[styles.tableCellRight, { width: COL_CONTAINER }]}>
-        <Text>{formatPrintableNumber(ticket.totals.containerDeductionWeight)}{isReceipt ? ' kg' : ''}</Text>
+        <Text>{formatPrintableNumber(ticket.totals.containerDeductionWeight)} kg</Text>
       </View>
       {isReceipt ? (
         <>
