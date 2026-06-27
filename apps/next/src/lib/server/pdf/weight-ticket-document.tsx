@@ -408,7 +408,7 @@ function TableHeader({ isReceipt }: { isReceipt: boolean }) {
 
 function TableFooter({ ticket, isReceipt }: { ticket: WeightTicketRecord; isReceipt: boolean }) {
   const totalAfterContainer = Math.max(0, ticket.totals.grossWeight - ticket.totals.containerDeductionWeight)
-  const labelWidth = isReceipt ? `${4 + 32 + 12}%` : `${4 + 46}%`
+  const labelWidth = isReceipt ? '36%' : '50%'
   return (
     <View style={[styles.tableRow, styles.bgProductTotal]}>
       <View style={[styles.tableCellRight, { width: labelWidth }]}>
