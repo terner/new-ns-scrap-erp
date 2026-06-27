@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 12,
   },
-  companyBlock: { flexDirection: 'row', flex: 1 },
+  companyBlock: { flexDirection: 'row', flex: 1.6 },
   logo: { width: 50, height: 50, marginRight: 10, objectFit: 'contain' },
   logoPlaceholder: {
     width: 50,
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   companyName: { fontSize: 14, fontWeight: 700, color: TEXT_DARK },
   companyEn: { fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, marginTop: 1 },
   companyInfo: { fontSize: 8, color: TEXT_SECONDARY, marginTop: 3 },
-  docHead: { flex: 0.9, alignItems: 'flex-end' },
+  docHead: { flex: 0.4, alignItems: 'flex-end' },
   docTitle: { fontSize: 16, fontWeight: 700, color: DOC_TITLE_GREEN },
 
   // Section grid (party + doc info)
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 4,
+    borderRadius: 8,
   },
   panelTitle: {
     padding: 5,
@@ -148,7 +148,10 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   tableHeaderCell: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 8,
     fontWeight: 700,
     color: '#1e293b',
@@ -156,7 +159,10 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER,
   },
   tableHeaderCellLast: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 8,
     fontWeight: 700,
     color: '#1e293b',
@@ -168,29 +174,44 @@ const styles = StyleSheet.create({
     borderColor: BORDER_LIGHT,
   },
   tableCell: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 9,
     borderRightWidth: 1,
     borderRightColor: BORDER_LIGHT,
   },
   tableCellLast: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 9,
   },
   tableCellRight: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 9,
     textAlign: 'right',
     borderRightWidth: 1,
     borderRightColor: BORDER_LIGHT,
   },
   tableCellRightLast: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 9,
     textAlign: 'right',
   },
   tableCellStrong: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 9,
     textAlign: 'right',
     fontWeight: 700,
@@ -199,7 +220,10 @@ const styles = StyleSheet.create({
     borderRightColor: BORDER_LIGHT,
   },
   tableCellStrongLast: {
-    padding: 4,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingLeft: 5,
+    paddingRight: 5,
     fontSize: 9,
     textAlign: 'right',
     fontWeight: 700,
@@ -334,6 +358,24 @@ function ItemRow({ row, isReceipt }: { row: PrintWeightRow; isReceipt: boolean }
       <View style={[styles.tableCellStrongLast, { width: isReceipt ? COL_NET : COL_NET_WTO }]}>
         <Text>{formatPrintableNumber(row.netWeight)}</Text>
       </View>
+    </View>
+  )
+}
+
+function FillerRow({ isReceipt }: { isReceipt: boolean }) {
+  return (
+    <View style={[styles.tableRow, { height: 18 }]}>
+      <View style={[styles.tableCell, { width: COL_RANK }]}><Text> </Text></View>
+      <View style={[styles.tableCell, { width: isReceipt ? COL_ITEM : `${100 - 4 - 12 - 12 - 26}%` }]}><Text> </Text></View>
+      <View style={[styles.tableCellRight, { width: COL_GROSS }]}><Text> </Text></View>
+      <View style={[styles.tableCellRight, { width: COL_CONTAINER }]}><Text> </Text></View>
+      {isReceipt ? (
+        <>
+          <View style={[styles.tableCellRight, { width: COL_AFTER_CONTAINER }]}><Text> </Text></View>
+          <View style={[styles.tableCellRight, { width: COL_DEDUCTION }]}><Text> </Text></View>
+        </>
+      ) : null}
+      <View style={[styles.tableCellStrongLast, { width: isReceipt ? COL_NET : COL_NET_WTO }]}><Text> </Text></View>
     </View>
   )
 }
@@ -524,6 +566,10 @@ export function WeightTicketDocument({ ticket, profile }: WeightTicketDocumentPr
               <TableHeader isReceipt={isReceipt} />
               {page.items.map((row, idx) => (
                 <ItemRow key={idx} row={row} isReceipt={isReceipt} />
+              ))}
+              {/* Filler rows to align height exactly with printed output */}
+              {Array.from({ length: Math.max(0, page.capacity - page.items.length) }).map((_, idx) => (
+                <FillerRow key={`filler-${idx}`} isReceipt={isReceipt} />
               ))}
               {isLastPage ? <TableFooter ticket={ticket} isReceipt={isReceipt} /> : null}
             </View>
