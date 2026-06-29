@@ -19,7 +19,6 @@ type CustomerTrackingRow = {
   revenue: number
 }
 type CustomerTrackingPayload = {
-  filters: { customers: Array<{ active: boolean | null; code: string | null; id: string; name: string }> }
   monthly: Array<{ gp: number; month: string; qty: number; revenue: number }>
   rows: CustomerTrackingRow[]
   summary: { cogs: number; customers: number; gp: number; qty: number; receivable: number; receivedAmount: number; revenue: number }
@@ -30,7 +29,6 @@ const monthLabels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.
 const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 
 export function CustomerTrackingPageClient() {
-  const [customerId, setCustomerId] = useState('')
   const [data, setData] = useState<CustomerTrackingPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -42,10 +40,9 @@ export function CustomerTrackingPageClient() {
   const queryString = useMemo(() => {
     const params = new URLSearchParams({ year })
     if (month) params.set('month', month)
-    if (customerId) params.set('customerId', customerId)
     if (search.trim()) params.set('q', search.trim())
     return params.toString()
-  }, [customerId, month, search, year])
+  }, [month, search, year])
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -83,11 +80,7 @@ export function CustomerTrackingPageClient() {
             <option value="">ทั้งปี</option>
             {months.map((value, index) => <option key={value} value={value}>{monthLabels[index]}</option>)}
           </select>
-          <select className="rounded-md border px-3 py-2 text-sm md:col-span-2" value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
-            <option value="">ลูกค้าทั้งหมด</option>
-            {(data?.filters.customers ?? []).map((customer) => <option key={customer.id} value={customer.id}>{customer.code ? `${customer.code} - ${customer.name}` : customer.name}</option>)}
-          </select>
-          <input className="rounded-md border px-3 py-2 text-sm" placeholder="ค้นหา Customer" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="rounded-md border px-3 py-2 text-sm md:col-span-3" placeholder="ค้นหา Customer" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
           <a className="rounded-md bg-emerald-600 px-4 py-2 text-center text-sm font-bold text-white" href={exportHref}>📥 XLSX</a>
         </div>
       </div>
