@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { parseInternalBigIntId } from '@/lib/business-code'
-import { calculateTicketTotals, isOtherProductImpurityId, isOtherProductImpurityLabel, weightTicketCancelSchema, weightTicketFormSchema } from '@/lib/weight-tickets'
+import { calculateTicketTotals, isOtherProductImpurityId, isOtherProductImpurityLabel, weightTicketCancelSchema, weightTicketConfirmSchema, weightTicketFormSchema } from '@/lib/weight-tickets'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { recordAuditLog } from '@/lib/server/app-logging'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { currentActor, toDateOnly } from '@/lib/server/daily'
+import { currentActor, toDateOnly, toNumber } from '@/lib/server/daily'
 import { findActiveBranchReferencesByCodes } from '@/lib/server/branch-reference'
 import { findActiveCustomerReferenceByCodeOrId } from '@/lib/server/customer-reference'
 import { PartyBranchEligibilityError, assertCustomerEligibleForBranch, assertSupplierEligibleForBranch } from '@/lib/server/party-branch-eligibility'
@@ -14,7 +14,9 @@ import {
   releaseActiveWtoPendingOut,
   createActiveWtoPendingOut,
   resolveWtoWarehousesForLines,
+  snapshotActiveWtoPendingOutCosts,
   validateWtoStockAvailability,
+  type WtoPreservedCostSnapshot,
   WtoPendingOutError,
 } from '@/lib/server/stock-holds'
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
@@ -61,6 +63,16 @@ const ticketInclude = {
       },
     },
     orderBy: { line_no: 'asc' },
+  },
+  stock_holds: {
+    select: {
+      product_id: true,
+      qty: true,
+      status: true,
+      unit_cost_snapshot: true,
+      value_snapshot: true,
+    },
+    where: { status: 'active' },
   },
 } as const
 
@@ -239,7 +251,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const actor = currentActor(auth)
     const documentDate = toDateOnly(existing.document_date)
-    const nextStatus = existing.status === 'billed'
+    const nextStatus = existing.status === 'billed' || existing.status === 'delivered'
       ? existing.status
       : defaultTicketStatus(values.type)
     const totals = calculateTicketTotals(values.lines.map((line) => ({
@@ -296,6 +308,49 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           },
         },
       })
+      const preservedCostSnapshots: WtoPreservedCostSnapshot[] = []
+      if (values.type === 'WTO' && existing.status === 'delivered') {
+        const activeHolds = await tx.stock_holds.findMany({
+          orderBy: [{ source_line_no: 'asc' }, { id: 'asc' }],
+          select: {
+            cost_snapshot_at: true,
+            cost_snapshot_note: true,
+            cost_snapshot_source: true,
+            hold_key: true,
+            lot_no: true,
+            not_available_for_sale: true,
+            output_category: true,
+            product_id: true,
+            qty: true,
+            unit_cost_snapshot: true,
+            value_snapshot: true,
+            warehouse_id: true,
+          },
+          where: {
+            status: 'active',
+            weight_ticket_id: existing.id,
+          },
+        })
+        for (const hold of activeHolds) {
+          if (hold.unit_cost_snapshot == null) {
+            throw new WtoPendingOutError(`pending_out ${hold.hold_key} ยังไม่มีราคาเฉลี่ย snapshot ไม่สามารถแก้ไขใบส่งของหลังยืนยันได้`)
+          }
+          preservedCostSnapshots.push({
+            costSnapshotAt: hold.cost_snapshot_at,
+            costSnapshotNote: hold.cost_snapshot_note,
+            costSnapshotSource: hold.cost_snapshot_source,
+            lotNo: hold.lot_no,
+            notAvailableForSale: hold.not_available_for_sale,
+            outputCategory: hold.output_category,
+            productId: hold.product_id,
+            qty: toNumber(hold.qty),
+            unitCostSnapshot: hold.unit_cost_snapshot,
+            valueSnapshot: hold.value_snapshot,
+            warehouseId: hold.warehouse_id,
+          })
+        }
+      }
+
       await releaseActiveWtoPendingOut(tx, {
         actor,
         reason: 'edit',
@@ -326,6 +381,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           branchId: branch.id,
           documentNo: docNo,
           lines: createdLines,
+          preservedCostSnapshots,
+          snapshotCost: existing.status === 'delivered',
+          snapshotSource: 'WTO_EDIT_INCREASE',
           weightTicketId: existing.id,
         })
       }
@@ -433,7 +491,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     requirePermission(auth, 'daily.weight_tickets.view')
 
     const { id } = await context.params
-    const values = weightTicketCancelSchema.parse(await request.json())
+    const rawValues = await request.json()
     const existing = await findScopedTicket(id, branchScopeIds(auth))
     if (!existing) return NextResponse.json({ code: 'NOT_FOUND', error: 'ไม่พบใบรับ-ส่งของที่ต้องการยกเลิก' }, { status: 404 })
 
@@ -444,6 +502,77 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const beforeSnapshot = weightTicketAuditSnapshot(mapWeightTicketRow(existing as WeightTicketRow, usage))
 
     const actor = currentActor(auth)
+    const confirmParsed = weightTicketConfirmSchema.safeParse(rawValues)
+    if (confirmParsed.success) {
+      if (existing.doc_type !== 'WTO') {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยืนยันต้นทุนได้เฉพาะใบส่งของ WTO' }, { status: 400 })
+      }
+      if (existing.status !== 'draft') {
+        return NextResponse.json({ code: 'BAD_REQUEST', error: 'ยืนยันได้เฉพาะใบส่งของสถานะร่าง' }, { status: 400 })
+      }
+
+      const confirmedAt = new Date()
+      const updated = await prisma.$transaction(async (tx) => {
+        await snapshotActiveWtoPendingOutCosts(tx, {
+          actor,
+          branchId: existing.branch_id,
+          source: 'WTO_CONFIRM',
+          weightTicketId: existing.id,
+        })
+        await tx.weight_tickets.update({
+          data: {
+            status: 'delivered',
+            updated_at: confirmedAt,
+            updated_by: actor,
+          },
+          where: { id: existing.id },
+        })
+        await appendWeightTicketStatusLog(tx, {
+          action: WEIGHT_TICKET_STATUS_ACTION.CONFIRMED,
+          actor,
+          createdAt: confirmedAt,
+          fromStatus: existing.status,
+          meta: {
+            reason: 'wto_confirm_cost_snapshot',
+          },
+          toStatus: 'delivered',
+          weightTicketId: existing.id,
+        })
+        return tx.weight_tickets.findUniqueOrThrow({
+          include: ticketInclude,
+          where: { id: existing.id },
+        })
+      })
+
+      const mapped = mapWeightTicketRow(updated as WeightTicketRow, usage)
+      await syncWeightTicketToGoogleSheets('update', mapped)
+      await recordAuditLog({
+        action: 'status',
+        afterData: weightTicketAuditSnapshot(mapped),
+        beforeData: beforeSnapshot,
+        context: auth,
+        entityId: String(updated.id),
+        entityLabel: updated.doc_no,
+        entitySchema: 'public',
+        entityTable: 'weight_tickets',
+        eventKey: 'daily.weight-ticket.confirmed',
+        metadata: {
+          documentNo: mapped.documentNo,
+          status: mapped.status,
+        },
+        request,
+        targetId: String(updated.id),
+        targetLabel: updated.doc_no,
+        targetType: 'weight_ticket',
+      })
+      const timeline = await getWeightTicketTimeline(prisma, updated.id)
+      return NextResponse.json({
+        ...mapped,
+        timeline,
+      })
+    }
+
+    const values = weightTicketCancelSchema.parse(rawValues)
     const cancelledAt = new Date()
     const updated = await prisma.$transaction(async (tx) => {
       await releaseActiveWtoPendingOut(tx, {

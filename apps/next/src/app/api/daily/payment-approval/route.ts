@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { paymentMethodGroupFromValue, resolvePaymentMethodName } from '@/lib/account-payment-method'
+import { defaultPaymentMethodNameByGroup, paymentMethodGroupFromValue, resolvePaymentMethodName } from '@/lib/account-payment-method'
 import { requireBusinessCode, requireDocumentNo } from '@/lib/business-code'
 import { PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { refreshAdvancePaymentWorkflowStatus } from '@/lib/server/advance-payments'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
-import { listDailyAccounts, nextBankStatementDocNos, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
 import { nextPaymentApprovalDocNos } from '@/lib/server/payment-approval-pending'
 import { getActivePaymentMethods, type ActivePaymentMethod } from '@/lib/server/payment-methods'
 import { appendPaymentApprovalStatusLog, PAYMENT_APPROVAL_STATUS_ACTION } from '@/lib/server/payment-history'
@@ -16,7 +16,7 @@ export const runtime = 'nodejs'
 
 const approvalRequestSchema = z.object({
   approvalId: z.string().trim().min(1, 'ไม่พบรายการอนุมัติที่ต้องการดำเนินการ'),
-  sourceType: z.enum(['purchase_bill', 'advance_payment', 'expense', 'petty_advance_return']),
+  sourceType: z.enum(['purchase_bill', 'advance_payment', 'expense', 'petty_advance']),
   splits: z.array(z.object({
     approvedAmount: z.coerce.number().finite().gt(0, 'ยอดอนุมัติต้องมากกว่า 0'),
     destinationId: z.string().trim().min(1, 'เลือกช่องทางจ่ายปลายทาง'),
@@ -67,11 +67,60 @@ function normalizeSupplierBankAccounts(params: {
     .filter((option) => option.paymentMethod.trim() || option.accountNo.trim())
 }
 
-function pettyReturnDisplayDocNo(entry: { date: Date; doc_no: string | null; id: bigint } | null | undefined, fallback: string) {
-  const docNo = entry?.doc_no?.trim()
-  if (docNo?.startsWith('PRET')) return docNo
-  if (!entry) return fallback
-  return `PRET${toDateOnly(entry.date).slice(2, 7).replace('-', '')}-${entry.id.toString().padStart(4, '0')}`
+function normalizeDirectorRecipientBankAccounts(params: {
+  paymentMethods: ActivePaymentMethod[]
+  row:
+    | {
+        director_employee_bank_accounts?:
+          | Array<{
+              account_name: string | null
+              account_no: string | null
+              active: boolean | null
+              bank_branch: string | null
+              bank_name: string | null
+              code: string
+              source_type: string
+              accounts: {
+                account_no: string | null
+                bank_name: string | null
+                name: string
+                type: string
+              } | null
+            }>
+          | null
+      }
+    | null
+    | undefined
+}): ApprovalDestinationOption[] {
+  const bankPaymentMethod = defaultPaymentMethodNameByGroup(params.paymentMethods, 'bank') ?? 'ธนาคาร'
+  return (params.row?.director_employee_bank_accounts ?? [])
+    .filter((account) => account.active !== false)
+    .map((account) => {
+      const accountNo = account.account_no ?? account.accounts?.account_no ?? ''
+      const bankName = account.bank_name ?? account.accounts?.bank_name ?? account.accounts?.name ?? ''
+      const accountName = account.account_name ?? account.accounts?.name ?? ''
+      const paymentMethod = account.accounts?.type
+        ? resolvePaymentMethodName(account.accounts.type, params.paymentMethods) ?? bankPaymentMethod
+        : bankPaymentMethod
+      const label = [
+        paymentMethod,
+        bankName,
+        accountName,
+        accountNo,
+        account.bank_branch ? `สาขา ${account.bank_branch}` : '',
+        account.source_type === 'IN_COMPANY' ? 'บัญชีในบริษัท' : 'บัญชีนอกบริษัท',
+      ].filter(Boolean).join(' / ')
+      return {
+        accountNo,
+        bankName,
+        id: account.code,
+        isPrimary: false,
+        kind: 'bank' as const,
+        label,
+        paymentMethod,
+      }
+    })
+    .filter((option) => option.accountNo.trim())
 }
 
 export async function GET() {
@@ -79,7 +128,7 @@ export async function GET() {
     const context = await getCurrentAuthContext()
     requirePermission(context, 'finance.cash.view')
 
-    const [purchaseBills, advancePayments, expenses, approvals, pettyReturns, paymentMethods, dailyAccounts] = await Promise.all([
+    const [purchaseBills, advancePayments, expenses, approvals, pettyAdvances, paymentMethods] = await Promise.all([
       prisma.purchase_bills.findMany({
         include: {
           suppliers: {
@@ -152,19 +201,34 @@ export async function GET() {
           status: { in: ['approved', 'paid', 'voided'] },
         },
       }),
-      prisma.petty_advance_returns.findMany({
+      prisma.petty_advances.findMany({
         include: {
           accounts: true,
-          petty_advances: true,
+          recipient_person: {
+            include: {
+              director_employee_bank_accounts: {
+                include: {
+                  accounts: {
+                    select: {
+                      account_no: true,
+                      bank_name: true,
+                      name: true,
+                      type: true,
+                    },
+                  },
+                },
+                orderBy: [{ is_primary: 'desc' }, { id: 'asc' }],
+              },
+            },
+          },
         },
         orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
         take: 5000,
         where: {
-          status: { in: ['pending', 'approved', 'voided'] },
+          status: { notIn: ['closed', 'cancelled'] },
         },
       }),
       getActivePaymentMethods(),
-      listDailyAccounts(),
     ])
 
     const approvedByPurchaseBillId = new Map<string, typeof approvals[number][]>()
@@ -173,14 +237,19 @@ export async function GET() {
     const voidedByPurchaseBillId = new Map<string, typeof approvals[number][]>()
     const voidedByAdvanceId = new Map<string, typeof approvals[number][]>()
     const voidedByExpenseId = new Map<string, typeof approvals[number][]>()
+    const voidedByPettyAdvanceId = new Map<string, typeof approvals[number][]>()
     const activeByAdvanceId = new Map<string, typeof approvals[number][]>()
     const activeByExpenseId = new Map<string, typeof approvals[number][]>()
+    const activeByPettyAdvanceId = new Map<string, typeof approvals[number][]>()
     for (const approval of approvals) {
       if ((approval.status === 'approved' || approval.status === 'paid') && approval.source_type === 'advance_payment') {
         activeByAdvanceId.set(approval.source_id, [...(activeByAdvanceId.get(approval.source_id) ?? []), approval])
       }
       if ((approval.status === 'approved' || approval.status === 'paid') && approval.source_type === 'expense') {
         activeByExpenseId.set(approval.source_id, [...(activeByExpenseId.get(approval.source_id) ?? []), approval])
+      }
+      if ((approval.status === 'approved' || approval.status === 'paid') && approval.source_type === 'petty_advance') {
+        activeByPettyAdvanceId.set(approval.source_id, [...(activeByPettyAdvanceId.get(approval.source_id) ?? []), approval])
       }
       if (approval.status === 'voided') {
         const targetMap = approval.source_type === 'purchase_bill'
@@ -189,6 +258,8 @@ export async function GET() {
             ? voidedByAdvanceId
             : approval.source_type === 'expense'
               ? voidedByExpenseId
+              : approval.source_type === 'petty_advance'
+                ? voidedByPettyAdvanceId
               : null
         if (targetMap) targetMap.set(approval.source_id, [...(targetMap.get(approval.source_id) ?? []), approval])
         continue
@@ -460,79 +531,101 @@ export async function GET() {
       return [...pendingRows, ...approvedRows, ...voidedRows]
     })
 
-    const dailyAccountOptions = dailyAccounts.map((account) => ({
-      accountNo: account.code ?? '',
-      bankName: account.name,
-      id: account.id,
-      isPrimary: false,
-      kind: account.type === 'cash' ? 'cash' as const : 'bank' as const,
-      label: [account.type, account.name, account.code ?? ''].filter(Boolean).join(' / '),
-      paymentMethod: account.type,
-    }))
-    const pettyReturnById = new Map(pettyReturns.map((entry) => [entry.id.toString(), entry] as const))
-    const pendingPettyReturnRows = pettyReturns
-      .filter((entry) => entry.status === 'pending')
-      .map((entry) => {
-        const returnAmount = toNumber(entry.amount)
-        const destinationLabel = [entry.accounts?.type ?? '', entry.accounts?.name ?? '', entry.accounts?.account_no ?? ''].filter(Boolean).join(' / ')
-        const matchingOption = dailyAccountOptions.find((option) => option.id === entry.accounts?.code)
-        return {
-          accountId: entry.accounts?.code ?? matchingOption?.id ?? '',
-          accountName: entry.accounts?.name || matchingOption?.bankName || '',
-          approvalDisplayDocNo: null,
-          approvalId: entry.id.toString(),
-          approvalStatus: 'pending' as const,
-          approvedAmount: 0,
-          date: toDateOnly(entry.date),
-          destinationLabel,
-          destinationOptions: dailyAccountOptions,
-          docNo: entry.petty_advances.doc_no,
-          dueDate: toDateOnly(entry.date),
-          id: `petty_advance_return:${entry.id.toString()}`,
-          payee: entry.petty_advances.recipient_name ?? '-',
-          refDocNo: entry.notes ?? '',
-          sourceDocNo: entry.petty_advances.doc_no,
-          sourceType: 'petty_advance_return' as const,
-          totalAmount: returnAmount,
-          voidReason: entry.void_reason ?? '',
-          voidedAt: toDateOnly(entry.voided_at),
-          description: entry.notes || entry.petty_advances.notes || '',
-        }
+    const pettyAdvanceRows = pettyAdvances.flatMap((advance: typeof pettyAdvances[number]) => {
+      const advanceId = advance.id.toString()
+      const activeOrConsumedApprovals = activeByPettyAdvanceId.get(advanceId) ?? []
+      const voidedApprovals = voidedByPettyAdvanceId.get(advanceId) ?? []
+      const amount = toNumber(advance.amount)
+      const returnedAmount = toNumber(advance.returned_amount)
+      const approvedOutstanding = activeOrConsumedApprovals.reduce((sum, approval) => sum + toNumber(approval.approved_amount), 0)
+      const pendingAmount = Math.max(0, amount - returnedAmount - approvedOutstanding)
+      const sourceDocNo = requireDocumentNo(advance.doc_no, `เงินสำรองจ่าย ${advance.id}`)
+      const recipientDestinationOptions = normalizeDirectorRecipientBankAccounts({
+        paymentMethods,
+        row: advance.recipient_person,
       })
-    const approvedPettyReturnRows = approvals
-      .filter((approval) => approval.source_type === 'petty_advance_return' && approval.status !== 'paid')
-      .map((approval) => {
-        const entry = pettyReturnById.get(approval.source_id)
-        const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติคืนเงิน ${approval.id}`)
+      const pendingRows = pendingAmount > 0.01 ? [{
+        accountId: advance.accounts?.code ?? '',
+        accountName: advance.accounts?.name ?? '',
+        approvalDisplayDocNo: null,
+        approvalId: sourceDocNo,
+        approvalStatus: 'pending' as const,
+        approvedAmount: 0,
+        createdAt: advance.created_at.toISOString(),
+        date: toDateOnly(advance.date),
+        destinationLabel: '',
+        destinationOptions: recipientDestinationOptions,
+        docNo: sourceDocNo,
+        dueDate: toDateOnly(advance.date),
+        id: `petty_advance:${sourceDocNo}`,
+        payee: advance.recipient_name ?? '-',
+        refDocNo: advance.notes ?? '',
+        sourceDocNo,
+        sourceType: 'petty_advance' as const,
+        totalAmount: pendingAmount,
+        voidReason: '',
+        voidedAt: '',
+        description: advance.notes || '',
+      }] : []
+      const approvedRows = activeOrConsumedApprovals
+        .filter((approval) => approval.status === 'approved')
+        .map((approval) => {
+          const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติเงินสำรองจ่าย ${approval.id}`)
+          const approvedAmount = toNumber(approval.approved_amount)
+          return {
+            accountId: approval.destination_bank_account_id_snapshot ?? '',
+            accountName: approval.destination_bank_name_snapshot ?? '',
+            approvalDisplayDocNo: approvalDocNo,
+            approvalId: approval.id.toString(),
+            approvalStatus: 'approved' as const,
+            approvedAmount,
+            createdAt: advance.created_at.toISOString(),
+            date: toDateOnly(advance.date),
+            destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
+            destinationOptions: recipientDestinationOptions,
+            docNo: approvalDocNo,
+            dueDate: toDateOnly(advance.date),
+            id: `petty_advance:${approval.id.toString()}`,
+            payee: approval.party_name_snapshot ?? advance.recipient_name ?? '-',
+            refDocNo: approval.note ?? advance.notes ?? '',
+            sourceDocNo,
+            sourceType: 'petty_advance' as const,
+            totalAmount: approvedAmount,
+            voidReason: '',
+            voidedAt: '',
+            description: advance.notes || '',
+          }
+        })
+      const voidedRows = voidedApprovals.map((approval) => {
+        const approvalDocNo = requireDocumentNo(approval.doc_no, `อนุมัติเงินสำรองจ่าย ${approval.id}`)
         const approvedAmount = toNumber(approval.approved_amount)
-        const destinationLabel = [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / ')
-        const matchingOption = dailyAccountOptions.find((option) => option.id === approval.destination_bank_account_id_snapshot)
         return {
-          accountId: approval.destination_bank_account_id_snapshot ?? matchingOption?.id ?? '',
-          accountName: approval.destination_bank_name_snapshot || matchingOption?.bankName || '',
+          accountId: approval.destination_bank_account_id_snapshot ?? '',
+          accountName: approval.destination_bank_name_snapshot ?? '',
           approvalDisplayDocNo: approvalDocNo,
           approvalId: approval.id.toString(),
-          approvalStatus: approval.status === 'voided' ? 'voided' as const : 'approved' as const,
+          approvalStatus: 'voided' as const,
           approvedAmount,
-          date: toDateOnly(entry?.date ?? approval.source_date_snapshot ?? approval.created_at),
-          destinationLabel,
-          destinationOptions: matchingOption ? [matchingOption] : dailyAccountOptions,
-          docNo: pettyReturnDisplayDocNo(entry, approvalDocNo),
-          dueDate: toDateOnly(entry?.date ?? approval.source_date_snapshot),
-          id: `petty_advance_return:${approval.id.toString()}`,
-          payee: approval.party_name_snapshot ?? entry?.petty_advances.recipient_name ?? '-',
-          refDocNo: approval.note ?? entry?.notes ?? '',
-          sourceDocNo: approval.source_doc_no_snapshot ?? entry?.petty_advances.doc_no ?? '',
-          sourceType: 'petty_advance_return' as const,
+          createdAt: advance.created_at.toISOString(),
+          date: toDateOnly(advance.date),
+          destinationLabel: [approval.destination_payment_method_snapshot ?? '', approval.destination_bank_name_snapshot ?? '', approval.destination_account_no_snapshot ?? ''].filter(Boolean).join(' / '),
+          destinationOptions: recipientDestinationOptions,
+          docNo: approvalDocNo,
+          dueDate: toDateOnly(advance.date),
+          id: `petty_advance:${approval.id.toString()}`,
+          payee: approval.party_name_snapshot ?? advance.recipient_name ?? '-',
+          refDocNo: approval.note ?? advance.notes ?? '',
+          sourceDocNo,
+          sourceType: 'petty_advance' as const,
           totalAmount: approvedAmount,
           voidReason: approval.void_reason ?? '',
           voidedAt: toDateOnly(approval.voided_at),
-          description: entry?.notes || entry?.petty_advances?.notes || approval.note || '',
+          description: advance.notes || '',
         }
       })
-    const pettyReturnRows = [...pendingPettyReturnRows, ...approvedPettyReturnRows]
-
-    return NextResponse.json({ apRows: [...apRows, ...advanceRows], expenseRows, pettyReturnRows })
+      return [...pendingRows, ...approvedRows, ...voidedRows]
+    })
+    return NextResponse.json({ apRows: [...apRows, ...advanceRows], expenseRows, pettyAdvanceRows })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
     return apiErrorResponse(caught, 'โหลดรายการอนุมัติจ่ายเงินไม่ได้', 500)
@@ -618,19 +711,35 @@ export async function POST(request: Request) {
       })
       if (values.sourceType === 'expense' && expenses.length !== 1) throw new Error('ไม่พบรายการค่าใช้จ่ายที่ต้องการอนุมัติ หรือรายการถูกยกเลิกแล้ว')
 
-      const pettyReturn = values.sourceType === 'petty_advance_return'
-        ? await tx.petty_advance_returns.findFirst({
+      const pettyAdvance = values.sourceType === 'petty_advance'
+        ? await tx.petty_advances.findFirst({
             include: {
               accounts: true,
-              petty_advances: true,
+              recipient_person: {
+                include: {
+                  director_employee_bank_accounts: {
+                    include: {
+                      accounts: {
+                        select: {
+                          account_no: true,
+                          bank_name: true,
+                          name: true,
+                          type: true,
+                        },
+                      },
+                    },
+                    orderBy: [{ is_primary: 'desc' }, { id: 'asc' }],
+                  },
+                },
+              },
             },
             where: {
-              id: BigInt(values.approvalId),
-              status: 'pending',
+              doc_no: sourceDocNo,
+              status: { notIn: ['closed', 'cancelled'] },
             },
           })
         : null
-      if (values.sourceType === 'petty_advance_return' && !pettyReturn) throw new Error('ไม่พบรายการคืนเงินที่รออนุมัติ')
+      if (values.sourceType === 'petty_advance' && !pettyAdvance) throw new Error('ไม่พบรายการเงินสำรองจ่าย/กู้กรรมการที่ต้องการอนุมัติ')
 
       const sourceInternalId = values.sourceType === 'purchase_bill'
         ? bills[0]?.id
@@ -638,12 +747,13 @@ export async function POST(request: Request) {
           ? advancePayments[0]?.id
           : values.sourceType === 'expense'
             ? expenses[0]?.id
-            : pettyReturn?.id
+            : pettyAdvance?.id
       if (sourceInternalId == null) throw new Error('รหัสรายการอนุมัติไม่ถูกต้อง')
 
       const billById = new Map(bills.map((bill) => [bill.id.toString(), bill]))
       const advanceById = new Map(advancePayments.map((advance) => [advance.id.toString(), advance]))
       const expenseById = new Map(expenses.map((expense) => [expense.id.toString(), expense]))
+      const pettyAdvanceById = pettyAdvance ? new Map([[pettyAdvance.id.toString(), pettyAdvance] as const]) : new Map<string, NonNullable<typeof pettyAdvance>>()
       const existingApprovals = await tx.payment_approvals.findMany({
         where: {
           source_id: sourceInternalId.toString(),
@@ -862,97 +972,52 @@ export async function POST(request: Request) {
         })
       }
 
-      if (values.sourceType === 'petty_advance_return') {
-        const returnEntry = pettyReturn
-        if (!returnEntry) throw new Error('ไม่พบรายการคืนเงินที่รออนุมัติ')
-        const returnAmount = toNumber(returnEntry.amount)
-        const splitTotal = values.splits.reduce((sum, split) => sum + split.approvedAmount, 0)
-        if (Math.abs(splitTotal - returnAmount) > 0.01) {
-          throw new Error(`ยอดอนุมัติคืนเงินต้องเท่ากับ ${returnAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+      if (values.sourceType === 'petty_advance') {
+        const advance = pettyAdvanceById.get(sourceInternalId.toString())
+        if (!advance) throw new Error('ไม่พบรายการเงินสำรองจ่าย/กู้กรรมการที่ต้องการอนุมัติ')
+        const totalAmount = toNumber(advance.amount)
+        const returnedAmount = toNumber(advance.returned_amount)
+        const alreadyApproved = approvedOrPaidAmount
+        const pendingAmount = Math.max(0, totalAmount - returnedAmount - alreadyApproved)
+        const cycleAmount = values.splits.reduce((sum, split) => sum + split.approvedAmount, 0)
+        if (cycleAmount - pendingAmount > 0.01) {
+          throw new Error(`ยอดอนุมัติของ ${advance.doc_no} เกินยอดคงเหลือที่ยังไม่ได้อนุมัติ`)
         }
-        const advance = returnEntry.petty_advances
-        if (!advance) throw new Error('ไม่พบรายการเงินสำรองจ่ายที่ต้องคืน')
-        const splitAccounts = await tx.accounts.findMany({
-          where: {
-            active: true,
-            code: { in: values.splits.map((split) => split.destinationId) },
-          },
-        })
-        const accountByCode = new Map(splitAccounts.map((account) => [account.code, account] as const))
-        const missingDestination = values.splits.find((split) => !accountByCode.has(split.destinationId))
-        if (missingDestination) throw new Error('บัญชีรับคืนบางรายการไม่ถูกต้อง')
 
-        const returnDate = toDateOnly(returnEntry.date)
-        const returnedAmount = toNumber(advance.returned_amount) + returnAmount
-        const status = returnedAmount >= toNumber(advance.amount) ? 'closed' : advance.status
+        const destinations = normalizeDirectorRecipientBankAccounts({
+          paymentMethods,
+          row: advance.recipient_person,
+        })
+        if (destinations.length === 0) throw new Error('ผู้รับเงินของรายการนี้ยังไม่มีบัญชีรับเงินในข้อมูลหลัก')
+        const destinationById = new Map(destinations.map((destination) => [destination.id, destination] as const))
+        const missingDestination = values.splits.find((split) => !destinationById.has(split.destinationId))
+        if (missingDestination) throw new Error('บัญชีรับเงินของผู้รับเงินบางรายการไม่ถูกต้อง')
+
         const approvedAt = new Date()
         await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('payment_approvals.doc_no'))`
-        const approvalDocNos = await nextPaymentApprovalDocNos(tx, normalizeDate(returnDate), '', values.splits.length)
-
-        await tx.petty_advances.update({
-          data: {
-            closed_at: status === 'closed' ? approvedAt : advance.closed_at,
-            returned_amount: returnedAmount,
-            status,
-            updated_at: approvedAt,
-            updated_by: actor,
-          },
-          where: { id: advance.id },
-        })
-
-        const entry = await tx.petty_advance_returns.update({
-          data: {
-            approved_at: approvedAt,
-            approved_by: actor,
-            status: 'approved',
-            updated_at: approvedAt,
-            updated_by: actor,
-          },
-          where: { id: returnEntry.id },
-        })
-
-        await tx.$executeRaw`select pg_advisory_xact_lock(hashtext('bank_statement.doc_no'))`
-        const statementDocNos = await nextBankStatementDocNos(returnDate, values.splits.length, tx)
-        await tx.bank_statement.createMany({
-          data: values.splits.map((split, index) => {
-            const account = accountByCode.get(split.destinationId)
-            if (!account) throw new Error('บัญชีรับคืนบางรายการไม่ถูกต้อง')
-            return {
-              account_id: account.id,
-              amount_in: split.approvedAmount,
-              amount_out: 0,
-              created_by: actor,
-              date: normalizeDate(returnDate),
-              description: `คืน ${advance.doc_no} โดย ${advance.recipient_name}${values.splits.length > 1 ? ` (split ${index + 1}/${values.splits.length})` : ''}`,
-              doc_no: statementDocNos[index]!,
-              ref_id: entry.doc_no,
-              ref_no: entry.doc_no,
-              ref_type: 'PRET',
-              type: 'คืนเงินสำรองจ่าย',
-            }
-          }),
-        })
+        const approvalDocNos = await nextPaymentApprovalDocNos(tx, advance.date, '', values.splits.length)
 
         for (const [index, split] of values.splits.entries()) {
-          const account = accountByCode.get(split.destinationId)
-          if (!account) throw new Error('บัญชีรับคืนบางรายการไม่ถูกต้อง')
+          const selectedDestination = destinationById.get(split.destinationId)
+          if (!selectedDestination) throw new Error('บัญชีรับเงินของผู้รับเงินบางรายการไม่ถูกต้อง')
+          const approvalDocNo = requireDocumentNo(approvalDocNos[index], `PMA split ${index + 1}`)
           const approval = await tx.payment_approvals.create({
             data: {
-              approved_at: approvedAt,
               approved_amount: split.approvedAmount,
+              approved_at: approvedAt,
               approved_by: actor,
-              destination_account_no_snapshot: account.account_no ?? null,
-              destination_bank_account_id_snapshot: account.code ?? null,
-              destination_bank_name_snapshot: account.name,
-              destination_payment_method_snapshot: account.type ?? 'รับคืน',
-              doc_no: approvalDocNos[index]!,
-              note: entry.notes,
+              destination_account_no_snapshot: selectedDestination.accountNo || null,
+              destination_bank_account_id_snapshot: selectedDestination.id,
+              destination_bank_name_snapshot: selectedDestination.bankName || null,
+              destination_payment_method_snapshot: selectedDestination.paymentMethod || null,
+              doc_no: approvalDocNo,
+              note: advance.notes,
               party_id: advance.recipient_person_code ?? null,
               party_name_snapshot: advance.recipient_name,
-              source_date_snapshot: entry.date,
+              source_date_snapshot: advance.date ? normalizeDate(toDateOnly(advance.date)) : null,
               source_doc_no_snapshot: advance.doc_no,
-              source_id: entry.id.toString(),
-              source_type: 'petty_advance_return',
+              source_id: advance.id.toString(),
+              source_type: 'petty_advance',
               status: 'approved',
               updated_at: approvedAt,
             },
@@ -962,11 +1027,11 @@ export async function POST(request: Request) {
             action: PAYMENT_APPROVAL_STATUS_ACTION.APPROVED,
             actor,
             createdAt: approvedAt,
-            fromStatus: 'pending',
+            fromStatus: null,
             meta: {
-              pretDocNo: entry.doc_no,
+              destinationId: split.destinationId,
               sourceDocNo: advance.doc_no,
-              sourceType: 'petty_advance_return',
+              sourceType: 'petty_advance',
               splitCount: values.splits.length,
               splitIndex: index + 1,
             },

@@ -143,7 +143,7 @@ type PoBuyRow = {
 
 type FieldErrors = Record<string, string>
 type PoBuySortDirection = 'asc' | 'desc'
-type PoBuySortKey = 'date' | 'docNo' | 'expectedDelivery' | 'itemCount' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
+type PoBuySortKey = 'createdAt' | 'date' | 'docNo' | 'expectedDelivery' | 'itemCount' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
 type PoBuyStatusKey = 'cancelled' | 'open' | 'partial' | 'received' | 'shortClosed'
 
 function blankItem(): PoBuyFormItem {
@@ -225,6 +225,29 @@ function formatDateTime(value?: string) {
   })
 }
 
+function formatTimeOnly(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleTimeString('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Bangkok',
+  })
+}
+
+function formatTimestampDateOnly(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('th-TH', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+  })
+}
+
 function poBuyStatusKey(status: string): PoBuyStatusKey {
   const normalized = status.trim().toLowerCase()
   if (normalized.includes('cancel')) return 'cancelled'
@@ -275,12 +298,12 @@ const rowActionButtonClass = 'rounded-md border border-slate-300 px-2 py-1 text-
 const rowDangerActionButtonClass = 'rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
 const rowWarningActionButtonClass = 'rounded-md border border-amber-200 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50'
 
-type PoBuyColumnKey = 'action' | 'checkbox' | 'date' | 'docNo' | 'expectedDelivery' | 'note' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
+type PoBuyColumnKey = 'action' | 'checkbox' | 'createdAt' | 'docNo' | 'expectedDelivery' | 'note' | 'productName' | 'qty' | 'remainingQty' | 'status' | 'supplierName' | 'totalAmount' | 'updatedAt'
 
 const poBuyColumns: Array<ResizableColumnDefinition<PoBuyColumnKey>> = [
   { key: 'checkbox', defaultWidth: 40, minWidth: 40 },
   { key: 'docNo', defaultWidth: 110, minWidth: 90 },
-  { key: 'date', defaultWidth: 95, minWidth: 80 },
+  { key: 'createdAt', defaultWidth: 150, minWidth: 130 },
   { key: 'supplierName', defaultWidth: 260, minWidth: 120 },
   { key: 'productName', defaultWidth: 180, minWidth: 100 },
   { key: 'qty', defaultWidth: 110, minWidth: 90 },
@@ -715,10 +738,6 @@ export function PoBuyPageClient() {
     setPage(1)
   }, [fromDate, pageSize, search, sortDirection, sortKey, statuses, toDate])
 
-  const openRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'open')
-  const partialRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'partial')
-  const receivedRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'received')
-  const shortClosedRows = (data?.rows ?? []).filter((row) => poBuyStatusKey(row.status) === 'shortClosed')
   const exportHref = useMemo(() => {
     const params = new URLSearchParams({ format: 'xlsx' })
     if (search.trim()) params.set('q', search.trim())
@@ -742,7 +761,7 @@ export function PoBuyPageClient() {
       return
     }
     setSortKey(nextKey)
-    setSortDirection(nextKey === 'date' || nextKey === 'docNo' ? 'desc' : 'asc')
+    setSortDirection(nextKey === 'createdAt' || nextKey === 'docNo' ? 'desc' : 'asc')
   }
 
   const hasFilters = statuses.length > 0 || fromDate || toDate || search.trim()
@@ -767,25 +786,18 @@ export function PoBuyPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3 text-sm">
+      <div className="grid grid-cols-1 gap-2.5 text-sm sm:grid-cols-2 sm:gap-4">
         <SummaryCard
-          label="ภาพรวม PO"
-          sublabel={`มูลค่ารวม ${formatMoney(data?.summary.totalAmount ?? 0)}`}
-          tone="blue"
-          value={`${data?.summary.totalRows ?? 0}`}
+          label="ยอดรอรับ"
+          sublabel={`มูลค่าคงเหลือ ${formatMoney(data?.summary.remainingAmount ?? 0)} บาท`}
+          tone="amber"
+          value={`${formatMoney(data?.summary.remainingQty ?? 0)} กก.`}
         />
         <SummaryCard
           label="สถานะการรับ"
           sublabel="ยังไม่รับ / บางส่วน / รับครบ / ปิดรับไม่ครบ"
-          tone="amber"
-          value={`${openRows.length || data?.summary.open || 0} / ${partialRows.length} / ${receivedRows.length} / ${shortClosedRows.length || data?.summary.shortClosed || 0}`}
-        />
-        <SummaryCard
-          className="col-span-2 lg:col-span-1"
-          label="ยอดคงเหลือ"
-          sublabel={`น้ำหนักรอรับ ${formatMoney(data?.summary.remainingQty ?? 0)}`}
           tone="emerald"
-          value={formatMoney(data?.summary.remainingAmount ?? 0)}
+          value={`${data?.summary.open ?? 0} / ${data?.summary.partial ?? 0} / ${data?.summary.received ?? 0} / ${data?.summary.shortClosed ?? 0}`}
         />
       </div>
 
@@ -802,7 +814,7 @@ export function PoBuyPageClient() {
           <UiButton type="button" onClick={openCreateForm}>+ PO Buy ใหม่</UiButton>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500">สถานะ:</span>
+          <span className="text-xs text-slate-500">สถานะเอกสาร:</span>
           <PoBuySegment
             active={statuses.length === 0}
             label="ทุกสถานะ"
@@ -912,7 +924,7 @@ export function PoBuyPageClient() {
               </div>
 
               <div>
-                <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะ</span>
+                <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะเอกสาร</span>
                 <div className="flex flex-wrap gap-2">
                   <PoBuySegment
                     active={statuses.length === 0}
@@ -990,7 +1002,7 @@ export function PoBuyPageClient() {
           >
             <div className="flex justify-between items-start mb-2">
               <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
-              <span className="text-xs text-slate-500">{formatDateDisplay(row.date)}</span>
+              <span className="text-xs text-slate-500">{formatTimestampDateOnly(row.createdAt)}</span>
             </div>
             
             <div className="text-xs text-slate-600 mb-3 space-y-1">
@@ -1047,9 +1059,13 @@ export function PoBuyPageClient() {
           </colgroup>
           <TableHeader>
             <tr>
-              <ResizableTableHead align="center" label={<input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} />} resizeProps={columnResize.getResizeHandleProps('checkbox', 'เลือก')} />
+              <TableHead className="p-0 text-center">
+                <div className="flex items-center justify-center p-2">
+                  <input aria-label="เลือก PO ทั้งหมดในตาราง" checked={allVisibleSelected} disabled={rows.length === 0} type="checkbox" onChange={toggleVisibleSelection} />
+                </div>
+              </TableHead>
               <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="เลขที่ PO ซื้อ" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่ PO ซื้อ')} sortKey="docNo" onSort={changeSort} />
-              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่สร้างเอกสาร" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่สร้างเอกสาร')} sortKey="date" onSort={changeSort} />
+              <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="วันที่สร้างเอกสาร" resizeProps={columnResize.getResizeHandleProps('createdAt', 'วันที่สร้างเอกสาร')} sortKey="createdAt" onSort={changeSort} />
               <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="ผู้ขาย" resizeProps={columnResize.getResizeHandleProps('supplierName', 'ผู้ขาย')} sortKey="supplierName" onSort={changeSort} />
               <PoBuySortHeader activeKey={sortKey} direction={sortDirection} label="รายการสินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'รายการสินค้า')} sortKey="productName" onSort={changeSort} />
               <PoBuySortHeader activeKey={sortKey} align="right" direction={sortDirection} label="จำนวนรวม" resizeProps={columnResize.getResizeHandleProps('qty', 'จำนวนรวม')} sortKey="qty" onSort={changeSort} />
@@ -1067,9 +1083,16 @@ export function PoBuyPageClient() {
             {!isLoading && !error && rows.length === 0 ? <TableRow><TableCell className="py-10 text-center text-slate-400" colSpan={13}>ยังไม่มี PO Buy</TableCell></TableRow> : null}
             {!isLoading && pageRows.map((row, index) => (
               <TableRow key={row.id} className={`cursor-pointer border-slate-100 hover:bg-slate-50 ${index % 2 === 1 ? 'bg-slate-50/40' : ''}`} onClick={() => setSelectedRow(row)}>
-                <TableCell className="text-center"><input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} /></TableCell>
+                <TableCell className="p-0">
+                  <div className="flex items-center justify-center p-2">
+                    <input aria-label={`เลือก ${row.docNo}`} checked={selectedPoIds.includes(row.id)} type="checkbox" onChange={() => toggleRowSelection(row.id)} onClick={(event) => event.stopPropagation()} />
+                  </div>
+                </TableCell>
                 <TableCell className="w-36 whitespace-nowrap font-mono">{row.docNo}</TableCell>
-                <TableCell className="w-28 whitespace-nowrap">{formatDateDisplay(row.date)}</TableCell>
+                <TableCell className="w-36 whitespace-nowrap text-xs text-slate-600">
+                  <div>{formatTimestampDateOnly(row.createdAt)}</div>
+                  <div className="font-mono text-[10px] text-slate-400">{formatTimeOnly(row.createdAt)}</div>
+                </TableCell>
                 <TableCell className="w-36">{row.supplierName}</TableCell>
                 <TableCell className="w-[280px] max-w-[280px]">
                   <PoBuyItemSummary fallbackText={row.productName} items={row.items} />
@@ -1433,6 +1456,7 @@ function PoBuyShortCloseModal({
 }
 
 function poBuySortValue(row: PoBuyRow, key: PoBuySortKey) {
+  if (key === 'createdAt') return row.createdAt || row.date
   if (key === 'date') return row.date
   if (key === 'docNo') return row.docNo
   if (key === 'expectedDelivery') return row.expectedDelivery || '9999-12-31'
@@ -1842,7 +1866,7 @@ function PoBuyDetailModal({
             <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-5">
               <div>
                 <div className="text-xs font-medium text-slate-500 mb-0.5">วันที่สร้างเอกสาร</div>
-                <div className="text-sm font-semibold text-slate-900">{formatDateDisplay(row.date)}</div>
+                <div className="text-sm font-semibold text-slate-900">{formatDateTime(row.createdAt)}</div>
               </div>
               <div>
                 <div className="text-xs font-medium text-slate-500 mb-0.5">วันที่กำหนดส่ง</div>

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 
 export type SearchComboboxOption = {
   description?: string
+  displayLabel?: string
   id: string
   label: string
   searchText?: string
@@ -55,7 +56,7 @@ export function SearchCombobox({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const hasMovedRef = useRef(false)
   const selectedOption = useMemo(() => options.find((option) => option.id === value) ?? null, [options, value])
-  const selectedLabel = selectedOption?.label ?? ''
+  const selectedLabel = selectedOption?.displayLabel ?? selectedOption?.label ?? ''
   const selectedLabelQuery = selectedLabel.trim().toLowerCase()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState(selectedLabel)
@@ -121,10 +122,10 @@ export function SearchCombobox({
       const optionsPanel = document.getElementById(`${inputId}-options`)
       if (optionsPanel?.contains(target)) return
 
-      const exactMatch = options.find((option) => option.label.toLowerCase() === query.trim().toLowerCase())
+      const exactMatch = options.find((option) => (option.displayLabel ?? option.label).toLowerCase() === query.trim().toLowerCase())
       if (exactMatch) {
         onChange(exactMatch.id)
-        setQuery(exactMatch.label)
+        setQuery(exactMatch.displayLabel ?? exactMatch.label)
       } else if (selectedOption) {
         setQuery(selectedOption.label)
       } else {
@@ -174,7 +175,7 @@ export function SearchCombobox({
   const selectOption = (option: SearchComboboxOption) => {
     if (disabled) return
     onChange(option.id)
-    setQuery(option.label)
+    setQuery(option.displayLabel ?? option.label)
     setOpen(false)
     if (shouldAutoSelectText()) inputRef.current?.focus()
   }
@@ -310,7 +311,7 @@ export function SearchCombobox({
                     event.preventDefault()
                   }}
                 >
-                  <span className="block font-medium">{option.label}</span>
+                  <span className="block font-medium">{option.displayLabel ?? option.label}</span>
                   {option.description ? <span className="block text-sm text-slate-500 sm:text-xs">{option.description}</span> : null}
                 </button>
               )) : <div className="px-3 py-2 text-base text-slate-500 sm:text-sm">ไม่พบข้อมูลที่ตรงกับคำค้นหา</div>}

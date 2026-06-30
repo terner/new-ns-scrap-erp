@@ -85,7 +85,7 @@ These gaps are not blockers for baseline acceptance, but they are blockers befor
 - `/daily/weight-ticket-list`: WTI/WTO target hold and all-or-nothing downstream billing rules must be reconciled with actual PB/SB usage behavior before changing stock/billing logic.
 - `/stock/balance`: target hold-aware `on_hand / hold / available` model still depends on a durable hold/reservation source.
 - `/purchase/bills`: current code uses delete/recreate for PB stock ledger/allocation rebuild in some paths; target append/reversal policy should be reviewed before production hardening.
-- `/daily/petty-advance`: current PADV create does not write BST; PRET return writes BST. This matches the latest business decision but must stay explicit in docs.
+- `/daily/petty-advance`: current PADV create does not write BST; PRET return writes BST. This is now only the current code baseline. The 2026-06-26 target for `DIRECTOR_LOAN` supersedes it: director-loan PADV must write company-account money-in, and `IN_SYSTEM` also writes director-account money-out.
 - payment cancellation/reversal scope still needs end-to-end proof for PMA/PMT/EXP/ADV/PB lock behavior before expanding UI actions.
 
 ## Next Runtime Batch Recommendation

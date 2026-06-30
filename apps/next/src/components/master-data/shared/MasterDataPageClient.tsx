@@ -77,6 +77,8 @@ function recordToForm(record: MasterDataRecord, paymentMethods: MasterDataRecord
     odLimit: record.odLimit,
     branchId: record.branchId,
     address: record.address,
+    bankAccounts: record.bankAccounts,
+    commissionEnabled: record.commissionEnabled,
     commissionPct: record.commissionPct,
     baseSalary: record.baseSalary,
     accountCurrency: record.accountCurrency,
@@ -121,6 +123,11 @@ function alignClass(align: 'center' | 'left' | 'right' | undefined) {
 function formatNumber(value: number | null, fractionDigits = 2) {
   if (value === null) return '-'
   return value.toLocaleString('th-TH', { maximumFractionDigits: fractionDigits, minimumFractionDigits: fractionDigits })
+}
+
+function formatPercent(value: number | null) {
+  if (value === null) return '-'
+  return `${formatNumber(value)}%`
 }
 
 function parseNumericFieldValue(value: string) {
@@ -262,12 +269,17 @@ function validateMasterDataForm(
     if (!values.firstName) errors.firstName = 'กรอกชื่อ'
     if (!values.lastName) errors.lastName = 'กรอกนามสกุล'
 
-    const hasBankInfo = Boolean(values.bankName || values.accountNo || values.accountName || values.bankBranch)
-    if (hasBankInfo) {
-      if (!values.bankName) errors.bankName = 'เลือกธนาคาร'
-      if (!values.accountName) errors.accountName = 'กรอกชื่อบัญชี'
-      if (!values.accountNo) errors.accountNo = 'กรอกเลขบัญชี'
-    }
+    values.bankAccounts.forEach((account, index) => {
+      const hasBankInfo = Boolean(account.bankName || account.accountNo || account.accountName || account.bankBranch || account.linkedAccountId)
+      if (!hasBankInfo) return
+      if (account.sourceType === 'IN_COMPANY') {
+        if (!account.linkedAccountId) errors[`bankAccounts.${index}.linkedAccountId`] = 'เลือกบัญชีในบริษัท'
+        return
+      }
+      if (!account.bankName) errors[`bankAccounts.${index}.bankName`] = 'เลือกธนาคาร'
+      if (!account.accountName) errors[`bankAccounts.${index}.accountName`] = 'กรอกชื่อบัญชี'
+      if (!account.accountNo) errors[`bankAccounts.${index}.accountNo`] = 'กรอกเลขบัญชี'
+    })
   }
 
   return { errors, values: parsed.success ? parsed.data : null }
@@ -279,6 +291,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [records, setRecords] = useState<MasterDataRecord[]>([])
+  const [directorAccountRows, setDirectorAccountRows] = useState<MasterDataRecord[]>([])
   const [fieldOptions, setFieldOptions] = useState<Partial<Record<keyof MasterDataFormValues, Array<{ label: string; value: string }>>>>({})
   const [fieldOptionRows, setFieldOptionRows] = useState<Partial<Record<keyof MasterDataFormValues, MasterDataRecord[]>>>({})
   const [page, setPage] = useState(1)
@@ -305,15 +318,17 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
     setIsLoading(true)
     try {
       const optionFields = config.fields.filter((field) => field.optionsApiPath)
-      const [rows, optionResults] = await Promise.all([
+      const [rows, optionResults, accountRows] = await Promise.all([
         listMasterDataRecords(config.apiPath),
         Promise.all(optionFields.map(async (field) => ({
           key: field.key,
           rows: await listMasterDataRecords(field.optionsApiPath as string),
           valueKey: field.optionValueKey ?? 'name',
         }))),
+        config.apiPath === '/api/master-data/directors' ? listMasterDataRecords('/api/master-data/accounts') : Promise.resolve([]),
       ])
       setRecords(rows)
+      setDirectorAccountRows(accountRows)
       setFieldOptionRows(Object.fromEntries(optionResults.map((result) => [result.key, result.rows])))
       setFieldOptions(Object.fromEntries(optionResults.map((result) => [
         result.key,
@@ -559,6 +574,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
           <MasterDataForm
             config={resolvedConfig}
             isSaving={isSaving}
+            directorAccountRows={directorAccountRows}
             paymentMethodRows={fieldOptionRows.type ?? []}
             supportsActive={config.supportsActive !== false}
             record={selectedRecord}
@@ -654,6 +670,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                       >
                         {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
                         {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
+                        {column.format === 'percent' ? formatPercent(record[column.key] as number | null) : null}
                         {column.format === 'status' ? (
                           <ActiveToggle
                             checked={record.active}
@@ -728,6 +745,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
                         <span className="font-semibold text-slate-700">
                           {column.format === 'money' ? formatNumber(record[column.key] as number | null) : null}
                           {column.format === 'number' ? formatNumber(record[column.key] as number | null, 4) : null}
+                          {column.format === 'percent' ? formatPercent(record[column.key] as number | null) : null}
                           {!column.format ? displayRecordValue(record, column.key) : null}
                         </span>
                       </div>
@@ -750,6 +768,7 @@ export function MasterDataPageClient({ config }: MasterDataPageClientProps) {
 
 type MasterDataFormProps = {
   config: MasterDataPageConfig
+  directorAccountRows: MasterDataRecord[]
   isSaving: boolean
   paymentMethodRows: MasterDataRecord[]
   record: MasterDataRecord | null
@@ -758,7 +777,7 @@ type MasterDataFormProps = {
   onSubmit: (values: MasterDataFormValues) => Promise<void>
 }
 
-function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsActive, onCancel, onSubmit }: MasterDataFormProps) {
+function MasterDataForm({ config, directorAccountRows, isSaving, paymentMethodRows, record, supportsActive, onCancel, onSubmit }: MasterDataFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<MasterDataFormValues>(() => (record ? recordToForm(record, paymentMethodRows) : emptyMasterDataForm))
 
@@ -799,6 +818,14 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
           }
         }
       }
+      if (config.apiPath === '/api/master-data/directors' && key === 'bankAccounts') {
+        const typedNext = next as MasterDataFormValues
+        const activeAccounts = typedNext.bankAccounts.filter((account) => account.active !== false)
+        if (activeAccounts.length > 0 && !activeAccounts.some((account) => account.isPrimary)) {
+          const firstActiveIndex = typedNext.bankAccounts.findIndex((account) => account.active !== false)
+          typedNext.bankAccounts = typedNext.bankAccounts.map((account, index) => ({ ...account, isPrimary: index === firstActiveIndex }))
+        }
+      }
       if (Object.keys(errors).length > 0) {
         setErrors(validateMasterDataForm(config, next, paymentMethodRows).errors)
       }
@@ -831,6 +858,9 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
         return false
       }
     }
+    if (config.apiPath === '/api/master-data/directors' && ['bankName', 'bankBranch', 'accountNo', 'accountName'].includes(String(field.key))) {
+      return false
+    }
     return true
   }
 
@@ -853,12 +883,14 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
         key={field.key}
         error={errors[field.key]}
         field={field}
-        value={form[field.key]}
+        value={form[field.key] as string | number | boolean | null | undefined}
         onChange={(value) => {
-          const normalized = field.key === 'availableForSale'
+          const normalized = field.type === 'checkbox'
+            ? value === true || value === 'true'
+            : field.key === 'availableForSale'
             ? value === 'true'
             : field.type === 'number'
-              ? parseNumericFieldValue(value)
+              ? parseNumericFieldValue(String(value))
               : value || null
           update(field.key, normalized as never)
         }}
@@ -895,6 +927,15 @@ function MasterDataForm({ config, isSaving, paymentMethodRows, record, supportsA
                 </div>
               </section>
             ))}
+            {config.apiPath === '/api/master-data/directors' ? (
+              <DirectorBankAccountsSection
+                accountRows={directorAccountRows}
+                bankNameOptions={config.fields.find((field) => field.key === 'bankName')?.options ?? []}
+                errors={errors}
+                value={form.bankAccounts}
+                onChange={(nextAccounts) => update('bankAccounts', nextAccounts)}
+              />
+            ) : null}
           </div>
         ) : (
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -960,7 +1001,7 @@ type FormFieldProps = {
   error?: string
   field: MasterDataField
   value: string | number | boolean | null | undefined
-  onChange: (value: string) => void
+  onChange: (value: string | boolean) => void
 }
 
 function FormField({ error, field, value, onChange }: FormFieldProps) {
@@ -985,6 +1026,21 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
       >
         {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </FormSelectField>
+    )
+  }
+
+  if (field.type === 'checkbox') {
+    return (
+      <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+        <input
+          checked={value === true}
+          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          type="checkbox"
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        <span className="text-sm font-semibold text-slate-700">{field.label}</span>
+        {error ? <span className="ml-auto text-xs text-red-700">{error}</span> : null}
+      </label>
     )
   }
 
@@ -1059,6 +1115,204 @@ function FormField({ error, field, value, onChange }: FormFieldProps) {
   )
 }
 
+type DirectorBankAccountFormValue = MasterDataFormValues['bankAccounts'][number]
+
+function blankDirectorBankAccount(): DirectorBankAccountFormValue {
+  return {
+    id: null,
+    code: null,
+    sourceType: 'OUTSIDE_COMPANY',
+    linkedAccountId: null,
+    bankName: null,
+    accountName: null,
+    accountNo: null,
+    bankBranch: null,
+    isPrimary: false,
+    active: true,
+  }
+}
+
+function accountRowLabel(account: MasterDataRecord) {
+  return [account.code, account.name, account.bankName, account.accountNo].filter(Boolean).join(' / ')
+}
+
+function DirectorBankAccountsSection({
+  accountRows,
+  bankNameOptions,
+  errors,
+  onChange,
+  value,
+}: {
+  accountRows: MasterDataRecord[]
+  bankNameOptions: Array<{ label: string; value: string }>
+  errors: Record<string, string>
+  onChange: (value: MasterDataFormValues['bankAccounts']) => void
+  value: MasterDataFormValues['bankAccounts']
+}) {
+  const activeCompanyAccounts = accountRows.filter((account) => account.active && account.accountNo)
+  const accounts = value.length > 0 ? value : [blankDirectorBankAccount()]
+
+  function normalize(nextAccounts: MasterDataFormValues['bankAccounts']) {
+    const activeAccounts = nextAccounts.filter((account) => account.active !== false)
+    if (activeAccounts.length > 0 && !activeAccounts.some((account) => account.isPrimary)) {
+      const firstActiveIndex = nextAccounts.findIndex((account) => account.active !== false)
+      return nextAccounts.map((account, index) => ({ ...account, isPrimary: index === firstActiveIndex }))
+    }
+    return nextAccounts
+  }
+
+  function updateAccount(index: number, patch: Partial<DirectorBankAccountFormValue>) {
+    const nextAccounts = accounts.map((account, accountIndex) => {
+      if (accountIndex !== index) return account
+      const nextAccount = { ...account, ...patch }
+      if (patch.sourceType === 'OUTSIDE_COMPANY') {
+        nextAccount.linkedAccountId = null
+      }
+      if (patch.sourceType === 'IN_COMPANY') {
+        nextAccount.bankName = null
+        nextAccount.accountName = null
+        nextAccount.accountNo = null
+        nextAccount.bankBranch = null
+      }
+      if (patch.linkedAccountId) {
+        const linked = activeCompanyAccounts.find((row) => row.id === patch.linkedAccountId || row.code === patch.linkedAccountId)
+        if (linked) {
+          nextAccount.bankName = linked.bankName
+          nextAccount.accountName = linked.name
+          nextAccount.accountNo = linked.accountNo
+          nextAccount.bankBranch = linked.bankBranch
+        }
+      }
+      return nextAccount
+    })
+    onChange(normalize(nextAccounts))
+  }
+
+  function setPrimary(index: number) {
+    onChange(accounts.map((account, accountIndex) => ({ ...account, isPrimary: accountIndex === index, active: accountIndex === index ? true : account.active })))
+  }
+
+  function removeAccount(index: number) {
+    const nextAccounts = accounts.filter((_, accountIndex) => accountIndex !== index)
+    onChange(normalize(nextAccounts.length > 0 ? nextAccounts : [blankDirectorBankAccount()]))
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+        <h4 className="text-sm font-bold text-slate-800">ข้อมูลบัญชีรับเงิน</h4>
+        <button
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          type="button"
+          onClick={() => onChange([...accounts, blankDirectorBankAccount()])}
+        >
+          + เพิ่มบัญชี
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {accounts.map((account, index) => (
+          <div key={`${account.code ?? 'new'}-${index}`} className="rounded-md border border-slate-200 bg-slate-50/60 p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-slate-600">บัญชีที่ {index + 1}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                  <input checked={account.isPrimary} type="radio" onChange={() => setPrimary(index)} />
+                  บัญชีหลัก
+                </label>
+                <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                  <input checked={account.active !== false} type="checkbox" onChange={(event) => updateAccount(index, { active: event.target.checked })} />
+                  ใช้งาน
+                </label>
+                {accounts.length > 1 ? (
+                  <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50" type="button" onClick={() => removeAccount(index)}>
+                    ลบ
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <FormSelectField
+                label="ประเภทบัญชี"
+                value={account.sourceType}
+                onChange={(sourceType) => updateAccount(index, { sourceType: sourceType as 'IN_COMPANY' | 'OUTSIDE_COMPANY' })}
+              >
+                <option value="IN_COMPANY">บัญชีในบริษัท</option>
+                <option value="OUTSIDE_COMPANY">บัญชีนอกบริษัท</option>
+              </FormSelectField>
+
+              {account.sourceType === 'IN_COMPANY' ? (
+                <FormSelectField
+                  error={errors[`bankAccounts.${index}.linkedAccountId`]}
+                  label="บัญชีในบริษัท"
+                  placeholder="เลือกบัญชีจาก Master Data Accounts"
+                  required
+                  value={account.linkedAccountId ?? ''}
+                  onChange={(linkedAccountId) => updateAccount(index, { linkedAccountId })}
+                >
+                  {activeCompanyAccounts.map((companyAccount) => (
+                    <option key={companyAccount.id} value={companyAccount.id}>{accountRowLabel(companyAccount)}</option>
+                  ))}
+                </FormSelectField>
+              ) : (
+                <FormSelectField
+                  error={errors[`bankAccounts.${index}.bankName`]}
+                  label="ธนาคาร"
+                  placeholder="เลือกธนาคาร"
+                  required
+                  value={account.bankName ?? ''}
+                  onChange={(bankName) => updateAccount(index, { bankName: bankName || null })}
+                >
+                  {bankNameOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </FormSelectField>
+              )}
+
+              {account.sourceType === 'OUTSIDE_COMPANY' ? (
+                <>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">ชื่อบัญชี<span className="ml-0.5 text-red-500">*</span></span>
+                    <input
+                      className={`h-10 w-full rounded-md border px-3 text-sm outline-none ${errors[`bankAccounts.${index}.accountName`] ? 'border-red-400 bg-red-50/50' : 'border-slate-300 bg-white'}`}
+                      value={account.accountName ?? ''}
+                      onChange={(event) => updateAccount(index, { accountName: event.target.value || null })}
+                    />
+                    {errors[`bankAccounts.${index}.accountName`] ? <span className="mt-1 block text-xs text-red-700">{errors[`bankAccounts.${index}.accountName`]}</span> : null}
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">เลขบัญชี<span className="ml-0.5 text-red-500">*</span></span>
+                    <input
+                      className={`h-10 w-full rounded-md border px-3 text-sm outline-none ${errors[`bankAccounts.${index}.accountNo`] ? 'border-red-400 bg-red-50/50' : 'border-slate-300 bg-white'}`}
+                      inputMode="numeric"
+                      value={account.accountNo ?? ''}
+                      onChange={(event) => updateAccount(index, { accountNo: sanitizeAccountNoInput(event.target.value) || null })}
+                    />
+                    {errors[`bankAccounts.${index}.accountNo`] ? <span className="mt-1 block text-xs text-red-700">{errors[`bankAccounts.${index}.accountNo`]}</span> : null}
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">สาขา</span>
+                    <input
+                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none"
+                      value={account.bankBranch ?? ''}
+                      onChange={(event) => updateAccount(index, { bankBranch: event.target.value || null })}
+                    />
+                  </label>
+                </>
+              ) : (
+                <div className="rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-600 md:col-span-2">
+                  {account.linkedAccountId
+                    ? [account.bankName, account.accountName, account.accountNo, account.bankBranch ? `สาขา ${account.bankBranch}` : ''].filter(Boolean).join(' / ')
+                    : 'เลือกบัญชีในบริษัทเพื่อดึงธนาคาร ชื่อบัญชี และเลขบัญชีอัตโนมัติ'}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolean; label: string; onClick: () => void; tone?: 'amber' | 'dark' | 'emerald' | 'red' | 'slate' }) {
   const activeClass = {
     amber: 'border-amber-600 bg-amber-600 text-white',
@@ -1070,5 +1324,3 @@ function MatchButton({ active, label, onClick, tone = 'dark' }: { active: boolea
   const idleClass = tone === 'amber' ? 'border-slate-300 bg-white hover:bg-amber-50' : tone === 'emerald' ? 'border-slate-300 bg-white hover:bg-emerald-50' : tone === 'red' ? 'border-slate-300 bg-white hover:bg-red-50' : 'border-slate-300 bg-white hover:bg-slate-100'
   return <button className={`rounded-md border px-3 py-1 text-xs font-medium ${active ? activeClass : idleClass}`} type="button" onClick={onClick}>{label}</button>
 }
-
-

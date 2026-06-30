@@ -22,6 +22,9 @@ reports/db_audit/*.backup
 reports/db_audit/*.csv
 reports/skills/global-skills-index.json
 
+# Generated sales/demo assets
+docs/assets/scrap-erp-feature-images/
+
 # Local duplicate migration scratch files
 supabase/migrations/20260519044843_create_fx_rates_table.sql
 

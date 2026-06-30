@@ -524,6 +524,7 @@ model accounts {
   branches                                      branches?                   @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   bank_statement                                bank_statement[]
   customer_receipts                             customer_receipts[]
+  director_employee_bank_accounts              director_employee_bank_accounts[]
   expenses                                      expenses[]
   loan_payments                                 loan_payments[]
   payment_account_splits                        payment_account_splits[]
@@ -784,9 +785,33 @@ model director_employees {
   last_name         String?
   bank_account_name String?
   bank_branch       String?
+  director_employee_bank_accounts director_employee_bank_accounts[]
   petty_advances    petty_advances[]
 
   @@index([active])
+  @@schema("public")
+}
+
+model director_employee_bank_accounts {
+  id                BigInt             @id @default(autoincrement())
+  code              String             @unique
+  director_id       BigInt
+  source_type       String             @default("OUTSIDE_COMPANY")
+  linked_account_id BigInt?
+  bank_name         String?
+  account_name      String?
+  account_no        String?
+  bank_branch       String?
+  is_primary        Boolean?           @default(false)
+  active            Boolean?           @default(true)
+  created_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  accounts          accounts?          @relation(fields: [linked_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  director_employee director_employees @relation(fields: [director_id], references: [id], onDelete: Cascade)
+
+  @@index([account_no], map: "idx_director_employee_bank_accounts_account")
+  @@index([director_id], map: "idx_director_employee_bank_accounts_director")
+  @@index([linked_account_id], map: "idx_director_employee_bank_accounts_linked_account")
   @@schema("public")
 }
 
@@ -1658,6 +1683,20 @@ model petty_advances {
   recipient_bank_account_name String?
   recipient_account_no        String?
   recipient_bank_branch       String?
+  loan_source_type            String?
+  loan_from_account_id        BigInt?
+  receive_account_id          BigInt?
+  loan_from_account_code_snapshot String?
+  loan_from_account_name_snapshot String?
+  loan_from_account_no_snapshot   String?
+  outside_loan_from_bank_name       String?
+  outside_loan_from_account_name    String?
+  outside_loan_from_account_no      String?
+  outside_loan_from_bank_branch     String?
+  outside_loan_transfer_method      String?
+  receive_account_code_snapshot   String?
+  receive_account_name_snapshot   String?
+  receive_account_no_snapshot     String?
   petty_advance_returns       petty_advance_returns[]
   accounts                    accounts?               @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   recipient_person            director_employees?     @relation(fields: [recipient_person_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
@@ -2820,16 +2859,17 @@ model sales_channels {
 }
 
 model salespersons {
-  code       String    @unique(map: "uq_salespersons_code")
-  name       String
-  phone      String?
-  email      String?
-  active     Boolean?  @default(true)
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at DateTime? @db.Timestamptz(6)
-  updated_by String?
-  version    Int?      @default(1)
-  id         BigInt    @id @default(autoincrement())
+  code               String    @unique(map: "uq_salespersons_code")
+  name               String
+  phone              String?
+  email              String?
+  active             Boolean?  @default(true)
+  commission_enabled Boolean?  @default(false)
+  created_at         DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime? @db.Timestamptz(6)
+  updated_by         String?
+  version            Int?      @default(1)
+  id                 BigInt    @id @default(autoincrement())
 
   @@schema("public")
 }
@@ -3155,6 +3195,11 @@ model stock_holds {
   output_category        String?
   lot_no                 String?
   not_available_for_sale Boolean              @default(false)
+  unit_cost_snapshot     Decimal?             @db.Decimal
+  value_snapshot         Decimal?             @db.Decimal
+  cost_snapshot_at       DateTime?            @db.Timestamptz(6)
+  cost_snapshot_source   String?
+  cost_snapshot_note     String?
   branches               branches             @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
   products               products             @relation(fields: [product_id], references: [id], onUpdate: NoAction)
   warehouses             warehouses           @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)

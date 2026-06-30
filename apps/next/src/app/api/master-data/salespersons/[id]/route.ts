@@ -42,6 +42,7 @@ export async function PATCH(request: Request, { params }: MasterDataRouteProps) 
       branchId: null,
       branchName: null,
       address: null,
+      commissionEnabled: row.commission_enabled ?? false,
       commissionPct: null,
       baseSalary: null,
       createdAt: toIso(row.created_at),

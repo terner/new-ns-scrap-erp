@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 const nullableString = z.string().nullable().default(null)
 const nullableNumber = z.number().nullable().default(null)
+const directorBankAccountSourceSchema = z.enum(['IN_COMPANY', 'OUTSIDE_COMPANY'])
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
 const codePattern = /^[A-Za-z0-9_-]+$/
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
@@ -107,6 +108,7 @@ export const masterDataRecordSchema = z.object({
   branchId: nullableString,
   branchName: nullableString,
   address: nullableString,
+  commissionEnabled: z.boolean().default(false),
   commissionPct: nullableNumber,
   baseSalary: nullableNumber,
   accountCurrency: nullableString,
@@ -128,6 +130,18 @@ export const masterDataRecordSchema = z.object({
   swift: nullableString,
   taxId: nullableString,
   unit: nullableString,
+  bankAccounts: z.array(z.object({
+    id: nullableString,
+    code: nullableString,
+    sourceType: directorBankAccountSourceSchema.default('OUTSIDE_COMPANY'),
+    linkedAccountId: nullableString,
+    bankName: nullableString,
+    accountName: nullableString,
+    accountNo: nullableString,
+    bankBranch: nullableString,
+    isPrimary: z.boolean().default(false),
+    active: z.boolean().default(true),
+  })).default([]),
   createdAt: nullableString,
   updatedAt: nullableString,
 })
@@ -166,6 +180,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     odLimit: true,
     branchId: true,
     address: true,
+    commissionEnabled: true,
     commissionPct: true,
     baseSalary: true,
     accountCurrency: true,
@@ -187,6 +202,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     swift: true,
     taxId: true,
     unit: true,
+    bankAccounts: true,
   })
   .extend({
     id: z.string().trim().optional(),
@@ -215,6 +231,7 @@ export const masterDataFormSchema = masterDataRecordSchema
     odLimit: nonNegativeNumber('วงเงิน OD'),
     branchId: optionalCode('รหัสสาขา'),
     address: optionalGeneralText('ที่อยู่', 500),
+    commissionEnabled: z.boolean().default(false),
     commissionPct: z.number().min(0, 'ค่าคอมมิชชันต้องไม่ติดลบ').max(100, 'ค่าคอมมิชชันต้องไม่เกิน 100%').nullable().default(null),
     baseSalary: nonNegativeNumber('เงินเดือนฐาน'),
     accountCurrency: optionalCode('สกุลเงินบัญชี'),
@@ -236,6 +253,18 @@ export const masterDataFormSchema = masterDataRecordSchema
     swift: z.preprocess(blankToNull, z.string().trim().toUpperCase().regex(/^[A-Z0-9]{8}([A-Z0-9]{3})?$/, 'SWIFT ต้องเป็นตัวอักษร/ตัวเลข 8 หรือ 11 ตัว').nullable().default(null)),
     taxId: z.preprocess(blankToNull, z.string().trim().regex(/^\d{10,13}$/, 'เลขผู้เสียภาษีต้องเป็นตัวเลข 10-13 หลัก').nullable().default(null)),
     unit: optionalBusinessText('หน่วย', 40),
+    bankAccounts: z.array(z.object({
+      id: z.preprocess(blankToNull, z.string().trim().nullable().default(null)),
+      code: z.preprocess(blankToNull, z.string().trim().nullable().default(null)),
+      sourceType: directorBankAccountSourceSchema.default('OUTSIDE_COMPANY'),
+      linkedAccountId: z.preprocess(blankToNull, z.string().trim().nullable().default(null)),
+      bankName: optionalBusinessText('ธนาคาร', 120),
+      accountName: optionalBusinessText('ชื่อบัญชี', 180),
+      accountNo: optionalAccountNo,
+      bankBranch: optionalBusinessText('สาขาธนาคาร', 160),
+      isPrimary: z.boolean().default(false),
+      active: z.boolean().default(true),
+    })).default([]),
   })
 
 export const accountMasterDataFormSchema = masterDataFormSchema.extend({
@@ -244,7 +273,7 @@ export const accountMasterDataFormSchema = masterDataFormSchema.extend({
 
 export type MasterDataFormValues = z.infer<typeof masterDataFormSchema>
 
-export type MasterDataFieldType = 'text' | 'number' | 'select'
+export type MasterDataFieldType = 'text' | 'number' | 'select' | 'checkbox'
 export type MasterDataFieldInputFormat = 'money'
 
 export type MasterDataField = {
@@ -263,7 +292,7 @@ export type MasterDataColumn = {
   key: keyof MasterDataRecord
   label: string
   align?: 'left' | 'right' | 'center'
-  format?: 'money' | 'number' | 'status'
+  format?: 'money' | 'number' | 'percent' | 'status'
   maxWidth?: number
   minWidth?: number
   width?: number
@@ -310,6 +339,7 @@ export const emptyMasterDataForm: MasterDataFormValues = {
   odLimit: null,
   branchId: null,
   address: null,
+  commissionEnabled: false,
   commissionPct: null,
   baseSalary: null,
   accountCurrency: null,
@@ -331,6 +361,7 @@ export const emptyMasterDataForm: MasterDataFormValues = {
   swift: null,
   taxId: null,
   unit: null,
+  bankAccounts: [],
 }
 
 async function readJson<TSchema extends z.ZodTypeAny>(response: Response, schema: TSchema): Promise<z.output<TSchema>> {

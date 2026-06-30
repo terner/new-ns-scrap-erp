@@ -12,6 +12,7 @@ export function toNumber(value: { toNumber: () => number } | number | null | und
 }
 
 export function normalizeDate(value: string) {
+  if (value.includes('T')) return new Date(value)
   return new Date(`${value}T00:00:00.000Z`)
 }
 
@@ -19,7 +20,7 @@ export function currentActor(context: { appUser: { username: string } | null; au
   return context.appUser?.username ?? context.authUser.email ?? '-'
 }
 
-type DailyDocNoTable = 'bank_statement' | 'customer_receipts' | 'expenses' | 'payments' | 'petty_advance_returns' | 'petty_advances' | 'purchase_bills' | 'receipts' | 'sales_bills' | 'transfers'
+type DailyDocNoTable = 'bank_statement' | 'customer_receipts' | 'expenses' | 'payments' | 'petty_advances' | 'purchase_bills' | 'receipts' | 'sales_bills' | 'transfers'
 type DailyDocNoModel = {
   findFirst: (args: {
     orderBy: { doc_no: 'desc' }

@@ -8,6 +8,9 @@ const workspaceRoot = path.resolve(__dirname, '../..')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: workspaceRoot,
+  outputFileTracingIncludes: {
+    '/api/docs/openapi.yaml': ['../../docs/api/openapi.yaml'],
+  },
   reactStrictMode: true,
   turbopack: {
     root: workspaceRoot,

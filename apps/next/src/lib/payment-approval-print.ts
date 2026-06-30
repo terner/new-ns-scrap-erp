@@ -34,7 +34,7 @@ type PrintPmaRow = {
   payableBalance?: number
   sourceDocNo: string
   sourceLabel?: string
-  sourceType: 'advance_payment' | 'purchase_bill' | 'expense' | 'petty_advance_return'
+  sourceType: 'advance_payment' | 'purchase_bill' | 'expense' | 'petty_advance'
   supplierName?: string
   payee?: string
   totalAmount: number
@@ -245,7 +245,7 @@ export function buildPmaSummaryPrintHtml(rows: PrintPmaRow[], profile: CompanyPr
   const currentDate = formatDateDisplay(new Date().toISOString().split('T')[0])
   const totalAmountToPay = rows.reduce((sum, row) => sum + amountToPay(row), 0)
   const sortedRows = sortedRowsForPaymentSummary(rows)
-  const noteHeader = rows.some(r => r.sourceType === 'petty_advance_return') ? 'หมายเหตุ' : 'รายละเอียด'
+  const noteHeader = rows.some(r => r.sourceType === 'petty_advance') ? 'หมายเหตุ' : 'รายละเอียด'
   const isApMode = rows.some(r => r.sourceType === 'purchase_bill')
 
   const rowsHtml = buildPaymentSummaryGroups(sortedRows).map(({ group, row, shouldRenderGroupSummary }) => {

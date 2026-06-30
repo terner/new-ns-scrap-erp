@@ -33,6 +33,7 @@ const optionalSafeId = (label: string) => z.preprocess(
 )
 
 const requiredDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'วันที่ต้องเป็นรูปแบบ YYYY-MM-DD')
+const requiredDateTime = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/, 'วันที่จ่ายต้องเป็นรูปแบบ YYYY-MM-DD หรือ YYYY-MM-DDTHH:mm')
 const money = (label: string) => z.coerce.number({ invalid_type_error: `${label}ต้องเป็นตัวเลข` }).finite(`${label}ต้องเป็นตัวเลข`).min(0, `${label}ต้องไม่ติดลบ`)
 const positiveMoney = (label: string) => money(label).gt(0, `${label}ต้องมากกว่า 0`)
 
@@ -67,7 +68,7 @@ export const expenseLineFormSchema = z.object({
 export const expenseFormSchema = z.object({
   id: optionalSafeId('รหัสรายการ'),
   docNo: optionalDocNo,
-  date: requiredDate,
+  date: requiredDateTime,
   dueDate: z.preprocess(blankToNull, requiredDate.nullable().default(null)),
   refDocNo: optionalDocNo,
   categoryId: optionalSafeId('หมวดค่าใช้จ่าย'),
@@ -126,23 +127,48 @@ export const pettyAdvanceFormSchema = z.object({
   type: z.enum(['DIRECTOR_LOAN', 'PETTY_CASH'], { errorMap: () => ({ message: 'ประเภทไม่ถูกต้อง' }) }),
   recipientId: z.string().trim().min(1, 'เลือกผู้รับเงินจากรายชื่อกรรมการ/พนักงาน').max(80, 'ผู้รับเงินยาวเกินไป').regex(/^[A-Za-z0-9_.:-]+$/, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
   recipientName: z.string().trim().min(1, 'เลือกผู้รับเงิน').max(180, 'ผู้รับเงินยาวเกินไป').regex(businessTextPattern, 'ผู้รับเงินมีรูปแบบไม่ถูกต้อง'),
+  loanSourceType: z.enum(['IN_SYSTEM', 'OUTSIDE_SYSTEM']).nullable().default(null),
+  loanFromAccountId: optionalSafeId('บัญชีที่กู้'),
+  outsideLoanFromAccountName: optionalBusinessText('ชื่อบัญชีที่โอนเข้า', 180),
+  outsideLoanFromAccountNo: optionalBusinessText('เลขบัญชีที่โอนเข้า', 80),
+  outsideLoanFromBankBranch: optionalBusinessText('สาขาบัญชีที่โอนเข้า', 120),
+  outsideLoanFromBankName: optionalBusinessText('ธนาคารบัญชีที่โอนเข้า', 120),
+  outsideLoanTransferMethod: z.enum(['COUNTER_DEPOSIT', 'BANK_TRANSFER']).nullable().default(null),
+  receiveAccountId: optionalSafeId('บัญชีที่รับ'),
   amount: positiveMoney('จำนวนเงิน'),
   accountId: optionalSafeId('บัญชีจ่าย'),
   status: z.enum(['active', 'closed', 'cancelled']).default('active'),
   notes: optionalGeneralText('หมายเหตุ', 500),
+}).superRefine((value, context) => {
+  if (value.type !== 'DIRECTOR_LOAN') return
+  if (!value.loanSourceType) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกประเภทเงินกู้', path: ['loanSourceType'] })
+  }
+  if (value.loanSourceType === 'IN_SYSTEM' && !value.loanFromAccountId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกบัญชีที่กู้', path: ['loanFromAccountId'] })
+  }
+  if (value.loanSourceType === 'OUTSIDE_SYSTEM') {
+    if (!value.outsideLoanTransferMethod) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกวิธีรับเงินนอกระบบ', path: ['outsideLoanTransferMethod'] })
+    }
+    if (value.outsideLoanTransferMethod === 'BANK_TRANSFER') {
+      if (!value.outsideLoanFromBankName) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกธนาคารที่โอนเข้า', path: ['outsideLoanFromBankName'] })
+      }
+      if (!value.outsideLoanFromAccountName) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบัญชีที่โอนเข้า', path: ['outsideLoanFromAccountName'] })
+      }
+    }
+  }
+  if (!value.receiveAccountId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกบัญชีที่รับ', path: ['receiveAccountId'] })
+  }
+  if (value.loanSourceType === 'IN_SYSTEM' && value.loanFromAccountId && value.receiveAccountId && value.loanFromAccountId === value.receiveAccountId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'บัญชีที่กู้และบัญชีที่รับต้องไม่ซ้ำกัน', path: ['receiveAccountId'] })
+  }
 })
 
 export type PettyAdvanceFormValues = z.infer<typeof pettyAdvanceFormSchema>
-
-export const pettyAdvanceReturnFormSchema = z.object({
-  advanceId: z.string().trim().min(1, 'ไม่พบรายการเงินสำรอง'),
-  date: requiredDate,
-  amount: positiveMoney('จำนวนเงินคืน'),
-  accountId: z.string().trim().min(1, 'เลือกบัญชีรับคืน'),
-  notes: optionalGeneralText('หมายเหตุ', 500),
-})
-
-export type PettyAdvanceReturnFormValues = z.infer<typeof pettyAdvanceReturnFormSchema>
 
 const supplierPaymentLineSchema = z.object({
   approvalId: optionalDocNo,
@@ -289,4 +315,18 @@ export function todayDateInput() {
   }).formatToParts(new Date())
   const valueByType = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${valueByType.year}-${valueByType.month}-${valueByType.day}`
+}
+
+export function todayDateTimeInput() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+  }).formatToParts(new Date())
+  const valueByType = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${valueByType.year}-${valueByType.month}-${valueByType.day}T${valueByType.hour}:${valueByType.minute}`
 }

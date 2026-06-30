@@ -5,7 +5,7 @@ tags:
   - menu
   - master-data
 status: accepted-baseline
-updated: 2026-06-11
+updated: 2026-06-26
 route: /master-data/directors
 ---
 
@@ -31,6 +31,7 @@ company person master for directors/shareholders/employees/related persons and p
 ## Page Responsibilities
 
 - ดูแล master data ของ พนักงาน / กรรมการ
+- ดูแลบัญชีรับเงินได้หลายบัญชีต่อบุคคล โดยแต่ละบัญชีต้องระบุว่าเป็นบัญชีในบริษัทหรือนอกบริษัท
 - รองรับ list/search/filter/sort/resize/export/import เฉพาะที่ API ของหน้านี้เปิดไว้
 - ใช้ code/name/status เป็น outward UI identity และให้ server resolve internal id
 - แสดง created date/status และใช้งาน active-only ใน transaction pages
@@ -47,8 +48,8 @@ company person master for directors/shareholders/employees/related persons and p
 | Step | User action | System result |
 |---|---|---|
 | 1 | เปิดหน้า | โหลด list จาก Current API |
-| 2 | สร้าง/แก้ไข | validate code/name/type/status และ required fields |
-| 3 | บันทึก | เขียน master row และ audit/updated timestamp |
+| 2 | สร้าง/แก้ไข | validate code/name/type/status, required fields, และบัญชีรับเงินหลายรายการ |
+| 3 | บันทึก | เขียน master row, เขียนบัญชีรับเงินลูก, sync บัญชีหลักกลับ field legacy และ audit/updated timestamp |
 | 4 | ปิดใช้งาน | active=false/status inactive เพื่อกันเลือกในเอกสารใหม่ |
 | 5 | นำไปใช้ | transaction pages เลือกเฉพาะ active และ snapshot ค่าที่ต้อง trace |
 
@@ -63,6 +64,10 @@ company person master for directors/shareholders/employees/related persons and p
 ### Data Contract
 
 - UI ใช้ business code/name เป็นหลัก ไม่ expose internal id เป็นเลขธุรกิจ
+- บัญชีรับเงินหลายรายการเก็บใน `director_employee_bank_accounts`
+- `source_type = IN_COMPANY` ต้อง link ไป `accounts` ที่ active และดึงธนาคาร/ชื่อบัญชี/เลขบัญชีจากบัญชีในบริษัท
+- `source_type = OUTSIDE_COMPANY` ต้องกรอกธนาคาร, ชื่อบัญชี, เลขบัญชีเอง และไม่ link `accounts`
+- บัญชีหลัก active บัญชีแรกถูก sync กลับ `director_employees.bank_name`, `bank_account_name`, `account_no`, `bank_branch`, `bank_account` เพื่อ compatibility กับ flow เดิม
 - create/update ต้อง validate server-side ตาม field type matrix ใน `docs/design.md`
 - active/inactive ต้องใช้เป็น selection eligibility ใน transaction pages
 - import/export ถ้ามี ต้องใช้ validation ชุดเดียวกับ form/API
@@ -70,6 +75,10 @@ company person master for directors/shareholders/employees/related persons and p
 ## Validation / Status Rules
 
 - required fields ต้องชัดตามหน้าและไม่พึ่ง placeholder เป็น validation
+- ถ้าเพิ่มบัญชีรับเงิน ต้องเลือกประเภทบัญชี `บัญชีในบริษัท` หรือ `บัญชีนอกบริษัท`
+- ถ้าเป็นบัญชีในบริษัท ต้องเลือกจาก `/master-data/accounts`
+- ถ้าเป็นบัญชีนอกบริษัท ต้องกรอกธนาคาร, ชื่อบัญชี, และเลขบัญชี
+- ควรมีบัญชีหลักหนึ่งบัญชีในกลุ่มบัญชีที่ active; ถ้าไม่ได้เลือก ระบบตั้งบัญชี active แรกเป็นบัญชีหลัก
 - code/business id ต้อง unique ตาม scope ที่กำหนด
 - inactive row ต้องยังแสดงในประวัติเอกสารเก่า แต่ห้ามเลือกในเอกสารใหม่
 - ห้าม normalize/merge ข้อมูล legacy แบบ silent ใน runtime path
@@ -82,18 +91,18 @@ company person master for directors/shareholders/employees/related persons and p
 
 ## Current Code Baseline
 
-- Current `apps/next` code is accepted as the source of truth for this master-data page.
+- Current `apps/next` code supports multi receiving accounts for this master-data page.
 - Legacy behavior does not override this page unless user requests a page-specific change.
 - Future work is doc sync when current code changes, not legacy proof.
 - Downstream transaction pages must consume this master data through active rows and snapshot values as required by their own flow.
 
 ## Current Gap
 
-Current code is accepted baseline. Remaining work is to keep documentation in sync with future code changes and verify downstream transaction consumption when those transaction pages are proofed.
+Remaining work is browser/UAT verification and import/export follow-up for the new child account table.
 
 ## Implementation Checklist
 
-- [x] Current code accepted as master-data baseline
+- [x] Current code supports multiple receiving accounts with in-company/outside-company source type
 - [ ] Verify future form changes against docs/design.md Field Input Decision Matrix
 - [ ] Verify required fields and server validation
 - [ ] Verify active/inactive behavior in downstream transaction pages

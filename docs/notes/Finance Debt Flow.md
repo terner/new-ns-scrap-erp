@@ -11,7 +11,7 @@ tags:
   - page-flow
 status: draft
 created: 2026-06-11
-updated: 2026-06-24
+updated: 2026-06-26
 ---
 
 # Finance Debt Flow / Flow หมวดการเงินและหนี้
@@ -51,8 +51,9 @@ flowchart LR
   CUSTADV -. "future allocation" .-> SB
 
   PADV["PADV\nเงินสำรอง/กู้"] --> PETTY["/daily/petty-advance"]
-  PETTY --> PRET["PRET\nคืนเงิน"]
-  PRET --> BST
+  PETTY --> PMA2["PMA\nอนุมัติ PADV"]
+  PMA2 --> PMT2["PMT\nจ่าย/คืนจริง"]
+  PMT2 --> BST
 
   BST --> CASH["/finance/cash-position\nCash Position"]
   AR --> CASH
@@ -63,7 +64,7 @@ flowchart LR
 
 | Page | Write/Read | Source of truth | Side effect |
 |---|---|---|---|
-| Petty Advance | write `PADV`, write `PRET` | `petty_advances`, `petty_advance_returns` | `PRET` creates `bank_statement`; `PADV` create does not |
+| Petty Advance | write `PADV`, approve/pay via PMA/PMT | `petty_advances`, `payment_approvals`, `payments` | `PADV` enters Payment Approval directly; PMT records payment movement |
 | AR | read-only | primary: `sales_bills.receivable_balance`, `sales_bills.received_amount`; drilldown: `customer_receipt_allocations`, `customer_receipts`, legacy `receipts` mirror, customer advance allocations | none |
 | AP | read-only | primary: `purchase_bills.payable_balance`, `purchase_bills.paid_amount`; drilldown: `payments`, `payment_allocations`, `payment_approvals`, `supplier_advance_allocations` | none |
 | Bank Statement | read-only ledger | `bank_statement`, `accounts` | none |
@@ -79,8 +80,9 @@ flowchart LR
 - AR/AP balance read models must use the source document balance snapshots first (`sales_bills.receivable_balance`, `purchase_bills.payable_balance`). Receipt/payment/allocation tables explain the balance in drilldown but must not be used to derive the visible balance before the source snapshot.
 - AP aging policy ปัจจุบันไม่มี credit term: ใช้ `purchase_bills.date` เป็นวันที่ตั้งต้นนับอายุหนี้เพื่อแจ้งเตือนการพร้อมจ่ายเท่านั้น ถ้าอนาคตมี credit term ต้องออกแบบ schema/source ใหม่ก่อน
 - AP ไม่มี purchase channel source ใน target runtime ปัจจุบัน จึงไม่ควรมี channel filter บน `/finance/ap` จนกว่าจะมี field จริงในเอกสารซื้อ
-- `PMT`, `RCP`, `TRF`, `PRET`, and `CADV` are examples of money facts that appear in `bank_statement`.
-- `PADV` is an outstanding advance document; the current target rule is that creating `PADV` does not write bank statement. Cash/bank impact in this page occurs only when recording `PRET` return.
+- `PMT`, `RCP`, `TRF`, `CADV`, and `DIRECTOR_LOAN PADV` are examples of money facts that appear in `bank_statement`.
+- Petty Advance target source type for approval is `petty_advance` only. Do not route through `petty_advance_return` / `PRET` as fallback.
+- `PADV` is an outstanding advance/loan document. For `DIRECTOR_LOAN`, creating `PADV` must also record the company-account money-in because the company receives borrowed cash. `IN_SYSTEM` loans also record the director-account money-out when that director account exists in `accounts`; `OUTSIDE_SYSTEM` loans do not show director-side cash position because the source account is outside `accounts`.
 - `Customer Advance` is a liability. Current Next reads `CADV` rows from `bank_statement`; target should move to dedicated `customer_advances` and `customer_advance_allocations`.
 - Cash Position must be rebuildable from facts and should not become a manual source of truth.
 - ทุกหน้าแยก `document date` หรือวันที่จ่าย/รับเงินจริง ออกจาก `created_at` เพราะระบบรองรับการบันทึกย้อนหลัง.
@@ -95,13 +97,13 @@ Legacy มีเมนูตรงกันสำหรับ `AR`, `AP`, `Bank`
 - `Bank`: อ่าน bank statement ตามบัญชีและวันที่, มี running balance, chart, export, และปุ่ม duplicate cleanup ที่ target ต้องแยกเป็น admin-only ก่อนเปิดใช้.
 - `Cash Position`: รวม cash/bank/FCD/OD, AR และ AP เพื่อดู liquidity.
 - `Customer Advance`: สร้าง `CADV` แล้วเขียน bank statement เงินเข้า; cancel จะลบ/ย้อน bank statement ถ้ายังไม่ถูกใช้.
-- `Petty Advance`: legacy เขียน bank statement ตอนสร้าง `PADV`, แต่ target ปัจจุบันเปลี่ยนแล้วว่า `PADV` ยังไม่เขียน `BST`; `PRET` คืนเงินจึงเขียน `BST`.
+- `Petty Advance`: target now separates `DIRECTOR_LOAN` from `PETTY_CASH`. Director loans write cash/bank movement on `PADV` because the company receives borrowed money; petty cash/advance clearing remains a separate outstanding flow and must not be inferred from the director-loan rule.
 
 ## Current API Summary
 
 | Page | Current API | Permission |
 |---|---|---|
-| `/daily/petty-advance` | `GET/POST /api/daily/petty-advances`, `POST /api/daily/petty-advances/returns` | `finance.cash.view` |
+| `/daily/petty-advance` | `GET/POST /api/daily/petty-advances`, `GET/POST /api/daily/payment-approval`, `/api/purchase/payments` | `finance.cash.view` |
 | `/finance/ar` | `GET /api/finance/ar` | `finance.cash.view` |
 | `/finance/ap` | `GET /api/finance/ap` | `finance.cash.view` |
 | `/finance/bank` | `GET /api/finance/bank` | `finance.cash.view` |

@@ -7,61 +7,75 @@ import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox, type SearchComboboxOption } from '@/components/ui/SearchCombobox'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { ApiError } from '@/lib/api-client'
-import { dailyFetchJson, formatMoney, pettyAdvanceFormSchema, pettyAdvanceReturnFormSchema, todayDateInput, type DailyAccountOption, type PettyAdvanceFormValues } from '@/lib/daily'
+import { dailyFetchJson, formatMoney, pettyAdvanceFormSchema, todayDateInput, type DailyAccountOption, type PettyAdvanceFormValues } from '@/lib/daily'
 import { formatDateDisplay } from '@/lib/format'
 
 type PettyAdvanceRow = PettyAdvanceFormValues & {
   accountName: string
+  canCancel: boolean
+  cancelBlockedReason: string
+  createdAt: string
+  createdBy: string
   docNo: string
   id: string
-  pendingReturn: number
+  loanFromAccountId: string | null
+  loanSourceType: 'IN_SYSTEM' | 'OUTSIDE_SYSTEM' | null
+  outsideLoanFromAccountName: string | null
+  outsideLoanFromAccountNo: string | null
+  outsideLoanFromBankBranch: string | null
+  outsideLoanFromBankName: string | null
+  outsideLoanTransferMethod: 'COUNTER_DEPOSIT' | 'BANK_TRANSFER' | null
   remaining: number
+  receiveAccountId: string | null
   recipientAccountLabel: string
   recipientAccountNo: string
   recipientBankAccountName: string
   recipientBankBranch: string
   recipientBankName: string
-  returns?: PettyReturnRow[]
   returned: number
-  spent: number
-}
-
-type PettyReturnRow = {
-  accountId: string
-  accountName: string
-  amount: number
-  date: string
-  id: string
-  notes: string
 }
 
 type PettyPayload = {
   accounts: DailyAccountOption[]
+  bankNames: PettyAdvanceBankNameOption[]
   recipientOptions: PettyAdvanceRecipientOption[]
   rows: PettyAdvanceRow[]
 }
-type PettyAdvanceRecipientOption = SearchComboboxOption & {
+type PettyAdvanceBankNameOption = {
+  code: string
+  name: string
+}
+type PettyAdvanceRecipientBankAccount = {
+  accountName: string
   accountNo: string
-  bankAccountLabel: string
-  bankAccountName: string
   bankBranch: string
   bankName: string
+  linkedAccountId: string | null
+  sourceType: string
+}
+type PettyAdvanceRecipientOption = SearchComboboxOption & {
   type: string
 }
-type PettyAdvanceColumnKey = 'action' | 'amount' | 'date' | 'docNo' | 'recipientName' | 'remaining' | 'returned' | 'spent' | 'status' | 'type'
+type PettyAdvanceColumnKey = 'action' | 'amount' | 'createdAt' | 'createdBy' | 'date' | 'docNo' | 'recipientName' | 'remaining' | 'returned' | 'status' | 'type'
+type PettyAdvanceSortKey = Exclude<PettyAdvanceColumnKey, 'action'>
+type PettyAdvanceStatusFilter = '' | 'active' | 'cancelled' | 'closed' | 'partial_returned'
+type SortDirection = 'asc' | 'desc'
 
 const pettyAdvanceColumns: Array<ResizableColumnDefinition<PettyAdvanceColumnKey>> = [
-  { key: 'docNo', defaultWidth: 150, minWidth: 120 },
-  { key: 'date', defaultWidth: 120, minWidth: 100 },
+  { key: 'docNo', defaultWidth: 160, minWidth: 130 },
+  { key: 'date', defaultWidth: 150, minWidth: 120 },
   { key: 'type', defaultWidth: 150, minWidth: 120 },
   { key: 'recipientName', defaultWidth: 260, minWidth: 130 },
   { key: 'amount', defaultWidth: 110, minWidth: 90 },
-  { key: 'spent', defaultWidth: 110, minWidth: 90 },
   { key: 'returned', defaultWidth: 110, minWidth: 90 },
   { key: 'remaining', defaultWidth: 110, minWidth: 90 },
   { key: 'status', defaultWidth: 120, minWidth: 100 },
-  { key: 'action', defaultWidth: 210, minWidth: 180 },
+  { key: 'createdBy', defaultWidth: 150, minWidth: 120 },
+  { key: 'createdAt', defaultWidth: 160, minWidth: 130 },
+  { key: 'action', defaultWidth: 150, minWidth: 120 },
 ]
+
+const pageSizeOptions = [10, 25, 50, 100]
 
 const emptyForm: PettyAdvanceFormValues = {
   accountId: '',
@@ -69,7 +83,15 @@ const emptyForm: PettyAdvanceFormValues = {
   date: todayDateInput(),
   docNo: null,
   id: null,
+  loanFromAccountId: null,
+  loanSourceType: null,
   notes: null,
+  outsideLoanFromAccountName: null,
+  outsideLoanFromAccountNo: null,
+  outsideLoanFromBankBranch: null,
+  outsideLoanFromBankName: null,
+  outsideLoanTransferMethod: null,
+  receiveAccountId: null,
   recipientId: '',
   recipientName: '',
   status: 'active',
@@ -91,25 +113,62 @@ function formatMoneyInput(value: number) {
   return value > 0 ? value.toLocaleString('th-TH', { maximumFractionDigits: 2, minimumFractionDigits: 2 }) : ''
 }
 
+function accountOptionLabel(account: DailyAccountOption) {
+  return `${account.type} / ${account.name} / ${account.code ?? '-'} / ยอดคงเหลือ ${formatMoney(account.balance ?? 0)}`
+}
+
+function normalizeAccountNo(value: string | null | undefined) {
+  return String(value ?? '').replace(/\D/g, '')
+}
+
 function typeLabel(value: PettyAdvanceFormValues['type']) {
   return value === 'DIRECTOR_LOAN' ? 'กู้กรรมการ' : 'เงินสำรองจ่าย'
 }
 
+function datePart(value: string | null | undefined) {
+  if (!value) return ''
+  return value.slice(0, 10)
+}
+
+function timePart(value: string | null | undefined) {
+  if (!value || !value.includes('T')) return ''
+  return value.slice(11, 16)
+}
+
+function compareText(left: string | null | undefined, right: string | null | undefined) {
+  return String(left ?? '').localeCompare(String(right ?? ''), 'th')
+}
+
+function uiStatus(row: Pick<PettyAdvanceRow, 'remaining' | 'returned' | 'status'>): PettyAdvanceStatusFilter {
+  if (row.status === 'cancelled') return 'cancelled'
+  if (row.status === 'closed') return 'closed'
+  if (row.returned > 0 && row.remaining > 0) return 'partial_returned'
+  return 'active'
+}
+
 export function DailyPettyAdvancePageClient() {
   const [accounts, setAccounts] = useState<DailyAccountOption[]>([])
+  const [bankNames, setBankNames] = useState<PettyAdvanceBankNameOption[]>([])
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState<PettyAdvanceFormValues>(emptyForm)
   const [formOpen, setFormOpen] = useState(false)
+  const [isCancellingId, setIsCancellingId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [lastSavedDocNo, setLastSavedDocNo] = useState<string | null>(null)
   const [detailRow, setDetailRow] = useState<PettyAdvanceRow | null>(null)
-  const [returnForm, setReturnForm] = useState({ accountId: '', amount: '', date: todayDateInput(), notes: '' })
-  const [returningRow, setReturningRow] = useState<PettyAdvanceRow | null>(null)
+  const [selectedRecipientBankAccounts, setSelectedRecipientBankAccounts] = useState<PettyAdvanceRecipientBankAccount[]>([])
   const [recipientOptions, setRecipientOptions] = useState<PettyAdvanceRecipientOption[]>([])
   const [rows, setRows] = useState<PettyAdvanceRow[]>([])
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('active')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const [sortKey, setSortKey] = useState<PettyAdvanceSortKey>('date')
+  const [status, setStatus] = useState<PettyAdvanceStatusFilter>('active')
   const [type, setType] = useState('')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -120,9 +179,10 @@ export function DailyPettyAdvancePageClient() {
     setError(null)
     try {
       const payload = await dailyFetchJson<PettyPayload>('/api/daily/petty-advances')
-      setAccounts(payload.accounts)
+      setAccounts(payload.accounts ?? [])
+      setBankNames(payload.bankNames ?? [])
       setRecipientOptions(payload.recipientOptions ?? [])
-      setRows(payload.rows)
+      setRows(payload.rows ?? [])
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'โหลดเงินสำรองจ่ายไม่ได้')
     } finally {
@@ -137,18 +197,48 @@ export function DailyPettyAdvancePageClient() {
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase()
     return rows
-      .filter((row) => !status || row.status === status)
+      .filter((row) => !status || uiStatus(row) === status)
       .filter((row) => !type || row.type === type)
+      .filter((row) => !dateFrom || datePart(row.date) >= dateFrom)
+      .filter((row) => !dateTo || datePart(row.date) <= dateTo)
       .filter((row) => !query || `${row.docNo} ${row.recipientName} ${row.notes ?? ''}`.toLowerCase().includes(query))
-      .sort((left, right) => right.date.localeCompare(left.date) || right.docNo.localeCompare(left.docNo))
-  }, [rows, search, status, type])
+  }, [dateFrom, dateTo, rows, search, status, type])
+
+  const sortedRows = useMemo(() => {
+    const sorted = [...filteredRows].sort((left, right) => {
+      let result = 0
+      if (sortKey === 'amount' || sortKey === 'remaining' || sortKey === 'returned') {
+        result = left[sortKey] - right[sortKey]
+      } else if (sortKey === 'date') {
+        result = left.date.localeCompare(right.date)
+      } else if (sortKey === 'createdAt') {
+        result = left.createdAt.localeCompare(right.createdAt)
+      } else if (sortKey === 'createdBy') {
+        result = compareText(left.createdBy, right.createdBy)
+      } else {
+        result = compareText(String(left[sortKey] ?? ''), String(right[sortKey] ?? ''))
+      }
+      if (result === 0) result = right.createdAt.localeCompare(left.createdAt) || right.docNo.localeCompare(left.docNo)
+      return sortDirection === 'asc' ? result : -result
+    })
+    return sorted
+  }, [filteredRows, sortDirection, sortKey])
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return sortedRows.slice(start, start + pageSize)
+  }, [currentPage, pageSize, sortedRows])
+
+  useEffect(() => {
+    setPage(1)
+  }, [dateFrom, dateTo, pageSize, search, status, type])
 
   const summary = {
     active: rows.filter((row) => row.status === 'active').length,
-    count: rows.filter((row) => row.status !== 'cancelled').length,
     remaining: rows.filter((row) => row.status === 'active').reduce((sum, row) => sum + row.remaining, 0),
     returned: rows.reduce((sum, row) => sum + row.returned, 0),
-    spent: rows.reduce((sum, row) => sum + row.spent, 0),
     total: rows.reduce((sum, row) => sum + row.amount, 0),
   }
 
@@ -169,7 +259,64 @@ export function DailyPettyAdvancePageClient() {
 
 
   const activeAccounts = useMemo(() => accounts.filter((account) => account.active), [accounts])
-  const hasActiveFilters = Boolean(search.trim() || type || status !== 'active')
+  const companyReceiveAccounts = useMemo(() => {
+    if (form.loanSourceType !== 'IN_SYSTEM' || !form.loanFromAccountId) return activeAccounts
+    return activeAccounts.filter((account) => account.id !== form.loanFromAccountId)
+  }, [activeAccounts, form.loanFromAccountId, form.loanSourceType])
+  const selectedRecipient = useMemo(() => recipientOptions.find((option) => option.id === form.recipientId) ?? null, [form.recipientId, recipientOptions])
+  const directorLoanSourceAccounts = useMemo(() => {
+    const recipientAccountNos = new Set(selectedRecipientBankAccounts.map((account) => normalizeAccountNo(account.accountNo)).filter(Boolean))
+    if (recipientAccountNos.size === 0) return []
+    return activeAccounts.filter((account) => recipientAccountNos.has(normalizeAccountNo(account.code)))
+  }, [activeAccounts, selectedRecipientBankAccounts])
+  const hasActiveFilters = Boolean(search.trim() || dateFrom || dateTo || type || status !== 'active')
+
+  useEffect(() => {
+    let isCurrent = true
+    setSelectedRecipientBankAccounts([])
+    if (!form.recipientId) return () => {
+      isCurrent = false
+    }
+
+    dailyFetchJson<{ bankAccounts: PettyAdvanceRecipientBankAccount[] }>(`/api/daily/petty-advances?recipientAccountsFor=${encodeURIComponent(form.recipientId)}`)
+      .then((payload) => {
+        if (!isCurrent) return
+        setSelectedRecipientBankAccounts(payload.bankAccounts ?? [])
+      })
+      .catch((caught) => {
+        if (!isCurrent) return
+        setError(caught instanceof Error ? caught.message : 'โหลดบัญชีผู้จ่ายไม่ได้')
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [form.recipientId])
+
+  useEffect(() => {
+    if (form.loanSourceType !== 'IN_SYSTEM' || form.loanFromAccountId || directorLoanSourceAccounts.length === 0) return
+    setForm((current) => {
+      if (current.loanSourceType !== 'IN_SYSTEM' || current.loanFromAccountId) return current
+      return { ...current, loanFromAccountId: directorLoanSourceAccounts[0]?.id ?? null }
+    })
+  }, [directorLoanSourceAccounts, form.loanFromAccountId, form.loanSourceType])
+
+  useEffect(() => {
+    if (form.loanSourceType !== 'IN_SYSTEM' || !form.loanFromAccountId || form.receiveAccountId !== form.loanFromAccountId) return
+    setForm((current) => {
+      if (current.loanSourceType !== 'IN_SYSTEM' || current.receiveAccountId !== current.loanFromAccountId) return current
+      return { ...current, receiveAccountId: null }
+    })
+  }, [form.loanFromAccountId, form.loanSourceType, form.receiveAccountId])
+
+  function handleSort(nextKey: PettyAdvanceSortKey) {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(nextKey)
+    setSortDirection(nextKey === 'date' ? 'desc' : 'asc')
+  }
 
   function focusFirstField(field: string) {
     requestAnimationFrame(() => {
@@ -184,6 +331,13 @@ export function DailyPettyAdvancePageClient() {
     const recipient = recipientOptions.find((option) => option.id === recipientId) ?? null
     setForm((current) => ({
       ...current,
+      loanFromAccountId: null,
+      loanSourceType: null,
+      outsideLoanFromAccountName: null,
+      outsideLoanFromAccountNo: null,
+      outsideLoanFromBankBranch: null,
+      outsideLoanFromBankName: null,
+      outsideLoanTransferMethod: null,
       recipientId,
       recipientName: recipient?.label ?? '',
     }))
@@ -195,6 +349,24 @@ export function DailyPettyAdvancePageClient() {
     setFormOpen(true)
   }
 
+  async function cancelRow(row: PettyAdvanceRow) {
+    if (!row.canCancel) return
+    if (!window.confirm(`ยืนยันยกเลิกรายการ ${row.docNo}?`)) return
+    setIsCancellingId(row.id)
+    setError(null)
+    try {
+      await dailyFetchJson('/api/daily/petty-advances', {
+        body: JSON.stringify({ id: row.id }),
+        method: 'PATCH',
+      })
+      await loadData()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ยกเลิกรายการเงินสำรองจ่ายไม่ได้')
+    } finally {
+      setIsCancellingId(null)
+    }
+  }
+
   function openEditForm(row: PettyAdvanceRow) {
     setForm({
       accountId: '',
@@ -202,7 +374,15 @@ export function DailyPettyAdvancePageClient() {
       date: row.date,
       docNo: row.docNo,
       id: row.id,
+      loanFromAccountId: row.loanFromAccountId,
+      loanSourceType: row.loanSourceType ?? (row.type === 'DIRECTOR_LOAN' ? 'IN_SYSTEM' : null),
       notes: row.notes,
+      outsideLoanFromAccountName: row.outsideLoanFromAccountName,
+      outsideLoanFromAccountNo: null,
+      outsideLoanFromBankBranch: row.outsideLoanFromBankBranch,
+      outsideLoanFromBankName: row.outsideLoanFromBankName,
+      outsideLoanTransferMethod: row.outsideLoanTransferMethod,
+      receiveAccountId: row.receiveAccountId,
       recipientId: row.recipientId,
       recipientName: row.recipientName,
       status: row.status,
@@ -212,16 +392,9 @@ export function DailyPettyAdvancePageClient() {
     setFormOpen(true)
   }
 
-  function openReturnForm(row: PettyAdvanceRow) {
-    setDetailRow(null)
-    setReturningRow(row)
-    const defaultAccountId = row.accountId ?? activeAccounts[0]?.id ?? ''
-    setReturnForm({ accountId: defaultAccountId, amount: String(Math.max(0, row.remaining)), date: todayDateInput(), notes: '' })
-  }
-
   async function saveForm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const parsed = pettyAdvanceFormSchema.safeParse(form)
+    const parsed = pettyAdvanceFormSchema.safeParse({ ...form, outsideLoanFromAccountNo: null })
     if (!parsed.success) {
       const nextFieldErrors = Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message]))
       setFieldErrors(nextFieldErrors)
@@ -232,11 +405,13 @@ export function DailyPettyAdvancePageClient() {
 
     setIsSaving(true)
     setError(null)
+    setLastSavedDocNo(null)
     try {
-      await dailyFetchJson('/api/daily/petty-advances', {
+      const saved = await dailyFetchJson<{ id: string }>('/api/daily/petty-advances', {
         body: JSON.stringify(parsed.data),
         method: 'POST',
       })
+      setLastSavedDocNo(saved.id)
       setFormOpen(false)
       await loadData()
     } catch (caught) {
@@ -252,53 +427,31 @@ export function DailyPettyAdvancePageClient() {
     }
   }
 
-  async function saveReturn(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!returningRow) return
-    const parsed = pettyAdvanceReturnFormSchema.safeParse({
-      accountId: returnForm.accountId,
-      advanceId: returningRow.id,
-      amount: Number(returnForm.amount),
-      date: returnForm.date,
-      notes: returnForm.notes || null,
-    })
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'ข้อมูลคืนเงินไม่ถูกต้อง')
-      return
-    }
-
-    setIsSaving(true)
-    setError(null)
-    try {
-      await dailyFetchJson('/api/daily/petty-advances/returns', {
-        body: JSON.stringify(parsed.data),
-        method: 'POST',
-      })
-      setReturningRow(null)
-      setReturnForm({ accountId: '', amount: '', date: todayDateInput(), notes: '' })
-      await loadData()
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'บันทึกคืนเงินไม่ได้')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   return (
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+      {lastSavedDocNo ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <span>บันทึก {lastSavedDocNo} แล้ว รายการนี้รออนุมัติใน Payment Approval</span>
+          <a
+            className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+            href={`/daily/payment-approval?tab=pettyAdvance&search=${encodeURIComponent(lastSavedDocNo)}`}
+          >
+            เปิดคิวอนุมัติ
+          </a>
+        </div>
+      ) : null}
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5 text-sm">
-        <SummaryCard label="รายการทั้งหมด" value={String(summary.count)} />
-        <SummaryCard label="ค้างคืน" tone="amber" value={String(summary.active)} />
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 text-sm">
+        <SummaryCard label="รอคืนเงิน" tone="amber" value={String(summary.active)} />
         <SummaryCard label="ยอดยืมทั้งหมด" tone="blue" value={formatMoney(summary.total)} />
-        <SummaryCard label="ใช้จ่าย/คืนแล้ว" tone="emerald" value={formatMoney(summary.spent + summary.returned)} />
+        <SummaryCard label="คืนแล้ว" tone="emerald" value={formatMoney(summary.returned)} />
         <SummaryCard className="col-span-2 lg:col-span-1" label="ยอดคงค้าง" tone="red" value={formatMoney(summary.remaining)} />
       </div>
 
       {topRecipients.length ? (
         <div className="rounded-md bg-white p-4 shadow">
-          <div className="mb-2 font-bold text-slate-700">Top 10 ผู้รับเงินที่ค้างคืน</div>
+          <div className="mb-2 font-bold text-slate-700">Top 10 ผู้รับเงินที่รอคืนเงิน</div>
           <div className="grid gap-2 text-sm md:grid-cols-2">
             {topRecipients.map((recipient) => (
               <div key={recipient.name} className="flex justify-between rounded-md border border-slate-100 bg-slate-50 p-2">
@@ -313,6 +466,9 @@ export function DailyPettyAdvancePageClient() {
       <div className="rounded-md bg-white p-3 shadow">
         <div className="flex flex-wrap items-center gap-2">
           <input className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100" placeholder="ค้นหาเลขที่ / ผู้รับเงิน / หมายเหตุ" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="hidden h-9 rounded-md border border-slate-300 px-3 text-sm outline-none lg:block" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <span className="hidden text-xs text-slate-400 lg:inline">ถึง</span>
+          <input className="hidden h-9 rounded-md border border-slate-300 px-3 text-sm outline-none lg:block" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
 
           {/* Mobile Filter Button */}
           <button
@@ -324,7 +480,7 @@ export function DailyPettyAdvancePageClient() {
           </button>
 
           {hasActiveFilters ? (
-            <button className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={() => { setSearch(''); setType(''); setStatus('active') }}>
+            <button className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50" type="button" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setType(''); setStatus('active') }}>
               ล้าง filter
             </button>
           ) : null}
@@ -342,8 +498,9 @@ export function DailyPettyAdvancePageClient() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500 w-14 inline-block shrink-0">สถานะ:</span>
             <SegmentFilterButton active={!status} label="ทั้งหมด" onClick={() => setStatus('')} />
-            <SegmentFilterButton active={status === 'active'} label="ค้างคืน" onClick={() => setStatus(status === 'active' ? '' : 'active')} />
-            <SegmentFilterButton active={status === 'closed'} label="ปิดแล้ว" onClick={() => setStatus(status === 'closed' ? '' : 'closed')} />
+            <SegmentFilterButton active={status === 'active'} label="รอคืนเงิน" onClick={() => setStatus(status === 'active' ? '' : 'active')} />
+            <SegmentFilterButton active={status === 'partial_returned'} label="คืนแล้วบางส่วน" onClick={() => setStatus(status === 'partial_returned' ? '' : 'partial_returned')} />
+            <SegmentFilterButton active={status === 'closed'} label="คืนแล้ว" onClick={() => setStatus(status === 'closed' ? '' : 'closed')} />
             <SegmentFilterButton active={status === 'cancelled'} label="ยกเลิก" onClick={() => setStatus(status === 'cancelled' ? '' : 'cancelled')} />
           </div>
         </div>
@@ -377,6 +534,15 @@ export function DailyPettyAdvancePageClient() {
             </div>
 
             <div className="space-y-4">
+              <div>
+                <span className="mb-2 block text-xs font-semibold text-slate-600">ช่วงวันที่กู้ยืม/สำรองจ่าย</span>
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <input className="h-11 rounded-md border border-slate-300 px-3 text-sm outline-none" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+                  <span className="text-xs text-slate-400">ถึง</span>
+                  <input className="h-11 rounded-md border border-slate-300 px-3 text-sm outline-none" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+                </div>
+              </div>
+
               <div>
                 <span className="mb-2 block text-xs font-semibold text-slate-600">ประเภท</span>
                 <div className="flex flex-wrap gap-2">
@@ -429,7 +595,16 @@ export function DailyPettyAdvancePageClient() {
                     type="button"
                     onClick={() => setStatus('active')}
                   >
-                    ค้างคืน
+                    รอคืนเงิน
+                  </button>
+                  <button
+                    className={`rounded-md border px-3 py-1.5 text-xs font-medium h-11 ${
+                      status === 'partial_returned' ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700'
+                    }`}
+                    type="button"
+                    onClick={() => setStatus('partial_returned')}
+                  >
+                    คืนแล้วบางส่วน
                   </button>
                   <button
                     className={`rounded-md border px-3 py-1.5 text-xs font-medium h-11 ${
@@ -438,7 +613,7 @@ export function DailyPettyAdvancePageClient() {
                     type="button"
                     onClick={() => setStatus('closed')}
                   >
-                    ปิดแล้ว
+                    คืนแล้ว
                   </button>
                   <button
                     className={`rounded-md border px-3 py-1.5 text-xs font-medium h-11 ${
@@ -459,6 +634,8 @@ export function DailyPettyAdvancePageClient() {
                 className="h-11 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 onClick={() => {
                   setSearch('')
+                  setDateFrom('')
+                  setDateTo('')
                   setType('')
                   setStatus('active')
                   setShowMobileFilters(false)
@@ -482,22 +659,36 @@ export function DailyPettyAdvancePageClient() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
           <form ref={formRef} noValidate className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveForm}>
             <div className="flex items-center justify-between bg-slate-900 px-5 py-4">
-              <h3 className="font-bold text-white">{form.id ? 'แก้ไขรายการยืมเงิน' : 'บันทึกรายการยืมเงิน'}</h3>
+              <h3 className="font-bold text-white">{form.id ? 'แก้ไขรายการยืมเงิน' : 'สร้างรายการกู้ยืม/สำรองจ่าย'}</h3>
               <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={() => setFormOpen(false)}>&times;</button>
             </div>
             <div className="space-y-5 p-5">
-              <section className="space-y-3">
-                <h4 className="text-sm font-semibold text-slate-900">ข้อมูลการจ่าย</h4>
+              <section className="space-y-3 rounded-md border border-slate-200 bg-slate-50/50 p-4">
+                <h4 className="text-sm font-semibold text-slate-900">ข้อมูลการกู้ยืม/สำรองจ่าย</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <label className="block col-span-2 sm:col-span-1" data-field="type">
                     <span className="mb-1 block text-xs font-medium text-slate-600">ประเภท <span className="text-red-600">*</span></span>
-                    <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as 'DIRECTOR_LOAN' | 'PETTY_CASH' })}>
+                    <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none" value={form.type} onChange={(event) => {
+                      const nextType = event.target.value as 'DIRECTOR_LOAN' | 'PETTY_CASH'
+                      setForm({
+                        ...form,
+                        loanFromAccountId: nextType === 'DIRECTOR_LOAN' ? form.loanFromAccountId : null,
+                        loanSourceType: nextType === 'DIRECTOR_LOAN' ? form.loanSourceType : null,
+                        outsideLoanFromAccountName: nextType === 'DIRECTOR_LOAN' ? form.outsideLoanFromAccountName : null,
+                        outsideLoanFromAccountNo: null,
+                        outsideLoanFromBankBranch: nextType === 'DIRECTOR_LOAN' ? form.outsideLoanFromBankBranch : null,
+                        outsideLoanFromBankName: nextType === 'DIRECTOR_LOAN' ? form.outsideLoanFromBankName : null,
+                        outsideLoanTransferMethod: nextType === 'DIRECTOR_LOAN' ? form.outsideLoanTransferMethod : null,
+                        receiveAccountId: nextType === 'DIRECTOR_LOAN' ? form.receiveAccountId : null,
+                        type: nextType,
+                      })
+                    }}>
                       <option value="DIRECTOR_LOAN">กู้กรรมการ</option>
                       <option value="PETTY_CASH">เงินสำรองจ่าย</option>
                     </select>
                   </label>
                   <div className="col-span-2 sm:col-span-1">
-                    <TextField error={fieldErrors.date} fieldName="date" label="วันที่จ่าย" required type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
+                    <TextField error={fieldErrors.date} fieldName="date" label="วันที่กู้ยืม/สำรองจ่าย" required type="date" value={form.date} onChange={(value) => setForm({ ...form, date: value })} />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <MoneyField error={fieldErrors.amount} fieldName="amount" label="จำนวนเงิน" required value={form.amount} onChange={(value) => setForm({ ...form, amount: value })} />
@@ -505,7 +696,8 @@ export function DailyPettyAdvancePageClient() {
                 </div>
               </section>
 
-              <section className="space-y-3 border-t border-slate-100 pt-4">
+              <section className="space-y-4 rounded-md border border-slate-200 bg-white p-4">
+                <h4 className="text-sm font-semibold text-slate-900">{form.type === 'DIRECTOR_LOAN' ? 'ผู้จ่ายและข้อมูลเงินกู้กรรมการ' : 'ผู้จ่าย / กรรมการ'}</h4>
                 <div data-field="recipientId">
                   <SearchCombobox
                      error={fieldErrors.recipientId ?? fieldErrors.recipientName}
@@ -515,14 +707,123 @@ export function DailyPettyAdvancePageClient() {
                      label="ผู้จ่าย *"
                      options={recipientOptions}
                      optionsPanelClassName="max-h-72"
-                     placeholder="ค้นหากรรมการ/พนักงาน"
+                     placeholder="ค้นหารายชื่อจากข้อมูลหลักพนักงาน/กรรมการ"
                      value={form.recipientId}
                      onChange={updateRecipient}
                   />
                 </div>
+
+                {form.type === 'DIRECTOR_LOAN' ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="block" data-field="loanSourceType">
+                      <span className="mb-1 block text-xs font-medium text-slate-600">ประเภทเงินกู้ <span className="text-red-600">*</span></span>
+                      <select
+                        className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                        disabled={!form.recipientId}
+                        value={form.loanSourceType ?? ''}
+                        onChange={(event) => {
+                          const loanSourceType = event.target.value ? event.target.value as 'IN_SYSTEM' | 'OUTSIDE_SYSTEM' : null
+                          setForm({
+                            ...form,
+                            loanFromAccountId: loanSourceType === 'IN_SYSTEM' ? form.loanFromAccountId : null,
+                            loanSourceType,
+                            outsideLoanFromAccountName: loanSourceType === 'OUTSIDE_SYSTEM' ? form.outsideLoanFromAccountName : null,
+                            outsideLoanFromAccountNo: null,
+                            outsideLoanFromBankBranch: loanSourceType === 'OUTSIDE_SYSTEM' ? form.outsideLoanFromBankBranch : null,
+                            outsideLoanFromBankName: loanSourceType === 'OUTSIDE_SYSTEM' ? form.outsideLoanFromBankName : null,
+                            outsideLoanTransferMethod: loanSourceType === 'OUTSIDE_SYSTEM' ? form.outsideLoanTransferMethod : null,
+                          })
+                        }}
+                      >
+                        <option value="">เลือกประเภทเงินกู้</option>
+                        <option value="IN_SYSTEM">บัญชีในระบบ</option>
+                        <option value="OUTSIDE_SYSTEM">บัญชีนอกระบบ</option>
+                      </select>
+                      {!form.recipientId ? <span className="mt-1 block text-xs text-slate-500">เลือกผู้จ่ายก่อน</span> : null}
+                      {fieldErrors.loanSourceType ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.loanSourceType}</span> : null}
+                    </label>
+
+                    {form.loanSourceType === 'IN_SYSTEM' ? (
+                      <label className="block" data-field="loanFromAccountId">
+                        <span className="mb-1 block text-xs font-medium text-slate-600">บัญชีที่กู้ <span className="text-red-600">*</span></span>
+                        <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-400" disabled={!form.recipientId || !form.loanSourceType} value={form.loanFromAccountId ?? ''} onChange={(event) => {
+                          const loanFromAccountId = event.target.value || null
+                          setForm({
+                            ...form,
+                            loanFromAccountId,
+                            receiveAccountId: form.receiveAccountId === loanFromAccountId ? null : form.receiveAccountId,
+                          })
+                        }}>
+                          <option value="">เลือกบัญชีกรรมการที่อยู่ในระบบ</option>
+                          {directorLoanSourceAccounts.map((account) => (
+                            <option key={account.id} value={account.id}>{accountOptionLabel(account)}</option>
+                          ))}
+                        </select>
+                        {fieldErrors.loanFromAccountId ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.loanFromAccountId}</span> : null}
+                        {selectedRecipient && directorLoanSourceAccounts.length === 0 ? <span className="mt-1 block text-xs text-amber-700">ไม่พบบัญชีในระบบที่เลขบัญชีตรงกับกรรมการนี้</span> : null}
+                      </label>
+                    ) : form.loanSourceType === 'OUTSIDE_SYSTEM' ? (
+                      <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
+                        <div className="text-xs text-slate-600">บัญชีกรรมการอยู่นอกระบบ ระบบจะเก็บข้อมูลแหล่งเงินนอกระบบเป็นประวัติ แต่บัญชีที่รับเงินเข้าบริษัทให้เลือกใน section ถัดไป</div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <label className="block" data-field="outsideLoanTransferMethod">
+                            <span className="mb-1 block text-xs font-medium text-slate-600">วิธีรับเงินนอกระบบ <span className="text-red-600">*</span></span>
+                            <select className={`h-9 w-full rounded-md border px-3 text-sm outline-none ${fieldErrors.outsideLoanTransferMethod ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white'}`} value={form.outsideLoanTransferMethod ?? ''} onChange={(event) => {
+                              const outsideLoanTransferMethod = event.target.value ? event.target.value as 'COUNTER_DEPOSIT' | 'BANK_TRANSFER' : null
+                              setForm({
+                                ...form,
+                                outsideLoanFromAccountName: outsideLoanTransferMethod === 'BANK_TRANSFER' ? form.outsideLoanFromAccountName : null,
+                                outsideLoanFromBankBranch: outsideLoanTransferMethod === 'BANK_TRANSFER' ? form.outsideLoanFromBankBranch : null,
+                                outsideLoanFromBankName: outsideLoanTransferMethod === 'BANK_TRANSFER' ? form.outsideLoanFromBankName : null,
+                                outsideLoanTransferMethod,
+                              })
+                            }}>
+                              <option value="">เลือกวิธีรับเงิน</option>
+                              <option value="COUNTER_DEPOSIT">ฝากหน้า counter</option>
+                              <option value="BANK_TRANSFER">โอนเงินผ่านบัญชี</option>
+                            </select>
+                            {fieldErrors.outsideLoanTransferMethod ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.outsideLoanTransferMethod}</span> : null}
+                          </label>
+                          {form.outsideLoanTransferMethod === 'BANK_TRANSFER' ? (
+                            <>
+                              <label className="block" data-field="outsideLoanFromBankName">
+                                <span className="mb-1 block text-xs font-medium text-slate-600">ธนาคารที่โอนเข้า <span className="text-red-600">*</span></span>
+                                <select className={`h-9 w-full rounded-md border px-3 text-sm outline-none ${fieldErrors.outsideLoanFromBankName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white'}`} value={form.outsideLoanFromBankName ?? ''} onChange={(event) => setForm({ ...form, outsideLoanFromBankName: event.target.value || null })}>
+                                  <option value="">เลือกธนาคาร</option>
+                                  {bankNames.map((bank) => (
+                                    <option key={bank.code} value={bank.name}>{bank.name}</option>
+                                  ))}
+                                </select>
+                                {fieldErrors.outsideLoanFromBankName ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.outsideLoanFromBankName}</span> : null}
+                              </label>
+                              <TextField error={fieldErrors.outsideLoanFromAccountName} fieldName="outsideLoanFromAccountName" label="ชื่อบัญชีที่โอนเข้า" required value={form.outsideLoanFromAccountName ?? ''} onChange={(value) => setForm({ ...form, outsideLoanFromAccountName: value || null })} />
+                              <TextField error={fieldErrors.outsideLoanFromBankBranch} fieldName="outsideLoanFromBankBranch" label="สาขา" value={form.outsideLoanFromBankBranch ?? ''} onChange={(value) => setForm({ ...form, outsideLoanFromBankBranch: value || null })} />
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </section>
 
-              <div className="border-t border-slate-100 pt-4">
+              {form.type === 'DIRECTOR_LOAN' ? (
+                <section className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
+                  <h4 className="text-sm font-semibold text-slate-900">บัญชีบริษัทที่รับเงิน</h4>
+                  <label className="block" data-field="receiveAccountId">
+                    <span className="mb-1 block text-xs font-medium text-slate-600">บัญชีที่รับเงินเข้าบริษัท <span className="text-red-600">*</span></span>
+                    <select className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-400" value={form.receiveAccountId ?? ''} onChange={(event) => setForm({ ...form, receiveAccountId: event.target.value || null })}>
+                      <option value="">เลือกบัญชีบริษัทที่รับเงิน</option>
+                      {companyReceiveAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>{accountOptionLabel(account)}</option>
+                      ))}
+                    </select>
+                    {fieldErrors.receiveAccountId ? <span className="mt-1 block text-xs text-red-600">{fieldErrors.receiveAccountId}</span> : null}
+                  </label>
+                </section>
+              ) : null}
+
+              <div>
                 <TextAreaField error={fieldErrors.notes} fieldName="notes" label="หมายเหตุ" value={form.notes ?? ''} onChange={(value) => setForm({ ...form, notes: value })} />
               </div>
             </div>
@@ -534,55 +835,27 @@ export function DailyPettyAdvancePageClient() {
         </div>
       ) : null}
 
-      {returningRow ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8">
-          <form noValidate className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onSubmit={saveReturn}>
-            <div className="flex items-center justify-between bg-slate-900 px-5 py-4">
-              <h3 className="font-bold text-white">คืนเงิน — {returningRow.docNo} / {returningRow.recipientName}</h3>
-              <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={() => setReturningRow(null)}>&times;</button>
-            </div>
-            <div className="grid grid-cols-2 gap-3 p-5 text-sm">
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 col-span-2">ยอดยืม: <b>{formatMoney(returningRow.amount)}</b> · ใช้ไปแล้ว: <b>{formatMoney(returningRow.spent)}</b> · คืนแล้ว: <b>{formatMoney(returningRow.returned)}</b> · <span className="font-bold text-red-700">คงค้าง: {formatMoney(returningRow.remaining)}</span></div>
-              <div className="col-span-2 sm:col-span-1">
-                <TextField label="วันที่คืน" required type="date" value={returnForm.date} onChange={(value) => setReturnForm({ ...returnForm, date: value })} />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <MoneyField label="จำนวนเงินคืน" required value={Number(returnForm.amount) || 0} onChange={(value) => setReturnForm({ ...returnForm, amount: String(value) })} />
-              </div>
-              <div className="col-span-2">
-                <SelectField
-                  label="บัญชีรับคืน"
-                  required
-                  options={activeAccounts}
-                  value={returnForm.accountId}
-                  onChange={(value) => setReturnForm({ ...returnForm, accountId: value })}
-                />
-              </div>
-              <div className="col-span-2">
-                <TextAreaField label="หมายเหตุ" value={returnForm.notes} onChange={(value) => setReturnForm({ ...returnForm, notes: value })} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-              <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={() => setReturningRow(null)}>ยกเลิก</button>
-              <button className="rounded-md bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors" disabled={isSaving} type="submit">{isSaving ? 'กำลังส่งอนุมัติ...' : 'ส่งอนุมัติคืนเงิน'}</button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{filteredRows.length}</span> รายการ</div>
-        {columnResize.hasCustomWidths ? <button className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button> : null}
+        <div>พบทั้งหมด <span className="font-semibold text-slate-900">{sortedRows.length}</span> รายการ</div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? <button className="h-9 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</button> : null}
+          <select className="h-9 rounded-md border border-slate-300 px-2 text-sm outline-none" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+            {pageSizeOptions.map((option) => <option key={option} value={option}>{option} / หน้า</option>)}
+          </select>
+          <button className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50" disabled={currentPage <= 1} type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>ก่อนหน้า</button>
+          <span className="px-1 text-sm">หน้า {currentPage} / {totalPages}</span>
+          <button className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50" disabled={currentPage >= totalPages} type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>ถัดไป</button>
+        </div>
       </div>
 
-      {detailRow ? <DetailModal row={detailRow} onClose={() => setDetailRow(null)} onReturn={openReturnForm} /> : null}
+      {detailRow ? <DetailModal row={detailRow} onClose={() => setDetailRow(null)} /> : null}
 
       {/* Mobile Card List */}
       <div className="block lg:hidden space-y-3">
         {isLoading ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
         ) : null}
-        {!isLoading && filteredRows.map((row) => (
+        {!isLoading && pagedRows.map((row) => (
           <div
             key={row.id}
             className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
@@ -590,25 +863,20 @@ export function DailyPettyAdvancePageClient() {
           >
             <div className="flex justify-between items-start mb-2">
               <span className="font-bold text-slate-800 text-sm">{row.docNo}</span>
-              <StatusBadge status={row.status} />
+              <StatusBadge row={row} />
             </div>
             <div className="flex justify-between items-center text-xs text-slate-500 mb-3">
               <span className={row.type === 'DIRECTOR_LOAN' ? 'text-purple-700 font-semibold' : 'text-amber-700 font-semibold'}>
                 {typeLabel(row.type)}
               </span>
-              <span>วันที่จ่าย: {formatDateDisplay(row.date)}</span>
+              <span>วันที่กู้ยืม/สำรองจ่าย: {formatDateDisplay(datePart(row.date))}</span>
             </div>
+            <div className="mb-2 text-xs text-slate-500">สร้างเมื่อ {formatDateDisplay(datePart(row.createdAt))} {timePart(row.createdAt) || '-'} · ผู้สร้าง {row.createdBy}</div>
             <div className="text-sm font-semibold text-slate-700 mb-3">
               {row.recipientName}
             </div>
             <div className="flex justify-between items-end border-t border-slate-100 pt-2.5">
               <div className="text-xs text-slate-500">
-                {row.spent > 0 ? (
-                  <span className="block">ใช้ไปแล้ว: <span className="font-semibold text-blue-700">{formatMoney(row.spent)}</span></span>
-                ) : null}
-                {row.pendingReturn > 0 ? (
-                  <span className="block">รออนุมัติคืน: <span className="font-semibold text-amber-700">{formatMoney(row.pendingReturn)}</span></span>
-                ) : null}
                 {row.returned > 0 ? (
                   <span className="block">คืนแล้ว: <span className="font-semibold text-emerald-700">{formatMoney(row.returned)}</span></span>
                 ) : null}
@@ -625,9 +893,13 @@ export function DailyPettyAdvancePageClient() {
                 </div>
               </div>
             </div>
+            <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
+              {row.status === 'active' ? <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button> : null}
+              <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={!row.canCancel || isCancellingId === row.id} title={row.canCancel ? 'ยกเลิกรายการ' : row.cancelBlockedReason} type="button" onClick={(event) => { event.stopPropagation(); void cancelRow(row) }}>{isCancellingId === row.id ? 'กำลังยกเลิก' : 'ยกเลิก'}</button>
+            </div>
           </div>
         ))}
-        {!isLoading && filteredRows.length === 0 ? (
+        {!isLoading && sortedRows.length === 0 ? (
           <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มีรายการ</div>
         ) : null}
       </div>
@@ -642,40 +914,45 @@ export function DailyPettyAdvancePageClient() {
           </colgroup>
           <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
             <tr>
-              <ResizableTableHead label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} />
-              <ResizableTableHead label="วันที่จ่าย" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่จ่าย')} />
-              <ResizableTableHead label="ประเภท" resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} />
-              <ResizableTableHead label="ผู้รับเงิน" resizeProps={columnResize.getResizeHandleProps('recipientName', 'ผู้รับเงิน')} />
-              <ResizableTableHead align="right" label="ยอดยืม" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดยืม')} />
-              <ResizableTableHead align="right" label="ใช้ไปแล้ว" resizeProps={columnResize.getResizeHandleProps('spent', 'ใช้ไปแล้ว')} />
-              <ResizableTableHead align="right" label="คืนแล้ว" resizeProps={columnResize.getResizeHandleProps('returned', 'คืนแล้ว')} />
-              <ResizableTableHead align="right" label="คงค้าง" resizeProps={columnResize.getResizeHandleProps('remaining', 'คงค้าง')} />
-              <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่เอกสาร" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่เอกสาร')} sortKey="docNo" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่กู้ยืม/สำรองจ่าย" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่กู้ยืม/สำรองจ่าย')} sortKey="date" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ประเภท" resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} sortKey="type" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้รับเงิน" resizeProps={columnResize.getResizeHandleProps('recipientName', 'ผู้รับเงิน')} sortKey="recipientName" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ยอดยืม" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอดยืม')} sortKey="amount" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="คืนแล้ว" resizeProps={columnResize.getResizeHandleProps('returned', 'คืนแล้ว')} sortKey="returned" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="คงค้าง" resizeProps={columnResize.getResizeHandleProps('remaining', 'คงค้าง')} sortKey="remaining" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="center" direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้สร้างรายการ" resizeProps={columnResize.getResizeHandleProps('createdBy', 'ผู้สร้างรายการ')} sortKey="createdBy" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่สร้างรายการ" resizeProps={columnResize.getResizeHandleProps('createdAt', 'วันที่สร้างรายการ')} sortKey="createdAt" onSort={handleSort} />
               <ResizableTableHead align="right" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('action', 'Action')} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-semibold">
-            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</td></tr> : null}
-            {!isLoading && filteredRows.map((row) => (
+            {isLoading ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>กำลังโหลดข้อมูล</td></tr> : null}
+            {!isLoading && pagedRows.map((row) => (
               <tr key={row.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setDetailRow(row)}>
                 <td className="p-2 font-mono text-xs">{row.docNo}</td>
-                <td className="p-2">{formatDateDisplay(row.date)}</td>
+                <td className="p-2">
+                  <div>{formatDateDisplay(datePart(row.date))}</div>
+                </td>
                 <td className="p-2"><span className={row.type === 'DIRECTOR_LOAN' ? 'text-purple-700' : 'text-amber-700'}>{typeLabel(row.type)}</span></td>
                 <td className="p-2 font-medium">{row.recipientName}</td>
                 <td className="p-2 pr-4 text-right tabular-nums">{formatMoney(row.amount)}</td>
-                <td className="p-2 pr-4 text-right text-blue-700 tabular-nums">{row.spent > 0 ? <button className="hover:underline" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>{formatMoney(row.spent)}</button> : '-'}</td>
                 <td className="p-2 pr-4 text-right text-emerald-700 tabular-nums">{formatMoney(row.returned)}</td>
                 <td className={`p-2 pr-4 text-right font-bold tabular-nums ${row.remaining > 1 ? 'text-red-700' : 'text-emerald-700'}`}>{formatMoney(row.remaining)}</td>
-                <td className="p-2 text-center"><StatusBadge status={row.status} /></td>
+                <td className="p-2 text-center"><StatusBadge row={row} /></td>
+                <td className="p-2 text-slate-700">{row.createdBy}</td>
+                <td className="p-2">
+                  <div>{formatDateDisplay(datePart(row.createdAt))}</div>
+                  <div className="text-[11px] font-normal text-slate-500">{timePart(row.createdAt) || '-'}</div>
+                </td>
                 <td className="space-x-1 whitespace-nowrap p-2 text-right">
-                  <button className="text-xs text-blue-600 hover:underline" title="ดูรายละเอียด" type="button" onClick={(event) => { event.stopPropagation(); setDetailRow(row) }}>ดู</button>
-                  {row.status === 'active' && row.remaining > 0 && row.pendingReturn <= 0 ? <button className="rounded-md bg-emerald-600 px-2 py-1 text-xs text-white" type="button" onClick={(event) => { event.stopPropagation(); openReturnForm(row) }}>คืนเงิน</button> : null}
                   {row.status === 'active' ? <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button> : null}
-                  <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled type="button" onClick={(event) => event.stopPropagation()}>ยกเลิก</button>
+                  <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={!row.canCancel || isCancellingId === row.id} title={row.canCancel ? 'ยกเลิกรายการ' : row.cancelBlockedReason} type="button" onClick={(event) => { event.stopPropagation(); void cancelRow(row) }}>{isCancellingId === row.id ? 'กำลังยกเลิก' : 'ยกเลิก'}</button>
                 </td>
               </tr>
             ))}
-            {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>ยังไม่มีรายการ</td></tr> : null}
+            {!isLoading && sortedRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={11}>ยังไม่มีรายการ</td></tr> : null}
           </tbody>
         </table>
       </div>
@@ -683,94 +960,70 @@ export function DailyPettyAdvancePageClient() {
   )
 }
 
-function DetailModal({ onClose, onReturn, row }: { onClose: () => void; onReturn: (row: PettyAdvanceRow) => void; row: PettyAdvanceRow }) {
-  const returns = row.returns ?? []
-  const canReturn = row.status === 'active' && row.remaining > 0 && row.pendingReturn <= 0
+function DetailModal({ onClose, row }: { onClose: () => void; row: PettyAdvanceRow }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 pt-8" onClick={onClose}>
       <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between bg-slate-900 px-5 py-4">
           <div>
             <h3 className="text-lg font-bold text-white">รายละเอียด {row.docNo} — {row.recipientName}</h3>
-            <div className="mt-0.5 text-xs text-slate-300">{typeLabel(row.type)} · วันที่จ่าย {formatDateDisplay(row.date)} · จำนวน {formatMoney(row.amount)} บาท</div>
+            <div className="mt-0.5 text-xs text-slate-300">{typeLabel(row.type)} · วันที่กู้ยืม/สำรองจ่าย {formatDateDisplay(datePart(row.date))} · จำนวน {formatMoney(row.amount)} บาท</div>
           </div>
-          <div className="flex items-center gap-2">
-            {canReturn ? (
-              <button className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 outline-none" type="button" onClick={() => onReturn(row)}>
-                คืนเงิน
-              </button>
-            ) : null}
-            <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={onClose}>&times;</button>
-          </div>
+          <button className="text-2xl text-white/80 hover:text-white outline-none" type="button" onClick={onClose}>&times;</button>
         </div>
         <div className="space-y-4 p-5 text-sm">
-          {/* สรุปยอดเงิน */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-center">
-              <div className="text-xs text-blue-700 font-semibold">ยอดยืม</div>
-              <div className="text-lg font-bold mt-1 text-blue-900">{formatMoney(row.amount)}</div>
+          <section className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+              <h4 className="text-sm font-semibold text-slate-900">สรุปยอดเงิน</h4>
+              <StatusBadge row={row} />
             </div>
-            <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 text-center">
-              <div className="text-xs text-amber-700 font-semibold">ใช้ไปแล้ว</div>
-              <div className="text-lg font-bold mt-1 text-amber-900">{formatMoney(row.spent)}</div>
-            </div>
-            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-center">
-              <div className="text-xs text-emerald-700 font-semibold">คืนแล้ว</div>
-              <div className="text-lg font-bold mt-1 text-emerald-900">{formatMoney(row.returned)}</div>
-            </div>
-            <div className="rounded-lg border border-red-100 bg-red-50/50 p-3 text-center">
-              <div className="text-xs text-red-700 font-semibold">คงค้าง</div>
-              <div className="text-lg font-bold mt-1 text-red-900">{formatMoney(row.remaining)}</div>
-            </div>
-          </div>
-
-          {/* ข้อมูลบัญชีและผู้รับ */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100/80">ข้อมูลการยืมและผู้รับ</div>
-            <div className="grid grid-cols-1 gap-y-3">
-              <DetailItem label="บัญชีรับเงินของกรรมการ/พนักงาน" value={row.recipientAccountLabel || '-'} />
-              {row.pendingReturn > 0 ? <DetailItem label="ยอดรออนุมัติคืน" value={`${formatMoney(row.pendingReturn)} บาท`} /> : null}
-              <DetailItem label="หมายเหตุการยืม" value={row.notes || '-'} />
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 font-bold text-slate-800">บิลค่าใช้จ่ายที่จ่ายจากเงินก้อนนี้</div>
-            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4 text-center text-slate-400">ยังไม่มีบิลที่ link อยู่ใน payload ปัจจุบัน</div>
-          </div>
-
-          <div>
-            <div className="mb-2 font-bold text-emerald-700">ประวัติการคืนเงิน ({returns.length} ครั้ง)</div>
-            {returns.length ? (
-              <div className="overflow-x-auto rounded-lg border border-slate-100 bg-white">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50 text-slate-600">
-                    <tr>
-                      <th className="p-2 text-left">วันที่</th>
-                      <th className="p-2 text-right">จำนวน</th>
-                      <th className="p-2 text-left">บัญชีรับ</th>
-                      <th className="p-2 text-left">หมายเหตุ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {returns.map((entry) => (
-                      <tr key={entry.id} className="border-t border-slate-100">
-                        <td className="p-2 font-mono">{entry.date}</td>
-                        <td className="p-2 text-right font-bold text-emerald-700 tabular-nums">{formatMoney(entry.amount)}</td>
-                        <td className="p-2 text-slate-700">{entry.accountName}</td>
-                        <td className="p-2 text-slate-600">{entry.notes || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="rounded-md border border-blue-100 bg-blue-50/50 p-3 text-center">
+                <div className="text-xs font-semibold text-blue-700">ยอดยืม</div>
+                <div className="mt-1 text-lg font-bold text-blue-900">{formatMoney(row.amount)}</div>
               </div>
-            ) : (
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 py-4 text-center text-slate-400">ยังไม่มีประวัติคืนเงิน</div>
-            )}
-          </div>
+              <div className="rounded-md border border-emerald-100 bg-emerald-50/50 p-3 text-center">
+                <div className="text-xs font-semibold text-emerald-700">คืนแล้ว</div>
+                <div className="mt-1 text-lg font-bold text-emerald-900">{formatMoney(row.returned)}</div>
+              </div>
+              <div className="rounded-md border border-red-100 bg-red-50/50 p-3 text-center">
+                <div className="text-xs font-semibold text-red-700">คงค้าง</div>
+                <div className="mt-1 text-lg font-bold text-red-900">{formatMoney(row.remaining)}</div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
+            <h4 className="border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">ข้อมูลเอกสาร</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <DetailItem label="เลขที่เอกสาร" value={row.docNo} />
+              <DetailItem label="ประเภท" value={typeLabel(row.type)} />
+              <DetailItem label="วันที่กู้ยืม/สำรองจ่าย" value={formatDateDisplay(datePart(row.date))} />
+              <DetailItem label="วันที่สร้างรายการ" value={`${formatDateDisplay(datePart(row.createdAt))} เวลา ${timePart(row.createdAt) || '-'}`} />
+              <DetailItem label="ผู้สร้างรายการ" value={row.createdBy || '-'} />
+            </div>
+          </section>
+
+          <section className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
+            <h4 className="border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">ผู้จ่ายและข้อมูลเงินกู้</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <DetailItem label="ผู้รับเงิน" value={row.recipientName || '-'} />
+              <DetailItem label="บัญชีรับเงินของกรรมการ/พนักงาน" value={row.recipientAccountLabel || '-'} />
+              {row.loanSourceType ? <DetailItem label="ประเภทเงินกู้" value={row.loanSourceType === 'IN_SYSTEM' ? 'บัญชีในระบบ' : 'บัญชีนอกระบบ'} /> : null}
+              {row.loanSourceType === 'OUTSIDE_SYSTEM' ? <DetailItem label="วิธีรับเงินนอกระบบ" value={row.outsideLoanTransferMethod === 'COUNTER_DEPOSIT' ? 'ฝากหน้า counter' : row.outsideLoanTransferMethod === 'BANK_TRANSFER' ? 'โอนเงินผ่านบัญชี' : '-'} /> : null}
+              {row.loanSourceType === 'OUTSIDE_SYSTEM' && row.outsideLoanTransferMethod === 'BANK_TRANSFER' ? <DetailItem label="บัญชีนอกระบบที่โอนเข้า" value={[row.outsideLoanFromBankName, row.outsideLoanFromAccountName, row.outsideLoanFromBankBranch ? `สาขา ${row.outsideLoanFromBankBranch}` : ''].filter(Boolean).join(' / ') || '-'} /> : null}
+            </div>
+          </section>
+
+          <section className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
+            <h4 className="border-b border-slate-100 pb-2 text-sm font-semibold text-slate-900">บัญชีบริษัทและหมายเหตุ</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <DetailItem label="บัญชีบริษัทที่รับเงิน" value={row.accountName || '-'} />
+              <DetailItem label="หมายเหตุ" value={row.notes || '-'} />
+            </div>
+          </section>
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-          {canReturn ? <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700" type="button" onClick={() => onReturn(row)}>คืนเงิน</button> : null}
           <button className="rounded-md px-4 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100/50" type="button" onClick={onClose}>ปิด</button>
         </div>
       </div>
@@ -799,9 +1052,11 @@ function SegmentFilterButton({ active, label, onClick }: { active: boolean; labe
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'active') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><span className="size-1.5 rounded-full bg-amber-500" />ค้างคืน</span>
-  if (status === 'closed') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><span className="size-1.5 rounded-full bg-emerald-500" />ปิดแล้ว</span>
+function StatusBadge({ row }: { row: Pick<PettyAdvanceRow, 'remaining' | 'returned' | 'status'> }) {
+  const status = uiStatus(row)
+  if (status === 'active') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><span className="size-1.5 rounded-full bg-amber-500" />รอคืนเงิน</span>
+  if (status === 'partial_returned') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700"><span className="size-1.5 rounded-full bg-blue-500" />คืนแล้วบางส่วน</span>
+  if (status === 'closed') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><span className="size-1.5 rounded-full bg-emerald-500" />คืนแล้ว</span>
   return <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500"><span className="size-1.5 rounded-full bg-slate-400" />ยกเลิก</span>
 }
 

@@ -6,6 +6,7 @@ type DbClient = Prisma.TransactionClient
 
 export const WEIGHT_TICKET_STATUS_ACTION = {
   CANCELLED: 'cancelled',
+  CONFIRMED: 'confirmed',
   CREATED: 'created',
   EDITED: 'edited',
   STATUS_SYNCED: 'status_synced',

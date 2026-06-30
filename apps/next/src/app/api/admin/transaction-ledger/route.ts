@@ -73,7 +73,7 @@ async function ledgerPayload(limit: number) {
 
   const refIds = uniqueStrings(movements.map((row) => row.ref_id))
   const refInternalIds = uniqueBigInts(refIds)
-  const [payments, receipts, expenses, transfers, pettyAdvances, pettyReturns] = await Promise.all([
+  const [payments, receipts, expenses, transfers, pettyAdvances] = await Promise.all([
     prisma.payments.findMany({
       include: { suppliers: true },
       where: { OR: [{ id: { in: refInternalIds } }, { voucher_id: { in: refIds } }] },
@@ -95,10 +95,6 @@ async function ledgerPayload(limit: number) {
     }),
     prisma.petty_advances.findMany({
       where: { id: { in: refInternalIds } },
-    }),
-    prisma.petty_advance_returns.findMany({
-      include: { petty_advances: true },
-      where: { OR: [{ id: { in: refInternalIds } }, { doc_no: { in: refIds } }] },
     }),
   ])
 
@@ -130,10 +126,6 @@ async function ledgerPayload(limit: number) {
   }
   const transferById = new Map(transfers.map((transfer) => [stringifyBusinessValue(transfer.id), transfer]))
   const pettyAdvanceById = new Map(pettyAdvances.map((advance) => [stringifyBusinessValue(advance.id), advance]))
-  const pettyReturnById = new Map(pettyReturns.flatMap((entry) => {
-    const keys = [entry.doc_no, stringifyBusinessValue(entry.id)].filter(Boolean)
-    return keys.map((key) => [key, entry] as const)
-  }))
 
   const balanceTotals = new Map<bigint, number>()
   for (const group of balanceGroups) {
@@ -212,10 +204,6 @@ async function ledgerPayload(limit: number) {
       const advance = pettyAdvanceById.get(refId)
       payee = advance?.recipient_name ?? ''
       sourceLabel = advance?.doc_no ?? ''
-    } else if (refType === 'PRET' && refId) {
-      const entry = pettyReturnById.get(refId)
-      payee = entry?.petty_advances?.recipient_name ?? ''
-      sourceLabel = entry?.doc_no ?? entry?.petty_advances?.doc_no ?? ''
     }
 
     return {

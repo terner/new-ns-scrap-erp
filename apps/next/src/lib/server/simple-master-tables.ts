@@ -48,6 +48,18 @@ const directorTypeSchema = z.enum(['กรรมการ', 'ผู้ถือ�
 const directorPersonSchema = z.object({
   accountName: z.string().nullable(),
   accountNo: z.string().nullable(),
+  bankAccounts: z.array(z.object({
+    active: z.boolean().default(true),
+    accountName: z.string().nullable(),
+    accountNo: z.string().nullable(),
+    bankBranch: z.string().nullable(),
+    bankName: z.string().nullable(),
+    code: z.string().nullable(),
+    id: z.string().nullable(),
+    isPrimary: z.boolean().default(false),
+    linkedAccountId: z.string().nullable(),
+    sourceType: z.enum(['IN_COMPANY', 'OUTSIDE_COMPANY']).default('OUTSIDE_COMPANY'),
+  })).default([]),
   bankBranch: z.string().nullable(),
   bankName: z.string().nullable(),
   firstName: z.string({ invalid_type_error: 'กรอกชื่อ', required_error: 'กรอกชื่อ' }).trim().min(1, 'กรอกชื่อ'),
@@ -55,12 +67,17 @@ const directorPersonSchema = z.object({
   nameTitle: directorTitleSchema,
   type: directorTypeSchema,
 }).superRefine((values, context) => {
-  const hasBankInfo = Boolean(values.bankName || values.accountNo || values.accountName || values.bankBranch)
-  if (!hasBankInfo) return
-
-  if (!values.bankName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกธนาคาร', path: ['bankName'] })
-  if (!values.accountName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบัญชี', path: ['accountName'] })
-  if (!values.accountNo) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกเลขบัญชี', path: ['accountNo'] })
+  values.bankAccounts.forEach((account, index) => {
+    const hasBankInfo = Boolean(account.bankName || account.accountNo || account.accountName || account.bankBranch || account.linkedAccountId)
+    if (!hasBankInfo) return
+    if (account.sourceType === 'IN_COMPANY') {
+      if (!account.linkedAccountId) context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกบัญชีในบริษัท', path: ['bankAccounts', index, 'linkedAccountId'] })
+      return
+    }
+    if (!account.bankName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'เลือกธนาคาร', path: ['bankAccounts', index, 'bankName'] })
+    if (!account.accountName) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกชื่อบัญชี', path: ['bankAccounts', index, 'accountName'] })
+    if (!account.accountNo) context.addIssue({ code: z.ZodIssueCode.custom, message: 'กรอกเลขบัญชี', path: ['bankAccounts', index, 'accountNo'] })
+  })
 })
 
 type SimpleMasterValues = ReturnType<typeof parseMasterDataForm>
@@ -71,6 +88,10 @@ function trimText(value: unknown) {
 
 function directorDisplayName(values: Pick<SimpleMasterValues, 'firstName' | 'lastName' | 'nameTitle'>) {
   return [values.nameTitle, values.firstName, values.lastName].map((part) => part?.trim()).filter(Boolean).join(' ')
+}
+
+function directorBankAccountCode(personCode: string, index: number) {
+  return `${personCode}-BA${String(index + 1).padStart(3, '0')}`
 }
 
 function prepareSimpleMasterBody(kind: SimpleMasterKind, body: unknown) {
@@ -115,6 +136,7 @@ function validateSimpleMasterValues(kind: SimpleMasterKind, values: SimpleMaster
     directorPersonSchema.parse({
       accountName: values.accountName,
       accountNo: values.accountNo,
+      bankAccounts: values.bankAccounts,
       bankBranch: values.bankBranch,
       bankName: values.bankName,
       firstName: values.firstName,
@@ -185,10 +207,46 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
     delegate: () => prisma.director_employees as Delegate,
     prefix: 'P',
     orderBy: [{ code: 'asc' }, { name: 'asc' }],
+    include: {
+      director_employee_bank_accounts: {
+        include: { accounts: true },
+        orderBy: [{ is_primary: 'desc' }, { id: 'asc' }],
+      },
+    },
     lookupKey: 'code',
     nextId: nextDirectorPersonCode,
     map: (row) => {
       const record = asRecord(row)
+      const childAccounts = (record.director_employee_bank_accounts as Array<Record<string, unknown>> | undefined) ?? []
+      const bankAccounts = childAccounts.length > 0
+        ? childAccounts.map((account) => {
+            const linkedAccount = account.accounts as Record<string, unknown> | null | undefined
+            return {
+              id: String(account.id ?? ''),
+              code: account.code ?? null,
+              sourceType: account.source_type ?? 'OUTSIDE_COMPANY',
+              linkedAccountId: linkedAccount?.code ?? null,
+              bankName: account.bank_name ?? linkedAccount?.bank_name ?? null,
+              accountName: account.account_name ?? linkedAccount?.name ?? null,
+              accountNo: account.account_no ?? linkedAccount?.account_no ?? null,
+              bankBranch: account.bank_branch ?? linkedAccount?.bank_branch ?? null,
+              isPrimary: Boolean(account.is_primary),
+              active: account.active ?? true,
+            }
+          })
+        : (record.account_no || record.bank_account ? [{
+            id: null,
+            code: null,
+            sourceType: 'OUTSIDE_COMPANY',
+            linkedAccountId: null,
+            bankName: record.bank_name ?? null,
+            accountName: record.bank_account_name ?? null,
+            accountNo: record.account_no ?? record.bank_account ?? null,
+            bankBranch: record.bank_branch ?? null,
+            isPrimary: true,
+            active: true,
+          }] : [])
+      const primaryAccount = bankAccounts.find((account) => account.active && account.isPrimary) ?? bankAccounts.find((account) => account.active) ?? bankAccounts[0] ?? null
       return {
         id: record.code,
         code: record.code,
@@ -197,10 +255,11 @@ const configs: Record<SimpleMasterKind, SimpleMasterConfig> = {
         firstName: record.first_name,
         lastName: record.last_name,
         type: record.type,
-        bankName: record.bank_name,
-        accountName: record.bank_account_name,
-        accountNo: record.account_no,
-        bankBranch: record.bank_branch,
+        bankName: primaryAccount?.bankName ?? record.bank_name,
+        accountName: primaryAccount?.accountName ?? record.bank_account_name,
+        accountNo: primaryAccount?.accountNo ?? record.account_no,
+        bankBranch: primaryAccount?.bankBranch ?? record.bank_branch,
+        bankAccounts,
         active: record.active,
         createdAt: toIso(record.created_at as Date | null),
         updatedAt: toIso(record.updated_at as Date | null),
@@ -531,6 +590,114 @@ export async function saveSimpleMasterData(request: Request, kind: SimpleMasterK
   const config = configs[kind]
   const rawValues = validateSimpleMasterValues(kind, parseMasterDataForm(prepareSimpleMasterBody(kind, await request.json())))
   const values = config.normalizeValues ? await config.normalizeValues(rawValues) : rawValues
+  if (kind === 'directors') {
+    const personCode = values.code || values.id || await nextId(config)
+    const requestedAccounts = (values.bankAccounts ?? []).filter((account) => (
+      account.sourceType === 'IN_COMPANY'
+        ? Boolean(account.linkedAccountId)
+        : Boolean(account.bankName || account.accountName || account.accountNo || account.bankBranch)
+    ))
+    const linkedAccountCodes = requestedAccounts
+      .filter((account) => account.sourceType === 'IN_COMPANY')
+      .map((account) => String(account.linkedAccountId))
+    const linkedRows = linkedAccountCodes.length
+      ? await prisma.accounts.findMany({
+          select: { account_no: true, bank_branch: true, bank_name: true, code: true, id: true, name: true },
+          where: { active: true, code: { in: linkedAccountCodes } },
+        })
+      : []
+    const linkedByCode = new Map(linkedRows.map((account) => [account.code, account]))
+    const normalizedAccounts = requestedAccounts.map((account, index) => {
+      if (account.sourceType === 'IN_COMPANY') {
+        const linked = linkedByCode.get(String(account.linkedAccountId))
+        if (!linked) throw new Error('บัญชีในบริษัทที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')
+        return {
+          active: account.active,
+          accountName: linked.name,
+          accountNo: linked.account_no,
+          bankBranch: linked.bank_branch,
+          bankName: linked.bank_name,
+          code: account.code || directorBankAccountCode(personCode, index),
+          isPrimary: account.isPrimary,
+          linkedAccountId: linked.id,
+          sourceType: 'IN_COMPANY' as const,
+        }
+      }
+      return {
+        active: account.active,
+        accountName: account.accountName,
+        accountNo: account.accountNo,
+        bankBranch: account.bankBranch,
+        bankName: account.bankName,
+        code: account.code || directorBankAccountCode(personCode, index),
+        isPrimary: account.isPrimary,
+        linkedAccountId: null,
+        sourceType: 'OUTSIDE_COMPANY' as const,
+      }
+    })
+    const activeAccounts = normalizedAccounts.filter((account) => account.active !== false)
+    if (activeAccounts.length > 0 && !activeAccounts.some((account) => account.isPrimary)) {
+      normalizedAccounts[normalizedAccounts.findIndex((account) => account.active !== false)]!.isPrimary = true
+    }
+    const primaryAccount = normalizedAccounts.find((account) => account.active !== false && account.isPrimary) ?? activeAccounts[0] ?? normalizedAccounts[0] ?? null
+    const row = await prisma.$transaction(async (tx) => {
+      const saved = await tx.director_employees.upsert({
+        where: { code: personCode },
+        create: {
+          code: personCode,
+          name: directorDisplayName(values),
+          name_title: values.nameTitle,
+          first_name: values.firstName,
+          last_name: values.lastName,
+          type: values.type,
+          phone: null,
+          bank_name: primaryAccount?.bankName || null,
+          bank_account_name: primaryAccount?.accountName || null,
+          account_no: primaryAccount?.accountNo || null,
+          bank_branch: primaryAccount?.bankBranch || null,
+          bank_account: primaryAccount?.accountNo || null,
+          active: values.active,
+        },
+        update: {
+          name: directorDisplayName(values),
+          name_title: values.nameTitle,
+          first_name: values.firstName,
+          last_name: values.lastName,
+          type: values.type,
+          phone: null,
+          bank_name: primaryAccount?.bankName || null,
+          bank_account_name: primaryAccount?.accountName || null,
+          account_no: primaryAccount?.accountNo || null,
+          bank_branch: primaryAccount?.bankBranch || null,
+          bank_account: primaryAccount?.accountNo || null,
+          active: values.active,
+          updated_at: new Date(),
+        },
+      })
+      await tx.director_employee_bank_accounts.deleteMany({ where: { director_id: saved.id } })
+      if (normalizedAccounts.length) {
+        await tx.director_employee_bank_accounts.createMany({
+          data: normalizedAccounts.map((account) => ({
+            code: account.code,
+            director_id: saved.id,
+            source_type: account.sourceType,
+            linked_account_id: account.linkedAccountId,
+            bank_name: account.bankName || null,
+            account_name: account.accountName || null,
+            account_no: account.accountNo || null,
+            bank_branch: account.bankBranch || null,
+            is_primary: Boolean(account.isPrimary),
+            active: account.active,
+          })),
+        })
+      }
+      return tx.director_employees.findFirstOrThrow({
+        where: { id: saved.id },
+        include: config.include as any,
+      })
+    })
+    return masterDataJson(config.map(row))
+  }
   if (kind === 'machines' && values.type) {
     const machineType = await prisma.production_machine_types.findFirst({ where: { active: true, name: values.type } })
     if (!machineType) throw new Error('ประเภทเครื่องจักรที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน')

@@ -88,6 +88,38 @@ function WeightCells({ container, deduction, gross, net }: { container: number; 
   )
 }
 
+function formatMoney(value: number) {
+  return value.toLocaleString('th-TH', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })
+}
+
+function CostSnapshotCells({ summary }: { summary: WeightTicketRecord['productSummaries'][number] }) {
+  if (summary.costSnapshotStatus === 'pending') {
+    return (
+      <>
+        <td className="whitespace-nowrap px-3 py-3 text-right text-xs font-medium text-amber-700">รอยืนยันราคาเฉลี่ย</td>
+        <td className="whitespace-nowrap px-3 py-3 text-right text-slate-400">-</td>
+      </>
+    )
+  }
+  if (summary.unitCostSnapshot == null) {
+    return (
+      <>
+        <td className="whitespace-nowrap px-3 py-3 text-right text-slate-400">-</td>
+        <td className="whitespace-nowrap px-3 py-3 text-right text-slate-400">-</td>
+      </>
+    )
+  }
+  return (
+    <>
+      <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-slate-900">{formatMoney(summary.unitCostSnapshot)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-slate-900">{formatMoney(summary.pendingOutValue)}</td>
+    </>
+  )
+}
+
 export function WeightTicketProductBreakdownTable({
   onOpenLineGallery,
   showBillingColumns = false,
@@ -113,6 +145,8 @@ export function WeightTicketProductBreakdownTable({
             <th className="px-3 py-3 text-right">หักภาชนะ</th>
             <th className="px-3 py-3 text-right">หักสิ่งเจือปน</th>
             <th className="px-3 py-3 text-right">Net</th>
+            {ticket.type === 'WTO' ? <th className="px-3 py-3 text-right">ราคาเฉลี่ย</th> : null}
+            {ticket.type === 'WTO' ? <th className="px-3 py-3 text-right">มูลค่า pending_out</th> : null}
             {showBillingColumns ? <th className="px-3 py-3 text-right">ออกบิลแล้ว</th> : null}
             {showBillingColumns ? <th className="px-3 py-3 text-right">คงเหลือ</th> : null}
             {showBillingColumns ? <th className="px-3 py-3 text-left">เอกสารปลายทาง</th> : null}
@@ -142,6 +176,7 @@ export function WeightTicketProductBreakdownTable({
                     gross={group.summary.grossWeight}
                     net={group.summary.netWeight}
                   />
+                  {ticket.type === 'WTO' ? <CostSnapshotCells summary={group.summary} /> : null}
                   {showBillingColumns ? <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-blue-700">{formatWeight(group.summary.billedWeight)}</td> : null}
                   {showBillingColumns ? <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-emerald-700">{formatWeight(group.summary.remainingWeight)}</td> : null}
                   {showBillingColumns ? (
@@ -166,6 +201,7 @@ export function WeightTicketProductBreakdownTable({
                     <td className="px-3 py-2 text-xs text-emerald-800">{group.realLotLines.length} เต๋า</td>
                     {ticket.type === 'WTO' ? <td className="px-3 py-2 text-xs text-emerald-800">-</td> : null}
                     <WeightCells container={lotTotals.container} deduction={0} gross={lotTotals.gross} net={lotTotals.net} />
+                    {ticket.type === 'WTO' ? <td colSpan={2} className="px-3 py-2" /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-2" /> : null}
                     <td className="px-3 py-2" />
                   </tr>
@@ -184,6 +220,7 @@ export function WeightTicketProductBreakdownTable({
                       gross={line.grossWeightValue}
                       net={line.netWeight}
                     />
+                    {ticket.type === 'WTO' ? <td colSpan={2} className="px-3 py-3" /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-3" /> : null}
                     <td className="px-3 py-3 text-right">
                       <LineImagesButton line={line} onOpenLineGallery={onOpenLineGallery} />
@@ -197,6 +234,7 @@ export function WeightTicketProductBreakdownTable({
                     <td className="px-3 py-2 text-xs text-amber-800">{group.impurityLines.length} รายการ</td>
                     {ticket.type === 'WTO' ? <td className="px-3 py-2 text-xs text-amber-800">-</td> : null}
                     <WeightCells container={0} deduction={impurityTotals.deduction} gross={0} net={0} />
+                    {ticket.type === 'WTO' ? <td colSpan={2} className="px-3 py-2" /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-2" /> : null}
                     <td className="px-3 py-2" />
                   </tr>
@@ -208,6 +246,7 @@ export function WeightTicketProductBreakdownTable({
                     <td className="px-3 py-3 text-slate-600">{line.note || '-'}</td>
                     {ticket.type === 'WTO' ? <td className="px-3 py-3 text-slate-500">-</td> : null}
                     <WeightCells container={0} deduction={line.deductionWeight} gross={0} net={0} />
+                    {ticket.type === 'WTO' ? <td colSpan={2} className="px-3 py-3" /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-3" /> : null}
                     <td className="px-3 py-3 text-right text-slate-400">-</td>
                   </tr>
@@ -219,6 +258,7 @@ export function WeightTicketProductBreakdownTable({
                     <td className="px-3 py-2 text-xs text-blue-800">{group.purchaseLines.length} รายการ</td>
                     {ticket.type === 'WTO' ? <td className="px-3 py-2 text-xs text-blue-800">-</td> : null}
                     <WeightCells container={purchaseTotals.container} deduction={0} gross={purchaseTotals.gross} net={purchaseTotals.net} />
+                    {ticket.type === 'WTO' ? <td colSpan={2} className="px-3 py-2" /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-2" /> : null}
                     <td className="px-3 py-2" />
                   </tr>
@@ -235,6 +275,7 @@ export function WeightTicketProductBreakdownTable({
                       gross={line.grossWeightValue}
                       net={line.netWeight}
                     />
+                    {ticket.type === 'WTO' ? <td colSpan={2} className="px-3 py-3" /> : null}
                     {showBillingColumns ? <td colSpan={3} className="px-3 py-3" /> : null}
                     <td className="px-3 py-3 text-right">
                       <LineImagesButton line={line} onOpenLineGallery={onOpenLineGallery} />
@@ -291,6 +332,26 @@ export function WeightTicketProductBreakdownTable({
                   <span className="text-slate-700">Net (น้ำหนักสุทธิ):</span>
                   <span className="text-emerald-700 text-base tabular-nums">{formatWeight(group.summary.netWeight)} กก.</span>
                 </div>
+                {ticket.type === 'WTO' ? (
+                  <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+                    <div className="flex justify-between gap-3">
+                      <span className="font-medium text-slate-500">ราคาเฉลี่ย:</span>
+                      <span className="text-right font-semibold text-slate-800">
+                        {group.summary.costSnapshotStatus === 'pending'
+                          ? 'รอยืนยันราคาเฉลี่ย'
+                          : group.summary.unitCostSnapshot == null
+                            ? '-'
+                            : formatMoney(group.summary.unitCostSnapshot)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="font-medium text-slate-500">มูลค่า pending_out:</span>
+                      <span className="text-right font-semibold tabular-nums text-slate-800">
+                        {group.summary.unitCostSnapshot == null ? '-' : formatMoney(group.summary.pendingOutValue)}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               {/* Sections: Real Lot, Impurities, Purchases */}

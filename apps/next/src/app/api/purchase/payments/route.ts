@@ -26,9 +26,9 @@ import { activeWhtRatePercent } from '@/lib/server/tax-settings'
 export const runtime = 'nodejs'
 
 type DecimalLike = number | { toNumber: () => number } | null | undefined
-type PayableSourceType = 'advance_payment' | 'expense' | 'petty_advance_return' | 'purchase_bill'
+type PayableSourceType = 'advance_payment' | 'expense' | 'petty_advance' | 'purchase_bill'
 
-const PAYABLE_SOURCE_TYPES: PayableSourceType[] = ['purchase_bill', 'advance_payment', 'expense', 'petty_advance_return']
+const PAYABLE_SOURCE_TYPES: PayableSourceType[] = ['purchase_bill', 'advance_payment', 'expense', 'petty_advance']
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
@@ -39,14 +39,15 @@ function branchPaymentCode(branchCode: string | null | undefined) {
   return digits ? digits.padStart(2, '0').slice(-2) : null
 }
 
-function expensePartyCode(payee: string | null | undefined, fallbackDocNo: string | null | undefined) {
-  const normalized = String(payee ?? fallbackDocNo ?? '').trim()
+function expensePartyCode(payee: string | null | undefined, documentNo: string | null | undefined) {
+  const normalized = String(payee ?? documentNo ?? '').trim()
   return normalized ? `EXP:${normalized}` : ''
 }
 
-function pettyReturnPartyCode(payee: string | null | undefined, fallbackDocNo: string | null | undefined) {
-  const normalized = String(payee ?? fallbackDocNo ?? '').trim()
-  return normalized ? `PETTY:${normalized}` : ''
+function pettyAdvancePartyCode(payee: string | null | undefined, documentNo: string | null | undefined) {
+  const normalized = String(payee ?? '').trim()
+  if (!normalized) throw new Error(`ไม่พบผู้รับเงินของ ${documentNo ?? 'รายการเงินสำรองจ่าย/กู้กรรมการ'}`)
+  return `PETTY:${normalized}`
 }
 
 function normalizedPaymentMethod(value: string | null | undefined) {
@@ -213,11 +214,11 @@ export async function GET() {
       .filter((approval) => approval.source_type === 'expense')
       .map((approval) => parseInternalBigIntId(approval.source_id))
       .filter((value): value is bigint => value != null))]
-    const pettyReturnIds = [...new Set(approvals
-      .filter((approval) => approval.source_type === 'petty_advance_return')
+    const pettyAdvanceIds = [...new Set(approvals
+      .filter((approval) => approval.source_type === 'petty_advance')
       .map((approval) => parseInternalBigIntId(approval.source_id))
       .filter((value): value is bigint => value != null))]
-    const [purchaseBills, advancePayments, expenses, pettyReturns] = await Promise.all([
+    const [purchaseBills, advancePayments, expenses, pettyAdvances] = await Promise.all([
       prisma.purchase_bills.findMany({
         orderBy: [{ date: 'desc' }],
         select: { date: true, doc_no: true, id: true, paid_amount: true, payable_balance: true, status: true, supplier_id: true, total_amount: true },
@@ -242,28 +243,23 @@ export async function GET() {
           ...(allowedBranchIds ? { branch_id: { in: allowedBranchIds } } : {}),
         },
       }),
-      prisma.petty_advance_returns.findMany({
+      prisma.petty_advances.findMany({
         orderBy: [{ date: 'desc' }],
         select: {
           amount: true,
           date: true,
           doc_no: true,
           id: true,
+          recipient_name: true,
           status: true,
-          petty_advances: {
-            select: {
-              doc_no: true,
-              recipient_name: true,
-            },
-          },
         },
-        where: { id: { in: pettyReturnIds } },
+        where: { id: { in: pettyAdvanceIds } },
       }),
     ])
     const billById = new Map(purchaseBills.map((bill: typeof purchaseBills[number]) => [bill.id, bill]))
     const advanceById = new Map(advancePayments.map((advance: typeof advancePayments[number]) => [advance.id, advance]))
     const expenseById = new Map(expenses.map((expense: typeof expenses[number]) => [expense.id, expense]))
-    const pettyReturnById = new Map(pettyReturns.map((entry: typeof pettyReturns[number]) => [entry.id, entry]))
+    const pettyAdvanceById = new Map(pettyAdvances.map((advance: typeof pettyAdvances[number]) => [advance.id, advance]))
     const expensePartiesById = new Map<string, {
       active: boolean
       bankAccount: string | null
@@ -290,7 +286,7 @@ export async function GET() {
       })
     }
     const expenseParties = Array.from(expensePartiesById.values())
-    const pettyReturnPartiesById = new Map<string, {
+    const pettyAdvancePartiesById = new Map<string, {
       active: boolean
       bankAccount: null
       bankAccounts: Array<{ accountNo: string | null; active: boolean; bankName: string | null; paymentMethod: null }>
@@ -298,20 +294,19 @@ export async function GET() {
       id: string
       name: string
     }>()
-    for (const entry of pettyReturns) {
-      const partyCode = pettyReturnPartyCode(entry.petty_advances.recipient_name, entry.petty_advances.doc_no)
-      if (!partyCode || pettyReturnPartiesById.has(partyCode)) continue
-      pettyReturnPartiesById.set(partyCode, {
+    for (const advance of pettyAdvances) {
+      const partyCode = pettyAdvancePartyCode(advance.recipient_name, advance.doc_no)
+      if (!partyCode || pettyAdvancePartiesById.has(partyCode)) continue
+      pettyAdvancePartiesById.set(partyCode, {
         active: true,
         bankAccount: null,
         bankAccounts: [],
         code: partyCode,
         id: partyCode,
-        name: entry.petty_advances.recipient_name || entry.petty_advances.doc_no,
+        name: advance.recipient_name || advance.doc_no,
       })
     }
-    const pettyReturnParties = Array.from(pettyReturnPartiesById.values())
-
+    const pettyAdvanceParties = Array.from(pettyAdvancePartiesById.values())
     return NextResponse.json({
       accounts,
       bills: approvals
@@ -369,10 +364,10 @@ export async function GET() {
               totalAmount: approvedAmount || totalAmount,
             }
           }
-          if (approval.source_type === 'petty_advance_return') {
-            const pettyReturnId = parseInternalBigIntId(approval.source_id)
-            const entry = pettyReturnId != null ? pettyReturnById.get(pettyReturnId) : undefined
-            if (!entry) return null
+          if (approval.source_type === 'petty_advance') {
+            const pettyAdvanceId = parseInternalBigIntId(approval.source_id)
+            const advance = pettyAdvanceId != null ? pettyAdvanceById.get(pettyAdvanceId) : undefined
+            if (!advance) return null
             const sourceDocNo = requireDocumentNo(approval.source_doc_no_snapshot, `เอกสารอ้างอิงของ ${approvalDocNo}`)
             return {
               approvalAccountNo: approval.destination_account_no_snapshot ?? '',
@@ -380,16 +375,16 @@ export async function GET() {
               approvalId: approvalDocNo,
               approvalPaymentMethod: approval.destination_payment_method_snapshot ?? '',
               approvedAmount,
-              date: toDateOnly(entry.date),
+              date: toDateOnly(advance.date),
               docNo: approvalDocNo,
               id: approvalDocNo,
               paidAmount: paidAgainstApproval,
               payableBalance,
               sourceDocNo,
-              sourceType: 'petty_advance_return',
+              sourceType: 'petty_advance',
               status: approval.status ?? '',
-              supplierId: pettyReturnPartyCode(approval.party_name_snapshot ?? entry.petty_advances.recipient_name, sourceDocNo),
-              totalAmount: approvedAmount || toNumber(entry.amount),
+              supplierId: pettyAdvancePartyCode(approval.party_name_snapshot ?? advance.recipient_name, sourceDocNo),
+              totalAmount: approvedAmount || toNumber(advance.amount),
             }
           }
           const advanceId = parseInternalBigIntId(approval.source_id)
@@ -473,7 +468,7 @@ export async function GET() {
         code: requireBusinessCode(supplier.code, `ผู้ขาย ${supplier.id}`),
         id: requireBusinessCode(supplier.code, `ผู้ขาย ${supplier.id}`),
         name: supplier.name,
-      })), ...expenseParties, ...pettyReturnParties],
+      })), ...expenseParties, ...pettyAdvanceParties],
     })
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
@@ -592,11 +587,11 @@ export async function POST(request: Request) {
         .filter((approval) => approval.source_type === 'expense')
         .map((approval) => parseInternalBigIntId(approval.source_id))
         .filter((value): value is bigint => value != null))]
-      const pettyReturnSourceIds = [...new Set(approvals
-        .filter((approval) => approval.source_type === 'petty_advance_return')
+      const pettyAdvanceSourceIds = [...new Set(approvals
+        .filter((approval) => approval.source_type === 'petty_advance')
         .map((approval) => parseInternalBigIntId(approval.source_id))
         .filter((value): value is bigint => value != null))]
-      const [lineBills, lineAdvances, lineExpenses, linePettyReturns] = await Promise.all([
+      const [lineBills, lineAdvances, lineExpenses, linePettyAdvances] = await Promise.all([
         tx.purchase_bills.findMany({
           select: {
             branch_id: true,
@@ -629,26 +624,29 @@ export async function POST(request: Request) {
           select: { branch_id: true, doc_no: true, id: true, payee: true, status: true },
           where: { id: { in: expenseSourceIds } },
         }),
-        tx.petty_advance_returns.findMany({
+        tx.petty_advances.findMany({
           select: {
+            account_id: true,
+            amount: true,
             accounts: { select: { branch_id: true } },
             doc_no: true,
             id: true,
-            petty_advances: { select: { doc_no: true, recipient_name: true } },
+            recipient_name: true,
+            returned_amount: true,
             status: true,
           },
-          where: { id: { in: pettyReturnSourceIds } },
+          where: { id: { in: pettyAdvanceSourceIds } },
         }),
       ])
       const billByDocNo = new Map(lineBills.map((bill: typeof lineBills[number]) => [bill.doc_no, bill]))
       const advanceByDocNo = new Map(lineAdvances.map((advance: typeof lineAdvances[number]) => [advance.doc_no, advance]))
       const expenseByDocNo = new Map(lineExpenses.map((expense: typeof lineExpenses[number]) => [expense.doc_no, expense]))
-      const pettyReturnById = new Map(linePettyReturns.map((entry: typeof linePettyReturns[number]) => [entry.id.toString(), entry]))
-      const pettyReturnByAdvanceDocNo = new Map(linePettyReturns.map((entry: typeof linePettyReturns[number]) => [entry.petty_advances.doc_no, entry]))
+      const pettyAdvanceByDocNo = new Map(linePettyAdvances.map((advance: typeof linePettyAdvances[number]) => [advance.doc_no, advance]))
+      const pettyAdvanceById = new Map(linePettyAdvances.map((advance: typeof linePettyAdvances[number]) => [advance.id.toString(), advance]))
       const firstBill = billByDocNo.get(requireDocumentNo(paymentLineTotals[0].billId, 'เอกสารอ้างอิง')) ?? null
       const firstAdvance = advanceByDocNo.get(requireDocumentNo(paymentLineTotals[0].billId, 'เอกสารอ้างอิง')) ?? null
       const firstExpense = expenseByDocNo.get(requireDocumentNo(paymentLineTotals[0].billId, 'เอกสารอ้างอิง')) ?? null
-      const firstPettyReturn = pettyReturnByAdvanceDocNo.get(requireDocumentNo(paymentLineTotals[0].billId, 'เอกสารอ้างอิง')) ?? null
+      const firstPettyAdvance = pettyAdvanceByDocNo.get(requireDocumentNo(paymentLineTotals[0].billId, 'เอกสารอ้างอิง')) ?? null
       const sourcePartyKey = (line: typeof paymentLineTotals[number]) => {
         const sourceDocNo = requireDocumentNo(line.billId, 'เอกสารอ้างอิง')
         const bill = billByDocNo.get(sourceDocNo)
@@ -657,8 +655,8 @@ export async function POST(request: Request) {
         if (advance) return advance.supplier_id != null ? `supplier:${advance.supplier_id.toString()}` : ''
         const expense = expenseByDocNo.get(sourceDocNo)
         if (expense) return `expense:${String(expense.payee ?? expense.doc_no ?? expense.id.toString()).trim().toLowerCase()}`
-        const pettyReturn = pettyReturnByAdvanceDocNo.get(sourceDocNo)
-        if (pettyReturn) return `petty:${String(pettyReturn.petty_advances.recipient_name ?? pettyReturn.petty_advances.doc_no).trim().toLowerCase()}`
+        const pettyAdvance = pettyAdvanceByDocNo.get(sourceDocNo)
+        if (pettyAdvance) return pettyAdvancePartyCode(pettyAdvance.recipient_name, pettyAdvance.doc_no).toLowerCase()
         return ''
       }
       const firstPartyKey = sourcePartyKey(paymentLineTotals[0])
@@ -688,7 +686,7 @@ export async function POST(request: Request) {
         const settled = toNumber(payment.amount) + toNumber(payment.withholding_tax) + toNumber(payment.discount)
         settledByApprovalId.set(approvalId, (settledByApprovalId.get(approvalId) ?? 0) + settled)
       }
-      const branchId = firstBill?.branch_id ?? firstAdvance?.branch_id ?? firstExpense?.branch_id ?? firstPettyReturn?.accounts?.branch_id ?? account?.branch_id ?? null
+      const branchId = firstBill?.branch_id ?? firstAdvance?.branch_id ?? firstExpense?.branch_id ?? firstPettyAdvance?.accounts?.branch_id ?? account?.branch_id ?? null
       if (!branchId) throw new Error('ไม่พบสาขาสำหรับออกเลขเอกสารจ่ายเงินผู้รับเงิน')
       const branch = await tx.branches.findFirst({
         select: { code: true },
@@ -712,6 +710,7 @@ export async function POST(request: Request) {
       await tx.payments.deleteMany({ where: { voucher_id: voucherId } })
       const payments = []
       const paidAt = new Date()
+      const pettyAdvanceSettlementById = new Map<string, number>()
       for (const line of paymentLineTotals) {
         const lineSourceDocNo = requireDocumentNo(line.billId, 'เอกสารอ้างอิง')
         const approval = line.approvalId ? approvalByDocNo.get(line.approvalId) : null
@@ -719,11 +718,11 @@ export async function POST(request: Request) {
         const lineBill = approval.source_type === 'purchase_bill' ? billByDocNo.get(lineSourceDocNo) : null
         const lineAdvance = approval.source_type === 'advance_payment' ? advanceByDocNo.get(lineSourceDocNo) : null
         const lineExpense = approval.source_type === 'expense' ? expenseByDocNo.get(lineSourceDocNo) : null
-        const linePettyReturn = approval.source_type === 'petty_advance_return' ? pettyReturnById.get(approval.source_id) : null
+        const linePettyAdvance = approval.source_type === 'petty_advance' ? pettyAdvanceById.get(approval.source_id) : null
         if (approval.source_type === 'purchase_bill' && !lineBill) throw new Error('บิลซื้อไม่ถูกต้อง')
         if (approval.source_type === 'advance_payment' && !lineAdvance) throw new Error('ADV อ้างอิงไม่ถูกต้อง')
         if (approval.source_type === 'expense' && !lineExpense) throw new Error('EXP อ้างอิงไม่ถูกต้อง')
-        if (approval.source_type === 'petty_advance_return' && !linePettyReturn) throw new Error('รายการคืนเงินสำรองจ่ายไม่ถูกต้อง')
+        if (approval.source_type === 'petty_advance' && !linePettyAdvance) throw new Error('รายการเงินสำรองจ่าย/กู้กรรมการไม่ถูกต้อง')
         const approvalSourceDocNo = requireDocumentNo(approval.source_doc_no_snapshot, `เอกสารอ้างอิงของ ${line.approvalId}`)
         const matchesSource = approval.source_type === 'purchase_bill'
           ? approvalSourceDocNo === lineBill?.doc_no && approval.source_id === lineBill?.id.toString()
@@ -731,7 +730,7 @@ export async function POST(request: Request) {
             ? approvalSourceDocNo === lineAdvance?.doc_no && approval.source_id === lineAdvance?.id.toString()
             : approval.source_type === 'expense'
               ? approvalSourceDocNo === lineExpense?.doc_no && approval.source_id === lineExpense?.id.toString()
-              : approvalSourceDocNo === linePettyReturn?.petty_advances.doc_no && approval.source_id === linePettyReturn?.id.toString()
+              : approvalSourceDocNo === linePettyAdvance?.doc_no && approval.source_id === linePettyAdvance?.id.toString()
         if (!matchesSource) throw new Error('รายการจ่ายไม่ตรงกับเอกสารที่อนุมัติไว้')
         const approvalInternalId = stringifyBusinessValue(approval.id)
         const approvalRemaining = Math.max(0, toNumber(approval.approved_amount) - (settledByApprovalId.get(approvalInternalId) ?? 0))
@@ -811,6 +810,23 @@ export async function POST(request: Request) {
         }
         if (approval.source_type === 'expense' && lineExpense) {
           await refreshExpensePaymentStatus(tx, lineExpense.id, actor)
+        }
+        if (approval.source_type === 'petty_advance' && linePettyAdvance) {
+          const advanceId = linePettyAdvance.id.toString()
+          const settledInThisVoucher = (pettyAdvanceSettlementById.get(advanceId) ?? 0) + lineSettlementAmount
+          pettyAdvanceSettlementById.set(advanceId, settledInThisVoucher)
+          const nextReturnedAmount = toNumber(linePettyAdvance.returned_amount) + settledInThisVoucher
+          const nextStatus = nextReturnedAmount >= toNumber(linePettyAdvance.amount) ? 'closed' : linePettyAdvance.status
+          await tx.petty_advances.update({
+            data: {
+              closed_at: nextStatus === 'closed' ? paidAt : undefined,
+              returned_amount: nextReturnedAmount,
+              status: nextStatus,
+              updated_at: paidAt,
+              updated_by: actor,
+            },
+            where: { id: linePettyAdvance.id },
+          })
         }
         payments.push(payment)
       }
