@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ButtonHTMLAttributes } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Printer, Search, Share2, SquarePen, XCircle } from 'lucide-react'
+import { Plus, Printer, Search, Share2, SquarePen, XCircle, CheckCircle2 } from 'lucide-react'
 import { getErrorMessage } from '@/lib/api-client'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Button } from '@/components/ui/Button'
@@ -56,13 +56,14 @@ const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey
 const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; values: StatusFilter[] }>> = {
   WTI: [
     { label: 'ทุกสถานะ', values: [] },
+    { label: 'แบบร่าง', values: ['draft'] },
     { label: 'รับของแล้ว', values: ['received'] },
     { label: 'เสร็จสิ้น', values: ['billed'] },
     { label: 'ยกเลิก', values: ['cancelled'] },
   ],
   WTO: [
     { label: 'ทุกสถานะ', values: [] },
-    { label: 'ร่าง', values: ['draft'] },
+    { label: 'แบบร่าง', values: ['draft'] },
     { label: 'ส่งของแล้ว', values: ['delivered'] },
     { label: 'ออกบิลแล้วบางส่วน', values: ['partially_billed'] },
     { label: 'ออกบิลแล้ว', values: ['billed'] },
@@ -206,6 +207,7 @@ export function WeightTicketListPageClient() {
   const [shareError, setShareError] = useState('')
   const [isSendingLine, setIsSendingLine] = useState(false)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [successModalMessage, setSuccessModalMessage] = useState('')
 
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -370,7 +372,8 @@ export function WeightTicketListPageClient() {
       await notifyWeightTicketLine(shareTicket.id, { customMessage: shareNote.trim() || undefined })
       setShareTicket(null)
       setShareNote('')
-      window.alert('ส่ง LINE พร้อม PDF เรียบร้อยแล้ว')
+      setShareError('')
+      setSuccessModalMessage('แชร์สำเร็จ')
     } catch (caught) {
       setShareError(getErrorMessage(caught, 'ส่ง LINE ใบรับ-ส่งของไม่สำเร็จ'))
     } finally {
@@ -1041,6 +1044,27 @@ export function WeightTicketListPageClient() {
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={!!successModalMessage}>
+        <DialogContent
+          hideClose
+          className="share-success-modal max-w-sm"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
+          <div className="flex flex-col items-center justify-center p-6 space-y-4">
+            <div className="share-success-icon-wrap rounded-full bg-emerald-100 p-3">
+              <CheckCircle2 className="share-success-icon h-8 w-8 text-emerald-600" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-slate-800">{successModalMessage}</h3>
+            </div>
+          </div>
+          <DialogFooter className="bg-transparent border-t-0 justify-center">
+            <Button onClick={() => setSuccessModalMessage('')} className="min-w-[120px]">ตกลง</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -686,6 +686,7 @@ export function findOptionLabel(options: OptionItem[], id: string) {
 }
 
 export const statusLabels: Record<WeightTicketStatus, string> = {
+  draft: 'แบบร่าง',
   billed: 'ออกบิลแล้ว',
   cancelled: 'ยกเลิก',
   draft: 'ร่าง',
@@ -695,6 +696,7 @@ export const statusLabels: Record<WeightTicketStatus, string> = {
 }
 
 export function displayWeightTicketStatus(type: WeightTicketType, status: WeightTicketStatus) {
+  if (status === 'draft') return 'แบบร่าง'
   if (type === 'WTI') {
     if (status === 'partially_billed') return 'ออกบิลแล้วบางส่วน'
     if (status === 'billed') return 'เสร็จสิ้น'
@@ -714,6 +716,7 @@ export function displayWeightTicketStatus(type: WeightTicketType, status: Weight
 }
 
 export function weightTicketStatusBadgeClass(type: WeightTicketType, status: WeightTicketStatus) {
+  if (status === 'draft') return 'text-slate-500'
   if (status === 'cancelled') return 'text-rose-700'
   if (type === 'WTI') {
     if (status === 'partially_billed') return 'text-amber-700'
