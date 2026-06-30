@@ -496,7 +496,20 @@ export function AccountsPayablePageClient() {
         </div>
       </div>
 
-      {tab === 'summary' ? <SummaryTable buckets={bucketRows} rows={visibleSummaryRows} summary={data?.summary} isLoading={isLoading} /> : null}
+      {tab === 'summary' ? (
+        <>
+          {/* Top Pagination controls for Summary tab */}
+          <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mb-3">
+            <div>พบทั้งหมด {summaryRows.length.toLocaleString('th-TH')} รายการ</div>
+            <div className="flex items-center gap-2">
+              <Button disabled={safeSummaryPage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setSummaryPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
+              <span>หน้า {safeSummaryPage} / {summaryTotalPages}</span>
+              <Button disabled={safeSummaryPage >= summaryTotalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setSummaryPage((current) => Math.min(summaryTotalPages, current + 1))}>ถัดไป</Button>
+            </div>
+          </div>
+          <SummaryTable buckets={bucketRows} rows={visibleSummaryRows} summary={data?.summary} isLoading={isLoading} />
+        </>
+      ) : null}
       {tab === 'detail' && (
         <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mb-3">
           <div>พบทั้งหมด {(data?.pagination.totalRows ?? 0).toLocaleString('th-TH')} รายการ</div>
@@ -509,16 +522,7 @@ export function AccountsPayablePageClient() {
       )}
       {tab === 'detail' ? <DetailTable isLoading={isLoading} onSort={changeSort} rows={data?.rows ?? []} selectedSort={sortKey} sortDirection={sortDirection} summaryTotal={data?.summary.total ?? 0} onOpen={setSelectedRow} /> : null}
 
-      {tab === 'detail' && (
-        <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mt-3">
-          <div>พบทั้งหมด {(data?.pagination.totalRows ?? 0).toLocaleString('th-TH')} รายการ</div>
-          <div className="flex items-center gap-2">
-            <Button disabled={page <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
-            <span>หน้า {page} / {totalPages}</span>
-            <Button disabled={page >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
-          </div>
-        </div>
-      )}
+
 
       {/* Mobile Card list for Summary tab */}
       {tab === 'summary' && (
@@ -562,16 +566,7 @@ export function AccountsPayablePageClient() {
         </div>
       )}
 
-      {tab === 'summary' && (
-        <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mt-3">
-          <div>พบทั้งหมด {summaryRows.length.toLocaleString('th-TH')} รายการ</div>
-          <div className="flex items-center gap-2">
-            <Button disabled={safeSummaryPage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setSummaryPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
-            <span>หน้า {safeSummaryPage} / {summaryTotalPages}</span>
-            <Button disabled={safeSummaryPage >= summaryTotalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setSummaryPage((current) => Math.min(summaryTotalPages, current + 1))}>ถัดไป</Button>
-          </div>
-        </div>
-      )}
+
 
       {/* Mobile Card list for Detail tab */}
       {tab === 'detail' && (

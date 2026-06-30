@@ -432,6 +432,16 @@ function WaitingAllocationsView() {
         </button>
       </div>
 
+      {/* Pagination controls */}
+      <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mt-3 mb-3">
+        <div>พบทั้งหมด {sortedRows.length.toLocaleString('th-TH')} รายการ</div>
+        <div className="flex items-center gap-2">
+          <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
+          <span>หน้า {safePage} / {totalPages}</span>
+          <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
+        </div>
+      </div>
+
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm" style={{ width: '100%', overflowX: 'auto' }}>
         <table className="text-xs divide-y divide-slate-100 w-full" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
@@ -576,15 +586,6 @@ function WaitingAllocationsView() {
         })}
       </div>
 
-      {/* Pagination controls */}
-      <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mt-4">
-        <div>พบทั้งหมด {sortedRows.length.toLocaleString('th-TH')} รายการ</div>
-        <div className="flex items-center gap-2">
-          <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
-          <span>หน้า {safePage} / {totalPages}</span>
-          <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
-        </div>
-      </div>
     </DualCostingPageSection>
   )
 }
@@ -749,6 +750,16 @@ function AllocationLedgerView() {
         </div>
       </DualCostingFilterCard>
 
+      {/* Pagination controls */}
+      <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mt-3 mb-3">
+        <div>พบทั้งหมด {rows.length.toLocaleString('th-TH')} รายการ</div>
+        <div className="flex items-center gap-2">
+          <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
+          <span>หน้า {safePage} / {totalPages}</span>
+          <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
+        </div>
+      </div>
+
       {/* Desktop View */}
       <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
         <Table className="text-xs">
@@ -852,15 +863,6 @@ function AllocationLedgerView() {
         ))}
       </div>
 
-      {/* Pagination controls */}
-      <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between mt-4">
-        <div>พบทั้งหมด {rows.length.toLocaleString('th-TH')} รายการ</div>
-        <div className="flex items-center gap-2">
-          <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
-          <span>หน้า {safePage} / {totalPages}</span>
-          <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
-        </div>
-      </div>
     </DualCostingPageSection>
   )
 }
