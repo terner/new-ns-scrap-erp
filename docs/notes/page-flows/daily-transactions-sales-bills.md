@@ -135,7 +135,7 @@ SB ตั้งลูกหนี้, consume WTO `pending_out`, ตัด stock
 - Sales Bill detail modal and `/sales/bills/[docNo]` now expose status timeline from `sales_bill_status_logs` plus source usage facts from `weight_ticket_usage_logs`, `sales_bill_po_sell_allocations`, `trading_allocation_facts`, and `sales_bill_customer_advance_allocations`. This keeps detail/timeline grounded in write-path facts instead of deriving downstream usage from the header status string.
 - customer advance availability/create/cancel now uses `sales_bill_customer_advance_allocations`; `/finance/customer-advance` still needs its own dedicated `customer_advances` header table in a later finance batch
 - receipt relation/lock is enforced by shared server policy; automated edge-case tests for legacy receipt/RCP lock are still needed
-- durable allocation tables/write-path for `sales_bill_lines`, `sales_bill_source_allocations`, `sales_bill_po_sell_allocations`, and `sales_bill_customer_advance_allocations` exists for new SB create/cancel; Stock SB detail/print/list item counts now read new line/source/PO allocation facts first and show a warning instead of inventing allocation data for legacy SBs that have no durable facts
+- durable allocation tables/write-path for `sales_bill_lines`, `sales_bill_source_allocations`, `sales_bill_po_sell_allocations`, and `sales_bill_customer_advance_allocations` exists for new SB create/cancel; Stock SB detail/print/list item counts now read only those durable line/source/PO allocation facts. Legacy SB rows that still have only header JSON snapshot and no durable line facts must return an explicit contract/data-repair error instead of inventing detail from snapshot JSON.
 - New Stock/Trading COGS verification should use WTO-backed SB and mixed Trading+WTO only. Legacy intermediate stock-issue verification is historical only because `/sales/stock-issue` runtime entry points are removed.
 - Sales Bill list drilldown and owner route rendering are covered by `npm run qa:sales-bill-mixed-trading-browser --workspace @ns-scrap-erp/next`: the QA searches the created SB in `/sales/bills`, clicks the table row to verify the detail dialog, and opens `/sales/bills/[docNo]` directly to verify source-link navigation.
 - Sales Bill branch-scope enforcement is covered by `npm run qa:sales-bill-mixed-trading-browser --workspace @ns-scrap-erp/next`: a non-admin app user with access to one branch can list/detail/create/cancel only within that branch; other-branch SB rows, Trading PB sources, WTO sources, branches, and detail/cancel targets are hidden or rejected without mutation.
@@ -164,7 +164,7 @@ SB ตั้งลูกหนี้, consume WTO `pending_out`, ตัด stock
 - [x] Harden API for mixed-source Trading SB so stock-source side effects are derived by line source, not header mode alone
 - [x] Browser/API smoke mixed-source Trading SB create with seeded PB+WTO source data
 - [x] Mark intermediate stock-issue browser QA as legacy-only after target flow moved to direct WTO-backed SB
-- [x] Normalize Stock SB detail/print/list item-count reads to durable allocation facts for new SBs and expose no-fallback warning for legacy SBs without facts
+- [x] Normalize Stock SB detail/print/list item-count reads to durable allocation facts only and reject legacy SB rows without durable facts as explicit contract/data-repair errors
 - [x] Mark intermediate stock-issue rollback verification as legacy-only after target flow moved to direct WTO-backed SB
 - [x] Design any future line-level SB export from durable allocation facts only
 - [x] Decide legacy SB reconciliation/backfill policy before removing the legacy snapshot display path entirely
@@ -179,4 +179,7 @@ SB ตั้งลูกหนี้, consume WTO `pending_out`, ตัด stock
 - `/api/sales/bills?format=xlsx` exports Sales Bill rows at line level from `sales_bill_lines`, `sales_bill_source_allocations`, `sales_bill_po_sell_allocations`, and `trading_allocation_facts` instead of exporting header rows from `sales_bills.items`.
 - Customer/Product Tracking and main dashboard sales qty/product breakdowns read Sales Bill line facts through the shared sales-line read model. Header-level AR/total/GP fields remain on `sales_bills`.
 - Cancel edge-case automation is covered by `npm run verify:sales-bill-cancel-edge-cases --workspace @ns-scrap-erp/next`, including active RCP lock detection, PO Sell restore, customer advance allocation release, and Trading allocation fact cancellation.
+- 2026-06-30 update:
+- `GET /api/sales/bills/{docNo}` detail is now strict no-fallback: if `sales_bill_lines` durable facts are missing, the API returns `409 CONFLICT` and the UI must surface that as a data-contract/data-repair problem instead of trying to rebuild rows from `sales_bills.items` JSON.
+- WTO list/detail read-model optimization also removed the last sales-side JSON usage scan. WTO downstream bill counts and source usage now read `sales_bill_source_allocations` plus `weight_ticket_usage_logs`, not `sales_bills.items`.
 - [ ] Update this file and canonical reference if contract changes

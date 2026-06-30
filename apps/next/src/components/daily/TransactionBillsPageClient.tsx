@@ -2917,7 +2917,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่'} resizeProps={columnResize.getResizeHandleProps('docNo', mode === 'purchase' ? 'เลขที่บิลซื้อ' : 'เลขที่')} sortKey="docNo" onSort={changeSort} />
               {mode === 'purchase' ? <ResizableTableHead label="เลขที่ใบรับของ" resizeProps={columnResize.getResizeHandleProps('receiptDocs', 'เลขที่ใบรับของ')} /> : null}
               {mode === 'sales' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="เลขที่อ้างอิง" resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขที่อ้างอิง')} sortKey="refNo" onSort={changeSort} /> : null}
-              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'วันที่สร้างรายการ' : 'วันที่'} resizeProps={columnResize.getResizeHandleProps('date', mode === 'purchase' ? 'วันที่สร้างรายการ' : 'วันที่')} sortKey="date" onSort={changeSort} />
+              <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สร้างวันที่" resizeProps={columnResize.getResizeHandleProps('date', 'สร้างวันที่')} sortKey="date" onSort={changeSort} />
               <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label={mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า'} resizeProps={columnResize.getResizeHandleProps('partyName', mode === 'purchase' ? 'ผู้ขาย' : 'ลูกค้า')} sortKey="name" onSort={changeSort} />
               {mode !== 'purchase' ? <SortHeader activeKey={sortKey} align="left" direction={sortDirection} label="สาขา / คลัง" resizeProps={columnResize.getResizeHandleProps('warehouse', 'สาขา / คลัง')} sortKey="warehouse" onSort={changeSort} /> : null}
               <SortHeader activeKey={sortKey} align="center" direction={sortDirection} label="ประเภท" resizeProps={columnResize.getResizeHandleProps('transactionMode', 'ประเภท')} sortKey="transactionMode" onSort={changeSort} />
@@ -3763,12 +3763,16 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                                </td>
 	                                <td className="p-2 text-right tabular-nums text-emerald-700">{isFirstRowOfSummary ? formatMoney(sourceSummary?.remainingWeight ?? item.netWeight ?? item.qty) : ''}</td>
 	                                <td className="p-2">
-	                                  <input data-error-key={`items.${index}.netWeight`} className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-bold tabular-nums text-slate-700 ${salesFieldErrors[`items.${index}.netWeight`] || salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.netWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'netWeight', Number(event.target.value || 0))} />
+	                                  <div className="ml-auto w-28">
+	                                    <input data-error-key={`items.${index}.netWeight`} className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-bold tabular-nums text-slate-700 ${salesFieldErrors[`items.${index}.netWeight`] || salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.netWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'netWeight', Number(event.target.value || 0))} />
+	                                  </div>
 	                                  {salesFieldErrors[`items.${index}.netWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.netWeight`]}</div> : null}
 	                                  {salesFieldErrors[`items.${index}.qty`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.qty`]}</div> : null}
 	                                </td>
 	                                <td className="p-2">
-	                                  <input data-error-key={`items.${index}.deductWeight`} className={`w-full rounded-md border bg-amber-50 px-2 py-2 text-right font-bold tabular-nums text-amber-700 ${salesFieldErrors[`items.${index}.deductWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'deductWeight', Number(event.target.value || 0))} />
+	                                  <div className="ml-auto w-28">
+	                                    <input data-error-key={`items.${index}.deductWeight`} className={`w-full rounded-md border bg-amber-50 px-2 py-2 text-right font-bold tabular-nums text-amber-700 ${salesFieldErrors[`items.${index}.deductWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'deductWeight', Number(event.target.value || 0))} />
+	                                  </div>
 	                                  {salesFieldErrors[`items.${index}.deductWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.deductWeight`]}</div> : null}
 	                                </td>
 	                                <td className="p-2">
@@ -3791,6 +3795,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                     disabled={hasSelectedPoSell}
                                     error={salesFieldErrors[`items.${index}.price`]}
                                     errorKey={`items.${index}.price`}
+                                    inputClassName="ml-auto w-32"
                                     value={item.price}
                                     onChange={(value) => updateSalesItem(index, 'price', value)}
                                   />
@@ -3799,6 +3804,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                   <InlineMoneyInput
                                     error={salesFieldErrors[`items.${index}.discount`]}
                                     errorKey={`items.${index}.discount`}
+                                    inputClassName="ml-auto w-28"
                                     value={item.discount}
                                     onChange={(value) => updateSalesItem(index, 'discount', value)}
                                   />

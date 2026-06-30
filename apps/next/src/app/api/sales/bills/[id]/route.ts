@@ -50,6 +50,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return NextResponse.json(detail)
   } catch (caught) {
     if (caught instanceof AuthContextError) return authContextErrorResponse(caught)
+    if (caught instanceof Error && caught.message.includes('durable line facts')) {
+      return NextResponse.json({ code: 'CONFLICT', error: caught.message }, { status: 409 })
+    }
     return apiErrorResponse(caught, 'โหลดรายละเอียดบิลขายไม่ได้', 500)
   }
 }

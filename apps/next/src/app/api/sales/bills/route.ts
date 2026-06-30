@@ -22,7 +22,7 @@ import { appendWtoPendingOutEventsForHoldKeys, appendWtoPendingOutEventsForSales
 import { appendWeightTicketStatusLog, WEIGHT_TICKET_STATUS_ACTION } from '@/lib/server/weight-ticket-status-history'
 import { appendWeightTicketUsageLogs, WEIGHT_TICKET_USAGE_ACTION } from '@/lib/server/weight-ticket-usage-history'
 import { applyWorksheetTableLayout } from '@/lib/server/xlsx'
-import type { Prisma } from '../../../../../generated/prisma/client'
+import { Prisma } from '../../../../../generated/prisma/client'
 
 export const runtime = 'nodejs'
 
@@ -242,7 +242,7 @@ function calculateSalesTotals(values: SalesBillFormValues, vatRatePercent: numbe
       ? afterDiscount * rate / (100 + rate)
       : afterDiscount * (rate / 100)
   const totalAmount = values.hasVat && values.vatType === 'EXCLUDE' ? afterDiscount + vatAmount : afterDiscount
-  return { subtotal, totalAmount, vatAmount }
+  return { grossProfitBase: afterDiscount, subtotal, totalAmount, vatAmount }
 }
 
 function salesItems(
@@ -455,28 +455,29 @@ function deliverySummaryUsageKey(ticketId: bigint, summaryId: bigint) {
 
 async function buildDeliveryTicketUsageMap(tickets: DeliveryTicketOptionRow[]) {
   if (tickets.length === 0) return new Map<string, number>()
-  const ticketDocNos = new Set(tickets.map((ticket) => ticket.doc_no))
-  const rows = await prisma.sales_bills.findMany({
-    select: {
-      items: true,
-      status: true,
-    },
-    where: {
-      status: { notIn: ['cancelled', 'Cancelled', 'void', 'voided'] },
-    },
-  })
+  const ticketIds = [...new Set(tickets.map((ticket) => ticket.id.toString()))].map((ticketId) => BigInt(ticketId))
+  const rows = await prisma.$queryRaw<Array<{
+    allocated_qty: Prisma.Decimal | number
+    delivery_summary_id: string | null
+    weight_ticket_id: bigint
+  }>>`
+    select
+      sba.allocated_qty,
+      sba.meta ->> 'deliverySummaryId' as delivery_summary_id,
+      sba.weight_ticket_id
+    from public.sales_bill_source_allocations sba
+    join public.sales_bills sb on sb.id = sba.sales_bill_id
+    where lower(coalesce(sb.status, '')) not in ('cancelled', 'void', 'voided')
+      and sba.status = 'active'
+      and sba.source_type = 'WTO'
+      and sba.weight_ticket_id in (${Prisma.join(ticketIds)})
+  `
   const usageMap = new Map<string, number>()
   rows.forEach((row) => {
-    if (!Array.isArray(row.items)) return
-    row.items.forEach((item) => {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) return
-      const record = item as Record<string, unknown>
-      const ticketDocNo = typeof record.deliveryTicketId === 'string' ? record.deliveryTicketId : null
-      const summaryId = typeof record.deliverySummaryId === 'string' ? record.deliverySummaryId : null
-      const qty = Number(record.qty ?? 0)
-      if (!ticketDocNo || !summaryId || !ticketDocNos.has(ticketDocNo) || !Number.isFinite(qty) || qty <= 0) return
-      usageMap.set(summaryId, (usageMap.get(summaryId) ?? 0) + qty)
-    })
+    const summaryId = row.delivery_summary_id
+    const qty = toNumber(row.allocated_qty)
+    if (!summaryId || qty <= 0.0001) return
+    usageMap.set(summaryId, (usageMap.get(summaryId) ?? 0) + qty)
   })
   return usageMap
 }
@@ -1684,7 +1685,7 @@ export async function POST(request: Request) {
           doc_no: docNo,
           cogs_amount: totalCost,
           export_order_no: exportOrderNo,
-          gross_profit: totals.subtotal - totalCost,
+          gross_profit: totals.grossProfitBase - totalCost,
           has_vat: values.hasVat,
           items: items as Prisma.InputJsonValue,
           license_plate: values.licensePlate,
@@ -1893,7 +1894,7 @@ export async function POST(request: Request) {
         await tx.sales_bills.update({
           data: {
             cogs_amount: combinedCogs,
-            gross_profit: totals.subtotal - combinedCogs,
+            gross_profit: totals.grossProfitBase - combinedCogs,
             total_cost: combinedCogs,
             updated_at: createdAt,
             updated_by: actor,
@@ -2682,7 +2683,7 @@ export async function PATCH(request: Request) {
             discount: values.discountTotal,
             discount_total: values.discountTotal,
             export_order_no: values.exportOrderNo,
-            gross_profit: totals.totalAmount - (totalCost + stockCostDelta),
+            gross_profit: totals.grossProfitBase - (totalCost + stockCostDelta),
             has_vat: values.hasVat,
             items: items as Prisma.InputJsonValue,
             note: values.note,

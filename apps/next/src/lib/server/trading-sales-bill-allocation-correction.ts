@@ -385,9 +385,10 @@ export async function correctTradingSalesBillAllocations(
     }),
   })
 
+  const grossProfitBase = Math.max(0, toNumber(bill.subtotal) - toNumber(bill.discount_total))
   const updated = await tx.sales_bills.update({
     data: {
-      gross_profit: toNumber(bill.total_amount) - totalCost,
+      gross_profit: grossProfitBase - totalCost,
       total_cost: totalCost,
       updated_at: correctedAt,
       updated_by: params.actor,

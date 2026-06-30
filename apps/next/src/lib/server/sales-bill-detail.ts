@@ -207,27 +207,6 @@ function customerAddress(customer: SalesBillDetailRow['customers']) {
   return customer.address || customer.address_line1 || structured
 }
 
-function snapshotString(item: unknown, key: string) {
-  if (!item || typeof item !== 'object' || Array.isArray(item)) return ''
-  const value = (item as Record<string, unknown>)[key]
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function snapshotNumber(item: unknown, key: string) {
-  if (!item || typeof item !== 'object' || Array.isArray(item)) return 0
-  const value = (item as Record<string, unknown>)[key]
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
-  if (typeof value === 'string') {
-    const parsed = Number(value.replace(/,/g, ''))
-    return Number.isFinite(parsed) ? parsed : 0
-  }
-  return 0
-}
-
-function itemSnapshots(items: Prisma.JsonValue | null | undefined) {
-  return Array.isArray(items) ? items.filter((item) => item && typeof item === 'object' && !Array.isArray(item)) : []
-}
-
 function jsonObject(value: unknown) {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -355,52 +334,6 @@ function buildDurableItems(input: {
   })
 }
 
-function buildSnapshotItems(input: {
-  bill: SalesBillDetailRow
-  snapshots: unknown[]
-  tradingFactByLineNo: Map<number, Prisma.trading_allocation_factsGetPayload<{
-    include: {
-      purchase_bills: { select: { doc_no: true } }
-      trading_cost_sources: { select: { source_no: true; source_type: true } }
-    }
-  }>>
-  vehicleByDeliveryDocNo: Map<string, string>
-}): SalesBillDetail['items'] {
-  return input.snapshots.map((item, index) => {
-    const lineNo = index + 1
-    const deliveryTicketDocNo = snapshotString(item, 'deliveryTicketDocNo')
-    const tradingSource = tradingSourceInfo(input.bill.transaction_mode, lineNo, input.tradingFactByLineNo)
-    const sourceParts = input.bill.transaction_mode === 'TRADING'
-      ? [tradingSource.label, 'รอ sales allocation facts']
-      : ['รอ migration allocation facts']
-    return {
-      amount: snapshotNumber(item, 'amount'),
-      deliveryLineId: snapshotString(item, 'deliveryLineId'),
-      deliverySummaryId: snapshotString(item, 'deliverySummaryId'),
-      deliveryTicketDocNo,
-      deliveryVehicleNo: input.vehicleByDeliveryDocNo.get(deliveryTicketDocNo) ?? '',
-      deductWeight: snapshotNumber(item, 'deductWeight'),
-      discount: snapshotNumber(item, 'discount'),
-      grossWeight: snapshotNumber(item, 'grossWeight'),
-      lineNo,
-      matchedCogs: tradingSource.matchedCogs,
-      netWeight: snapshotNumber(item, 'netWeight') || snapshotNumber(item, 'qty'),
-      note: snapshotString(item, 'note'),
-      poSellDocNo: '',
-      price: snapshotNumber(item, 'unitPrice') || snapshotNumber(item, 'price'),
-      productCode: snapshotString(item, 'productCode'),
-      productId: snapshotString(item, 'productId'),
-      productName: snapshotString(item, 'productName') || '-',
-      qty: snapshotNumber(item, 'qty'),
-      sourceLabel: sourceParts.filter(Boolean).join(' / '),
-      sourceType: input.bill.transaction_mode === 'TRADING' ? tradingSource.sourceType : 'Migration Gap',
-      tradingSourceDocNo: tradingSource.sourceDocNo,
-      tradingSourceLineNo: tradingSource.sourceLineNo,
-      unit: snapshotString(item, 'unit') || 'กก.',
-    }
-  })
-}
-
 export async function getSalesBillDetail(
   docNo: string,
   options: { allowedBranchCodes?: string[] | null } = {},
@@ -422,7 +355,6 @@ export async function getSalesBillDetail(
   if (!bill) return null
 
   const factStatuses = ['active', 'cancelled']
-  const snapshots = itemSnapshots(bill.items)
   const [lineFacts, salesperson, customerAdvanceAllocations, tradingAllocationFacts, statusLogs, weightTicketUsageLogs, poSellAllocationLogs] = await Promise.all([
     prisma.sales_bill_lines.findMany({
       include: {
@@ -502,16 +434,15 @@ export async function getSalesBillDetail(
     }),
   ])
 
-  const hasDurableLineFacts = lineFacts.length > 0
-  const deliveryDocNos = hasDurableLineFacts
-    ? Array.from(new Set(lineFacts.flatMap((line) => line.sales_bill_source_allocations
-      .filter((allocation) => allocation.source_type === 'WTO')
-      .map((allocation) => allocation.source_doc_no)).filter(Boolean)))
-    : Array.from(new Set(snapshots.map((item) => snapshotString(item, 'deliveryTicketDocNo')).filter(Boolean)))
-  const poSellDocNos = hasDurableLineFacts
-    ? Array.from(new Set(lineFacts.flatMap((line) => line.sales_bill_po_sell_allocations
-      .map((allocation) => allocation.po_sell_doc_no ?? allocation.po_sells?.doc_no ?? '')).filter(Boolean)))
-    : []
+  if (lineFacts.length === 0) {
+    throw new Error(`บิลขาย ${bill.doc_no} ยังไม่มี durable line facts จึงเปิดหน้ารายละเอียดไม่ได้`)
+  }
+
+  const deliveryDocNos = Array.from(new Set(lineFacts.flatMap((line) => line.sales_bill_source_allocations
+    .filter((allocation) => allocation.source_type === 'WTO')
+    .map((allocation) => allocation.source_doc_no)).filter(Boolean)))
+  const poSellDocNos = Array.from(new Set(lineFacts.flatMap((line) => line.sales_bill_po_sell_allocations
+    .map((allocation) => allocation.po_sell_doc_no ?? allocation.po_sells?.doc_no ?? '')).filter(Boolean)))
 
   const [deliveryTickets, poSells] = await Promise.all([
     deliveryDocNos.length
@@ -563,9 +494,7 @@ export async function getSalesBillDetail(
     if (fact.sales_line_no == null) return
     tradingFactByLineNo.set(fact.sales_line_no, fact)
   })
-  const items = hasDurableLineFacts
-    ? buildDurableItems({ bill, lineFacts, poSellDocNoSet, tradingFactByLineNo, vehicleByDeliveryDocNo })
-    : buildSnapshotItems({ bill, snapshots, tradingFactByLineNo, vehicleByDeliveryDocNo })
+  const items = buildDurableItems({ bill, lineFacts, poSellDocNoSet, tradingFactByLineNo, vehicleByDeliveryDocNo })
   const timeline = statusLogs.map((log) => {
     const customerReceiptDocNo = historyMetaValue(log.meta, 'customerReceiptDocNo')
     const allocationLineNo = historyMetaValue(log.meta, 'allocationLineNo')
@@ -679,12 +608,6 @@ export async function getSalesBillDetail(
     const dateCompare = Date.parse(right.createdAt) - Date.parse(left.createdAt)
     return dateCompare || left.id.localeCompare(right.id)
   })
-  const readModelWarning = hasDurableLineFacts
-    ? ''
-    : snapshots.length > 0
-      ? 'บิลนี้ยังไม่มี durable Sales Bill allocation facts จึงแสดงได้เฉพาะ snapshot พื้นฐาน และไม่เดา PO/Stock/Customer advance allocation จาก JSON'
-      : ''
-
   return {
     billDate: bill.bill_date ? toDateOnly(bill.bill_date) : '',
     branchId: bill.branches?.code ?? '',
@@ -707,7 +630,7 @@ export async function getSalesBillDetail(
     note: bill.note ?? bill.notes ?? '',
     paidAmount: toNumber(bill.paid_amount),
     receivableBalance: toNumber(bill.receivable_balance),
-    readModelWarning,
+    readModelWarning: '',
     receivedAmount: toNumber(bill.received_amount),
     salesName: salesperson?.name ?? bill.salesman ?? '-',
     status: bill.status ?? '',

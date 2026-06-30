@@ -1,4 +1,4 @@
-import type { Prisma } from '../../../generated/prisma/client'
+import { Prisma } from '../../../generated/prisma/client'
 import { parseInternalBigIntId, requireBusinessCode } from '@/lib/business-code'
 import {
   appendImpurityProductMeta,
@@ -36,12 +36,19 @@ type WeightTicketUsage = {
   salesDocNos: string[]
 }
 
+type WeightTicketUsageCountRow = {
+  bill_count: number
+  doc_nos: string[] | null
+  weight_ticket_id: bigint
+}
+
 type WeightTicketDownstreamAllocationRow = {
   allocated_deduct_weight: Prisma.Decimal | number
   allocated_gross_weight: Prisma.Decimal | number
   allocated_qty: Prisma.Decimal | number
   created_at: Date | null
   created_by: string | null
+  meta?: Prisma.JsonValue | null
   product_code: string | null
   product_name: string | null
   status: string | null
@@ -501,39 +508,84 @@ export function buildWeightTicketProductSummaryRows(
   return { summaryRows }
 }
 
-export async function getWeightTicketUsageCounts(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {
+function emptyWeightTicketUsage(): WeightTicketUsage {
+  return {
+    purchaseCount: 0,
+    purchaseDocNos: [],
+    salesCount: 0,
+    salesDocNos: [],
+  }
+}
+
+function normalizeUsageCountRows(rows: WeightTicketUsageCountRow[], field: 'purchase' | 'sales') {
+  const usageMap = new Map<string, WeightTicketUsage>()
+  rows.forEach((row) => {
+    const key = row.weight_ticket_id.toString()
+    const current = usageMap.get(key) ?? emptyWeightTicketUsage()
+    const docNos = [...(row.doc_nos ?? [])].sort((left, right) => left.localeCompare(right, 'th'))
+    if (field === 'purchase') {
+      current.purchaseCount = row.bill_count ?? 0
+      current.purchaseDocNos = docNos
+    } else {
+      current.salesCount = row.bill_count ?? 0
+      current.salesDocNos = docNos
+    }
+    usageMap.set(key, current)
+  })
+  return usageMap
+}
+
+export async function getWeightTicketUsageCountsByTicketIds(
+  tx: Prisma.TransactionClient | PrismaClientLike,
+  ticketIds: bigint[],
+) {
+  const uniqueTicketIds = [...new Set(ticketIds.map((ticketId) => ticketId.toString()))]
+    .map((ticketId) => BigInt(ticketId))
+  const usageMap = new Map<string, WeightTicketUsage>()
+  if (uniqueTicketIds.length === 0) return usageMap
+
   const [purchaseRows, salesRows] = await Promise.all([
-    tx.$queryRaw<Array<{ bill_count: number; doc_nos: string[] | null }>>`
+    tx.$queryRaw<WeightTicketUsageCountRow[]>`
       select count(distinct pb.id)::int as bill_count
            , array_remove(array_agg(distinct pb.doc_no), null) as doc_nos
+           , pbra.weight_ticket_id
       from public.purchase_bill_receipt_allocations pbra
       join public.purchase_bills pb on pb.id = pbra.purchase_bill_id
       where lower(coalesce(pb.status, '')) not in ('cancelled', 'cancelled_supplier_swap')
         and pbra.allocation_status = 'active'
-        and pbra.weight_ticket_id = ${ticketId}
+        and pbra.weight_ticket_id in (${Prisma.join(uniqueTicketIds)})
+      group by pbra.weight_ticket_id
     `,
-    tx.$queryRaw<Array<{ bill_count: number; doc_nos: string[] | null }>>`
+    tx.$queryRaw<WeightTicketUsageCountRow[]>`
       select count(distinct sb.id)::int as bill_count
            , array_remove(array_agg(distinct sb.doc_no), null) as doc_nos
-      from public.sales_bills sb
-      join public.weight_tickets wt on wt.id = ${ticketId}
-      cross join lateral jsonb_array_elements(
-        case
-          when jsonb_typeof(coalesce(sb.items::jsonb, '[]'::jsonb)) = 'array' then coalesce(sb.items::jsonb, '[]'::jsonb)
-          else '[]'::jsonb
-        end
-      ) as item
+           , sba.weight_ticket_id
+      from public.sales_bill_source_allocations sba
+      join public.sales_bills sb on sb.id = sba.sales_bill_id
       where lower(coalesce(sb.status, '')) not in ('cancelled', 'void', 'voided')
-        and coalesce(item ->> 'deliveryTicketId', '') = wt.doc_no
+        and sba.status = 'active'
+        and sba.source_type = 'WTO'
+        and sba.weight_ticket_id in (${Prisma.join(uniqueTicketIds)})
+      group by sba.weight_ticket_id
     `,
   ])
 
-  return {
-    purchaseCount: purchaseRows[0]?.bill_count ?? 0,
-    purchaseDocNos: [...(purchaseRows[0]?.doc_nos ?? [])].sort((left, right) => left.localeCompare(right, 'th')),
-    salesCount: salesRows[0]?.bill_count ?? 0,
-    salesDocNos: [...(salesRows[0]?.doc_nos ?? [])].sort((left, right) => left.localeCompare(right, 'th')),
-  }
+  const purchaseMap = normalizeUsageCountRows(purchaseRows, 'purchase')
+  const salesMap = normalizeUsageCountRows(salesRows, 'sales')
+  uniqueTicketIds.forEach((ticketId) => {
+    const key = ticketId.toString()
+    usageMap.set(key, {
+      ...emptyWeightTicketUsage(),
+      ...(purchaseMap.get(key) ?? {}),
+      ...(salesMap.get(key) ?? {}),
+    })
+  })
+  return usageMap
+}
+
+export async function getWeightTicketUsageCounts(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {
+  const usageMap = await getWeightTicketUsageCountsByTicketIds(tx, [ticketId])
+  return usageMap.get(ticketId.toString()) ?? emptyWeightTicketUsage()
 }
 
 export async function getWeightTicketDownstreamAllocations(tx: Prisma.TransactionClient | PrismaClientLike, ticketId: bigint) {
@@ -572,35 +624,39 @@ export async function getWeightTicketDownstreamAllocations(tx: Prisma.Transactio
       select
         'SALES_BILL'::text as target_type,
         sb.doc_no as target_doc_no,
-        item_ordinality::int as target_line_no,
+        sba.sales_line_no as target_line_no,
         sb.status,
-        coalesce(nullif(item ->> 'qty', ''), '0')::numeric as allocated_qty,
-        coalesce(nullif(item ->> 'grossWeight', ''), '0')::numeric as allocated_gross_weight,
-        coalesce(nullif(item ->> 'deductWeight', ''), '0')::numeric as allocated_deduct_weight,
-        sb.created_at,
-        sb.created_by,
-        item ->> 'productId' as product_code,
-        item ->> 'productName' as product_name,
-        split_part(coalesce(item ->> 'deliverySummaryId', ''), ':', 2) as summary_code,
-        nullif(split_part(coalesce(item ->> 'deliverySummaryId', ''), ':', 3), '')::int as summary_line_count,
-        item ->> 'productName' as summary_product_name,
+        sba.allocated_qty,
+        sba.allocated_gross_weight,
+        sba.allocated_deduct_weight,
+        sba.created_at,
+        sba.created_by,
+        sba.product_code_snapshot as product_code,
+        sba.product_name_snapshot as product_name,
+        split_part(coalesce(sba.meta ->> 'deliverySummaryId', ''), ':', 2) as summary_code,
+        nullif(split_part(coalesce(sba.meta ->> 'deliverySummaryId', ''), ':', 3), '')::int as summary_line_count,
+        sba.product_name_snapshot as summary_product_name,
+        sba.meta,
         wt.doc_no as weight_ticket_doc_no
-      from public.sales_bills sb
-      join public.weight_tickets wt on wt.id = ${ticketId}
-      cross join lateral jsonb_array_elements(
-        case
-          when jsonb_typeof(coalesce(sb.items::jsonb, '[]'::jsonb)) = 'array' then coalesce(sb.items::jsonb, '[]'::jsonb)
-          else '[]'::jsonb
-        end
-      ) with ordinality as item(item, item_ordinality)
+      from public.sales_bill_source_allocations sba
+      join public.sales_bills sb on sb.id = sba.sales_bill_id
+      join public.weight_tickets wt on wt.id = sba.weight_ticket_id
       where lower(coalesce(sb.status, '')) not in ('cancelled', 'void', 'voided')
-        and coalesce(item ->> 'deliveryTicketId', '') = wt.doc_no
-      order by sb.created_at desc, sb.doc_no desc, item_ordinality asc
+        and sba.status = 'active'
+        and sba.source_type = 'WTO'
+        and sba.weight_ticket_id = ${ticketId}
+      order by sba.created_at desc, sb.doc_no desc, sba.sales_line_no asc
     `,
   ])
 
   return [...purchaseRows, ...salesRows].map((row) => {
-    const summaryCode = requireBusinessCode(row.summary_code, `สรุปสินค้าเอกสาร ${row.summary_product_name ?? row.product_name ?? ''}`)
+    const meta = row.meta && typeof row.meta === 'object' && !Array.isArray(row.meta)
+      ? row.meta as Record<string, unknown>
+      : null
+    const deliverySummaryId = typeof meta?.deliverySummaryId === 'string' ? meta.deliverySummaryId : ''
+    const summaryCode = deliverySummaryId
+      ? ''
+      : requireBusinessCode(row.summary_code, `สรุปสินค้าเอกสาร ${row.summary_product_name ?? row.product_name ?? ''}`)
     return {
       allocatedDeductWeight: toNumber(row.allocated_deduct_weight),
       allocatedGrossWeight: toNumber(row.allocated_gross_weight),
@@ -608,11 +664,11 @@ export async function getWeightTicketDownstreamAllocations(tx: Prisma.Transactio
       allocatedQty: toNumber(row.allocated_qty),
       createdAt: row.created_at?.toISOString() ?? null,
       createdBy: row.created_by ?? '-',
-      id: `${row.target_type}:${row.target_doc_no ?? ''}:${row.target_line_no ?? 0}:${summaryCode}`,
+      id: `${row.target_type}:${row.target_doc_no ?? ''}:${row.target_line_no ?? 0}:${deliverySummaryId || summaryCode}`,
       productCode: row.product_code ?? '',
       productName: row.product_name ?? row.summary_product_name ?? '-',
       status: row.status ?? '',
-      summaryId: `${row.weight_ticket_doc_no}:${summaryCode}:${row.summary_line_count ?? 0}`,
+      summaryId: deliverySummaryId || `${row.weight_ticket_doc_no}:${summaryCode}:${row.summary_line_count ?? 0}`,
       targetDocNo: row.target_doc_no ?? '',
       targetLineNo: row.target_line_no,
       targetType: row.target_type,

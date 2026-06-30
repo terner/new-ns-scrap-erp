@@ -25,6 +25,7 @@ import {
   enteredByLabel,
   getWeightTicketTimeline,
   getWeightTicketUsageCounts,
+  getWeightTicketUsageCountsByTicketIds,
   mapWeightTicketRow,
   nextWeightTicketDocNo,
   parseWeightTicketQuery,
@@ -107,10 +108,15 @@ export async function GET(request: Request) {
       prisma.weight_tickets.count({ where }),
     ])
 
-    const mappedRows = await Promise.all(rows.map(async (row: Awaited<typeof rows>[number]) => {
-      const usage = await getWeightTicketUsageCounts(prisma, row.id)
-      return mapWeightTicketRow(row, usage)
-    }))
+    const usageMap = await getWeightTicketUsageCountsByTicketIds(prisma, rows.map((row) => row.id))
+    const mappedRows = rows.map((row: Awaited<typeof rows>[number]) => (
+      mapWeightTicketRow(row, usageMap.get(row.id.toString()) ?? {
+        purchaseCount: 0,
+        purchaseDocNos: [],
+        salesCount: 0,
+        salesDocNos: [],
+      })
+    ))
 
     return NextResponse.json({ rows: mappedRows, totalRows })
   } catch (caught) {
