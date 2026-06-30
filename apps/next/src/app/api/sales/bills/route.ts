@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import * as XLSX from 'xlsx'
+import { XLSX } from '@/lib/server/xlsx'
 import { salesBillFormSchema, type SalesBillFormValues } from '@/lib/sales'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getBranchCodeIntersection, getCurrentAuthContext, requirePermission, type AppAuthContext } from '@/lib/server/auth-context'
@@ -1190,7 +1190,7 @@ function salesBillStatusLabel(status?: string | null) {
   return labels[status.toLowerCase()] ?? status
 }
 
-function buildWorkbook(summaryRows: any[], lineRows: SalesBillLineFactRow[]) {
+async function buildWorkbook(summaryRows: any[], lineRows: SalesBillLineFactRow[]) {
   const summaryData = summaryRows.map((row) => ({
     'เลขที่': row.docNo,
     'อ้างอิง': row.refNo || '-',
@@ -1246,7 +1246,7 @@ function buildWorkbook(summaryRows: any[], lineRows: SalesBillLineFactRow[]) {
   applyWorksheetTableLayout(sheet2, 14, detailData.length + 1)
   XLSX.utils.book_append_sheet(workbook, sheet2, 'รายละเอียดสินค้า')
 
-  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' })
 }
 
 export async function GET(request: Request) {
@@ -1286,7 +1286,7 @@ export async function GET(request: Request) {
     const jsonRows = rows.map((row) => billJson(row, activeReceiptCountByBillId.get(row.id) ?? 0, lineCountByBillId.get(row.id)))
 
     if (url.searchParams.get('format') === 'xlsx') {
-      const body = buildWorkbook(jsonRows, await salesBillLineFactsForBills(billIds, { lineStatuses: ['active', 'cancelled'], tradingStatuses: ['active', 'cancelled'] }))
+      const body = await buildWorkbook(jsonRows, await salesBillLineFactsForBills(billIds, { lineStatuses: ['active', 'cancelled'], tradingStatuses: ['active', 'cancelled'] }))
       const filename = `sales_bills_${new Date().toISOString().slice(0, 10)}.xlsx`
 
       return new NextResponse(new Uint8Array(body), {
