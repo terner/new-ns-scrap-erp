@@ -174,7 +174,7 @@ Local route smoke:
 - [x] Add monthly movement and receivable/pending AR signal.
 - [x] Add read-only AR aging buckets, overdue AR amount/count, and oldest AR age from Document Aging Policy.
 - [x] Remove Customer Return as a separate signal; void/cancel Sales documents are the correction mechanism.
-- [x] Keep `year`, `month`, `customerId`, and `q` filters consistent for summary, rows, detail, and export.
+- [x] Keep `year`, `month`, and `q` filters consistent for summary, rows, detail, and export. The main Customer Tracking UI must not show the Master Customer `customerId` selector; `customerId` is retained only for backend/deep-link backward compatibility if still needed.
 - [x] Add source-link fields using business doc numbers for SB.
 - [x] Add source-link fields using business doc numbers for RCP.
 

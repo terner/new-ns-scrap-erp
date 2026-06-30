@@ -69,7 +69,6 @@ type CustomerTrackingRow = {
 type CustomerTrackingPayload = {
   detail?: CustomerTrackingDetail | null
   filters: {
-    customers: Array<{ active: boolean | null; code: string | null; id: string; name: string }>
     productCategories: string[]
     products: Array<{ category: string | null; code: string | null; id: string; name: string }>
   }
@@ -107,7 +106,6 @@ const monthLabels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.
 const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 
 export function CustomerTrackingPageClient() {
-  const [customerId, setCustomerId] = useState('')
   const [productCategory, setProductCategory] = useState('')
   const [productId, setProductId] = useState('')
   const [data, setData] = useState<CustomerTrackingPayload | null>(null)
@@ -136,12 +134,11 @@ export function CustomerTrackingPageClient() {
   const queryString = useMemo(() => {
     const params = new URLSearchParams({ year })
     if (month) params.set('month', month)
-    if (customerId) params.set('customerId', customerId)
     if (productCategory) params.set('productCategory', productCategory)
     if (productId) params.set('productId', productId)
     if (search.trim()) params.set('q', search.trim())
     return params.toString()
-  }, [customerId, month, productCategory, productId, search, year])
+  }, [month, productCategory, productId, search, year])
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -223,13 +220,6 @@ export function CustomerTrackingPageClient() {
   const topGp = [...rows].sort((left, right) => right.gp - left.gp).slice(0, 10)
   const topGpPct = [...rows].filter((row) => row.revenue > 0).sort((left, right) => right.gpPct - left.gpPct).slice(0, 10)
   const topReceivable = [...rows].sort((left, right) => right.receivable - left.receivable).slice(0, 10)
-  const customerSearchOptions = useMemo<SearchComboboxOption[]>(() => {
-    return (data?.filters?.customers ?? []).map((customer) => ({
-      id: customer.id,
-      label: customer.code ? `${customer.code} - ${customer.name}` : customer.name,
-    }))
-  }, [data?.filters?.customers])
-
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     let list = data?.filters?.products ?? []
     if (productCategory) {
@@ -309,18 +299,6 @@ export function CustomerTrackingPageClient() {
                 options={productSearchOptions}
                 value={productId}
                 onChange={setProductId}
-              />
-            </div>
-
-            <div className="min-w-[150px]">
-              <SearchCombobox
-                inputId="desktop-customer-filter"
-                label="Customer"
-                hideLabel
-                placeholder="ทุก Customer"
-                options={customerSearchOptions}
-                value={customerId}
-                onChange={setCustomerId}
               />
             </div>
 
@@ -421,19 +399,6 @@ export function CustomerTrackingPageClient() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <span className="text-xs text-slate-500 font-semibold">Customer</span>
-                <SearchCombobox
-                  inputId="mobile-customer-filter"
-                  label="Customer"
-                  hideLabel
-                  placeholder="ทุก Customer"
-                  options={customerSearchOptions}
-                  value={customerId}
-                  onChange={setCustomerId}
-                />
-              </div>
-
               <div className="flex justify-end pt-1">
                 <button
                   className="rounded-md bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors focus-visible:outline-none"
@@ -441,7 +406,6 @@ export function CustomerTrackingPageClient() {
                   onClick={() => {
                     setYear(String(new Date().getFullYear()))
                     setMonth('')
-                    setCustomerId('')
                     setProductCategory('')
                     setProductId('')
                     setSearch('')

@@ -5,7 +5,7 @@ tags:
   - menu
   - tracking
 status: accepted-baseline
-updated: 2026-06-15
+updated: 2026-06-29
 route: /tracking/customer
 ---
 
@@ -52,6 +52,14 @@ Latest user screenshot changes the target from a simple customer sales summary i
 - Local vs legacy finding: legacy row click opens customer detail with sales list, receipt list, product breakdown, and monthly breakdown. Current Next now supports row-click detail for SB/RCP/product/monthly breakdown via `detailId`; pending AR, AR aging, credit utilization, and margin decision signals are wired from current source facts.
 - Target UI direction: list remains high-density, but each customer row/card opens a detail modal with SB/RCP movement, SB source links, product breakdown, channel breakdown, monthly movement, pending AR/AR aging/receivable exposure, and credit/margin decision signals. Return count/value is removed by requirement; use void/cancel documents instead.
 
+## Requirement Update 2026-06-29
+
+- Remove the `ลูกค้า` select/search control that resolves customers from Master Customer.
+- The page must not require users to pick a customer from Master Customer before viewing Customer Tracking.
+- Use one combined free-text search field only. This search can match customer code/name or visible row text, but it is not a Master Customer combobox.
+- Keep period filters (`year`, optional `month`) and export.
+- Backend may keep accepting `customerId` only for backward compatibility or deep links, but the main UI must not render or send the Master Customer `customerId` selector.
+
 ## Page Responsibilities
 
 - แสดงภาพรวมลูกค้าจากยอดขาย รับเงิน ลูกหนี้ และ GP
@@ -81,8 +89,8 @@ Query:
 |---|---|
 | `year` | ปี ค.ศ.; default ปีปัจจุบัน |
 | `month` | เดือน `1-12` หรือ `01-12`; optional |
-| `customerId` | customer code หรือ internal id ที่ resolve ผ่าน active customer reference |
-| `q` | ค้นหา customer code/name |
+| `q` | ค้นหา customer code/name จากช่องค้นหารวม ไม่ใช่ช่องเลือกจาก Master Customer |
+| `customerId` | Deprecated/backward compatibility only; main UI must not render the Master Customer customer selector |
 | `format=xlsx` | export workbook |
 
 Source tables:
@@ -146,14 +154,14 @@ Target detail payload fields:
 | Step | User action | System result |
 |---|---|---|
 | 1 | เปิดหน้า | โหลด customer tracking ของปีปัจจุบัน |
-| 2 | เลือก year/month/customer/search | API recalculates rows, monthly, summary with same filters |
+| 2 | เลือก year/month/search | API recalculates rows, monthly, summary with same filters |
 | 3 | ดู top/summary | User identifies revenue, margin, receivable risk |
 | 4 | Export | Download `tracking_customer_<year>[_month].xlsx` |
 | 5 | เปิด detail | Open customer detail with SB/RCP/product/monthly movement and credit decision signals |
 
 ## Validation / Status Rules
 
-- Customer filter must resolve active customer only.
+- No Master Customer selector is shown in the main UI; customer-specific filtering from UI uses the combined text search only.
 - Cancelled SB/RCP must be excluded.
 - Receipt amount must not double count bill received amount and aggregate receipt list separately without stating purpose.
 - Customer code is required for outward id; missing business code should fail loudly through `requireBusinessCode`.
@@ -190,14 +198,14 @@ Target detail payload fields:
 - [x] Add structured decision signals: low margin, negative margin, pending AR, and credit utilization.
 - [x] Add read-only AR aging buckets, overdue AR amount/count, and oldest AR age from [[Document Aging Policy]].
 - [x] Remove return frequency from Customer Tracking; use void/cancel Sales documents.
-- [x] Keep `year/month/customerId/q` filter and `format=xlsx` export aligned with the JSON result.
+- [x] Keep `year/month/q` filter and `format=xlsx` export aligned with the JSON result; `customerId` is backend/deep-link compatibility only and must not be exposed as a Master Customer selector.
 - [x] Render SB source links in the detail table; `/sales/bills/[id]` is available as a read-only owner page.
 - [x] Add RCP source links after `/sales/receipts` detail/deep-link contract is confirmed.
 
 ### UI
 
 - [x] Keep `docs/design.md` ordering: KPI cards, filter shell, tabs, pagination/summary if row count grows, data area.
-- [x] Use compact filter shell with year, month, customer, search, and XLSX export button.
+- [x] Use compact filter shell with year, month, combined text search, and XLSX export button. Do not show the Master Customer customer selector.
 - [x] Make desktop rows and dense mobile cards clickable to open customer detail.
 - [x] Add detail modal/view sections: SB list, RCP list, product breakdown.
 - [x] Add dense mobile cards and keyboard-openable mobile card controls for the same customer detail.
