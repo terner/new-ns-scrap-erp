@@ -27,6 +27,7 @@ type ProductTrackingRow = {
   gpPct?: number
   id: string
   itemStatus?: string
+  matchKey?: string
   metalGroup?: string
   name?: string
   productName?: string

@@ -513,7 +513,7 @@ export async function GET(request: Request) {
           revenue: row.revenue,
           stock,
           wac,
-          monthlyData: productMonthlyMap.get(row.id) ?? Array.from({ length: 12 }, () => ({ qty: 0, buyAmount: 0, sellQty: 0, salesAmount: 0 })),
+          monthlyData: productMonthlyMap.get(row.matchKey) ?? productMonthlyMap.get(row.id) ?? Array.from({ length: 12 }, () => ({ qty: 0, buyAmount: 0, sellQty: 0, salesAmount: 0 })),
         }
       })
       .filter((row) => !search || `${row.code} ${row.name} ${row.metalGroup} ${row.itemStatus}`.toLowerCase().includes(search))
