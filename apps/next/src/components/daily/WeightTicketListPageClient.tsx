@@ -21,6 +21,7 @@ import { WeightTicketDetailModal } from './WeightTicketDetailModal'
 import { WeightTicketsPageClient } from './WeightTicketsPageClient'
 import {
   cancelWeightTicket,
+  confirmWeightTicket,
   displayWeightTicketStatus,
   formatWeight,
   listWeightTickets,
@@ -61,6 +62,7 @@ const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; value
   ],
   WTO: [
     { label: 'ทุกสถานะ', values: [] },
+    { label: 'ร่าง', values: ['draft'] },
     { label: 'ส่งของแล้ว', values: ['delivered'] },
     { label: 'ออกบิลแล้วบางส่วน', values: ['partially_billed'] },
     { label: 'ออกบิลแล้ว', values: ['billed'] },
@@ -169,6 +171,10 @@ function canOpenSalesBillFromTicket(ticket: WeightTicketRecord) {
   return ticket.type === 'WTO' && ticket.status === 'delivered' && ticket.usedInSalesBillCount === 0
 }
 
+function canConfirmWto(ticket: WeightTicketRecord) {
+  return ticket.type === 'WTO' && ticket.status === 'draft' && ticket.usedInSalesBillCount === 0
+}
+
 export function WeightTicketListPageClient() {
   const router = useRouter()
   const [tickets, setTickets] = useState<WeightTicketRecord[]>([])
@@ -193,6 +199,7 @@ export function WeightTicketListPageClient() {
   const [cancelNote, setCancelNote] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCanceling, setIsCanceling] = useState(false)
+  const [confirmingTicketId, setConfirmingTicketId] = useState<string | null>(null)
   const [printingTicketId, setPrintingTicketId] = useState<string | null>(null)
   const [shareTicket, setShareTicket] = useState<WeightTicketRecord | null>(null)
   const [shareNote, setShareNote] = useState('')
@@ -319,6 +326,19 @@ export function WeightTicketListPageClient() {
       setCancelError(getErrorMessage(caught, 'ยกเลิกใบรับ-ส่งของไม่ได้'))
     } finally {
       setIsCanceling(false)
+    }
+  }
+
+  async function handleConfirmTicket(ticket: WeightTicketRecord) {
+    setConfirmingTicketId(ticket.id)
+    setLoadError('')
+    try {
+      const updated = await confirmWeightTicket(ticket.id)
+      setTickets((current) => current.map((row) => row.id === updated.id ? updated : row))
+    } catch (caught) {
+      setLoadError(getErrorMessage(caught, 'ยืนยันใบส่งของไม่ได้'))
+    } finally {
+      setConfirmingTicketId(null)
     }
   }
 
@@ -660,6 +680,16 @@ export function WeightTicketListPageClient() {
                     เปิดบิลขาย
                   </button>
                 ) : null}
+                {canConfirmWto(ticket) ? (
+                  <button
+                    className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
+                    disabled={confirmingTicketId === ticket.id}
+                    type="button"
+                    onClick={() => void handleConfirmTicket(ticket)}
+                  >
+                    {confirmingTicketId === ticket.id ? 'ยืนยัน...' : 'ยืนยัน'}
+                  </button>
+                ) : null}
                 <button
                   className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
                   type="button"
@@ -804,6 +834,19 @@ export function WeightTicketListPageClient() {
                             }}
                           >
                             เปิดบิลขาย
+                          </button>
+                        ) : null}
+                        {canConfirmWto(ticket) ? (
+                          <button
+                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
+                            disabled={confirmingTicketId === ticket.id}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void handleConfirmTicket(ticket)
+                            }}
+                          >
+                            {confirmingTicketId === ticket.id ? 'ยืนยัน...' : 'ยืนยัน'}
                           </button>
                         ) : null}
                         <button

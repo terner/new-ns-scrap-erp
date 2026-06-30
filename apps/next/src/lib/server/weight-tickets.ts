@@ -95,6 +95,18 @@ export type WeightTicketRow = Prisma.weight_ticketsGetPayload<{
         line_no: 'asc'
       }
     }
+    stock_holds: {
+      select: {
+        product_id: true
+        qty: true
+        status: true
+        unit_cost_snapshot: true
+        value_snapshot: true
+      }
+      where: {
+        status: 'active'
+      }
+    }
   }
 }>
 
@@ -248,7 +260,7 @@ export function enteredByLabel(context: AppAuthContext) {
 }
 
 export function defaultTicketStatus(type: WeightTicketType): WeightTicketStatus {
-  return type === 'WTI' ? 'received' : 'delivered'
+  return type === 'WTI' ? 'received' : 'draft'
 }
 
 export async function nextWeightTicketDocNo(
@@ -758,20 +770,48 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
     warehouseType: line.warehouses?.type ?? '',
   }))
   const lineImageNames = lineRows.flatMap((line: { imageNames: string[] }) => line.imageNames)
-  const productSummaries = row.weight_ticket_product_summaries.map((summary) => ({
-    billedWeight: toNumber(summary.billed_weight),
-    containerDeductionWeight: toNumber(summary.container_deduction_weight),
-    deductWeight: toNumber(summary.deduct_weight),
-    grossWeight: toNumber(summary.gross_weight),
-    hasMixedDeductionProfiles: summary.has_mixed_deduction_profiles ?? false,
-    id: `${row.doc_no}:${requireBusinessCode(summary.products.code, `สินค้า ${summary.products.id}`)}:${summary.line_count ?? 0}`,
-    lineCount: summary.line_count ?? 0,
-    netWeight: toNumber(summary.net_weight),
-    productId: requireBusinessCode(summary.products.code, `สินค้า ${summary.products.id}`),
-    productName: summary.product_name,
-    categoryName: summary.products.metal_group || '-',
-    remainingWeight: toNumber(summary.remaining_weight),
-  }))
+  const activeHoldsByProductId = new Map<string, { missingCost: boolean; qty: number; value: number }>()
+  ;(row.stock_holds ?? []).forEach((hold) => {
+    if (hold.status !== 'active') return
+    const key = String(hold.product_id)
+    const current = activeHoldsByProductId.get(key) ?? { missingCost: false, qty: 0, value: 0 }
+    const qty = toNumber(hold.qty)
+    const unitCost = hold.unit_cost_snapshot == null ? null : toNumber(hold.unit_cost_snapshot)
+    current.qty += qty
+    if (unitCost == null) {
+      current.missingCost = true
+    } else {
+      current.value += hold.value_snapshot == null ? qty * unitCost : toNumber(hold.value_snapshot)
+    }
+    activeHoldsByProductId.set(key, current)
+  })
+
+  const productSummaries = row.weight_ticket_product_summaries.map((summary) => {
+    const activeHold = activeHoldsByProductId.get(String(summary.product_id))
+    const pendingOutQty = activeHold?.qty ?? 0
+    const pendingOutValue = activeHold?.value ?? 0
+    const unitCostSnapshot = activeHold && pendingOutQty > 0 && !activeHold.missingCost
+      ? pendingOutValue / pendingOutQty
+      : null
+    return {
+      billedWeight: toNumber(summary.billed_weight),
+      containerDeductionWeight: toNumber(summary.container_deduction_weight),
+      costSnapshotStatus: activeHold?.missingCost ? 'pending' as const : unitCostSnapshot == null ? 'none' as const : 'locked' as const,
+      deductWeight: toNumber(summary.deduct_weight),
+      grossWeight: toNumber(summary.gross_weight),
+      hasMixedDeductionProfiles: summary.has_mixed_deduction_profiles ?? false,
+      id: `${row.doc_no}:${requireBusinessCode(summary.products.code, `สินค้า ${summary.products.id}`)}:${summary.line_count ?? 0}`,
+      lineCount: summary.line_count ?? 0,
+      netWeight: toNumber(summary.net_weight),
+      pendingOutQty,
+      pendingOutValue,
+      productId: requireBusinessCode(summary.products.code, `สินค้า ${summary.products.id}`),
+      productName: summary.product_name,
+      categoryName: summary.products.metal_group || '-',
+      remainingWeight: toNumber(summary.remaining_weight),
+      unitCostSnapshot,
+    }
+  })
 
   const productOrder = new Map<string, number>()
   lineRows.forEach((line, index) => {
@@ -888,6 +928,16 @@ export const weightTicketInclude = {
     orderBy: {
       line_no: 'asc',
     },
+  },
+  stock_holds: {
+    select: {
+      product_id: true,
+      qty: true,
+      status: true,
+      unit_cost_snapshot: true,
+      value_snapshot: true,
+    },
+    where: { status: 'active' },
   },
 } as const
 

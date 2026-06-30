@@ -3791,6 +3791,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                   </div>
                                 </td>
                                 <td className="p-2">
+                                  <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold tabular-nums text-slate-700">
+                                    {sourceSummary?.unitCostSnapshot == null ? '-' : formatMoney(sourceSummary.unitCostSnapshot)}
+                                  </div>
+                                </td>
+                                <td className="p-2">
                                   <InlineMoneyInput
                                     disabled={hasSelectedPoSell}
                                     error={salesFieldErrors[`items.${index}.price`]}
@@ -3932,6 +3937,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                   {itemPoSellOptions.map((po) => <option key={`${po.id}-${po.line_id ?? po.product_id ?? 'all'}`} value={po.id}>{po.label ?? po.name}</option>)}
                                 </select>
                                 {poSellVariance ? <div className={`mt-1 text-xs font-semibold ${poSellVariance.className}`}>{poSellVariance.text}</div> : null}
+                              </td>
+                              <td className="p-2">
+                                <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold tabular-nums text-slate-700">
+                                  {wtoSourceSummary?.unitCostSnapshot == null ? '-' : formatMoney(wtoSourceSummary.unitCostSnapshot)}
+                                </div>
                               </td>
                               <td className="p-2">
                                 <input data-error-key={`items.${index}.grossWeight`} className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-bold tabular-nums text-slate-700 ${salesFieldErrors[`items.${index}.grossWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.grossWeight || ''} onChange={(event) => updateSalesItemWeights(index, 'grossWeight', Number(event.target.value || 0))} />

@@ -3,7 +3,7 @@ import { readJsonResponse } from '@/lib/api-client'
 
 export type WeightTicketType = 'WTI' | 'WTO'
 export type DeductionMode = 'none' | 'kg' | 'percent'
-export type WeightTicketStatus = 'received' | 'delivered' | 'partially_billed' | 'billed' | 'cancelled'
+export type WeightTicketStatus = 'draft' | 'received' | 'delivered' | 'partially_billed' | 'billed' | 'cancelled'
 
 export type WeightTicketLine = {
   containerDeductionWeight: string
@@ -42,16 +42,20 @@ export type WeightTicketRecordLine = WeightTicketLine & {
 export type WeightTicketProductSummary = {
   billedWeight: number
   containerDeductionWeight: number
+  costSnapshotStatus: 'locked' | 'none' | 'pending'
   deductWeight: number
   grossWeight: number
   hasMixedDeductionProfiles: boolean
   id: string
   lineCount: number
   netWeight: number
+  pendingOutQty: number
+  pendingOutValue: number
   productId: string
   productName: string
   categoryName: string
   remainingWeight: number
+  unitCostSnapshot: number | null
 }
 
 export type WeightTicketDownstreamAllocation = {
@@ -166,7 +170,7 @@ export type WeightTicketUsageTimelineEvent = {
 }
 
 const typeEnum = z.enum(['WTI', 'WTO'])
-const statusEnum = z.enum(['received', 'delivered', 'partially_billed', 'billed', 'cancelled'])
+const statusEnum = z.enum(['draft', 'received', 'delivered', 'partially_billed', 'billed', 'cancelled'])
 const deductionModeEnum = z.enum(['none', 'kg', 'percent'])
 const generalTextPattern = /^[^\u0000-\u001F\u007F]+$/u
 export const OTHER_PRODUCT_IMPURITY_ID = '__OTHER_PRODUCT__'
@@ -374,16 +378,20 @@ const weightTicketUsageTimelineSchema = z.object({
 const weightTicketProductSummarySchema = z.object({
   billedWeight: z.number(),
   containerDeductionWeight: z.number().default(0),
+  costSnapshotStatus: z.enum(['locked', 'none', 'pending']).default('none'),
   deductWeight: z.number(),
   grossWeight: z.number(),
   hasMixedDeductionProfiles: z.boolean(),
   id: z.string(),
   lineCount: z.number().int().nonnegative(),
   netWeight: z.number(),
+  pendingOutQty: z.number().default(0),
+  pendingOutValue: z.number().default(0),
   productId: z.string(),
   productName: z.string(),
   categoryName: z.string(),
   remainingWeight: z.number(),
+  unitCostSnapshot: z.number().nullable().default(null),
 })
 
 const weightTicketDownstreamAllocationSchema = z.object({
@@ -457,6 +465,10 @@ export const weightTicketCancelSchema = z.object({
     .min(1, 'กรอกหมายเหตุการยกเลิก')
     .max(500, 'หมายเหตุการยกเลิกยาวเกินไป')
     .regex(generalTextPattern, 'หมายเหตุการยกเลิกมีรูปแบบไม่ถูกต้อง'),
+})
+
+export const weightTicketConfirmSchema = z.object({
+  action: z.literal('confirm'),
 })
 
 export type WeightTicketFormValues = z.infer<typeof weightTicketFormSchema>
@@ -676,6 +688,7 @@ export function findOptionLabel(options: OptionItem[], id: string) {
 export const statusLabels: Record<WeightTicketStatus, string> = {
   billed: 'ออกบิลแล้ว',
   cancelled: 'ยกเลิก',
+  draft: 'ร่าง',
   delivered: 'ส่งของแล้ว',
   partially_billed: 'ออกบิลบางส่วน',
   received: 'รับของแล้ว',
@@ -690,6 +703,7 @@ export function displayWeightTicketStatus(type: WeightTicketType, status: Weight
   }
 
   if (type === 'WTO') {
+    if (status === 'draft') return 'ร่าง'
     if (status === 'cancelled') return 'ยกเลิก'
     if (status === 'delivered') return 'ส่งของแล้ว'
     if (status === 'partially_billed') return 'ออกบิลแล้วบางส่วน'
@@ -707,6 +721,7 @@ export function weightTicketStatusBadgeClass(type: WeightTicketType, status: Wei
     return 'text-emerald-700'
   }
   if (type === 'WTO') {
+    if (status === 'draft') return 'text-slate-700'
     if (status === 'delivered') return 'text-amber-700'
     if (status === 'partially_billed') return 'text-orange-700'
     return 'text-blue-700'
@@ -784,6 +799,16 @@ export async function cancelWeightTicket(id: string, note: string) {
     body: JSON.stringify(values),
   })
   return readJsonResponse(response, weightTicketRecordSchema, 'ยกเลิกใบรับ-ส่งของไม่ได้')
+}
+
+export async function confirmWeightTicket(id: string) {
+  const values = weightTicketConfirmSchema.parse({ action: 'confirm' })
+  const response = await fetch(`/api/daily/weight-tickets/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(values),
+  })
+  return readJsonResponse(response, weightTicketRecordSchema, 'ยืนยันใบส่งของไม่ได้')
 }
 
 const weightTicketLineNotifyResultSchema = z.object({

@@ -27,6 +27,36 @@ route: /daily/weight-ticket-list
 
 list/detail/create link สำหรับ WTI/WTO; WTI/WTO เป็น evidence/usage control ไม่ใช่ stock ledger movement owner
 
+### WTO Pending Out And Average Cost Snapshot Decision
+
+User decision on 2026-06-29: WTO must reserve stock as `pending_out` from draft/save time, but must not lock average cost until the first confirm action.
+
+- `Draft` / saved-but-not-confirmed WTO creates or updates active `pending_out` rows so Stock Balance shows the quantity as `รอออก` and removes it from available stock.
+- Draft `pending_out` does not store average-cost snapshot yet. It is only a quantity reservation.
+- First `Confirm` locks the current average cost for each pending_out portion at confirmation time. This snapshot becomes the cost source for later Sales Bill stock-out/COGS.
+- After confirm, edit uses a delta rule:
+  - unchanged SKU and unchanged quantity keeps the existing pending_out and existing average-cost snapshot;
+  - decreased quantity releases only the decreased portion from `pending_out` back to on-hand/available stock and keeps the existing average-cost snapshot for the remaining portion;
+  - increased quantity creates additional pending_out only for the increase and snapshots the current average cost at that save time;
+  - new SKU creates new pending_out and snapshots the current average cost at that save time;
+  - removed SKU releases its remaining pending_out back to on-hand/available stock.
+- If one SKU has both old confirmed quantity and newly increased quantity, the preferred durable model is multiple pending_out rows/portions so each portion keeps its own average-cost snapshot. Do not overwrite the old snapshot for the already-confirmed quantity.
+- UI may show one combined average cost for the same SKU by weighted average: `(old qty x old snapshot cost + new qty x new snapshot cost) / total qty`. The audit detail must still preserve the old and new pending_out portions so the weighted result is traceable.
+- Sales Bill must consume pending_out portions and write `stock_ledger.value_out` from the pending_out cost snapshot, not recalculate the old portion from current WAC at SB time.
+- No runtime fallback is allowed for cost: if a pending_out portion has no average-cost snapshot, Sales Bill consume, stock return/loss, and any COGS movement must fail and require confirming/fixing the WTO cost snapshot first.
+
+### WTO Cost Snapshot Display
+
+- Main list `/daily/weight-ticket-list` should not show cost by default because it is a fast scanning surface and cost is sensitive.
+- WTO detail/modal should show cost snapshot on the product breakdown table for users allowed to see stock/sales cost:
+  - product summary row: weighted average cost and pending_out value;
+  - line/portion row: cost snapshot used by that portion, or `รอยืนยันราคาต้นทุนเฉลี่ย` when draft pending_out has no snapshot yet.
+- WTO edit form should show read-only cost guidance after confirm:
+  - existing confirmed quantity and cost snapshot;
+  - new/increased quantity that will use current average cost at save time;
+  - weighted average result for the same SKU when old and new portions are combined for display.
+- Sales Bill detail/create should display the same cost only as COGS/GP context for authorized users. Sales Bill must not be the place to edit WTO cost snapshots.
+
 ## Current UI Behavior Summary
 
 - หน้า list แสดง WTI/WTO และส่ง context ประเภทเอกสารไปหน้า create/edit ให้ถูกต้อง
@@ -57,7 +87,7 @@ list/detail/create link สำหรับ WTI/WTO; WTI/WTO เป็น evidenc
 - WTO ใช้เป็น source SB: 1 WTO ต่อ 1 SB; SB สามารถออกบิลบางส่วนได้เมื่อ Customer ซื้อไม่ครบ โดย remaining ต้องคงเป็น `pending_out` และปิดด้วย action `รับของคืน` ไม่ใช่นำไปเปิด SB ใบอื่น
 - WTI/WTO create/edit ต้องบังคับเลือก `สาขา` ก่อน `ผู้ขาย/ลูกค้า`; party selector ต้อง disabled จนกว่าจะเลือกสาขา
 - WTI supplier selector ต้องกรองจาก active `supplier_branches` ของสาขาเอกสาร และ WTO customer selector ต้องกรองจาก active `customer_branches` ของสาขาเอกสาร; เปลี่ยนสาขาแล้วคู่ค้าที่ไม่ตรง mapping ต้องถูก clear
-- WTO เป็น `pending_out` source โดยตรง: เมื่อสร้าง WTO ต้องกัน stock เป็น `pending_out` และแสดงใน Stock Balance เป็น `รอออก`
+- WTO เป็น `pending_out` source โดยตรง: เมื่อบันทึก WTO draft ต้องกัน stock เป็น `pending_out` และแสดงใน Stock Balance เป็น `รอออก`; ราคาต้นทุนเฉลี่ยจะถูก snapshot เฉพาะตอนยืนยันครั้งแรกหรือส่วนเพิ่ม/SKU ใหม่หลังยืนยันเท่านั้น
 - แสดง product thumbnail, เต๋า/summary, vehicle/image evidence และ downstream usage lock
 - WTI create/edit ต้องแยกข้อมูลในแต่ละเต๋าเป็น `ข้อมูลเต๋า` -> `ซื้อเพิ่มจากสิ่งเจือปน` -> `รายการหักสิ่งเจือปน`
 - ในแต่ละรายการต้องเลือกสินค้าก่อนกรอกข้อมูลเต๋า/น้ำหนัก/รูป/สิ่งเจือปน และเมื่อเปลี่ยนสินค้าต้องล้างข้อมูลเต๋า รูป สิ่งเจือปน และรายการซื้อเพิ่มที่ผูกกับสินค้าเดิม
@@ -102,10 +132,14 @@ list/detail/create link สำหรับ WTI/WTO; WTI/WTO เป็น evidenc
 - `POST /api/daily/weight-tickets`
   - for `WTO`, must require `warehouseId` per line
   - must validate requested qty/net weight against server-side `availableQty`
-  - must create `pending_out` in the same transaction as the WTO document
+  - must create draft `pending_out` in the same transaction as the WTO document to reserve stock, without average-cost snapshot
   - must not write `stock_ledger`; ledger stock-out is owned by Sales Bill when it consumes the WTO `pending_out`
 - `PUT /api/daily/weight-tickets/[id]`
-  - for editable unused `WTO`, must rebuild `pending_out` to match latest lines
+  - for editable unused draft `WTO`, must adjust `pending_out` to match latest lines
+  - for confirmed `WTO`, must use the delta rule: release decreases back to on-hand/available stock, preserve existing cost snapshots for unchanged/decreased remaining qty, and snapshot current average cost only for increased qty or new SKU
+- `POST/PATCH /api/daily/weight-tickets/[id]/confirm` or equivalent confirm action
+  - for first WTO confirm, must fill average-cost snapshot on active draft pending_out rows
+  - must be idempotent enough to avoid overwriting existing confirmed cost snapshots
 - `PATCH /api/daily/weight-tickets/[id]`
   - for cancel `WTO`, must release active `pending_out`
 
@@ -185,7 +219,7 @@ list/detail/create link สำหรับ WTI/WTO; WTI/WTO เป็น evidenc
 ## Side Effects
 
 - WTI save สร้าง evidence/summary แต่ไม่ stock ledger
-- WTO target save สร้าง `pending_out` แต่ไม่ stock ledger
+- WTO draft save สร้าง `pending_out` เพื่อกัน stock แต่ยังไม่ snapshot ราคาต้นทุนเฉลี่ย; WTO confirm จึง snapshot ราคาต้นทุนเฉลี่ยของ pending_out ที่ยืนยันแล้ว
 - PB/SB เป็นผู้ consume source และเขียน ledger
 - WTO detail แสดงปุ่ม `รับของคืน` เฉพาะเมื่อ `GET /api/daily/weight-tickets/[id]/stock-returns` พบ active `pending_out` ที่ถูกนำไปออก `SB` แล้วบางส่วน; modal ให้กรอกน้ำหนักชั่งคืนจริง และถ้าคืนน้อยกว่ายอดค้างต้องระบุเหตุผลเพื่อให้ระบบบันทึก loss ledger ผ่าน Sales Bill stock-return API
 

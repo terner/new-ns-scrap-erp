@@ -61,6 +61,16 @@ const ticketInclude = {
     },
     orderBy: { line_no: 'asc' },
   },
+  stock_holds: {
+    select: {
+      product_id: true,
+      qty: true,
+      status: true,
+      unit_cost_snapshot: true,
+      value_snapshot: true,
+    },
+    where: { status: 'active' },
+  },
 } as const
 
 export async function GET(request: Request) {
