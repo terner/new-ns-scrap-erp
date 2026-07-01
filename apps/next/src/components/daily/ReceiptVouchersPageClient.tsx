@@ -241,6 +241,12 @@ function normalizeFormFromRow(row: ReceiptVoucherRow): ReceiptVoucherFormState {
   return { ...form, amountInWords: form.amountInWords || thaiBahtText(formTotals(form).amount) }
 }
 
+function supplierPaymentMethodValue(supplier?: SupplierOption | null) {
+  const account = supplier?.bankAccounts?.find((item) => item.isPrimary) ?? supplier?.bankAccounts?.[0]
+  if (!account) return 'รับเงินสด'
+  return `${account.paymentMethod} บช.${account.accountNo}`
+}
+
 export function ReceiptVouchersPageClient() {
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [cancelNote, setCancelNote] = useState('')
@@ -424,6 +430,7 @@ export function ReceiptVouchersPageClient() {
       return
     }
     updateForm({
+      paymentMethod: supplierPaymentMethodValue(supplier),
       purchaseBillDocNo: '',
       sellerAddress: supplier.address,
       sellerName: supplier.name,
@@ -445,6 +452,7 @@ export function ReceiptVouchersPageClient() {
       qty: String(toNumber(item.qty)),
       unit: item.unit || 'กก.',
     })) : form.items
+    const supplier = supplierOptions.find((item) => item.code === bill.sellerCode)
     updateForm({
       amountInWords: thaiBahtText(billItems.reduce((sum, item) => sum + itemAmount(item), 0)),
       date: bill.date || form.date,
@@ -457,6 +465,7 @@ export function ReceiptVouchersPageClient() {
       sellerName: bill.sellerName,
       sellerPhone: bill.sellerPhone,
       sellerTaxId: bill.sellerTaxId,
+      paymentMethod: supplierPaymentMethodValue(supplier),
       supplierCode: bill.sellerCode,
     })
   }
@@ -1006,14 +1015,6 @@ function ReceiptVoucherFormModal({
                   value={form.note}
                   onChange={(event) => onUpdateForm({ note: event.target.value })}
                 />
-              </FormField>
-              <FormField label="วิธีรับเงิน">
-                <div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 md:px-3 text-xs md:text-sm font-semibold text-slate-800">
-                  {form.paymentMethod && form.paymentMethod !== 'รับเงินสด' ? 'โอนเงินบัญชีธนาคาร' : 'รับเงินสด'}
-                </div>
-                <div className="mt-1 text-xs md:text-xs text-slate-500">
-                  {form.amountInWords || thaiBahtText(totals.amount) || '-'}
-                </div>
               </FormField>
               <FormField label="ผู้จ่ายเงิน (ลายเซ็น)">
                 <div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 md:px-3 text-xs md:text-sm font-semibold text-slate-800 truncate">
