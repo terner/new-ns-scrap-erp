@@ -105,11 +105,24 @@ function summarizeQuantityByUnit(items: ReceiptVoucherPrintItem[]) {
 function selectedSupplierBankAccount(row: ReceiptVoucherPrintDocument) {
   const paymentMethod = row.paymentMethod?.trim()
   if (!paymentMethod || paymentMethod === CASH_PAYMENT_METHOD) return null
-  return row.supplierBankAccounts?.find((account) => {
+  const matchedAccount = row.supplierBankAccounts?.find((account) => {
     const accountNo = account.accountNo.trim()
     const methodWithAccount = `${account.paymentMethod} บช.${accountNo}`
     return paymentMethod === methodWithAccount || Boolean(accountNo && paymentMethod.includes(accountNo))
-  }) ?? null
+  })
+  if (matchedAccount) return matchedAccount
+
+  const accountMatch = paymentMethod.match(/^(.*?)\s*บช\.?\s*(.+)$/)
+  if (!accountMatch) return null
+  return {
+    accountName: '',
+    accountNo: accountMatch[2]?.trim() ?? '',
+    bankName: '',
+    branchCode: '',
+    code: '',
+    isPrimary: false,
+    paymentMethod: accountMatch[1]?.trim() || paymentMethod,
+  }
 }
 
 function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile: CompanyProfilePrintValues) {
