@@ -624,6 +624,11 @@ Expected:
   - The mobile target/rule/job cards render from the same sorted row sets as desktop. LINE credential save, target sync/test/default/delete, rule save/delete/simulate, outbox retry/cancel/process, analytics, API behavior, and DB state were not changed.
   - Browser QA remains pending.
 
+- `/admin/audit`
+  - After the latest correction, the main Audit & Activity Log table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting of the current page rows, persisted resizable widths, a reset-width control, and fixed table layout.
+  - Mobile audit cards render from the same sorted row set as desktop, and current-page CSV export follows that sorted order. `/api/admin/auth-events`, audit source, permission boundary, filters, pagination, and detail modal facts were not changed.
+  - Browser QA remains pending.
+
 ### Updated Suggested Fix Order
 
 1. Finish remaining high-confidence operational inconsistencies users will notice immediately: `/sales/receipts` (`/purchase/payments`, PO Sell, Sales Bills, and RV static findings are fixed; browser QA still pending).
