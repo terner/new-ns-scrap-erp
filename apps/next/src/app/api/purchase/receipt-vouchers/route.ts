@@ -276,7 +276,7 @@ export async function GET() {
       .map((rv) => rv.purchase_bill_doc_no)
       .filter((docNo): docNo is string => docNo !== null)
 
-    const [suppliers, purchaseBills, rows, companyProfile] = await Promise.all([
+    const [suppliers, purchaseBills, receiptVoucherPurchaseBills, rows, companyProfile] = await Promise.all([
       prisma.suppliers.findMany({
         orderBy: [{ code: 'asc' }, { name: 'asc' }],
         select: {
@@ -339,6 +339,19 @@ export async function GET() {
           doc_no: { notIn: referencedBillDocNos },
         },
       }),
+      prisma.purchase_bills.findMany({
+        select: {
+          doc_no: true,
+          suppliers: {
+            select: {
+              code: true,
+            },
+          },
+        },
+        where: {
+          doc_no: { in: referencedBillDocNos },
+        },
+      }),
       prisma.receipt_vouchers.findMany({
         orderBy: [{ date: 'desc' }, { doc_no: 'desc' }],
         include: {
@@ -364,7 +377,17 @@ export async function GET() {
     ])
 
     const supplierCodeByPurchaseBillDocNo = new Map(
-      purchaseBills.map((bill) => [bill.doc_no, bill.suppliers?.code ?? '']),
+      receiptVoucherPurchaseBills.map((bill) => [bill.doc_no, bill.suppliers?.code ?? '']),
+    )
+    const supplierCodeByTaxId = new Map(
+      suppliers
+        .map((supplier) => [supplier.tax_id?.trim() ?? '', supplier.code] as const)
+        .filter(([taxId]) => taxId),
+    )
+    const supplierCodeByName = new Map(
+      suppliers
+        .map((supplier) => [supplier.name.trim(), supplier.code] as const)
+        .filter(([name]) => name),
     )
 
     return NextResponse.json({
@@ -438,7 +461,10 @@ export async function GET() {
         sellerPhone: row.seller_phone ?? '',
         sellerTaxId: row.seller_tax_id ?? '',
         status: row.status,
-        supplierCode: supplierCodeByPurchaseBillDocNo.get(row.purchase_bill_doc_no ?? '') ?? '',
+        supplierCode: supplierCodeByPurchaseBillDocNo.get(row.purchase_bill_doc_no ?? '')
+          || supplierCodeByTaxId.get(row.seller_tax_id?.trim() ?? '')
+          || supplierCodeByName.get(row.seller_name?.trim() ?? '')
+          || '',
         cancelNote: row.cancel_note ?? '',
         cancelledAt: row.cancelled_at?.toISOString() ?? '',
         cancelledBy: row.cancelled_by ?? '',
