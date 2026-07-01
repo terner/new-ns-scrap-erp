@@ -1572,6 +1572,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         productName: item.productName,
         remainingWeight: item.netWeight,
         sourceLineIds: item.deliveryLineId ? [item.deliveryLineId] : [],
+        unitCostSnapshot: item.unitCostSnapshot,
       })),
       status: '',
       vehicleNo: deliveryItems[0]?.deliveryVehicleNo ?? '',

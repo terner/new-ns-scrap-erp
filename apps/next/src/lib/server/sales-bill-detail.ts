@@ -44,6 +44,7 @@ export type SalesBillDetail = {
     sourceType: string
     tradingSourceDocNo: string
     tradingSourceLineNo: number | null
+    unitCostSnapshot: number | null
     unit: string
   }>
   note: string
@@ -264,6 +265,7 @@ function buildDurableItems(input: {
   bill: SalesBillDetailRow
   lineFacts: SalesBillLineFact[]
   poSellDocNoSet: Set<string>
+  stockUnitCostByLineNo: Map<number, number | null>
   tradingFactByLineNo: Map<number, Prisma.trading_allocation_factsGetPayload<{
     include: {
       purchase_bills: { select: { doc_no: true } }
@@ -330,6 +332,7 @@ function buildDurableItems(input: {
       sourceType,
       tradingSourceDocNo: tradingSource.sourceDocNo,
       tradingSourceLineNo: tradingSource.sourceLineNo,
+      unitCostSnapshot: input.stockUnitCostByLineNo.get(line.line_no) ?? null,
       unit: line.unit_snapshot || 'กก.',
     }
   })
@@ -495,12 +498,23 @@ export async function getSalesBillDetail(
     if (fact.sales_line_no == null) return
     tradingFactByLineNo.set(fact.sales_line_no, fact)
   })
-  const items = buildDurableItems({ bill, lineFacts, poSellDocNoSet, tradingFactByLineNo, vehicleByDeliveryDocNo })
   const stockLineFacts = await salesBillLineFactsForBills([bill.id], {
     lineStatuses: factStatuses,
     tradingStatuses: factStatuses,
   })
   const stockCogsByLineNo = new Map(stockLineFacts.map((line) => [line.lineNo, line.cogs] as const))
+  const stockUnitCostByLineNo = new Map(stockLineFacts.map((line) => {
+    const qty = toNumber(line.qty) || toNumber(line.netWeight)
+    return [line.lineNo, qty > 0 && line.cogs > 0 ? line.cogs / qty : null] as const
+  }))
+  const items = buildDurableItems({
+    bill,
+    lineFacts,
+    poSellDocNoSet,
+    stockUnitCostByLineNo,
+    tradingFactByLineNo,
+    vehicleByDeliveryDocNo,
+  })
   const allocatedUsageQtyByLineNo = new Map<number, number>()
   weightTicketUsageLogs.forEach((log) => {
     if (log.action !== 'allocated_to_sales_bill' || log.target_line_no == null) return

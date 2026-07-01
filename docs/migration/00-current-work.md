@@ -2230,3 +2230,6 @@ Tailwind dependency check:
   - Authenticated API QA passed for create path using existing `WTO012606-0008` to create `SB2606-0010`: subtotal `399`, bill discount `5`, VAT `27.58`, total `421.58`, COGS `170.366581374016`, expected GP `(399 - 5) - 170.366581374016 = 223.633418625984`; DB `gross_profit = 223.633418625984`, proving the code did not use VAT-inclusive `total_amount - COGS`.
   - Local tmux dev server was restarted with `DATABASE_POOL_MAX=10` for QA only because the default local pool max `1` timed out when another browser tab was polling `/api/owner-daily`; this is an environment/testing note, not a production code change.
   - Validation passed after removing temporary debug logging and updating docs: `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false` and `git diff --check`.
+- 2026-07-01: Sales Bill edit WTO cost snapshot checkpoint
+  - Fixed the Sales Bill edit read path so WTO-derived lines carry `unitCostSnapshot` from durable Sales Bill stock facts (`COGS / qty`) into the locked delivery snapshot used by the edit form.
+  - This keeps old/consumed WTO documents editable without falling back to active `stock_holds`, because billed WTO holds are no longer active after Sales Bill stock-out.
