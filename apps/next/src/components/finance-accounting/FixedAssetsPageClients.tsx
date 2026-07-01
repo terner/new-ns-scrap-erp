@@ -153,8 +153,10 @@ type DisposalFormState = {
 type AssetRegisterColumnKey = 'accumDep' | 'actions' | 'assetName' | 'branchName' | 'category' | 'code' | 'monthlyDep' | 'nbv' | 'netAssetCost' | 'purchaseDate' | 'status'
 type AssetRegisterSortKey = Exclude<AssetRegisterColumnKey, 'actions'>
 type DepreciationColumnKey = 'accumAfter' | 'accumBefore' | 'actions' | 'asset' | 'depreciationAmount' | 'nbvAfter' | 'nbvBefore' | 'period' | 'refNo' | 'status'
+type DepreciationSortKey = Exclude<DepreciationColumnKey, 'actions'>
 type DisposalColumnKey = 'actions' | 'asset' | 'date' | 'disposalNo' | 'disposalType' | 'gainLoss' | 'nbv' | 'reason' | 'sellingPrice' | 'status'
 type PendingAssetColumnKey = 'accumDep' | 'code' | 'monthlyDep' | 'name' | 'nbv' | 'netAssetCost' | 'status'
+type PendingAssetSortKey = PendingAssetColumnKey
 type SortDirection = 'asc' | 'desc'
 
 const assetRegisterColumns: Array<ResizableColumnDefinition<AssetRegisterColumnKey>> = [
@@ -904,6 +906,8 @@ export function DepreciationPageClient() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const [historySortDirection, setHistorySortDirection] = useState<SortDirection>('asc')
+  const [historySortKey, setHistorySortKey] = useState<DepreciationSortKey | null>(null)
   const columnResize = useResizableColumns('finance-accounting.depreciation.history.v1', depreciationColumns)
 
   useEffect(() => {
@@ -951,13 +955,30 @@ export function DepreciationPageClient() {
     })
   }, [data?.rows, filterCategory, filterDepartment])
 
-  const totalRows = filteredRows.length
+  const sortedRows = useMemo(() => {
+    if (!historySortKey) return filteredRows
+    return [...filteredRows].sort((left, right) => {
+      const result = compareSortValues(getDepreciationSortValue(left, historySortKey), getDepreciationSortValue(right, historySortKey))
+      return historySortDirection === 'asc' ? result : -result
+    })
+  }, [filteredRows, historySortDirection, historySortKey])
+
+  const totalRows = sortedRows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pagedRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize
-    return filteredRows.slice(start, start + pageSize)
-  }, [filteredRows, currentPage, pageSize])
+    return sortedRows.slice(start, start + pageSize)
+  }, [sortedRows, currentPage, pageSize])
+
+  const changeHistorySort = (key: DepreciationSortKey) => {
+    if (historySortKey === key) {
+      setHistorySortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setHistorySortKey(key)
+    setHistorySortDirection('asc')
+  }
 
   const totalDepreciationAmount = useMemo(() => {
     return filteredRows.filter((row) => row.status !== 'reversed').reduce((sum, row) => sum + row.depreciationAmount, 0)
@@ -1224,7 +1245,7 @@ export function DepreciationPageClient() {
               </button>
             </div>
           ) : null}
-          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {depreciationColumns.map((column, index) => {
                 if (index === depreciationColumns.length - 1) {
@@ -1235,15 +1256,15 @@ export function DepreciationPageClient() {
             </colgroup>
             <thead className="sticky top-0 bg-slate-100">
               <tr>
-                <ResizableTableHead label="เลขที่รันค่าเสื่อม" resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขที่รันค่าเสื่อม')} />
-                <ResizableTableHead label="งวด" resizeProps={columnResize.getResizeHandleProps('period', 'งวด')} />
-                <ResizableTableHead label="สินทรัพย์" resizeProps={columnResize.getResizeHandleProps('asset', 'สินทรัพย์')} />
-                <ResizableTableHead align="right" label="ค่าเสื่อมสะสมก่อน" resizeProps={columnResize.getResizeHandleProps('accumBefore', 'ค่าเสื่อมสะสมก่อน')} />
-                <ResizableTableHead align="right" label="ค่าเสื่อมงวดนี้" resizeProps={columnResize.getResizeHandleProps('depreciationAmount', 'ค่าเสื่อมงวดนี้')} />
-                <ResizableTableHead align="right" label="ค่าเสื่อมสะสมหลัง" resizeProps={columnResize.getResizeHandleProps('accumAfter', 'ค่าเสื่อมสะสมหลัง')} />
-                <ResizableTableHead align="right" label="NBV ก่อน" resizeProps={columnResize.getResizeHandleProps('nbvBefore', 'NBV ก่อน')} />
-                <ResizableTableHead align="right" label="NBV หลัง" resizeProps={columnResize.getResizeHandleProps('nbvAfter', 'NBV หลัง')} />
-                <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} direction={historySortDirection} label="เลขที่รันค่าเสื่อม" resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขที่รันค่าเสื่อม')} sortKey="refNo" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} direction={historySortDirection} label="งวด" resizeProps={columnResize.getResizeHandleProps('period', 'งวด')} sortKey="period" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} direction={historySortDirection} label="สินทรัพย์" resizeProps={columnResize.getResizeHandleProps('asset', 'สินทรัพย์')} sortKey="asset" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} align="right" direction={historySortDirection} label="ค่าเสื่อมสะสมก่อน" resizeProps={columnResize.getResizeHandleProps('accumBefore', 'ค่าเสื่อมสะสมก่อน')} sortKey="accumBefore" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} align="right" direction={historySortDirection} label="ค่าเสื่อมงวดนี้" resizeProps={columnResize.getResizeHandleProps('depreciationAmount', 'ค่าเสื่อมงวดนี้')} sortKey="depreciationAmount" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} align="right" direction={historySortDirection} label="ค่าเสื่อมสะสมหลัง" resizeProps={columnResize.getResizeHandleProps('accumAfter', 'ค่าเสื่อมสะสมหลัง')} sortKey="accumAfter" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} align="right" direction={historySortDirection} label="NBV ก่อน" resizeProps={columnResize.getResizeHandleProps('nbvBefore', 'NBV ก่อน')} sortKey="nbvBefore" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} align="right" direction={historySortDirection} label="NBV หลัง" resizeProps={columnResize.getResizeHandleProps('nbvAfter', 'NBV หลัง')} sortKey="nbvAfter" onSort={changeHistorySort} />
+                <ResizableTableHead activeSortKey={historySortKey ?? undefined} align="center" direction={historySortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeHistorySort} />
                 <ResizableTableHead align="center" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('actions', 'จัดการ')} />
               </tr>
             </thead>
@@ -1795,6 +1816,16 @@ function getAssetRegisterSortValue(row: AssetRegisterRow, key: AssetRegisterSort
   return row[key]
 }
 
+function getDepreciationSortValue(row: DepreciationPayload['rows'][number], key: DepreciationSortKey) {
+  if (key === 'asset') return `${row.assetCode} ${row.assetName}`
+  return row[key]
+}
+
+function getPendingAssetSortValue(row: DepreciationPayload['pendingAssets'][number], key: PendingAssetSortKey) {
+  if (key === 'status') return row.assetStatus
+  return row[key]
+}
+
 function compareSortValues(left: string | number, right: string | number) {
   if (typeof left === 'number' && typeof right === 'number') return left - right
   return String(left ?? '').localeCompare(String(right ?? ''), 'th', { numeric: true, sensitivity: 'base' })
@@ -2041,6 +2072,25 @@ function Bar({ label, max, value }: { label: string; max: number; value: number 
 
 function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: DepreciationPayload['pendingAssets'] }) {
   const columnResize = useResizableColumns('finance-accounting.depreciation.pending-assets.v1', pendingAssetColumns)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [sortKey, setSortKey] = useState<PendingAssetSortKey | null>(null)
+
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+    return [...rows].sort((left, right) => {
+      const result = compareSortValues(getPendingAssetSortValue(left, sortKey), getPendingAssetSortValue(right, sortKey))
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [rows, sortDirection, sortKey])
+
+  const changeSort = (key: PendingAssetSortKey) => {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortKey(key)
+    setSortDirection('asc')
+  }
 
   return (
     <div>
@@ -2057,7 +2107,7 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
             </button>
           </div>
         ) : null}
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {pendingAssetColumns.map((column, index) => {
               if (index === pendingAssetColumns.length - 1) {
@@ -2068,18 +2118,18 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
           </colgroup>
           <thead className="bg-slate-100">
             <tr>
-              <ResizableTableHead label="รหัสทรัพย์สิน" resizeProps={columnResize.getResizeHandleProps('code', 'รหัสทรัพย์สิน')} />
-              <ResizableTableHead label="ชื่อทรัพย์สิน" resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อทรัพย์สิน')} />
-              <ResizableTableHead align="right" label="ต้นทุนสุทธิ" resizeProps={columnResize.getResizeHandleProps('netAssetCost', 'ต้นทุนสุทธิ')} />
-              <ResizableTableHead align="right" label="ค่าเสื่อมสะสมเดิม" resizeProps={columnResize.getResizeHandleProps('accumDep', 'ค่าเสื่อมสะสมเดิม')} />
-              <ResizableTableHead align="right" label="NBV ปัจจุบัน" resizeProps={columnResize.getResizeHandleProps('nbv', 'NBV ปัจจุบัน')} />
-              <ResizableTableHead align="right" label="ค่าเสื่อม/เดือน" resizeProps={columnResize.getResizeHandleProps('monthlyDep', 'ค่าเสื่อมต่อเดือน')} />
-              <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="รหัสทรัพย์สิน" resizeProps={columnResize.getResizeHandleProps('code', 'รหัสทรัพย์สิน')} sortKey="code" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} direction={sortDirection} label="ชื่อทรัพย์สิน" resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อทรัพย์สิน')} sortKey="name" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="ต้นทุนสุทธิ" resizeProps={columnResize.getResizeHandleProps('netAssetCost', 'ต้นทุนสุทธิ')} sortKey="netAssetCost" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="ค่าเสื่อมสะสมเดิม" resizeProps={columnResize.getResizeHandleProps('accumDep', 'ค่าเสื่อมสะสมเดิม')} sortKey="accumDep" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="NBV ปัจจุบัน" resizeProps={columnResize.getResizeHandleProps('nbv', 'NBV ปัจจุบัน')} sortKey="nbv" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="right" direction={sortDirection} label="ค่าเสื่อม/เดือน" resizeProps={columnResize.getResizeHandleProps('monthlyDep', 'ค่าเสื่อมต่อเดือน')} sortKey="monthlyDep" onSort={changeSort} />
+              <ResizableTableHead activeSortKey={sortKey ?? undefined} align="center" direction={sortDirection} label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} sortKey="status" onSort={changeSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             <LoadingOrEmpty colSpan={7} isLoading={isLoading} rows={rows.length} />
-            {rows.map((row) => (
+            {sortedRows.map((row) => (
               <tr key={row.id} className="transition-colors hover:bg-slate-50">
                 <td className="whitespace-nowrap px-3 py-3 font-mono font-bold text-amber-700">{row.code}</td>
                 <td className="px-3 py-3 font-semibold text-slate-800">{row.name}</td>
@@ -2098,10 +2148,10 @@ function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: Depreci
       <div className="block lg:hidden space-y-2.5">
         {isLoading ? (
           <div className="text-center text-xs text-slate-400 py-6">กำลังโหลดข้อมูล...</div>
-        ) : rows.length === 0 ? (
+        ) : sortedRows.length === 0 ? (
           <div className="text-center text-xs text-slate-400 py-6">ไม่มีรายการทรัพย์สินที่ต้องประมวลผล</div>
         ) : (
-          rows.map((row) => (
+          sortedRows.map((row) => (
             <div key={row.id} className="bg-slate-50 rounded-lg p-3 border border-slate-100 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="font-mono text-xs text-amber-700 font-bold">{row.code}</span>
