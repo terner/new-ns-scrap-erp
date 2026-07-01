@@ -12,6 +12,7 @@ import { DatePickerInput } from '@/components/ui/date-picker-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { Select } from '@/components/ui/Select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib/weight-ticket-print'
@@ -39,7 +40,7 @@ type TypeFilter = WeightTicketType
 type StatusFilter = WeightTicketStatus
 type WeightTicketColumnKey = 'action' | 'branch' | 'containerDeductionWeight' | 'createdAt' | 'documentNo' | 'netWeight' | 'partyName' | 'status' | 'updatedAt' | 'vehicleNo'
 
-const pageSize = 10
+const pageSizeOptions = [10, 25, 50, 100] as const
 const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey>> = [
   { key: 'documentNo', defaultWidth: 150, minWidth: 120 },
   { key: 'createdAt', defaultWidth: 170, minWidth: 130 },
@@ -193,6 +194,7 @@ export function WeightTicketListPageClient() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<(typeof pageSizeOptions)[number]>(10)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [cancelTicket, setCancelTicket] = useState<WeightTicketRecord | null>(null)
@@ -292,7 +294,7 @@ export function WeightTicketListPageClient() {
     return () => {
       cancelled = true
     }
-  }, [branchFilter, dateFrom, dateTo, page, query, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
+  }, [branchFilter, dateFrom, dateTo, page, pageSize, query, sortBy, sortDir, statusFilter, typeFilter, refreshKey])
 
   function clearFilters() {
     setQuery('')
@@ -601,13 +603,27 @@ export function WeightTicketListPageClient() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-sm text-slate-600">
         <div>{summaryText}</div>
-        <div className="flex items-center gap-2">
-          {columnResize.hasCustomWidths ? <Button size="xs" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
-          <Button disabled={safePage <= 1 || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
-          <span>หน้า {safePage} / {totalPages}</span>
-          <Button disabled={safePage >= totalPages || isLoading} size="xs" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {columnResize.hasCustomWidths ? <Button className="hidden lg:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>คืนค่าเดิมตาราง</Button> : null}
+          <Select
+            aria-label="จำนวนรายการต่อหน้า"
+            className="h-9 w-auto px-2 py-1"
+            disabled={isLoading}
+            value={pageSize}
+            onChange={(event) => {
+              setPageSize(Number(event.target.value) as (typeof pageSizeOptions)[number])
+              setPage(1)
+            }}
+          >
+            {pageSizeOptions.map((option) => (
+              <option key={option} value={option}>{option} / หน้า</option>
+            ))}
+          </Select>
+          <Button disabled={safePage <= 1 || isLoading} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))}>ก่อนหน้า</Button>
+          <span className="px-1">หน้า {safePage} / {totalPages}</span>
+          <Button disabled={safePage >= totalPages || isLoading} size="sm" type="button" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>ถัดไป</Button>
         </div>
       </div>
 
