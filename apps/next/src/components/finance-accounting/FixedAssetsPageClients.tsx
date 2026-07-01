@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type AssetRegisterRow = {
   acquisitionType: string
@@ -148,6 +150,61 @@ type DisposalFormState = {
   sellingPrice: string
 }
 
+type AssetRegisterColumnKey = 'accumDep' | 'actions' | 'assetName' | 'branchName' | 'category' | 'code' | 'monthlyDep' | 'nbv' | 'netAssetCost' | 'purchaseDate' | 'status'
+type DepreciationColumnKey = 'accumAfter' | 'accumBefore' | 'actions' | 'asset' | 'depreciationAmount' | 'nbvAfter' | 'nbvBefore' | 'period' | 'refNo' | 'status'
+type DisposalColumnKey = 'actions' | 'asset' | 'date' | 'disposalNo' | 'disposalType' | 'gainLoss' | 'nbv' | 'reason' | 'sellingPrice' | 'status'
+type PendingAssetColumnKey = 'accumDep' | 'code' | 'monthlyDep' | 'name' | 'nbv' | 'netAssetCost' | 'status'
+
+const assetRegisterColumns: Array<ResizableColumnDefinition<AssetRegisterColumnKey>> = [
+  { key: 'code', defaultWidth: 120, minWidth: 105 },
+  { key: 'assetName', defaultWidth: 230, minWidth: 170 },
+  { key: 'category', defaultWidth: 135, minWidth: 110 },
+  { key: 'branchName', defaultWidth: 140, minWidth: 110 },
+  { key: 'purchaseDate', defaultWidth: 120, minWidth: 105 },
+  { key: 'netAssetCost', defaultWidth: 150, minWidth: 125 },
+  { key: 'accumDep', defaultWidth: 155, minWidth: 130 },
+  { key: 'nbv', defaultWidth: 140, minWidth: 115 },
+  { key: 'monthlyDep', defaultWidth: 155, minWidth: 130 },
+  { key: 'status', defaultWidth: 165, minWidth: 130 },
+  { key: 'actions', defaultWidth: 155, minWidth: 130 },
+]
+
+const depreciationColumns: Array<ResizableColumnDefinition<DepreciationColumnKey>> = [
+  { key: 'refNo', defaultWidth: 130, minWidth: 110 },
+  { key: 'period', defaultWidth: 110, minWidth: 95 },
+  { key: 'asset', defaultWidth: 240, minWidth: 170 },
+  { key: 'accumBefore', defaultWidth: 170, minWidth: 140 },
+  { key: 'depreciationAmount', defaultWidth: 155, minWidth: 130 },
+  { key: 'accumAfter', defaultWidth: 170, minWidth: 140 },
+  { key: 'nbvBefore', defaultWidth: 145, minWidth: 120 },
+  { key: 'nbvAfter', defaultWidth: 140, minWidth: 115 },
+  { key: 'status', defaultWidth: 165, minWidth: 130 },
+  { key: 'actions', defaultWidth: 145, minWidth: 120 },
+]
+
+const disposalColumns: Array<ResizableColumnDefinition<DisposalColumnKey>> = [
+  { key: 'disposalNo', defaultWidth: 140, minWidth: 115 },
+  { key: 'date', defaultWidth: 115, minWidth: 100 },
+  { key: 'asset', defaultWidth: 240, minWidth: 170 },
+  { key: 'disposalType', defaultWidth: 130, minWidth: 110 },
+  { key: 'sellingPrice', defaultWidth: 145, minWidth: 120 },
+  { key: 'nbv', defaultWidth: 150, minWidth: 125 },
+  { key: 'gainLoss', defaultWidth: 155, minWidth: 130 },
+  { key: 'reason', defaultWidth: 210, minWidth: 150 },
+  { key: 'status', defaultWidth: 155, minWidth: 125 },
+  { key: 'actions', defaultWidth: 135, minWidth: 115 },
+]
+
+const pendingAssetColumns: Array<ResizableColumnDefinition<PendingAssetColumnKey>> = [
+  { key: 'code', defaultWidth: 120, minWidth: 105 },
+  { key: 'name', defaultWidth: 240, minWidth: 170 },
+  { key: 'netAssetCost', defaultWidth: 150, minWidth: 125 },
+  { key: 'accumDep', defaultWidth: 165, minWidth: 135 },
+  { key: 'nbv', defaultWidth: 145, minWidth: 120 },
+  { key: 'monthlyDep', defaultWidth: 155, minWidth: 130 },
+  { key: 'status', defaultWidth: 160, minWidth: 130 },
+]
+
 const blankDisposalForm = (): DisposalFormState => ({
   assetId: '',
   customerId: '',
@@ -174,6 +231,7 @@ export function AssetRegisterPageClient() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const columnResize = useResizableColumns('finance-accounting.asset-register.main.v1', assetRegisterColumns)
 
   useEffect(() => {
     setPage(1)
@@ -576,45 +634,70 @@ export function AssetRegisterPageClient() {
           >
             ถัดไป
           </button>
+          {columnResize.hasCustomWidths ? (
+            <button
+              className="h-9 rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              รีเซ็ตความกว้างตาราง
+            </button>
+          ) : null}
         </div>
       </div>
 
       {/* Desktop View Table */}
       <div className="hidden lg:block">
         <TableShell>
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+            <colgroup>
+              {assetRegisterColumns.map((column, index) => {
+                if (index === assetRegisterColumns.length - 1) {
+                  return <col key={column.key} style={{ minWidth: column.minWidth }} />
+                }
+                return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+              })}
+            </colgroup>
+            <thead className="bg-slate-100">
               <tr>
-                <Th>รหัส</Th>
-                <Th>ชื่อ + location</Th>
-                <Th>หมวด</Th>
-                <Th>สาขา</Th>
-                <Th>วันที่ซื้อ</Th>
-                <Th align="right">ต้นทุน/Net Cost</Th>
-                <Th align="right">ค่าเสื่อมสะสม</Th>
-                <Th align="right">NBV</Th>
-                <Th align="right">ค่าเสื่อม/เดือน</Th>
-                <Th align="center">สถานะ</Th>
-                <Th align="center">actions</Th>
+                <ResizableTableHead label="รหัสทรัพย์สิน" resizeProps={columnResize.getResizeHandleProps('code', 'รหัสทรัพย์สิน')} />
+                <ResizableTableHead label="ชื่อทรัพย์สิน / สถานที่" resizeProps={columnResize.getResizeHandleProps('assetName', 'ชื่อทรัพย์สิน / สถานที่')} />
+                <ResizableTableHead label="หมวด" resizeProps={columnResize.getResizeHandleProps('category', 'หมวด')} />
+                <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branchName', 'สาขา')} />
+                <ResizableTableHead label="วันที่ซื้อ" resizeProps={columnResize.getResizeHandleProps('purchaseDate', 'วันที่ซื้อ')} />
+                <ResizableTableHead align="right" label="ต้นทุนสุทธิ" resizeProps={columnResize.getResizeHandleProps('netAssetCost', 'ต้นทุนสุทธิ')} />
+                <ResizableTableHead align="right" label="ค่าเสื่อมสะสม" resizeProps={columnResize.getResizeHandleProps('accumDep', 'ค่าเสื่อมสะสม')} />
+                <ResizableTableHead align="right" label="มูลค่าคงเหลือ (NBV)" resizeProps={columnResize.getResizeHandleProps('nbv', 'มูลค่าคงเหลือ')} />
+                <ResizableTableHead align="right" label="ค่าเสื่อม/เดือน" resizeProps={columnResize.getResizeHandleProps('monthlyDep', 'ค่าเสื่อมต่อเดือน')} />
+                <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+                <ResizableTableHead align="center" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('actions', 'จัดการ')} />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               <LoadingOrEmpty colSpan={11} isLoading={isLoading} rows={rows.length} />
               {pagedRows.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
-                  <Td><span className="font-mono font-bold text-amber-700">{row.code}</span></Td>
-                  <Td><div className="font-semibold text-slate-900">{row.name}</div><div className="text-slate-400 text-xs">{row.location || '-'}</div></Td>
-                  <Td>{row.category}</Td><Td>{row.branchName}</Td><Td>{row.purchaseDate || '-'}</Td>
-                  <Td align="right" className="font-medium">{formatMoney(row.netAssetCost)}</Td><Td align="right" className="text-slate-500">{formatMoney(row.accumDep)}</Td><Td align="right" strong className="text-emerald-700">{formatMoney(row.nbv)}</Td><Td align="right" className="text-amber-700 font-medium">{formatMoney(row.monthlyDep)}</Td>
-                  <Td align="center"><StatusPill status={row.assetStatus} /></Td>
-                  <Td align="center">
+                <tr key={row.id} className="transition-colors hover:bg-slate-50">
+                  <td className="whitespace-nowrap px-3 py-3 font-mono font-bold text-amber-700">{row.code}</td>
+                  <td className="px-3 py-3">
+                    <div className="font-semibold text-slate-900">{row.name}</div>
+                    <div className="text-xs text-slate-400">{row.location || '-'}</div>
+                  </td>
+                  <td className="px-3 py-3 text-slate-700">{row.category}</td>
+                  <td className="px-3 py-3 text-slate-700">{row.branchName}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{row.purchaseDate || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-medium tabular-nums text-slate-700">{formatMoney(row.netAssetCost)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-500">{formatMoney(row.accumDep)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-emerald-700">{formatMoney(row.nbv)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-medium tabular-nums text-amber-700">{formatMoney(row.monthlyDep)}</td>
+                  <td className="px-3 py-3 text-center"><StatusPill status={row.assetStatus} /></td>
+                  <td className="px-3 py-3 text-center">
                     <div className="flex justify-center gap-1">
                       <button className="rounded border border-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition outline-none" disabled={isSaving} onClick={() => openEdit(row)} type="button">แก้ไข</button>
                       {!['Inactive', 'Sold', 'Disposed', 'Lost'].includes(row.assetStatus) ? (
                         <button className="rounded border border-red-200 px-2 py-0.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition outline-none" disabled={isSaving} onClick={() => deactivateAsset(row)} type="button">ปิดใช้งาน</button>
                       ) : null}
                     </div>
-                  </Td>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -800,6 +883,7 @@ export function DepreciationPageClient() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const columnResize = useResizableColumns('finance-accounting.depreciation.history.v1', depreciationColumns)
 
   useEffect(() => {
     setPage(1)
@@ -1107,41 +1191,60 @@ export function DepreciationPageClient() {
 
       <TableShell title="ประวัติการประมวลผลค่าเสื่อม (Depreciation History)">
         {/* Desktop view */}
-        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
+        <div className="hidden lg:block">
+          {columnResize.hasCustomWidths ? (
+            <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-2">
+              <button
+                className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                type="button"
+                onClick={columnResize.resetColumnWidths}
+              >
+                รีเซ็ตความกว้างตาราง
+              </button>
+            </div>
+          ) : null}
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+            <colgroup>
+              {depreciationColumns.map((column, index) => {
+                if (index === depreciationColumns.length - 1) {
+                  return <col key={column.key} style={{ minWidth: column.minWidth }} />
+                }
+                return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+              })}
+            </colgroup>
+            <thead className="sticky top-0 bg-slate-100">
               <tr>
-                <Th>DEP ID</Th>
-                <Th>งวด</Th>
-                <Th>สินทรัพย์</Th>
-                <Th align="right">ค่าเสื่อมสะสมก่อนหน้า</Th>
-                <Th align="right">ค่าเสื่อมงวดนี้</Th>
-                <Th align="right">ค่าเสื่อมสะสมหลังรัน</Th>
-                <Th align="right">NBV ก่อนหน้า</Th>
-                <Th align="right">NBV หลังรัน</Th>
-                <Th align="center">สถานะ</Th>
-                <Th align="center">จัดการ</Th>
+                <ResizableTableHead label="เลขที่รันค่าเสื่อม" resizeProps={columnResize.getResizeHandleProps('refNo', 'เลขที่รันค่าเสื่อม')} />
+                <ResizableTableHead label="งวด" resizeProps={columnResize.getResizeHandleProps('period', 'งวด')} />
+                <ResizableTableHead label="สินทรัพย์" resizeProps={columnResize.getResizeHandleProps('asset', 'สินทรัพย์')} />
+                <ResizableTableHead align="right" label="ค่าเสื่อมสะสมก่อน" resizeProps={columnResize.getResizeHandleProps('accumBefore', 'ค่าเสื่อมสะสมก่อน')} />
+                <ResizableTableHead align="right" label="ค่าเสื่อมงวดนี้" resizeProps={columnResize.getResizeHandleProps('depreciationAmount', 'ค่าเสื่อมงวดนี้')} />
+                <ResizableTableHead align="right" label="ค่าเสื่อมสะสมหลัง" resizeProps={columnResize.getResizeHandleProps('accumAfter', 'ค่าเสื่อมสะสมหลัง')} />
+                <ResizableTableHead align="right" label="NBV ก่อน" resizeProps={columnResize.getResizeHandleProps('nbvBefore', 'NBV ก่อน')} />
+                <ResizableTableHead align="right" label="NBV หลัง" resizeProps={columnResize.getResizeHandleProps('nbvAfter', 'NBV หลัง')} />
+                <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+                <ResizableTableHead align="center" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('actions', 'จัดการ')} />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               <LoadingOrEmpty colSpan={10} isLoading={isLoading} rows={filteredRows.length} />
               {pagedRows.map((row) => (
-                <tr key={row.id} className={`border-t border-slate-100 hover:bg-slate-50/50 transition ${row.status === 'reversed' ? 'bg-slate-50 opacity-70' : ''}`}>
-                  <Td><span className="font-mono font-bold text-red-700">{row.refNo}</span></Td>
-                  <Td>{row.period}</Td>
-                  <Td>
+                <tr key={row.id} className={`transition-colors hover:bg-slate-50 ${row.status === 'reversed' ? 'bg-slate-50 opacity-70' : ''}`}>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono font-bold text-red-700">{row.refNo}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-slate-700">{row.period}</td>
+                  <td className="px-3 py-3">
                     <div className="font-semibold text-slate-800">{row.assetName}</div>
                     <div className="text-xs text-slate-400 font-medium font-mono">{row.assetCode}</div>
-                  </Td>
-                  <Td align="right">{formatMoney(row.accumBefore)}</Td>
-                  <Td align="right" className="font-medium text-amber-700">{formatMoney(row.depreciationAmount)}</Td>
-                  <Td align="right">{formatMoney(row.accumAfter)}</Td>
-                  <Td align="right" className="text-slate-500">{formatMoney(row.nbvBefore)}</Td>
-                  <Td align="right" strong className="text-emerald-700">{formatMoney(row.nbvAfter)}</Td>
-                  <Td align="center">
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(row.accumBefore)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-medium tabular-nums text-amber-700">{formatMoney(row.depreciationAmount)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(row.accumAfter)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-500">{formatMoney(row.nbvBefore)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-emerald-700">{formatMoney(row.nbvAfter)}</td>
+                  <td className="px-3 py-3 text-center">
                     <StatusPill status={row.status} />
-                  </Td>
-                  <Td align="center">
+                  </td>
+                  <td className="px-3 py-3 text-center">
                     {row.status === 'reversed' ? (
                       <span className="text-xs text-slate-400 font-medium">{row.reversalReason || '-'}</span>
                     ) : (
@@ -1154,7 +1257,7 @@ export function DepreciationPageClient() {
                         Reverse
                       </button>
                     )}
-                  </Td>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1288,6 +1391,7 @@ export function AssetDisposalPageClient() {
   const [reverseRow, setReverseRow] = useState<DisposalPayload['rows'][number] | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const columnResize = useResizableColumns('finance-accounting.asset-disposal.history.v1', disposalColumns)
 
   useEffect(() => {
     setPage(1)
@@ -1456,41 +1560,62 @@ export function AssetDisposalPageClient() {
 
       <TableShell title="ประวัติการจำหน่ายสินทรัพย์ (Asset Disposal History)">
         {/* Desktop view */}
-        <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+        <div className="hidden lg:block">
+          {columnResize.hasCustomWidths ? (
+            <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-2">
+              <button
+                className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                type="button"
+                onClick={columnResize.resetColumnWidths}
+              >
+                รีเซ็ตความกว้างตาราง
+              </button>
+            </div>
+          ) : null}
+          <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+            <colgroup>
+              {disposalColumns.map((column, index) => {
+                if (index === disposalColumns.length - 1) {
+                  return <col key={column.key} style={{ minWidth: column.minWidth }} />
+                }
+                return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+              })}
+            </colgroup>
+            <thead className="bg-slate-100">
               <tr>
-                <Th>DISP No.</Th>
-                <Th>วันที่</Th>
-                <Th>สินทรัพย์</Th>
-                <Th>ประเภท</Th>
-                <Th align="right">ราคาขาย</Th>
-                <Th align="right">NBV ณ วันจำหน่าย</Th>
-                <Th align="right">กำไร/(ขาดทุน)</Th>
-                <Th>เหตุผล</Th>
-                <Th align="center">สถานะ</Th>
-                <Th align="center">จัดการ</Th>
+                <ResizableTableHead label="เลขที่จำหน่าย" resizeProps={columnResize.getResizeHandleProps('disposalNo', 'เลขที่จำหน่าย')} />
+                <ResizableTableHead label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} />
+                <ResizableTableHead label="สินทรัพย์" resizeProps={columnResize.getResizeHandleProps('asset', 'สินทรัพย์')} />
+                <ResizableTableHead label="ประเภท" resizeProps={columnResize.getResizeHandleProps('disposalType', 'ประเภท')} />
+                <ResizableTableHead align="right" label="ราคาขาย" resizeProps={columnResize.getResizeHandleProps('sellingPrice', 'ราคาขาย')} />
+                <ResizableTableHead align="right" label="NBV ณ วันจำหน่าย" resizeProps={columnResize.getResizeHandleProps('nbv', 'NBV ณ วันจำหน่าย')} />
+                <ResizableTableHead align="right" label="กำไร/(ขาดทุน)" resizeProps={columnResize.getResizeHandleProps('gainLoss', 'กำไรหรือขาดทุน')} />
+                <ResizableTableHead label="เหตุผล" resizeProps={columnResize.getResizeHandleProps('reason', 'เหตุผล')} />
+                <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+                <ResizableTableHead align="center" label="จัดการ" resizeProps={columnResize.getResizeHandleProps('actions', 'จัดการ')} />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               <LoadingOrEmpty colSpan={10} isLoading={isLoading} rows={rows.length} emptyText="ยังไม่มีรายการจำหน่ายทรัพย์สิน" />
               {pagedRows.map((row) => (
-                <tr key={row.id} className={`border-t border-slate-100 hover:bg-slate-50/50 transition ${row.status === 'reversed' ? 'bg-slate-50 opacity-70' : ''}`}>
-                  <Td><span className="font-mono font-bold text-slate-700">{row.disposalNo}</span></Td>
-                  <Td>{row.date}</Td>
-                  <Td>
+                <tr key={row.id} className={`transition-colors hover:bg-slate-50 ${row.status === 'reversed' ? 'bg-slate-50 opacity-70' : ''}`}>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono font-bold text-slate-700">{row.disposalNo}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-slate-600">{row.date}</td>
+                  <td className="px-3 py-3">
                     <div className="font-semibold text-slate-800">{row.assetCode}</div>
                     <div className="text-xs text-slate-400 font-medium">{row.assetName}</div>
-                  </Td>
-                  <Td className="font-medium text-slate-700">{row.disposalType}</Td>
-                  <Td align="right">{formatMoney(row.sellingPrice)}</Td>
-                  <Td align="right" className="text-slate-500">{formatMoney(row.nbv)}</Td>
-                  <Td align="right" strong className={(row.gainLoss ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}>{formatMoney(row.gainLoss)}</Td>
-                  <Td className="text-slate-500 truncate max-w-[150px]" title={row.reason}>{row.reason || '-'}</Td>
-                  <Td align="center">
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{row.disposalType}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(row.sellingPrice)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-500">{formatMoney(row.nbv)}</td>
+                  <td className={`whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums ${(row.gainLoss ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatMoney(row.gainLoss)}</td>
+                  <td className="min-w-0 px-3 py-3 text-slate-500" title={row.reason}>
+                    <div className="truncate">{row.reason || '-'}</div>
+                  </td>
+                  <td className="px-3 py-3 text-center">
                     <StatusPill status={row.status} />
-                  </Td>
-                  <Td align="center">
+                  </td>
+                  <td className="px-3 py-3 text-center">
                     {row.status === 'reversed' ? (
                       <span className="text-xs text-slate-400 font-medium">{row.reversalReason || '-'}</span>
                     ) : (
@@ -1503,7 +1628,7 @@ export function AssetDisposalPageClient() {
                         Reverse
                       </button>
                     )}
-                  </Td>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1883,33 +2008,54 @@ function Bar({ label, max, value }: { label: string; max: number; value: number 
 }
 
 function MiniAssetTable({ isLoading, rows }: { isLoading: boolean; rows: DepreciationPayload['pendingAssets'] }) {
+  const columnResize = useResizableColumns('finance-accounting.depreciation.pending-assets.v1', pendingAssetColumns)
+
   return (
     <div>
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        {columnResize.hasCustomWidths ? (
+          <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-2">
+            <button
+              className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              รีเซ็ตความกว้างตาราง
+            </button>
+          </div>
+        ) : null}
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+          <colgroup>
+            {pendingAssetColumns.map((column, index) => {
+              if (index === pendingAssetColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
+              return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            })}
+          </colgroup>
+          <thead className="bg-slate-100">
             <tr>
-              <Th>รหัส</Th>
-              <Th>ชื่อ</Th>
-              <Th align="right">ต้นทุนสุทธิ</Th>
-              <Th align="right">ค่าเสื่อมสะสมเดิม</Th>
-              <Th align="right">NBV ปัจจุบัน</Th>
-              <Th align="right">ค่าเสื่อม/เดือน</Th>
-              <Th align="center">สถานะ</Th>
+              <ResizableTableHead label="รหัสทรัพย์สิน" resizeProps={columnResize.getResizeHandleProps('code', 'รหัสทรัพย์สิน')} />
+              <ResizableTableHead label="ชื่อทรัพย์สิน" resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อทรัพย์สิน')} />
+              <ResizableTableHead align="right" label="ต้นทุนสุทธิ" resizeProps={columnResize.getResizeHandleProps('netAssetCost', 'ต้นทุนสุทธิ')} />
+              <ResizableTableHead align="right" label="ค่าเสื่อมสะสมเดิม" resizeProps={columnResize.getResizeHandleProps('accumDep', 'ค่าเสื่อมสะสมเดิม')} />
+              <ResizableTableHead align="right" label="NBV ปัจจุบัน" resizeProps={columnResize.getResizeHandleProps('nbv', 'NBV ปัจจุบัน')} />
+              <ResizableTableHead align="right" label="ค่าเสื่อม/เดือน" resizeProps={columnResize.getResizeHandleProps('monthlyDep', 'ค่าเสื่อมต่อเดือน')} />
+              <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             <LoadingOrEmpty colSpan={7} isLoading={isLoading} rows={rows.length} />
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors transition">
-                <Td><span className="font-mono font-bold text-amber-700">{row.code}</span></Td>
-                <Td className="font-semibold text-slate-800">{row.name}</Td>
-                <Td align="right">{formatMoney(row.netAssetCost)}</Td>
-                <Td align="right" className="text-slate-500">{formatMoney(row.accumDep)}</Td>
-                <Td align="right" strong className="text-emerald-700">{formatMoney(row.nbv)}</Td>
-                <Td align="right" className="text-amber-700 font-medium">{formatMoney(row.monthlyDep)}</Td>
-                <Td align="center"><StatusPill status={row.assetStatus} /></Td>
+              <tr key={row.id} className="transition-colors hover:bg-slate-50">
+                <td className="whitespace-nowrap px-3 py-3 font-mono font-bold text-amber-700">{row.code}</td>
+                <td className="px-3 py-3 font-semibold text-slate-800">{row.name}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{formatMoney(row.netAssetCost)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-500">{formatMoney(row.accumDep)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums text-emerald-700">{formatMoney(row.nbv)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-medium tabular-nums text-amber-700">{formatMoney(row.monthlyDep)}</td>
+                <td className="px-3 py-3 text-center"><StatusPill status={row.assetStatus} /></td>
               </tr>
             ))}
           </tbody>

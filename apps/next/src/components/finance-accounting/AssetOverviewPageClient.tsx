@@ -3,9 +3,12 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DatePickerInput } from '@/components/ui/date-picker-input'
+import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
+import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 
 type AnyRow = Record<string, number | string | boolean | null | undefined>
+type CashColumnKey = 'balance' | 'currency' | 'name' | 'thbEquivalent' | 'type'
 type Payload = {
   asOf: string
   branches: { code: string; id: string; name: string }[]
@@ -16,6 +19,14 @@ type Payload = {
   summary: Record<string, number>
   tradingPending: Record<string, number>
 }
+
+const cashColumns: Array<ResizableColumnDefinition<CashColumnKey>> = [
+  { key: 'name', defaultWidth: 220, minWidth: 160 },
+  { key: 'type', defaultWidth: 145, minWidth: 115 },
+  { key: 'currency', defaultWidth: 105, minWidth: 90 },
+  { key: 'balance', defaultWidth: 150, minWidth: 120 },
+  { key: 'thbEquivalent', defaultWidth: 160, minWidth: 130 },
+]
 
 function today() {
   const date = new Date()
@@ -290,7 +301,8 @@ function agingLabel(key: string) {
 }
 
 function CashTable({ rows, total }: { rows: AnyRow[]; total: number }) {
-  const headers = ['บัญชี', 'ประเภท', 'สกุล', 'Balance', 'THB Equiv']
+  const columnResize = useResizableColumns('finance-accounting.asset-overview.cash.v1', cashColumns)
+
   return (
     <Panel heading="💵 CASH & OTHERS" tone="emerald" total={total}>
       {/* Mobile view */}
@@ -318,21 +330,44 @@ function CashTable({ rows, total }: { rows: AnyRow[]; total: number }) {
       </div>
 
       {/* Desktop view */}
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full text-xs text-slate-700">
-          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
+      <div className="hidden overflow-x-auto lg:block">
+        {columnResize.hasCustomWidths ? (
+          <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-2">
+            <button
+              className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              type="button"
+              onClick={columnResize.resetColumnWidths}
+            >
+              รีเซ็ตความกว้างตาราง
+            </button>
+          </div>
+        ) : null}
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+          <colgroup>
+            {cashColumns.map((column, index) => {
+              if (index === cashColumns.length - 1) {
+                return <col key={column.key} style={{ minWidth: column.minWidth }} />
+              }
+              return <col key={column.key} style={columnResize.getColumnStyle(column.key)} />
+            })}
+          </colgroup>
+          <thead className="bg-slate-100">
             <tr>
-              {headers.map((header) => <th key={header} className="px-4 py-3 text-xs font-semibold text-slate-500 text-left last:text-right">{header}</th>)}
+              <ResizableTableHead label="บัญชี" resizeProps={columnResize.getResizeHandleProps('name', 'บัญชี')} />
+              <ResizableTableHead label="ประเภท" resizeProps={columnResize.getResizeHandleProps('type', 'ประเภท')} />
+              <ResizableTableHead label="สกุลเงิน" resizeProps={columnResize.getResizeHandleProps('currency', 'สกุลเงิน')} />
+              <ResizableTableHead align="right" label="ยอดคงเหลือ" resizeProps={columnResize.getResizeHandleProps('balance', 'ยอดคงเหลือ')} />
+              <ResizableTableHead align="right" label="เทียบบาท (THB)" resizeProps={columnResize.getResizeHandleProps('thbEquivalent', 'เทียบบาท')} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row, index) => (
               <tr key={`${row.name}-${index}`} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-4 py-3.5 font-medium">{text(row.name)}</td>
-                <td className="px-4 py-3.5 text-slate-500">{text(row.type)}</td>
-                <td className="px-4 py-3.5 text-slate-500">{text(row.currency)}</td>
-                <td className="px-4 py-3.5 text-right font-mono">{money(row.balance)}</td>
-                <td className="px-4 py-3.5 text-right font-mono font-semibold text-emerald-600">{money(row.thbEquivalent)}</td>
+                <td className="px-3 py-3 font-medium text-slate-900">{text(row.name)}</td>
+                <td className="px-3 py-3 text-slate-500">{text(row.type)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-slate-500">{text(row.currency)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums text-slate-700">{money(row.balance)}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-semibold tabular-nums text-emerald-600">{money(row.thbEquivalent)}</td>
               </tr>
             ))}
           </tbody>
