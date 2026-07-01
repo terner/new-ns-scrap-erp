@@ -232,6 +232,7 @@ function billOrderBy(query: BillQuery): Prisma.sales_billsOrderByWithRelationInp
 }
 
 function calculateSalesTotals(values: SalesBillFormValues, vatRatePercent: number) {
+  const grossProfitBase = values.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price), 0)
   const subtotal = values.items.reduce((sum, item) => sum + Math.max(0, item.qty * item.price - item.discount), 0)
   const afterDiscount = Math.max(0, subtotal - values.discountTotal)
   const rate = Math.max(0, Math.min(100, vatRatePercent))
@@ -241,7 +242,7 @@ function calculateSalesTotals(values: SalesBillFormValues, vatRatePercent: numbe
       ? afterDiscount * rate / (100 + rate)
       : afterDiscount * (rate / 100)
   const totalAmount = values.hasVat && values.vatType === 'EXCLUDE' ? afterDiscount + vatAmount : afterDiscount
-  return { subtotal, totalAmount, vatAmount }
+  return { grossProfitBase, subtotal, totalAmount, vatAmount }
 }
 
 function salesItems(
@@ -1683,7 +1684,7 @@ export async function POST(request: Request) {
           doc_no: docNo,
           cogs_amount: totalCost,
           export_order_no: exportOrderNo,
-          gross_profit: roundMoney(totals.subtotal - totalCost),
+          gross_profit: roundMoney(totals.grossProfitBase - totalCost),
           has_vat: values.hasVat,
           items: items as Prisma.InputJsonValue,
           license_plate: values.licensePlate,
@@ -1892,7 +1893,7 @@ export async function POST(request: Request) {
         await tx.sales_bills.update({
           data: {
             cogs_amount: combinedCogs,
-            gross_profit: roundMoney(totals.subtotal - combinedCogs),
+            gross_profit: roundMoney(totals.grossProfitBase - combinedCogs),
             total_cost: combinedCogs,
             updated_at: createdAt,
             updated_by: actor,
@@ -2655,7 +2656,7 @@ export async function PATCH(request: Request) {
             discount: values.discountTotal,
             discount_total: values.discountTotal,
             export_order_no: values.exportOrderNo,
-            gross_profit: roundMoney(totals.totalAmount - updatedTotalCost),
+            gross_profit: roundMoney(totals.grossProfitBase - updatedTotalCost),
             has_vat: values.hasVat,
             items: items as Prisma.InputJsonValue,
             note: values.note,
