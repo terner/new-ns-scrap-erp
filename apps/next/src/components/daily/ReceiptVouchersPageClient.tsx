@@ -121,6 +121,10 @@ type PurchaseBillOption = {
   sellerTaxId: string
   totalAmount: number
 }
+type PaymentMethodOption = {
+  name: string
+  type?: string | null
+}
 type ReceiptVoucherColumnKey = 'action' | 'date' | 'docNo' | 'licensePlate' | 'purchaseBillDocNo' | 'sellerName' | 'sellerTaxId' | 'status' | 'totalAmount' | 'totalQty'
 
 type ReceiptVoucherCompanyProfile = {
@@ -292,6 +296,7 @@ export function ReceiptVouchersPageClient() {
   const [form, setForm] = useState<ReceiptVoucherFormState>(() => blankForm())
   const [formError, setFormError] = useState<string | null>(null)
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null)
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<PaymentMethodOption[]>([])
   const [purchaseBillOptions, setPurchaseBillOptions] = useState<PurchaseBillOption[]>([])
   const [rows, setRows] = useState<ReceiptVoucherRow[]>([])
   const [search, setSearch] = useState('')
@@ -318,9 +323,10 @@ export function ReceiptVouchersPageClient() {
     setIsLoading(true)
     setError(null)
     try {
-      const payload = await dailyFetchJson<{ companyProfile: ReceiptVoucherCompanyProfile; currentActor: string; purchaseBills: PurchaseBillOption[]; rows: ReceiptVoucherRow[]; suppliers: SupplierOption[] }>('/api/purchase/receipt-vouchers')
+      const payload = await dailyFetchJson<{ companyProfile: ReceiptVoucherCompanyProfile; currentActor: string; paymentMethods?: PaymentMethodOption[]; purchaseBills: PurchaseBillOption[]; rows: ReceiptVoucherRow[]; suppliers: SupplierOption[] }>('/api/purchase/receipt-vouchers')
       setCompanyProfile(payload.companyProfile)
       setCurrentActorName(payload.currentActor ?? '')
+      setPaymentMethodOptions(payload.paymentMethods ?? [])
       setPurchaseBillOptions(payload.purchaseBills ?? [])
       setRows(payload.rows)
       setSupplierOptions(payload.suppliers ?? [])
@@ -509,7 +515,7 @@ export function ReceiptVouchersPageClient() {
           })),
           licensePlate: form.licensePlate,
           note: form.note,
-          paymentMethod: paymentMethodForSupplier(supplierOptions.find((supplier) => supplier.code === form.supplierCode), form.paymentMethod),
+          paymentMethod: form.paymentMethod,
           purchaseBillDocNo: form.purchaseBillDocNo,
           salesPerson: form.salesPerson,
           sellerAddress: form.sellerAddress,
@@ -820,6 +826,7 @@ export function ReceiptVouchersPageClient() {
           onPickPurchaseBill={pickPurchaseBill}
           onSave={saveForm}
           onUpdateForm={updateForm}
+          paymentMethods={paymentMethodOptions}
           supplierBankAccounts={supplierOptions.find((supplier) => supplier.code === form.supplierCode)?.bankAccounts ?? []}
           supplierSearchOptions={supplierSearchOptions}
           purchaseBillSearchOptions={purchaseBillSearchOptions}
@@ -871,6 +878,7 @@ function ReceiptVoucherFormModal({
   onPickPurchaseBill,
   onSave,
   onUpdateForm,
+  paymentMethods,
   supplierBankAccounts,
   supplierSearchOptions,
   purchaseBillSearchOptions,
@@ -884,12 +892,35 @@ function ReceiptVoucherFormModal({
   onPickPurchaseBill: (docNo: string) => void
   onSave: () => void
   onUpdateForm: (patch: Partial<ReceiptVoucherFormState>) => void
+  paymentMethods: PaymentMethodOption[]
   supplierBankAccounts: SupplierOption['bankAccounts']
   supplierSearchOptions: SearchComboboxOption[]
   purchaseBillSearchOptions: SearchComboboxOption[]
 }) {
   const totals = formTotals(form)
   const [showSellerDetails, setShowSellerDetails] = useState(false)
+  const paymentMethodChoices = (() => {
+    const choices: Array<{ label: string; value: string }> = []
+    const seen = new Set<string>()
+    const addChoice = (value: string, label = value) => {
+      const normalized = value.trim()
+      if (!normalized || seen.has(normalized)) return
+      seen.add(normalized)
+      choices.push({ label, value: normalized })
+    }
+    for (const account of supplierBankAccounts ?? []) {
+      const value = `${account.paymentMethod} บช.${account.accountNo}`
+      addChoice(value, `${account.paymentMethod}${account.bankName ? ` · ${account.bankName}` : ''}${account.accountNo ? ` · ${account.accountNo}` : ''}`)
+    }
+    for (const method of paymentMethods) {
+      addChoice(method.name)
+    }
+    if (form.paymentMethod) {
+      addChoice(form.paymentMethod)
+    }
+    if (choices.length === 0) addChoice(CASH_PAYMENT_METHOD)
+    return choices
+  })()
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 md:p-3 print:hidden flex items-stretch md:items-start justify-center">
@@ -1015,25 +1046,23 @@ function ReceiptVoucherFormModal({
               <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-4">
                 <FormField className="col-span-2 md:col-span-1" label="วิธีรับเงิน / เลขบัญชี">
                   <select
-                    disabled={!supplierBankAccounts?.length}
+                    disabled={paymentMethodChoices.length === 0}
                     className="h-8 md:h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
                     value={(() => {
                       const matched = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === CASH_PAYMENT_METHOD ? '' : form.paymentMethod))
-                      return matched ? `${matched.paymentMethod} บช.${matched.accountNo}` : supplierBankAccounts?.[0] ? `${supplierBankAccounts[0].paymentMethod} บช.${supplierBankAccounts[0].accountNo}` : ''
+                      if (matched) return `${matched.paymentMethod} บช.${matched.accountNo}`
+                      if (form.paymentMethod && paymentMethodChoices.some((choice) => choice.value === form.paymentMethod)) return form.paymentMethod
+                      return paymentMethodChoices[0]?.value ?? ''
                     })()}
                     onChange={(event) => onUpdateForm({ paymentMethod: event.target.value })}
                   >
-                    {supplierBankAccounts && supplierBankAccounts.length > 0 ? supplierBankAccounts.map((account) => (
-                      <option key={account.code} value={`${account.paymentMethod} บช.${account.accountNo}`}>
-                        {account.paymentMethod}{account.bankName ? ` · ${account.bankName}` : ''}{account.accountNo ? ` · ${account.accountNo}` : ''}
-                      </option>
-                    )) : (
-                      <option value="">เลือก Supplier ก่อน</option>
-                    )}
+                    {paymentMethodChoices.map((choice) => (
+                      <option key={choice.value} value={choice.value}>{choice.label}</option>
+                    ))}
                   </select>
                 </FormField>
                 {(() => {
-                  const current = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === CASH_PAYMENT_METHOD ? '' : form.paymentMethod)) ?? supplierBankAccounts?.[0]
+                  const current = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === CASH_PAYMENT_METHOD ? '' : form.paymentMethod))
                   const fallbackAcctNo = !current && form.paymentMethod ? form.paymentMethod.split('บช.')[1]?.trim() : null
                   return (
                     <>

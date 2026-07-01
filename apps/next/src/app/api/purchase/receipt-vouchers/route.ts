@@ -4,6 +4,7 @@ import type { Prisma } from '../../../../../generated/prisma/client'
 import { apiErrorResponse } from '@/lib/server/api-error'
 import { AuthContextError, authContextErrorResponse, getCurrentAuthContext, requirePermission } from '@/lib/server/auth-context'
 import { currentActor, normalizeDate, toDateOnly, toNumber } from '@/lib/server/daily'
+import { getActivePaymentMethods } from '@/lib/server/payment-methods'
 import { prisma } from '@/lib/server/prisma'
 import { isPurchaseBillCancelledStatus, PURCHASE_BILL_CANCELLED_STATUSES } from '@/lib/purchase-bill-status'
 
@@ -276,7 +277,7 @@ export async function GET() {
       .map((rv) => rv.purchase_bill_doc_no)
       .filter((docNo): docNo is string => docNo !== null)
 
-    const [suppliers, purchaseBills, receiptVoucherPurchaseBills, rows, companyProfile] = await Promise.all([
+    const [suppliers, purchaseBills, receiptVoucherPurchaseBills, rows, companyProfile, paymentMethods] = await Promise.all([
       prisma.suppliers.findMany({
         orderBy: [{ code: 'asc' }, { name: 'asc' }],
         select: {
@@ -374,6 +375,7 @@ export async function GET() {
       prisma.company_profiles.findFirst({
         orderBy: [{ branch_code: 'asc' }, { created_at: 'asc' }],
       }),
+      getActivePaymentMethods(),
     ])
 
     const supplierCodeByPurchaseBillDocNo = new Map(
@@ -402,6 +404,10 @@ export async function GET() {
         }
         : null,
       currentActor: actor,
+      paymentMethods: paymentMethods.map((method) => ({
+        name: method.name,
+        type: method.type,
+      })),
       suppliers: suppliers.map((supplier) => ({
         address: supplier.address ?? '',
         bankAccounts: (supplier.supplier_bank_accounts ?? []).map((account) => ({
