@@ -2421,3 +2421,10 @@ Tailwind dependency check:
   - The summary-by-category table now uses `ResizableTableHead` sort indicators/handlers, persisted resizable widths, reset-width control, `tableLayout: fixed`, lined table shell, Thai-first table headers, and column-definition based empty `colSpan`.
   - Summary rows are sorted client-side before desktop/mobile rendering so the mobile summary cards follow the same ordered row set as the desktop table. Page-local `font-sans` control overrides were removed so controls inherit the app Thai font baseline.
   - Validation passed: `npm exec --workspace @ns-scrap-erp/next -- eslint src/components/dual-costing/DualCostingManagementPageClient.tsx`, `npm run type-check --workspace @ns-scrap-erp/next`, and `git diff --check`.
+
+- 2026-07-02: Supplier Tracking table mechanics checkpoint
+  - `/tracking/supplier` received a UI-only table mechanics pass. Runtime API behavior, AP/payable formulas, filters, export contract, top-10 summary panels, detail drilldown data, and DB state were not changed.
+  - The Product breakdown table now uses `ResizableTableHead` sort indicators/handlers, persisted resizable widths, reset-width control, `colgroup`, and `tableLayout: fixed`; desktop and mobile both render from the same sorted top-20 product row set.
+  - The Year Compare matrix now uses sortable/resizable headers, persisted widths, reset-width control, and fixed table layout on desktop; mobile now renders dense supplier/month cards from the same sorted row set instead of a wide horizontal table.
+  - Validation passed: `npm exec --workspace @ns-scrap-erp/next -- eslint src/components/purchase-flow/SupplierTrackingPageClient.tsx`, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and `git diff --check`.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.

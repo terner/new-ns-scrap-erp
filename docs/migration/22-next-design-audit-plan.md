@@ -615,6 +615,10 @@ Expected:
   - After the latest correction, the main Customer Tracking table now uses the active table mechanics: resizable desktop columns, sortable `ResizableTableHead` headers with inactive/active up/down indicators, fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`, and mobile cards backed by the same sorted row set.
   - Customer filters, export, top customer charts, detail drilldown data, AR aging, GP/receivable formulas, source links, API behavior, and DB state were not changed.
   - Browser QA remains pending.
+- `/tracking/supplier`
+  - After the latest correction, the Product breakdown table and Year Compare matrix now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Product breakdown mobile cards now use the same sorted top-20 row set as desktop, and Year Compare mobile now renders dense month cards from the same sorted row set instead of a wide mobile table scroll. Supplier filters, export, top-10 panels, detail drilldown tables, AP/payable formulas, API behavior, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
 - Master data shared pages under `/master-data/*`
   - Most shared pages use `MasterDataPageClient`, which already has resizable desktop table, mobile toolbar/filter bottom sheet, mobile card list, and dark-header form modal.
   - Remaining work is mostly modal polish, wording cleanup, and field-specific validation/presentation, not a full table rewrite.
