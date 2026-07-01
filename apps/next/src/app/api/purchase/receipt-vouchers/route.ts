@@ -363,6 +363,10 @@ export async function GET() {
       }),
     ])
 
+    const supplierCodeByPurchaseBillDocNo = new Map(
+      purchaseBills.map((bill) => [bill.doc_no, bill.suppliers?.code ?? '']),
+    )
+
     return NextResponse.json({
       companyProfile: companyProfile
         ? {
@@ -434,6 +438,7 @@ export async function GET() {
         sellerPhone: row.seller_phone ?? '',
         sellerTaxId: row.seller_tax_id ?? '',
         status: row.status,
+        supplierCode: supplierCodeByPurchaseBillDocNo.get(row.purchase_bill_doc_no ?? '') ?? '',
         cancelNote: row.cancel_note ?? '',
         cancelledAt: row.cancelled_at?.toISOString() ?? '',
         cancelledBy: row.cancelled_by ?? '',

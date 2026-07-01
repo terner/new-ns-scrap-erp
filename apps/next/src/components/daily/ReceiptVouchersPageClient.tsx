@@ -49,6 +49,7 @@ type ReceiptVoucherRow = {
   sellerPhone: string
   sellerTaxId: string
   status: string
+  supplierCode?: string
   timeline?: ReceiptVoucherTimelineEvent[]
   totalAmount: number
   totalQty: number
@@ -251,7 +252,7 @@ function normalizeFormFromRow(row: ReceiptVoucherRow): ReceiptVoucherFormState {
     sellerName: row.sellerName || '',
     sellerPhone: row.sellerPhone || '',
     sellerTaxId: row.sellerTaxId || '',
-    supplierCode: '',
+    supplierCode: row.supplierCode || '',
   }
   return { ...form, amountInWords: form.amountInWords || thaiBahtText(formTotals(form).amount) }
 }
@@ -416,7 +417,8 @@ export function ReceiptVouchersPageClient() {
 
   function openEditForm(row: ReceiptVoucherRow) {
     if (row.status === 'cancelled') return
-    setForm(normalizeFormFromRow(row))
+    const purchaseBill = purchaseBillOptions.find((bill) => bill.docNo === row.purchaseBillDocNo)
+    setForm({ ...normalizeFormFromRow(row), supplierCode: row.supplierCode || purchaseBill?.sellerCode || '' })
     setFormError(null)
     setFormMode('edit')
   }
@@ -1009,7 +1011,7 @@ function ReceiptVoucherFormModal({
               <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-4">
                 <FormField className="col-span-2 md:col-span-1" label="วิธีรับเงิน / เลขบัญชี">
                   <select
-                    disabled={mode === 'edit' || !supplierBankAccounts?.length}
+                    disabled={!supplierBankAccounts?.length}
                     className="h-8 md:h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
                     value={(() => {
                       const matched = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === CASH_PAYMENT_METHOD ? '' : form.paymentMethod))
