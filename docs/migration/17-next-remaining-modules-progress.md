@@ -1702,6 +1702,14 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Validation: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI remains valid with existing catalog warnings.
 - Browser QA: subagent unauth sweep confirmed protected pages redirect to login and APIs return `401`; authenticated main Playwright smoke confirmed the three pages and APIs render/return `200`, desktop/mobile widths do not horizontally overflow, and write/import/run/disposal buttons are disabled. Only residual console error observed was the pre-existing `/favicon.ico` 500, not a touched A6 endpoint.
 
+#### A6 Design Polish Checkpoint
+
+- Date: 2026-07-01.
+- Routes covered: `/finance-accounting/asset-register`, `/finance-accounting/depreciation`, `/finance-accounting/asset-disposal`, and `/finance-accounting/asset-overview`.
+- UI changes: converted the visible desktop asset/accounting tables to the active lined/resizable baseline: Asset Register, Depreciation pending-assets, Depreciation History, Asset Disposal History, and Asset Overview Cash & Others. Mobile card views were preserved.
+- Boundary: UI/layout only; no asset lifecycle write behavior, depreciation calculation, disposal gain/loss calculation, report read model, GL, bank, receipt, stock, AP/AR, or API behavior changed.
+- Validation: targeted ESLint for the two touched clients, full Next lint, full Next type-check, and full Next build passed. Browser QA remains pending because this was a local code/layout checkpoint only.
+
 ### A7: Loans / Equity / Opening / Historical
 
 - [x] `/finance-accounting/loan-contracts`

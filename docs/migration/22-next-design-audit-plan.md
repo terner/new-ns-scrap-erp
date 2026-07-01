@@ -512,6 +512,10 @@ Expected:
   - After the latest correction, the per-deal desktop table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, final status-column auto-stretch, and a shared pagination toolbar.
   - The mobile card list now uses the same paged row set as desktop and uses clearer Thai-first labels for revenue, matched cost, deal margin, and match status.
   - Browser QA remains pending.
+- Fixed assets finance pages: `/finance-accounting/asset-register`, `/finance-accounting/depreciation`, `/finance-accounting/asset-disposal`, and `/finance-accounting/asset-overview`
+  - After the latest correction, the visible desktop tables in the fixed-assets slice now use the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width controls, and safer nowrap/tabular numeric alignment.
+  - Covered tables: Asset Register, Depreciation pending-assets, Depreciation History, Asset Disposal History, and Asset Overview Cash & Others. Existing mobile cards were preserved.
+  - Browser QA remains pending.
 - Master data shared pages under `/master-data/*`
   - Most shared pages use `MasterDataPageClient`, which already has resizable desktop table, mobile toolbar/filter bottom sheet, mobile card list, and dark-header form modal.
   - Remaining work is mostly modal polish, wording cleanup, and field-specific validation/presentation, not a full table rewrite.
@@ -523,6 +527,6 @@ Expected:
 
 1. Finish remaining high-confidence operational inconsistencies users will notice immediately: `/sales/receipts` (`/purchase/payments`, PO Sell, Sales Bills, and RV static findings are fixed; browser QA still pending).
 2. Normalize shared operational modal surfaces by component family: `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, `StockOperationPageClient`, tracking pages, then trading pages. `DailyExpensePageClient` has a static design checkpoint and should move to browser QA rather than another static rewrite.
-3. Continue with Finance / Accounting table mechanics in shared component batches: fixed assets, financial statements, cash-flow planning, loans/equity.
+3. Continue with Finance / Accounting table mechanics in shared component batches: financial statements, cash-flow planning, then loans/equity. Fixed assets now has a local code/layout checkpoint; browser QA is still pending.
 4. Review `type="number"` only inside the touched page batch using the design matrix; do not run a broad replacement sweep.
 5. Run browser QA desktop + mobile for the selected batch before claiming visual completion.
