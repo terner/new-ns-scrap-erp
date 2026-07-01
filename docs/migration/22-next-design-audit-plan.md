@@ -247,7 +247,7 @@ Resolved in local design checkpoint:
 
 ### Suggested Fix Order
 
-1. Finish the remaining high-confidence operational findings already drafted below: `/sales/receipts`; `/purchase/payments`, `/sales/po-sell`, `/sales/bills`, `/purchase/receipt-vouchers`, and `/production/report` have local code/layout checkpoints and still need browser QA.
+1. No high-confidence operational static table-mechanics finding remains after the `/sales/receipts` follow-up; `/sales/receipts`, `/purchase/payments`, `/sales/po-sell`, `/sales/bills`, `/purchase/receipt-vouchers`, and `/production/report` now have local code/layout checkpoints and still need browser QA.
 2. Normalize shared modal surfaces in one batch per component family: transaction bills, PO Buy/Sell, money movement, stock operation, then tracking/trading. `/daily/expense` has a local static design checkpoint; keep it in the browser-QA queue instead of reworking it again from the same static finding.
 3. Review the field input matrix only inside the touched form batch; do not blanket-convert all `type="number"` hits.
 4. Polish finance/accounting report filter/card styling after operational transaction pages are stable.
@@ -286,6 +286,7 @@ The absence of a static finding is not a visual pass. These still need browser r
 ### `/sales/receipts`
 
 - 2026-07-01 implementation checkpoint: the RCP waiting-receipt table now aligns more closely with the `/daily/weight-ticket-list` lined/resizable table baseline. The desktop table uses `border-slate-200`, `min-w-full divide-y divide-slate-200 text-sm`, final-column auto-stretch, column-definition based loading/empty `colSpan` values, and its reset-width button now reads/writes the receipt queue column state instead of the payment queue state. Receipt line `receiptAmount`, `withholdingTaxAmount`, and `discountAmount` fields now follow the Field Input Decision Matrix money-input pattern on both desktop and mobile layouts. The receipt cancel, receivable bill detail, and receipt history detail dialogs now use the `rounded-md` dark-header modal baseline with hidden corner close controls; detail headers put the RCP document number in the title and customer name in the subtitle. Browser QA remains pending because this batch was local code/layout validation only.
+- 2026-07-02 follow-up: the remaining static table-mechanics drift was corrected. In the RCP queue, `เลขที่ใบรับเงิน` now sorts by the visible RCP document number and `บิลขายอ้างอิง` has its own sortable/resizable business header for the SB reference. In the RCP history table, bill refs, receiving account, WHT, Bank Fee, status, and notes now use sortable `ResizableTableHead` headers with inactive/active up/down indicators; the action column remains resize-only. The history account header now follows the mode (`บัญชีที่รับเงิน` for receipt, `บัญชีที่จ่าย` for payment), and receipt form/detail wording now says `บิลขายที่รับเงิน` instead of `บิลขายที่ทำจ่าย`. Browser/computer-use QA was not run per user instruction.
 - Remaining follow-up: run desktop/mobile browser QA for `/sales/receipts` create/edit/cancel/detail visual confirmation when the selected visual batch reaches browser verification.
 
 ### `/daily/expense`
@@ -416,6 +417,7 @@ High-impact route families:
 - `/purchase/payments` and `/sales/receipts`
   - `/purchase/payments` has a 2026-07-01 local design checkpoint for table shell/colgroup/colSpan cleanup, hidden unavailable PMA cancel actions, PMT form/cancel/detail modal radius normalization, and money-pattern confirmation.
   - `/sales/receipts` has a 2026-07-01 local design checkpoint for RCP queue table shell/colgroup/colSpan cleanup, receipt queue reset-width state, receipt cancel/detail modal radius normalization, and receipt line money fields through the Field Input Decision Matrix.
+  - 2026-07-02 follow-up: RCP queue sorting now separates displayed RCP doc number from referenced Sales Bill doc number, `บิลขายอ้างอิง` is sortable/resizable, and the RCP history table now has sortable up/down `ResizableTableHead` headers for bill refs, receiving account, WHT, Bank Fee, status, and notes. Receipt wording was corrected from `บิลขายที่ทำจ่าย` to `บิลขายที่รับเงิน`. Browser/computer-use QA was not run per user instruction.
 - `/daily/transfer`
   - 2026-07-01 design polish completed for the high-confidence static findings: transfer table shell/final-column auto-stretch, page-specific TRF/date/account/amount headers, mobile filter count, neutral quick-range filters, hidden unavailable cancel action, and rounded-md dark-header transfer form/detail surfaces.
   - Remaining: browser QA for desktop/mobile visual confirmation.
@@ -649,7 +651,7 @@ Expected:
 
 ### Updated Suggested Fix Order
 
-1. Finish remaining high-confidence operational inconsistencies users will notice immediately: `/sales/receipts` (`/purchase/payments`, PO Sell, Sales Bills, and RV static findings are fixed; browser QA still pending).
+1. No remaining high-confidence operational static inconsistency is currently listed after the `/sales/receipts` follow-up. The listed operational pages are now in browser QA / real-data visual confirmation rather than another static rewrite.
 2. Normalize shared operational modal surfaces by component family: `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, `StockOperationPageClient`, tracking pages, then trading pages. `DailyExpensePageClient` has a static design checkpoint and should move to browser QA rather than another static rewrite.
 3. Treat Finance / Accounting table mechanics static checkpoints as complete for the selected slices. Next Finance / Accounting design work should be browser QA desktop/mobile, not another static table rewrite, unless a new issue is found.
 4. Review `type="number"` only inside the touched page batch using the design matrix; do not run a broad replacement sweep.
