@@ -1635,6 +1635,14 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Validation: passed `npm run lint --workspace @ns-scrap-erp/next`, `npm run type-check --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200` (valid with existing warnings), and `git diff --check`.
 - Browser QA: unauth subagent confirmed page redirects to login and API 401 for both endpoints on desktop/mobile with no login overflow. Authenticated smoke on `http://localhost:3100` confirmed both APIs return 200, desktop/mobile have no horizontal overflow, legacy-colored hero/card/table markers render, forecast calendar renders the day grid, and day detail modal opens.
 
+#### A2 Design Polish Checkpoint
+
+- Date: 2026-07-01.
+- Routes covered: `/finance-accounting/cash-flow-analysis` and `/finance-accounting/cf-forecast-calendar`.
+- UI changes: converted the Cash Flow Analysis detail table, Forecast Calendar Top AR/AP insight tables, and day-event detail modal to the active lined/resizable table baseline with Thai-first headers, persisted widths, reset-width controls, and safer numeric alignment. Existing charts, cards, filter layout, calendar grid, baseline notice, and mobile card views were preserved.
+- Boundary: UI/layout only; no forecast formula, AP/AR/payment schedule source, bank, stock, tax, loan, GL, statutory cash-flow statement, forecast write, payment/receipt creation, reclass, API, or business behavior changed.
+- Validation: targeted ESLint for `CashFlowPlanningPageClients.tsx`, full Next lint, full Next type-check, and full Next build passed. Browser QA remains pending because this was a local code/layout checkpoint only.
+
 ### A3: Working Capital and Stock Finance
 
 - [x] `/finance-accounting/working-capital`
@@ -1685,6 +1693,14 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Validation: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI remains valid with existing catalog warnings.
 - Browser QA: subagent unauth sweep confirmed protected pages redirect to login and APIs return `401`; authenticated main Playwright smoke confirmed the three A5 APIs return `200`, pages render the legacy-colored management baseline UI, Excel buttons are disabled, and mobile width has no horizontal overflow.
 
+#### A5 Design Polish Checkpoint
+
+- Date: 2026-07-01.
+- Routes covered: `/finance-accounting/pl-statement`, `/finance-accounting/balance-sheet`, and `/finance-accounting/cash-flow-statement`.
+- UI changes: converted the shared Statement tables and drilldown detail modal to the active lined/resizable table baseline with Thai-first headers, persisted widths, reset-width controls, and safer numeric alignment. Mobile card views were preserved.
+- Boundary: UI/layout only; no report formula, source table, query param, management-vs-statutory boundary, GL posting, period close, retained earnings, cash-flow category write, stock, bank, AP/AR, asset, loan, equity, or API behavior changed.
+- Validation: targeted ESLint for `FinancialStatementsPageClients.tsx`, full Next lint, full Next type-check, and full Next build passed. Browser QA remains pending because this was a local code/layout checkpoint only.
+
 ### A6: Fixed Assets
 
 - [x] `/finance-accounting/asset-register`
@@ -1701,6 +1717,14 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - UI baseline: preserved legacy-first headers, cards, filters, compact tables, color semantics, and disabled write controls for Asset Register, Depreciation, and Asset Disposal.
 - Validation: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI remains valid with existing catalog warnings.
 - Browser QA: subagent unauth sweep confirmed protected pages redirect to login and APIs return `401`; authenticated main Playwright smoke confirmed the three pages and APIs render/return `200`, desktop/mobile widths do not horizontally overflow, and write/import/run/disposal buttons are disabled. Only residual console error observed was the pre-existing `/favicon.ico` 500, not a touched A6 endpoint.
+
+#### A6 Design Polish Checkpoint
+
+- Date: 2026-07-01.
+- Routes covered: `/finance-accounting/asset-register`, `/finance-accounting/depreciation`, `/finance-accounting/asset-disposal`, and `/finance-accounting/asset-overview`.
+- UI changes: converted the visible desktop asset/accounting tables to the active lined/resizable baseline: Asset Register, Depreciation pending-assets, Depreciation History, Asset Disposal History, and Asset Overview Cash & Others. Mobile card views were preserved.
+- Boundary: UI/layout only; no asset lifecycle write behavior, depreciation calculation, disposal gain/loss calculation, report read model, GL, bank, receipt, stock, AP/AR, or API behavior changed.
+- Validation: targeted ESLint for the two touched clients, full Next lint, full Next type-check, and full Next build passed. Browser QA remains pending because this was a local code/layout checkpoint only.
 
 ### A7: Loans / Equity / Opening / Historical
 
@@ -1720,6 +1744,14 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - UI baseline: preserved legacy-first gradients, summary cards, filter/action order, tab chips, compact tables, and disabled write controls.
 - Validation: `npm run type-check --workspace @ns-scrap-erp/next`, `npm run lint --workspace @ns-scrap-erp/next`, `npm run build --workspace @ns-scrap-erp/next`, `npx --yes @redocly/cli lint docs/api/openapi.yaml --max-problems 200`, and `git diff --check` passed. OpenAPI remains valid with existing catalog warnings.
 - Browser QA: subagent unauth sweep confirmed protected pages redirect to login and APIs return `401`; authenticated main Playwright smoke confirmed the five A7 APIs return `200`, Loan Contracts and Opening Balance render without desktop overflow, Opening Balance and Historical Data render without mobile overflow, and write controls are disabled. The main authenticated smoke also checked Loan Contracts disabled Template/Import/Add/Schedule actions, Opening Save/Push disabled, and Historical Clear/Save disabled.
+
+#### A7 Design Polish Checkpoint
+
+- Date: 2026-07-01.
+- Routes covered: `/finance-accounting/loan-contracts`, `/finance-accounting/loan-dashboard`, `/finance-accounting/equity-maint`, `/finance-accounting/opening-balance`, and `/finance-accounting/historical-data`.
+- UI changes: converted the Loan Contracts desktop table, Loan Dashboard upcoming/overdue due tables, Opening Balance accounts table, and Historical Data dynamic month table to the active lined/resizable table baseline with Thai-first headers, persisted widths, reset-width controls, and safer numeric alignment. Existing KPI cards, tabs, disabled write/import actions, and mobile card views were preserved. Equity has no desktop table in this read baseline.
+- Boundary: UI/layout only; no loan schedule/payment generation, equity save, opening balance apply/lock, historical clear/save/sync, GL, period close, bank, asset, stock, AP/AR, API, or business behavior changed.
+- Validation: targeted ESLint for `LoansEquityPageClients.tsx`, full Next lint, full Next type-check, and full Next build passed. Browser QA remains pending because this was a local code/layout checkpoint only.
 
 ### A8: Accounting QA Batch
 
