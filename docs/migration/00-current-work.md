@@ -2,9 +2,11 @@
 
 ## Current Status
 
-Date: 2026-06-30
+Date: 2026-07-01
 Active app: `apps/next`
 Primary remote: `new-origin`
+
+Transaction bill table design checkpoint on 2026-07-01: the shared `/sales/bills` and `/purchase/bills` list table now follows the design-audit wording/action baseline more closely. Sales rows label the document column as `เลขที่บิลขาย` instead of generic `เลขที่`, the date header is `วันที่สร้าง`, and unavailable edit/cancel row actions are hidden instead of rendered as disabled buttons. Purchase bill rows keep the existing `เลขที่บิลซื้อ` wording but now use the same hidden-unavailable-action rule. This is a UI/layout cleanup only; no bill API, status, stock, AR, or AP behavior changed. Validation passed: targeted ESLint for `TransactionBillsPageClient.tsx`, `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false`, and scoped `git diff --check`.
 
 NSERP-125 Receipt Voucher print follow-up on 2026-07-01: account selection now persists the selected supplier bank account instead of forcing `payment_method = รับเงินสด` on save. The print template uses that persisted selected account only for the `เลขที่บัญชี / Bank Account` box, and falls back to the supplier's first active bank account for older RV records where the selected account was previously lost. The document header and green total summary remain `รับเงินสด` / `ยอดรับเงินสด` to match the user mockup. This fixes the case where the form visually selected a bank account but the printed RV still showed the amount-in-words box.
 
