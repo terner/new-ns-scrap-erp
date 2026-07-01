@@ -643,6 +643,11 @@ Expected:
   - The table remains a small support-page empty-state table; no separate mobile card layer was added in this pass. Backup/restore/reset/cloud sync behavior, permissions, API behavior, and DB state were not changed.
   - Browser QA remains pending.
 
+- `/admin/system-settings`
+  - After the latest correction, the WHT settings desktop table now uses sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting, persisted resizable widths, reset-width control, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile WHT cards now render from the same sorted row set as the desktop table. VAT/WHT master-data APIs, default WHT behavior, save confirmation flow, permissions, and DB state were not changed.
+  - Browser QA remains pending per the current instruction to avoid Computer Use/browser verification.
+
 
 - `/reports`
   - After the latest correction, the aggregate report table and report catalog table now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
