@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { PostingRulesTable } from './PostingRulesTable'
 
 export const metadata: Metadata = {
   title: 'Posting Rules | NS Scrap ERP',
@@ -127,36 +128,7 @@ export default function PostingRulesPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-md bg-white shadow">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-          <h3 className="text-sm font-bold text-slate-900">Target rule groups</h3>
-          <p className="mt-1 text-xs text-slate-500">รายการนี้เป็น readiness matrix ยังไม่ใช่ account mapping ที่บันทึกลง DB</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="w-36 p-2 text-left font-semibold text-slate-700">Group</th>
-                <th className="min-w-64 p-2 text-left font-semibold text-slate-700">Example source</th>
-                <th className="min-w-80 p-2 text-left font-semibold text-slate-700">Target mapping concern</th>
-                <th className="w-52 p-2 text-left font-semibold text-slate-700">Readiness</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
-              {ruleGroups.map((rule) => (
-                <tr key={rule.group}>
-                  <td className="p-2 align-top font-semibold text-slate-900">{rule.group}</td>
-                  <td className="p-2 align-top text-slate-700">{rule.source}</td>
-                  <td className="p-2 align-top text-slate-700">{rule.concern}</td>
-                  <td className="p-2 align-top">
-                    <StatusBadge tone="slate">{rule.readiness}</StatusBadge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <PostingRulesTable rows={ruleGroups} />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
         <section className="rounded-md bg-white p-4 shadow">
