@@ -370,7 +370,6 @@ Routes/components with high-confidence table mechanics drift:
   - `/business-calendar`
   - `/cash-flow-calendar`
   - `/cash-others-summary`
-  - `/profit-cost-analysis`
   - `/sales-plan`
   - `/sales-commission`
 - Finance / Accounting:
@@ -478,6 +477,10 @@ Expected:
   - It has desktop resizable/sortable table, mobile filters, mobile card list, table shell, and pagination/reset controls.
 - `/production/report`
   - After the latest correction, the report, WIP, and product-summary tables now share the same toolbar/table mechanics and mobile card pattern.
+  - Browser QA remains pending.
+- `/profit-cost-analysis`
+  - After the latest correction, the product, supplier, customer, channel, trend, and alert tables now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, and safer nowrap/tabular numeric alignment.
+  - Mobile cards now render from the same sorted row sets as the desktop tables. Profit/Cost formulas, filters, summary cards, top-product charts, AP/AR values, stock values, and read-model behavior were not changed.
   - Browser QA remains pending.
 - `/purchase/receipt-vouchers`
   - After the latest correction, the list table/action/filter wording and RV modal surfaces follow the active baseline more closely.
