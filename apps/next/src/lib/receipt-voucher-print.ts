@@ -125,6 +125,10 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
 
   const isCancelled = row.status === 'cancelled'
   const selectedBankAccount = selectedSupplierBankAccount(row)
+  const paymentMethodDisplay = selectedBankAccount?.paymentMethod || row.paymentMethod || CASH_PAYMENT_METHOD
+  const legalNote = selectedBankAccount
+    ? 'เอกสารนี้เป็นหลักฐานรับเงินจาก Supplier ตามบัญชีที่ระบุในเอกสาร'
+    : 'เอกสารนี้เป็นหลักฐานรับเงินสดจาก Supplier เท่านั้น ไม่ใช่เอกสารโอนเงินหรือรายการธนาคาร'
 
   const itemsHtml = printItems.map((item, index) => {
     return `
@@ -256,7 +260,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
             </div>
             <div class="meta-card">
               <div class="meta-label">วิธีรับเงิน</div>
-              <div class="meta-value">${escapeHtml(CASH_PAYMENT_METHOD)}</div>
+              <div class="meta-value">${escapeHtml(paymentMethodDisplay)}</div>
             </div>
           </div>
         </div>
@@ -374,7 +378,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
             <div style="text-align: right; font-weight: 900; color: #0f172a;">${money(row.totalAmount)}</div>
           </div>
           <div class="summary-row highlight">
-            <div>ยอดรับเงินสด</div>
+            <div>ยอดรับเงิน</div>
             <div style="text-align: right; font-variant-numeric: tabular-nums;">${money(row.totalAmount)}</div>
           </div>
           ${selectedBankAccount ? `
@@ -401,7 +405,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
       </div>
       
       <div class="legal-note">
-        เอกสารนี้เป็นหลักฐานรับเงินสดจาก Supplier เท่านั้น ไม่ใช่เอกสารโอนเงินหรือรายการธนาคาร
+        ${escapeHtml(legalNote)}
       </div>
     </div>
   </body></html>`
