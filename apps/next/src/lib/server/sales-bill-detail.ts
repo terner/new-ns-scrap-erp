@@ -1,5 +1,6 @@
 import { toDateOnly, toNumber } from '@/lib/server/daily'
 import { prisma } from '@/lib/server/prisma'
+import { salesBillLineFactsForBills } from '@/lib/server/sales-bill-line-facts'
 import type { Prisma } from '../../../generated/prisma/client'
 
 export type SalesBillDetail = {
@@ -495,6 +496,27 @@ export async function getSalesBillDetail(
     tradingFactByLineNo.set(fact.sales_line_no, fact)
   })
   const items = buildDurableItems({ bill, lineFacts, poSellDocNoSet, tradingFactByLineNo, vehicleByDeliveryDocNo })
+  const stockLineFacts = await salesBillLineFactsForBills([bill.id], {
+    lineStatuses: factStatuses,
+    tradingStatuses: factStatuses,
+  })
+  const stockCogsByLineNo = new Map(stockLineFacts.map((line) => [line.lineNo, line.cogs] as const))
+  const allocatedUsageQtyByLineNo = new Map<number, number>()
+  weightTicketUsageLogs.forEach((log) => {
+    if (log.action !== 'allocated_to_sales_bill' || log.target_line_no == null) return
+    const qty = toNumber(log.allocated_net_weight) || toNumber(log.allocated_qty)
+    allocatedUsageQtyByLineNo.set(log.target_line_no, (allocatedUsageQtyByLineNo.get(log.target_line_no) ?? 0) + qty)
+  })
+  const stockCogsByUsageLogId = new Map<bigint, number>()
+  weightTicketUsageLogs.forEach((log) => {
+    if (log.target_line_no == null) return
+    const lineCogs = stockCogsByLineNo.get(log.target_line_no) ?? 0
+    if (lineCogs <= 0) return
+    const lineUsageQty = allocatedUsageQtyByLineNo.get(log.target_line_no) ?? 0
+    const usageQty = toNumber(log.allocated_net_weight) || toNumber(log.allocated_qty)
+    if (lineUsageQty <= 0 || usageQty <= 0) return
+    stockCogsByUsageLogId.set(log.id, lineCogs * (usageQty / lineUsageQty))
+  })
   const timeline = statusLogs.map((log) => {
     const customerReceiptDocNo = historyMetaValue(log.meta, 'customerReceiptDocNo')
     const allocationLineNo = historyMetaValue(log.meta, 'allocationLineNo')
@@ -528,7 +550,7 @@ export async function getSalesBillDetail(
   }).reverse()
   const sourceUsageFacts: SalesBillDetail['sourceUsageFacts'] = [
     ...weightTicketUsageLogs.map((log) => ({
-      amount: 0,
+      amount: stockCogsByUsageLogId.get(log.id) ?? 0,
       createdAt: log.created_at.toISOString(),
       docNo: log.weight_ticket_doc_no,
       id: log.event_key ?? `wto-usage:${String(log.id)}`,

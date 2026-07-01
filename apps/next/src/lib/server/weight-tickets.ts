@@ -860,32 +860,45 @@ export function mapWeightTicketRow(row: WeightTicketRow, usage: WeightTicketUsag
   }))
   const lineImageNames = lineRows.flatMap((line: { imageNames: string[] }) => line.imageNames)
   const activeHoldsByProductId = new Map<string, { missingCost: boolean; qty: number; value: number }>()
+  const costSnapshotHoldsByProductId = new Map<string, { missingCost: boolean; qty: number; value: number }>()
   ;(row.stock_holds ?? []).forEach((hold) => {
-    if (hold.status !== 'active') return
     const key = String(hold.product_id)
-    const current = activeHoldsByProductId.get(key) ?? { missingCost: false, qty: 0, value: 0 }
     const qty = toNumber(hold.qty)
     const unitCost = hold.unit_cost_snapshot == null ? null : toNumber(hold.unit_cost_snapshot)
-    current.qty += qty
-    if (unitCost == null) {
-      current.missingCost = true
-    } else {
-      current.value += hold.value_snapshot == null ? qty * unitCost : toNumber(hold.value_snapshot)
+    if (hold.status === 'active') {
+      const current = activeHoldsByProductId.get(key) ?? { missingCost: false, qty: 0, value: 0 }
+      current.qty += qty
+      if (unitCost == null) {
+        current.missingCost = true
+      } else {
+        current.value += hold.value_snapshot == null ? qty * unitCost : toNumber(hold.value_snapshot)
+      }
+      activeHoldsByProductId.set(key, current)
     }
-    activeHoldsByProductId.set(key, current)
+    if (hold.status === 'active' || hold.status === 'consumed') {
+      const current = costSnapshotHoldsByProductId.get(key) ?? { missingCost: false, qty: 0, value: 0 }
+      current.qty += qty
+      if (unitCost == null) {
+        current.missingCost = true
+      } else {
+        current.value += hold.value_snapshot == null ? qty * unitCost : toNumber(hold.value_snapshot)
+      }
+      costSnapshotHoldsByProductId.set(key, current)
+    }
   })
 
   const productSummaries = row.weight_ticket_product_summaries.map((summary) => {
     const activeHold = activeHoldsByProductId.get(String(summary.product_id))
+    const costSnapshotHold = activeHold ?? costSnapshotHoldsByProductId.get(String(summary.product_id))
     const pendingOutQty = activeHold?.qty ?? 0
     const pendingOutValue = activeHold?.value ?? 0
-    const unitCostSnapshot = activeHold && pendingOutQty > 0 && !activeHold.missingCost
-      ? pendingOutValue / pendingOutQty
+    const unitCostSnapshot = costSnapshotHold && costSnapshotHold.qty > 0 && !costSnapshotHold.missingCost
+      ? costSnapshotHold.value / costSnapshotHold.qty
       : null
     return {
       billedWeight: toNumber(summary.billed_weight),
       containerDeductionWeight: toNumber(summary.container_deduction_weight),
-      costSnapshotStatus: activeHold?.missingCost ? 'pending' as const : unitCostSnapshot == null ? 'none' as const : 'locked' as const,
+      costSnapshotStatus: costSnapshotHold?.missingCost ? 'pending' as const : unitCostSnapshot == null ? 'none' as const : 'locked' as const,
       deductWeight: toNumber(summary.deduct_weight),
       grossWeight: toNumber(summary.gross_weight),
       hasMixedDeductionProfiles: summary.has_mixed_deduction_profiles ?? false,
