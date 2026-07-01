@@ -95,6 +95,12 @@ type OwnerDueRow = { amount: number; daysOverdue?: number; docNo: string; due: s
 type OwnerDueSortKey = 'amount' | 'daysOverdue' | 'docNo' | 'due' | 'name'
 type OwnerSmallRow = { amount: number; contractNo?: string; docNo?: string; installmentNo?: number; name?: string }
 type OwnerSmallSortKey = 'amount' | 'detail' | 'ref'
+type DailyBillRow = { amount: number; docNo: string; name: string; qty: number }
+type DailyBillSortKey = keyof DailyBillRow
+type DailyGroupProductRow = MainPayload['dailyReport']['groupBreakdown'][number]['products'][number]
+type DailyGroupProductSortKey = keyof DailyGroupProductRow | 'spread'
+type CashAccountRow = MainPayload['dailyReport']['cashMovement']['accounts'][number]
+type CashAccountSortKey = keyof CashAccountRow | 'net'
 
 const dashboardAgingColumns: ResizableColumnDefinition<string>[] = [
   { key: 'label', defaultWidth: 170, minWidth: 140 },
@@ -126,6 +132,30 @@ const ownerSmallColumns: ResizableColumnDefinition<OwnerSmallSortKey>[] = [
   { key: 'ref', defaultWidth: 150, minWidth: 110 },
   { key: 'detail', defaultWidth: 180, minWidth: 110 },
   { key: 'amount', defaultWidth: 130, minWidth: 100 },
+]
+
+const dailyGroupProductColumns: ResizableColumnDefinition<DailyGroupProductSortKey>[] = [
+  { key: 'productCode', defaultWidth: 110, minWidth: 80 },
+  { key: 'productName', defaultWidth: 220, minWidth: 140 },
+  { key: 'buyQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'buyAmt', defaultWidth: 130, minWidth: 100 },
+  { key: 'sellQty', defaultWidth: 120, minWidth: 90 },
+  { key: 'sellAmt', defaultWidth: 130, minWidth: 100 },
+  { key: 'spread', defaultWidth: 120, minWidth: 90 },
+]
+
+const dailyBillColumns: ResizableColumnDefinition<DailyBillSortKey>[] = [
+  { key: 'docNo', defaultWidth: 150, minWidth: 110 },
+  { key: 'name', defaultWidth: 220, minWidth: 130 },
+  { key: 'qty', defaultWidth: 120, minWidth: 90 },
+  { key: 'amount', defaultWidth: 140, minWidth: 100 },
+]
+
+const cashAccountColumns: ResizableColumnDefinition<CashAccountSortKey>[] = [
+  { key: 'name', defaultWidth: 220, minWidth: 130 },
+  { key: 'cashIn', defaultWidth: 130, minWidth: 100 },
+  { key: 'cashOut', defaultWidth: 130, minWidth: 100 },
+  { key: 'net', defaultWidth: 130, minWidth: 100 },
 ]
 
 function today() {
@@ -668,6 +698,16 @@ function ownerSmallValue(row: OwnerSmallRow, key: OwnerSmallSortKey) {
   if (key === 'ref') return row.docNo ?? row.contractNo ?? ''
   if (key === 'detail') return row.name ?? String(row.installmentNo ?? '')
   return row.amount
+}
+
+function dailyGroupProductValue(row: DailyGroupProductRow, key: DailyGroupProductSortKey) {
+  if (key === 'spread') return row.sellQty && row.buyQty ? row.sellAmt / row.sellQty - row.buyAmt / row.buyQty : 0
+  return row[key]
+}
+
+function cashAccountValue(row: CashAccountRow, key: CashAccountSortKey) {
+  if (key === 'net') return row.cashIn - row.cashOut
+  return row[key]
 }
 
 function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: string; sub: string; tone: string; value: string }) {
@@ -1214,66 +1254,7 @@ function GroupBreakdown({ expandedGroup, groups, setExpandedGroup }: { expandedG
                 </div>
               </button>
               {expandedGroup === group.group ? (
-                <>
-                  {/* Desktop view */}
-                  <div className="hidden lg:block overflow-x-auto border-t border-slate-100 p-3">
-                    <table className="w-full text-xs">
-                      <thead className="bg-slate-50 text-slate-500">
-                        <tr>
-                          <th className="p-2 text-left font-semibold">Code</th>
-                          <th className="p-2 text-left font-semibold">สินค้า</th>
-                          <th className="p-2 text-right font-semibold">ซื้อ กก.</th>
-                          <th className="p-2 text-right font-semibold">ซื้อ</th>
-                          <th className="p-2 text-right font-semibold">ขาย กก.</th>
-                          <th className="p-2 text-right font-semibold">ขาย</th>
-                          <th className="p-2 text-right font-semibold">Spread/กก.</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.products.map((row, idx) => (
-                          <tr key={`${row.productId}_${idx}`} className="border-t border-slate-100">
-                            <td className="p-2 font-mono text-slate-600 whitespace-nowrap">{row.productCode}</td>
-                            <td className="p-2 text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.productName}>{row.productName}</div></td>
-                            <td className="p-2 text-right whitespace-nowrap tabular-nums pl-4">{money(row.buyQty)}</td>
-                            <td className="p-2 text-right text-blue-700 font-bold whitespace-nowrap tabular-nums pl-4">{money(row.buyAmt)}</td>
-                            <td className="p-2 text-right whitespace-nowrap tabular-nums pl-4">{money(row.sellQty)}</td>
-                            <td className="p-2 text-right text-emerald-700 font-bold whitespace-nowrap tabular-nums pl-4">{money(row.sellAmt)}</td>
-                            <td className="p-2 text-right font-bold text-slate-700 whitespace-nowrap tabular-nums pl-4">{row.sellQty && row.buyQty ? money(row.sellAmt / row.sellQty - row.buyAmt / row.buyQty) : '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile view */}
-                  <div className="block lg:hidden border-t border-slate-100 divide-y divide-slate-100 bg-slate-50/30 p-2">
-                    {group.products.map((row, idx) => (
-                      <div key={`${row.productId}_${idx}`} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
-                        <div className="flex justify-between items-start">
-                          <span className="font-bold text-slate-800">{row.productName}</span>
-                          <span className="font-mono text-xs text-slate-400">{row.productCode}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
-                          <div className="text-blue-700 bg-blue-50/50 p-1.5 rounded-lg">
-                            <div className="font-semibold text-xs">📥 ซื้อ</div>
-                            <div className="mt-0.5">{money(row.buyQty)} กก.</div>
-                            <div className="font-bold mt-0.5">{money(row.buyAmt)} ฿</div>
-                          </div>
-                          <div className="text-emerald-700 bg-emerald-50/50 p-1.5 rounded-lg">
-                            <div className="font-semibold text-xs">📤 ขาย</div>
-                            <div className="mt-0.5">{money(row.sellQty)} กก.</div>
-                            <div className="font-bold mt-0.5">{money(row.sellAmt)} ฿</div>
-                          </div>
-                        </div>
-                        {row.sellQty && row.buyQty ? (
-                          <div className="text-right text-xs font-semibold text-purple-700 mt-1">
-                            Spread: {money(row.sellAmt / row.sellQty - row.buyAmt / row.buyQty)} ฿/กก.
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </>
+                <GroupProductTable rows={group.products} tableKey={group.group} />
               ) : null}
             </div>
           ))}
@@ -1283,30 +1264,147 @@ function GroupBreakdown({ expandedGroup, groups, setExpandedGroup }: { expandedG
   )
 }
 
-function DailyBillTable({ rows, title, tone, total }: { rows: { amount: number; docNo: string; name: string; qty: number }[]; title: string; tone: 'blue' | 'emerald'; total: number }) {
+function GroupProductTable({ rows, tableKey }: { rows: DailyGroupProductRow[]; tableKey: string }) {
+  const [sortKey, setSortKey] = useState<DailyGroupProductSortKey>('buyAmt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const columnResize = useResizableColumns(`main.daily-report.group-products.${tableKey}.v1`, dailyGroupProductColumns)
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((left, right) => compareDashboardValues(dailyGroupProductValue(left, sortKey), dailyGroupProductValue(right, sortKey), sortDirection))
+  }, [rows, sortDirection, sortKey])
+  const handleSort = (key: DailyGroupProductSortKey) => {
+    if (sortKey === key) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    else {
+      setSortKey(key)
+      setSortDirection(key === 'productCode' || key === 'productName' ? 'asc' : 'desc')
+    }
+  }
+
+  return (
+    <>
+      <div className="hidden border-t border-slate-100 p-3 lg:block">
+        <div className="mb-2 flex justify-end">
+          {columnResize.hasCustomWidths ? (
+            <button className="rounded border border-slate-200 bg-white px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-slate-50 hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+              คืนค่าเดิมตาราง
+            </button>
+          ) : null}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+            <colgroup>
+              {dailyGroupProductColumns.map((column, index) => (
+                <col key={column.key} style={index === dailyGroupProductColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
+              ))}
+            </colgroup>
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="Code" resizeProps={columnResize.getResizeHandleProps('productCode', 'Code')} sortKey="productCode" onSort={handleSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} sortKey="productName" onSort={handleSort} />
+                <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ซื้อ กก." resizeProps={columnResize.getResizeHandleProps('buyQty', 'ซื้อ กก.')} sortKey="buyQty" onSort={handleSort} />
+                <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ซื้อ" resizeProps={columnResize.getResizeHandleProps('buyAmt', 'ซื้อ')} sortKey="buyAmt" onSort={handleSort} />
+                <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ขาย กก." resizeProps={columnResize.getResizeHandleProps('sellQty', 'ขาย กก.')} sortKey="sellQty" onSort={handleSort} />
+                <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ขาย" resizeProps={columnResize.getResizeHandleProps('sellAmt', 'ขาย')} sortKey="sellAmt" onSort={handleSort} />
+                <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="Spread/กก." resizeProps={columnResize.getResizeHandleProps('spread', 'Spread/กก.')} sortKey="spread" onSort={handleSort} />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {sortedRows.map((row, idx) => (
+                <tr key={`${row.productId}_${idx}`} className="border-t border-slate-100">
+                  <td className="p-2 font-mono text-slate-600 whitespace-nowrap">{row.productCode}</td>
+                  <td className="p-2 text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.productName}>{row.productName}</div></td>
+                  <td className="p-2 text-right whitespace-nowrap tabular-nums pl-4">{money(row.buyQty)}</td>
+                  <td className="p-2 text-right text-blue-700 font-bold whitespace-nowrap tabular-nums pl-4">{money(row.buyAmt)}</td>
+                  <td className="p-2 text-right whitespace-nowrap tabular-nums pl-4">{money(row.sellQty)}</td>
+                  <td className="p-2 text-right text-emerald-700 font-bold whitespace-nowrap tabular-nums pl-4">{money(row.sellAmt)}</td>
+                  <td className="p-2 text-right font-bold text-slate-700 whitespace-nowrap tabular-nums pl-4">{dailyGroupProductValue(row, 'spread') ? `${money(dailyGroupProductValue(row, 'spread') as number)} ฿/กก.` : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="block border-t border-slate-100 divide-y divide-slate-100 bg-slate-50/30 p-2 lg:hidden">
+        {sortedRows.map((row, idx) => (
+          <div key={`${row.productId}_${idx}`} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-800">{row.productName}</span>
+              <span className="font-mono text-xs text-slate-400">{row.productCode}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+              <div className="text-blue-700 bg-blue-50/50 p-1.5 rounded-lg">
+                <div className="font-semibold text-xs">📥 ซื้อ</div>
+                <div className="mt-0.5">{money(row.buyQty)} กก.</div>
+                <div className="font-bold mt-0.5">{money(row.buyAmt)} ฿</div>
+              </div>
+              <div className="text-emerald-700 bg-emerald-50/50 p-1.5 rounded-lg">
+                <div className="font-semibold text-xs">📤 ขาย</div>
+                <div className="mt-0.5">{money(row.sellQty)} กก.</div>
+                <div className="font-bold mt-0.5">{money(row.sellAmt)} ฿</div>
+              </div>
+            </div>
+            {dailyGroupProductValue(row, 'spread') ? (
+              <div className="text-right text-xs font-semibold text-purple-700 mt-1">
+                Spread: {money(dailyGroupProductValue(row, 'spread') as number)} ฿/กก.
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function DailyBillTable({ rows, title, tone, total }: { rows: DailyBillRow[]; title: string; tone: 'blue' | 'emerald'; total: number }) {
+  const [sortKey, setSortKey] = useState<DailyBillSortKey>('amount')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const columnResize = useResizableColumns(`main.daily-report.bills.${tone}.v1`, dailyBillColumns)
   const header = tone === 'blue' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
   const hover = tone === 'blue' ? 'hover:bg-blue-50/30' : 'hover:bg-emerald-50/30'
   const amountColor = tone === 'blue' ? 'text-blue-700' : 'text-emerald-700'
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((left, right) => compareDashboardValues(left[sortKey], right[sortKey], sortDirection))
+  }, [rows, sortDirection, sortKey])
+  const handleSort = (key: DailyBillSortKey) => {
+    if (sortKey === key) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    else {
+      setSortKey(key)
+      setSortDirection(key === 'docNo' || key === 'name' ? 'asc' : 'desc')
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
         <h3 className="font-bold">{title}</h3>
-        <span className="text-sm font-bold">{money(total)}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold">{money(total)}</span>
+          {columnResize.hasCustomWidths ? (
+            <button className="rounded border border-slate-200 bg-white/70 px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-white hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+              คืนค่าเดิมตาราง
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Desktop view */}
-      <div className="hidden lg:block max-h-[300px] overflow-y-auto">
-        <table className="w-full text-sm">
+      <div className="hidden lg:block max-h-[300px] overflow-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {dailyBillColumns.map((column, index) => (
+              <col key={column.key} style={index === dailyBillColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 text-xs">
             <tr>
-              <th className="p-2 text-left font-semibold">เลขที่</th>
-              <th className="p-2 text-left font-semibold">{tone === 'blue' ? 'Supplier' : 'Customer'}</th>
-              <th className="p-2 text-right font-semibold">กก.</th>
-              <th className="p-2 text-right font-semibold">ยอด</th>
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label={tone === 'blue' ? 'Supplier' : 'Customer'} resizeProps={columnResize.getResizeHandleProps('name', tone === 'blue' ? 'Supplier' : 'Customer')} sortKey="name" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="กก." resizeProps={columnResize.getResizeHandleProps('qty', 'กก.')} sortKey="qty" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ยอด" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอด')} sortKey="amount" onSort={handleSort} />
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => (
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row) => (
               <tr key={row.docNo} className={`border-t border-slate-100 ${hover}`}>
                 <td className="p-2 font-mono text-xs text-slate-600 whitespace-nowrap">{row.docNo}</td>
                 <td className="p-2 text-xs text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.name}>{row.name}</div></td>
@@ -1327,7 +1425,7 @@ function DailyBillTable({ rows, title, tone, total }: { rows: { amount: number; 
 
       {/* Mobile view */}
       <div className="block lg:hidden max-h-[300px] overflow-y-auto divide-y divide-slate-100 p-2 bg-slate-50/30">
-        {rows.map((row) => (
+        {sortedRows.map((row) => (
           <div key={row.docNo} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">{row.name}</span>
@@ -1379,9 +1477,31 @@ function ExpenseSummary({ rows, total }: { rows: { amount: number; count: number
 }
 
 function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cashMovement'] }) {
+  const [sortKey, setSortKey] = useState<CashAccountSortKey>('net')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const columnResize = useResizableColumns('main.daily-report.cash-accounts.v1', cashAccountColumns)
+  const sortedAccountRows = useMemo(() => {
+    const accountRows = movement?.accounts ?? []
+    return [...accountRows].sort((left, right) => compareDashboardValues(cashAccountValue(left, sortKey), cashAccountValue(right, sortKey), sortDirection))
+  }, [movement?.accounts, sortDirection, sortKey])
+  const handleSort = (key: CashAccountSortKey) => {
+    if (sortKey === key) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    else {
+      setSortKey(key)
+      setSortDirection(key === 'name' || key === 'type' ? 'asc' : 'desc')
+    }
+  }
+
   return (
     <div className="rounded-xl bg-white p-5 shadow-sm border border-slate-100">
-      <h3 className="mb-3 font-bold text-slate-800 text-sm">💰 เงินหมุนประจำวัน</h3>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="font-bold text-slate-800 text-sm">💰 เงินหมุนประจำวัน</h3>
+        {columnResize.hasCustomWidths ? (
+          <button className="rounded border border-slate-200 bg-white px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-slate-50 hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+            คืนค่าเดิมตาราง
+          </button>
+        ) : null}
+      </div>
       <div className="mb-4 grid gap-3 md:grid-cols-3">
         <Tile tone="emerald" label="📥 เงินเข้ารวม" value={money(movement?.cashIn)} />
         <Tile tone="red" label="📤 เงินออกรวม" value={money(movement?.cashOut)} />
@@ -1398,18 +1518,23 @@ function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cas
           </div>
         ))}
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full border-t border-slate-100 text-xs">
+      <div className="hidden overflow-x-auto sm:block">
+        <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {cashAccountColumns.map((column, index) => (
+              <col key={column.key} style={index === cashAccountColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
           <thead className="bg-slate-50 text-slate-500">
             <tr>
-              <th className="p-2 text-left font-semibold">บัญชี</th>
-              <th className="p-2 text-right font-semibold">เข้า</th>
-              <th className="p-2 text-right font-semibold">ออก</th>
-              <th className="p-2 text-right font-semibold">Net</th>
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บัญชี" resizeProps={columnResize.getResizeHandleProps('name', 'บัญชี')} sortKey="name" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="เข้า" resizeProps={columnResize.getResizeHandleProps('cashIn', 'เข้า')} sortKey="cashIn" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ออก" resizeProps={columnResize.getResizeHandleProps('cashOut', 'ออก')} sortKey="cashOut" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="Net" resizeProps={columnResize.getResizeHandleProps('net', 'Net')} sortKey="net" onSort={handleSort} />
             </tr>
           </thead>
-          <tbody>
-            {(movement?.accounts ?? []).map((row) => (
+          <tbody className="divide-y divide-slate-100">
+            {sortedAccountRows.map((row) => (
               <tr key={row.name} className="border-t border-slate-100 hover:bg-slate-50/30">
                 <td className="p-2 text-slate-700">
                   <b>{row.name}</b> <span className="text-xs text-slate-400">({row.type})</span>
@@ -1423,6 +1548,26 @@ function CashMovement({ movement }: { movement?: MainPayload['dailyReport']['cas
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="space-y-2 sm:hidden">
+        {sortedAccountRows.map((row) => {
+          const net = row.cashIn - row.cashOut
+          return (
+            <div key={row.name} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2 text-xs">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-bold text-slate-800">{row.name}</div>
+                  <div className="text-slate-400">{row.type}</div>
+                </div>
+                <div className={net >= 0 ? 'font-bold text-blue-600' : 'font-bold text-rose-600'}>{money(net)}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-slate-600">
+                <span>เข้า: <b className="text-emerald-600">{row.cashIn > 0 ? money(row.cashIn) : '-'}</b></span>
+                <span>ออก: <b className="text-red-600">{row.cashOut > 0 ? money(row.cashOut) : '-'}</b></span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
