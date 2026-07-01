@@ -375,7 +375,6 @@ Routes/components with high-confidence table mechanics drift:
   - `/sales-commission`
 - Dual Costing:
   - `/dual-costing/cost-allocator`
-  - `/dual-costing/cost-pool`
   - `/dual-costing/deal-margin`
 - Finance / Accounting:
   - `/finance-accounting/asset-disposal`
@@ -398,7 +397,7 @@ Routes/components with high-confidence table mechanics drift:
 Notes:
 
 - Many finance-accounting pages already have mobile card/list alternates, so the primary issue is desktop table mechanics and old compact `text-xs` table style, not only mobile behavior.
-- `/dual-costing/cost-allocator` and `/dual-costing/cost-pool` are heavier because they also lack clear mobile card/list alternate signals.
+- `/dual-costing/deal-margin` remains heavier because it still combines older table mechanics with mixed-language table wording.
 
 ### P2 Dual Costing Font And Mixed-Language Drift
 
@@ -508,6 +507,10 @@ Expected:
   - After the latest correction, the target-sale table, Cost Pool lot table, and Preview table now use the active lined/resizable table shell with Thai-first business headers, reset-width controls, and dense mobile cards.
   - The page no longer overrides the app font with `font-sans`, and the Manual target-cost field now uses the money input pattern instead of `type="number"`.
   - Browser QA remains pending.
+- `/dual-costing/cost-pool`
+  - After the latest correction, the main Cost Pool table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, and final status-column auto-stretch.
+  - The table now shows the branch column already present in the read model, mobile uses dense cards instead of horizontal table scrolling, and filter/pagination wording/sizing follows the shared list baseline more closely.
+  - Browser QA remains pending.
 - Master data shared pages under `/master-data/*`
   - Most shared pages use `MasterDataPageClient`, which already has resizable desktop table, mobile toolbar/filter bottom sheet, mobile card list, and dark-header form modal.
   - Remaining work is mostly modal polish, wording cleanup, and field-specific validation/presentation, not a full table rewrite.
@@ -519,7 +522,7 @@ Expected:
 
 1. Finish remaining high-confidence operational inconsistencies users will notice immediately: `/sales/receipts` (`/purchase/payments`, PO Sell, Sales Bills, and RV static findings are fixed; browser QA still pending).
 2. Normalize shared operational modal surfaces by component family: `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, `StockOperationPageClient`, tracking pages, then trading pages. `DailyExpensePageClient` has a static design checkpoint and should move to browser QA rather than another static rewrite.
-3. Continue Dual Costing table normalization with `/dual-costing/cost-pool` next. `/dual-costing/cost-allocator` now has a local static design checkpoint; `/dual-costing/cost-pool` and `/dual-costing/deal-margin` still combine table mechanics drift with mobile/table density risk.
+3. Continue Dual Costing table normalization with `/dual-costing/deal-margin` next. `/dual-costing/cost-allocator` and `/dual-costing/cost-pool` now have local static design checkpoints; Deal Margin still combines table mechanics drift with mobile/table density and wording risk.
 4. Normalize Finance / Accounting table mechanics in shared component batches: fixed assets, financial statements, cash-flow planning, loans/equity.
 5. Review `type="number"` only inside the touched page batch using the design matrix; do not run a broad replacement sweep.
 6. Run browser QA desktop + mobile for the selected batch before claiming visual completion.
