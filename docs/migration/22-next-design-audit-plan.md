@@ -635,6 +635,10 @@ Expected:
   - After the latest correction, the Receivables & Payables Aging and Stock by Group widget tables now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
   - Mobile aging and stock-group cards render from the same sorted row sets as desktop. Dashboard API behavior, filters, KPI cards, period logic, historical monthly merge, AR/AP aging formulas, stock valuation/grouping logic, and DB state were not changed.
   - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- `/owner-daily`
+  - After the latest correction, the daily AR/AP due tables plus the loan/expense small tables now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
+  - Mobile due/expense cards render from the same sorted row sets as desktop. Owner Daily API behavior, cash-plan formula, expected in/out logic, pending counts, loan/expense source rows, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
 - Master data shared pages under `/master-data/*`
   - Most shared pages use `MasterDataPageClient`, which already has resizable desktop table, mobile toolbar/filter bottom sheet, mobile card list, and dark-header form modal.
   - Remaining work is mostly modal polish, wording cleanup, and field-specific validation/presentation, not a full table rewrite.

@@ -91,6 +91,10 @@ type DashboardAgingRow = {
 }
 type DashboardStockGroupRow = MainPayload['dashboard']['stockByGroup'][number]
 type DashboardStockGroupSortKey = keyof DashboardStockGroupRow
+type OwnerDueRow = { amount: number; daysOverdue?: number; docNo: string; due: string; name: string }
+type OwnerDueSortKey = 'amount' | 'daysOverdue' | 'docNo' | 'due' | 'name'
+type OwnerSmallRow = { amount: number; contractNo?: string; docNo?: string; installmentNo?: number; name?: string }
+type OwnerSmallSortKey = 'amount' | 'detail' | 'ref'
 
 const dashboardAgingColumns: ResizableColumnDefinition<string>[] = [
   { key: 'label', defaultWidth: 170, minWidth: 140 },
@@ -106,6 +110,22 @@ const dashboardStockGroupColumns: ResizableColumnDefinition<string>[] = [
   { key: 'group', defaultWidth: 180, minWidth: 130 },
   { key: 'qty', defaultWidth: 120, minWidth: 100 },
   { key: 'value', defaultWidth: 140, minWidth: 110 },
+]
+
+const ownerDueColumns: ResizableColumnDefinition<OwnerDueSortKey>[] = [
+  { key: 'name', defaultWidth: 190, minWidth: 120 },
+  { key: 'docNo', defaultWidth: 140, minWidth: 100 },
+  { key: 'due', defaultWidth: 120, minWidth: 90 },
+  { key: 'amount', defaultWidth: 130, minWidth: 100 },
+  { key: 'daysOverdue', defaultWidth: 100, minWidth: 80 },
+]
+
+const ownerDueApColumns = ownerDueColumns.filter((column) => column.key !== 'daysOverdue')
+
+const ownerSmallColumns: ResizableColumnDefinition<OwnerSmallSortKey>[] = [
+  { key: 'ref', defaultWidth: 150, minWidth: 110 },
+  { key: 'detail', defaultWidth: 180, minWidth: 110 },
+  { key: 'amount', defaultWidth: 130, minWidth: 100 },
 ]
 
 function today() {
@@ -639,6 +659,17 @@ function compareDashboardValues(left: number | string | null | undefined, right:
   return direction === 'asc' ? result : -result
 }
 
+function ownerDueValue(row: OwnerDueRow, key: OwnerDueSortKey) {
+  if (key === 'daysOverdue') return row.daysOverdue ?? 0
+  return row[key]
+}
+
+function ownerSmallValue(row: OwnerSmallRow, key: OwnerSmallSortKey) {
+  if (key === 'ref') return row.docNo ?? row.contractNo ?? ''
+  if (key === 'detail') return row.name ?? String(row.installmentNo ?? '')
+  return row.amount
+}
+
 function DashboardKpi({ icon, label, sub, tone, value }: { icon: string; label: string; sub: string; tone: string; value: string }) {
   const toneMap: Record<string, { bg: string; text: string }> = {
     'from-blue-500 to-blue-700': { bg: 'bg-blue-50', text: 'text-blue-600' },
@@ -702,8 +733,8 @@ function OwnerDailyView({ data }: { data: MainPayload | null }) {
       </div>
       <div className="grid gap-3 lg:grid-cols-2"><OwnerDueTable rows={data?.ownerDaily.due.ar ?? []} title="📥 ลูกหนี้ที่ควรเก็บวันนี้" type="ar" /><OwnerDueTable rows={data?.ownerDaily.due.ap ?? []} title="📤 เจ้าหนี้ที่ต้องจ่ายวันนี้" type="ap" /></div>
       <div className="grid gap-3 lg:grid-cols-3">
-        <OwnerSmallTable rows={data?.ownerDaily.loanToday ?? []} title="🏦 ค่างวด/ดอกเบี้ยวันนี้" />
-        <OwnerSmallTable rows={(data?.ownerDaily.expensesToday ?? []).map((row) => ({ amount: row.amount, docNo: row.docNo, name: row.payee }))} title="💰 ค่าใช้จ่ายวันนี้" />
+        <OwnerSmallTable rows={data?.ownerDaily.loanToday ?? []} tableKey="loan" title="🏦 ค่างวด/ดอกเบี้ยวันนี้" />
+        <OwnerSmallTable rows={(data?.ownerDaily.expensesToday ?? []).map((row) => ({ amount: row.amount, docNo: row.docNo, name: row.payee }))} tableKey="expense" title="💰 ค่าใช้จ่ายวันนี้" />
         <Panel title="📋 รายการรอดำเนินการ">
           <div className="space-y-3 text-sm">
             <MiniLine label="📥 บิลซื้อ Draft" value={money(pending.pendingPurchaseCount)} />
@@ -915,29 +946,56 @@ function MiniLine({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between rounded-lg bg-slate-50 p-2 text-xs border border-slate-100"><span>{label}</span><span className="font-bold text-slate-800">{value}</span></div>
 }
 
-function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; daysOverdue?: number; docNo: string; due: string; name: string }>; title: string; type: 'ap' | 'ar' }) {
+function OwnerDueTable({ rows, title, type }: { rows: OwnerDueRow[]; title: string; type: 'ap' | 'ar' }) {
+  const [sortKey, setSortKey] = useState<OwnerDueSortKey>('amount')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const columns = type === 'ar' ? ownerDueColumns : ownerDueApColumns
+  const columnResize = useResizableColumns(`main.owner-daily.due.${type}.v1`, columns)
   const header = type === 'ar' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((left, right) => compareDashboardValues(ownerDueValue(left, sortKey), ownerDueValue(right, sortKey), sortDirection))
+  }, [rows, sortDirection, sortKey])
+  const handleSort = (key: OwnerDueSortKey) => {
+    if (sortKey === key) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    else {
+      setSortKey(key)
+      setSortDirection(key === 'amount' || key === 'daysOverdue' ? 'desc' : 'asc')
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className={`flex justify-between border-b p-3 font-bold text-sm ${header}`}>
         <span>{title} ({rows.length})</span>
-        <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+        <div className="flex items-center gap-2">
+          <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+          {columnResize.hasCustomWidths ? (
+            <button className="rounded border border-slate-200 bg-white/70 px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-white hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+              คืนค่าเดิมตาราง
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Desktop view */}
-      <div className="hidden lg:block max-h-64 overflow-y-auto">
-        <table className="w-full text-sm">
+      <div className="hidden lg:block max-h-64 overflow-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {columns.map((column, index) => (
+              <col key={column.key} style={index === columns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 text-slate-500 text-xs">
             <tr>
-              <th className="p-2 text-left font-semibold">ชื่อ</th>
-              <th className="p-2 text-left font-semibold">บิล</th>
-              <th className="p-2 text-left font-semibold">Due</th>
-              <th className="p-2 text-right font-semibold">ค้าง</th>
-              {type === 'ar' ? <th className="p-2 text-right font-semibold">เกินวัน</th> : null}
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ชื่อ" resizeProps={columnResize.getResizeHandleProps('name', 'ชื่อ')} sortKey="name" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บิล" resizeProps={columnResize.getResizeHandleProps('docNo', 'บิล')} sortKey="docNo" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="Due" resizeProps={columnResize.getResizeHandleProps('due', 'Due')} sortKey="due" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ค้าง" resizeProps={columnResize.getResizeHandleProps('amount', 'ค้าง')} sortKey="amount" onSort={handleSort} />
+              {type === 'ar' ? <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="เกินวัน" resizeProps={columnResize.getResizeHandleProps('daysOverdue', 'เกินวัน')} sortKey="daysOverdue" onSort={handleSort} /> : null}
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => (
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row) => (
               <tr key={row.docNo} className="border-t border-slate-100 hover:bg-slate-50/50">
                 <td className="p-2 text-xs text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={row.name}>{row.name}</div></td>
                 <td className="p-2 font-mono text-xs text-slate-600 whitespace-nowrap">{row.docNo}</td>
@@ -952,7 +1010,7 @@ function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; da
             ))}
             {rows.length === 0 && (
               <tr>
-                <td className="py-4 text-center text-slate-400" colSpan={type === 'ar' ? 5 : 4}>
+                <td className="py-4 text-center text-slate-400" colSpan={columns.length}>
                   {type === 'ar' ? 'ไม่มีลูกหนี้ครบกำหนด ✓' : 'ไม่มี ✓'}
                 </td>
               </tr>
@@ -963,7 +1021,7 @@ function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; da
 
       {/* Mobile view (Dense Card List) */}
       <div className="block lg:hidden max-h-64 overflow-y-auto divide-y divide-slate-100 p-2 bg-slate-50/30">
-        {rows.map((row) => (
+        {sortedRows.map((row) => (
           <div key={row.docNo} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-start">
               <span className="font-bold text-slate-800 line-clamp-1">{row.name}</span>
@@ -990,19 +1048,52 @@ function OwnerDueTable({ rows, title, type }: { rows: Array<{ amount: number; da
   )
 }
 
-function OwnerSmallTable({ rows, title }: { rows: Array<{ amount: number; contractNo?: string; docNo?: string; installmentNo?: number; name?: string }>; title: string }) {
+function OwnerSmallTable({ rows, tableKey, title }: { rows: OwnerSmallRow[]; tableKey: string; title: string }) {
+  const [sortKey, setSortKey] = useState<OwnerSmallSortKey>('amount')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const columnResize = useResizableColumns(`main.owner-daily.small.${tableKey}.v1`, ownerSmallColumns)
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((left, right) => compareDashboardValues(ownerSmallValue(left, sortKey), ownerSmallValue(right, sortKey), sortDirection))
+  }, [rows, sortDirection, sortKey])
+  const handleSort = (key: OwnerSmallSortKey) => {
+    if (sortKey === key) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    else {
+      setSortKey(key)
+      setSortDirection(key === 'amount' ? 'desc' : 'asc')
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-slate-100">
       <div className="flex justify-between border-b bg-amber-50 text-amber-700 p-3 font-bold border-amber-100 text-sm">
         <span>{title} ({rows.length})</span>
-        <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+        <div className="flex items-center gap-2">
+          <span>{money(rows.reduce((sum, row) => sum + row.amount, 0))}</span>
+          {columnResize.hasCustomWidths ? (
+            <button className="rounded border border-slate-200 bg-white/70 px-2 py-0.5 text-xs font-normal text-slate-500 hover:bg-white hover:text-slate-800" type="button" onClick={columnResize.resetColumnWidths}>
+              คืนค่าเดิมตาราง
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Desktop view */}
-      <div className="hidden lg:block">
-        <table className="w-full text-xs">
-          <tbody>
-            {rows.map((row, index) => (
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-xs" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            {ownerSmallColumns.map((column, index) => (
+              <col key={column.key} style={index === ownerSmallColumns.length - 1 ? { minWidth: column.minWidth ?? 80 } : columnResize.getColumnStyle(column.key)} />
+            ))}
+          </colgroup>
+          <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+            <tr>
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เอกสาร" resizeProps={columnResize.getResizeHandleProps('ref', 'เอกสาร')} sortKey="ref" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="รายละเอียด" resizeProps={columnResize.getResizeHandleProps('detail', 'รายละเอียด')} sortKey="detail" onSort={handleSort} />
+              <ResizableTableHead activeSortKey={sortKey} align="right" direction={sortDirection} label="ยอด" resizeProps={columnResize.getResizeHandleProps('amount', 'ยอด')} sortKey="amount" onSort={handleSort} />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((row, index) => (
               <tr key={`${row.docNo ?? row.contractNo ?? index}`} className="border-t border-slate-100 hover:bg-slate-50/50">
                 <td className="p-2 font-mono text-slate-600 whitespace-nowrap">{row.docNo ?? row.contractNo}</td>
                 <td className="p-2 text-slate-700 min-w-0 overflow-hidden"><div className="truncate" title={String(row.name ?? row.installmentNo ?? '-')}>{row.name ?? row.installmentNo ?? '-'}</div></td>
@@ -1020,7 +1111,7 @@ function OwnerSmallTable({ rows, title }: { rows: Array<{ amount: number; contra
 
       {/* Mobile view */}
       <div className="block lg:hidden divide-y divide-slate-100 p-2 bg-slate-50/30">
-        {rows.map((row, index) => (
+        {sortedRows.map((row, index) => (
           <div key={`${row.docNo ?? row.contractNo ?? index}`} className="p-2.5 bg-white rounded-lg border border-slate-100 mb-1.5 last:mb-0 shadow-sm flex flex-col gap-1 text-xs">
             <div className="flex justify-between items-center">
               <span className="font-mono text-slate-600">{row.docNo ?? row.contractNo}</span>
