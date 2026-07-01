@@ -2233,3 +2233,18 @@ Tailwind dependency check:
 - 2026-07-01: Sales Bill edit WTO cost snapshot checkpoint
   - Fixed the Sales Bill edit read path so WTO-derived lines carry `unitCostSnapshot` from durable Sales Bill stock facts (`COGS / qty`) into the locked delivery snapshot used by the edit form.
   - This keeps old/consumed WTO documents editable without falling back to active `stock_holds`, because billed WTO holds are no longer active after Sales Bill stock-out.
+- 2026-07-01: Sales Bill edit PO Sell hydration checkpoint
+  - Fixed the Sales Bill edit form to hydrate PO Sell options from the durable Sales Bill detail when the original PO Sell is already completed or has zero remaining quantity.
+  - Create-new flow still reads only active PO Sell options; edit flow carries the already-linked PO Sell so rows such as `SB2607-0008` keep `POS6907-0002` instead of displaying as Spot Sale or splitting against missing PO capacity.
+- 2026-07-01: Sales Bill partial WTO allocation checkpoint
+  - Removed the Sales Bill validation that forced every selected WTO source to be fully billed in the same Sales Bill. A WTO source can now be partially sold, and the unsold remainder stays as pending_out/returnable stock for later billing or return handling.
+  - The form still blocks only true over-allocation: a Sales Bill line cannot sell more weight than the selected WTO source has available.
+- 2026-07-01: WTO stock-return availability checkpoint
+  - Fixed the WTO `รับของคืน` availability API to read active Sales Bill source allocations as the durable source of truth instead of usage-log rows. This keeps the return button visible for partially billed WTO documents such as `WTO012607-0010` when an active pending_out remainder still exists.
+  - Added the same `รับของคืน` action to the weight-ticket list row/card when a WTO has an active Sales Bill reference and remaining weight. The dialog refreshes the list after completion.
+  - Changed the stock-return `เหตุผลส่วนต่าง` field from a single-line input to a textarea because shortage explanations can be longer than one line.
+- 2026-07-01: WTO stock-return ledger checkpoint
+  - WTO stock return must be append-only in `stock_ledger`; do not edit the original Sales Bill `SB` stock-out/COGS ledger rows.
+  - When returned weight is greater than zero, the return flow writes `movement_type = รับคืนจากใบส่งของ WTO`, `ref_type = WTO-RETURN`, `qty_in = returned weight`, and `value_in = returned weight * stock_holds.unit_cost_snapshot`.
+  - When returned weight is less than the active pending_out quantity, the shortage flow writes `movement_type = ของขาดจากรับคืน WTO`, `ref_type = WTO-RETURN-LOSS`, `qty_out = shortage weight`, `value_out = shortage weight * stock_holds.unit_cost_snapshot`, and stores the required shortage reason.
+  - `stock_holds.status` remains the pending_out lifecycle source of truth (`active`, `released`, `consumed`, `lost`). `stock_ledger` does not carry a separate lifecycle status; `movement_type` and `ref_type` identify the stock movement type for audit/reporting.

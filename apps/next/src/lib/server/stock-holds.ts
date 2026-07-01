@@ -1275,9 +1275,18 @@ export async function closeActiveWtoPendingOutForSalesBillReturn(tx: TxClient, i
   }
 
   const now = new Date()
+  let returnedUnitCost = 0
+  let returnedValueIn = 0
   let lossUnitCost = 0
   let lossValueOut = 0
   let lossPendingOutKey: string | null = null
+  if (normalizedReturnedQty > 0.0001) {
+    if (hold.unit_cost_snapshot == null) {
+      throw new WtoPendingOutError(`pending_out ${hold.hold_key} ยังไม่มีราคาต้นทุนเฉลี่ยที่บันทึกไว้ ไม่สามารถบันทึกรับคืนเข้าคลังได้`)
+    }
+    returnedUnitCost = toNumber(hold.unit_cost_snapshot)
+    returnedValueIn = normalizedReturnedQty * returnedUnitCost
+  }
   if (lossQty > 0.0001) {
     if (hold.unit_cost_snapshot == null) {
       throw new WtoPendingOutError(`pending_out ${hold.hold_key} ยังไม่มีราคาต้นทุนเฉลี่ยที่บันทึกไว้ ไม่สามารถบันทึกของขาดได้`)
@@ -1349,6 +1358,34 @@ export async function closeActiveWtoPendingOutForSalesBillReturn(tx: TxClient, i
     if (closed.count !== 1) {
       throw new WtoPendingOutError('pending_out นี้ถูกเปลี่ยนสถานะไปแล้ว กรุณาโหลดข้อมูลใหม่')
     }
+  }
+
+  if (normalizedReturnedQty > 0.0001) {
+    await tx.stock_ledger.create({
+      data: {
+        branch_id: hold.branch_id,
+        created_by: input.actor,
+        date: input.returnDate,
+        lot_no: hold.lot_no,
+        movement_type: 'รับคืนจากใบส่งของ WTO',
+        note: input.note ?? `รับคืน pending_out จาก WTO ${hold.source_doc_no}`,
+        notes: `รับคืน pending_out ${hold.hold_key} จาก SB ${input.salesBillDocNo}`,
+        not_available_for_sale: hold.not_available_for_sale,
+        output_category: hold.output_category,
+        product_id: hold.product_id,
+        qty_in: normalizedReturnedQty,
+        qty_out: 0,
+        ref_id: input.salesBillDocNo,
+        ref_no: input.salesBillDocNo,
+        ref_type: 'WTO-RETURN',
+        return_reason: input.reason ?? null,
+        sales_channel_id: input.salesChannelId ?? null,
+        unit_cost: returnedUnitCost,
+        value_in: returnedValueIn,
+        value_out: 0,
+        warehouse_id: hold.warehouse_id,
+      },
+    })
   }
 
   if (lossQty > 0.0001) {

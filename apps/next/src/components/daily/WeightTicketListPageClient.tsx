@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ButtonHTMLAttributes } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Printer, Search, Share2, SquarePen, XCircle, CheckCircle2 } from 'lucide-react'
+import { Plus, Printer, RotateCcw, Search, Share2, SquarePen, XCircle, CheckCircle2 } from 'lucide-react'
 import { getErrorMessage } from '@/lib/api-client'
 import { BranchSelectCombobox } from '@/components/ui/BranchSelectCombobox'
 import { Button } from '@/components/ui/Button'
@@ -19,6 +19,7 @@ import { openWeightTicketPrintWindow, openWeightTicketReceiptPrint } from '@/lib
 import { openWeightTicketLineShare } from '@/lib/weight-ticket-share'
 import { cn } from '@/lib/utils'
 import { WeightTicketDetailModal } from './WeightTicketDetailModal'
+import { WeightTicketStockReturnDialog } from './WeightTicketStockReturnDialog'
 import { WeightTicketsPageClient } from './WeightTicketsPageClient'
 import {
   cancelWeightTicket,
@@ -51,7 +52,7 @@ const weightTicketColumns: Array<ResizableColumnDefinition<WeightTicketColumnKey
   { key: 'containerDeductionWeight', defaultWidth: 160, minWidth: 130 },
   { key: 'status', defaultWidth: 160, minWidth: 130 },
   { key: 'updatedAt', defaultWidth: 170, minWidth: 130 },
-  { key: 'action', defaultWidth: 300, minWidth: 240 },
+  { key: 'action', defaultWidth: 380, minWidth: 300 },
 ]
 
 const statusOptionsByType: Record<WeightTicketType, Array<{ label: string; values: StatusFilter[] }>> = {
@@ -177,6 +178,12 @@ function canConfirmWto(ticket: WeightTicketRecord) {
   return ticket.type === 'WTO' && ticket.status === 'draft' && ticket.usedInSalesBillCount === 0
 }
 
+function canReturnWtoStock(ticket: WeightTicketRecord) {
+  return ticket.type === 'WTO'
+    && ticket.usedInSalesBillCount > 0
+    && ticket.productSummaries.some((summary) => summary.remainingWeight > 0.0001)
+}
+
 export function WeightTicketListPageClient() {
   const router = useRouter()
   const [tickets, setTickets] = useState<WeightTicketRecord[]>([])
@@ -208,6 +215,7 @@ export function WeightTicketListPageClient() {
   const [shareNote, setShareNote] = useState('')
   const [shareError, setShareError] = useState('')
   const [isSendingLine, setIsSendingLine] = useState(false)
+  const [stockReturnTicket, setStockReturnTicket] = useState<WeightTicketRecord | null>(null)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [successModalMessage, setSuccessModalMessage] = useState('')
 
@@ -709,6 +717,16 @@ export function WeightTicketListPageClient() {
                     {confirmingTicketId === ticket.id ? 'ยืนยัน...' : 'ยืนยัน'}
                   </button>
                 ) : null}
+                {canReturnWtoStock(ticket) ? (
+                  <button
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-200 px-3 py-1.5 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                    type="button"
+                    onClick={() => setStockReturnTicket(ticket)}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    รับของคืน
+                  </button>
+                ) : null}
                 <button
                   className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-3 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
                   type="button"
@@ -866,6 +884,19 @@ export function WeightTicketListPageClient() {
                             }}
                           >
                             {confirmingTicketId === ticket.id ? 'ยืนยัน...' : 'ยืนยัน'}
+                          </button>
+                        ) : null}
+                        {canReturnWtoStock(ticket) ? (
+                          <button
+                            className="inline-flex items-center gap-1 rounded-md border border-amber-200 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setStockReturnTicket(ticket)
+                            }}
+                          >
+                            <RotateCcw className="size-3" />
+                            รับของคืน
                           </button>
                         ) : null}
                         <button
@@ -1036,6 +1067,18 @@ export function WeightTicketListPageClient() {
           }}
         />
       )}
+
+      {stockReturnTicket ? (
+        <WeightTicketStockReturnDialog
+          open={Boolean(stockReturnTicket)}
+          ticketDocNo={stockReturnTicket.documentNo}
+          onClose={() => setStockReturnTicket(null)}
+          onCompleted={() => {
+            setStockReturnTicket(null)
+            setRefreshKey((prev) => prev + 1)
+          }}
+        />
+      ) : null}
 
       {activeForm && (
         <Dialog open onOpenChange={(open) => {
