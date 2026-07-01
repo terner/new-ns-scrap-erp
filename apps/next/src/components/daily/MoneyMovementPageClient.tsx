@@ -857,6 +857,7 @@ export function MoneyMovementPageClient({
   const receiptQueueColumnResize = useResizableColumns('daily.money-movement.receipt.queue.compact.v1', receiptQueueColumns)
   const historyColumns = useMemo(() => mode === 'payment' ? paymentHistoryColumns : receiptHistoryColumns, [mode])
   const historyColumnResize = useResizableColumns(`daily.money-movement.${mode}.history.v5`, historyColumns)
+  const historyTableColumnCount = historyColumns.length + (mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? 1 : 0)
 
   const showReceiptTabs = mode === 'receipt' && !entryOnly && !historyOnly
   const showPaymentTabs = mode === 'payment' && !entryOnly && !historyOnly
@@ -2442,11 +2443,14 @@ export function MoneyMovementPageClient({
           </div>
 
           {/* Desktop Table */}
-          <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
-            <Table className="text-xs" style={{ minWidth: paymentQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+          <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <Table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: paymentQueueColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
               <colgroup>
-                {paymentQueueColumns.map((column) => {
+                {paymentQueueColumns.map((column, index) => {
                   const style = paymentQueueColumnResize.getColumnStyle(column.key);
+                  if (index === paymentQueueColumns.length - 1) {
+                    return <col key={column.key} style={{ minWidth: column.minWidth }} />;
+                  }
                   return <col key={column.key} style={style} />;
                 })}
               </colgroup>
@@ -2465,11 +2469,12 @@ export function MoneyMovementPageClient({
                 </tr>
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">
-                {isLoading ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={10}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
+                {isLoading ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={paymentQueueColumns.length}>กำลังโหลดข้อมูล</TableCell></TableRow> : null}
                   {!isLoading && supplierBillPageRows.map((bill) => {
                     const balance = bill.payableBalance ?? 0
                     const supplier = supplierMap.get(bill.supplierId ?? '')
                     const supplierBankAccounts = approvalBankAccountLines(bill).length > 0 ? approvalBankAccountLines(bill) : supplierBankAccountLines(supplier, paymentMethods)
+                    const canCancelApproval = (bill.paidAmount ?? 0) <= 0.01 && Boolean(bill.approvalId)
                     return (
                       <TableRow key={`${bill.id}:${bill.approvalId ?? 'no-approval'}`} className="cursor-pointer hover:bg-slate-50" onClick={() => openFormForBill(bill)}>
                         <TableCell className="text-xs font-semibold text-slate-700">
@@ -2542,25 +2547,26 @@ export function MoneyMovementPageClient({
                             >
                               ทำจ่าย
                             </button>
-                            <button
-                              className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                              disabled={(bill.paidAmount ?? 0) > 0.01 || !bill.approvalId}
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                setCancelApprovalTarget(bill)
-                                setCancelApprovalReason('')
-                                setError(null)
-                              }}
-                            >
-                              ยกเลิก
-                            </button>
+                            {canCancelApproval ? (
+                              <button
+                                className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setCancelApprovalTarget(bill)
+                                  setCancelApprovalReason('')
+                                  setError(null)
+                                }}
+                              >
+                                ยกเลิก
+                              </button>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>
                     )
                   })}
-                {!isLoading && supplierBillPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={10}>ไม่พบ PMA ค้างจ่ายตามเงื่อนไข</TableCell></TableRow> : null}
+                {!isLoading && supplierBillPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={paymentQueueColumns.length}>ไม่พบ PMA ค้างจ่ายตามเงื่อนไข</TableCell></TableRow> : null}
               </TableBody>
             </Table>
           </div>
@@ -2571,23 +2577,15 @@ export function MoneyMovementPageClient({
         <Dialog open onOpenChange={(open) => {
           if (!open && !isSaving) setFormOpen(false)
         }}>
-          <DialogContent className="top-[max(2rem,50%)] max-h-[90vh] overflow-hidden flex flex-col p-0 border-0 shadow-2xl bg-slate-900 max-w-5xl" hideClose>
+          <DialogContent className="top-[max(2rem,50%)] max-h-[90vh] overflow-hidden flex flex-col rounded-md p-0 border-0 shadow-2xl bg-slate-900 max-w-5xl outline-none focus:outline-none" hideClose>
             <form noValidate onSubmit={save} className="flex flex-col max-h-[90vh]">
-            <DialogHeader className="flex-row items-center justify-between px-5 py-4 shrink-0 bg-slate-900 text-white rounded-t-2xl">
+            <DialogHeader className="flex-row items-center justify-between px-5 py-4 shrink-0 bg-slate-900 text-white rounded-t-md">
               <div>
                 <DialogTitle className="font-bold text-white">
                   {mode === 'payment' ? 'สร้าง Payment Voucher' : (form.id ? 'แก้ไข Receipt Voucher' : title)}
                 </DialogTitle>
                 {mode === 'payment' ? null : <p className="text-xs text-slate-300 opacity-80">{subtitle}</p>}
               </div>
-              <button
-                type="button"
-                onClick={() => setFormOpen(false)}
-                className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1 transition-colors outline-none focus:outline-none focus:ring-0 text-2xl leading-none"
-                aria-label="Close"
-              >
-                &times;
-              </button>
             </DialogHeader>
             {error ? <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 shrink-0">{error}</div> : null}
             {mode === 'payment' ? (
@@ -3202,14 +3200,17 @@ export function MoneyMovementPageClient({
             </div>
 
             {/* Desktop Table */}
-            <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm mt-3">
-              <Table className="text-xs" style={{ minWidth: historyColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
+            <div className="hidden lg:block overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm mt-3">
+              <Table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: historyColumnResize.tableMinWidth, tableLayout: 'fixed' }}>
                 <colgroup>
                   {mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? (
                     <col style={{ width: '40px' }} />
                   ) : null}
-                  {historyColumns.map((column) => {
+                  {historyColumns.map((column, index) => {
                     const style = historyColumnResize.getColumnStyle(column.key);
+                    if (index === historyColumns.length - 1) {
+                      return <col key={column.key} style={{ minWidth: column.minWidth }} />;
+                    }
                     return <col key={column.key} style={style} />;
                   })}
                 </colgroup>
@@ -3242,7 +3243,7 @@ export function MoneyMovementPageClient({
                 <TableBody className="divide-y divide-slate-100">
                   {isLoading ? (
                     <TableRow>
-                      <TableCell className="p-8 text-center text-slate-500" colSpan={12 + (mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? 1 : 0)}>
+                      <TableCell className="p-8 text-center text-slate-500" colSpan={historyTableColumnCount}>
                         กำลังโหลดข้อมูล
                       </TableCell>
                     </TableRow>
@@ -3355,7 +3356,7 @@ export function MoneyMovementPageClient({
                       </TableRow>
                     )
                   })}
-                  {!isLoading && historyPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={12 + (mode === 'receipt' && paymentHistoryStatusFilter === 'active' ? 1 : 0)}>ยังไม่มีรายการ</TableCell></TableRow> : null}
+                  {!isLoading && historyPageRows.length === 0 ? <TableRow><TableCell className="p-8 text-center text-slate-500" colSpan={historyTableColumnCount}>ยังไม่มีรายการ</TableCell></TableRow> : null}
                 </TableBody>
               </Table>
             </div>
@@ -3465,8 +3466,8 @@ export function MoneyMovementPageClient({
         <Dialog open onOpenChange={(open) => {
           if (!open && !isCancellingPayment) setCancelPaymentTarget(null)
         }}>
-          <DialogContent className="max-w-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl">
-            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-2xl">
+          <DialogContent className="max-w-md rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose>
+            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md">
               <DialogTitle className="font-bold text-white">ยกเลิกรายการจ่ายเงิน</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 text-sm bg-slate-50 p-5">
@@ -3498,8 +3499,8 @@ export function MoneyMovementPageClient({
             setCancelApprovalReason('')
           }
         }}>
-          <DialogContent className="max-w-lg !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl" hideClose>
-            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-2xl">
+          <DialogContent className="max-w-lg rounded-md !p-0 overflow-hidden bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" hideClose>
+            <DialogHeader className="px-5 py-4 bg-slate-900 text-white rounded-t-md">
               <DialogTitle className="font-bold text-white">ยกเลิกรายการรอจ่าย</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 px-5 py-4 text-sm bg-slate-50">
@@ -3584,21 +3585,16 @@ function PaymentHistoryDetailDialog({
   row: MoneyRow | null
 }) {
   const summary = detail?.summary
+  const detailDocNo = detail?.docNo ?? row?.docNo ?? '-'
+  const detailPartyName = row?.partyName ?? '-'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-6xl rounded-2xl !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
-        <DialogHeader className="flex-row items-center justify-between gap-3 px-5 py-4 bg-slate-900 text-white">
+      <DialogContent className="max-h-[90vh] max-w-6xl rounded-md !p-0 overflow-hidden flex flex-col bg-slate-900 border-0 shadow-2xl outline-none focus:outline-none" fallbackTitle="รายละเอียดการจ่ายเงิน" hideClose>
+        <DialogHeader className="flex-row items-center justify-between gap-3 px-5 py-4 bg-slate-900 text-white rounded-t-md">
           <div className="min-w-0">
-            <DialogTitle className="truncate text-base font-bold text-white">{detail?.heading ?? 'รายละเอียดการจ่ายเงิน'}</DialogTitle>
-            <div className="mt-1 truncate font-mono text-xs text-slate-300">{detail?.docNo ?? row?.docNo ?? '-'}</div>
+            <DialogTitle className="truncate text-base font-bold text-white">รายละเอียด {detailDocNo}</DialogTitle>
+            <div className="mt-1 truncate text-xs text-slate-300">{detailPartyName}</div>
           </div>
-          <button
-            aria-label="ปิดรายละเอียด"
-            className="rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 transition-colors outline-none focus:outline-none focus:ring-0 text-2xl leading-none"
-            onClick={() => onOpenChange(false)}
-          >
-            &times;
-          </button>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 p-5 text-sm bg-slate-50">
