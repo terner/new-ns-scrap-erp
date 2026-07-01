@@ -278,7 +278,13 @@ export function ReceiptVouchersPageClient() {
     setPrintingDocNo(row.docNo)
     try {
       printWindow = openReceiptVoucherPrintWindow()
-      const matchedSupplier = supplierOptions.find((s) => s.name === row.sellerName || s.taxId === row.sellerTaxId)
+      const sellerTaxId = row.sellerTaxId?.trim()
+      const sellerName = row.sellerName?.trim()
+      const matchedSupplier = supplierOptions.find((supplier) => (
+        supplier.code === row.supplierCode
+        || Boolean(sellerTaxId && sellerTaxId !== '-' && supplier.taxId === sellerTaxId)
+        || Boolean(sellerName && supplier.name.trim() === sellerName)
+      ))
       const docToPrint: ReceiptVoucherPrintDocument = {
         ...row,
         supplierBankAccounts: matchedSupplier?.bankAccounts ?? [],

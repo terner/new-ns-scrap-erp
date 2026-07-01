@@ -40,6 +40,7 @@ export type ReceiptVoucherPrintDocument = {
   sellerPhone?: string | null
   sellerTaxId?: string | null
   status: string
+  supplierCode?: string
   totalAmount: number
   totalQty: number
   supplierBankAccounts?: Array<{
