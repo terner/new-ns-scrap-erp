@@ -246,7 +246,7 @@ Evidence:
 ### Suggested Fix Order
 
 1. Resolve the two active placeholder sidebar routes: implement minimal policy pages or remove from sidebar until ready.
-2. Finish the remaining high-confidence operational findings already drafted below: `/purchase/payments` and `/sales/receipts`; `/sales/po-sell`, `/sales/bills`, `/purchase/receipt-vouchers`, and `/production/report` have local code/layout checkpoints and still need browser QA.
+2. Finish the remaining high-confidence operational findings already drafted below: `/sales/receipts`; `/purchase/payments`, `/sales/po-sell`, `/sales/bills`, `/purchase/receipt-vouchers`, and `/production/report` have local code/layout checkpoints and still need browser QA.
 3. Normalize shared modal surfaces in one batch per component family: transaction bills, PO Buy/Sell, daily expense, money movement, stock operation, then tracking/trading.
 4. Review the field input matrix only inside the touched form batch; do not blanket-convert all `type="number"` hits.
 5. Polish finance/accounting report filter/card styling after operational transaction pages are stable.
@@ -268,6 +268,11 @@ The absence of a static finding is not a visual pass. These still need browser r
 
 - 2026-07-01 implementation checkpoint: the PO Sell list already had the page-specific Thai headers and hidden unavailable edit/cancel actions; this pass finished the remaining table/modal drift by aligning the desktop table shell with the lined table baseline, letting the final action column auto-stretch, replacing fixed `colSpan={15}` with the column definition count, and normalizing the create/edit, cancel, and detail dialogs to the `rounded-md` dark-header modal baseline with no outer border/outline leakage. The detail subtitle now keeps readable slate-300 contrast in dark mode. Browser QA remains pending because this batch was local code/layout validation only.
 - Remaining follow-up: run desktop/mobile browser QA for PO Sell when the selected visual batch reaches browser verification.
+
+### `/purchase/payments`
+
+- 2026-07-01 implementation checkpoint: the PMA waiting-payment table and PMT history table now align more closely with the `/daily/weight-ticket-list` lined/resizable table baseline. Both desktop tables use `border-slate-200`, `min-w-full divide-y divide-slate-200 text-sm`, final-column auto-stretch, and column-definition based loading/empty `colSpan` values. PMA cancel actions now hide when unavailable instead of rendering disabled controls. The create PMT modal, payment cancel dialog, waiting-payment cancel dialog, and PMT history detail dialog now use the `rounded-md` dark-header modal baseline with hidden corner close controls; the PMT detail header puts the document number in the title and the supplier/party name in the subtitle. Payment money fields already use the money input pattern, so no `type="number"` conversion was needed. Browser QA remains pending because this batch was local code/layout validation only.
+- Remaining follow-up: `/sales/receipts` still needs its receipt-specific detail/cancel/form review in the next page pass because it shares `MoneyMovementPageClient`.
 
 ### `/production/report`
 
@@ -398,9 +403,8 @@ High-impact route families:
   - `/sales/bills` has a 2026-07-01 local design checkpoint for table wording/actions, mobile filter count, final-column auto-stretch, Sales Bill detail grouped cards, and Sales Bill/cancel modal radius normalization.
   - `/purchase/bills` shares the transaction list/action table mechanics, but its purchase detail/form modal surfaces still need a separate page pass before marking the purchase side visually complete.
 - `/purchase/payments` and `/sales/receipts`
-  - Tables are mostly resizable and have mobile cards.
-  - Money/WHT/discount fields still use `type="number"` in payment/receipt entry rows; review through the Field Input Decision Matrix before changing.
-  - History actions still show disabled buttons for cancelled rows in some places.
+  - `/purchase/payments` has a 2026-07-01 local design checkpoint for table shell/colgroup/colSpan cleanup, hidden unavailable PMA cancel actions, PMT form/cancel/detail modal radius normalization, and money-pattern confirmation.
+  - `/sales/receipts` still needs a dedicated pass for receipt-specific detail/cancel/form modal surfaces and receipt line money fields through the Field Input Decision Matrix.
 - `/purchase/receipt-vouchers`
   - 2026-07-01 design polish completed for the high-confidence static findings: page-specific headers/filter wording, final-column auto-stretch, desktop action alignment, hidden unavailable edit/cancel actions, and dark-header modal surfaces.
   - Remaining: browser QA for desktop/mobile visual confirmation.
@@ -471,7 +475,7 @@ Expected:
 ### Updated Suggested Fix Order
 
 1. Fix the two scaffold sidebar routes: `/finance-accounting/accounting-periods` and `/finance-accounting/posting-rules`.
-2. Finish remaining high-confidence operational inconsistencies users will notice immediately: `/purchase/payments` and `/sales/receipts` (PO Sell, Sales Bills, and RV static findings are fixed; browser QA still pending).
+2. Finish remaining high-confidence operational inconsistencies users will notice immediately: `/sales/receipts` (`/purchase/payments`, PO Sell, Sales Bills, and RV static findings are fixed; browser QA still pending).
 3. Normalize shared operational modal surfaces by component family: `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, `DailyExpensePageClient`, `StockOperationPageClient`, tracking pages, then trading pages.
 4. Bring Dual Costing tables up to the table reference, starting with `/dual-costing/cost-allocator` and `/dual-costing/cost-pool` because they combine table mechanics drift with mobile/table density risk.
 5. Normalize Finance / Accounting table mechanics in shared component batches: fixed assets, financial statements, cash-flow planning, loans/equity.
