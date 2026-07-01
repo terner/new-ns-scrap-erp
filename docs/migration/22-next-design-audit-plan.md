@@ -367,7 +367,7 @@ Expected:
 Routes/components with high-confidence table mechanics drift:
 
 - Main dashboard/report pages:
-  - `/sales-commission`
+  - None remaining in this static table-mechanics queue after the main dashboard/report table checkpoints below. Browser QA remains pending.
 - Finance / Accounting:
   - None remaining in this static table-mechanics queue after the A2, A5, A6, and A7 design checkpoints. Browser QA remains pending.
 - Lower-priority playground:
@@ -486,6 +486,10 @@ Expected:
 - `/sales-plan`
   - After the latest correction, the plan table, sales-plan vs stock analysis table, and remaining-stock table now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, Thai-first business headers, and safer nowrap/tabular numeric alignment.
   - Mobile cards now render from the same sorted row sets as their desktop tables. LME config, filters, KPI totals, CSV export contents, plan lock/write behavior, stock/WAC source, best-plan price, projected profit, margin formula, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/sales-commission`
+  - After the latest correction, the overview sales/category summary table and selected-sales drilldown tables now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, and safer nowrap/tabular numeric alignment.
+  - The overview table was flattened from nested mini tables into a real sortable/resizable table. Date/branch filters, salesperson cards, commission eligibility, annual/current totals, supplier grouping, bill detail search, CSV export contents, step-tier commission formula, and read-model behavior were not changed.
   - Browser QA remains pending.
 - `/production/report`
   - After the latest correction, the report, WIP, and product-summary tables now share the same toolbar/table mechanics and mobile card pattern.
