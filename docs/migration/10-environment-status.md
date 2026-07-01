@@ -39,7 +39,7 @@ Git branch boundary:
 
 ### Staging / UAT
 
-- Project ref: not created yet
+- Project ref: `oolzfvqhovmjhiocfqdw`
 - Purpose: user testing, customer UAT, migration rehearsal, release validation
 - Expected usage:
   - deploy tested schema from `dev-target`
@@ -47,6 +47,13 @@ Git branch boundary:
   - let customer/user validate business flow
   - run reconciliation checks before any production cutover
 - Should be a separate Supabase project, not another database inside the same project
+
+Status update on 2026-07-01:
+- Customer UAT Supabase is available at project ref `oolzfvqhovmjhiocfqdw`.
+- The current dev database snapshot was dumped from the active Next app `DATABASE_URL` in `apps/next/.env.local` at `2026-07-01 11:23:04 +07`.
+- UAT was backed up before restore, then restored with the dev snapshot for `public` plus the required `auth.users` and `auth.identities` rows needed by public foreign keys and login.
+- Post-restore validation matched the restored snapshot: `public` has 135 tables and 26,171 rows; `auth.users` has 43 rows and `auth.identities` has 42 rows.
+- A later comparison against live dev showed 10 additional rows in dev after the dump time, so UAT matches the dump snapshot, not subsequent dev writes.
 
 ### New Production / Target
 
