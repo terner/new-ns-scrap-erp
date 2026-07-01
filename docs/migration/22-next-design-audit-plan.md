@@ -494,7 +494,8 @@ Expected:
   - Browser QA remains pending.
 - `/dual-costing/cost-pool`
   - After the latest correction, the main Cost Pool table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, and final status-column auto-stretch.
-  - The table now shows the branch column already present in the read model, mobile uses dense cards instead of horizontal table scrolling, and filter/pagination wording/sizing follows the shared list baseline more closely.
+  - Follow-up correction after visual feedback: every business header now uses `ResizableTableHead` sorting props, shows inactive/active up/down sort indicators, applies client-side ascending/descending sorting before pagination, and uses fixed table layout so resize handles visibly adjust the columns like `/daily/weight-ticket-list` and `/sales/po-sell`.
+  - The table now shows the branch column already present in the read model, mobile uses dense cards from the same sorted paged row set instead of horizontal table scrolling, and filter/pagination wording/sizing follows the shared list baseline more closely.
   - Browser QA remains pending.
 - `/dual-costing/deal-margin`
   - After the latest correction, the per-deal desktop table now uses the active lined/resizable table shell with Thai-first business headers, persisted column widths, reset-width control, final status-column auto-stretch, and a shared pagination toolbar.

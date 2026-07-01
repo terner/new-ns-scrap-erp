@@ -59,6 +59,7 @@ type CostPoolPayload = {
 }
 
 type CostPoolColumnKey = 'availableQty' | 'availableValue' | 'branchName' | 'costType' | 'counterparty' | 'date' | 'productName' | 'qty' | 'sourceNo' | 'sourceType' | 'status' | 'unitCost' | 'usedQty'
+type SortDirection = 'asc' | 'desc'
 
 const costPoolColumns: Array<ResizableColumnDefinition<CostPoolColumnKey>> = [
   { key: 'costType', defaultWidth: 125, minWidth: 105 },
@@ -92,6 +93,8 @@ export function CostPoolPageClient() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const [sortKey, setSortKey] = useState<CostPoolColumnKey | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const columnResize = useResizableColumns('dual-costing.cost-pool.main.v1', costPoolColumns)
 
   useEffect(() => {
@@ -129,13 +132,26 @@ export function CostPoolPageClient() {
   }, [loadData])
 
   const rows = useMemo(() => data?.rows ?? [], [data?.rows])
-  const totalRows = rows.length
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows
+
+    return [...rows].sort((a, b) => {
+      const aValue = getCostPoolSortValue(a, sortKey)
+      const bValue = getCostPoolSortValue(b, sortKey)
+      const result = typeof aValue === 'number' && typeof bValue === 'number'
+        ? aValue - bValue
+        : String(aValue).localeCompare(String(bValue), 'th', { numeric: true })
+
+      return sortDirection === 'asc' ? result : -result
+    })
+  }, [rows, sortDirection, sortKey])
+  const totalRows = sortedRows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pagedRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize
-    return rows.slice(start, start + pageSize)
-  }, [rows, currentPage, pageSize])
+    return sortedRows.slice(start, start + pageSize)
+  }, [sortedRows, currentPage, pageSize])
 
   const productSearchOptions = useMemo<SearchComboboxOption[]>(() => {
     return (data?.filters.products ?? []).map((product) => ({
@@ -168,6 +184,16 @@ export function CostPoolPageClient() {
     setSourceType('all')
     setStatus('all')
     setToDate('')
+  }
+
+  function handleSort(key: CostPoolColumnKey) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortKey(key)
+    setSortDirection('asc')
   }
 
   return (
@@ -397,7 +423,7 @@ export function CostPoolPageClient() {
       </div>
 
       <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm md:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ minWidth: columnResize.tableMinWidth }}>
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
           <colgroup>
             {costPoolColumns.map((column, index) => {
               const style = columnResize.getColumnStyle(column.key)
@@ -409,19 +435,19 @@ export function CostPoolPageClient() {
           </colgroup>
           <thead className="bg-slate-100">
             <tr>
-              <ResizableTableHead label="ประเภทต้นทุน" resizeProps={columnResize.getResizeHandleProps('costType', 'ประเภทต้นทุน')} />
-              <ResizableTableHead label="แหล่งต้นทุน" resizeProps={columnResize.getResizeHandleProps('sourceType', 'แหล่งต้นทุน')} />
-              <ResizableTableHead label="เลขที่เอกสารต้นทุน" resizeProps={columnResize.getResizeHandleProps('sourceNo', 'เลขที่เอกสารต้นทุน')} />
-              <ResizableTableHead label="วันที่เอกสาร" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่เอกสาร')} />
-              <ResizableTableHead label="สาขา" resizeProps={columnResize.getResizeHandleProps('branchName', 'สาขา')} />
-              <ResizableTableHead label="คู่ค้า" resizeProps={columnResize.getResizeHandleProps('counterparty', 'คู่ค้า')} />
-              <ResizableTableHead label="สินค้า" resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} />
-              <ResizableTableHead align="right" label="ปริมาณตั้งต้น" resizeProps={columnResize.getResizeHandleProps('qty', 'ปริมาณตั้งต้น')} />
-              <ResizableTableHead align="right" label="จับคู่แล้ว" resizeProps={columnResize.getResizeHandleProps('usedQty', 'จับคู่แล้ว')} />
-              <ResizableTableHead align="right" label="คงเหลือพร้อมใช้" resizeProps={columnResize.getResizeHandleProps('availableQty', 'คงเหลือพร้อมใช้')} />
-              <ResizableTableHead align="right" label="ต้นทุน/หน่วย" resizeProps={columnResize.getResizeHandleProps('unitCost', 'ต้นทุนต่อหน่วย')} />
-              <ResizableTableHead align="right" label="มูลค่าคงเหลือ" resizeProps={columnResize.getResizeHandleProps('availableValue', 'มูลค่าคงเหลือ')} />
-              <ResizableTableHead align="center" label="สถานะ" resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
+              <ResizableTableHead label="ประเภทต้นทุน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="costType" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('costType', 'ประเภทต้นทุน')} />
+              <ResizableTableHead label="แหล่งต้นทุน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="sourceType" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('sourceType', 'แหล่งต้นทุน')} />
+              <ResizableTableHead label="เลขที่เอกสารต้นทุน" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="sourceNo" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('sourceNo', 'เลขที่เอกสารต้นทุน')} />
+              <ResizableTableHead label="วันที่เอกสาร" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="date" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('date', 'วันที่เอกสาร')} />
+              <ResizableTableHead label="สาขา" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="branchName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('branchName', 'สาขา')} />
+              <ResizableTableHead label="คู่ค้า" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="counterparty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('counterparty', 'คู่ค้า')} />
+              <ResizableTableHead label="สินค้า" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="productName" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('productName', 'สินค้า')} />
+              <ResizableTableHead align="right" label="ปริมาณตั้งต้น" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="qty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('qty', 'ปริมาณตั้งต้น')} />
+              <ResizableTableHead align="right" label="จับคู่แล้ว" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="usedQty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('usedQty', 'จับคู่แล้ว')} />
+              <ResizableTableHead align="right" label="คงเหลือพร้อมใช้" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="availableQty" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('availableQty', 'คงเหลือพร้อมใช้')} />
+              <ResizableTableHead align="right" label="ต้นทุน/หน่วย" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="unitCost" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('unitCost', 'ต้นทุนต่อหน่วย')} />
+              <ResizableTableHead align="right" label="มูลค่าคงเหลือ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="availableValue" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('availableValue', 'มูลค่าคงเหลือ')} />
+              <ResizableTableHead align="center" label="สถานะ" activeSortKey={sortKey ?? undefined} direction={sortDirection} sortKey="status" onSort={handleSort} resizeProps={columnResize.getResizeHandleProps('status', 'สถานะ')} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -458,6 +484,19 @@ export function CostPoolPageClient() {
 
     </DualCostingPageSection>
   )
+}
+
+function getCostPoolSortValue(row: CostPoolRow, key: CostPoolColumnKey): string | number {
+  if (key === 'date') {
+    const timestamp = Date.parse(row.date)
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+
+  if (key === 'status') {
+    return statusLabel(row.status)
+  }
+
+  return row[key] ?? ''
 }
 
 function CostPoolMobileCard({ row }: { row: CostPoolRow }) {

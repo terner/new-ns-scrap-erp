@@ -1270,6 +1270,22 @@ Priority: สูง เพราะผูกกับ AP/AR/payment/receipt/bank
 - Result: UI-D2 Cost Pool / Cost Allocator legacy UI parity revision validated and pushed.
 - Commit: `488f7fa fix: restore cost pool allocator legacy ui parity` pushed to `main`.
 
+### UI-D2a: Cost Pool Sort / Resize Table Correction
+
+#### Execution Log
+
+- Task: fix `/dual-costing/cost-pool` table mechanics after visual feedback that the table still did not sort up/down or resize like the active reference tables.
+- Legacy refs: none new; this correction follows `docs/design.md` table mechanics and active references `/daily/weight-ticket-list` plus `/sales/po-sell`.
+- Files changed: `apps/next/src/components/dual-costing/CostPoolPageClient.tsx`, this tracker, current work handoff, and design audit plan.
+- DB/API changes: none. `GET /api/dual-costing/cost-pool`, export contract, product eligibility, Cost Pool source rules, quantity/value calculation, allocation usage, stock, WAC, GL, and payment behavior are unchanged.
+- Buttons/actions checked: table header sort controls now exist on every business column; reset column widths remains unchanged.
+- Modal/form checked: none; no modal/form behavior changed.
+- Validation added: client-side sort state, active/inactive sort indicators through `ResizableTableHead`, sorted rows before pagination, sorted mobile card row set, and fixed table layout so column resize handles apply visibly and consistently.
+- Playwright smoke: not run in this correction; project rule limits browser UAT unless explicitly requested. Browser QA remains pending.
+- Commands: targeted ESLint for `CostPoolPageClient.tsx` passed; `npm run type-check --workspace @ns-scrap-erp/next -- --pretty false` passed; `npm run lint --workspace @ns-scrap-erp/next` passed with 0 errors and 5 existing unrelated warnings; `npm run build --workspace @ns-scrap-erp/next` passed.
+- Result: Cost Pool table headers now expose the expected up/down sort behavior, sorted pagination/mobile rows, and fixed-layout resizable columns without changing Cost Pool API or business behavior.
+- Commit: this checkpoint.
+
 ### UI-D3: Match Log / Deal Margin / Compare Margin Legacy UI Parity Revision
 
 - [x] `/dual-costing/match-log` legacy info/filter/table/action-shell parity
