@@ -643,6 +643,10 @@ Expected:
   - After the latest correction, the expanded product-by-group detail table, daily purchase bill table, daily sales bill table, and cash movement account table now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
   - Mobile product/bill cards render from the same sorted row sets as desktop, and the cash account table now has compact mobile cards from the sorted account rows. Daily Report API behavior, daily summary formulas, group breakdown formulas, purchase/sales bill source rows, cash movement calculations, and DB state were not changed.
   - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- `/analytics-dashboard`
+  - Static follow-up after the latest correction: the rendered analytics tables already use sortable `ResizableTableHead` headers, persisted resizable widths, `colgroup`, fixed table layout, reset-width controls where applicable, and mobile card alternatives.
+  - Removed unused stale `DueTable` and `BillTable` helpers from `MainDashboardsPageClient.tsx`; they were not rendered by any route and only caused static scans to flag old non-resizable table markup. Analytics API behavior, formulas, filters, KPI cards, chart rows, and DB state were not changed.
+  - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
 - Master data shared pages under `/master-data/*`
   - Most shared pages use `MasterDataPageClient`, which already has resizable desktop table, mobile toolbar/filter bottom sheet, mobile card list, and dark-header form modal.
   - Remaining work is mostly modal polish, wording cleanup, and field-specific validation/presentation, not a full table rewrite.
