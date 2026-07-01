@@ -589,6 +589,11 @@ Expected:
   - Both have resizable desktop tables and mobile card lists.
   - Remaining work is mostly wording (`Customer`/`Supplier`, `วันที่`, `Due`, `Current`) and AP/AR-specific detail/modal/card polish already tracked in the implementation tasklist.
 
+- `/admin/line-settings`
+  - After the latest correction, the Targets / Groups, Routing Rules, and Outbox Queue desktop tables now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before rendering, persisted resizable widths, reset-width controls, and fixed table layout.
+  - The mobile target/rule/job cards render from the same sorted row sets as desktop. LINE credential save, target sync/test/default/delete, rule save/delete/simulate, outbox retry/cancel/process, analytics, API behavior, and DB state were not changed.
+  - Browser QA remains pending.
+
 ### Updated Suggested Fix Order
 
 1. Finish remaining high-confidence operational inconsistencies users will notice immediately: `/sales/receipts` (`/purchase/payments`, PO Sell, Sales Bills, and RV static findings are fixed; browser QA still pending).
