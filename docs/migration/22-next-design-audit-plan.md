@@ -367,7 +367,6 @@ Expected:
 Routes/components with high-confidence table mechanics drift:
 
 - Main dashboard/report pages:
-  - `/sales-plan`
   - `/sales-commission`
 - Finance / Accounting:
   - None remaining in this static table-mechanics queue after the A2, A5, A6, and A7 design checkpoints. Browser QA remains pending.
@@ -483,6 +482,10 @@ Expected:
 - `/cash-others-summary`
   - After the latest correction, the Cash Accounts table now uses the active lined/resizable table shell with persisted column widths, reset-width control, sortable up/down headers, fixed table layout, and safer nowrap/tabular numeric alignment for Balance and THB Equivalent.
   - Mobile account cards now render from the same sorted row set as the desktop table. As-of filter, KPIs, Trading Pending cards, asset/debt donut data, AR aging, receivable/debt/stock key rows, and read-model behavior were not changed.
+  - Browser QA remains pending.
+- `/sales-plan`
+  - After the latest correction, the plan table, sales-plan vs stock analysis table, and remaining-stock table now use the active lined/resizable table shell with persisted column widths, reset-width controls, sortable up/down headers, fixed table layout, Thai-first business headers, and safer nowrap/tabular numeric alignment.
+  - Mobile cards now render from the same sorted row sets as their desktop tables. LME config, filters, KPI totals, CSV export contents, plan lock/write behavior, stock/WAC source, best-plan price, projected profit, margin formula, and read-model behavior were not changed.
   - Browser QA remains pending.
 - `/production/report`
   - After the latest correction, the report, WIP, and product-summary tables now share the same toolbar/table mechanics and mobile card pattern.
