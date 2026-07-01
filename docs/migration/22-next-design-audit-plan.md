@@ -643,6 +643,10 @@ Expected:
   - After the latest correction, the expanded product-by-group detail table, daily purchase bill table, daily sales bill table, and cash movement account table now use sortable `ResizableTableHead` headers with inactive/active up/down indicators, persisted resizable widths, reset-width controls, `colgroup`, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
   - Mobile product/bill cards render from the same sorted row sets as desktop, and the cash account table now has compact mobile cards from the sorted account rows. Daily Report API behavior, daily summary formulas, group breakdown formulas, purchase/sales bill source rows, cash movement calculations, and DB state were not changed.
   - Browser/computer-use QA was not run per the current instruction to avoid browser verification.
+- `/daily/expense-dashboard`
+  - Follow-up after the latest static scan: the read-only expense heatmap now uses sortable `ResizableTableHead` headers with inactive/active up/down indicators on the large desktop heatmap while preserving persisted resizable widths, `colgroup`, and fixed table layout.
+  - The tablet simplified table now also uses sortable/resizable headers, persisted widths, reset-width support, `colgroup`, and fixed table layout instead of a plain table. Mobile cards now render from the same sorted dashboard row set as desktop/tablet.
+  - Expense dashboard API behavior, legacy `amount + vat` math, active-category bucket logic, anomaly thresholds, period selector behavior, expense write flow, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
 - `/analytics-dashboard`
   - Static follow-up after the latest correction: the rendered analytics tables already use sortable `ResizableTableHead` headers, persisted resizable widths, `colgroup`, fixed table layout, reset-width controls where applicable, and mobile card alternatives.
   - Removed unused stale `DueTable` and `BillTable` helpers from `MainDashboardsPageClient.tsx`; they were not rendered by any route and only caused static scans to flag old non-resizable table markup. Analytics API behavior, formulas, filters, KPI cards, chart rows, and DB state were not changed.
@@ -724,8 +728,8 @@ After completing the Foreign Finance table sweep, tracked `apps/next/src` TS/TSX
 
 ### Updated Suggested Fix Order
 
-1. No remaining high-confidence operational static inconsistency is currently listed after the `/sales/receipts` follow-up. The listed operational pages are now in browser QA / real-data visual confirmation rather than another static rewrite.
-2. Normalize shared operational modal surfaces by component family: `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, `StockOperationPageClient`, tracking pages, then trading pages. `DailyExpensePageClient` has a static design checkpoint and should move to browser QA rather than another static rewrite.
+1. No remaining high-confidence operational static inconsistency is currently listed after the `/daily/expense-dashboard` follow-up. The listed operational pages are now in browser QA / real-data visual confirmation rather than another static rewrite.
+2. Normalize shared operational modal surfaces by component family: `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, `StockOperationPageClient`, tracking pages, then trading pages. `DailyExpensePageClient` has a table-mechanics follow-up checkpoint and should move to browser QA rather than another static rewrite.
 3. Foreign-finance static table mechanics sweep is corrected for `/finance/foreign/fx-gain-loss-report`, `/finance/foreign/fcd-ledger`, `/finance/foreign/fx-rate`, `/finance/foreign/intl-transfer`, and `/finance/foreign/overseas-receipt`; remaining work is browser QA / real-data visual confirmation, not another high-confidence static table rewrite.
 4. Review `type="number"` only inside the touched page batch using the design matrix; do not run a broad replacement sweep.
 5. Run browser QA desktop + mobile for the selected batch before claiming visual completion.
