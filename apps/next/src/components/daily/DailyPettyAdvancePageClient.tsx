@@ -617,56 +617,57 @@ export function DailyPettyAdvancePageClient() {
         </div>
       ) : null}
 
-      {/* Pagination Controls */}
-      <div className="mb-4 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <span>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</span>
-          {columnResize.hasCustomWidths ? (
-            <button className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>
-              คืนค่าเดิมตาราง
-            </button>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            aria-label="จำนวนรายการต่อหน้า"
-            className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-          >
-            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-          </select>
-          <button
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            disabled={currentPage <= 1}
-            type="button"
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
-          >
-            ก่อนหน้า
-          </button>
-          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-          <button
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            disabled={currentPage >= totalPages}
-            type="button"
-            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-          >
-            ถัดไป
-          </button>
-        </div>
-      </div>
-
       {detailRow ? <DetailModal row={detailRow} onClose={() => setDetailRow(null)} onReturn={openReturnForm} /> : null}
 
-      {/* Mobile Card List */}
-      <div className="block lg:hidden space-y-3">
+      {/* Table Card Controls */}
+      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ</span>
+            {columnResize.hasCustomWidths ? (
+              <button className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50" type="button" onClick={columnResize.resetColumnWidths}>
+                คืนค่าเดิมตาราง
+              </button>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="จำนวนรายการต่อหน้า"
+              className="h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+            >
+              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+            </select>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage <= 1}
+              type="button"
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+            <button
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              disabled={currentPage >= totalPages}
+              type="button"
+              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Card List */}
+        <div className="block divide-y divide-slate-100/60 lg:hidden">
         {isLoading ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-500 shadow border border-slate-100">กำลังโหลดข้อมูล</div>
+          <div className="p-8 text-center text-slate-500">กำลังโหลดข้อมูล</div>
         ) : null}
         {!isLoading && pagedRows.map((row) => (
           <div
             key={row.id}
-            className="rounded-md border border-slate-100 bg-white p-4 shadow-sm active:bg-slate-50 cursor-pointer transition-colors"
+            className="cursor-pointer p-4 transition-colors active:bg-slate-50"
             onClick={() => setDetailRow(row)}
           >
             <div className="flex justify-between items-start mb-2">
@@ -709,11 +710,11 @@ export function DailyPettyAdvancePageClient() {
           </div>
         ))}
         {!isLoading && filteredRows.length === 0 ? (
-          <div className="rounded-md bg-white p-8 text-center text-slate-400 shadow border border-slate-100">ยังไม่มีรายการ</div>
+          <div className="p-8 text-center text-slate-400">ยังไม่มีรายการ</div>
         ) : null}
-      </div>
+        </div>
 
-      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+        <div className="hidden overflow-x-auto lg:block">
         <table className="w-full text-sm" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
           <colgroup>
             {pettyAdvanceColumns.map((column) => {
@@ -759,6 +760,7 @@ export function DailyPettyAdvancePageClient() {
             {!isLoading && filteredRows.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={10}>ยังไม่มีรายการ</td></tr> : null}
           </tbody>
         </table>
+        </div>
       </div>
     </section>
   )
