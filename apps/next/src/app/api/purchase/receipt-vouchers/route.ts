@@ -282,10 +282,25 @@ function purchaseBillItemRemarks(items: Array<{
     .join('\n')
 }
 
-function explicitReceiptVoucherNote(note: string | null | undefined) {
-  const value = note?.trim() ?? ''
-  if (!value) return ''
-  return value === DEFAULT_RECEIPT_VOUCHER_NOTE ? '' : value
+function combineReceiptVoucherNotes(...notes: Array<string | null | undefined>) {
+  const lines: string[] = []
+  const seen = new Set<string>()
+  notes.forEach((note) => {
+    String(note ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .forEach((line) => {
+        if (seen.has(line)) return
+        seen.add(line)
+        lines.push(line)
+      })
+  })
+  return lines.join('\n')
+}
+
+function receiptVoucherNote(note: string | null | undefined, purchaseBillNote?: string | null) {
+  return combineReceiptVoucherNotes(DEFAULT_RECEIPT_VOUCHER_NOTE, note, purchaseBillNote)
 }
 
 async function buildVoucherWriteData(
@@ -386,12 +401,15 @@ async function buildVoucherWriteData(
   const sellerName = purchaseBill ? purchaseBill.supplier_name_snapshot ?? '' : values.sellerName?.trim() ?? ''
   const purchaseBillRemarkNote = purchaseBill ? purchaseBillItemRemarks(purchaseBill.purchase_bill_items) : ''
   if (!purchaseBill && !sellerName) throw new Error('กรุณากรอกชื่อผู้รับเงิน')
+  const purchaseBillNote = purchaseBill
+    ? combineReceiptVoucherNotes(purchaseBillRemarkNote, purchaseBill.note, purchaseBill.notes)
+    : ''
   return {
     amount_in_words: values.amountInWords?.trim() || thaiBahtText(totalAmount),
     date: normalizeDate(values.date),
     items: items as Prisma.InputJsonValue,
     license_plate: purchaseBill ? purchaseBill.license_plate ?? null : values.licensePlate || null,
-    note: explicitReceiptVoucherNote(values.note) || purchaseBillRemarkNote || purchaseBill?.note || purchaseBill?.notes || null,
+    note: receiptVoucherNote(values.note, purchaseBillNote) || null,
     payer_signer_name: payerSignerName,
     payment_method: values.paymentMethod?.trim() || CASH_PAYMENT_METHOD,
     purchase_bill_doc_no: purchaseBill?.doc_no ?? null,
@@ -667,7 +685,7 @@ export async function GET() {
     const rowPurchaseBillNoteById = new Map<string, string>()
     const rowPurchaseBillNoteByDocNo = new Map<string, string>()
     rowPurchaseBillRemarkRows.forEach((bill) => {
-      const note = purchaseBillItemRemarks(bill.purchase_bill_items) || bill.note || bill.notes || ''
+      const note = combineReceiptVoucherNotes(purchaseBillItemRemarks(bill.purchase_bill_items), bill.note, bill.notes)
       rowPurchaseBillNoteById.set(bill.id.toString(), note)
       rowPurchaseBillNoteByDocNo.set(bill.doc_no, note)
     })
@@ -718,7 +736,7 @@ export async function GET() {
           unit: item.unit ?? 'กก.',
         })),
         licensePlate: bill.license_plate ?? '',
-        note: purchaseBillItemRemarks(bill.purchase_bill_items) || bill.note || bill.notes || '',
+        note: receiptVoucherNote(null, combineReceiptVoucherNotes(purchaseBillItemRemarks(bill.purchase_bill_items), bill.note, bill.notes)),
         salesPerson: bill.supplier_sales_rep_snapshot ?? '',
         sellerAddress: bill.supplier_address_snapshot ?? '',
         sellerCode: bill.suppliers?.code ?? '',
@@ -736,10 +754,11 @@ export async function GET() {
         id: row.doc_no,
         items: row.items ?? [],
         licensePlate: row.license_plate ?? '',
-        note: explicitReceiptVoucherNote(row.note)
-          || rowPurchaseBillNoteById.get(row.purchase_bill_id?.toString() ?? '')
-          || rowPurchaseBillNoteByDocNo.get(row.purchase_bill_doc_no ?? '')
-          || '',
+        note: receiptVoucherNote(
+          row.note,
+          rowPurchaseBillNoteById.get(row.purchase_bill_id?.toString() ?? '')
+            || rowPurchaseBillNoteByDocNo.get(row.purchase_bill_doc_no ?? ''),
+        ),
         payerSignerName: row.payer_signer_name ?? row.created_by ?? '',
         paymentMethod: row.payment_method ?? '',
         purchaseBillId: row.purchase_bill_doc_no ?? '',
