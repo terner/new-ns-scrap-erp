@@ -534,6 +534,7 @@ Expected:
   - After the latest correction, the allocation rows table and Trading purchase/cost source remaining table now use sortable `ResizableTableHead` business headers with inactive/active up/down indicators, client-side ascending/descending sorting before pagination, persisted resizable widths, reset-width controls, and fixed table layout so resize handles visibly adjust columns like `/dual-costing/cost-pool`.
   - Allocation and remaining-cost mobile cards now render from the same sorted paged row sets as desktop. Export query, allocation facts, ex-VAT GP formula, filters, read-only correction boundary, detail modal behavior, and API/DB state were not changed.
   - Browser QA remains pending.
+  - 2026-07-02 modal polish follow-up: the deal detail dialog now uses the dark-header no-border-leak modal baseline with `hideClose`, `rounded-md`, `border-0`, `bg-slate-900`, `!p-0`, shadow, outline suppression, a slate scroll body, and a white footer with an outline `ปิด` action. The custom header `X` close button was removed. Allocation rows, remaining cost rows, export query, ex-VAT GP formula, filters, read-only correction boundary, API behavior, and DB state were not changed. Browser/computer-use QA was not run per the current instruction.
 - `/production/report`
   - After the latest correction, the report, WIP, and product-summary tables now share the same toolbar/table mechanics and mobile card pattern.
   - Browser QA remains pending.
