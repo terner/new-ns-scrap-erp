@@ -11,6 +11,7 @@ import { isPurchaseBillCancelledStatus, PURCHASE_BILL_CANCELLED_STATUSES } from 
 export const runtime = 'nodejs'
 
 const CASH_PAYMENT_METHOD = 'รับเงินสด'
+const DEFAULT_RECEIPT_VOUCHER_NOTE = 'แนบสำเนาบัตรประชาชนผู้รับเงิน (กรณีบุคคลธรรมดา)'
 
 const receiptVoucherItemSchema = z.object({
   description: z.string().trim().min(1, 'กรุณากรอกรายการ'),
@@ -194,6 +195,12 @@ function purchaseBillItemRemarks(items: Array<{ line_no: number; note?: string |
     .join('\n')
 }
 
+function explicitReceiptVoucherNote(note: string | null | undefined) {
+  const value = note?.trim() ?? ''
+  if (!value) return ''
+  return value === DEFAULT_RECEIPT_VOUCHER_NOTE ? '' : value
+}
+
 async function buildVoucherWriteData(
   tx: Prisma.TransactionClient,
   values: z.infer<typeof receiptVoucherWriteSchema>,
@@ -252,7 +259,7 @@ async function buildVoucherWriteData(
     date: normalizeDate(values.date),
     items: items as Prisma.InputJsonValue,
     license_plate: purchaseBill ? purchaseBill.license_plate ?? null : values.licensePlate || null,
-    note: values.note?.trim() || purchaseBillRemarkNote || purchaseBill?.note || purchaseBill?.notes || null,
+    note: explicitReceiptVoucherNote(values.note) || purchaseBillRemarkNote || purchaseBill?.note || purchaseBill?.notes || null,
     payer_signer_name: payerSignerName,
     payment_method: values.paymentMethod?.trim() || CASH_PAYMENT_METHOD,
     purchase_bill_doc_no: purchaseBill?.doc_no ?? null,
@@ -507,7 +514,7 @@ export async function GET() {
         id: row.doc_no,
         items: row.items ?? [],
         licensePlate: row.license_plate ?? '',
-        note: row.note?.trim()
+        note: explicitReceiptVoucherNote(row.note)
           || rowPurchaseBillNoteById.get(row.purchase_bill_id?.toString() ?? '')
           || rowPurchaseBillNoteByDocNo.get(row.purchase_bill_doc_no ?? '')
           || '',
