@@ -527,15 +527,15 @@ export function OpeningBalancePageClient() {
       <Panel title="⚙️ Setup ข้อมูลพื้นฐาน"><div className="grid grid-cols-2 gap-3 text-sm"><ReadField label="Cutoff Date" value="2026-04-30" /><ReadField label="Go-Live Date" value="2026-05-01" /></div><div className="mt-3 text-xs text-slate-400">Updated: {data?.row.updatedAt || '-'}</div></Panel>
       {/* Desktop Table View */}
       <div className="hidden lg:block">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
           {columnResize.hasCustomWidths ? (
             <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-2">
               <button
-                className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
                 type="button"
                 onClick={columnResize.resetColumnWidths}
               >
-                รีเซ็ตความกว้างตาราง
+                คืนค่าเดิมตาราง
               </button>
             </div>
           ) : null}
