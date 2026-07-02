@@ -46,6 +46,28 @@ const receiptVoucherCancelSchema = z.object({
 
 type ReceiptVoucherStatusLogAction = 'cancelled' | 'created' | 'edited'
 
+type PurchaseBillRemarkLine = {
+  deduct_weight: Prisma.Decimal | number | string | null
+  gross_weight: Prisma.Decimal | number | string | null
+  impurity_id: bigint | number | string | null
+  impurity_name: string | null
+  note: string | null
+  product_id: bigint | number | string | null
+  product_name: string | null
+}
+
+type PurchaseBillReceiptAllocationRemark = {
+  weight_ticket_product_summaries: {
+    product_name: string | null
+    weight_ticket_product_summary_lines: Array<{
+      weight_ticket_lines: PurchaseBillRemarkLine
+    }>
+  }
+  weight_tickets: {
+    weight_ticket_lines: PurchaseBillRemarkLine[]
+  }
+} | null
+
 async function appendReceiptVoucherStatusLog(
   tx: Prisma.TransactionClient,
   params: {
@@ -157,6 +179,67 @@ function toVoucherNumber(value: Prisma.Decimal | number | string | null) {
   return toNumber(value)
 }
 
+function cleanImpurityName(name: string | null | undefined) {
+  if (!name) return ''
+  return name
+    .replace(/\s*[\d.]+\s*kg/gi, '')
+    .replace(/\s*[\d.]+\s*กก\.?/gi, '')
+    .trim()
+}
+
+function receiptVoucherWeight(value: number) {
+  return value.toLocaleString('th-TH', {
+    maximumFractionDigits: 3,
+    minimumFractionDigits: 0,
+  })
+}
+
+function isImpurityLine(line: PurchaseBillRemarkLine) {
+  return toVoucherNumber(line.gross_weight) === 0 && Boolean(line.impurity_name || line.impurity_id)
+}
+
+function isPurchaseFromImpurityLine(line: PurchaseBillRemarkLine) {
+  return toVoucherNumber(line.gross_weight) > 0 && (line.note ?? '').includes('มาจากสิ่งเจือปน')
+}
+
+function findPurchaseLineForImpurity(
+  impurityLine: PurchaseBillRemarkLine,
+  sourceProductName: string,
+  purchaseLines: PurchaseBillRemarkLine[],
+) {
+  return purchaseLines.find((purchaseLine) => {
+    const note = purchaseLine.note ?? ''
+    if (!note.includes(sourceProductName) && !note.includes(String(impurityLine.product_id))) return false
+    return Math.abs(toVoucherNumber(purchaseLine.gross_weight) - toVoucherNumber(impurityLine.deduct_weight)) < 0.001
+  })
+}
+
+function receiptLineRemark(receiptAllocation: PurchaseBillReceiptAllocationRemark) {
+  if (!receiptAllocation) return ''
+  const summary = receiptAllocation.weight_ticket_product_summaries
+  const allReceiptLines = receiptAllocation.weight_tickets.weight_ticket_lines
+  const purchaseLines = allReceiptLines.filter(isPurchaseFromImpurityLine)
+  const summaryLines = summary.weight_ticket_product_summary_lines.map((bridge) => bridge.weight_ticket_lines)
+  const impurityLines = summaryLines.filter(isImpurityLine)
+  const lotNotes = Array.from(new Set(summaryLines
+    .filter((line) => !isImpurityLine(line) && !isPurchaseFromImpurityLine(line))
+    .map((line) => line.note?.trim() ?? '')
+    .filter((note): note is string => Boolean(note))))
+
+  if (impurityLines.length > 0) {
+    const impurityRemarks = impurityLines.map((line, index) => {
+      const purchaseLine = findPurchaseLineForImpurity(line, summary.product_name ?? '', purchaseLines)
+      const impurityName = cleanImpurityName(line.impurity_name) || 'สิ่งเจือปน'
+      const prefix = `- ${index + 1}. ${impurityName} ${receiptVoucherWeight(toVoucherNumber(line.deduct_weight))} กก.`
+      return purchaseLine ? `${prefix} ซื้อเป็น ${purchaseLine.product_name}` : prefix
+    })
+    const noteRemarks = lotNotes.map((note, index) => `- ${impurityRemarks.length + index + 1}. ${note}`)
+    return [...impurityRemarks, ...noteRemarks].join('\n')
+  }
+
+  return lotNotes.join(' / ')
+}
+
 function normalizePurchaseBillVoucherItems(items: Array<{
   amount: Prisma.Decimal | number | null
   display_name: string | null
@@ -187,10 +270,14 @@ function normalizePurchaseBillVoucherItems(items: Array<{
   })
 }
 
-function purchaseBillItemRemarks(items: Array<{ line_no: number; note?: string | null }>) {
+function purchaseBillItemRemarks(items: Array<{
+  line_no: number
+  note?: string | null
+  purchase_bill_receipt_allocations?: PurchaseBillReceiptAllocationRemark
+}>) {
   return [...items]
     .sort((left, right) => left.line_no - right.line_no)
-    .map((item) => item.note?.trim())
+    .map((item) => receiptLineRemark(item.purchase_bill_receipt_allocations ?? null) || item.note?.trim())
     .filter((note): note is string => Boolean(note))
     .join('\n')
 }
@@ -225,6 +312,51 @@ async function buildVoucherWriteData(
             price: true,
             product_code: true,
             product_name: true,
+            purchase_bill_receipt_allocations: {
+              select: {
+                weight_ticket_product_summaries: {
+                  select: {
+                    product_name: true,
+                    weight_ticket_product_summary_lines: {
+                      orderBy: {
+                        weight_ticket_lines: {
+                          line_no: 'asc',
+                        },
+                      },
+                      select: {
+                        weight_ticket_lines: {
+                          select: {
+                            deduct_weight: true,
+                            gross_weight: true,
+                            impurity_id: true,
+                            impurity_name: true,
+                            note: true,
+                            product_id: true,
+                            product_name: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                weight_tickets: {
+                  select: {
+                    weight_ticket_lines: {
+                      orderBy: { line_no: 'asc' },
+                      select: {
+                        deduct_weight: true,
+                        gross_weight: true,
+                        impurity_id: true,
+                        impurity_name: true,
+                        note: true,
+                        product_id: true,
+                        product_name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
             qty: true,
             unit: true,
           },
@@ -338,6 +470,51 @@ export async function GET() {
               price: true,
               product_code: true,
               product_name: true,
+              purchase_bill_receipt_allocations: {
+                select: {
+                  weight_ticket_product_summaries: {
+                    select: {
+                      product_name: true,
+                      weight_ticket_product_summary_lines: {
+                        orderBy: {
+                          weight_ticket_lines: {
+                            line_no: 'asc',
+                          },
+                        },
+                        select: {
+                          weight_ticket_lines: {
+                            select: {
+                              deduct_weight: true,
+                              gross_weight: true,
+                              impurity_id: true,
+                              impurity_name: true,
+                              note: true,
+                              product_id: true,
+                              product_name: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  weight_tickets: {
+                    select: {
+                      weight_ticket_lines: {
+                        orderBy: { line_no: 'asc' },
+                        select: {
+                          deduct_weight: true,
+                          gross_weight: true,
+                          impurity_id: true,
+                          impurity_name: true,
+                          note: true,
+                          product_id: true,
+                          product_name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
               qty: true,
               unit: true,
             },
@@ -430,6 +607,51 @@ export async function GET() {
             select: {
               line_no: true,
               note: true,
+              purchase_bill_receipt_allocations: {
+                select: {
+                  weight_ticket_product_summaries: {
+                    select: {
+                      product_name: true,
+                      weight_ticket_product_summary_lines: {
+                        orderBy: {
+                          weight_ticket_lines: {
+                            line_no: 'asc',
+                          },
+                        },
+                        select: {
+                          weight_ticket_lines: {
+                            select: {
+                              deduct_weight: true,
+                              gross_weight: true,
+                              impurity_id: true,
+                              impurity_name: true,
+                              note: true,
+                              product_id: true,
+                              product_name: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  weight_tickets: {
+                    select: {
+                      weight_ticket_lines: {
+                        orderBy: { line_no: 'asc' },
+                        select: {
+                          deduct_weight: true,
+                          gross_weight: true,
+                          impurity_id: true,
+                          impurity_name: true,
+                          note: true,
+                          product_id: true,
+                          product_name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             where: { item_status: 'active' },
           },
