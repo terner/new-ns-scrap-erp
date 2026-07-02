@@ -557,7 +557,7 @@ AR contract:
 - ตารางนี้เป็นข้อมูลของบิลขายโดยตรง ไม่ใช่ประวัติ stock hold ดิบ: ต้องแสดง line สินค้าที่ขาย, เอกสารต้นทาง, จำนวนที่ใช้, ต้นทุน/COGS, สถานะ allocation/usage, และเวลาเกิด fact
 - ถ้า Sales Bill line ขาย SKU จริงต่างจาก SKU ต้นทางของ WTO ให้แสดงข้อความ `คัดแยกจาก: <สินค้าเดิม>` ในรายการสินค้า เพื่อให้ audit เข้าใจว่าลูกค้าคัดแยกสินค้าจากแถว WTO เดิม ไม่ใช่การแก้ WTO ย้อนหลัง
 - ไม่ควรเปลี่ยน source/cost identity ของ WTO หรือ stock hold จาก UI detail; detail เป็น read model เพื่ออธิบายความสัมพันธ์ของ SB กับ source เท่านั้น
-- หน้าแก้ไขบิลขายสามารถลบ split line ได้ แต่ต้องทำแบบ audit-safe: ใช้ `salesBillLineNo`/`line_no` จับคู่ line fact เดิม, mark line ที่ถูกลบเป็น `removed`, reverse source allocation/PO Sell allocation, release WTO pending_out, และคำนวณยอดบิลใหม่จาก line ที่เหลือ ห้าม hard delete line fact เดิม
+- หน้าแก้ไขบิลขายสามารถลบ split line ได้ แต่ต้องทำแบบ audit-safe: ใช้ `salesBillLineNo`/`line_no` จับคู่ line fact เดิม, mark line ที่ถูกลบเป็น `reversed`, reverse source allocation/PO Sell allocation, release WTO pending_out, และคำนวณยอดบิลใหม่จาก line ที่เหลือ ห้าม hard delete line fact เดิม
 - โหมดสร้างบิลใหม่ยังต้องบังคับจำนวนและราคามากกว่า 0 เสมอ; โหมดแก้ไขก็ต้องส่งเฉพาะ line ที่ยังใช้งานจริง ไม่ใช้ zero-out เป็นตัวแทนการลบแถว
 
 ## งาน Implementation ที่ตามมา

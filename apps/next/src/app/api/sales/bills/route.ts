@@ -2903,7 +2903,7 @@ export async function PATCH(request: Request) {
           await tx.sales_bill_lines.updateMany({
             data: {
               notes: 'Removed by Sales Bill edit',
-              status: 'removed',
+              status: 'reversed',
               updated_at: createdAt,
               updated_by: actor,
               version: { increment: 1 },
