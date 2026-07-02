@@ -6,6 +6,8 @@ Date: 2026-07-02
 Active app: `apps/next`
 Primary remote: `new-origin`
 
+Waiting Allocations table-card follow-up on 2026-07-02: `/dual-costing/waiting-allocations` now keeps the PO/Sales Bill/Production tabs, waiting-list summary/pagination controls, desktop waiting table, and mobile waiting cards inside one lined `rounded-md border border-slate-200 bg-white shadow-sm` table card. This removes the floating pagination row above the waiting table while preserving filters, tab switching, allocator links, sorting/resizing state, pagination behavior, APIs, permissions, and DB state.
+
 Trading Matching table-card follow-up on 2026-07-02: `/trading/matching` now keeps the active tab pagination controls, reset-width controls, desktop tables, and mobile lists inside the same lined `rounded-md border border-slate-200 bg-white shadow-sm` tab/table card. This removes the remaining nested table-card/floating-control split while preserving allocation and remaining-cost filters, pagination, sorting/resizing state, export behavior, calculations, APIs, permissions, and DB state.
 
 Cost Allocator table-card follow-up on 2026-07-02: `/dual-costing/cost-allocator` now keeps the target sale summary/reset/pagination controls inside the same lined `rounded-md border border-slate-200 bg-white shadow-sm` card as the desktop resizable target table and mobile target list. This removes the floating pagination/control row above the target candidates while preserving allocation mode, target selection, preview, Cost Pool matching, sorting/resizing state, pagination behavior, APIs, permissions, and DB state.
