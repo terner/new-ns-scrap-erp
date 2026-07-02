@@ -196,6 +196,51 @@ export function CostPoolPageClient() {
     setSortDirection('asc')
   }
 
+  const tableControls = (
+    <>
+      <div>
+        พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
+        <span className="ml-2 text-xs font-normal text-slate-500">เรียงตาม {sort}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {columnResize.hasCustomWidths ? (
+          <Button className="hidden h-9 md:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
+            คืนค่าเดิมตาราง
+          </Button>
+        ) : null}
+        <select
+          aria-label="จำนวนรายการต่อหน้า"
+          className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800"
+          value={pageSize}
+          onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
+        >
+          {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
+        </select>
+        <Button
+          disabled={currentPage <= 1}
+          className="h-9"
+          size="sm"
+          variant="outline"
+          type="button"
+          onClick={() => setPage((value) => Math.max(1, value - 1))}
+        >
+          ก่อนหน้า
+        </Button>
+        <span className="px-1">หน้า {currentPage} / {totalPages}</span>
+        <Button
+          disabled={currentPage >= totalPages}
+          className="h-9"
+          size="sm"
+          variant="outline"
+          type="button"
+          onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+        >
+          ถัดไป
+        </Button>
+      </div>
+    </>
+  )
+
   return (
     <DualCostingPageSection>
       <DualCostingHint tone="amber">
@@ -379,51 +424,16 @@ export function CostPoolPageClient() {
         </div>
       </DualCostingFilterCard>
 
-      <div className="mb-3 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
-          <span className="ml-2 text-xs font-normal text-slate-500">เรียงตาม {sort}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {columnResize.hasCustomWidths ? (
-            <Button className="hidden h-9 md:inline-flex" size="sm" type="button" variant="outline" onClick={columnResize.resetColumnWidths}>
-              คืนค่าเดิมตาราง
-            </Button>
-          ) : null}
-          <select
-            aria-label="จำนวนรายการต่อหน้า"
-            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800"
-            value={pageSize}
-            onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
-          >
-            {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size} / หน้า</option>)}
-          </select>
-          <Button
-            disabled={currentPage <= 1}
-            className="h-9"
-            size="sm"
-            variant="outline"
-            type="button"
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
-          >
-            ก่อนหน้า
-          </Button>
-          <span className="px-1">หน้า {currentPage} / {totalPages}</span>
-          <Button
-            disabled={currentPage >= totalPages}
-            className="h-9"
-            size="sm"
-            variant="outline"
-            type="button"
-            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-          >
-            ถัดไป
-          </Button>
-        </div>
+      <div className="mb-3 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between md:hidden">
+        {tableControls}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm md:block">
-        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth }}>
+      <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm md:block">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          {tableControls}
+        </div>
+        <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: columnResize.tableMinWidth, width: '100%' }}>
           <colgroup>
             {costPoolColumns.map((column, index) => {
               const style = columnResize.getColumnStyle(column.key)
@@ -472,6 +482,7 @@ export function CostPoolPageClient() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="space-y-3 md:hidden">
