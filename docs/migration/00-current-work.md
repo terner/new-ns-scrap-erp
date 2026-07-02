@@ -6,6 +6,8 @@ Date: 2026-07-02
 Active app: `apps/next`
 Primary remote: `new-origin`
 
+Depreciation tab-render follow-up on 2026-07-02: `/finance-accounting/depreciation` now renders the pending-assets table and depreciation-history table through an explicit active-tab state, matching the production report tab pattern and preventing both large table sections from appearing at the same time. The tab selector keeps the standard rounded white line-tab surface. This is UI-only; period filters, preview/commit/reverse behavior, depreciation math, table sort/resize logic, APIs, permissions, and DB state were not changed.
+
 Asset Register toolbar placement follow-up on 2026-07-02: `/finance-accounting/asset-register` now makes the desktop filter/action toolbar visually explicit as one card. The filter shell uses the standard `rounded-md bg-white p-3 shadow` surface, search/select controls use `rounded-md` `h-9` sizing, and Template CSV / Import / Export CSV / `+ Add Asset` stay right-aligned inside the same filter card instead of reading as a separate floating action row. This is UI-only; asset register filters, import/export URLs, create/import behavior, table sorting/resizing, APIs, permissions, and DB state were not changed.
 
 Financial Statements reset-control follow-up on 2026-07-02: `/finance-accounting/pl-statement`, `/finance-accounting/balance-sheet`, and `/finance-accounting/cash-flow-statement` now use the standard `h-9`, `rounded-md`, `text-sm`, `คืนค่าเดิมตาราง` reset-width controls in the shared statement table and drilldown modal. This is UI-only; report formulas, drilldown rows, filters, table sort/resize behavior, APIs, permissions, and DB state were not changed.

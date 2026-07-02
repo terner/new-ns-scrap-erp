@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { dailyFetchJson, formatMoney } from '@/lib/daily'
 import { ResizableTableHead } from '@/components/ui/ResizableTableHead'
 import { SearchCombobox } from '@/components/ui/SearchCombobox'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useResizableColumns, type ResizableColumnDefinition } from '@/components/ui/useResizableColumns'
 
 type AssetRegisterRow = {
@@ -927,6 +927,7 @@ export function DepreciationPageClient() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const [depreciationTab, setDepreciationTab] = useState<'pending' | 'history'>('pending')
   const [historySortDirection, setHistorySortDirection] = useState<SortDirection>('asc')
   const [historySortKey, setHistorySortKey] = useState<DepreciationSortKey | null>(null)
   const columnResize = useResizableColumns('finance-accounting.depreciation.history.v1', depreciationColumns)
@@ -1208,20 +1209,31 @@ export function DepreciationPageClient() {
           </div>
         </div>
       ) : null}
-      <Tabs defaultValue="pending" className="gap-3">
-        <TabsList className="w-full overflow-x-auto bg-white px-2 shadow-sm" variant="line">
+      <Tabs
+        value={depreciationTab}
+        className="gap-2"
+        onValueChange={(value) => {
+          setDepreciationTab(value as typeof depreciationTab)
+          setPage(1)
+        }}
+      >
+        <TabsList className="w-full overflow-x-auto rounded-md bg-white px-2 shadow-sm" variant="line">
           <TabsTrigger value="pending" variant="line">สินทรัพย์รอประมวลผล</TabsTrigger>
           <TabsTrigger value="history" variant="line">ประวัติการประมวลผล</TabsTrigger>
         </TabsList>
+      </Tabs>
 
-        <TabsContent value="pending" className="space-y-3">
+      {depreciationTab === 'pending' ? (
+        <div className="space-y-3">
           <div className="px-1 text-sm text-slate-600">
             พบสินทรัพย์รอประมวลผล <span className="font-semibold text-slate-900">{filteredPendingAssets.length}</span> รายการ
           </div>
           <MiniAssetTable isLoading={isLoading} rows={filteredPendingAssets} />
-        </TabsContent>
+        </div>
+      ) : null}
 
-        <TabsContent value="history" className="space-y-3">
+      {depreciationTab === 'history' ? (
+        <div className="space-y-3">
           {/* Pagination Controls */}
           <div className="mb-3 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1396,8 +1408,8 @@ export function DepreciationPageClient() {
           )}
         </div>
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      ) : null}
 
 
       {preview ? (
