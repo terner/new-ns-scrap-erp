@@ -6,6 +6,8 @@ Date: 2026-07-02
 Active app: `apps/next`
 Primary remote: `new-origin`
 
+Asset Overview reset-control follow-up on 2026-07-02: `/finance-accounting/asset-overview` now uses the standard `h-9`, `rounded-md`, `text-sm`, `คืนค่าเดิมตาราง` reset-width control for the Cash & Others table instead of the older compact reset wording. This is UI-only; asset/cash/debt/net-worth read-model behavior, filters, APIs, permissions, and DB state were not changed.
+
 Finance Accounting Tax/VAT/WHT reset-control follow-up on 2026-07-02: `/finance-accounting/tax-vat-wht` now uses the standard `h-9`, `rounded-md`, `text-sm`, `คืนค่าเดิมตาราง` table reset controls for both VAT/WHT detail tables and the tax calendar table. This removes the remaining tiny `h-5`/`h-7` reset controls while preserving the existing read-only tax report calculations, filters, table sorting/resizing, APIs, permissions, and DB state.
 
 Finance Accounting working/stock/profit reset-control follow-up on 2026-07-02: `/finance-accounting/working-capital`, `/finance-accounting/stock-finance`, and `/finance-accounting/profit-leak` now use the standard table reset control sizing and wording everywhere in the shared report component. Remaining custom-width reset buttons were raised from tiny `h-5`/`h-7` controls to the `h-9`, `rounded-md`, `text-sm`, `คืนค่าเดิมตาราง` baseline so report table toolbars match the active Cost Pool / Weight Ticket table design. This is UI-only; report formulas, filters, source rows, APIs, permissions, and DB state were not changed.
