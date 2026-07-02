@@ -6,6 +6,8 @@ Date: 2026-07-02
 Active app: `apps/next`
 Primary remote: `new-origin`
 
+Trading Matching table-card follow-up on 2026-07-02: `/trading/matching` now keeps the active tab pagination controls, reset-width controls, desktop tables, and mobile lists inside the same lined `rounded-md border border-slate-200 bg-white shadow-sm` tab/table card. This removes the remaining nested table-card/floating-control split while preserving allocation and remaining-cost filters, pagination, sorting/resizing state, export behavior, calculations, APIs, permissions, and DB state.
+
 Cost Allocator table-card follow-up on 2026-07-02: `/dual-costing/cost-allocator` now keeps the target sale summary/reset/pagination controls inside the same lined `rounded-md border border-slate-200 bg-white shadow-sm` card as the desktop resizable target table and mobile target list. This removes the floating pagination/control row above the target candidates while preserving allocation mode, target selection, preview, Cost Pool matching, sorting/resizing state, pagination behavior, APIs, permissions, and DB state.
 
 PO Outstanding table-card follow-up on 2026-07-02: `/po-reports/outstanding` now keeps the active buy/sell table summary and pagination controls inside the same lined `rounded-md border border-slate-200 bg-white shadow-sm` card as the active desktop table and mobile list. This removes the floating pagination row between the filter card and active table while preserving PO Buy/Sell filters, tab state, totals, sorting/resizing state, CSV/export behavior, APIs, permissions, and DB state.
