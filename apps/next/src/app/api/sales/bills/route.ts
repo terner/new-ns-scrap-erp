@@ -863,12 +863,8 @@ async function validateStockDeliverySelection(
       return { error: 'สินค้าที่เลือกไม่ถูกต้องหรือถูกปิดใช้งาน' as const }
     }
     const buyerAcceptedWeight = Math.max(0, item.netWeight)
-    const expectedNetWeight = Number(Math.max(0, buyerAcceptedWeight - item.deductWeight).toFixed(2))
     if (item.deductWeight > buyerAcceptedWeight + 0.0001) {
       return { error: `หักสิ่งเจือปนของ ${summarySource.product_name} เกินจำนวนที่ขายได้` as const }
-    }
-    if (Math.abs(expectedNetWeight - item.qty) > 0.01) {
-      return { error: `น้ำหนักขายสุทธิของ ${summarySource.product_name} ไม่ตรงกับจำนวนที่ขายได้หลังหักสิ่งเจือปน` as const }
     }
     if (buyerAcceptedWeight <= 0.0001) {
       if (input?.excludeSalesBillId) {
@@ -2360,19 +2356,11 @@ export async function PATCH(request: Request) {
             || Math.abs(toNumber(line.deduct_weight) - item.deductWeight) > 0.0001)) {
           return NextResponse.json({ code: 'BAD_REQUEST', error: `รายการที่ ${lineNo}: แก้ไขน้ำหนัก/จำนวนขายของบิล Trading ยังไม่เปิดในรอบนี้ ให้แก้ได้เฉพาะ PO Sell อ้างอิง ราคา ส่วนลด และหมายเหตุ` }, { status: 400 })
         }
-        const expectedQty = Number(Math.max(0, item.netWeight - item.deductWeight).toFixed(2))
         if (item.deductWeight > item.netWeight + 0.0001) {
           return NextResponse.json({
             code: 'BAD_REQUEST',
             error: `รายการที่ ${index + 1}: หักสิ่งเจือปนต้องไม่เกินจำนวนที่ขายได้`,
             fieldErrors: { [`items.${index}.deductWeight`]: ['หักสิ่งเจือปนต้องไม่เกินจำนวนที่ขายได้'] },
-          }, { status: 400 })
-        }
-        if (Math.abs(expectedQty - item.qty) > 0.01) {
-          return NextResponse.json({
-            code: 'BAD_REQUEST',
-            error: `รายการที่ ${index + 1}: น้ำหนักขายสุทธิต้องเท่ากับจำนวนที่ขายได้ - หักสิ่งเจือปน`,
-            fieldErrors: { [`items.${index}.qty`]: ['น้ำหนักขายสุทธิต้องเท่ากับจำนวนที่ขายได้ - หักสิ่งเจือปน'] },
           }, { status: 400 })
         }
       }
