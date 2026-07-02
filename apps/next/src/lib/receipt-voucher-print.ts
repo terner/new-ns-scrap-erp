@@ -7,6 +7,8 @@ const companyProfilePayloadSchema = z.object({
   selectedBranchName: z.string().nullable().default(null),
 })
 
+const CASH_PAYMENT_METHOD = 'รับเงินสด'
+
 export type ReceiptVoucherPrintItem = {
   amount?: number | string | null
   description?: string | null
@@ -38,6 +40,7 @@ export type ReceiptVoucherPrintDocument = {
   sellerPhone?: string | null
   sellerTaxId?: string | null
   status: string
+  supplierCode?: string
   totalAmount: number
   totalQty: number
   supplierBankAccounts?: Array<{
@@ -99,6 +102,29 @@ function summarizeQuantityByUnit(items: ReceiptVoucherPrintItem[]) {
   return [...byUnit.entries()].map(([unit, qty]) => `${money(qty)} ${unit}`).join(' / ')
 }
 
+function selectedSupplierBankAccount(row: ReceiptVoucherPrintDocument) {
+  const paymentMethod = row.paymentMethod?.trim()
+  if (!paymentMethod || paymentMethod === CASH_PAYMENT_METHOD) return null
+  const matchedAccount = row.supplierBankAccounts?.find((account) => {
+    const accountNo = account.accountNo.trim()
+    const methodWithAccount = `${account.paymentMethod} บช.${accountNo}`
+    return paymentMethod === methodWithAccount || Boolean(accountNo && paymentMethod.includes(accountNo))
+  })
+  if (matchedAccount) return matchedAccount
+
+  const accountMatch = paymentMethod.match(/^(.*?)\s*บช\.?\s*(.+)$/)
+  if (!accountMatch) return null
+  return {
+    accountName: '',
+    accountNo: accountMatch[2]?.trim() ?? '',
+    bankName: '',
+    branchCode: '',
+    code: '',
+    isPrimary: false,
+    paymentMethod: accountMatch[1]?.trim() || paymentMethod,
+  }
+}
+
 function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile: CompanyProfilePrintValues) {
   const items = normalizeItems(row.items)
   const printItems = items.length
@@ -112,6 +138,11 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
   const companyTaxId = profile.taxId || 'ไม่มีข้อมูล'
 
   const isCancelled = row.status === 'cancelled'
+  const selectedBankAccount = selectedSupplierBankAccount(row)
+  const paymentMethodDisplay = selectedBankAccount?.paymentMethod || row.paymentMethod || CASH_PAYMENT_METHOD
+  const legalNote = selectedBankAccount
+    ? 'เอกสารนี้เป็นหลักฐานรับเงินจาก Supplier ตามบัญชีที่ระบุในเอกสาร'
+    : 'เอกสารนี้เป็นหลักฐานรับเงินสดจาก Supplier เท่านั้น ไม่ใช่เอกสารโอนเงินหรือรายการธนาคาร'
 
   const itemsHtml = printItems.map((item, index) => {
     return `
@@ -174,7 +205,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
       .note-box { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; }
       .note-box-header { background: #f1f5f9; padding: 4px 8px; font-weight: 900; color: #475569; font-size: 12px; }
       .note-content { padding: 8px; font-size: 12px; font-weight: bold; color: #0f172a; min-height: 32px; }
-      .note-content-small { padding: 6px 8px; font-size: 12px; color: #475569; min-height: 40px; white-space: pre-wrap; }
+      .note-content-small { padding: 8px 10px; font-size: 12px; line-height: 1.55; color: #334155; min-height: 64px; white-space: pre-wrap; overflow-wrap: anywhere; }
       .summary-box { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
       .summary-row { display: grid; grid-template-columns: 1fr 32mm; gap: 8px; border-bottom: 1px solid #cbd5e1; padding: 6px 8px; font-size: 12px; }
       .summary-row:last-child { border-bottom: 0; }
@@ -243,7 +274,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
             </div>
             <div class="meta-card">
               <div class="meta-label">วิธีรับเงิน</div>
-              <div class="meta-value">${escapeHtml(row.paymentMethod || 'รับเงินสด')}</div>
+              <div class="meta-value">${escapeHtml(paymentMethodDisplay)}</div>
             </div>
           </div>
         </div>
@@ -325,22 +356,15 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
       <section class="bottom-grid">
         <div class="notes-panel">
           ${(() => {
-            if (row.paymentMethod && row.paymentMethod !== 'รับเงินสด') {
-              const selected = row.supplierBankAccounts?.find(account => `${account.paymentMethod} บช.${account.accountNo}` === row.paymentMethod)
+            if (selectedBankAccount) {
               return `
                 <div class="note-box">
                   <div class="note-box-header">เลขที่บัญชี / Bank Account</div>
                   <div class="note-content" style="min-height: 48px; padding: 6px 8px; font-weight: normal; line-height: 1.4;">
-                    ${selected ? `
-                      <div style="font-size: 12px;">
-                        <strong>${escapeHtml(selected.paymentMethod)}</strong> · ${escapeHtml(selected.bankName || '-')} · <span style="font-variant-numeric: tabular-nums;">${escapeHtml(selected.accountNo || '-')}</span>
-                        <div style="color: #475569; margin-top: 2px;">ชื่อบัญชี: ${escapeHtml(selected.accountName || '-')} ${selected.branchCode ? `· สาขา: ${escapeHtml(selected.branchCode)}` : ''}</div>
-                      </div>
-                    ` : `
-                      <div style="font-size: 12px; margin-top: 6px;">
-                        <strong>${escapeHtml(row.paymentMethod)}</strong>
-                      </div>
-                    `}
+                    <div style="font-size: 12px;">
+                      <strong>${escapeHtml(selectedBankAccount.paymentMethod)}</strong> · ${escapeHtml(selectedBankAccount.bankName || '-')} · <span style="font-variant-numeric: tabular-nums;">${escapeHtml(selectedBankAccount.accountNo || '-')}</span>
+                      <div style="color: #475569; margin-top: 2px;">ชื่อบัญชี: ${escapeHtml(selectedBankAccount.accountName || '-')} ${selectedBankAccount.branchCode ? `· สาขา: ${escapeHtml(selectedBankAccount.branchCode)}` : ''}</div>
+                    </div>
                   </div>
                 </div>
               `
@@ -368,10 +392,10 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
             <div style="text-align: right; font-weight: 900; color: #0f172a;">${money(row.totalAmount)}</div>
           </div>
           <div class="summary-row highlight">
-            <div>${row.paymentMethod && row.paymentMethod !== 'รับเงินสด' ? 'ยอดสุทธิ' : 'ยอดรับเงินสด'}</div>
+            <div>ยอดรับเงิน</div>
             <div style="text-align: right; font-variant-numeric: tabular-nums;">${money(row.totalAmount)}</div>
           </div>
-          ${(row.paymentMethod && row.paymentMethod !== 'รับเงินสด') ? `
+          ${selectedBankAccount ? `
             <div style="padding: 6px 8px; text-align: right; font-size: 12px; font-weight: bold; color: #065f46; background: #ecfdf5; border-top: 1px solid #cbd5e1;">
               (${escapeHtml(row.amountInWords || '-')})
             </div>
@@ -395,7 +419,7 @@ function buildReceiptVoucherPrintHtml(row: ReceiptVoucherPrintDocument, profile:
       </div>
       
       <div class="legal-note">
-        เอกสารนี้เป็นหลักฐานรับเงินสดจาก Supplier เท่านั้น ไม่ใช่เอกสารโอนเงินหรือรายการธนาคาร
+        ${escapeHtml(legalNote)}
       </div>
     </div>
   </body></html>`

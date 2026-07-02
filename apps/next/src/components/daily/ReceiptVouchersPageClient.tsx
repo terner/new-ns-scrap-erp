@@ -49,6 +49,7 @@ type ReceiptVoucherRow = {
   sellerPhone: string
   sellerTaxId: string
   status: string
+  supplierCode?: string
   timeline?: ReceiptVoucherTimelineEvent[]
   totalAmount: number
   totalQty: number
@@ -120,6 +121,10 @@ type PurchaseBillOption = {
   sellerTaxId: string
   totalAmount: number
 }
+type PaymentMethodOption = {
+  name: string
+  type?: string | null
+}
 type ReceiptVoucherColumnKey = 'action' | 'date' | 'docNo' | 'licensePlate' | 'purchaseBillDocNo' | 'sellerName' | 'sellerTaxId' | 'status' | 'totalAmount' | 'totalQty'
 
 type ReceiptVoucherCompanyProfile = {
@@ -130,6 +135,21 @@ type ReceiptVoucherCompanyProfile = {
   phone: string
   taxId: string
 } | null
+
+const CASH_PAYMENT_METHOD = 'รับเงินสด'
+
+function bankAccountPaymentMethodValue(account: NonNullable<SupplierOption['bankAccounts']>[number]) {
+  return `${account.paymentMethod} บช.${account.accountNo}`
+}
+
+function paymentMethodForSupplier(supplier: SupplierOption | undefined, currentPaymentMethod = '') {
+  const accounts = supplier?.bankAccounts ?? []
+  const current = currentPaymentMethod.trim()
+  if (accounts.length === 0) return current || CASH_PAYMENT_METHOD
+  return accounts.some((account) => bankAccountPaymentMethodValue(account) === current)
+    ? current
+    : bankAccountPaymentMethodValue(accounts[0])
+}
 
 const receiptVoucherColumns: Array<ResizableColumnDefinition<ReceiptVoucherColumnKey>> = [
   { key: 'docNo', defaultWidth: 110, minWidth: 90 },
@@ -161,7 +181,7 @@ function blankForm(): ReceiptVoucherFormState {
     licensePlate: '',
     note: '',
     payerSignerName: '',
-    paymentMethod: 'รับเงินสด',
+    paymentMethod: CASH_PAYMENT_METHOD,
     purchaseBillDocNo: '',
     salesPerson: '',
     sellerAddress: '',
@@ -229,22 +249,16 @@ function normalizeFormFromRow(row: ReceiptVoucherRow): ReceiptVoucherFormState {
     licensePlate: row.licensePlate || '',
     note: row.note || '',
     payerSignerName: row.payerSignerName || row.createdBy || '',
-    paymentMethod: row.paymentMethod || 'รับเงินสด',
+    paymentMethod: row.paymentMethod || CASH_PAYMENT_METHOD,
     purchaseBillDocNo: row.purchaseBillDocNo || '',
     salesPerson: row.salesPerson || '',
     sellerAddress: row.sellerAddress || '',
     sellerName: row.sellerName || '',
     sellerPhone: row.sellerPhone || '',
     sellerTaxId: row.sellerTaxId || '',
-    supplierCode: '',
+    supplierCode: row.supplierCode || '',
   }
   return { ...form, amountInWords: form.amountInWords || thaiBahtText(formTotals(form).amount) }
-}
-
-function supplierPaymentMethodValue(supplier?: SupplierOption | null) {
-  const account = supplier?.bankAccounts?.find((item) => item.isPrimary) ?? supplier?.bankAccounts?.[0]
-  if (!account) return 'รับเงินสด'
-  return `${account.paymentMethod} บช.${account.accountNo}`
 }
 
 export function ReceiptVouchersPageClient() {
@@ -268,10 +282,8 @@ export function ReceiptVouchersPageClient() {
     setPrintingDocNo(row.docNo)
     try {
       printWindow = openReceiptVoucherPrintWindow()
-      const matchedSupplier = supplierOptions.find((s) => s.name === row.sellerName || s.taxId === row.sellerTaxId)
       const docToPrint: ReceiptVoucherPrintDocument = {
         ...row,
-        supplierBankAccounts: matchedSupplier?.bankAccounts ?? [],
       }
       await openReceiptVoucherPrint(docToPrint, printWindow)
     } catch (err) {
@@ -284,10 +296,12 @@ export function ReceiptVouchersPageClient() {
   const [form, setForm] = useState<ReceiptVoucherFormState>(() => blankForm())
   const [formError, setFormError] = useState<string | null>(null)
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null)
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<PaymentMethodOption[]>([])
   const [purchaseBillOptions, setPurchaseBillOptions] = useState<PurchaseBillOption[]>([])
   const [rows, setRows] = useState<ReceiptVoucherRow[]>([])
   const [search, setSearch] = useState('')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'active' | 'all' | 'cancelled'>('all')
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([])
   const [currentActorName, setCurrentActorName] = useState('')
   const columnResize = useResizableColumns('daily.receipt-vouchers.v5', receiptVoucherColumns)
@@ -309,9 +323,10 @@ export function ReceiptVouchersPageClient() {
     setIsLoading(true)
     setError(null)
     try {
-      const payload = await dailyFetchJson<{ companyProfile: ReceiptVoucherCompanyProfile; currentActor: string; purchaseBills: PurchaseBillOption[]; rows: ReceiptVoucherRow[]; suppliers: SupplierOption[] }>('/api/purchase/receipt-vouchers')
+      const payload = await dailyFetchJson<{ companyProfile: ReceiptVoucherCompanyProfile; currentActor: string; paymentMethods?: PaymentMethodOption[]; purchaseBills: PurchaseBillOption[]; rows: ReceiptVoucherRow[]; suppliers: SupplierOption[] }>('/api/purchase/receipt-vouchers')
       setCompanyProfile(payload.companyProfile)
       setCurrentActorName(payload.currentActor ?? '')
+      setPaymentMethodOptions(payload.paymentMethods ?? [])
       setPurchaseBillOptions(payload.purchaseBills ?? [])
       setRows(payload.rows)
       setSupplierOptions(payload.suppliers ?? [])
@@ -330,7 +345,7 @@ export function ReceiptVouchersPageClient() {
 
   useEffect(() => {
     setPage(1)
-  }, [dateFrom, dateTo, pageSize, search, sortKey, sortDirection])
+  }, [dateFrom, dateTo, pageSize, search, sortKey, sortDirection, statusFilter])
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -338,6 +353,8 @@ export function ReceiptVouchersPageClient() {
       .filter((row) => {
         const inDateRange = (!dateFrom || row.date >= dateFrom) && (!dateTo || row.date <= dateTo)
         if (!inDateRange) return false
+        if (statusFilter === 'active' && row.status === 'cancelled') return false
+        if (statusFilter === 'cancelled' && row.status !== 'cancelled') return false
         if (!query) return true
         return `${row.docNo} ${row.purchaseBillDocNo} ${row.sellerName} ${row.sellerTaxId} ${row.licensePlate}`.toLowerCase().includes(query)
       })
@@ -364,7 +381,7 @@ export function ReceiptVouchersPageClient() {
         }
         return sortDirection === 'asc' ? comparison : -comparison
       })
-  }, [dateFrom, dateTo, rows, search, sortKey, sortDirection])
+  }, [dateFrom, dateTo, rows, search, sortKey, sortDirection, statusFilter])
 
   const supplierSearchOptions = useMemo<SearchComboboxOption[]>(() => supplierOptions.map((supplier) => ({
     description: supplier.taxId ? `เลขประจำตัวผู้เสียภาษี ${supplier.taxId}` : supplier.address,
@@ -383,21 +400,18 @@ export function ReceiptVouchersPageClient() {
     searchText: `${bill.docNo} ${bill.sellerCode} ${bill.sellerName} ${bill.date} ${bill.licensePlate}`.toLowerCase(),
   })), [filteredPurchaseBillOptions])
 
-  const totals = useMemo(() => ({
-    amount: filteredRows.filter((row) => row.status !== 'cancelled').reduce((sum, row) => sum + row.totalAmount, 0),
-    qty: filteredRows.filter((row) => row.status !== 'cancelled').reduce((sum, row) => sum + row.totalQty, 0),
-  }), [filteredRows])
-
   const totalRows = filteredRows.length
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pagedRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const hasActiveFilter = Boolean(search || dateFrom || dateTo)
+  const hasActiveFilter = Boolean(search || dateFrom || dateTo || statusFilter !== 'all')
+  const mobileFilterCount = (dateFrom || dateTo ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)
 
   function clearFilters() {
     setSearch('')
     setDateFrom('')
     setDateTo('')
+    setStatusFilter('all')
   }
 
   function openCreateForm() {
@@ -408,7 +422,8 @@ export function ReceiptVouchersPageClient() {
 
   function openEditForm(row: ReceiptVoucherRow) {
     if (row.status === 'cancelled') return
-    setForm(normalizeFormFromRow(row))
+    const purchaseBill = purchaseBillOptions.find((bill) => bill.docNo === row.purchaseBillDocNo)
+    setForm({ ...normalizeFormFromRow(row), supplierCode: row.supplierCode || purchaseBill?.sellerCode || '' })
     setFormError(null)
     setFormMode('edit')
   }
@@ -430,13 +445,13 @@ export function ReceiptVouchersPageClient() {
       return
     }
     updateForm({
-      paymentMethod: supplierPaymentMethodValue(supplier),
       purchaseBillDocNo: '',
       sellerAddress: supplier.address,
       sellerName: supplier.name,
       sellerPhone: supplier.phone,
       sellerTaxId: supplier.taxId,
       supplierCode: supplier.code,
+      paymentMethod: paymentMethodForSupplier(supplier),
     })
   }
 
@@ -465,8 +480,8 @@ export function ReceiptVouchersPageClient() {
       sellerName: bill.sellerName,
       sellerPhone: bill.sellerPhone,
       sellerTaxId: bill.sellerTaxId,
-      paymentMethod: supplierPaymentMethodValue(supplier),
       supplierCode: bill.sellerCode,
+      paymentMethod: paymentMethodForSupplier(supplier, form.paymentMethod),
     })
   }
 
@@ -549,33 +564,45 @@ export function ReceiptVouchersPageClient() {
       <section className="space-y-4 print:hidden">
         {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4 text-sm">
-          <KpiCard label="จำนวนเอกสาร" tone="slate" value={totalRows.toLocaleString('th-TH')} />
-          <KpiCard label="น้ำหนัก active (กก.)" tone="blue" value={formatMoney(totals.qty)} />
-          <KpiCard label="ยอด active" tone="emerald" value={formatMoney(totals.amount)} />
-          <KpiCard label="ยกเลิก" tone="violet" value={filteredRows.filter((row) => row.status === 'cancelled').length.toLocaleString('th-TH')} />
-        </div>
-
         {/* Desktop Toolbar (Hidden on Mobile) */}
         <div className="hidden lg:block rounded-md bg-white p-3 shadow">
           <div className="flex flex-wrap items-center gap-2">
             <Input
               className="min-w-[260px] flex-1 rounded-md"
-              placeholder="ค้นเลขที่ / ชื่อผู้รับ / เลขบิลซื้อ / ทะเบียน..."
+              placeholder="ค้นเลขที่ RV / ผู้รับเงิน / บิลซื้อ / ทะเบียนรถ..."
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">วันที่:</span>
+              <span className="text-xs text-slate-500">วันที่ออกเอกสาร:</span>
               <DatePickerInput id="receipt-vouchers-date-from" value={dateFrom} onChange={setDateFrom} />
               <span className="text-slate-400">→</span>
               <DatePickerInput id="receipt-vouchers-date-to" value={dateTo} onChange={setDateTo} />
             </div>
 
-            {hasActiveFilter ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕ ล้าง</Button> : null}
-            <Button type="button" onClick={openCreateForm}>+ สร้างใบสำคัญรับเงิน</Button>
+            {hasActiveFilter ? <Button size="sm" type="button" variant="secondary" onClick={clearFilters}>ล้างตัวกรอง</Button> : null}
+            <div className="ml-auto">
+              <Button size="sm" type="button" onClick={openCreateForm}>+ สร้างใบสำคัญรับเงิน</Button>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">สถานะ:</span>
+            {[
+              ['all', 'ทุกสถานะ'],
+              ['active', 'ใช้งาน'],
+              ['cancelled', 'ยกเลิก'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                className={`rounded-md border px-3 py-1 text-xs font-medium ${statusFilter === value ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+                type="button"
+                onClick={() => setStatusFilter(value as typeof statusFilter)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -594,9 +621,9 @@ export function ReceiptVouchersPageClient() {
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 shrink-0"
               onClick={() => setShowMobileFilters(true)}
             >
-              <span>🔍</span> ตัวกรอง {(dateFrom || dateTo) ? '(1)' : ''}
+              ตัวกรอง {mobileFilterCount > 0 ? `(${mobileFilterCount})` : ''}
             </button>
-            {hasActiveFilter ? <Button size="xs" type="button" variant="secondary" onClick={clearFilters}>✕</Button> : null}
+            {hasActiveFilter ? <Button size="sm" type="button" variant="secondary" onClick={clearFilters}>ล้าง</Button> : null}
           </div>
         </div>
 
@@ -616,6 +643,25 @@ export function ReceiptVouchersPageClient() {
               </div>
 
               <div className="space-y-4">
+                <div>
+                  <span className="mb-1 block text-xs font-semibold text-slate-600">สถานะ</span>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      ['all', 'ทุกสถานะ'],
+                      ['active', 'ใช้งาน'],
+                      ['cancelled', 'ยกเลิก'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        className={`rounded-md border px-3 py-1 text-xs font-medium ${statusFilter === value ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+                        type="button"
+                        onClick={() => setStatusFilter(value as typeof statusFilter)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <span className="mb-1 block text-xs font-semibold text-slate-600">ระบุวันที่</span>
                   <div className="flex items-center gap-2">
@@ -713,15 +759,18 @@ export function ReceiptVouchersPageClient() {
         <div className="hidden lg:block overflow-hidden rounded-md border border-slate-100 bg-white shadow-sm">
           <Table className="[&_tbody_tr]:border-slate-100" style={{ minWidth: columnResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
-              {receiptVoucherColumns.map((column) => {
+              {receiptVoucherColumns.map((column, index) => {
                 const style = columnResize.getColumnStyle(column.key);
+                if (index === receiptVoucherColumns.length - 1) {
+                  return <col key={column.key} style={{ minWidth: column.minWidth }} />;
+                }
                 return <col key={column.key} style={style} />;
               })}
             </colgroup>
             <TableHeader>
               <tr>
-                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่')} sortKey="docNo" onSort={changeSort} />
-                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่')} sortKey="date" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขที่ RV" resizeProps={columnResize.getResizeHandleProps('docNo', 'เลขที่ RV')} sortKey="docNo" onSort={changeSort} />
+                <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="วันที่ออกเอกสาร" resizeProps={columnResize.getResizeHandleProps('date', 'วันที่ออกเอกสาร')} sortKey="date" onSort={changeSort} />
                 <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="ผู้รับเงิน" resizeProps={columnResize.getResizeHandleProps('sellerName', 'ผู้รับเงิน')} sortKey="sellerName" onSort={changeSort} />
                 <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="เลขประจำตัวผู้เสียภาษี" resizeProps={columnResize.getResizeHandleProps('sellerTaxId', 'เลขประจำตัวผู้เสียภาษี')} sortKey="sellerTaxId" onSort={changeSort} />
                 <ResizableTableHead activeSortKey={sortKey} direction={sortDirection} label="บิลซื้อ" resizeProps={columnResize.getResizeHandleProps('purchaseBillDocNo', 'บิลซื้อ')} sortKey="purchaseBillDocNo" onSort={changeSort} />
@@ -750,8 +799,12 @@ export function ReceiptVouchersPageClient() {
                       <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60" type="button" disabled={printingDocNo === row.docNo} onClick={(event) => { event.stopPropagation(); void printReceiptVoucher(row) }}>
                         {printingDocNo === row.docNo ? 'กำลังพิมพ์...' : 'พิมพ์'}
                       </button>
-                      <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={row.status === 'cancelled'} type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
-                      <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={row.status === 'cancelled'} type="button" onClick={(event) => { event.stopPropagation(); setCancelingRow(row); setCancelNote(''); setCancelError(null) }}>ยกเลิก</button>
+                      {row.status !== 'cancelled' ? (
+                        <>
+                          <button className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={(event) => { event.stopPropagation(); openEditForm(row) }}>แก้ไข</button>
+                          <button className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50" type="button" onClick={(event) => { event.stopPropagation(); setCancelingRow(row); setCancelNote(''); setCancelError(null) }}>ยกเลิก</button>
+                        </>
+                      ) : null}
                     </div>
                   </td>
                 </TableRow>
@@ -773,6 +826,7 @@ export function ReceiptVouchersPageClient() {
           onPickPurchaseBill={pickPurchaseBill}
           onSave={saveForm}
           onUpdateForm={updateForm}
+          paymentMethods={paymentMethodOptions}
           supplierBankAccounts={supplierOptions.find((supplier) => supplier.code === form.supplierCode)?.bankAccounts ?? []}
           supplierSearchOptions={supplierSearchOptions}
           purchaseBillSearchOptions={purchaseBillSearchOptions}
@@ -824,6 +878,7 @@ function ReceiptVoucherFormModal({
   onPickPurchaseBill,
   onSave,
   onUpdateForm,
+  paymentMethods,
   supplierBankAccounts,
   supplierSearchOptions,
   purchaseBillSearchOptions,
@@ -837,22 +892,45 @@ function ReceiptVoucherFormModal({
   onPickPurchaseBill: (docNo: string) => void
   onSave: () => void
   onUpdateForm: (patch: Partial<ReceiptVoucherFormState>) => void
+  paymentMethods: PaymentMethodOption[]
   supplierBankAccounts: SupplierOption['bankAccounts']
   supplierSearchOptions: SearchComboboxOption[]
   purchaseBillSearchOptions: SearchComboboxOption[]
 }) {
   const totals = formTotals(form)
   const [showSellerDetails, setShowSellerDetails] = useState(false)
+  const paymentMethodChoices = (() => {
+    const choices: Array<{ label: string; value: string }> = []
+    const seen = new Set<string>()
+    const addChoice = (value: string, label = value) => {
+      const normalized = value.trim()
+      if (!normalized || seen.has(normalized)) return
+      seen.add(normalized)
+      choices.push({ label, value: normalized })
+    }
+    for (const account of supplierBankAccounts ?? []) {
+      const value = `${account.paymentMethod} บช.${account.accountNo}`
+      addChoice(value, `${account.paymentMethod}${account.bankName ? ` · ${account.bankName}` : ''}${account.accountNo ? ` · ${account.accountNo}` : ''}`)
+    }
+    for (const method of paymentMethods) {
+      addChoice(method.name)
+    }
+    if (form.paymentMethod) {
+      addChoice(form.paymentMethod)
+    }
+    if (choices.length === 0) addChoice(CASH_PAYMENT_METHOD)
+    return choices
+  })()
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 md:p-3 print:hidden flex items-stretch md:items-start justify-center">
       <div className="w-full md:max-w-6xl rounded-none md:rounded-md bg-white shadow-xl flex flex-col h-screen md:h-auto md:max-h-[calc(100vh-80px)] my-0 md:my-4 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 md:px-5 py-3 shrink-0">
+        <div className="flex items-center justify-between bg-slate-900 px-4 md:px-5 py-3 text-white shrink-0">
           <div>
-            <h3 className="text-base font-bold text-slate-900">{mode === 'edit' ? 'แก้ไข' : 'สร้าง'}ใบสำคัญรับเงิน</h3>
-            <p className="hidden lg:block text-xs text-slate-500">ใช้สำหรับ Supplier รับเงินสดจากบริษัท กรณีไม่มีใบเสร็จจาก Supplier</p>
+            <h3 className="text-base font-bold text-white">{mode === 'edit' ? 'แก้ไข' : 'สร้าง'}ใบสำคัญรับเงิน</h3>
+            <p className="hidden lg:block text-xs text-slate-300">ใช้สำหรับ Supplier รับเงินสดจากบริษัท กรณีไม่มีใบเสร็จจาก Supplier</p>
           </div>
-          <button className="text-2xl leading-none text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>&times;</button>
+          <button className="text-2xl leading-none text-slate-300 hover:text-white" type="button" onClick={onClose}>&times;</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-3 md:space-y-4">
@@ -964,45 +1042,37 @@ function ReceiptVoucherFormModal({
                 </tfoot>
               </table>
             </div>
-            <div className="mt-2 md:mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
-              {(supplierBankAccounts && supplierBankAccounts.length > 0) || (mode === 'edit' && form.paymentMethod && form.paymentMethod !== 'รับเงินสด') ? (
-                <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-4">
-                  <FormField className="col-span-2 md:col-span-1" label="วิธีรับเงิน / เลขบัญชี">
-                    <select
-                      disabled={mode === 'edit'}
-                      className="h-8 md:h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
-                      value={(() => {
-                        const matched = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === 'รับเงินสด' ? '' : form.paymentMethod))
-                        return matched ? `${matched.paymentMethod} บช.${matched.accountNo}` : supplierBankAccounts?.[0] ? `${supplierBankAccounts[0].paymentMethod} บช.${supplierBankAccounts[0].accountNo}` : form.paymentMethod
-                      })()}
-                      onChange={(event) => onUpdateForm({ paymentMethod: event.target.value })}
-                    >
-                      {supplierBankAccounts && supplierBankAccounts.length > 0 ? supplierBankAccounts.map((account) => (
-                        <option key={account.code} value={`${account.paymentMethod} บช.${account.accountNo}`}>
-                          {account.paymentMethod}{account.bankName ? ` · ${account.bankName}` : ''}{account.accountNo ? ` · ${account.accountNo}` : ''}
-                        </option>
-                      )) : (
-                        <option value={form.paymentMethod}>{form.paymentMethod}</option>
-                      )}
-                    </select>
-                  </FormField>
-                  {(() => {
-                    const current = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === 'รับเงินสด' ? '' : form.paymentMethod)) ?? supplierBankAccounts?.[0]
-                    const fallbackAcctNo = !current && form.paymentMethod ? form.paymentMethod.split('บช.')[1]?.trim() : null
-                    return (
-                      <>
-                        <FormField label="ธนาคาร"><div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs md:text-sm text-slate-800">{current?.bankName || '-'}</div></FormField>
-                        <FormField label="เลขบัญชี"><div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs md:text-sm font-semibold tabular-nums text-slate-900">{current?.accountNo || fallbackAcctNo || '-'}</div></FormField>
-                        <FormField label="ชื่อบัญชี"><div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs md:text-sm text-slate-800 truncate">{current?.accountName || '-'}</div></FormField>
-                      </>
-                    )
-                  })()}
-                </div>
-              ) : (
-                <div className="flex min-h-8 md:min-h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2 md:px-3 text-xs md:text-sm text-slate-800">
-                  {form.amountInWords || thaiBahtText(totals.amount) || '-'}
-                </div>
-              )}
+            <div className="mt-2 md:mt-3">
+              <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-2 md:grid-cols-4">
+                <FormField className="col-span-2 md:col-span-1" label="วิธีรับเงิน / เลขบัญชี">
+                  <select
+                    disabled={paymentMethodChoices.length === 0}
+                    className="h-8 md:h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+                    value={(() => {
+                      const matched = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === CASH_PAYMENT_METHOD ? '' : form.paymentMethod))
+                      if (matched) return `${matched.paymentMethod} บช.${matched.accountNo}`
+                      if (form.paymentMethod && paymentMethodChoices.some((choice) => choice.value === form.paymentMethod)) return form.paymentMethod
+                      return paymentMethodChoices[0]?.value ?? ''
+                    })()}
+                    onChange={(event) => onUpdateForm({ paymentMethod: event.target.value })}
+                  >
+                    {paymentMethodChoices.map((choice) => (
+                      <option key={choice.value} value={choice.value}>{choice.label}</option>
+                    ))}
+                  </select>
+                </FormField>
+                {(() => {
+                  const current = supplierBankAccounts?.find((account) => `${account.paymentMethod} บช.${account.accountNo}` === (form.paymentMethod === CASH_PAYMENT_METHOD ? '' : form.paymentMethod))
+                  const fallbackAcctNo = !current && form.paymentMethod ? form.paymentMethod.split('บช.')[1]?.trim() : null
+                  return (
+                    <>
+                      <FormField label="ธนาคาร"><div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs md:text-sm text-slate-800">{current?.bankName || '-'}</div></FormField>
+                      <FormField label="เลขบัญชี"><div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs md:text-sm font-semibold tabular-nums text-slate-900">{current?.accountNo || fallbackAcctNo || '-'}</div></FormField>
+                      <FormField label="ชื่อบัญชี"><div className="flex h-8 md:h-9 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs md:text-sm text-slate-800 truncate">{current?.accountName || '-'}</div></FormField>
+                    </>
+                  )
+                })()}
+              </div>
             </div>
           </section>
 
@@ -1011,7 +1081,8 @@ function ReceiptVoucherFormModal({
             <div className="grid grid-cols-2 gap-2 md:gap-3">
               <FormField className="col-span-2" label="หมายเหตุ">
                 <textarea
-                  className="h-10 md:h-20 min-h-10 md:min-h-20 w-full rounded-md border border-slate-300 px-3 py-1.5 md:py-2 text-xs md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                  className="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-xs md:min-h-36 md:text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                  rows={5}
                   value={form.note}
                   onChange={(event) => onUpdateForm({ note: event.target.value })}
                 />
@@ -1052,59 +1123,6 @@ function ReadOnlyInfo({ label, value, wide = false }: { label: string; value?: s
   )
 }
 
-function KpiCard({ label, tone, value }: { label: string; tone: 'blue' | 'emerald' | 'slate' | 'violet'; value: string }) {
-  const configs = {
-    slate: {
-      bg: 'bg-slate-100 text-slate-600',
-      emoji: '📋',
-      labelColor: 'text-slate-500',
-      valueColor: 'text-slate-900',
-    },
-    blue: {
-      bg: 'bg-blue-100 text-blue-600',
-      emoji: '⚖️',
-      labelColor: 'text-blue-600',
-      valueColor: 'text-blue-700',
-    },
-    emerald: {
-      bg: 'bg-emerald-100 text-emerald-600',
-      emoji: '✅',
-      labelColor: 'text-emerald-600',
-      valueColor: 'text-emerald-700',
-    },
-    violet: {
-      bg: 'bg-violet-100 text-violet-600',
-      emoji: '🚨',
-      labelColor: 'text-violet-600',
-      valueColor: 'text-violet-700',
-    },
-  }
-
-  const numericValue = parseFloat(value.replace(/[^0-9.-]/g, ''))
-  const isZero = isNaN(numericValue) ? false : numericValue === 0
-
-  const config = isZero
-    ? {
-        bg: 'bg-slate-100 text-slate-600',
-        emoji: configs[tone].emoji,
-        labelColor: 'text-slate-500',
-        valueColor: 'text-slate-900',
-      }
-    : configs[tone]
-
-  return (
-    <div className="bg-white p-3 sm:p-5 border border-slate-200 rounded-xl shadow-sm flex items-center gap-2.5 sm:gap-4 flex-1">
-      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${config.bg} flex items-center justify-center text-lg sm:text-xl shrink-0`}>
-        {config.emoji}
-      </div>
-      <div>
-        <div className={`text-xs ${config.labelColor}`}>{label}</div>
-        <div className={`font-bold ${config.valueColor}`}>{value}</div>
-      </div>
-    </div>
-  )
-}
-
 function receiptVoucherStatusLabel(status: string) {
   if (status === 'cancelled') return 'ยกเลิก'
   return 'ใช้งาน'
@@ -1130,16 +1148,16 @@ function ReceiptVoucherDetailModal({ onClose, onPrint, row }: { onClose: () => v
   const timeline = row.timeline ?? []
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-3 print:hidden">
-      <div className="mx-auto my-4 max-w-4xl rounded-md bg-white shadow-xl">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-3">
+      <div className="mx-auto my-4 max-w-4xl overflow-hidden rounded-md bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-3 bg-slate-900 px-5 py-4 text-white">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-bold text-slate-900">รายละเอียดใบสำคัญรับเงิน {row.docNo}</h3>
+              <h3 className="text-base font-bold text-white">รายละเอียดใบสำคัญรับเงิน {row.docNo}</h3>
               <StatusPill status={row.status} />
             </div>
-            <p className="mt-1 text-xs text-slate-500">เอกสารหลักฐานรับเงินสดจาก Supplier ไม่กระทบ PMT/BST/AP/stock</p>
+            <p className="mt-1 text-xs text-slate-300">เอกสารหลักฐานรับเงินสดจาก Supplier ไม่กระทบ PMT/BST/AP/stock</p>
           </div>
-          <button className="text-2xl leading-none text-slate-400 hover:text-slate-600" type="button" onClick={onClose}>&times;</button>
+          <button className="text-2xl leading-none text-slate-300 hover:text-white" type="button" onClick={onClose}>&times;</button>
         </div>
 
         <div className="max-h-[calc(100vh-150px)] space-y-4 overflow-y-auto p-5">
@@ -1151,20 +1169,26 @@ function ReceiptVoucherDetailModal({ onClose, onPrint, row }: { onClose: () => v
             </div>
           ) : null}
 
-          <section className="grid grid-cols-2 gap-3 md:gap-5">
-            <div className="flex flex-col gap-1">
-              <DetailField label="วันที่ออกเอกสาร" value={formatDateDisplay(row.date)} />
-              <DetailField label="บิลซื้ออ้างอิง" value={row.purchaseBillDocNo || '-'} />
-              <DetailField label="ผู้รับเงิน" value={row.sellerName || '-'} />
-              <DetailField label="เลขประจำตัวผู้เสียภาษี" value={row.sellerTaxId || '-'} />
-              <DetailField label="ที่อยู่" value={row.sellerAddress || '-'} />
+          <section className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <h4 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">ข้อมูลเอกสาร</h4>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <DetailField label="วันที่ออกเอกสาร" value={formatDateDisplay(row.date)} />
+                <DetailField label="บิลซื้ออ้างอิง" value={row.purchaseBillDocNo || '-'} />
+                <DetailField label="ผู้รับเงิน" value={row.sellerName || '-'} />
+                <DetailField label="เลขประจำตัวผู้เสียภาษี" value={row.sellerTaxId || '-'} />
+                <DetailField label="ที่อยู่" value={row.sellerAddress || '-'} />
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <DetailField label="เบอร์โทร" value={row.sellerPhone || '-'} />
-              <DetailField label="Sale contact" value={row.salesPerson || '-'} />
-              <DetailField label="ยอดเงิน" value={formatMoney(row.totalAmount)} />
-              <DetailField label="น้ำหนักรวม" value={formatMoney(row.totalQty)} />
-              <DetailField label="หมายเหตุ" value={row.note || '-'} />
+            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <h4 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">ยอดและผู้ติดต่อ</h4>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <DetailField label="เบอร์โทร" value={row.sellerPhone || '-'} />
+                <DetailField label="Sale contact" value={row.salesPerson || '-'} />
+                <DetailField label="ยอดเงิน" value={formatMoney(row.totalAmount)} />
+                <DetailField label="น้ำหนักรวม" value={formatMoney(row.totalQty)} />
+                <DetailField label="หมายเหตุ" value={row.note || '-'} wide />
+              </div>
             </div>
           </section>
 
@@ -1202,8 +1226,8 @@ function ReceiptVoucherDetailModal({ onClose, onPrint, row }: { onClose: () => v
 function DetailField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
     <div className={`flex flex-col py-1 ${wide ? 'md:col-span-2' : ''}`}>
-      <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">{label}</div>
-      <div className="mt-0.5 text-xs sm:text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">{value}</div>
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="mt-0.5 whitespace-pre-wrap text-xs sm:text-sm font-semibold text-slate-800 [overflow-wrap:anywhere]">{value}</div>
     </div>
   )
 }
@@ -1227,10 +1251,10 @@ function CancelReceiptVoucherDialog({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 print:hidden">
-      <div className="w-full max-w-lg rounded-md bg-white shadow-xl">
-        <div className="border-b border-slate-200 px-5 py-3">
-          <h3 className="text-base font-bold text-slate-900">ยกเลิกใบสำคัญรับเงิน {row.docNo}</h3>
-          <p className="mt-1 text-xs text-slate-500">{row.sellerName || '-'}</p>
+      <div className="w-full max-w-lg overflow-hidden rounded-md bg-white shadow-xl">
+        <div className="bg-slate-900 px-5 py-3 text-white">
+          <h3 className="text-base font-bold text-white">ยกเลิกใบสำคัญรับเงิน {row.docNo}</h3>
+          <p className="mt-1 text-xs text-slate-300">{row.sellerName || '-'}</p>
         </div>
         <div className="space-y-3 p-5">
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
