@@ -185,7 +185,7 @@ export function PoOutstandingPageClient() {
     <section className="space-y-4">
       {error ? <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 border border-slate-200 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <button
           className={`rounded-lg px-5 py-2 text-sm font-semibold transition-colors outline-none focus:ring-0 ${
             tab === 'buy'
@@ -222,7 +222,7 @@ export function PoOutstandingPageClient() {
         <div className="ml-auto flex items-center gap-2">
           {tab === 'buy' && buyResize.hasCustomWidths && (
             <button
-              className="hidden h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 outline-none focus:ring-0 lg:inline-flex"
+              className="hidden h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 outline-none focus:ring-0 lg:inline-flex"
               type="button"
               onClick={buyResize.resetColumnWidths}
             >
@@ -231,7 +231,7 @@ export function PoOutstandingPageClient() {
           )}
           {tab === 'sell' && sellResize.hasCustomWidths && (
             <button
-              className="hidden h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 outline-none focus:ring-0 lg:inline-flex"
+              className="hidden h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50 outline-none focus:ring-0 lg:inline-flex"
               type="button"
               onClick={sellResize.resetColumnWidths}
             >
@@ -256,9 +256,9 @@ export function PoOutstandingPageClient() {
         <Metric label={tab === 'buy' ? 'มูลค่ารอรับ' : 'มูลค่ารอส่ง'} tone={tab === 'buy' ? 'blue' : 'emerald'} emoji="💰" value={formatMoney(totals.remainingValue)} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 border border-slate-200/60 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <input
-          className="h-9 min-w-[220px] flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800 placeholder-slate-400 outline-none transition-colors focus:border-slate-400 focus:ring-0"
+          className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 placeholder-slate-400 outline-none transition-colors focus:border-slate-400 focus:ring-0"
           placeholder="ค้นหา PO / คู่ค้า / สินค้า"
           type="search"
           value={search}
@@ -289,7 +289,7 @@ export function PoOutstandingPageClient() {
       </div>
 
       {/* Pagination Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-4">
+      <div className="mb-4 flex flex-col gap-3 px-1 py-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
         <div>
           พบทั้งหมด <span className="font-semibold text-slate-900">{totalRows}</span> รายการ
         </div>
@@ -323,8 +323,8 @@ export function PoOutstandingPageClient() {
       </div>
 
       {tab === 'buy' ? (
-        <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/60 bg-white shadow-sm">
-          <div className="rounded-t-xl border-b border-amber-200 bg-amber-50/50 p-3 text-xs font-medium text-amber-800">
+        <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
+          <div className="rounded-t-md border-b border-amber-200 bg-amber-50/50 p-3 text-xs font-medium text-amber-800">
             ตัดต้นทุนเป็น write/cost-pool side effect ใน legacy จึงแสดงเป็นคอลัมน์อ่านอย่างเดียวใน Next จนกว่าจะออกแบบ audit และ permission
           </div>
           <table className="w-full text-xs" style={{ minWidth: buyResize.tableMinWidth, tableLayout: 'fixed' }}>
@@ -497,7 +497,7 @@ export function PoOutstandingPageClient() {
           </table>
         </div>
       ) : (
-        <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200/60 bg-white shadow-sm">
+        <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm lg:block">
           <table className="w-full text-xs" style={{ minWidth: sellResize.tableMinWidth, tableLayout: 'fixed' }}>
             <colgroup>
               {sellColumns.map((column) => {
