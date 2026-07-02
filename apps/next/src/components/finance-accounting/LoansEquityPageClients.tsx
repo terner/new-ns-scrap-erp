@@ -637,15 +637,15 @@ export function HistoricalDataPageClient() {
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600"><span>{tab === 'expense' ? 'กรอกค่าใช้จ่ายแต่ละหมวด — แต่ละเดือน' : tab === 'pnl' ? 'กรอกตัวเลขสรุป P&L แต่ละเดือน' : 'กรอก Cash Flow แต่ละเดือน'}</span><div className="flex gap-2"><DisabledButton>🗑 ล้าง tab นี้</DisabledButton><DisabledButton strong>💾 บันทึก + Sync Cloud</DisabledButton></div></div>
       {/* Desktop Table View */}
       <div className="hidden lg:block">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
           {columnResize.hasCustomWidths ? (
             <div className="flex justify-end border-b border-slate-100 bg-white px-3 py-2">
               <button
-                className="h-8 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 hover:bg-slate-50"
                 type="button"
                 onClick={columnResize.resetColumnWidths}
               >
-                รีเซ็ตความกว้างตาราง
+                คืนค่าเดิมตาราง
               </button>
             </div>
           ) : null}

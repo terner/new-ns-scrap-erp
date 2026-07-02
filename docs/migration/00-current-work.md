@@ -6,6 +6,8 @@ Date: 2026-07-02
 Active app: `apps/next`
 Primary remote: `new-origin`
 
+Historical Data table reset follow-up on 2026-07-02: `/finance-accounting/historical-data` now uses the rounded-md lined table shell and standard `h-9`, `text-sm`, `???????????????` reset-width control for the historical monthly matrix. This is UI-only; historical baseline rows, tab selection, sorting/resizing, API permissions, and DB state were not changed.
+
 Opening Balance table reset follow-up on 2026-07-02: `/finance-accounting/opening-balance` now uses the rounded-md lined table shell and standard `h-9`, `text-sm`, `???????????????` reset-width control for the accounts table. This is UI-only; cutover/read-only state, account rows, sorting/resizing, API permissions, and DB state were not changed.
 
 Loan Dashboard due-table reset follow-up on 2026-07-02: `/finance-accounting/loan-dashboard` due/overdue tables now use the rounded-md lined table card and standard `h-9`, `text-sm`, `???????????????` reset-width control. This is UI-only; dashboard summaries, due/overdue source rows, sorting/resizing, API permissions, and DB state were not changed.
