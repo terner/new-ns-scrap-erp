@@ -43,6 +43,7 @@ type BillRow = {
   date: string
   discountTotal?: number
   docNo: string
+  editLockedReason?: string | null
   grossProfit?: number
   hasVat?: boolean
   id: string
@@ -196,6 +197,8 @@ type Option = {
   id: string
   label?: string | null
   line_id?: string | null
+  lockedAmount?: number | null
+  lockedQty?: number | null
   marketScope?: string | null
   name: string
   product_id?: string | null
@@ -838,15 +841,23 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       poSellOptionsByKey.set(key, { ...option })
       return
     }
+    const currentLockedQty = current.lockedQty ?? (current.status === 'locked' ? current.remainingQty ?? 0 : 0)
+    const incomingLockedQty = option.lockedQty ?? (option.status === 'locked' ? option.remainingQty ?? 0 : 0)
+    const currentLockedAmount = current.lockedAmount ?? (current.status === 'locked' ? current.remainingAmount ?? 0 : 0)
+    const incomingLockedAmount = option.lockedAmount ?? (option.status === 'locked' ? option.remainingAmount ?? 0 : 0)
     const existingQty = current.remainingQty ?? 0
     const incomingQty = option.remainingQty ?? 0
     current.remainingAmount = (current.remainingAmount ?? 0) + (option.remainingAmount ?? 0)
     current.remainingQty = existingQty + incomingQty
+    current.lockedAmount = currentLockedAmount + incomingLockedAmount
+    current.lockedQty = currentLockedQty + incomingLockedQty
     current.active = current.active !== false || option.active !== false
     if (current.status === 'locked' || option.status === 'locked') {
       const unit = current.unit ?? option.unit ?? 'กก.'
       const unitPrice = current.unitPrice ?? option.unitPrice ?? 0
-      current.label = `${current.id} · ใช้ได้ ${formatMoney(current.remainingQty)}${unit ? ` ${unit}` : ''} (เดิม ${formatMoney(existingQty)} + คงเหลือ ${formatMoney(incomingQty)}) · ${formatMoney(unitPrice)} บาท`
+      const lockedQty = current.lockedQty ?? 0
+      const liveRemainingQty = Math.max(0, (current.remainingQty ?? 0) - lockedQty)
+      current.label = `${current.id} · ใช้ในบิลนี้ ${formatMoney(lockedQty)}${unit ? ` ${unit}` : ''}${liveRemainingQty > 0.0001 ? ` · คงเหลือ ${formatMoney(liveRemainingQty)}${unit ? ` ${unit}` : ''}` : ''} · ${formatMoney(unitPrice)} บาท`
     }
   })
   const activePoSells = [...poSellOptionsByKey.values()].filter((option) => {
@@ -1315,6 +1326,25 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
     return Math.max(0, (po.remainingQty ?? 0) - allocatedOtherRows)
   }
 
+  function poSellVarianceForRow(poSellId: string | null, index: number) {
+    if (!poSellId) return null
+    const currentItem = salesForm.items[index]
+    const po = poSellOptionForProduct(poSellId, currentItem?.productId ?? null)
+    if (!po) return null
+    const availableQty = poSellAvailableForRow(poSellId, index)
+    if (currentItem.qty > availableQty + 0.001) {
+      return { className: 'text-red-700', text: `เกิน ${formatMoney(currentItem.qty - availableQty)} กก.` }
+    }
+    return null
+  }
+
+  function poSellDetailText(option: Option | null) {
+    if (!option?.label) return null
+    const [, ...detailParts] = option.label.split(' · ')
+    const detail = detailParts.join(' · ').trim()
+    return detail || null
+  }
+
   function tradingCostSourceOptionForProduct(sourceId: string | null | undefined, productId: string | null | undefined) {
     if (!sourceId) return null
     const productMatched = productId
@@ -1640,8 +1670,11 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
       const qty = item.qty
       const amount = item.amount || item.price * qty
       if (current) {
+        current.lockedAmount = (current.lockedAmount ?? 0) + amount
+        current.lockedQty = (current.lockedQty ?? 0) + qty
         current.remainingAmount = (current.remainingAmount ?? 0) + amount
         current.remainingQty = (current.remainingQty ?? 0) + qty
+        current.label = `${poSellDocNo} · ใช้ในบิลนี้ ${formatMoney(current.lockedQty ?? 0)}${item.unit ? ` ${item.unit}` : ' กก.'} · ${item.price.toLocaleString('th-TH')} บาท`
         return
       }
       optionsByKey.set(key, {
@@ -1649,8 +1682,10 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
         branch_id: detail.branchId,
         customer_id: detail.customerCode === '-' ? null : detail.customerCode,
         id: poSellDocNo,
-        label: `${poSellDocNo} · เดิม ${qty.toLocaleString('th-TH')} · ${item.price.toLocaleString('th-TH')} บาท`,
+        label: `${poSellDocNo} · ใช้ในบิลนี้ ${formatMoney(qty)}${item.unit ? ` ${item.unit}` : ' กก.'} · ${item.price.toLocaleString('th-TH')} บาท`,
         line_id: `${poSellDocNo}:locked:${productId ?? 'all'}`,
+        lockedAmount: amount,
+        lockedQty: qty,
         name: poSellDocNo,
         product_id: productId,
         remainingAmount: amount,
@@ -1722,8 +1757,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
   }
 
   async function openEditSalesForm(row: BillRow) {
-    if (row.status === 'cancelled') {
-      setError(row.lockedReason ?? 'บิลขายที่ยกเลิกแล้วแก้ไขไม่ได้')
+    if (row.canEdit === false) {
+      setError(row.editLockedReason ?? row.lockedReason ?? 'บิลขายนี้แก้ไขไม่ได้')
       return
     }
     const docNo = row.docNo || row.id
@@ -2979,7 +3014,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                     >
                       พิมพ์
                     </button>
-                    {row.status !== 'cancelled' ? (
+                    {row.canEdit !== false ? (
                       <button
                         className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50"
                         disabled={isDetailLoading}
@@ -3126,7 +3161,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       >
                         {printingBillDocNo === row.docNo ? 'เตรียม...' : 'พิมพ์'}
                       </button>
-                      {row.status !== 'cancelled' ? (
+                      {row.canEdit !== false ? (
                         <button
                           className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50"
                           disabled={isDetailLoading}
@@ -3309,7 +3344,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                       <table className="w-full min-w-[920px] text-sm">
                         <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-medium">
                           <tr>
-                            <th className="p-2 text-left">สินค้า</th>
+                            <th className="w-[220px] p-2 text-left">สินค้า</th>
                             <th className="p-2 text-right">Gross</th>
                             <th className="p-2 text-right">หัก</th>
                             <th className="p-2 text-right">น้ำหนักสุทธิ</th>
@@ -3831,7 +3866,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                             <th className="p-2 text-right">จำนวนที่ขายได้</th>
                             <th className="p-2 text-right">หักสิ่งเจือปน</th>
                             <th className="p-2 text-right">น้ำหนักขายสุทธิ</th>
-                            <th className="p-2 text-left">อ้างอิง</th>
+                            <th className="w-[260px] p-2 text-left">อ้างอิง</th>
 	                            <th className="p-2 text-right">ราคาต้นทุนเฉลี่ย</th>
 	                            <th className="p-2 text-right">ราคาขาย/หน่วย</th>
 	                            <th className="p-2 text-right">ส่วนลด</th>
@@ -3858,29 +3893,25 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                            })
 	                            const selectedPoSell = poSellOptionForProduct(item.poSellId, item.productId)
 	                            const hasSelectedPoSell = Boolean(item.poSellId && selectedPoSell)
-	                            const rowPoCapacity = hasSelectedPoSell ? poSellAvailableForRow(item.poSellId, index) : null
-	                            const poSellVariance = rowPoCapacity != null
-	                              ? poQtyVariance(rowPoCapacity, item.qty)
-	                              : null
+	                            const selectedPoSellDetail = hasSelectedPoSell ? poSellDetailText(selectedPoSell) : null
+	                            const poSellVariance = hasSelectedPoSell ? poSellVarianceForRow(item.poSellId, index) : null
+	                            const rowKey = `${item.deliverySummaryId ?? item.deliveryLineId ?? item.productId}-${index}`
 	                            return (
-	                              <tr key={`${item.deliverySummaryId ?? item.deliveryLineId ?? item.productId}-${index}`} className={`${isFirstRowOfSummary ? 'border-t border-slate-200' : ''} align-top hover:bg-blue-50/30`}>
-	                                <td className="p-2">
+	                              <Fragment key={rowKey}>
+	                              <tr className={`${isFirstRowOfSummary ? 'border-t border-slate-200' : ''} align-top hover:bg-blue-50/30`}>
+	                                <td className="p-2" colSpan={isFirstRowOfSummary ? undefined : 2}>
 	                                  {isFirstRowOfSummary ? (
 	                                    <>
 	                                      <div className="font-medium text-slate-900">{sourceSummary?.productName ?? productName}</div>
 	                                      <div className="mt-1 text-xs text-slate-500">{sourceSummary?.productId ?? item.productId}</div>
 	                                      {sourceSummary ? <div className="mt-1 text-xs text-slate-500">รวม {sourceSummary.lineCount} เต๋า</div> : null}
-	                                      {sourceSummary && summaryVariance ? (
-	                                        <div className={`mt-1 text-xs font-semibold ${summaryVariance.className}`}>
-	                                          {summaryVariance.text}
-	                                        </div>
-	                                      ) : null}
 	                                    </>
 	                                  ) : (
-                                      <div className="min-w-[220px]">
+                                      <div className="min-w-[360px]">
                                         <ProductSearchCombobox
                                           error={salesFieldErrors[`items.${index}.productId`]}
                                           errorKey={`items.${index}.productId`}
+                                          hideLabel
                                           inputId={`sales-bill-split-product-search-${index}`}
                                           options={activeProducts}
                                           value={item.productId}
@@ -3889,16 +3920,25 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                       </div>
                                     )}
 	                                </td>
-	                                <td className="p-2 text-right tabular-nums text-emerald-700">{isFirstRowOfSummary ? formatMoney(sourceSummary?.remainingWeight ?? item.netWeight ?? item.qty) : ''}</td>
+	                                {isFirstRowOfSummary ? (
+	                                  <td className="p-2 text-right tabular-nums text-emerald-700">
+	                                    <div>{formatMoney(sourceSummary?.remainingWeight ?? item.netWeight ?? item.qty)}</div>
+	                                    {sourceSummary && summaryVariance ? (
+	                                      <div className={`ml-auto mt-1 max-w-24 whitespace-normal text-right text-xs font-semibold leading-snug [overflow-wrap:anywhere] ${summaryVariance.className}`}>
+	                                        {summaryVariance.text}
+	                                      </div>
+	                                    ) : null}
+	                                  </td>
+	                                ) : null}
 	                                <td className="p-2">
-	                                  <div className="ml-auto w-28">
+	                                  <div className="ml-auto w-17">
 	                                    <input data-error-key={`items.${index}.netWeight`} className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-bold tabular-nums text-slate-700 ${salesFieldErrors[`items.${index}.netWeight`] || salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.netWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'netWeight', Number(event.target.value || 0))} />
 	                                  </div>
 	                                  {salesFieldErrors[`items.${index}.netWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.netWeight`]}</div> : null}
 	                                  {salesFieldErrors[`items.${index}.qty`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.qty`]}</div> : null}
 	                                </td>
 	                                <td className="p-2">
-	                                  <div className="ml-auto w-28">
+	                                  <div className="ml-auto w-17">
 	                                    <input data-error-key={`items.${index}.deductWeight`} className={`w-full rounded-md border bg-amber-50 px-2 py-2 text-right font-bold tabular-nums text-amber-700 ${salesFieldErrors[`items.${index}.deductWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateSalesStockSaleWeight(index, 'deductWeight', Number(event.target.value || 0))} />
 	                                  </div>
 	                                  {salesFieldErrors[`items.${index}.deductWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.deductWeight`]}</div> : null}
@@ -3907,14 +3947,16 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                                  <div data-error-key={`items.${index}.qty`} className={`rounded-md border px-2 py-2 text-right font-bold tabular-nums ${salesFieldErrors[`items.${index}.qty`] ? 'border-red-400 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{formatMoney(item.qty)}</div>
 	                                </td>
                                 <td className="p-2">
-                                  <select className="w-full rounded-md border bg-blue-50 px-2 py-2 text-xs" value={hasSelectedPoSell ? item.poSellId ?? '' : ''} onChange={(event) => updateSalesItemPoSell(index, event.target.value || null)}>
+                                  <select className="h-10 w-2/3 rounded-md border bg-blue-50 px-2 text-xs" value={hasSelectedPoSell ? item.poSellId ?? '' : ''} onChange={(event) => updateSalesItemPoSell(index, event.target.value || null)}>
                                     <option value="">Spot Sale</option>
+                                    {hasSelectedPoSell && selectedPoSell ? <option hidden value={item.poSellId ?? ''}>{selectedPoSell.name || selectedPoSell.id}</option> : null}
                                     {itemPoSellOptions.map((po) => <option key={`${po.id}-${po.line_id ?? po.product_id ?? 'all'}`} value={po.id}>{po.label ?? po.name}</option>)}
                                   </select>
+                                  {selectedPoSellDetail ? <div className="mt-1 max-w-[260px] text-xs font-semibold leading-snug text-slate-600">{selectedPoSellDetail}</div> : null}
                                   {poSellVariance ? <div className={`mt-1 text-xs font-semibold ${poSellVariance.className}`}>{poSellVariance.text}</div> : null}
                                 </td>
                                 <td className="p-2">
-                                  <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold tabular-nums text-slate-700">
+                                  <div className="flex h-10 items-center justify-end rounded-md border border-slate-200 bg-slate-50 px-2 text-right font-semibold tabular-nums text-slate-700">
                                     {sourceSummary?.unitCostSnapshot == null ? '-' : formatMoney(sourceSummary.unitCostSnapshot)}
                                   </div>
                                 </td>
@@ -3923,7 +3965,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                     disabled={hasSelectedPoSell}
                                     error={salesFieldErrors[`items.${index}.price`]}
                                     errorKey={`items.${index}.price`}
-                                    inputClassName="ml-auto w-32"
+                                    inputClassName="ml-auto w-20"
                                     value={item.price}
                                     onChange={(value) => updateSalesItem(index, 'price', value)}
                                   />
@@ -3932,7 +3974,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                   <InlineMoneyInput
                                     error={salesFieldErrors[`items.${index}.discount`]}
                                     errorKey={`items.${index}.discount`}
-                                    inputClassName="ml-auto w-28"
+                                    inputClassName="ml-auto w-14"
                                     value={item.discount}
                                     onChange={(value) => updateSalesItem(index, 'discount', value)}
                                   />
@@ -3942,17 +3984,24 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
 	                                </td>
 	                                <td className="p-2">
 	                                  <div className="flex justify-end gap-1">
-	                                    {isLastRowOfSummary ? (
-	                                      <Button disabled={summaryUnallocatedQty <= 0.0001} size="xs" type="button" variant="outline" onClick={() => addSalesStockAllocationRow(index)}>
-	                                        + เพิ่มแถว
-	                                      </Button>
-	                                    ) : null}
 	                                    <Button disabled={!summaryState || summaryState.rowIndices.length <= 1} size="xs" type="button" variant="outline" onClick={() => removeSalesStockAllocationRow(index)}>
 	                                      ลบ
 	                                    </Button>
 	                                  </div>
 	                                </td>
 	                              </tr>
+	                              {isLastRowOfSummary ? (
+	                                <tr className="border-t border-dashed border-slate-100">
+	                                  <td className="p-2"></td>
+	                                  <td className="p-2 text-right">
+	                                    <Button disabled={summaryUnallocatedQty <= 0.0001} size="xs" type="button" variant="outline" onClick={() => addSalesStockAllocationRow(index)}>
+	                                      + เพิ่มแถว
+	                                    </Button>
+	                                  </td>
+	                                  <td colSpan={9}></td>
+	                                </tr>
+	                              ) : null}
+	                              </Fragment>
 	                            )
 	                          })}
                         </tbody>
@@ -4013,8 +4062,8 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                           })
                           const selectedPoSell = poSellOptionForProduct(item.poSellId, item.productId)
                           const hasSelectedPoSell = Boolean(item.poSellId && selectedPoSell)
-                          const rowPoCapacity = hasSelectedPoSell ? poSellAvailableForRow(item.poSellId, index) : null
-                          const poSellVariance = rowPoCapacity != null ? poQtyVariance(rowPoCapacity, item.qty) : null
+                          const selectedPoSellDetail = hasSelectedPoSell ? poSellDetailText(selectedPoSell) : null
+                          const poSellVariance = hasSelectedPoSell ? poSellVarianceForRow(item.poSellId, index) : null
                           const selectedTradingCostSource = tradingCostSourceOptionForProduct(item.tradingCostSourceId, item.productId)
                           const rowCostSourceCapacity = item.tradingCostSourceId ? tradingCostSourceAvailableForRow(item.tradingCostSourceId, index) : null
                           const costSourceVariance = !isWtoLine && rowCostSourceCapacity != null ? poQtyVariance(rowCostSourceCapacity, item.qty) : null
@@ -4040,7 +4089,7 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                 )}
                               </td>
                               <td className="p-2">
-                                <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold tabular-nums text-slate-700">
+                                <div className="flex h-10 items-center justify-end rounded-md border border-slate-200 bg-slate-50 px-2 text-right font-semibold tabular-nums text-slate-700">
                                   {wtoSourceSummary?.unitCostSnapshot == null ? '-' : formatMoney(wtoSourceSummary.unitCostSnapshot)}
                                 </div>
                               </td>
@@ -4057,23 +4106,29 @@ export function TransactionBillsPageClient({ mode }: TransactionBillsPageClientP
                                 )}
                               </td>
                               <td className="p-2">
-                                <select className="w-full rounded-md border bg-blue-50 px-2 py-2 text-xs" value={hasSelectedPoSell ? item.poSellId ?? '' : ''} onChange={(event) => updateSalesItemPoSell(index, event.target.value || null)}>
+                                <select className="h-10 w-full rounded-md border bg-blue-50 px-2 text-xs" value={hasSelectedPoSell ? item.poSellId ?? '' : ''} onChange={(event) => updateSalesItemPoSell(index, event.target.value || null)}>
                                   <option value="">Spot Sale</option>
+                                  {hasSelectedPoSell && selectedPoSell ? <option hidden value={item.poSellId ?? ''}>{selectedPoSell.name || selectedPoSell.id}</option> : null}
                                   {itemPoSellOptions.map((po) => <option key={`${po.id}-${po.line_id ?? po.product_id ?? 'all'}`} value={po.id}>{po.label ?? po.name}</option>)}
                                 </select>
+                                {selectedPoSellDetail ? <div className="mt-1 text-xs font-semibold leading-snug text-slate-600">{selectedPoSellDetail}</div> : null}
                                 {poSellVariance ? <div className={`mt-1 text-xs font-semibold ${poSellVariance.className}`}>{poSellVariance.text}</div> : null}
                               </td>
                               <td className="p-2">
-                                <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-right font-semibold tabular-nums text-slate-700">
+                                <div className="flex h-10 items-center justify-end rounded-md border border-slate-200 bg-slate-50 px-2 text-right font-semibold tabular-nums text-slate-700">
                                   {wtoSourceSummary?.unitCostSnapshot == null ? '-' : formatMoney(wtoSourceSummary.unitCostSnapshot)}
                                 </div>
                               </td>
                               <td className="p-2">
-                                <input data-error-key={`items.${index}.grossWeight`} className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-bold tabular-nums text-slate-700 ${salesFieldErrors[`items.${index}.grossWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.grossWeight || ''} onChange={(event) => updateSalesItemWeights(index, 'grossWeight', Number(event.target.value || 0))} />
+                                <div className="ml-auto w-17">
+                                  <input data-error-key={`items.${index}.grossWeight`} className={`w-full rounded-md border bg-slate-50 px-2 py-2 text-right font-bold tabular-nums text-slate-700 ${salesFieldErrors[`items.${index}.grossWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.grossWeight || ''} onChange={(event) => updateSalesItemWeights(index, 'grossWeight', Number(event.target.value || 0))} />
+                                </div>
                                 {salesFieldErrors[`items.${index}.grossWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.grossWeight`]}</div> : null}
                               </td>
                               <td className="p-2">
-                                <input data-error-key={`items.${index}.deductWeight`} className={`w-full rounded-md border bg-amber-50 px-2 py-2 text-right font-bold tabular-nums text-amber-700 ${salesFieldErrors[`items.${index}.deductWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateSalesItemWeights(index, 'deductWeight', Number(event.target.value || 0))} />
+                                <div className="ml-auto w-17">
+                                  <input data-error-key={`items.${index}.deductWeight`} className={`w-full rounded-md border bg-amber-50 px-2 py-2 text-right font-bold tabular-nums text-amber-700 ${salesFieldErrors[`items.${index}.deductWeight`] ? 'border-red-400 bg-red-50 text-red-700' : ''} ${numberInputClass}`} min="0" step="0.01" type="number" value={item.deductWeight || ''} onChange={(event) => updateSalesItemWeights(index, 'deductWeight', Number(event.target.value || 0))} />
+                                </div>
                                 {salesFieldErrors[`items.${index}.deductWeight`] ? <div className="mt-1 text-xs text-red-600">{salesFieldErrors[`items.${index}.deductWeight`]}</div> : null}
                               </td>
                               <td className="p-2">
@@ -4727,30 +4782,40 @@ function SalesBillDetailModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {detail.items.map((item) => (
-                      <tr key={`${item.lineNo}-${item.productCode}-${item.deliveryLineId}`} className="border-t border-slate-200">
-                        <td className="px-3 py-2 align-top">
-                          <div className="font-medium text-slate-900">{item.productName}</div>
-                          <div className="text-xs text-slate-500">{[item.productCode || null, `line ${item.lineNo}`].filter(Boolean).join(' · ')}</div>
-                          {item.note ? <div className="mt-1 text-xs text-slate-500">{item.note}</div> : null}
-                        </td>
-                        <td className="px-3 py-2 align-top">
-                          <div className="text-slate-900">{item.deliveryTicketDocNo || '-'}</div>
-                          <div className="text-xs text-slate-500">{item.deliveryVehicleNo || '-'}</div>
-                        </td>
-                        <td className="px-3 py-2 align-top">
-                          <div className="text-slate-900">{item.sourceLabel || '-'}</div>
-                          <div className="text-xs text-slate-500">{item.sourceType || '-'}</div>
-                          {item.matchedCogs > 0 ? <div className="mt-1 text-xs text-red-600">Matched COGS {formatMoney(item.matchedCogs)}</div> : null}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.grossWeight)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.deductWeight)}</td>
-                        <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(item.qty || item.netWeight)} {item.unit}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.price)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.discount)}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-blue-700 tabular-nums">{formatMoney(item.amount)}</td>
-                      </tr>
-                    ))}
+                    {detail.items.map((item) => {
+                      const sourceProductCode = item.sourceProductCode?.trim() ?? ''
+                      const salesProductCode = item.productCode?.trim() ?? ''
+                      const isSeparatedFromSource = Boolean(sourceProductCode && salesProductCode && sourceProductCode !== salesProductCode)
+                      return (
+                        <tr key={`${item.lineNo}-${item.productCode}-${item.deliveryLineId}`} className="border-t border-slate-200">
+                          <td className="px-3 py-2 align-top">
+                            <div className="font-medium text-slate-900">{item.productName}</div>
+                            <div className="text-xs text-slate-500">{[item.productCode || null, `line ${item.lineNo}`].filter(Boolean).join(' · ')}</div>
+                            {isSeparatedFromSource ? (
+                              <div className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold leading-snug text-amber-800">
+                                คัดแยกจาก: {item.sourceProductName} ({item.sourceProductCode})
+                              </div>
+                            ) : null}
+                            {item.note ? <div className="mt-1 text-xs text-slate-500">{item.note}</div> : null}
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            <div className="text-slate-900">{item.deliveryTicketDocNo || '-'}</div>
+                            <div className="text-xs text-slate-500">{item.deliveryVehicleNo || '-'}</div>
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            <div className="text-slate-900">{item.sourceLabel || '-'}</div>
+                            <div className="text-xs text-slate-500">{item.sourceType || '-'}</div>
+                            {item.matchedCogs > 0 ? <div className="mt-1 text-xs text-red-600">Matched COGS {formatMoney(item.matchedCogs)}</div> : null}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.grossWeight)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.deductWeight)}</td>
+                          <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(item.qty || item.netWeight)} {item.unit}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.price)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatMoney(item.discount)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-blue-700 tabular-nums">{formatMoney(item.amount)}</td>
+                        </tr>
+                      )
+                    })}
                     {detail.items.length === 0 ? <tr><td className="px-6 py-6 text-center text-slate-500" colSpan={9}>ไม่มีรายการสินค้าในบิล</td></tr> : null}
                   </tbody>
                 </table>
@@ -4778,7 +4843,7 @@ function SalesBillDetailModal({
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+            <div>
               <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-medium text-slate-700">ประวัติสถานะ SB</div>
@@ -4788,43 +4853,6 @@ function SalesBillDetailModal({
                   </span>
                 </div>
                 <SalesBillDetailTimeline detail={detail} />
-              </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <div className="mb-3 text-sm font-medium text-slate-700">Source usage facts</div>
-                {detail.sourceUsageFacts.length === 0 ? (
-                  <div className="rounded-md bg-white p-4 text-center text-xs text-slate-500">ยังไม่มี usage fact สำหรับบิลนี้</div>
-                ) : (
-                  <div className="max-h-[360px] overflow-auto rounded-md border border-slate-200 bg-white">
-                    <table className="w-full min-w-[680px] text-xs">
-                      <thead className="bg-slate-50 text-slate-600">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-medium">รายการ</th>
-                          <th className="px-3 py-2 text-left font-medium">เอกสาร</th>
-                          <th className="px-3 py-2 text-right font-medium">จำนวน</th>
-                          <th className="px-3 py-2 text-right font-medium">มูลค่า/COGS</th>
-                          <th className="px-3 py-2 text-left font-medium">สถานะ</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.sourceUsageFacts.map((fact) => (
-                          <tr key={fact.id} className="border-t border-slate-100">
-                            <td className="px-3 py-2 align-top">
-                              <div className="font-medium text-slate-900">{fact.title}</div>
-                              <div className="text-slate-500">{[fact.type, fact.productName !== '-' ? fact.productName : null, fact.lineNo ? `line ${fact.lineNo}` : null].filter(Boolean).join(' · ')}</div>
-                            </td>
-                            <td className="px-3 py-2 align-top font-mono text-xs text-slate-700">{fact.docNo || '-'}</td>
-                            <td className="px-3 py-2 text-right align-top tabular-nums">{fact.qty ? `${formatMoney(fact.qty)} ${fact.unit}` : '-'}</td>
-                            <td className="px-3 py-2 text-right align-top tabular-nums">{fact.amount ? formatMoney(fact.amount) : '-'}</td>
-                            <td className="px-3 py-2 align-top">
-                              <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${fact.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{fact.status}</span>
-                              <div className="mt-1 text-xs text-slate-400">{formatDateTime(fact.createdAt)}</div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -4904,6 +4932,7 @@ function SalesBillDetailTimeline({ detail }: { detail: SalesBillDetail }) {
         tone: 'slate' as const,
         transitionText: detail.statusLabel,
       }]
+  const sourceFactsEventIndex = timelineEvents.length - 1
 
   return (
     <div className="space-y-3">
@@ -4926,10 +4955,55 @@ function SalesBillDetailTimeline({ detail }: { detail: SalesBillDetail }) {
             <div className="mt-2 grid gap-1 rounded-md bg-white px-3 py-2 text-xs text-slate-600">
               {event.details.map((detailLine) => <div key={detailLine}>{detailLine}</div>)}
             </div>
+            {index === sourceFactsEventIndex ? <SalesBillSourceUsageTimelineTable facts={detail.sourceUsageFacts} /> : null}
           </div>
         </div>
       ))}
     </div>
+  )
+}
+
+function SalesBillSourceUsageTimelineTable({ facts }: { facts: SalesBillDetail['sourceUsageFacts'] }) {
+  return (
+    <details className="mt-3 rounded-md border border-slate-200 bg-white">
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-blue-700">
+        ต้นทางสินค้าและต้นทุน {facts.length > 0 ? `${facts.length} รายการ` : ''}
+      </summary>
+      {facts.length === 0 ? (
+        <div className="border-t border-slate-100 px-3 py-3 text-center text-xs text-slate-500">ยังไม่มีข้อมูลต้นทางสินค้าและต้นทุนสำหรับบิลนี้</div>
+      ) : (
+        <div className="max-h-[360px] overflow-auto border-t border-slate-100">
+          <table className="w-full min-w-[760px] text-xs">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">รายการ</th>
+                <th className="px-3 py-2 text-left font-medium">ต้นทาง</th>
+                <th className="px-3 py-2 text-right font-medium">จำนวน</th>
+                <th className="px-3 py-2 text-right font-medium">ต้นทุน/COGS</th>
+                <th className="px-3 py-2 text-left font-medium">สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {facts.map((fact) => (
+                <tr key={fact.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2 align-top">
+                    <div className="font-medium text-slate-900">{fact.title}</div>
+                    <div className="text-slate-500">{[fact.type, fact.productName !== '-' ? fact.productName : null, fact.lineNo ? `line ${fact.lineNo}` : null].filter(Boolean).join(' · ')}</div>
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono text-xs text-slate-700">{fact.docNo || '-'}</td>
+                  <td className="px-3 py-2 text-right align-top tabular-nums">{fact.qty ? `${formatMoney(fact.qty)} ${fact.unit}` : '-'}</td>
+                  <td className="px-3 py-2 text-right align-top tabular-nums">{fact.amount ? formatMoney(fact.amount) : '-'}</td>
+                  <td className="px-3 py-2 align-top">
+                    <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${fact.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{fact.status}</span>
+                    <div className="mt-1 text-xs text-slate-400">{formatDateTime(fact.createdAt)}</div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </details>
   )
 }
 

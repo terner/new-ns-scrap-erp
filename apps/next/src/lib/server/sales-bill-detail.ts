@@ -225,10 +225,6 @@ function jsonString(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function deliverySummaryOutwardId(ticketDocNo: string, productCode: string, lineCount: number | null | undefined) {
-  return `${ticketDocNo}:${productCode}:${lineCount ?? 0}`
-}
-
 function tradingSourceInfo(
   transactionMode: string | null,
   lineNo: number,
@@ -317,7 +313,10 @@ function buildDurableItems(input: {
     const wtoMeta = jsonObject(wtoSource?.meta)
     const deliveryLineId = jsonString(wtoMeta.deliveryLineId)
     const deliverySummaryId = jsonString(wtoMeta.deliverySummaryId)
-    const sourceSummary = deliverySummaryId ? input.deliverySummaryById.get(deliverySummaryId) ?? null : null
+    const sourceSummaryKey = wtoSource?.weight_ticket_product_summary_id != null
+      ? String(wtoSource.weight_ticket_product_summary_id)
+      : ''
+    const sourceSummary = sourceSummaryKey ? input.deliverySummaryById.get(sourceSummaryKey) ?? null : null
     const sourceType = input.bill.transaction_mode === 'TRADING'
       ? tradingSource.sourceType
       : Array.from(new Set([
@@ -485,6 +484,7 @@ export async function getSalesBillDetail(
               select: {
                 deduct_weight: true,
                 gross_weight: true,
+                id: true,
                 line_count: true,
                 net_weight: true,
                 product_name: true,
@@ -545,7 +545,7 @@ export async function getSalesBillDetail(
     ticket.weight_ticket_product_summaries.forEach((summary) => {
       const productCode = summary.products?.code?.trim() ?? ''
       if (!productCode) return
-      deliverySummaryById.set(deliverySummaryOutwardId(ticket.doc_no, productCode, summary.line_count), {
+      deliverySummaryById.set(String(summary.id), {
         deductWeight: toNumber(summary.deduct_weight),
         grossWeight: toNumber(summary.gross_weight),
         lineCount: summary.line_count ?? 0,
