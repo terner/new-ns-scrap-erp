@@ -487,9 +487,9 @@ export function AssetRegisterPageClient() {
       </div>
 
       {/* Desktop Toolbar */}
-      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="hidden lg:flex flex-wrap items-center gap-2 rounded-md bg-white p-3 shadow">
         <input
-          className="h-9 min-w-[320px] flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none transition focus:border-slate-400"
+          className="h-9 min-w-[260px] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm outline-none transition focus:border-slate-400"
           placeholder="ค้นหา รหัส / ชื่อ / สถานที่ / สาขา"
           type="search"
           value={search}
@@ -497,7 +497,7 @@ export function AssetRegisterPageClient() {
         />
         <div className="flex items-center gap-2">
           <select
-            className="h-9 w-auto min-w-[120px] rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
+            className="h-9 w-auto min-w-[120px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
           >
@@ -505,7 +505,7 @@ export function AssetRegisterPageClient() {
             {(data?.filters.categories ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
           <select
-            className="h-9 w-auto min-w-[120px] rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
+            className="h-9 w-auto min-w-[120px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none transition cursor-pointer focus:border-slate-400"
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
@@ -513,12 +513,12 @@ export function AssetRegisterPageClient() {
             {(data?.filters.statuses ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </div>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
           <LinkButton href="/api/finance-accounting/asset-register?template=csv">📄 Template CSV</LinkButton>
           <button
             type="button"
             onClick={openImport}
-            className="inline-flex h-9 items-center rounded-lg border border-slate-100 bg-slate-50 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 outline-none focus:ring-0"
+            className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 outline-none focus:ring-0"
           >
             📥 Import
           </button>
@@ -526,7 +526,7 @@ export function AssetRegisterPageClient() {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex h-9 items-center rounded-lg bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 outline-none focus:ring-0"
+            className="inline-flex h-9 items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 outline-none focus:ring-0"
           >
             + เพิ่มทรัพย์สิน
           </button>
@@ -2040,7 +2040,7 @@ function DisabledButton({ children, strong = false }: { children: ReactNode; str
 }
 
 function LinkButton({ children, href }: { children: ReactNode; href: string }) {
-  return <a className="inline-flex h-9 items-center rounded-lg border border-slate-100 bg-slate-50 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 outline-none focus:ring-0" href={href}>{children}</a>
+  return <a className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 transition hover:bg-slate-50 outline-none focus:ring-0" href={href}>{children}</a>
 }
 
 function Panel({ children, title }: { children: ReactNode; title: string }) {

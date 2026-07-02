@@ -6,6 +6,8 @@ Date: 2026-07-02
 Active app: `apps/next`
 Primary remote: `new-origin`
 
+Asset Register toolbar placement follow-up on 2026-07-02: `/finance-accounting/asset-register` now makes the desktop filter/action toolbar visually explicit as one card. The filter shell uses the standard `rounded-md bg-white p-3 shadow` surface, search/select controls use `rounded-md` `h-9` sizing, and Template CSV / Import / Export CSV / `+ Add Asset` stay right-aligned inside the same filter card instead of reading as a separate floating action row. This is UI-only; asset register filters, import/export URLs, create/import behavior, table sorting/resizing, APIs, permissions, and DB state were not changed.
+
 Financial Statements reset-control follow-up on 2026-07-02: `/finance-accounting/pl-statement`, `/finance-accounting/balance-sheet`, and `/finance-accounting/cash-flow-statement` now use the standard `h-9`, `rounded-md`, `text-sm`, `คืนค่าเดิมตาราง` reset-width controls in the shared statement table and drilldown modal. This is UI-only; report formulas, drilldown rows, filters, table sort/resize behavior, APIs, permissions, and DB state were not changed.
 
 Cash-flow Planning reset-control follow-up on 2026-07-02: `/finance-accounting/cash-flow-analysis` and `/finance-accounting/cf-forecast-calendar` now use the standard `h-9`, `rounded-md`, `text-sm`, `คืนค่าเดิมตาราง` reset-width controls across the detail, Top AR, Top AP, and day-event modal tables. This is UI-only; cash forecast formulas, AR/AP source rows, calendar state, filters, APIs, permissions, and DB state were not changed.
