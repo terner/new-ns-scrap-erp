@@ -2682,6 +2682,7 @@ model sales_bill_source_allocations {
   source_line_no          Int?
   source_id               BigInt?
   weight_ticket_id        BigInt?
+  weight_ticket_product_summary_id BigInt?
   stock_issue_id          BigInt?
   product_id              BigInt?
   product_code_snapshot   String
@@ -2704,11 +2705,13 @@ model sales_bill_source_allocations {
   sales_bills             sales_bills       @relation(fields: [sales_bill_id], references: [id], onUpdate: NoAction)
   sales_bill_lines        sales_bill_lines? @relation(fields: [sales_bill_line_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   stock_issues            stock_issues?     @relation(fields: [stock_issue_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  weight_ticket_product_summaries  weight_ticket_product_summaries? @relation(fields: [weight_ticket_product_summary_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "sales_bill_source_allocations_wto_summary_fkey")
   weight_tickets          weight_tickets?   @relation(fields: [weight_ticket_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([sales_bill_id, sales_line_no, status], map: "idx_sales_bill_source_allocations_bill_line_status")
   @@index([source_type, source_doc_no, status], map: "idx_sales_bill_source_allocations_source_status")
   @@index([weight_ticket_id, status], map: "idx_sales_bill_source_allocations_wto", where: raw("(weight_ticket_id IS NOT NULL)"))
+  @@index([weight_ticket_product_summary_id, status], map: "idx_sales_bill_source_allocations_wto_summary", where: raw("(weight_ticket_product_summary_id IS NOT NULL)"))
   @@index([stock_issue_id, status], map: "idx_sales_bill_source_allocations_psale", where: raw("(stock_issue_id IS NOT NULL)"))
   @@schema("public")
 }
@@ -2943,6 +2946,7 @@ model weight_ticket_product_summaries {
   container_deduction_weight          Decimal                               @default(0) @db.Decimal
   purchase_bill_receipt_allocations   purchase_bill_receipt_allocations[]
   products                            products                              @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  sales_bill_source_allocations       sales_bill_source_allocations[]
   weight_tickets                      weight_tickets                        @relation(fields: [weight_ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   weight_ticket_product_summary_lines weight_ticket_product_summary_lines[]
   weight_ticket_usage_logs            weight_ticket_usage_logs[]

@@ -11,7 +11,7 @@ tags:
   - decision
 status: draft
 created: 2026-05-24
-updated: 2026-06-24
+updated: 2026-07-01
 ---
 
 # Sales Flow / Flow ขาย
@@ -25,6 +25,9 @@ updated: 2026-06-24
 - เมื่อยกเลิก `SB` หรือรับของคืนจาก `WTO` หลังออกบิลบางส่วน ต้องคืน stock ด้วย unit cost/value เดิมที่ snapshot ตอนออกบิล แล้วให้ WAC ปัจจุบันคำนวณใหม่จาก stock ledger ปัจจุบันรวมรายการคืนเข้า
 - ถ้าระหว่างออกบิลกับยกเลิก/รับคืนมี PB/production/adjust เข้า stock เพิ่ม WAC หลังคืนอาจเปลี่ยนจาก WAC ตอนขาย เพราะ value เดิมของ SB ถูกนำกลับไปผสมกับ stock ปัจจุบัน
 - ถ้า `SB` ถูกยกเลิกก่อนมีการรับของคืน ให้ reopen `WTO pending_out` กลับมารอออกบิล; ถ้า `WTO` เคยรับของคืนแล้ว ให้ `SB-CANCEL` คืน stock ตรงด้วยต้นทุนเดิมของ `SB` และห้าม reopen `pending_out` ซ้ำ
+- `SB` ที่ขายจาก `WTO` อาจแยก SKU ขายจริงไม่ตรงกับ SKU ที่ส่งออกได้ เช่น หน้างานตีว่าสินค้าบางส่วนเป็น SKU อื่น; ระบบต้องเก็บ SKU ขายจริงที่ `sales_bill_lines` แต่ source/cost ยังอ้าง `WTO` เดิมผ่าน `sales_bill_source_allocations.weight_ticket_product_summary_id`
+- `WTO` ที่ถูกนำไปใช้ใน `SB` แล้วต้องแก้ไขไม่ได้ เพราะ `SB` ใช้ pending_out/source/cost snapshot จากเอกสารนั้นเป็น audit trail
+- `SB` ที่มีรายการรับเงิน Customer active แล้วต้องแก้ไขไม่ได้; ถ้าต้องปรับยอดหลังรับเงิน ต้องไปจัดการ reversal/cancel flow ของ receipt ก่อน ไม่แก้บิลย้อนหลังกระทบ AR
 - flow `Pending Sale / PSALE / เบิกออกรอบิล` ถูกถอดจาก target runtime แล้ว ไม่ใช้เป็นเอกสารคั่นกลางระหว่าง WTO กับ SB
 - Customer ใน PO Sell, WTO, Sales Bill, Receipt/AR ต้องเลือกจาก active `customer_branches` ของสาขาเอกสารเท่านั้น; ไม่มี mapping ต้องไม่แสดงเป็น option และ API ต้อง reject โดยไม่ fallback เป็นทุกสาขา
 - ถ้าต้องออกเอกสารส่งของ/น้ำหนักขาออก ให้ใช้ `ใบส่งของ / Weight Ticket Out` เลขเอกสาร `WTO{branchCode}{YYMM}-NNNN`; ไม่มีเลข `WT` เดี่ยวใน target
@@ -117,7 +120,24 @@ updated: 2026-06-24
 - `WTO` ที่ถูกใช้แล้วต้อง `แก้ไขไม่ได้` และ `ยกเลิกไม่ได้`
 - `WTO` ที่ออกบิลบางส่วนต้องใช้ action `รับของคืน` สำหรับ remaining `pending_out`; remaining นี้ห้ามนำไปเปิดบิลขายใบอื่น
 - ตอน `รับของคืน` ต้องให้ผู้ใช้กรอกน้ำหนักที่ชั่งกลับมาจริงและยืนยันก่อน ระบบจึงคืน stock เข้า available
+- `SB` ที่มี `customer_receipt_allocations` active แล้วต้อง `แก้ไขไม่ได้` และ `ยกเลิกไม่ได้` เพื่อไม่ให้ยอดรับเงิน/ลูกหนี้และ audit trail ของ receipt เพี้ยน; ถ้าข้อมูลเก่ามีแต่ legacy receipt ต้อง repair/migrate เข้าสัญญาใหม่ ไม่ใช้ runtime fallback
 - ต้นทุนรับคืนต้องใช้ WAC/cost per unit ณ ตอนออกบิลขายที่ snapshot ไว้บน `SB`/stock ledger ไม่ใช้ WAC ปัจจุบันหรือราคาขาย
+
+### WTO -> SB Source Allocation Contract
+
+เมื่อเปิด `SB` จาก `WTO` ให้แยกข้อมูลออกเป็น 2 แกน:
+
+| แกนข้อมูล | ตารางหลัก | ความหมาย |
+|---|---|---|
+| สินค้าที่ขายจริง | `sales_bill_lines.product_id/product_code_snapshot/product_name_snapshot` | SKU ที่ลูกค้าตี/ยอมซื้อจริงในบิลขาย ใช้กับราคา, ส่วนลด, VAT, GP และเอกสารขาย |
+| แหล่ง stock/cost | `sales_bill_source_allocations.weight_ticket_product_summary_id` | Summary ของสินค้าใน `WTO` เดิมที่ถูกกันเป็น `pending_out` และใช้เป็นต้นทุน/COGS source |
+
+กติกา:
+
+- ถ้าแตกแถวจาก `WTO` ใน `SB` แถวใหม่ default เป็นสินค้าเดิม แต่ผู้ใช้เปลี่ยน SKU ขายจริงได้
+- การเปลี่ยน SKU ใน `SB` ไม่แก้ `WTO`, `stock_holds`, หรือ stock/cost source เดิมย้อนหลัง
+- `sales_bill_source_allocations.source_line_no` หมายถึง line ของเอกสารต้นทางจริงเท่านั้น; allocation ระดับ summary ที่ไม่มี line ชัดเจนให้เป็น `null` ไม่ใช้เลขแถวของ `SB`
+- `sales_bill_source_allocations.meta.deliverySummaryId` ยังเป็น outward id สำหรับ form snapshot/read UI แต่ FK จริงในการ trace source คือ `weight_ticket_product_summary_id`
 - หลังรับคืนแล้ว WAC ปัจจุบันของ bucket อาจเปลี่ยน เพราะต้นทุนเดิมของ SB ถูกคืนเข้าไปผสมกับ stock ปัจจุบันที่อาจมี PB/production/adjust เกิดขึ้นระหว่างทาง
 - `WTO` ที่ยังไม่ถูกใช้เปิดบิลขายยังคงอยู่สถานะ `ส่งของแล้ว` และยังอนุญาตให้แก้ไข/ยกเลิกได้ตามสิทธิ์
 - ถ้าแก้ไขก่อนถูกใช้ ต้อง rebuild `pending_out`
@@ -528,6 +548,14 @@ AR contract:
 | ประวัติสถานะ | แยก status logs ตามเอกสาร เช่น `po_sell_status_logs`, `weight_ticket_status_logs`, `sales_bill_status_logs`, `receipt_status_logs` ตาม [[Document History Table Design]] |
 | ประวัติการใช้งาน/ตัดยอด | แยก usage/allocation logs และ fact tables ตาม flow เช่น `po_sell_allocation_logs`, `receipt_allocations`, `weight_ticket_usage_logs` สำหรับ WTO |
 | Summary/KPI | maintained summary current tables |
+
+### Sales Bill Detail History
+
+- หน้า detail ของบิลขายต้องใช้ `ประวัติสถานะ SB` เป็น audit surface หลักเหมือนแนวคิดของใบส่งของ ไม่แยกข้อมูล usage เป็นกล่อง debug ถาวร
+- ข้อมูลการใช้ต้นทางสินค้า/ต้นทุน เช่น WTO usage, PO Sell allocation, Trading allocation, และ Customer advance allocation ให้แสดงเป็นตารางยุบ/ขยายชื่อ `ต้นทางสินค้าและต้นทุน` ภายใน timeline
+- ตารางนี้เป็นข้อมูลของบิลขายโดยตรง ไม่ใช่ประวัติ stock hold ดิบ: ต้องแสดง line สินค้าที่ขาย, เอกสารต้นทาง, จำนวนที่ใช้, ต้นทุน/COGS, สถานะ allocation/usage, และเวลาเกิด fact
+- ถ้า Sales Bill line ขาย SKU จริงต่างจาก SKU ต้นทางของ WTO ให้แสดงข้อความ `คัดแยกจาก: <สินค้าเดิม>` ในรายการสินค้า เพื่อให้ audit เข้าใจว่าลูกค้าคัดแยกสินค้าจากแถว WTO เดิม ไม่ใช่การแก้ WTO ย้อนหลัง
+- ไม่ควรเปลี่ยน source/cost identity ของ WTO หรือ stock hold จาก UI detail; detail เป็น read model เพื่ออธิบายความสัมพันธ์ของ SB กับ source เท่านั้น
 
 ## งาน Implementation ที่ตามมา
 
