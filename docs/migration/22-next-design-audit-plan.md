@@ -272,9 +272,15 @@ The absence of a static finding is not a visual pass. These still need browser r
 - 2026-07-02 transaction-bill modal follow-up: the Purchase Bill create/edit modal shell now explicitly prevents border/focus leakage with `overflow-hidden`, `border-0`, and outline suppression, and the footer actions now match the modal baseline: outline secondary cancel and slate primary `บันทึก` for normal saves. The shared cancel dialog no longer renders a duplicate header close button when `hideClose` is already set. Browser QA remains pending because this batch was local code/layout validation only.
 - Remaining follow-up: run desktop/mobile browser QA for `/purchase/bills` create/edit/detail/cancel visual confirmation when the selected visual batch reaches browser verification.
 
+### `/purchase/po-buy`
+
+- 2026-07-02 modal polish checkpoint: the PO Buy create/edit modal, detail modal, cancel dialog, and short-close dialog now follow the `rounded-md` dark-header modal baseline with `!p-0`, `border-0`, `overflow-hidden`, outline suppression, no duplicate corner close button, white footer, outline close/cancel controls, and slate `บันทึก` for normal form saves. The add-line action is normal `h-9`, and inner form summary/table cards use `rounded-md` where they were drifting to larger radii. Runtime PO Buy API behavior, remaining/reconciliation logic, Cost Pool availability, PB allocation, stock, AP, VAT, print behavior, and DB state were not changed. Browser/computer-use QA was not run per user instruction.
+- Remaining follow-up: run desktop/mobile browser QA for PO Buy create/edit/detail/cancel/short-close visual confirmation when browser verification is re-enabled.
+
 ### `/sales/po-sell`
 
 - 2026-07-01 implementation checkpoint: the PO Sell list already had the page-specific Thai headers and hidden unavailable edit/cancel actions; this pass finished the remaining table/modal drift by aligning the desktop table shell with the lined table baseline, letting the final action column auto-stretch, replacing fixed `colSpan={15}` with the column definition count, and normalizing the create/edit, cancel, and detail dialogs to the `rounded-md` dark-header modal baseline with no outer border/outline leakage. The detail subtitle now keeps readable slate-300 contrast in dark mode. Browser QA remains pending because this batch was local code/layout validation only.
+- 2026-07-02 modal polish follow-up: the PO Sell form, cancel, and detail dialogs now remove duplicate header close buttons when `hideClose` is already set; form footer actions now use outline cancel plus slate primary `บันทึก`; cancel/detail footers use the white footer baseline; the cancel dialog no longer uses `rounded-t-2xl` for the bottom-sheet shell. Runtime PO Sell API behavior, match status, Sales Bill allocation, Cost Allocator, stock, AR, VAT, print behavior, and DB state were not changed. Browser/computer-use QA was not run per user instruction.
 - Remaining follow-up: run desktop/mobile browser QA for PO Sell when the selected visual batch reaches browser verification.
 
 ### `/purchase/payments`
@@ -750,7 +756,7 @@ After the `/daily/expense-dashboard` follow-up, tracked `apps/next/src` TS/TSX f
 ### Updated Suggested Fix Order
 
 1. No remaining high-confidence operational static inconsistency is currently listed after the final static table-mechanics classification. The listed operational pages are now in browser QA / real-data visual confirmation rather than another static rewrite.
-2. Normalize shared operational modal surfaces by component family: `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, `PoSellPageClient`, `StockOperationPageClient`, tracking pages, then trading pages. `DailyExpensePageClient` has a table-mechanics follow-up checkpoint and should move to browser QA rather than another static rewrite.
+2. Normalize shared operational modal surfaces by component family: `StockOperationPageClient`, tracking pages, then trading pages. `TransactionBillsPageClient`, `MoneyMovementPageClient`, `PoBuyPageClient`, and `PoSellPageClient` now have static modal polish checkpoints and remain in browser QA rather than another static rewrite. `DailyExpensePageClient` has a table-mechanics follow-up checkpoint and should move to browser QA rather than another static rewrite.
 3. Foreign-finance static table mechanics sweep is corrected for `/finance/foreign/fx-gain-loss-report`, `/finance/foreign/fcd-ledger`, `/finance/foreign/fx-rate`, `/finance/foreign/intl-transfer`, and `/finance/foreign/overseas-receipt`; remaining work is browser QA / real-data visual confirmation, not another high-confidence static table rewrite.
 4. Review `type="number"` only inside the touched page batch using the design matrix; do not run a broad replacement sweep.
 5. Run browser QA desktop + mobile for the selected batch before claiming visual completion.
