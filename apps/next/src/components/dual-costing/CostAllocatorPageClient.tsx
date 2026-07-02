@@ -597,15 +597,16 @@ export function CostAllocatorPageClient() {
 
       {hasSelection ? (
         <DualCostingPanel title="③ Lot ต้นทุนใน Cost Pool ของสินค้าที่เลือก">
-          {poolColumnResize.hasCustomWidths ? (
-            <div className="mb-3 flex justify-end">
-              <Button className="h-8 text-xs" size="sm" type="button" variant="outline" onClick={poolColumnResize.resetColumnWidths}>
-                คืนค่าเดิมตาราง
-              </Button>
-            </div>
-          ) : null}
-          <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm md:block">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: poolColumnResize.tableMinWidth }}>
+          <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm md:block">
+            {poolColumnResize.hasCustomWidths ? (
+              <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+                <Button className="h-8 text-xs" size="sm" type="button" variant="outline" onClick={poolColumnResize.resetColumnWidths}>
+                  คืนค่าเดิมตาราง
+                </Button>
+              </div>
+            ) : null}
+            <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: poolColumnResize.tableMinWidth, width: '100%' }}>
               <colgroup>
                 {poolColumns.map((column) => (
                   <col key={column.key} style={poolColumnResize.getColumnStyle(column.key)} />
@@ -638,6 +639,7 @@ export function CostAllocatorPageClient() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="space-y-3 md:hidden">
@@ -670,15 +672,16 @@ export function CostAllocatorPageClient() {
 
       {showPreview && hasCandidates ? (
         <DualCostingPanel title="④ Preview การจับคู่ต้นทุน">
-          {previewColumnResize.hasCustomWidths ? (
-            <div className="mb-3 flex justify-end">
-              <Button className="h-8 text-xs" size="sm" type="button" variant="outline" onClick={previewColumnResize.resetColumnWidths}>
-                คืนค่าเดิมตาราง
-              </Button>
-            </div>
-          ) : null}
-          <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm md:block">
-            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: previewColumnResize.tableMinWidth }}>
+          <div className="hidden overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm md:block">
+            {previewColumnResize.hasCustomWidths ? (
+              <div className="flex justify-end border-b border-slate-100 px-3 py-3">
+                <Button className="h-8 text-xs" size="sm" type="button" variant="outline" onClick={previewColumnResize.resetColumnWidths}>
+                  คืนค่าเดิมตาราง
+                </Button>
+              </div>
+            ) : null}
+            <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm" style={{ tableLayout: 'fixed', minWidth: previewColumnResize.tableMinWidth, width: '100%' }}>
               <colgroup>
                 {previewColumns.map((column) => (
                   <col key={column.key} style={previewColumnResize.getColumnStyle(column.key)} />
@@ -709,6 +712,7 @@ export function CostAllocatorPageClient() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="space-y-3 md:hidden">
