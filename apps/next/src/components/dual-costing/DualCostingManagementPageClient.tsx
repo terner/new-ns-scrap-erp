@@ -295,12 +295,8 @@ function WaitingAllocationsView() {
 
   return (
     <DualCostingPageSection>
-      <DualCostingHint tone="amber">
-        Waiting Allocation Queue ใช้ดึงข้อมูลทองแดง/ทองเหลืองจาก PO ขาย, บิลขาย และ Production มาแยกเป็น tab เพื่อให้ผู้ใช้เลือกเอกสารแล้วส่งต่อไปหน้า Cost Allocator
-      </DualCostingHint>
       <DualCostingErrorBox error={error} />
-      <DualCostingWorkflowStrip active="waiting" />
-      
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <DualCostingStatCard icon="⏳" label="รายการที่รอส่งต่อ" tone="amber" value={String(data?.summary.count ?? 0)} />
         <DualCostingStatCard icon="❌" label="ยังไม่ส่งจัดสรร" tone="red" value={String(data?.summary.fullyPending ?? 0)} />
